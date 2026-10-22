@@ -204,12 +204,22 @@ private fun categoryPalette(night: Boolean): Map<String, TonePair> {
     val violet = t(0xFF8B5CF6, 0xFF7848E0)
     val sky = t(0xFF0EA5E9, 0xFF0B8CC7)
     val income = t(0xFF16A34A, 0xFF15803D)
-    return mapOf(
-        "groceries" to coral, "dining" to coral,
-        "transport" to green, "travel" to sky,
-        "shopping" to rose, "personal" to rose, "gift" to rose,
-        "utilities" to amber, "housing" to blue,
-        "health" to teal, "education" to indigo, "subscriptions" to indigo, "entertainment" to violet,
+    // One hue per family of spending, matching the preset groups (see domain/CategoryPresets.kt).
+    val families = mapOf(
+        coral to listOf("groceries", "dining", "cafe", "takeout", "work_meals", "convenience"),
+        green to listOf("transport", "fuel", "taxi", "parking", "car", "repairs", "registration", "bicycle"),
+        sky to listOf("travel", "hotel", "outdoor", "business_travel"),
+        rose to listOf("shopping", "personal", "gift", "grooming", "childcare", "baby", "pets", "family"),
+        amber to listOf("utilities", "water", "heating", "internet", "phone"),
+        blue to listOf("housing", "mortgage", "insurance", "maintenance", "home_supplies", "furniture", "security"),
+        teal to listOf("health", "dental", "vision", "pharmacy", "wellbeing", "fitness", "sports"),
+        indigo to listOf("education", "tuition", "subscriptions", "streaming", "books", "home_office", "membership", "certification", "work_expenses"),
+        violet to listOf("entertainment", "hobbies", "games", "social"),
+        t(0xFF64748B, 0xFF56637D) to listOf("tax", "fees", "bank_fees", "loan", "credit_card", "debt", "legal", "supplies"),
+        t(0xFF0F766E, 0xFF0E6B63) to listOf("savings", "emergency", "retirement", "investing"),
+        t(0xFFDB2777, 0xFFBE2468) to listOf("donation", "community"),
+    )
+    return families.flatMap { (tone, keys) -> keys.map { it to tone } }.toMap() + mapOf(
         "work" to income, "business" to income, "investments" to income, "refund" to income, "income" to income,
     )
 }

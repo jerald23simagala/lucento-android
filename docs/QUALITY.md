@@ -2,6 +2,17 @@
 
 Rule: a check counts only if it actually ran and passed. Anything not executed is listed as **NOT VERIFIED**.
 
+## v0.5.0 verification status (authoring session, 2026-10-22)
+
+| Check | Result | How |
+|---|---|---|
+| JVM unit tests | **253 passed, 0 failed** (38 new: category budget plan, health thresholds, burn consistency, presets/selection, existing-user setup, allocations, legacy overall, goals level, net worth composition, trends, upcoming payments, Home state) | `tools/jvm-harness/run.sh` (kotlinc 2.0.21, JUnit 4.13.2, Room annotation stubs, `runTest` → `runBlocking`). Not Gradle. |
+| Migration SQL vs schemas | **1→2, 2→3 match** — no schema change in 0.5 (database stays v3) | `python3 tools/check_migrations.py` |
+| New Lottie (mascot `concerned`, net-flow glyphs) | **Render without errors in lottie-web** | previews in `docs/design/` |
+| Kotlin/Compose compilation, lint, release APK/AAB | **NOT VERIFIED locally** — no Android SDK/Maven access | CI on push (`feature/**` branches now trigger it) |
+| Instrumented migration tests + `ScreenshotTourTest` | **NOT VERIFIED locally** | CI emulator job (API 30, Pixel 6 profile); screenshots uploaded as the `ui-screenshots` artifact |
+| Screenshot comparison with the mockup | **NOT DONE** until the CI screenshots exist | review `ui-screenshots` against `docs/design-reference/lucento-mock.png` |
+
 ## v0.4.0 verification status (authoring session, 2026-10-22)
 
 | Check | Result | How |
@@ -26,7 +37,9 @@ export) → schema committed and unchanged (`git diff --exit-code app/schemas`) 
 → size table in the run summary → artifacts (debug APK, release AAB/APK + R8 mapping, schemas, reports).
 
 Job **migrations** (needs build): fails immediately if schema history is incomplete, otherwise boots an API 30 x86_64
-emulator and runs `MigrationTest` with `connectedDebugAndroidTest`. No `continue-on-error` anywhere: a red job means
+emulator (Pixel 6 profile) and runs `MigrationTest`, then `ScreenshotTourTest` — a fresh install walked through
+mandatory category onboarding, every dock destination, the + / More / Profile sheets, light and dark, with assertions
+on the budget total and the mascot state — and uploads its screenshots (`ui-screenshots` artifact). No `continue-on-error` anywhere: a red job means
 something did not pass.
 
 ## Lint policy

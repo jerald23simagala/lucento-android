@@ -24,7 +24,8 @@ app/src/main/java/com/lucento/app/
   data/repository/     Repositories mapping entities <-> domain, enforcing validation
   domain/              Pure Kotlin models and calculators (unit-tested, no Android deps)
   feature/<name>/      Screen + ViewModel per feature
-  navigation/          LucentoRoot, routes, bottom navigation (Home · Transactions · Add · Insights · More; the rest pushed)
+  navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · Wallets · Insights · Budget + More menu),
+                       app-wide + Add sheet (Manual · Scan · Speak · Type it), profile menu (Settings lives there)
 ```
 - Dependency wiring: `AppContainer` in `LucentoApplication` (manual DI). ViewModels use `containerFactory`.
 - Keep financial logic in `domain/` or `core/money/` as pure functions so it is testable on the JVM.
@@ -35,13 +36,18 @@ app/src/main/java/com/lucento/app/
 - Use `Math.addExact`-style arithmetic; overflow must throw, not wrap.
 - Parse user input only through `MoneyParser`.
 - Transfers are a single atomic DB transaction producing two linked legs (`transfer_group`); never double-count.
-- Financial definitions (Safe to spend, burn rate, net flow, budgets, goals, debts) live in `docs/CALCULATIONS.md`.
+- Financial definitions (budget, burn rate, net flow, goals, net worth, debts) live in `docs/CALCULATIONS.md`.
+- **The overall budget is always the sum of category allocations** (`BudgetPlanner`), per currency and calendar month.
+  Never add a separately editable overall amount; legacy "everything" rows are ignored. Home, Budget and Insights read
+  the same `BudgetPlan`.
 - Guard against duplicate submissions (in-flight flags, idempotency keys for imports).
 
 ## Database
 - `exportSchema = true`; schemas land in `app/schemas/` and **are committed** (1–3 recovered from CI artifacts).
   CI fails if the exported schema differs from the committed one. Never hand-write a schema JSON.
 - Wallet type/currency edits go through `WalletChangePolicy`; categories in use are archived, never deleted.
+- Fresh installs seed income categories only; expense categories come from the mandatory onboarding step
+  (`CategoryPresets` + `CategorySelection`). `DefaultCategories.all` is frozen (MIGRATION_1_2 depends on it).
 - Every version bump needs an explicit `Migration` plus a migration test. Never enable destructive fallback.
 
 ## Privacy & cost
@@ -71,7 +77,9 @@ app/src/main/java/com/lucento/app/
 
 ## Quality
 - Write JVM unit tests for every financial calculation and critical workflow (`app/src/test`).
-- Run `./gradlew testDebugUnitTest assembleDebug` before pushing.
+- Run `./gradlew testDebugUnitTest assembleDebug` before pushing. Without the Android SDK, `tools/jvm-harness/run.sh`
+  compiles and runs the Android-free code and all JVM tests (a fallback, not a replacement for CI).
+- `ScreenshotTourTest` (androidTest, run by CI on an emulator) walks the main flows and saves screenshots for review.
 - Never claim a build or test passed without seeing it pass (locally or in GitHub Actions).
 - Fix defects instead of hiding them. Keep `docs/ROADMAP.md` and `README.md` current.
 

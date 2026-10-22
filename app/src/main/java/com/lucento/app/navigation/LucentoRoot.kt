@@ -6,12 +6,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,37 +24,37 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.PieChart
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -69,12 +69,13 @@ import com.lucento.app.AppViewModel
 import com.lucento.app.core.designsystem.component.Confirmation
 import com.lucento.app.core.designsystem.component.ConfirmationHost
 import com.lucento.app.core.designsystem.component.EmptyState
-import com.lucento.app.core.designsystem.component.Hairline
+import com.lucento.app.core.designsystem.component.LocalProfileChrome
 import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
+import com.lucento.app.core.designsystem.component.ProfileChrome
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
@@ -85,20 +86,25 @@ import com.lucento.app.domain.FeatureSet
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.capture.QuickEntryProposal
-import com.lucento.app.feature.capture.QuickAddScreen
+import com.lucento.app.feature.budget.BudgetScreen
+import com.lucento.app.feature.budget.CategorySetupScreen
+import com.lucento.app.feature.budget.ManageCategoriesScreen
+import com.lucento.app.feature.capture.AddMethod
+import com.lucento.app.feature.capture.AddTransactionSheet
 import com.lucento.app.feature.capture.ReceiptResult
 import com.lucento.app.feature.capture.ReceiptScanScreen
 import com.lucento.app.feature.capture.VoiceEntryScreen
 import com.lucento.app.feature.home.HomeActions
 import com.lucento.app.feature.home.HomeScreen
 import com.lucento.app.feature.insights.InsightsScreen
-import com.lucento.app.feature.more.MoreScreen
+import com.lucento.app.feature.more.MoreDestination
+import com.lucento.app.feature.more.MoreSheet
 import com.lucento.app.feature.onboarding.OnboardingScreen
-import com.lucento.app.feature.plan.BudgetsScreen
 import com.lucento.app.feature.plan.DebtsScreen
 import com.lucento.app.feature.plan.GoalsScreen
-import com.lucento.app.feature.plan.PlanScreen
 import com.lucento.app.feature.plan.RecurringScreen
+import com.lucento.app.feature.profile.ProfileDestination
+import com.lucento.app.feature.profile.ProfileSheet
 import com.lucento.app.feature.settings.EnabledFeaturesScreen
 import com.lucento.app.feature.settings.SettingsScreen
 import com.lucento.app.feature.transactions.TransactionDraft
@@ -113,50 +119,67 @@ import com.lucento.app.feature.wallets.WalletsScreen
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
+import kotlin.reflect.KClass
 
-// Primary destinations (bottom navigation).
+// Primary destinations: the five tabs of the navigation dock.
 @Serializable data object HomeRoute
 @Serializable data object TransactionsRoute
-@Serializable data object QuickAddRoute
-@Serializable data object InsightsRoute
-@Serializable data object MoreRoute
-
-// Pushed destinations.
 @Serializable data object WalletsRoute
+@Serializable data object InsightsRoute
+@Serializable data object BudgetRoute
+
+// Secondary destinations, pushed on top of the current tab; the dock stays visible.
 @Serializable data class WalletDetailRoute(val walletId: Long)
-@Serializable data object PlanRoute
-@Serializable data object BudgetsRoute
 @Serializable data object GoalsRoute
 @Serializable data object DebtsRoute
-@Serializable data object RecurringRoute
+@Serializable data class RecurringRoute(val scheduleId: Long = NO_SCHEDULE)
+@Serializable data object CategoriesRoute
+
+// Focused workflows: full screen, the dock is hidden.
+@Serializable data object CategorySetupRoute
 @Serializable data object SettingsRoute
 @Serializable data object FeaturesRoute
 @Serializable data object ScanReceiptRoute
-@Serializable data object VoiceEntryRoute
+@Serializable data class VoiceEntryRoute(val typing: Boolean = false)
 
-private data class TopLevelDestination(
-    val route: Any,
-    val label: String,
-    val selectedIcon: ImageVector,
-    val icon: ImageVector,
-    val isAdd: Boolean = false,
-)
+const val NO_SCHEDULE = -1L
 
-/*
- * Five primary destinations: Home · Transactions · Add · Insights · More. Insights disappears from the
- * bar when the user turns it off; everything else secondary (Wallets, Plan and its screens, Settings)
- * lives behind More and is pushed on top, hiding the bar.
+private data class Tab(val item: DockItem, val route: Any)
+
+/**
+ * The navigation dock: Home · Transactions · Wallets · Insights · Budget, then a "More" menu. Insights and Budget leave
+ * the dock when the user switches those modules off (their data is kept).
  */
-private fun topLevelDestinations(features: FeatureSet): List<TopLevelDestination> = listOfNotNull(
-    TopLevelDestination(HomeRoute, "Home", Icons.Filled.Home, Icons.Outlined.Home),
-    TopLevelDestination(TransactionsRoute, "Transactions", Icons.AutoMirrored.Filled.ReceiptLong, Icons.AutoMirrored.Outlined.ReceiptLong),
-    TopLevelDestination(QuickAddRoute, "Add", Icons.Filled.Add, Icons.Filled.Add, isAdd = true),
-    if (features.isEnabled(Feature.INSIGHTS)) TopLevelDestination(InsightsRoute, "Insights", Icons.Filled.Insights, Icons.Outlined.Insights) else null,
-    TopLevelDestination(MoreRoute, "More", Icons.Filled.MoreHoriz, Icons.Outlined.MoreHoriz),
+private fun tabs(features: FeatureSet): List<Tab> = listOfNotNull(
+    Tab(DockItem("home", "Home", Icons.Outlined.Home, Icons.Filled.Home), HomeRoute),
+    Tab(DockItem("transactions", "Transactions", Icons.AutoMirrored.Outlined.ReceiptLong, Icons.AutoMirrored.Filled.ReceiptLong), TransactionsRoute),
+    Tab(DockItem("wallets", "Wallets", Icons.Outlined.AccountBalanceWallet, Icons.Filled.AccountBalanceWallet), WalletsRoute),
+    if (features.isEnabled(Feature.INSIGHTS)) Tab(DockItem("insights", "Insights", Icons.Outlined.Insights, Icons.Filled.Insights), InsightsRoute) else null,
+    if (features.isEnabled(Feature.BUDGETS)) Tab(DockItem("budget", "Budget", Icons.Outlined.PieChart, Icons.Filled.PieChart), BudgetRoute) else null,
 )
 
-private fun NavDestination?.isTopLevel(destinations: List<TopLevelDestination>): Boolean =
-    this?.hierarchy?.any { d -> destinations.any { d.hasRoute(it.route::class) } } == true
+private val PrimaryRoutes: List<Pair<String, KClass<out Any>>> = listOf(
+    "home" to HomeRoute::class,
+    "transactions" to TransactionsRoute::class,
+    "wallets" to WalletsRoute::class,
+    "insights" to InsightsRoute::class,
+    "budget" to BudgetRoute::class,
+)
+
+/** Workflows that take the whole screen (capture, category setup, settings): the dock steps aside. */
+private val FocusedRoutes: List<KClass<out Any>> = listOf(
+    CategorySetupRoute::class,
+    SettingsRoute::class,
+    FeaturesRoute::class,
+    ScanReceiptRoute::class,
+    VoiceEntryRoute::class,
+)
+
+private fun NavDestination?.primaryKey(): String? =
+    this?.hierarchy?.firstNotNullOfOrNull { d -> PrimaryRoutes.firstOrNull { d.hasRoute(it.second) }?.first }
+
+private fun NavDestination?.isFocused(): Boolean =
+    this?.hierarchy?.any { d -> FocusedRoutes.any { d.hasRoute(it) } } == true
 
 /** Switches between first-run onboarding and the main app once preferences are known. */
 @Composable
@@ -173,16 +196,16 @@ fun LucentoRoot(preferences: UserPreferences) {
 @Composable
 private fun MainScaffold(preferences: UserPreferences, navController: NavHostController = rememberNavController()) {
     val features = preferences.features
-    val destinations = topLevelDestinations(features)
+    val tabs = tabs(features)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
-    val haptics = rememberHaptics()
     val reducedMotion = LucentoTheme.reducedMotion
+    val haptics = rememberHaptics()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val appViewModel: AppViewModel = viewModel(factory = AppViewModel.Factory)
 
-    // One transaction editor for the whole app (Home, Add, account screens, history, scan and voice).
+    // One transaction editor for the whole app (the + sheet, wallet screens, history, scan, speak and type).
     val editorViewModel: TransactionEditorViewModel = viewModel(factory = TransactionEditorViewModel.Factory)
     val editorState by editorViewModel.state.collectAsStateWithLifecycle()
     var editorDraft by remember { mutableStateOf<TransactionDraft?>(null) }
@@ -192,6 +215,16 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     val separator = remember { MoneyFormatter.decimalSeparator() }
     // Set only from a save callback that reported success, i.e. after the database write committed.
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
+
+    var showAdd by rememberSaveable { mutableStateOf(false) }
+    var showMore by rememberSaveable { mutableStateOf(false) }
+    var showProfile by rememberSaveable { mutableStateOf(false) }
+    // The tab a pushed screen belongs to, so the dock keeps it highlighted (e.g. Goals opened from Home).
+    var selectedTab by rememberSaveable { mutableStateOf("home") }
+
+    LaunchedEffect(currentDestination) {
+        currentDestination.primaryKey()?.let { selectedTab = it }
+    }
 
     fun navigateTo(route: Any) {
         navController.navigate(route) {
@@ -212,15 +245,17 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         }
     }
 
-    // If Insights is turned off while it is showing, return Home rather than show a hidden module.
+    // A tab whose module is switched off while it is showing returns to Home rather than show a hidden module.
     LaunchedEffect(features) {
-        val onInsights = navController.currentDestination?.hierarchy?.any { it.hasRoute(InsightsRoute::class) } == true
-        if (onInsights && !features.isEnabled(Feature.INSIGHTS)) navigateTo(HomeRoute)
+        val key = navController.currentDestination.primaryKey()
+        if ((key == "insights" && !features.isEnabled(Feature.INSIGHTS)) || (key == "budget" && !features.isEnabled(Feature.BUDGETS))) {
+            navigateTo(HomeRoute)
+        }
     }
 
     fun requireWallets(): Boolean {
         if (editorState.loaded && editorState.wallets.isEmpty()) {
-            push(WalletsRoute)
+            navigateTo(WalletsRoute)
             notify("Add a wallet first — every transaction belongs to one.")
             return false
         }
@@ -236,7 +271,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     fun openTransfer(from: Long? = null, to: Long? = null) {
         if (!requireWallets()) return
         if (editorState.loaded && editorState.wallets.size < 2) {
-            push(WalletsRoute)
+            navigateTo(WalletsRoute)
             notify("Add a second account to move money between them.")
             return
         }
@@ -253,6 +288,15 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         } else {
             editorNote = null
             editorDraft = transaction.toDraft()
+        }
+    }
+
+    fun startAdd(method: AddMethod) {
+        when (method) {
+            AddMethod.MANUAL -> openNew(TransactionType.EXPENSE)
+            AddMethod.SCAN -> push(ScanReceiptRoute)
+            AddMethod.SPEAK -> push(VoiceEntryRoute(typing = false))
+            AddMethod.TYPE -> push(VoiceEntryRoute(typing = true))
         }
     }
 
@@ -295,6 +339,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
 
     val enableFeature: (Feature) -> Unit = { appViewModel.setFeatureEnabled(it, true) }
     val back: () -> Unit = { navController.popBackStack() }
+    val focused = currentDestination.isFocused()
+    val onPrimary = currentDestination == null || currentDestination.primaryKey() != null
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -308,177 +354,190 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 )
             }
         },
+        floatingActionButton = {
+            // The app-wide "+ Add transaction", on every primary screen.
+            AnimatedVisibility(
+                visible = onPrimary && !focused,
+                enter = scaleIn(tween(if (reducedMotion) 0 else 180)) + fadeIn(),
+                exit = scaleOut(tween(if (reducedMotion) 0 else 120)) + fadeOut(),
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        haptics.tick()
+                        showAdd = true
+                    },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add transaction", modifier = Modifier.size(28.dp))
+                }
+            }
+        },
         bottomBar = {
             AnimatedVisibility(
-                visible = currentDestination == null || currentDestination.isTopLevel(destinations),
+                visible = !focused,
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut(),
             ) {
-                Column {
-                    Hairline()
-                    NavigationBar(
-                        containerColor = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLowest,
-                        tonalElevation = 0.dp,
-                    ) {
-                        destinations.forEach { destination ->
-                            val selected = currentDestination?.hierarchy?.any { it.hasRoute(destination.route::class) } == true
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = {
-                                    if (!selected) haptics.tick()
-                                    navigateTo(destination.route)
-                                },
-                                icon = {
-                                    if (destination.isAdd) {
-                                        // The capture action stands out as a filled circle, as in the mockup.
-                                        Box(
-                                            Modifier
-                                                .size(44.dp)
-                                                .background(MaterialTheme.colorScheme.primary, CircleShape),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
-                                        }
-                                    } else {
-                                        Icon(if (selected) destination.selectedIcon else destination.icon, contentDescription = null)
-                                    }
-                                },
-                                label = { Text(destination.label, style = MaterialTheme.typography.labelMedium, maxLines = 1) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = if (destination.isAdd) Color.Transparent else MaterialTheme.colorScheme.primaryContainer,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
+                NavigationDock(
+                    items = tabs.map { it.item },
+                    selectedKey = selectedTab,
+                    onSelect = { item ->
+                        val tab = tabs.first { it.item.key == item.key }
+                        selectedTab = item.key
+                        navigateTo(tab.route)
+                    },
+                    onMore = { showMore = true },
+                )
+            }
+        },
+    ) { innerPadding ->
+        CompositionLocalProvider(LocalProfileChrome provides ProfileChrome(preferences.displayName) { showProfile = true }) {
+            Box(Modifier.fillMaxSize().padding(innerPadding)) {
+                NavHost(
+                    navController = navController,
+                    startDestination = HomeRoute,
+                    modifier = Modifier.fillMaxSize(),
+                    // Tab switches fade through; pushed screens slide in from the trailing edge.
+                    enterTransition = { if (reducedMotion) fadeIn(tween(0)) else fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.985f) },
+                    exitTransition = { fadeOut(tween(if (reducedMotion) 0 else 120)) },
+                ) {
+                    composable<HomeRoute> {
+                        HomeScreen(
+                            actions = HomeActions(
+                                onOpenBudget = { navigateTo(BudgetRoute) },
+                                onChooseCategories = { push(CategorySetupRoute) },
+                                onOpenInsights = { navigateTo(InsightsRoute) },
+                                onOpenGoals = { push(GoalsRoute) },
+                                onOpenRecurring = { id -> push(RecurringRoute(id ?: NO_SCHEDULE)) },
+                            ),
+                        )
+                    }
+                    composable<TransactionsRoute> {
+                        TransactionsScreen(
+                            onAddTransaction = { showAdd = true },
+                            onEditTransaction = { edit(it) },
+                            onAddWallet = { navigateTo(WalletsRoute) },
+                            onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ push(ScanReceiptRoute) }) else null,
+                            onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ push(VoiceEntryRoute(typing = false)) }) else null,
+                        )
+                    }
+                    composable<WalletsRoute> {
+                        WalletsScreen(
+                            onBack = null,
+                            onOpenWallet = { push(WalletDetailRoute(it)) },
+                            allowAdding = features.isEnabled(Feature.MULTIPLE_WALLETS),
+                        )
+                    }
+                    composable<InsightsRoute> {
+                        Gated(Feature.INSIGHTS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) { InsightsScreen() }
+                    }
+                    composable<BudgetRoute> {
+                        Gated(Feature.BUDGETS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) {
+                            BudgetScreen(
+                                onChooseCategories = { push(CategorySetupRoute) },
+                                onManageCategories = { push(CategoriesRoute) },
+                            )
+                        }
+                    }
+
+                    pushed<WalletDetailRoute>(reducedMotion) { entry ->
+                        val route = entry.toRoute<WalletDetailRoute>()
+                        WalletDetailScreen(
+                            walletId = route.walletId,
+                            onBack = back,
+                            onAddTransaction = { type, walletId -> openNew(type, walletId) },
+                            onTransfer = { from, to -> openTransfer(from, to) },
+                            onEditTransaction = { edit(it) },
+                            transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
+                        )
+                    }
+                    pushed<GoalsRoute>(reducedMotion) {
+                        Gated(Feature.SAVINGS_GOALS, features, enableFeature, back) { GoalsScreen(onBack = back) }
+                    }
+                    pushed<DebtsRoute>(reducedMotion) {
+                        Gated(Feature.DEBTS_LOANS, features, enableFeature, back) {
+                            DebtsScreen(onBack = back, onOpenWallet = { push(WalletDetailRoute(it)) })
+                        }
+                    }
+                    pushed<RecurringRoute>(reducedMotion) { entry ->
+                        val route = entry.toRoute<RecurringRoute>()
+                        Gated(Feature.RECURRING, features, enableFeature, back) {
+                            RecurringScreen(onBack = back, openScheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE })
+                        }
+                    }
+                    pushed<CategoriesRoute>(reducedMotion) {
+                        ManageCategoriesScreen(onBack = back, onChooseFromPresets = { push(CategorySetupRoute) })
+                    }
+                    pushed<CategorySetupRoute>(reducedMotion) { CategorySetupScreen(onDone = back) }
+                    pushed<SettingsRoute>(reducedMotion) { SettingsScreen(onBack = back) }
+                    pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
+                    pushed<ScanReceiptRoute>(reducedMotion) {
+                        Gated(Feature.RECEIPT_SCANNING, features, enableFeature, back) {
+                            ReceiptScanScreen(
+                                onBack = back,
+                                onReview = { reviewReceipt(it) },
+                                expectedCurrency = editorViewModel.newDraft(TransactionType.EXPENSE).walletId
+                                    ?.let { id -> editorState.wallets.firstOrNull { it.id == id }?.currencyCode },
+                            )
+                        }
+                    }
+                    pushed<VoiceEntryRoute>(reducedMotion) { entry ->
+                        val route = entry.toRoute<VoiceEntryRoute>()
+                        Gated(Feature.VOICE_ENTRY, features, enableFeature, back) {
+                            VoiceEntryScreen(
+                                wallets = editorState.wallets,
+                                categories = editorState.categories,
+                                onBack = back,
+                                onReview = { reviewProposal(it) },
+                                typing = route.typing,
                             )
                         }
                     }
                 }
-            }
-        },
-    ) { innerPadding ->
-      Box(Modifier.fillMaxSize().padding(innerPadding)) {
-        NavHost(
-            navController = navController,
-            startDestination = HomeRoute,
-            modifier = Modifier.fillMaxSize(),
-            // Top-level switches fade through; pushed screens slide in from the trailing edge.
-            enterTransition = { if (reducedMotion) fadeIn(tween(0)) else fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.985f) },
-            exitTransition = { fadeOut(tween(if (reducedMotion) 0 else 120)) },
-        ) {
-            composable<HomeRoute> {
-                HomeScreen(
-                    actions = HomeActions(
-                        onAddTransaction = { openNew(it) },
-                        onTransfer = { openTransfer() },
-                        onScanReceipt = { push(ScanReceiptRoute) },
-                        onSpeak = { push(VoiceEntryRoute) },
-                        onEditTransaction = { edit(it) },
-                        onOpenTransactions = { navigateTo(TransactionsRoute) },
-                        onOpenInsights = { navigateTo(InsightsRoute) },
-                        onOpenBudgets = { push(BudgetsRoute) },
-                        onOpenRecurring = { push(RecurringRoute) },
-                        onOpenQuickAdd = { navigateTo(QuickAddRoute) },
-                    ),
-                )
-            }
-            composable<TransactionsRoute> {
-                TransactionsScreen(
-                    onAddTransaction = { navigateTo(QuickAddRoute) },
-                    onEditTransaction = { edit(it) },
-                    onAddWallet = { push(WalletsRoute) },
-                    onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ push(ScanReceiptRoute) }) else null,
-                    onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ push(VoiceEntryRoute) }) else null,
-                )
-            }
-            composable<QuickAddRoute> {
-                QuickAddScreen(
-                    onManual = { type, categoryId -> openNew(type, categoryId = categoryId) },
-                    onTransfer = { openTransfer() },
-                    onScan = { push(ScanReceiptRoute) },
-                    onSpeak = { push(VoiceEntryRoute) },
-                )
-            }
-            composable<InsightsRoute> {
-                Gated(Feature.INSIGHTS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) { InsightsScreen() }
-            }
-            composable<MoreRoute> {
-                MoreScreen(
-                    onOpenWallets = { push(WalletsRoute) },
-                    onOpenPlan = { push(PlanRoute) },
-                    onOpenSettings = { push(SettingsRoute) },
-                    onOpenFeatures = { push(FeaturesRoute) },
-                )
-            }
-
-            pushed<WalletsRoute>(reducedMotion) {
-                WalletsScreen(
-                    onBack = back,
-                    onOpenWallet = { push(WalletDetailRoute(it)) },
-                    allowAdding = features.isEnabled(Feature.MULTIPLE_WALLETS),
-                )
-            }
-            pushed<WalletDetailRoute>(reducedMotion) { entry ->
-                val route = entry.toRoute<WalletDetailRoute>()
-                WalletDetailScreen(
-                    walletId = route.walletId,
-                    onBack = back,
-                    onAddTransaction = { type, walletId -> openNew(type, walletId) },
-                    onTransfer = { from, to -> openTransfer(from, to) },
-                    onEditTransaction = { edit(it) },
-                    transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
-                )
-            }
-            pushed<PlanRoute>(reducedMotion) {
-                PlanScreen(
-                    onBack = back,
-                    onOpenBudgets = { push(BudgetsRoute) },
-                    onOpenGoals = { push(GoalsRoute) },
-                    onOpenDebts = { push(DebtsRoute) },
-                    onOpenRecurring = { push(RecurringRoute) },
-                    onOpenSettings = { push(FeaturesRoute) },
-                )
-            }
-            pushed<BudgetsRoute>(reducedMotion) {
-                Gated(Feature.BUDGETS, features, enableFeature, back) { BudgetsScreen(onBack = back) }
-            }
-            pushed<GoalsRoute>(reducedMotion) {
-                Gated(Feature.SAVINGS_GOALS, features, enableFeature, back) { GoalsScreen(onBack = back) }
-            }
-            pushed<DebtsRoute>(reducedMotion) {
-                Gated(Feature.DEBTS_LOANS, features, enableFeature, back) {
-                    DebtsScreen(onBack = back, onOpenWallet = { push(WalletDetailRoute(it)) })
-                }
-            }
-            pushed<RecurringRoute>(reducedMotion) {
-                Gated(Feature.RECURRING, features, enableFeature, back) { RecurringScreen(onBack = back) }
-            }
-            pushed<SettingsRoute>(reducedMotion) { SettingsScreen(onBack = back) }
-            pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
-            pushed<ScanReceiptRoute>(reducedMotion) {
-                Gated(Feature.RECEIPT_SCANNING, features, enableFeature, back) {
-                    ReceiptScanScreen(
-                        onBack = back,
-                        onReview = { reviewReceipt(it) },
-                        expectedCurrency = editorViewModel.newDraft(TransactionType.EXPENSE).walletId
-                            ?.let { id -> editorState.wallets.firstOrNull { it.id == id }?.currencyCode },
-                    )
-                }
-            }
-            pushed<VoiceEntryRoute>(reducedMotion) {
-                Gated(Feature.VOICE_ENTRY, features, enableFeature, back) {
-                    VoiceEntryScreen(
-                        wallets = editorState.wallets,
-                        categories = editorState.categories,
-                        onBack = back,
-                        onReview = { reviewProposal(it) },
-                    )
-                }
+                ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
             }
         }
-        ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
-      }
+    }
+
+    if (showAdd) {
+        AddTransactionSheet(
+            features = features,
+            onChoose = { startAdd(it) },
+            onTransfer = if (features.isEnabled(Feature.MULTIPLE_WALLETS)) ({ openTransfer() }) else null,
+            onDismiss = { showAdd = false },
+        )
+    }
+
+    if (showMore) {
+        MoreSheet(
+            onOpen = { destination ->
+                when (destination) {
+                    MoreDestination.GOALS -> push(GoalsRoute)
+                    MoreDestination.RECURRING -> push(RecurringRoute())
+                    MoreDestination.DEBTS -> push(DebtsRoute)
+                    MoreDestination.CATEGORIES -> push(CategoriesRoute)
+                }
+            },
+            onDismiss = { showMore = false },
+        )
+    }
+
+    if (showProfile) {
+        ProfileSheet(
+            preferences = preferences,
+            onSaveName = appViewModel::setDisplayName,
+            onTheme = appViewModel::setThemeMode,
+            onOpen = { destination ->
+                when (destination) {
+                    ProfileDestination.SETTINGS -> push(SettingsRoute)
+                    ProfileDestination.FEATURES -> push(FeaturesRoute)
+                }
+            },
+            onDismiss = { showProfile = false },
+        )
     }
 
     editorDraft?.let { draft ->
@@ -558,7 +617,7 @@ private inline fun <reified T : Any> androidx.navigation.NavGraphBuilder.pushed(
 
 /**
  * Shows [content] only when [feature] is usable. Reaching a module that is switched off (an old link,
- * a back-stack entry) explains why and offers to turn it back on — its data is still there.
+ * a back-stack entry, the + sheet) explains why and offers to turn it back on — its data is still there.
  */
 @Composable
 private fun Gated(

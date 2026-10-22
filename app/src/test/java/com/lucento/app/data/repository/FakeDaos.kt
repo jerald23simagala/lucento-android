@@ -55,9 +55,13 @@ class FakeCategoryDao : CategoryDao {
     var transactionCounts = mutableMapOf<Long, Int>()
     private var nextId = 1L
 
-    override fun observeAll(): Flow<List<CategoryEntity>> = rows
+    /** Same order as the real query: kind, sort order, id. */
+    override fun observeAll(): Flow<List<CategoryEntity>> =
+        rows.map { list -> list.sortedWith(compareBy<CategoryEntity> { it.kind }.thenBy { it.sortOrder }.thenBy { it.id }) }
 
     override suspend fun getById(id: Long) = rows.value.firstOrNull { it.id == id }
+
+    override suspend fun getAll() = rows.value.sortedWith(compareBy<CategoryEntity> { it.kind }.thenBy { it.sortOrder }.thenBy { it.id })
 
     override suspend fun countActiveWithName(kind: String, name: String, excludeId: Long) =
         rows.value.count { !it.archived && it.kind == kind && it.name.equals(name, ignoreCase = true) && it.id != excludeId }
@@ -165,6 +169,15 @@ class FakeBudgetDao : BudgetDao {
 
     override suspend fun deleteById(id: Long) {
         rows.value = rows.value.filterNot { it.id == id }
+    }
+
+    override suspend fun findAllocation(categoryId: Long, currencyCode: String) =
+        rows.value.filter { it.categoryId == categoryId && it.currencyCode == currencyCode }.minByOrNull { it.id }
+
+    override suspend fun deleteLegacyOverall(): Int {
+        val before = rows.value.size
+        rows.value = rows.value.filterNot { it.categoryId == null }
+        return before - rows.value.size
     }
 }
 

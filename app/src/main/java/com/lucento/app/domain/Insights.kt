@@ -8,6 +8,11 @@ import java.time.YearMonth
 /** Total spent (or earned) in one calendar month, in one currency. */
 data class MonthAmount(val month: YearMonth, val amount: Money)
 
+/** Income and expenses recorded in one calendar month, in one currency. Transfers are never included. */
+data class FlowMonth(val month: YearMonth, val income: Money, val expense: Money) {
+    val net: Money get() = income - expense
+}
+
 /** Share of a period's spending that belongs to one category. [categoryId] null means uncategorized. */
 data class CategoryShare(val categoryId: Long?, val amount: Money)
 
@@ -39,6 +44,22 @@ object Insights {
             val month = startMonth.plusMonths(offset.toLong())
             MonthAmount(month, Money.sum(currencyCode, byMonth[month].orEmpty().map { it.amount }))
         }
+    }
+
+    /**
+     * Income and expenses per month for the [months] months ending at [endMonth], oldest first, zero-filled. Only
+     * INCOME and EXPENSE transactions count, so transfers between the user's own wallets (two linked legs) never
+     * appear as either.
+     */
+    fun incomeExpenseTrend(
+        transactions: List<Transaction>,
+        currencyCode: String,
+        endMonth: YearMonth,
+        months: Int,
+    ): List<FlowMonth> {
+        val income = monthlyTotals(transactions, currencyCode, endMonth, months, TransactionType.INCOME)
+        val expense = monthlyTotals(transactions, currencyCode, endMonth, months, TransactionType.EXPENSE)
+        return income.zip(expense) { i, e -> FlowMonth(i.month, i.amount, e.amount) }
     }
 
     /**

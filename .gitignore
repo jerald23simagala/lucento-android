@@ -15,3 +15,6 @@ keystore.properties
 
 # Downloaded CI artifacts (schemas are copied into app/schemas deliberately)
 _ci_artifacts/
+
+# Python bytecode from tools/lottie
+__pycache__/

@@ -54,7 +54,9 @@ balances say "owed", budget states say "Over" / a percentage, and transfers are 
 | `MoneyText` / `AmountText` | Prominent animated figure / compact tabular figure; both signed. |
 | `ProgressRing`, `DonutChart`, `ShareBar`, `MonthlyBarChart` | Data visuals; each has a spoken description and the exact figures beside it. |
 | `ActionTile` | Round quick action with label (Home, account screens). |
-| `NavRow` | Hub row: icon tile, title, real status line, chevron (More, Plan, Quick Add). |
+| `NavRow` | Menu row: icon tile, title, real status line, chevron (More, Profile, Add sheet). |
+| `ConsumptionBar`, `IncomeExpenseChart`, `CompositionBar`, `LegendKey`, `NetFlowIndicator` | v0.5 visuals: budget/goal consumption with a today marker; income vs expenses by month; stacked net-worth composition; net-flow Lottie glyph. |
+| `ProfileButton`, `ProfileAvatar` | Top-bar avatar (initials or a person glyph) that opens the profile menu. |
 | `SwitchRow` | Whole-row toggle with description and dependency note (Enabled features). |
 | `InfoNote`, `StatusPill` | Calculation explanations; small status labels with text. |
 | `LucentoTopBar`, `SectionHeader`, `Figure`, `Hairline`, `EmptyState` | Structure. |
@@ -71,7 +73,7 @@ files (`res/raw`, register in `docs/design/ANIMATION_ASSETS.md`) through two com
 | Component | Behaviour |
 |---|---|
 | `LucentoLottieAnimation(animation, marker, iterations, playing, onFinished, fallback)` | Day/night variant by theme; one-shots hold the final frame; loops stop when disposed; reduced motion shows a still (final frame for one-shots, first for loops); parse failure → fallback. |
-| `LucentoMascot(mood)` | Lottie Sun/Moon with markers: `Happy` (idle ×3, then rests), `Curious` (empty states), `Success` (onboarding done), `Celebrate`. Vector drawing as still/fallback. |
+| `LucentoMascot(mood)` | Lottie Sun/Moon with markers: `Happy` (idle ×3, then rests), `Curious` (empty states), `Success` (onboarding done), `Celebrate`, `Concerned` (v0.5: budget nearly or fully used — supportive, never a frown). Vector drawing as still/fallback. |
 | `EmptyIllustration` / `LucentoEmptyState` | Empty-state illustration (200×166dp) that drops out on narrow/short layouts. |
 | `ConfirmationHost(Confirmation)` | Saved check or calm milestone with one line of text, shown **after** a committed write; does not block touches; announced as a live region. |
 | `LucentoWorkingIndicator` | Brand dots + label for genuine background work. |
@@ -98,9 +100,48 @@ Not taken from the mockup on purpose: the user name/avatar (Lucento has no accou
 Visual parity has **not** been verified on a device: no emulator or Android build was available in the authoring
 environment (see `docs/QUALITY.md`).
 
-## Navigation
-Bottom bar: **Home · Transactions · Add · Insights · More** (Add is a filled blue circle). Insights leaves the bar
-when the user turns it off. Everything secondary is pushed from More: Wallets → account detail, Plan → Budgets,
-Savings goals, Debts & loans, Recurring payments; Settings; Enabled features. Scan receipt and Speak/type are pushed
-from Home or Add. One app-wide transaction editor and one transfer sheet open from anywhere. Opening a module that is
-switched off shows an explanation with "Turn on" instead of a broken screen.
+## Navigation (v0.5)
+- **Dock** (`navigation/NavigationDock.kt`, persistent): **Home · Transactions · Wallets · Insights · Budget**, then a
+  **More** button. The selected tab shows its label under a tinted indicator; the others are icon-only (each keeps its
+  label as the accessibility name). Insights/Budget leave the dock when switched off. The dock stays on secondary
+  screens (goals, recurring, debts, account detail, categories — the tab they were opened from stays highlighted)
+  and steps aside for focused workflows: receipt scan, Speak / Type it, category setup, Settings, Enabled features.
+  Tabs keep their state (save/restore on switch).
+- **+ Add transaction** (floating, every primary screen) opens a sheet with four workflows — **Manual** (the editor),
+  **Scan** (receipt OCR), **Speak** (starts listening on arrival), **Type it** (sentence → structured fields). Scanned,
+  spoken and typed entries always open in the editor for review. A switched-off module still appears and offers to
+  turn itself back on. Transfers are a secondary row in the same sheet.
+- **More** (sheet): Savings goals, Recurring payments, Debts & loans, Categories — each with a real status line.
+- **Profile** (avatar in every primary screen's top bar): optional name (device-only), appearance, **Settings**,
+  Enabled features, version. Lucento has no account; nothing here signs in.
+- One app-wide transaction editor and one transfer sheet. Opening a switched-off module explains and offers "Turn on".
+
+## Home dashboard (v0.5)
+Top to bottom, nothing duplicated from the dock or the + button:
+1. **Budget hero** — solid brand panel (the most prominent element, ≈30 % shorter than v0.4's card): budget left
+   (or over) this month, "of total · spent", one supportive sentence, and the **Sun** (Moon at night) — happy while
+   comfortably within budget, *supportively concerned* when ≤ 10 % is left or the budget is used up, curious before a
+   budget exists. Taps through to Budget (or category setup when none is chosen).
+2. **Net flow** — one compact row: Lottie trend glyph (green up / red down / neutral level line at exactly zero), the
+   signed net, income and expenses in small type.
+3. **Burn rate** — consumption bar with a "today" marker (share of the month gone), level colours normal / approaching
+   / exhausted from the same thresholds as the hero, day N of M, daily average and the daily allowance that keeps the
+   month on budget. No percentage when there is no budget.
+4. **Savings goals** — overall % saved across goals (capped per goal), progress bar, closest goal and what's left.
+5. **Upcoming payments** — next recurring items within 30 days in date order (overdue flagged in red with words),
+   wallet and amount; tapping opens that payment's review sheet where it can be marked paid. Never auto-recorded.
+
+## Budget tab (v0.5)
+The total is always the **sum of category amounts**. Month switcher, currency pills (never summed across currencies),
+a summary card (left of total, status pill, consumption bar with today marker, daily allowance), spending outside the
+budget explained (uncategorised / unallocated), **Budgeted** rows (spent of amount, left/over, status, bar) and **Not
+budgeted yet** rows ("Set amount"). Tapping a row opens an amount sheet that previews the new total. Manage
+categories: add, rename, reorder, deactivate (archive) and restore. Existing users get a one-time "Make your budget
+yours" card (choose from presets or keep their categories); a pre-0.5 overall limit is explained once and can be
+removed. Users with no categories see "Finish setting up your budget".
+
+## Insights (v0.5)
+Two questions only: **income and expenses over time** (3/6/12 months; grouped bars, legend, totals and net, plain
+summary; transfers excluded) and **what net worth is made of** (net worth figure; assets and liabilities as two
+stacked bars on one shared scale, grouped by account type with counts, shares and amounts; negative net worth shown
+honestly). Category donuts and budget performance moved out (Budget tab owns budgets).

@@ -100,11 +100,16 @@ private data class ScheduleDraft(
  * "Skip" moves to the next date. Nothing is posted automatically.
  */
 @Composable
-fun RecurringScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory)) {
+fun RecurringScreen(
+    onBack: () -> Unit,
+    /** Opens straight into this schedule's review sheet (from Home's upcoming payments), where it can be marked paid. */
+    openScheduleId: Long? = null,
+    viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(RecurringTab.UPCOMING) }
     var editing by remember { mutableStateOf<ScheduleDraft?>(null) }
-    var actingOn by remember { mutableStateOf<Long?>(null) }
+    var actingOn by rememberSaveable { mutableStateOf(openScheduleId) }
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
     val shown = state.schedules

@@ -29,6 +29,14 @@ data class UserPreferences(
     val features: FeatureSet = FeatureSet.ALL,
     /** Last month whose kept budget was acknowledged ("2026-09"), so the moment is shown only once. */
     val acknowledgedBudgetMonth: java.time.YearMonth? = null,
+    /** Optional name shown on the profile button and menu. Stored only on this device; never required. */
+    val displayName: String? = null,
+    /**
+     * True once the user has chosen their budget categories (in onboarding since 0.5, or later from the Budget
+     * screen). Installs that completed onboarding before 0.5 start false: they keep their categories and are offered
+     * the category setup on the Budget screen, never forced back through onboarding.
+     */
+    val categorySetupDone: Boolean = false,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
@@ -41,6 +49,8 @@ class UserPreferencesRepository(private val context: Context) {
         val primaryCurrency = stringPreferencesKey("primary_currency")
         val enabledFeatures = stringSetPreferencesKey("enabled_features")
         val acknowledgedBudgetMonth = stringPreferencesKey("acknowledged_budget_month")
+        val displayName = stringPreferencesKey("display_name")
+        val categorySetupDone = booleanPreferencesKey("category_setup_done")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -59,16 +69,39 @@ class UserPreferencesRepository(private val context: Context) {
                     ?: FeatureSet.ALL,
                 acknowledgedBudgetMonth = p[Keys.acknowledgedBudgetMonth]
                     ?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
+                displayName = p[Keys.displayName]?.trim()?.takeIf { it.isNotEmpty() },
+                categorySetupDone = p[Keys.categorySetupDone] ?: false,
             )
         }
 
-    /** Saves the onboarding choices in one atomic edit, then marks onboarding complete. */
+    /**
+     * Saves the onboarding choices in one atomic edit, then marks onboarding complete. Called only after the chosen
+     * categories were written to the database, so a completed onboarding always has the user's categories.
+     */
     suspend fun completeOnboarding(primaryCurrency: String, themeMode: ThemeMode, features: Set<Feature>) {
         context.dataStore.edit {
             it[Keys.primaryCurrency] = primaryCurrency
             it[Keys.themeMode] = themeMode.name
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
+            it[Keys.categorySetupDone] = true
             it[Keys.onboardingComplete] = true
+        }
+    }
+
+    suspend fun setCategorySetupDone(done: Boolean) {
+        context.dataStore.edit { it[Keys.categorySetupDone] = done }
+    }
+
+    /** Blank clears the name. */
+    suspend fun setDisplayName(name: String) {
+        val cleaned = name.trim().replace(Regex("\\s+"), " ").take(MAX_DISPLAY_NAME)
+        context.dataStore.edit { prefs ->
+            if (cleaned.isEmpty()) {
+                prefs.remove(Keys.displayName)
+            } else {
+                prefs[Keys.displayName] = cleaned
+            }
+            Unit
         }
     }
 
@@ -94,6 +127,8 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     companion object {
+        const val MAX_DISPLAY_NAME = 40
+
         fun defaultCurrency(locale: Locale = Locale.getDefault()): String =
             runCatching { Currency.getInstance(locale).currencyCode }.getOrNull()
                 ?.takeIf { it != "XXX" }

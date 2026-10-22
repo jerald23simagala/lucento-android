@@ -10,35 +10,33 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 > [docs/QUALITY.md](docs/QUALITY.md) for exactly what was and wasn't verified. Also: [docs/ROADMAP.md](docs/ROADMAP.md),
 > [docs/DESIGN.md](docs/DESIGN.md), [docs/CALCULATIONS.md](docs/CALCULATIONS.md), [CHANGELOG.md](CHANGELOG.md).
 
-## What works today
-- **Onboarding**: welcome → financial focus → features → currency & appearance → confirmation. Skippable; choices
-  only set the initial modules.
-- **Home**: greeting with the Sun (light) / Moon (dark) mascot; **Safe to spend** (budget-based, or a labelled
-  estimate from spendable balances, minus bills still due); quick actions (expense, income, transfer, scan, speak);
-  **Net flow** with income/expenses and **burn rate** (actual, projected, vs last month); budget and bill alerts;
-  recent transactions.
+## What works today (0.5.0)
+- **Navigation**: a persistent dock — **Home · Transactions · Wallets · Insights · Budget** — plus a **More** menu
+  (Savings goals, Recurring payments, Debts & loans, Categories) and a **profile** button (optional name,
+  appearance, Settings, Enabled features). An app-wide **+** opens **Manual · Scan · Speak · Type it**.
+- **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
+  search, custom categories; required) → review → currency & appearance → confirmation.
+- **Home**: budget hero with the Sun/Moon mascot (happy within budget, supportively concerned when ≤ 10 % is left),
+  compact net flow with an animated trend glyph, burn-rate bar against the calendar, savings goals level, upcoming
+  recurring payments (tap to review and mark paid).
+- **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
+  the budget shown transparently; amounts per month and currency; manage categories (add, rename, reorder,
+  deactivate, restore). Existing users keep their categories and can personalise them from presets.
+- **Insights**: income and expenses over 3/6/12 months (transfers excluded) and net-worth composition by account type.
 - **Transactions**: search, filters (date, type incl. transfers, wallet, category), day groups, edit/delete.
-- **Add tab**: Scan receipt, Speak or type, Manual entry, recent categories.
 - **Transfers** between your own accounts (two linked legs, atomic, never income or spending).
-- **Wallets** (via More): cash, bank, e-wallet, savings, credit card and **loan**; account detail with history and
-  the right actions for assets vs debts.
-- **Plan** hub: **Budgets** (overall + category, monthly), **Savings goals** (contributions, projection,
-  required per month), **Debts & loans**, **Recurring payments** (mark paid / skip / pause — never auto-posted).
-- **Insights**: net flow by period, spending/income breakdown donut, 6-month spending, budget performance, net worth.
-- **Receipt scanning**: system camera or photo picker → on-device ML Kit OCR (bundled model) → editable suggestions.
-- **Voice & text entry**: system speech recogniser (prefers offline) or typing → offline parser → editable review.
-- **Settings**: theme, main currency, **Enabled features** (turn modules off/on without losing data), CSV export,
-  privacy facts.
-- **Motion**: original Lottie Sun/Moon mascot (idle, curious, success, celebrate), onboarding mark, four empty-state
-  illustrations, receipt-scanning beam, saved confirmation, calm milestones — all bundled, reduced-motion aware.
-- **Data safety**: wallet type/currency locked while history or schedules depend on it; used categories are archived,
-  never cascade-deleting budgets; CSV export neutralises spreadsheet formulas; currency-aware receipt amounts.
-- Exact money math in minor units; 215 JVM unit tests.
-- No internet permission (network permissions merged by libraries are stripped); Android cloud backup disabled.
+- **Wallets**: cash, bank, e-wallet, savings, credit card and loan; account detail with history.
+- **Savings goals**, **Debts & loans**, **Recurring payments** (mark paid / skip / pause — never auto-posted).
+- **Receipt scanning** (on-device ML Kit OCR) and **Speak / Type it** (offline parser) → always reviewed before saving.
+- **Settings**: theme, main currency, Enabled features, CSV export, privacy facts.
+- **Motion**: original Lottie Sun/Moon (idle, curious, success, celebrate, concerned), net-flow glyphs, onboarding mark,
+  empty states, receipt scan beam, saved confirmation, milestones — bundled and reduced-motion aware.
+- Exact money math in minor units; 253 JVM unit tests; an emulator screenshot tour in CI.
+- No internet permission; Android cloud backup disabled.
 
 ## Not yet
-Full backup/restore (CSV export only), reminder notifications, category management screen (the safe rules exist and
-are tested), cross-currency transfers, automatic principal/interest split. See the roadmap.
+Full backup/restore (CSV export only), reminder notifications, cross-currency transfers, automatic principal/interest
+split, budget periods other than calendar months. See the roadmap.
 
 ## Tech
 Kotlin · Jetpack Compose · Material 3 · Room · DataStore · ViewModel · Coroutines/Flow · Navigation Compose (type-safe).

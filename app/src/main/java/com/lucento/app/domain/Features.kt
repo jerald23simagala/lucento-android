@@ -19,7 +19,7 @@ enum class Feature(
         "Multiple wallets",
         "Track several accounts and move money between them with transfers.",
     ),
-    BUDGETS("budgets", "Budgets", "Monthly limits overall and per category, with progress."),
+    BUDGETS("budgets", "Budgets", "Monthly amounts per category; your total budget is their sum."),
     SAVINGS_GOALS("savings_goals", "Savings goals", "Targets, contributions and projected completion dates."),
     DEBTS_LOANS(
         "debts_loans",
@@ -68,11 +68,12 @@ enum class FinancialFocus(val title: String, val description: String, val featur
 
     companion object {
         /**
-         * Initial modules for the chosen focuses. Multiple wallets, quick capture and insights are on by
-         * default because they make everyday tracking easier; the user can still turn them off.
+         * Initial modules for the chosen focuses. Budgets, multiple wallets, quick capture and insights are on by
+         * default because they make everyday tracking easier (Budget is a primary tab, built from the categories
+         * chosen in onboarding); the user can still turn them off.
          */
         fun initialFeatures(focuses: Set<FinancialFocus>): Set<Feature> =
-            setOf(Feature.MULTIPLE_WALLETS, Feature.INSIGHTS, Feature.RECEIPT_SCANNING, Feature.VOICE_ENTRY) +
+            setOf(Feature.BUDGETS, Feature.MULTIPLE_WALLETS, Feature.INSIGHTS, Feature.RECEIPT_SCANNING, Feature.VOICE_ENTRY) +
                 focuses.flatMap { it.features }
     }
 }

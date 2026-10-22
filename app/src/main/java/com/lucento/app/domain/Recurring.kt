@@ -108,6 +108,21 @@ object RecurringMath {
             .filter { (_, date) -> !date.isAfter(through) }
             .sortedWith(compareBy<Pair<RecurringSchedule, LocalDate>> { it.second }.thenBy { it.first.id })
 
+    /**
+     * The dashboard list: the next unpaid occurrence of each active schedule due on or before
+     * [today] + [horizonDays] (overdue ones included and flagged), in date order, at most [limit]. Pure: listing a
+     * payment never records it — only the user's "Mark paid" does.
+     */
+    fun upcomingPayments(
+        schedules: List<RecurringSchedule>,
+        today: LocalDate,
+        horizonDays: Long = DASHBOARD_HORIZON_DAYS,
+        limit: Int = DASHBOARD_LIMIT,
+    ): List<UpcomingPayment> =
+        upcoming(schedules, today.plusDays(horizonDays))
+            .take(limit)
+            .map { (s, date) -> UpcomingPayment(s, date, overdue = date.isBefore(today)) }
+
     fun state(schedule: RecurringSchedule, today: LocalDate): RecurringState = when {
         schedule.isFinished -> RecurringState.FINISHED
         schedule.paused -> RecurringState.PAUSED
@@ -117,4 +132,10 @@ object RecurringMath {
 
     /** Schedules due within this many days (or overdue) are shown as upcoming. */
     const val UPCOMING_WINDOW_DAYS = 14L
+
+    const val DASHBOARD_HORIZON_DAYS = 30L
+    const val DASHBOARD_LIMIT = 4
 }
+
+/** A scheduled payment (or expected income) waiting for the user's confirmation. */
+data class UpcomingPayment(val schedule: RecurringSchedule, val dueDate: LocalDate, val overdue: Boolean)

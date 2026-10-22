@@ -137,11 +137,18 @@ object Migrations {
     val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 }
 
-/** Seeds [DefaultCategories] once: on fresh install (database callback) or when upgrading from v1. */
+/**
+ * Category seeding. [insertDefaults] is frozen (used by MIGRATION_1_2). Fresh installs since 0.5 use
+ * [insertFreshInstall]: income categories only, because the user picks their own expense categories in onboarding.
+ */
 object CategorySeed {
-    fun insertDefaults(db: SupportSQLiteDatabase, createdAt: Long) {
+    fun insertDefaults(db: SupportSQLiteDatabase, createdAt: Long) = insert(db, DefaultCategories.all, createdAt)
+
+    fun insertFreshInstall(db: SupportSQLiteDatabase, createdAt: Long) = insert(db, DefaultCategories.freshInstall, createdAt)
+
+    private fun insert(db: SupportSQLiteDatabase, seeds: List<DefaultCategories.Seed>, createdAt: Long) {
         val nextOrderByKind = HashMap<String, Int>()
-        DefaultCategories.all.forEach { seed ->
+        seeds.forEach { seed ->
             val order = nextOrderByKind[seed.kind.name] ?: 0
             nextOrderByKind[seed.kind.name] = order + 1
             db.execSQL(

@@ -15,6 +15,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE id = :id")
     suspend fun getById(id: Long): CategoryEntity?
 
+    @Query("SELECT * FROM categories ORDER BY kind ASC, sort_order ASC, id ASC")
+    suspend fun getAll(): List<CategoryEntity>
+
     @Query(
         "SELECT COUNT(*) FROM categories WHERE archived = 0 AND kind = :kind " +
             "AND name = :name COLLATE NOCASE AND id != :excludeId"

@@ -41,7 +41,7 @@ class AppContainer(application: Application) {
             scheduleCount = { id -> database.recurringDao().countForWallet(id) },
         )
     }
-    val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao()) }
+    val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao(), runner = runner) }
     val transactions: TransactionRepository by lazy {
         TransactionRepository(database.transactionDao(), database.walletDao(), database.categoryDao(), runner = runner)
     }

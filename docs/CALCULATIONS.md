@@ -12,10 +12,19 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 | Income / Expenses | sum of INCOME / EXPENSE in the period. **Transfers never count.** | `TransactionQueries.totalsByCurrency` |
 | Net flow | income − expenses for the month; compared with last month when last month has records | `CashflowCalculator.netFlow` |
 | Burn rate | actual: expenses this month ÷ days elapsed (incl. today), half-up. Projection (labelled): expenses × days in month ÷ days elapsed. Comparison: last month's expenses ÷ its length | `CashflowCalculator.burnRate` |
-| Safe to spend — with an overall monthly budget | budget − expenses this month − unpaid recurring expenses due by month end (overdue included) | `CashflowCalculator.safeToSpend` |
+| **Monthly budget (v0.5)** | **Σ category allocations** of active expense categories in one currency for the calendar month. Never stored or edited on its own, so it cannot disagree with the categories. Archived categories, income categories, zero amounts and legacy "everything" rows (≤ v0.4) never count. Currencies are never summed together | `BudgetPlanner.plan` |
+| Budgeted spending | EXPENSE in the month, that currency, in an allocated category. Remaining = budget − budgeted spending (negative when over) | `BudgetPlan.spent / remaining` |
+| Outside the budget | every other EXPENSE in the month and currency (uncategorised, unallocated or archived categories). Shown on the Budget tab, never hidden or reassigned | `BudgetPlan.unbudgetedSpending` |
+| Budget health | NOT_SET when the budget is 0; EXCEEDED when spent ≥ budget (exhausted or over); LOW when remaining × 100 ≤ budget × 10; APPROACHING when spent × 100 ≥ budget × 80; else ON_TRACK. Exact integers. The Home hero (Sun happy vs. supportively concerned = LOW/EXCEEDED), burn bar and Budget tab all use it | `BudgetPlanner.health` |
+| Burn-rate bar | consumed = budgeted spending ÷ budget (display fraction); elapsed = day of month ÷ days in month; level NORMAL / APPROACHING (APPROACHING or LOW) / EXHAUSTED; no percentage without a budget. Daily allowance = remaining ÷ days left incl. today, rounded down, only when positive | `BudgetPlanner.burn` |
+| Savings level | Σ min(max(saved, 0), target) ÷ Σ targets for goals in one currency; closest = unreached goal with the highest percent. A view only: never added to net worth or budgets | `GoalsSummary.overview` |
+| Net worth composition | assets and liabilities grouped by wallet type, per currency; totals equal `NetWorthCalculator` | `NetWorthComposer.compose` |
+| Income/expense trend | INCOME and EXPENSE per month (zero-filled); transfers never appear | `Insights.incomeExpenseTrend` |
+| Upcoming payments | next unpaid occurrence of each active schedule due within 30 days (overdue flagged), date order, max 4. Listing never records anything | `RecurringMath.upcomingPayments` |
+| Safe to spend — with category allocations | budget − budgeted spending − unpaid recurring expenses in budgeted categories due by month end (overdue included) | `CashflowCalculator.safeToSpend` |
 | Safe to spend — without a budget (estimate, labelled) | cash + bank + e-wallet balances − unpaid recurring expenses due by month end. Savings and liabilities excluded | same |
 | Safe per day | safe to spend ÷ days left incl. today, rounded down; shown only when positive | same |
-| Budget spent | EXPENSE in the calendar month, budget currency, matching category (or all for overall). No rollover; refunds recorded as income are not netted | `BudgetCalculator` |
+| Category spent | EXPENSE in the calendar month, budget currency, matching category. No rollover; refunds recorded as income are not netted | `BudgetCalculator` |
 | Budget status | over when spent > limit; near when spent × 100 ≥ limit × 80 (exact, no rounding) | `BudgetProgress.status` |
 | Goal saved | sum of contributions (earmarks; wallets unchanged, so savings are never double-counted) | `GoalCalculator` |
 | Goal projection (labelled estimate) | remaining ÷ average daily pace since first contribution (min. 30 days) | `GoalCalculator.projectCompletion` |
@@ -23,7 +32,20 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 | Recurring occurrence *k* | start + k × interval × frequency (month-end anchors kept: Jan 31 → Feb 28 → Mar 31) | `RecurringMath` |
 | Recurring idempotency key | `recurring-<schedule id>-on-<due epoch day>` (v0.4). Keyed by due date, not index, so editing a schedule's timing (which restarts the index) never makes a new payment look like a duplicate of an old one. v0.3 keys (`recurring-<id>-<index>`) cannot collide | `RecurringSchedule.occurrenceKey` |
 | Goal milestone | halfway / reached, when saved × 100 crosses target × 50 / × 100 because of a contribution (never a withdrawal) | `GoalMilestones` |
-| Budget month kept | the previous calendar month, overall budget in the main currency that existed all month, real spending, spent ≤ limit. Acknowledged once (persisted) | `BudgetMilestones` |
+| Budget month kept | the previous calendar month: allocations that existed all month (created on/before its 1st) sum to a positive budget in the main currency, budgeted spending > 0 and ≤ that budget. Acknowledged once (persisted) | `BudgetMilestones` |
+
+## Budget model (v0.5)
+- The overall budget is derived — the sum of category amounts — for one currency and one calendar month. There is no
+  separately editable overall amount, and nothing is double-counted: each expense belongs to at most one category.
+- Pre-0.5 "budget for everything" rows (category NULL) are kept in the database but ignored by every calculation. The
+  Budget tab explains this once and offers "Remove the old limit" (`BudgetRepository.removeLegacyOverall`).
+- Savings-goal contributions are earmarks, not expenses; transfers and debt principal repayments are transfers. None
+  of them count as budget spending unless the user records an actual EXPENSE.
+- Categories: a fresh install seeds only income categories; onboarding requires choosing at least one expense
+  category from the preset library (`CategoryPresets`) or custom names. Applying a selection (`CategorySelection`)
+  reuses categories by normalised name (case, spacing, "&" = "and"), restores archived matches with their ids,
+  creates the rest, and deactivates unchosen ones (archived when used, deleted only when unused). No schema change
+  was needed, so the database stays at version 3.
 
 ## Debt rules
 - Credit-card purchase: EXPENSE on the card (raises owed). Paying the card: TRANSFER from bank to card (lowers owed;

@@ -39,9 +39,10 @@ abstract class LucentoDatabase : RoomDatabase() {
             Room.databaseBuilder(context.applicationContext, LucentoDatabase::class.java, NAME)
                 .addMigrations(*Migrations.ALL)
                 .addCallback(object : RoomDatabase.Callback() {
-                    // Fresh installs only; upgrades are seeded by MIGRATION_1_2.
+                    // Fresh installs only (income categories; expense categories come from onboarding).
+                    // Upgrades from v1 are seeded by MIGRATION_1_2.
                     override fun onCreate(db: SupportSQLiteDatabase) {
-                        CategorySeed.insertDefaults(db, createdAt = System.currentTimeMillis())
+                        CategorySeed.insertFreshInstall(db, createdAt = System.currentTimeMillis())
                     }
                 })
                 .build()

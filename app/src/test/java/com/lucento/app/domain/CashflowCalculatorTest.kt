@@ -12,14 +12,18 @@ class CashflowCalculatorTest {
 
     private val today = LocalDate.parse("2026-10-22") // 10 days left including today (22..31)
     private var nextId = 1L
-    private fun tx(type: TransactionType, minor: Long, date: String, code: String = "PHP") =
-        Transaction(nextId++, type, Money(minor, code), 1, null, LocalDate.parse(date), "", 0L,
+    private fun tx(type: TransactionType, minor: Long, date: String, code: String = "PHP", category: Long? = 6) =
+        Transaction(nextId++, type, Money(minor, code), 1, category, LocalDate.parse(date), "", 0L,
             transferGroup = if (type.isTransfer) "g" else null)
 
     private fun wallet(id: Long, type: WalletType, minor: Long, code: String = "PHP") =
         Wallet(id, "W$id", type, Money(minor, code), 0L)
 
-    private val rent = RecurringSchedule(1, "Rent", TransactionType.EXPENSE, Money(10_000_00, "PHP"), 1, null,
+    private val housing = Category(5, "Housing", CategoryKind.EXPENSE, "housing")
+    private val food = Category(6, "Food", CategoryKind.EXPENSE, "groceries")
+    private val categories = listOf(housing, food)
+
+    private val rent = RecurringSchedule(1, "Rent", TransactionType.EXPENSE, Money(10_000_00, "PHP"), 1, 5,
         Frequency.MONTHLY, 1, LocalDate.parse("2026-10-28"), null, 0, false)
 
     private val txs = listOf(
@@ -32,11 +36,13 @@ class CashflowCalculatorTest {
     )
 
     @Test fun safeToSpendFromBudgetSubtractsSpendingAndCommittedBills() {
+        // The budget is the sum of the category allocations: 20,000 housing + 10,000 food = 30,000.
         val result = CashflowCalculator.safeToSpend(
             "PHP", today, txs,
             wallets = listOf(wallet(1, WalletType.BANK, 50_000_00)),
-            budgets = listOf(Budget(1, null, Money(30_000_00, "PHP"))),
+            budgets = listOf(Budget(1, 5, Money(20_000_00, "PHP")), Budget(2, 6, Money(10_000_00, "PHP"))),
             schedules = listOf(rent),
+            categories = categories,
         )!!
         assertEquals(SafeToSpend.Basis.BUDGET, result.basis)
         assertEquals(Money(7_000_00, "PHP"), result.spentThisMonth)
@@ -45,6 +51,21 @@ class CashflowCalculatorTest {
         assertEquals(10, result.daysLeft)
         assertEquals(Money(1_300_00, "PHP"), result.perDay)
         assertEquals(57, result.budgetUsedPercent)
+        assertEquals(Money(30_000_00, "PHP"), result.budgetLimit)
+    }
+
+    @Test fun legacyOverallBudgetIsIgnoredAndBillsOutsideBudgetedCategoriesDoNotCount() {
+        // Only food is allocated; rent (housing) is not budgeted, so its bill does not reduce the budget figure.
+        val result = CashflowCalculator.safeToSpend(
+            "PHP", today, txs, emptyList(),
+            budgets = listOf(Budget(9, null, Money(99_000_00, "PHP")), Budget(2, 6, Money(10_000_00, "PHP"))),
+            schedules = listOf(rent),
+            categories = categories,
+        )!!
+        assertEquals(SafeToSpend.Basis.BUDGET, result.basis)
+        assertEquals(Money(10_000_00, "PHP"), result.budgetLimit)
+        assertEquals(Money.zero("PHP"), result.committed)
+        assertEquals(Money(3_000_00, "PHP"), result.amount)
     }
 
     @Test fun withoutBudgetUsesOnlySpendableBalancesAndSaysSo() {
@@ -68,7 +89,7 @@ class CashflowCalculatorTest {
 
     @Test fun overspendingIsShownNotClamped() {
         val result = CashflowCalculator.safeToSpend(
-            "PHP", today, txs, emptyList(), listOf(Budget(1, null, Money(5_000_00, "PHP"))), emptyList(),
+            "PHP", today, txs, emptyList(), listOf(Budget(1, 6, Money(5_000_00, "PHP"))), emptyList(), categories,
         )!!
         assertEquals(Money(-2_000_00, "PHP"), result.amount)
         assertNull(result.perDay)

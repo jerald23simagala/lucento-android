@@ -34,6 +34,11 @@ enum class MascotMood(val marker: String, val cycles: Int) {
     Success("success", 1),
     /** A meaningful milestone: the rays turn one step and four sparkles appear. Plays once. */
     Celebrate("celebrate", 1),
+    /**
+     * Supportive concern (the month's budget is nearly used or used up): a slow nod, inner brows lifted, a calm
+     * mouth. Never a frown or tears — Lucento encourages rather than judges. Plays twice, then rests.
+     */
+    Concerned("concerned", 2),
 }
 
 /**
@@ -121,10 +126,12 @@ private fun DrawScope.drawMoon(u: Float, c: LucentoExtendedColors, mood: MascotM
 private fun DrawScope.drawFace(u: Float, c: LucentoExtendedColors, mood: MascotMood, sleepyEyes: Boolean) {
     val ink = c.mascotFace
     val stroke = Stroke(width = 2.6f * u, cap = StrokeCap.Round)
-    // Brows: level and confident; the right one lifts a little when curious.
+    // Brows: level and confident; the right one lifts a little when curious; inner ends lift when concerned.
     val lift = if (mood == MascotMood.Curious) 2.5f * u else 0f
-    drawLine(ink, Offset(34f * u, 39f * u), Offset(43f * u, 37f * u), strokeWidth = 2.4f * u, cap = StrokeCap.Round)
-    drawLine(ink, Offset(57f * u, 37f * u - lift), Offset(66f * u, 39f * u - lift), strokeWidth = 2.4f * u, cap = StrokeCap.Round)
+    val concerned = mood == MascotMood.Concerned
+    val inner = if (concerned) 2.6f * u else 0f
+    drawLine(ink, Offset(34f * u, 39f * u), Offset(43f * u, 37f * u - inner), strokeWidth = 2.4f * u, cap = StrokeCap.Round)
+    drawLine(ink, Offset(57f * u, 37f * u - lift - inner), Offset(66f * u, 39f * u - lift), strokeWidth = 2.4f * u, cap = StrokeCap.Round)
     if (sleepyEyes) {
         // Contented, half-closed eyes for the night.
         drawArc(ink, 200f, 140f, false, Offset(34f * u, 44f * u), Size(10f * u, 8f * u), style = stroke)
@@ -138,7 +145,12 @@ private fun DrawScope.drawFace(u: Float, c: LucentoExtendedColors, mood: MascotM
     // Cheeks and a restrained, slightly asymmetric smile.
     drawCircle(c.mascotCheek.copy(alpha = 0.45f), 4f * u, Offset(31f * u, 58f * u))
     drawCircle(c.mascotCheek.copy(alpha = 0.45f), 4f * u, Offset(69f * u, 58f * u))
-    drawArc(ink, 25f, 125f, false, Offset(41f * u, 50f * u), Size(19f * u, 13f * u), style = stroke)
+    if (concerned) {
+        // A calm, gentle mouth: still turned up a touch, never a frown.
+        drawArc(ink, 35f, 110f, false, Offset(43f * u, 54f * u), Size(15f * u, 5f * u), style = stroke)
+    } else {
+        drawArc(ink, 25f, 125f, false, Offset(41f * u, 50f * u), Size(19f * u, 13f * u), style = stroke)
+    }
 }
 
 private fun DrawScope.drawSparkle(center: Offset, r: Float, color: Color) {

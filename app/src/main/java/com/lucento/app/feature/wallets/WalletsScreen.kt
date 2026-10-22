@@ -14,8 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +37,7 @@ import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
+import com.lucento.app.core.designsystem.component.ProfileButton
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.component.ShareBar
@@ -51,7 +52,8 @@ import com.lucento.app.domain.Wallet
 
 @Composable
 fun WalletsScreen(
-    onBack: () -> Unit,
+    /** Null when Wallets is a primary destination in the navigation dock. */
+    onBack: (() -> Unit)?,
     onOpenWallet: (Long) -> Unit,
     /** False when Multiple wallets is off and one account already exists. */
     allowAdding: Boolean,
@@ -71,7 +73,20 @@ fun WalletsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
         ) {
-            item(key = "title") { LucentoTopBar(title = "Wallets", onBack = onBack) }
+            item(key = "title") {
+                LucentoTopBar(
+                    title = "Wallets",
+                    onBack = onBack,
+                    actions = {
+                        if (state.wallets.isNotEmpty() && canAdd) {
+                            IconButton(onClick = { editing = newDraft() }) {
+                                Icon(Icons.Filled.Add, contentDescription = "Add wallet")
+                            }
+                        }
+                        if (onBack == null) ProfileButton()
+                    },
+                )
+            }
 
             if (!state.loading && state.wallets.isEmpty()) {
                 item(key = "empty") {
@@ -116,19 +131,6 @@ fun WalletsScreen(
             }
         }
 
-        if (state.wallets.isNotEmpty() && canAdd) {
-            ExtendedFloatingActionButton(
-                onClick = { editing = newDraft() },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Add wallet") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(Spacing.gutter),
-            )
-        }
     }
 
     editing?.let { draft ->

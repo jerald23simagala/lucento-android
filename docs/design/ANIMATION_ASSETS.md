@@ -11,13 +11,15 @@ Apache License 2.0 (credited in Settings › About). Files are bundled in `app/s
 at runtime and no network permission is involved.
 
 Rendered previews (lottie-web, first → last frames): `animation-preview-day.png`, `animation-preview-night.png`,
-`animation-preview-mascot.png`, `animation-preview-feedback.png` in this folder. lottie-web is a proxy for
+`animation-preview-mascot.png`, `animation-preview-feedback.png`, `animation-preview-mascot-concerned.png`,
+`animation-preview-netflow.png` in this folder. lottie-web is a proxy for
 lottie-android; on-device appearance has **not yet been verified** (no emulator/device was available).
 
 | File (`res/raw/`) | Purpose | Where it plays | Playback | Size (raw / gzip) | Source · licence |
 |---|---|---|---|---|---|
-| `lucento_mascot_sun.json` | Sun mascot (day theme); markers `idle`, `success`, `curious`, `celebrate` | `LucentoMascot` everywhere (Home, Plan, onboarding, empty/off states) | idle ×3 then rests; curious ×2; success/celebrate once | 24.2 KB / 2.0 KB | Original (Lucento) |
-| `lucento_mascot_moon.json` | Moon mascot (night theme), same markers | as above, dark theme | as above | 19.8 KB / 2.0 KB | Original (Lucento) |
+| `lucento_mascot_sun.json` | Sun mascot (day theme); markers `idle`, `success`, `curious`, `celebrate`, `concerned` (v0.5) | `LucentoMascot` everywhere; on the Home budget hero its mood follows the budget: `idle` while comfortably within budget, `concerned` when ≤ 10 % is left or the budget is used up, `curious` before a budget exists | idle ×3 then rests; curious ×2; concerned ×2 then rests; success/celebrate once | 27.4 KB / 2.3 KB | Original (Lucento) |
+| `lucento_mascot_moon.json` | Moon mascot (night theme), same markers | as above, dark theme | as above | 22.9 KB / 2.2 KB | Original (Lucento) |
+| `net_flow_indicator.json` (+`_night`) | Trend glyph on a tinted tile; markers `up` (green, rising), `down` (red, falling), `flat` (neutral level line for exactly zero) | Home net-flow card (`NetFlowIndicator`), chosen from the calculated net flow | once per direction (≈0.6 s), holds the finished glyph; static icon under reduced motion | 9.1 KB / 1.0 KB each | Original (Lucento) |
 | `onboarding_welcome.json` (+`_night`) | The mark assembles: backdrop, L drawn, leaf grows, three sparkles | Onboarding welcome step | once, 2.5 s, never blocks "Get started" | 6.5 KB / 1.0 KB each | Original (Lucento) |
 | `empty_transactions.json` (+`_night`) | Ledger card with rows and a lens | Transactions: no transactions yet | once, 2 s, holds last frame | 11.1 KB / 1.0 KB each | Original (Lucento) |
 | `empty_budgets.json` (+`_night`) | Gauge filling to 62 % with a coin | Budgets: none yet | once, 1.8 s | 5.9 KB / 0.9 KB each | Original (Lucento) |
@@ -28,7 +30,11 @@ lottie-android; on-device appearance has **not yet been verified** (no emulator/
 | `feedback_milestone.json` | Ring completes, sun-yellow star, eight short rays | Goal halfway / reached (after the contribution is saved); a finished month kept within budget (shown once per month) | once, 2 s | 12.1 KB / 1.1 KB | Original (Lucento) |
 | `loading_dots.json` | Three brand-blue dots | `LucentoWorkingIndicator` for genuine background work | loops while composed | 3.5 KB / 0.5 KB | Original (Lucento) |
 
-Total: 17 files, 176 KB uncompressed, ≈18 KB compressed (APK entries are deflated). Release APK/AAB size impact
+The `concerned` expression is deliberately supportive — inner brows lift, the eyes glance down, the mouth softens to
+a calm line (still turned up a touch), the rays settle and the head nods slowly. No frown, tears or red. Preview:
+`animation-preview-mascot-concerned.png`; net-flow glyphs: `animation-preview-netflow.png` (lottie-web renders).
+
+Total: 19 files, ≈200 KB uncompressed, ≈20 KB compressed (APK entries are deflated). Release APK/AAB size impact
 including the Lottie library itself is **not yet measured** — the CI "Inspect release artifacts" step reports sizes.
 Note: `lottie` declares `androidx.appcompat` as an API dependency, so AppCompat enters the release classpath; R8
 removes what is unused.

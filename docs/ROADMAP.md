@@ -74,6 +74,11 @@ Presentation-layer only: no schema, entity, DAO or repository changes. See `docs
   states; Lottie: mascot expressions, onboarding, empty states, scan, saved, milestones (goal halfway/reached, month
   kept within budget — once).
 
+## Done — v0.5.0 UI/UX refinement (JVM-tested; compile pending CI)
+Dock navigation + More + profile menu, + Add sheet (Manual/Scan/Speak/Type it), budget hero with Sun moods, net flow
+glyph, burn bar, savings level, upcoming payments, category-derived budget, preset category onboarding, Budget tab
+with category management, focused Insights, screenshot tour in CI.
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).

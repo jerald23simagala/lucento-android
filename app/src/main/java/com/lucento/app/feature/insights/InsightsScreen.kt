@@ -27,61 +27,60 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.AmountText
-import com.lucento.app.core.designsystem.component.DonutChart
+import com.lucento.app.core.designsystem.component.CompositionBar
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Figure
+import com.lucento.app.core.designsystem.component.IncomeExpenseChart
+import com.lucento.app.core.designsystem.component.LegendKey
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.MoneyText
-import com.lucento.app.core.designsystem.component.MonthlyBarChart
+import com.lucento.app.core.designsystem.component.ProfileButton
 import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.component.SegmentedToggle
-import com.lucento.app.core.designsystem.component.ShareBar
+import com.lucento.app.core.designsystem.component.groupLabel
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
-import com.lucento.app.domain.BudgetCalculator
-import com.lucento.app.domain.BudgetStatus
-import com.lucento.app.domain.CashflowCalculator
-import com.lucento.app.domain.CategoryShare
-import com.lucento.app.domain.DateRange
-import com.lucento.app.domain.Feature
+import com.lucento.app.domain.FlowMonth
 import com.lucento.app.domain.Insights
-import com.lucento.app.domain.NetWorthCalculator
-import com.lucento.app.domain.TransactionQueries
-import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.NetWorthComponent
+import com.lucento.app.domain.NetWorthComposer
+import com.lucento.app.domain.NetWorthComposition
 import com.lucento.app.feature.home.monthLabel
-import java.time.LocalDate
+import com.lucento.app.feature.plan.PillRow
 import java.time.YearMonth
 
-private enum class Period(val label: String) { THIS_MONTH("This month"), LAST_MONTH("Last month"), THREE_MONTHS("3 months") }
-private enum class Breakdown(val label: String) { SPENDING("Spending"), INCOME("Income") }
-
-private fun Period.range(today: LocalDate): DateRange = when (this) {
-    Period.THIS_MONTH -> DateRange.monthOf(today)
-    Period.LAST_MONTH -> DateRange.monthOf(today.minusMonths(1))
-    Period.THREE_MONTHS -> DateRange(YearMonth.from(today).minusMonths(2).atDay(1), today.withDayOfMonth(today.lengthOfMonth()))
-}
+private enum class TrendPeriod(val label: String, val months: Int) { THREE("3 months", 3), SIX("6 months", 6), TWELVE("12 months", 12) }
 
 /**
- * Local analytics from recorded data only, in one currency at a time. Every chart has the exact
- * figures beside it and a spoken summary; transfers never appear as income or spending.
+ * Insights answers two questions, from the user's own records and in one currency at a time:
+ * how are my income and expenses trending, and what is my net worth made of? Transfers between the user's own
+ * wallets are never income or expenses; savings goals are never added to net worth (their money is already in the
+ * wallet balances). Every chart has its exact figures beside it and a spoken summary.
  */
 @Composable
 fun InsightsScreen(viewModel: InsightsViewModel = viewModel(factory = InsightsViewModel.Factory)) {
     val data by viewModel.data.collectAsStateWithLifecycle()
-    var period by rememberSaveable { mutableStateOf(Period.THIS_MONTH) }
-    var breakdown by rememberSaveable { mutableStateOf(Breakdown.SPENDING) }
-    val currency = data.focusCurrency
+    var period by rememberSaveable { mutableStateOf(TrendPeriod.SIX) }
+    var currencyChoice by rememberSaveable { mutableStateOf<String?>(null) }
+    val currencies = remember(data.wallets, data.transactions, data.focusCurrency) {
+        (listOf(data.focusCurrency) +
+            NetWorthComposer.currencies(data.wallets, data.focusCurrency) +
+            data.transactions.filterNot { it.isTransfer }.map { it.currencyCode }.distinct().sorted()).distinct()
+    }
+    val currency = currencyChoice?.takeIf { it in currencies } ?: data.focusCurrency
 
     Column(
         Modifier
@@ -89,204 +88,188 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel(factory = InsightsVi
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.gutter),
     ) {
-        LucentoTopBar(title = "Insights", subtitle = "From your own records · $currency")
-        when {
-            data.loading -> Unit
-            data.transactions.none { !it.isTransfer } -> EmptyState(
-                title = "Insights need a little history",
-                body = "Record a few incomes and expenses and Lucento will show where your money goes, month by month.",
-                illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
-            )
-            else -> InsightsContent(
-                data = data,
-                period = period,
-                onPeriod = { period = it },
-                breakdown = breakdown,
-                onBreakdown = { breakdown = it },
-            )
-        }
-        Spacer(Modifier.height(Spacing.xxl))
-    }
-}
-
-@Composable
-private fun InsightsContent(
-    data: InsightsData,
-    period: Period,
-    onPeriod: (Period) -> Unit,
-    breakdown: Breakdown,
-    onBreakdown: (Breakdown) -> Unit,
-) {
-    val currency = data.focusCurrency
-    val range = period.range(data.today)
-    Column {
-        SegmentedToggle(options = Period.entries.map { it to it.label }, selected = period, onSelect = onPeriod)
-        Spacer(Modifier.height(Spacing.md))
-
-        val totals = remember(data.transactions, range, currency) {
-            TransactionQueries.totalsByCurrency(data.transactions, range, currency).firstOrNull { it.currencyCode == currency }
-        }
-        LucentoCard(Modifier.fillMaxWidth()) {
-            val income = totals?.income ?: Money.zero(currency)
-            val expense = totals?.expense ?: Money.zero(currency)
-            val net = income - expense
-            Figure("Net flow") {
-                MoneyText(money = net, style = AmountStyles.hero, showPlus = true, color = if (net.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface)
-            }
+        LucentoTopBar(title = "Insights", subtitle = "From your own records · $currency", actions = { ProfileButton() })
+        if (data.loading) return@Column
+        if (currencies.size > 1) {
+            PillRow(currencies.map { it to it }, currency, onSelect = { currencyChoice = it })
             Spacer(Modifier.height(Spacing.md))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Figure("Income", Modifier.weight(1f)) {
-                    MoneyText(money = income, style = AmountStyles.medium, showPlus = true, color = LucentoTheme.extendedColors.positive, fractionScale = 1f)
-                }
-                Figure("Expenses", Modifier.weight(1f)) {
-                    MoneyText(money = -expense, style = AmountStyles.medium, fractionScale = 1f)
-                }
-            }
-            val percent = Insights.percentOf(expense, income)
-            if (percent != null) {
-                Spacer(Modifier.height(Spacing.sm))
-                Text(
-                    if (percent > 100) "You spent $percent% of what came in." else "You kept ${100 - percent}% of what came in.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
 
+        TrendSection(data, currency, period, onPeriod = { period = it })
         Spacer(Modifier.height(Spacing.section))
-        SectionHeader("Breakdown")
-        SegmentedToggle(options = Breakdown.entries.map { it to it.label }, selected = breakdown, onSelect = onBreakdown)
-        Spacer(Modifier.height(Spacing.md))
-        val type = if (breakdown == Breakdown.SPENDING) TransactionType.EXPENSE else TransactionType.INCOME
-        val shares = remember(data.transactions, range, currency, type) {
-            Insights.categoryBreakdown(data.transactions, currency, range, type)
-        }
-        BreakdownCard(shares, data, currency)
-
-        Spacer(Modifier.height(Spacing.section))
-        val months = remember(data.transactions, currency, data.today) {
-            Insights.monthlyTotals(data.transactions, currency, YearMonth.from(data.today), 6)
-        }
-        SectionHeader("Spending · last 6 months")
-        if (months.any { !it.amount.isZero }) {
-            MonthlyBarChart(months = months, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(Spacing.sm))
-            val current = months.last()
-            val previous = months[months.size - 2]
-            Text(
-                buildString {
-                    append("${monthLabel(current.month)} so far: ${MoneyFormatter.format(current.amount)}.")
-                    if (!previous.amount.isZero) append(" ${monthLabel(previous.month)}: ${MoneyFormatter.format(previous.amount)}.")
-                    val average = CashflowCalculator.divide(Money.sum(currency, months.dropLast(1).map { it.amount }), 5)
-                    if (!average.isZero) append(" Five-month average: ${MoneyFormatter.format(average)}.")
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Text("No spending in $currency in the last six months.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-
-        if (data.features.isEnabled(Feature.BUDGETS) && data.budgets.isNotEmpty()) {
-            Spacer(Modifier.height(Spacing.section))
-            val month = YearMonth.from(range.endInclusive)
-            SectionHeader("Budget performance · ${monthLabel(month)}")
-            BudgetCalculator.progressAll(data.budgets, data.transactions, month).forEach { p ->
-                val name = p.budget.categoryId?.let { data.categoriesById[it]?.name } ?: "Overall (${p.budget.currencyCode})"
-                Column(Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            "${MoneyFormatter.format(p.spent)} / ${MoneyFormatter.format(p.budget.limit)}",
-                            style = AmountStyles.small,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.height(Spacing.xs))
-                    ShareBar(
-                        fraction = p.fraction,
-                        color = when (p.status) {
-                            BudgetStatus.ON_TRACK -> LucentoTheme.extendedColors.success
-                            BudgetStatus.NEAR_LIMIT -> LucentoTheme.extendedColors.warning
-                            BudgetStatus.OVER_LIMIT -> LucentoTheme.extendedColors.negative
-                        },
-                    )
-                }
-            }
-        }
-
-        if (data.wallets.isNotEmpty()) {
-            Spacer(Modifier.height(Spacing.section))
-            SectionHeader("Net worth today")
-            val summary = NetWorthCalculator.summarize(data.wallets, data.primaryCurrency)
-            summary.totals.forEach { total ->
-                val code = total.currencyCode
-                Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(code, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Have ${MoneyFormatter.format(summary.assets[code] ?: Money.zero(code))} · owe ${MoneyFormatter.format(summary.liabilities[code] ?: Money.zero(code))}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    AmountText(total, style = AmountStyles.medium)
-                }
-            }
-            Text(
-                "Each currency is shown separately — Lucento never converts with guessed rates.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.xs),
-            )
-        }
+        NetWorthSection(data, currency)
+        Spacer(Modifier.height(Spacing.fabClearance))
     }
 }
 
 @Composable
-private fun BreakdownCard(shares: List<CategoryShare>, data: InsightsData, currency: String) {
-    if (shares.isEmpty()) {
-        Text("Nothing recorded in this period.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun TrendSection(data: InsightsData, currency: String, period: TrendPeriod, onPeriod: (TrendPeriod) -> Unit) {
+    val ext = LucentoTheme.extendedColors
+    val endMonth = YearMonth.from(data.today)
+    val months = remember(data.transactions, currency, endMonth, period) {
+        Insights.incomeExpenseTrend(data.transactions, currency, endMonth, period.months)
+    }
+    SectionHeader("Income and expenses", Modifier.semantics { heading() })
+    SegmentedToggle(options = TrendPeriod.entries.map { it to it.label }, selected = period, onSelect = onPeriod)
+    Spacer(Modifier.height(Spacing.md))
+    val hasData = months.any { !it.income.isZero || !it.expense.isZero }
+    if (!hasData) {
+        EmptyState(
+            title = "No income or expenses yet",
+            body = "Record a few incomes and expenses in $currency and you’ll see how they move month by month. " +
+                "Transfers between your own accounts never count here.",
+            illustration = { LucentoMascot(size = 88.dp, mood = MascotMood.Curious) },
+        )
         return
     }
-    val palette = LucentoTheme.extendedColors.categorical
-    val total = Money.sum(currency, shares.map { it.amount })
-    // Five largest, then everything else together, so the chart stays readable.
-    val top = shares.take(5)
-    val rest = shares.drop(5)
-    val rows: List<Triple<String, Money, Color>> = top.mapIndexed { i, s ->
-        Triple(s.categoryId?.let { data.categoriesById[it]?.name } ?: "Uncategorized", s.amount, palette[i % palette.size])
-    } + if (rest.isEmpty()) emptyList<Triple<String, Money, Color>>() else listOf(Triple("Other", Money.sum(currency, rest.map { it.amount }), palette.last()))
-    val description = rows.joinToString("; ") { (name, amount, _) ->
-        "$name ${MoneyFormatter.format(amount)}, ${Insights.percentOf(amount, total) ?: 0}%"
-    }
+    val income = Money.sum(currency, months.map { it.income })
+    val expense = Money.sum(currency, months.map { it.expense })
+    val net = income - expense
     LucentoCard(Modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            DonutChart(
-                values = rows.map { Insights.fraction(it.second, total) },
-                colors = rows.map { it.third },
-                description = "Breakdown. Total ${MoneyFormatter.format(total)}. $description",
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    AmountText(total, style = AmountStyles.large, signed = false)
-                    Text("Total", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Figure("Income", Modifier.weight(1f)) {
+                MoneyText(money = income, style = AmountStyles.medium, showPlus = true, color = ext.positive, fractionScale = 1f)
+            }
+            Figure("Expenses", Modifier.weight(1f)) {
+                MoneyText(money = -expense, style = AmountStyles.medium, color = ext.negative, fractionScale = 1f)
+            }
+            Figure("Net", Modifier.weight(1f)) {
+                MoneyText(
+                    money = net,
+                    style = AmountStyles.medium,
+                    showPlus = true,
+                    color = if (net.isNegative) ext.negative else MaterialTheme.colorScheme.onSurface,
+                    fractionScale = 1f,
+                )
             }
         }
         Spacer(Modifier.height(Spacing.lg))
-        rows.forEach { (name, amount, color) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-                Spacer(Modifier.width(Spacing.sm))
-                Text(name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    "${Insights.percentOf(amount, total) ?: 0}%",
-                    style = AmountStyles.small,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(end = Spacing.md),
-                )
-                AmountText(amount, style = AmountStyles.row, signed = false)
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            LegendKey("Income", ext.positive)
+            LegendKey("Expenses", ext.negative)
+        }
+        Spacer(Modifier.height(Spacing.md))
+        IncomeExpenseChart(months = months, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(Spacing.md))
+        Text(
+            trendSummary(months),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A plain-language reading of the trend, from exact figures only. */
+private fun trendSummary(months: List<FlowMonth>): String {
+    val current = months.last()
+    val previous = months.getOrNull(months.size - 2)
+    return buildString {
+        append("${monthLabel(current.month)} so far: ${MoneyFormatter.format(current.income)} in, ${MoneyFormatter.format(current.expense)} out.")
+        if (previous != null && (!previous.income.isZero || !previous.expense.isZero)) {
+            append(" ${monthLabel(previous.month)}: ${MoneyFormatter.format(previous.income)} in, ${MoneyFormatter.format(previous.expense)} out.")
+        }
+        val positive = months.count { it.net.amountMinor > 0L }
+        val recorded = months.count { !it.income.isZero || !it.expense.isZero }
+        if (recorded > 1) append(" You kept money in $positive of $recorded months with records.")
+    }
+}
+
+@Composable
+private fun NetWorthSection(data: InsightsData, currency: String) {
+    val ext = LucentoTheme.extendedColors
+    SectionHeader("What your net worth is made of", Modifier.semantics { heading() })
+    val composition = remember(data.wallets, currency) { NetWorthComposer.compose(data.wallets, currency) }
+    if (composition.isEmpty) {
+        Text(
+            if (data.wallets.isEmpty()) "Add your accounts — cash, bank, e-wallets, savings, cards and loans — to see your net worth."
+            else "None of your accounts use $currency.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    val net = composition.netWorth
+    LucentoCard(Modifier.fillMaxWidth()) {
+        Figure("Net worth · $currency") {
+            MoneyText(money = net, style = AmountStyles.hero, color = if (net.isNegative) ext.negative else MaterialTheme.colorScheme.onSurface)
+        }
+        Text(
+            when {
+                net.isNegative -> "You owe more than you have in $currency right now. Paying down debt raises this number."
+                net.isZero -> "What you have and what you owe in $currency balance out."
+                else -> "What you have minus what you owe, in $currency."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // One shared scale so the two bars compare honestly.
+        val scale = maxOf(
+            composition.assets.sumOf { it.amount.amountMinor.coerceAtLeast(0L) },
+            composition.liabilities.sumOf { it.amount.amountMinor.coerceAtLeast(0L) },
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        CompositionGroup("Assets", composition.totalAssets, composition.assets, scale, composition)
+        Spacer(Modifier.height(Spacing.lg))
+        CompositionGroup("Liabilities", composition.totalLiabilities, composition.liabilities, scale, composition)
+        Spacer(Modifier.height(Spacing.md))
+        Text(
+            "Savings goals aren’t added here — the money set aside for them is already in your account balances. " +
+                "Other currencies are shown separately and never converted.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CompositionGroup(
+    title: String,
+    total: Money,
+    components: List<NetWorthComponent>,
+    scale: Long,
+    composition: NetWorthComposition,
+) {
+    val ext = LucentoTheme.extendedColors
+    val colors: List<Color> = components.map { ext.tone(it.type).content }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        AmountText(total, style = AmountStyles.row, signed = total.isNegative)
+    }
+    Spacer(Modifier.height(Spacing.sm))
+    if (components.isEmpty()) {
+        Text(
+            if (title == "Liabilities") "Nothing owed in ${composition.currencyCode}." else "No assets in ${composition.currencyCode}.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    CompositionBar(
+        weights = components.map { it.amount.amountMinor.coerceAtLeast(0L) },
+        colors = colors,
+        scaleTo = scale,
+        description = "$title ${MoneyFormatter.format(total)}: " +
+            components.joinToString("; ") { "${it.type.groupLabel} ${MoneyFormatter.format(it.amount)}" },
+    )
+    Spacer(Modifier.height(Spacing.sm))
+    components.forEachIndexed { i, c ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(colors[i]))
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                "${c.type.groupLabel} · ${c.walletCount}",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val share = Insights.percentOf(c.amount.coerceAtLeastZero(), total.coerceAtLeastZero())
+            if (share != null) {
+                Text("$share%", style = AmountStyles.small, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = Spacing.md))
             }
+            AmountText(c.amount, style = AmountStyles.row, signed = c.amount.isNegative)
         }
     }
 }
+
+private fun Money.coerceAtLeastZero(): Money = if (isNegative) Money.zero(currencyCode) else this

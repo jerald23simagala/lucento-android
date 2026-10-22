@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.UUID
 
-/** Everything the Plan hub and its four screens read. Calculations happen in the domain layer. */
+/** Everything the goals, debts and recurring screens (and the More menu) read. Calculations happen in the domain layer. */
 data class PlanUiState(
     val loading: Boolean = true,
     val today: LocalDate = LocalDate.now(),
@@ -152,17 +152,7 @@ class PlanViewModel(
         }
     }
 
-    // ---------------------------------------------------------------- budgets
-
-    fun saveBudget(id: Long?, categoryId: Long?, limit: Money, onResult: (BudgetRepository.SaveResult) -> Unit) =
-        write({ budgets.save(id, categoryId, limit) }, onResult)
-
-    fun deleteBudget(id: Long) = write({ budgets.delete(id) }) {}
-
-    /** Records that [month]'s kept budget was acknowledged, so it is never shown again. */
-    fun acknowledgeBudgetMonth(month: java.time.YearMonth) {
-        viewModelScope.launch { runCatching { preferences.setAcknowledgedBudgetMonth(month) } }
-    }
+    // Budgets moved to the Budget tab (feature/budget/BudgetViewModel) in 0.5.
 
     // ---------------------------------------------------------------- goals
 

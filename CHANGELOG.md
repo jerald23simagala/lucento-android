@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.5.0 — 2026-10-22 (UI/UX refinement; JVM-tested locally, awaiting CI compile)
+
+### Navigation
+- Persistent dock: Home · Transactions · Wallets · Insights · Budget + More menu (goals, recurring, debts, categories).
+  Hidden only for focused workflows (scan, speak/type, category setup, settings). Tab state preserved.
+- Profile button on every primary screen → profile menu (optional device-only name, appearance, Settings, Enabled
+  features). Settings is no longer a primary destination.
+- App-wide + opens Add Transaction: Manual, Scan, Speak (listens on arrival), Type it (focuses the sentence field).
+  Removed: Add tab, Quick Add screen, Plan hub, More screen.
+
+### Home
+- Budget hero (brand panel, ~30 % shorter) with remaining/total/spent and the Sun mascot: happy within budget,
+  supportively concerned at ≤ 10 % left or exceeded (new `concerned` Lottie marker + vector still).
+- Compact net-flow card with an animated trend glyph (green / red / neutral at zero — new `net_flow_indicator` Lottie).
+- Burn-rate consumption bar with a today marker; same thresholds as the hero; no percentage without a budget.
+- Savings goals level; Upcoming recurring payments replace Recent transactions (tap → review / mark paid).
+- Action-button row removed.
+
+### Budget
+- The overall budget is derived: the sum of category allocations per currency and month (`BudgetPlanner`). No
+  separate "budget for everything"; legacy rows are ignored, explained once and removable.
+- New Budget tab: summary, budgeted / not-budgeted categories, spending outside the budget, amount sheet with a
+  live new-total preview, category management (add, rename, reorder, deactivate, restore).
+- Mandatory onboarding step: choose spending categories from a grouped preset library (≈90 presets, 10 groups,
+  search, recommended defaults, custom names) and review before confirming. Fresh installs seed income categories
+  only. Existing users are never sent back through onboarding: a one-time card offers the same picker or keeping
+  their categories; users with no categories get "Finish setting up your budget".
+- Budgets module on by default.
+
+### Insights
+- Focused on income/expense trends (3/6/12 months, transfers excluded) and net-worth composition (assets and
+  liabilities by account type on a shared scale). Category donut and budget performance removed from Insights.
+
+### Quality
+- 38 new JVM tests (253 total, passing in `tools/jvm-harness/run.sh`, now committed).
+- `ScreenshotTourTest` (emulator) + CI upload of screenshots; CI also runs on `feature/**` and `release/**` pushes.
+- No Room schema change (database stays v3).
+
 ## 0.4.0 — 2026-10-22 (local, not yet built by CI)
 
 ### Financial integrity

@@ -29,4 +29,11 @@ interface BudgetDao {
 
     @Query("DELETE FROM budgets WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("SELECT * FROM budgets WHERE category_id = :categoryId AND currency_code = :currencyCode ORDER BY id ASC LIMIT 1")
+    suspend fun findAllocation(categoryId: Long, currencyCode: String): BudgetEntity?
+
+    /** Removes pre-0.5 "budget for everything" rows (category_id NULL). Transactions are never touched. */
+    @Query("DELETE FROM budgets WHERE category_id IS NULL")
+    suspend fun deleteLegacyOverall(): Int
 }

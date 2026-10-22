@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -62,9 +65,12 @@ import com.lucento.app.feature.plan.formatDate
 import java.time.LocalDate
 
 /**
- * "Speak or type it": the system speech recogniser (when the device has one) or the keyboard turns a
+ * "Speak" and "Type it": the system speech recogniser (when the device has one) or the keyboard turns a
  * sentence into text; Lucento's offline parser turns the text into a proposal; the proposal opens in
  * the normal editor for review. Nothing is saved from this screen and nothing is sent to an AI service.
+ *
+ * [typing] = true opens straight into the text field (Type it); false starts listening once on arrival (Speak).
+ * Either way the other input stays available on the same screen.
  */
 @Composable
 fun VoiceEntryScreen(
@@ -72,8 +78,12 @@ fun VoiceEntryScreen(
     categories: List<Category>,
     onBack: () -> Unit,
     onReview: (QuickEntryProposal) -> Unit,
+    typing: Boolean = false,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
+    // Survives rotation so arriving on Speak starts the recogniser exactly once.
+    var autoStarted by rememberSaveable { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
     var proposal by remember { mutableStateOf<QuickEntryProposal?>(null) }
     var speechMessage by remember { mutableStateOf<String?>(null) }
     val haptics = rememberHaptics()
@@ -114,6 +124,16 @@ fun VoiceEntryScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        if (autoStarted) return@LaunchedEffect
+        autoStarted = true
+        if (typing) {
+            runCatching { focusRequester.requestFocus() }
+        } else {
+            listen()
+        }
+    }
+
     Column(
         Modifier
             .fillMaxSize()
@@ -121,9 +141,13 @@ fun VoiceEntryScreen(
             .padding(horizontal = Spacing.gutter)
             .imePadding(),
     ) {
-        LucentoTopBar(title = "Speak or type", onBack = onBack)
+        LucentoTopBar(
+            title = if (typing) "Type it" else "Speak",
+            subtitle = "Describe a transaction · you review before saving",
+            onBack = onBack,
+        )
 
-        Column(Modifier.fillMaxWidth().padding(vertical = Spacing.lg), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (!typing) Column(Modifier.fillMaxWidth().padding(vertical = Spacing.lg), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 Modifier
                     .size(88.dp)
@@ -151,15 +175,18 @@ fun VoiceEntryScreen(
                 text = it.take(200)
                 proposal = null
             },
-            label = { Text("Or type it") },
+            label = { Text(if (typing) "What happened?" else "Or type it") },
             placeholder = { Text("e.g. Grab 180 yesterday from GCash") },
             minLines = 2,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
             shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
         )
         Spacer(Modifier.height(Spacing.md))
         LucentoPrimaryButton(text = "Understand it", onClick = { interpret(text) }, enabled = text.isNotBlank())
+        if (typing) {
+            LucentoTextButton(text = "Speak instead", onClick = ::listen, modifier = Modifier.align(Alignment.CenterHorizontally))
+        }
 
         val p = proposal
         if (p == null) {

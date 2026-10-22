@@ -12,9 +12,9 @@ import java.time.temporal.ChronoUnit
  *
  * Two bases, chosen by the data that exists, and always disclosed to the user:
  *
- * - [Basis.BUDGET] (an overall monthly budget exists in this currency):
- *   `limit − spent this month − unpaid recurring expenses due by month end`.
- * - [Basis.BALANCES] (no overall budget): `spendable balances − unpaid recurring expenses due by month end`.
+ * - [Basis.BUDGET] (category allocations exist in this currency; their sum is the budget, see [BudgetPlanner]):
+ *   `budget − budgeted spending this month − unpaid recurring expenses in budgeted categories due by month end`.
+ * - [Basis.BALANCES] (no allocations): `spendable balances − unpaid recurring expenses due by month end`.
  *   Spendable balances are cash, bank and e-wallet accounts only; savings and liabilities are excluded,
  *   so money set aside is never presented as spendable. This is an estimate and is labelled as one.
  *
@@ -29,11 +29,11 @@ data class SafeToSpend(
     val daysLeft: Int,
     /** [amount] spread evenly over [daysLeft]; null when nothing is left to spread. */
     val perDay: Money?,
-    /** Expenses recorded this month in this currency. */
+    /** Expenses counted against the figure: budgeted spending for [Basis.BUDGET], all expenses for [Basis.BALANCES]. */
     val spentThisMonth: Money,
     /** Unpaid recurring expenses due on or before the last day of the month (overdue included). */
     val committed: Money,
-    /** The overall budget's limit for [Basis.BUDGET]. */
+    /** The category-derived budget total for [Basis.BUDGET]. */
     val budgetLimit: Money?,
     /** Sum of spendable balances in this currency; null when the user has no spendable account in it. */
     val spendableBalance: Money?,
@@ -88,19 +88,29 @@ object CashflowCalculator {
         wallets: List<Wallet>,
         budgets: List<Budget>,
         schedules: List<RecurringSchedule>,
+        categories: List<Category> = emptyList(),
     ): SafeToSpend? {
         val month = YearMonth.from(today)
         val monthEnd = month.atEndOfMonth()
         val daysLeft = (ChronoUnit.DAYS.between(today, monthEnd) + 1).toInt()
-        val spent = expensesIn(transactions, currencyCode, month)
-        val committed = RecurringMath.committedExpenses(schedules, currencyCode, monthEnd)
+        val plan = BudgetPlanner.plan(categories, budgets, transactions, currencyCode, month)
         val spendableWallets = wallets.filter { it.type.isSpendable && it.currencyCode == currencyCode }
         val spendable = if (spendableWallets.isEmpty()) null else Money.sum(currencyCode, spendableWallets.map { it.balance })
-        val budget = BudgetCalculator.overallFor(budgets, currencyCode)
 
+        val budgeted = plan.allocatedLines.map { it.category.id }.toSet()
+        val spent: Money
+        val committed: Money
         val (basis, amount) = when {
-            budget != null -> SafeToSpend.Basis.BUDGET to (budget.limit - spent - committed)
-            spendable != null -> SafeToSpend.Basis.BALANCES to (spendable - committed)
+            plan.hasBudget -> {
+                spent = plan.spent
+                committed = RecurringMath.committedExpenses(schedules.filter { it.categoryId in budgeted }, currencyCode, monthEnd)
+                SafeToSpend.Basis.BUDGET to (plan.total - spent - committed)
+            }
+            spendable != null -> {
+                spent = expensesIn(transactions, currencyCode, month)
+                committed = RecurringMath.committedExpenses(schedules, currencyCode, monthEnd)
+                SafeToSpend.Basis.BALANCES to (spendable - committed)
+            }
             else -> return null
         }
         return SafeToSpend(
@@ -111,7 +121,7 @@ object CashflowCalculator {
             perDay = if (amount.amountMinor > 0L) divide(amount, daysLeft.toLong(), RoundingMode.DOWN) else null,
             spentThisMonth = spent,
             committed = committed,
-            budgetLimit = budget?.limit,
+            budgetLimit = plan.total.takeIf { plan.hasBudget },
             spendableBalance = spendable,
         )
     }

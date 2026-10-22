@@ -1,0 +1,2 @@
+# Pure (Android-free) feature files compiled by the JVM harness, relative to app/src/main/java/com/lucento/app
+feature/home/HomeState.kt

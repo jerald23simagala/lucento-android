@@ -6,11 +6,14 @@ import com.lucento.app.core.containerFactory
 import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.BudgetRepository
 import com.lucento.app.data.repository.CategoryRepository
+import com.lucento.app.data.repository.GoalRepository
 import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.Budget
 import com.lucento.app.domain.Category
+import com.lucento.app.domain.Goal
+import com.lucento.app.domain.GoalContribution
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.Wallet
@@ -26,6 +29,7 @@ class HomeViewModel(
     categories: CategoryRepository,
     budgets: BudgetRepository,
     recurring: RecurringRepository,
+    goals: GoalRepository,
     preferences: UserPreferencesRepository,
 ) : ViewModel() {
 
@@ -37,6 +41,8 @@ class HomeViewModel(
         val schedules: List<RecurringSchedule>,
     )
 
+    private data class Savings(val goals: List<Goal>, val contributions: List<GoalContribution>)
+
     val uiState: StateFlow<HomeUiState> = combine(
         combine(
             transactions.observeTransactions(),
@@ -47,8 +53,9 @@ class HomeViewModel(
         ) { all, walletList, categoryList, budgetList, scheduleList ->
             Core(all, walletList, categoryList, budgetList, scheduleList)
         },
+        combine(goals.observeGoals(), goals.observeContributions()) { g, c -> Savings(g, c) },
         preferences.preferences,
-    ) { core, prefs ->
+    ) { core, savings, prefs ->
         HomeStateBuilder.build(
             all = core.transactions,
             wallets = core.wallets,
@@ -58,12 +65,15 @@ class HomeViewModel(
             budgets = core.budgets,
             schedules = core.schedules,
             features = prefs.features,
+            goals = savings.goals,
+            contributions = savings.contributions,
+            displayName = prefs.displayName,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     companion object {
         val Factory = containerFactory {
-            HomeViewModel(it.transactions, it.wallets, it.categories, it.budgets, it.recurring, it.preferences)
+            HomeViewModel(it.transactions, it.wallets, it.categories, it.budgets, it.recurring, it.goals, it.preferences)
         }
     }
 }

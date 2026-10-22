@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -59,6 +58,7 @@ import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
+import com.lucento.app.core.designsystem.component.ProfileButton
 import com.lucento.app.core.designsystem.component.SearchField
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
@@ -95,7 +95,7 @@ fun TransactionsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
         ) {
-            item(key = "title") { LucentoTopBar(title = "Transactions") }
+            item(key = "title") { LucentoTopBar(title = "Transactions", actions = { ProfileButton() }) }
 
             when {
                 state.loading -> Unit
@@ -194,19 +194,7 @@ fun TransactionsScreen(
             }
         }
 
-        if (hasHistory) {
-            ExtendedFloatingActionButton(
-                onClick = onAddTransaction,
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Add") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(Spacing.gutter),
-            )
-        }
+        // Adding happens through the app-wide + button above the navigation dock.
     }
 }
 
