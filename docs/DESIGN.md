@@ -32,8 +32,8 @@ balances say "owed", budget states say "Over" / a percentage, and transfers are 
 - **Handsome Sun** (light theme) and **Handsome Moon** (dark theme), `LucentoMascot`: an original character pair
   drawn entirely in Compose vectors (no image assets, no downloads). They share one face — level, confident brows,
   bright eyes, cheeks and a restrained smile — so they read as the same character by day and night. Moods: `Happy`,
-  `Curious`. A gentle 2.8s float plays only when animations are allowed.
-- Usage: small and secondary on Home (beside the greeting, 60dp); larger in onboarding (140dp) and empty states (96dp).
+  `Curious`, `Success`, `Celebrate` — animated with the original Lottie files, still vector otherwise.
+- Usage: small and secondary on Home (beside the greeting, 72dp); larger in onboarding (140dp) and empty states.
   Never on every screen; never competing with a financial figure.
 
 ## Typography
@@ -61,13 +61,42 @@ balances say "owed", budget states say "Over" / a percentage, and transfers are 
 | `IconTile`, `CategoryTile`, `WalletTypeTile`, `IconBadge` | Tinted icon tiles (transfers use a swap icon). |
 | Buttons, `SearchField`, `SegmentedToggle`, `ChoicePill`, `LucentoBottomSheet`, `ConfirmDialog` | Inputs and containers. |
 | `LucentoMark`, `LucentoMascot` | Brand. |
+| `LucentoLottieAnimation`, `EmptyIllustration`, `LucentoEmptyState`, `ConfirmationHost`, `LucentoWorkingIndicator` | Motion (see below). |
 
-## Motion
-Short and purposeful (120–800ms): fade-through between tabs, pushed screens slide from the trailing edge, the
-mark's leaf grows once, rings/donuts/bars draw in once, amounts roll on change, the mascot floats gently. With the
-system's "Remove animations" on (`LucentoTheme.reducedMotion`) decorative motion is skipped.
-**Lottie is not integrated yet** (see roadmap): every current moment is served by Compose animation, and the
-mascots are vector-drawn, so a Lottie dependency would add size without user value today.
+## Motion and Lottie (v0.4)
+Short and purposeful (120–800ms) Compose motion remains for structure: fade-through between tabs, pushed screens slide
+from the trailing edge, rings/bars draw once, amounts roll on change. Character and moments use **original Lottie**
+files (`res/raw`, register in `docs/design/ANIMATION_ASSETS.md`) through two components:
+
+| Component | Behaviour |
+|---|---|
+| `LucentoLottieAnimation(animation, marker, iterations, playing, onFinished, fallback)` | Day/night variant by theme; one-shots hold the final frame; loops stop when disposed; reduced motion shows a still (final frame for one-shots, first for loops); parse failure → fallback. |
+| `LucentoMascot(mood)` | Lottie Sun/Moon with markers: `Happy` (idle ×3, then rests), `Curious` (empty states), `Success` (onboarding done), `Celebrate`. Vector drawing as still/fallback. |
+| `EmptyIllustration` / `LucentoEmptyState` | Empty-state illustration (200×166dp) that drops out on narrow/short layouts. |
+| `ConfirmationHost(Confirmation)` | Saved check or calm milestone with one line of text, shown **after** a committed write; does not block touches; announced as a live region. |
+| `LucentoWorkingIndicator` | Brand dots + label for genuine background work. |
+
+Moments: onboarding mark assembles; empty Transactions/Budgets/Goals/Recurring; receipt scan beam while ML Kit runs
+(replaced by results or a clear error); saved transaction/transfer/recurring payment; goal halfway/reached; a month
+kept within budget (once). With "Remove animations" on (`LucentoTheme.reducedMotion`) nothing moves.
+
+## Reference mockup (v0.4)
+`docs/design-reference/lucento-mock.png` is the visual source of truth. Implemented from it:
+- **Category tiles**: saturated hue per spending family with a white glyph (food coral, transport green, shopping
+  rose, bills amber, housing blue, health teal, education/subscriptions indigo, entertainment violet, travel sky,
+  income green) — `LucentoExtendedColors.categoryTones`, used by `CategoryTile` in every list.
+- **Home**: greeting with a larger mascot (72dp); quick actions as one filled **Add** circle + tonal Transfer / Scan /
+  Speak / **More** (opens the Add hub); Net flow card split — net figure left, Income/Expenses stacked right with a
+  hairline divider; change vs last month coloured by direction.
+- **Transactions**: All · Income · Expenses · Transfers tabs above search (type pill removed from the filter row);
+  empty state with the ledger illustration, Add transaction + outlined Scan receipt / Speak transaction.
+- **Plan**: mascot enlarged beside the tagline; **Budgets/Goals/Recurring** empty states with their illustrations.
+- **Onboarding**: animated mark above the wordmark; "You're all set" mascot plays its success expression.
+- **Receipt scan**: scanning illustration while reading, "Couldn't read this receipt" state with the curious mascot.
+Not taken from the mockup on purpose: the user name/avatar (Lucento has no account), "I already have an account"
+(no sign-in exists), notification settings (no reminders yet), and emoji in the greeting.
+Visual parity has **not** been verified on a device: no emulator or Android build was available in the authoring
+environment (see `docs/QUALITY.md`).
 
 ## Navigation
 Bottom bar: **Home · Transactions · Add · Insights · More** (Add is a filled blue circle). Insights leaves the bar

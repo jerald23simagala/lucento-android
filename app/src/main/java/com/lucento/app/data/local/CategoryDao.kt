@@ -27,6 +27,14 @@ interface CategoryDao {
     @Query("SELECT COUNT(*) FROM transactions WHERE category_id = :id")
     suspend fun transactionCount(id: Long): Int
 
+    /** Budgets linked to the category. The budgets FK cascades, so these must be checked before any delete. */
+    @Query("SELECT COUNT(*) FROM budgets WHERE category_id = :id")
+    suspend fun budgetCount(id: Long): Int
+
+    /** Recurring schedules linked to the category (their FK would silently clear the link on delete). */
+    @Query("SELECT COUNT(*) FROM recurring WHERE category_id = :id")
+    suspend fun recurringCount(id: Long): Int
+
     @Insert
     suspend fun insert(category: CategoryEntity): Long
 

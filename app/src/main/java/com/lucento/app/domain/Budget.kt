@@ -16,6 +16,8 @@ data class Budget(
     val id: Long,
     val categoryId: Long?,
     val limit: Money,
+    /** Local date the budget was created; null when unknown. Used to tell whether it covered a whole month. */
+    val createdOn: java.time.LocalDate? = null,
 ) {
     val currencyCode: String get() = limit.currencyCode
     val isOverall: Boolean get() = categoryId == null
@@ -85,4 +87,34 @@ object BudgetCalculator {
     /** The overall budget for [currencyCode], if the user set one. */
     fun overallFor(budgets: List<Budget>, currencyCode: String): Budget? =
         budgets.firstOrNull { it.isOverall && it.currencyCode == currencyCode }
+}
+
+/**
+ * When to (calmly) acknowledge a month kept within budget. Pure and deterministic; the caller persists the
+ * month it acknowledged so it is shown once, not on every visit or recomposition.
+ */
+object BudgetMilestones {
+
+    /**
+     * The most recent *finished* month (before [today]'s month) worth acknowledging, or null. It qualifies when an
+     * overall budget in [currencyCode] existed for that whole month, there was real spending, and spending stayed
+     * at or under the limit. Overspending is never celebrated, nor is an empty month, nor a month already
+     * acknowledged ([lastAcknowledged] on or after it).
+     */
+    fun monthToAcknowledge(
+        budgets: List<Budget>,
+        transactions: List<Transaction>,
+        currencyCode: String,
+        today: java.time.LocalDate,
+        lastAcknowledged: YearMonth?,
+    ): BudgetProgress? {
+        val month = YearMonth.from(today).minusMonths(1)
+        if (lastAcknowledged != null && !lastAcknowledged.isBefore(month)) return null
+        val budget = BudgetCalculator.overallFor(budgets, currencyCode) ?: return null
+        val created = budget.createdOn ?: return null
+        if (created.isAfter(month.atDay(1))) return null
+        val progress = BudgetCalculator.progress(budget, transactions, month)
+        if (progress.spent.isZero || progress.status == BudgetStatus.OVER_LIMIT) return null
+        return progress
+    }
 }

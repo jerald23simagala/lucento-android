@@ -108,10 +108,11 @@ class PlanRepositoriesTest {
 
     @Test fun payingTheSameOccurrenceTwiceNeverDuplicates() = runTest {
         val id = rentSchedule()
+        val key = recurring.observeSchedules().first().single().occurrenceKey(0)
         recurring.markPaid(id)
         // Simulate a stale retry of occurrence 0 after the index advanced.
         transactions.save(
-            TransactionRepository.Input(null, "recurring-$id-0", TransactionType.EXPENSE, Money(12_000, "USD"), bank, rent, start, "Rent")
+            TransactionRepository.Input(null, key, TransactionType.EXPENSE, Money(12_000, "USD"), bank, rent, start, "Rent")
         )
         assertEquals(1, transactionDao.rows.value.size)
     }

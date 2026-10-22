@@ -1,14 +1,8 @@
 package com.lucento.app.core.designsystem.component
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -19,7 +13,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -28,8 +21,20 @@ import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoExtendedColors
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 
-/** Expression for the mascot; kept small on purpose — Lucento's friend, not a cartoon cast. */
-enum class MascotMood { Happy, Curious }
+/**
+ * Expression for the mascot; kept small on purpose — Lucento's friend, not a cartoon cast.
+ * [marker] names the matching segment in the mascot Lottie files; [cycles] is how often it plays before resting.
+ */
+enum class MascotMood(val marker: String, val cycles: Int) {
+    /** Gentle idle: a slow float and one blink, a few cycles, then still. */
+    Happy("idle", 3),
+    /** Empty states and "let's start": a head tilt and a look around. */
+    Curious("curious", 2),
+    /** Something was done well: a small hop and a wider smile. Plays once. */
+    Success("success", 1),
+    /** A meaningful milestone: the rays turn one step and four sparkles appear. Plays once. */
+    Celebrate("celebrate", 1),
+}
 
 /**
  * Lucento's original mascot pair, drawn entirely in vectors (no image assets, no downloads):
@@ -37,8 +42,9 @@ enum class MascotMood { Happy, Curious }
  * share one face — confident brows, bright eyes, a restrained smile — so they read as the same
  * character at different times of day.
  *
- * Use it small and secondary on dashboards; it may be larger in onboarding and empty states. A gentle
- * float plays when [animate] is true and the system has not asked to remove animations.
+ * Use it small and secondary on dashboards; it may be larger in onboarding and empty states. When [animate]
+ * is true and the system has not asked to remove animations, the Lottie character plays [mood]'s segment a
+ * few times and then rests; otherwise this exact vector drawing is shown still.
  * Decorative by default (no accessibility label) unless [contentDescription] is given.
  */
 @Composable
@@ -50,20 +56,20 @@ fun LucentoMascot(
     night: Boolean = LucentoTheme.isDark,
     contentDescription: String? = null,
 ) {
-    val colors = LucentoTheme.extendedColors
-    val play = animate && !LucentoTheme.reducedMotion
-    val float = if (play) {
-        val transition = rememberInfiniteTransition(label = "mascot")
-        val value by transition.animateFloat(
-            initialValue = -1f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(2800), RepeatMode.Reverse),
-            label = "mascot-float",
+    // The animated character (Lottie) is the default; the vector drawing below is its still form, used when
+    // motion is off, when a non-theme variant is requested, or if the animation can't be loaded.
+    if (animate && !LucentoTheme.reducedMotion && night == LucentoTheme.isDark) {
+        LucentoLottieAnimation(
+            animation = LucentoAnimation.Mascot,
+            modifier = modifier.size(size),
+            marker = mood.marker,
+            iterations = mood.cycles,
+            contentDescription = contentDescription,
+            fallback = { LucentoMascot(size = size, animate = false, mood = mood, night = night, contentDescription = null) },
         )
-        value
-    } else {
-        0f
+        return
     }
+    val colors = LucentoTheme.extendedColors
     val semantics = if (contentDescription != null) {
         Modifier.semantics { this.contentDescription = contentDescription }
     } else {
@@ -71,9 +77,7 @@ fun LucentoMascot(
     }
     Canvas(modifier.size(size).then(semantics)) {
         val u = this.size.minDimension / 100f
-        translate(top = float * 1.6f * u) {
-            if (night) drawMoon(u, colors, mood) else drawSun(u, colors, mood)
-        }
+        if (night) drawMoon(u, colors, mood) else drawSun(u, colors, mood)
     }
 }
 

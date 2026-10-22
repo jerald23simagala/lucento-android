@@ -1,5 +1,10 @@
 package com.lucento.app.feature.transactions
 
+import com.lucento.app.core.designsystem.component.SegmentedToggle
+import androidx.compose.material.icons.outlined.KeyboardVoice
+import androidx.compose.material.icons.outlined.DocumentScanner
+import com.lucento.app.core.designsystem.component.LucentoAnimation
+import com.lucento.app.core.designsystem.component.EmptyIllustration
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -70,6 +75,10 @@ fun TransactionsScreen(
     onAddTransaction: () -> Unit,
     onEditTransaction: (Transaction) -> Unit,
     onAddWallet: () -> Unit,
+    /** Shown on the empty state when receipt scanning is switched on. */
+    onScanReceipt: (() -> Unit)? = null,
+    /** Shown on the empty state when voice entry is switched on. */
+    onSpeak: (() -> Unit)? = null,
     viewModel: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -104,15 +113,37 @@ fun TransactionsScreen(
                 state.totalCount == 0 -> item(key = "no-transactions") {
                     EmptyState(
                         title = "No transactions yet",
-                        body = "Record what comes in and goes out. Wallet balances and your monthly picture update as you go.",
-                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
-                        action = { LucentoPrimaryButton(text = "Add transaction", onClick = onAddTransaction) },
+                        body = "Start by adding your first transaction to see your financial activity here.",
+                        illustration = { EmptyIllustration(LucentoAnimation.EmptyTransactions) },
+                        action = {
+                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                                LucentoPrimaryButton(text = "Add transaction", onClick = onAddTransaction)
+                                if (onScanReceipt != null) {
+                                    LucentoSecondaryButton(text = "Scan receipt", icon = Icons.Outlined.DocumentScanner, onClick = onScanReceipt)
+                                }
+                                if (onSpeak != null) {
+                                    LucentoSecondaryButton(text = "Speak transaction", icon = Icons.Outlined.KeyboardVoice, onClick = onSpeak)
+                                }
+                            }
+                        },
                     )
                 }
 
                 else -> {
                     item(key = "controls") {
                         Column {
+                            // Reference layout: type tabs first, then search, then the finer filters.
+                            SegmentedToggle(
+                                options = listOf<Pair<TransactionType?, String>>(
+                                    null to "All",
+                                    TransactionType.INCOME to "Income",
+                                    TransactionType.EXPENSE to "Expenses",
+                                    TransactionType.TRANSFER_OUT to "Transfers",
+                                ),
+                                selected = state.filter.type?.let { if (it.isTransfer) TransactionType.TRANSFER_OUT else it },
+                                onSelect = { viewModel.setType(it) },
+                            )
+                            Spacer(Modifier.height(Spacing.sm))
                             SearchField(
                                 value = query,
                                 onValueChange = {
@@ -259,21 +290,6 @@ private fun FilterRow(state: TransactionsUiState, viewModel: TransactionsViewMod
             label = rangeLabel(f.preset),
             active = f.preset != RangePreset.ALL,
             options = RangePreset.entries.map { preset -> rangeLabel(preset) to { viewModel.setPreset(preset) } },
-        )
-        MenuPill(
-            label = when (f.type) {
-                null -> "All types"
-                TransactionType.EXPENSE -> "Expenses"
-                TransactionType.INCOME -> "Income"
-                TransactionType.TRANSFER_OUT, TransactionType.TRANSFER_IN -> "Transfers"
-            },
-            active = f.type != null,
-            options = listOf<Pair<String, () -> Unit>>(
-                "All types" to { viewModel.setType(null) },
-                "Expenses" to { viewModel.setType(TransactionType.EXPENSE) },
-                "Income" to { viewModel.setType(TransactionType.INCOME) },
-                "Transfers" to { viewModel.setType(TransactionType.TRANSFER_OUT) },
-            ),
         )
         MenuPill(
             label = f.walletId?.let { state.walletsById[it]?.name } ?: "All wallets",

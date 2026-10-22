@@ -21,7 +21,8 @@ object CsvExporter {
         transactions
             .sortedWith(compareBy<Transaction> { it.date }.thenBy { it.id })
             .forEach { t ->
-                val row = listOf(
+                // Generated values: ISO date, fixed type words, exact decimal amount, ISO currency, transfer UUID.
+                val generated = listOf(
                     t.date.format(DateTimeFormatter.ISO_LOCAL_DATE),
                     when (t.type) {
                         TransactionType.EXPENSE -> "expense"
@@ -31,28 +32,45 @@ object CsvExporter {
                     },
                     t.signedAmount.toBigDecimal().toPlainString(),
                     t.currencyCode,
+                ).map { quote(it) }
+                // Free text typed by the user (or read from a receipt): neutralised before quoting.
+                val text = listOf(
                     walletNames[t.walletId].orEmpty(),
                     t.categoryId?.let { categoryNames[it] }.orEmpty(),
                     t.note,
-                    t.transferGroup.orEmpty(),
-                )
-                sb.append(row.joinToString(",") { escape(it) }).append("\r\n")
+                ).map { escape(it) }
+                sb.append((generated + text + quote(t.transferGroup.orEmpty())).joinToString(",")).append("\r\n")
             }
         return sb.toString()
     }
 
     /**
-     * Quotes fields containing separators, quotes or line breaks. Fields starting with a formula trigger
-     * (=, +, -, @) are prefixed with an apostrophe so spreadsheets don't execute them; amounts are exempt
-     * because they are generated numbers, not user text.
+     * Escapes one user-entered text field: [neutralizeFormula] first, then RFC 4180 [quote]ing.
+     *
+     * Protection provided (and its limits): spreadsheet apps (Excel, LibreOffice Calc, Google Sheets, Numbers)
+     * may evaluate a cell whose text starts with `=`, `+`, `-` or `@`, and some also act on a leading tab or
+     * carriage return, or skip leading spaces/control characters before deciding. Such fields get a leading
+     * apostrophe, which these apps treat as "this is text". This follows the OWASP CSV-injection guidance; it is
+     * not a guarantee for every application or import setting (e.g. an importer told to strip apostrophes).
+     * Amounts are never passed through here — they are generated numbers, so negative values stay numeric.
      */
-    fun escape(field: String): String {
-        val isNumber = field.matches(Regex("-?\\d+(\\.\\d+)?"))
-        val safe = if (!isNumber && field.isNotEmpty() && field[0] in "=+-@\t\r") "'$field" else field
-        return if (safe.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) {
-            "\"" + safe.replace("\"", "\"\"") + "\""
-        } else {
-            safe
-        }
+    fun escape(field: String): String = quote(neutralizeFormula(field))
+
+    /** Prefixes an apostrophe when the first meaningful character could start a formula. Other text is untouched. */
+    fun neutralizeFormula(field: String): String {
+        val first = field.firstOrNull { !it.isWhitespace() && !it.isISOControl() && it != '\uFEFF' } ?: return field
+        val leadingControl = field.first().let { it == '\t' || it == '\r' || it == '\n' }
+        return if (first in FORMULA_TRIGGERS || leadingControl) "'$field" else field
     }
+
+    /** RFC 4180: quotes fields containing separators, quotes or line breaks, doubling embedded quotes. */
+    fun quote(field: String): String =
+        if (field.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) {
+            "\"" + field.replace("\"", "\"\"") + "\""
+        } else {
+            field
+        }
+
+    /** ASCII triggers plus their full-width forms, which some apps normalise before evaluating. */
+    private const val FORMULA_TRIGGERS = "=+-@\uFF1D\uFF0B\uFF0D\uFF20"
 }

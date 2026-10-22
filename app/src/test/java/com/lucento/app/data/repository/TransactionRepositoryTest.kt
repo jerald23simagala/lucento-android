@@ -3,6 +3,7 @@ package com.lucento.app.data.repository
 import com.lucento.app.core.money.Money
 import com.lucento.app.data.local.CategoryEntity
 import com.lucento.app.domain.CategoryKind
+import com.lucento.app.domain.CategoryUsage
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.WalletType
 import com.lucento.app.data.repository.TransactionRepository.Input
@@ -161,7 +162,7 @@ class TransactionRepositoryTest {
     @Test fun walletCurrencyIsLockedOnceTransactionsExist() = runTest {
         transactions.save(input())
         val result = wallets.update(usdWallet, "Everyday", WalletType.BANK, Money(100_000, "EUR"))
-        assertEquals(WalletRepository.SaveResult.CurrencyLocked, result)
+        assertEquals(WalletRepository.SaveResult.CurrencyLocked(com.lucento.app.domain.WalletUsage(1, 0)), result)
         assertEquals(WalletRepository.SaveResult.Saved(usdWallet), wallets.update(usdWallet, "Renamed", WalletType.BANK, Money(1, "USD")))
     }
 
@@ -180,7 +181,7 @@ class TransactionRepositoryTest {
 
     @Test fun usedCategoryIsArchivedNotDeleted() = runTest {
         categoryDao.transactionCounts[groceries] = 3
-        assertEquals(CategoryRepository.DeleteResult.Archived(3), categories.remove(groceries))
+        assertEquals(CategoryRepository.DeleteResult.Archived(CategoryUsage(3, 0, 0)), categories.remove(groceries))
         assertTrue(categoryDao.rows.value.first { it.id == groceries }.archived)
     }
 

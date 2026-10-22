@@ -11,6 +11,11 @@ data class Category(
     val archived: Boolean = false,
 )
 
+/** Records that reference a category. Used to decide between deleting and archiving it. */
+data class CategoryUsage(val transactionCount: Int, val budgetCount: Int, val scheduleCount: Int) {
+    val isUsed: Boolean get() = transactionCount > 0 || budgetCount > 0 || scheduleCount > 0
+}
+
 /** Categories created on first install and when upgrading from schema v1. Names contain no quotes (used in SQL seeding). */
 object DefaultCategories {
     data class Seed(val name: String, val kind: CategoryKind, val iconKey: String)

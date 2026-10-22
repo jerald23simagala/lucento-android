@@ -36,3 +36,56 @@ data class Wallet(
     /** Signed effect of this wallet on net worth. */
     val netWorthContribution: Money get() = if (type.isLiability) -balance else balance
 }
+
+/** What still depends on a wallet: posted transactions (including transfer legs) and recurring schedules. */
+data class WalletUsage(val transactionCount: Int, val scheduleCount: Int) {
+    val isUsed: Boolean get() = transactionCount > 0 || scheduleCount > 0
+
+    companion object {
+        val Unused = WalletUsage(0, 0)
+    }
+}
+
+/** Why an edit to an existing wallet was refused. Nothing is changed when an edit is refused. */
+sealed interface WalletChangeViolation {
+    val usage: WalletUsage
+
+    /**
+     * Switching between an asset type (cash, bank, e-wallet, savings) and a liability type (credit card, loan)
+     * would reinterpret every recorded movement: an expense lowers an asset's balance but raises what a card
+     * owes. Refused while anything references the wallet.
+     */
+    data class TypeLocked(override val usage: WalletUsage) : WalletChangeViolation
+
+    /**
+     * Every transaction and recurring schedule stores the wallet's currency. Changing it would make existing
+     * records disagree with their wallet (and make a schedule impossible to pay), and Lucento never converts.
+     */
+    data class CurrencyLocked(override val usage: WalletUsage) : WalletChangeViolation
+}
+
+/**
+ * Single source of truth for which edits an existing wallet accepts. Used by [com.lucento.app.data.repository.WalletRepository];
+ * screens may call it to explain a lock up front, but the repository always enforces it.
+ *
+ * - Name and opening balance can always change (an explicit correction by the user).
+ * - Type changes within the same side (cash ↔ bank, credit card ↔ loan) keep the balance formula and are allowed.
+ * - Asset ↔ liability changes and currency changes are allowed only for a wallet nothing references yet.
+ */
+object WalletChangePolicy {
+
+    fun crossesBalanceSide(from: WalletType, to: WalletType): Boolean = from.isLiability != to.isLiability
+
+    fun check(
+        currentType: WalletType,
+        currentCurrency: String,
+        newType: WalletType,
+        newCurrency: String,
+        usage: WalletUsage,
+    ): WalletChangeViolation? = when {
+        !usage.isUsed -> null
+        currentCurrency != newCurrency -> WalletChangeViolation.CurrencyLocked(usage)
+        crossesBalanceSide(currentType, newType) -> WalletChangeViolation.TypeLocked(usage)
+        else -> null
+    }
+}

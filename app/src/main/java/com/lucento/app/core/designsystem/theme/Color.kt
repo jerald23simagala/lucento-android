@@ -172,7 +172,16 @@ data class LucentoExtendedColors(
     val mascotShade: Color,
     val mascotFace: Color,
     val mascotCheek: Color,
+    /**
+     * Category tiles, as in the reference design: a saturated tile with a white glyph, one hue per family of
+     * spending (food coral, transport green, shopping rose, bills amber…). Purely decorative — the row's text and
+     * signed amount carry the meaning — so the glyph only needs non-text contrast on its own tile.
+     */
+    val categoryTones: Map<String, TonePair> = emptyMap(),
+    val categoryFallback: TonePair = TonePair(Color(0xFF94A3B8), Color.White),
 ) {
+    fun categoryTone(iconKey: String?): TonePair = iconKey?.let { categoryTones[it] } ?: categoryFallback
+
     fun tone(type: WalletType): TonePair = when (type) {
         WalletType.CASH -> cash
         WalletType.BANK -> bank
@@ -181,6 +190,28 @@ data class LucentoExtendedColors(
         WalletType.CREDIT_CARD -> credit
         WalletType.LOAN -> loan
     }
+}
+
+private fun categoryPalette(night: Boolean): Map<String, TonePair> {
+    fun t(day: Long, dark: Long) = TonePair(Color(if (night) dark else day), Color.White)
+    val coral = t(0xFFF2685A, 0xFFD9574A)
+    val green = t(0xFF16A34A, 0xFF15803D)
+    val rose = t(0xFFE5487A, 0xFFC93A68)
+    val amber = t(0xFFF59E0B, 0xFFD38708)
+    val blue = t(0xFF3B82F6, 0xFF2F6FDB)
+    val teal = t(0xFF0D9488, 0xFF0F8A7E)
+    val indigo = t(0xFF6366F1, 0xFF5457D6)
+    val violet = t(0xFF8B5CF6, 0xFF7848E0)
+    val sky = t(0xFF0EA5E9, 0xFF0B8CC7)
+    val income = t(0xFF16A34A, 0xFF15803D)
+    return mapOf(
+        "groceries" to coral, "dining" to coral,
+        "transport" to green, "travel" to sky,
+        "shopping" to rose, "personal" to rose, "gift" to rose,
+        "utilities" to amber, "housing" to blue,
+        "health" to teal, "education" to indigo, "subscriptions" to indigo, "entertainment" to violet,
+        "work" to income, "business" to income, "investments" to income, "refund" to income, "income" to income,
+    )
 }
 
 internal val LightExtended = LucentoExtendedColors(
@@ -222,6 +253,8 @@ internal val LightExtended = LucentoExtendedColors(
     mascotShade = Color(0xFFF59E0B),
     mascotFace = Palette.Navy950,
     mascotCheek = Color(0xFFFB923C),
+    categoryTones = categoryPalette(night = false),
+    categoryFallback = TonePair(Color(0xFF94A3B8), Color.White),
 )
 
 internal val DarkExtended = LucentoExtendedColors(
@@ -263,4 +296,6 @@ internal val DarkExtended = LucentoExtendedColors(
     mascotShade = Color(0xFFB9C7EE),
     mascotFace = Color(0xFF1B2850),
     mascotCheek = Color(0xFFF9A8D4),
+    categoryTones = categoryPalette(night = true),
+    categoryFallback = TonePair(Color(0xFF5B6680), Color.White),
 )

@@ -127,7 +127,7 @@ fun PlanScreen(
 
         Spacer(Modifier.height(Spacing.xl))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            LucentoMascot(size = 56.dp)
+            LucentoMascot(size = 88.dp)
             Spacer(Modifier.width(Spacing.md))
             Text(
                 "A clearer plan today, a brighter tomorrow.",

@@ -1,5 +1,8 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.domain.GoalCalculator
+import com.lucento.app.domain.GoalMilestone
+import com.lucento.app.domain.GoalMilestones
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lucento.app.core.containerFactory
@@ -41,6 +44,7 @@ data class PlanUiState(
     val goals: List<Goal> = emptyList(),
     val contributions: List<GoalContribution> = emptyList(),
     val schedules: List<RecurringSchedule> = emptyList(),
+    val acknowledgedBudgetMonth: java.time.YearMonth? = null,
 ) {
     val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
     val categoriesById: Map<Long, Category> = categories.associateBy { it.id }
@@ -81,7 +85,7 @@ class PlanViewModel(
     private val budgets: BudgetRepository,
     private val goals: GoalRepository,
     private val recurring: RecurringRepository,
-    preferences: UserPreferencesRepository,
+    private val preferences: UserPreferencesRepository,
 ) : ViewModel() {
 
     private data class Base(
@@ -119,22 +123,32 @@ class PlanViewModel(
             goals = plans.goals,
             contributions = plans.contributions,
             schedules = plans.schedules,
+            acknowledgedBudgetMonth = prefs.acknowledgedBudgetMonth,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlanUiState())
 
     private var busy = false
 
-    /** Runs one write at a time so double taps cannot create duplicates. */
+    /**
+     * Runs one write at a time so double taps cannot create duplicates. If the database refuses the write
+     * (it was rolled back), [onResult] is not called: the form stays open with the user's input, nothing is
+     * reported as saved, and the app does not crash.
+     */
     private fun <T> write(block: suspend () -> T, onResult: (T) -> Unit) {
         if (busy) return
         busy = true
         viewModelScope.launch {
             val result = try {
                 block()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("Lucento", "Plan write failed and was rolled back", e)
+                null
             } finally {
                 busy = false
             }
-            onResult(result)
+            if (result != null) onResult(result)
         }
     }
 
@@ -144,6 +158,11 @@ class PlanViewModel(
         write({ budgets.save(id, categoryId, limit) }, onResult)
 
     fun deleteBudget(id: Long) = write({ budgets.delete(id) }) {}
+
+    /** Records that [month]'s kept budget was acknowledged, so it is never shown again. */
+    fun acknowledgeBudgetMonth(month: java.time.YearMonth) {
+        viewModelScope.launch { runCatching { preferences.setAcknowledgedBudgetMonth(month) } }
+    }
 
     // ---------------------------------------------------------------- goals
 
@@ -156,8 +175,30 @@ class PlanViewModel(
         onResult: (GoalRepository.SaveResult) -> Unit,
     ) = write({ goals.save(id, name, target, targetDate, walletId) }, onResult)
 
-    fun contribute(goalId: Long, amount: Money, date: LocalDate, note: String, key: String, onResult: (GoalRepository.ContributionResult) -> Unit) =
-        write({ goals.contribute(goalId, amount, date, note, key) }, onResult)
+    /**
+     * Saves a contribution. [onMilestone] is called once, after the write succeeded, if this contribution moved
+     * the goal past halfway or to its target — never on recomposition and never for a withdrawal.
+     */
+    fun contribute(
+        goalId: Long,
+        amount: Money,
+        date: LocalDate,
+        note: String,
+        key: String,
+        onResult: (GoalRepository.ContributionResult) -> Unit,
+        onMilestone: (GoalMilestone) -> Unit = {},
+    ) {
+        val snapshot = uiState.value
+        val goal = snapshot.goals.firstOrNull { it.id == goalId }
+        val before = goal?.let { g -> runCatching { GoalCalculator.saved(g, snapshot.contributions) }.getOrNull() }
+        write({ goals.contribute(goalId, amount, date, note, key) }) { result ->
+            onResult(result)
+            if (result == GoalRepository.ContributionResult.Saved && goal != null && before != null && amount.currencyCode == goal.currencyCode) {
+                val after = runCatching { before + amount }.getOrNull()
+                after?.let { GoalMilestones.crossed(goal.target, before, it) }?.let(onMilestone)
+            }
+        }
+    }
 
     fun deleteContribution(id: Long) = write({ goals.deleteContribution(id) }) {}
 

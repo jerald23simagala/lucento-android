@@ -7,7 +7,10 @@ import com.lucento.app.data.local.WalletEntity
 import com.lucento.app.data.local.WalletFlowRow
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletBalanceCalculator
+import com.lucento.app.domain.WalletChangePolicy
+import com.lucento.app.domain.WalletChangeViolation
 import com.lucento.app.domain.WalletType
+import com.lucento.app.domain.WalletUsage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -24,8 +27,11 @@ class WalletRepository(
         data object BlankName : SaveResult
         data object DuplicateName : SaveResult
         data object NegativeBalance : SaveResult
-        /** Currency can't change once transactions exist in the wallet. */
-        data object CurrencyLocked : SaveResult
+        /** Currency can't change while transactions or recurring schedules use the wallet. */
+        data class CurrencyLocked(val usage: WalletUsage) : SaveResult
+        /** Can't switch between an asset and a liability type while anything uses the wallet. */
+        data class TypeLocked(val usage: WalletUsage) : SaveResult
+        data object NotFound : SaveResult
     }
 
     sealed interface DeleteResult {
@@ -62,12 +68,25 @@ class WalletRepository(
     }
 
     suspend fun update(id: Long, name: String, type: WalletType, openingBalance: Money): SaveResult {
-        val existing = dao.getById(id) ?: return SaveResult.BlankName
+        val existing = dao.getById(id) ?: return SaveResult.NotFound
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = id)?.let { return it }
-        // A wallet's currency is part of every recorded transaction; it cannot change once used.
-        if (existing.currencyCode != openingBalance.currencyCode && transactionDao.countForWallet(id) > 0) {
-            return SaveResult.CurrencyLocked
+        val currentType = runCatching { WalletType.valueOf(existing.type) }.getOrNull()
+        val typeOrCurrencyChanges = currentType != type || existing.currencyCode != openingBalance.currencyCode
+        if (typeOrCurrencyChanges) {
+            // An unreadable stored type is treated as a side change, so a used wallet can't be rewritten.
+            val violation = WalletChangePolicy.check(
+                currentType = currentType ?: if (type.isLiability) WalletType.CASH else WalletType.CREDIT_CARD,
+                currentCurrency = existing.currencyCode,
+                newType = type,
+                newCurrency = openingBalance.currencyCode,
+                usage = usage(id),
+            )
+            when (violation) {
+                is WalletChangeViolation.CurrencyLocked -> return SaveResult.CurrencyLocked(violation.usage)
+                is WalletChangeViolation.TypeLocked -> return SaveResult.TypeLocked(violation.usage)
+                null -> Unit
+            }
         }
         dao.update(
             existing.copy(
@@ -80,6 +99,10 @@ class WalletRepository(
         )
         return SaveResult.Saved(id)
     }
+
+    /** Transactions (including transfer legs) and recurring schedules that reference wallet [id]. */
+    suspend fun usage(id: Long): WalletUsage =
+        WalletUsage(transactionCount = transactionDao.countForWallet(id), scheduleCount = scheduleCount?.invoke(id) ?: 0)
 
     /** Refuses to delete a wallet that still has transactions so financial history is never lost silently. */
     suspend fun delete(id: Long): DeleteResult {

@@ -4,3 +4,6 @@
 -keepclassmembers class com.lucento.app.** {
     *** Companion;
 }
+
+# Lottie exposes optional okio-based loaders; okio is not on Lucento's classpath and those APIs are unused.
+-dontwarn okio.**

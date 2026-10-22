@@ -27,6 +27,8 @@ data class UserPreferences(
     val primaryCurrency: String,
     /** Optional modules the user has switched on. Defaults to everything for installs that predate the setting. */
     val features: FeatureSet = FeatureSet.ALL,
+    /** Last month whose kept budget was acknowledged ("2026-09"), so the moment is shown only once. */
+    val acknowledgedBudgetMonth: java.time.YearMonth? = null,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
@@ -38,6 +40,7 @@ class UserPreferencesRepository(private val context: Context) {
         val themeMode = stringPreferencesKey("theme_mode")
         val primaryCurrency = stringPreferencesKey("primary_currency")
         val enabledFeatures = stringSetPreferencesKey("enabled_features")
+        val acknowledgedBudgetMonth = stringPreferencesKey("acknowledged_budget_month")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -54,6 +57,8 @@ class UserPreferencesRepository(private val context: Context) {
                 features = p[Keys.enabledFeatures]
                     ?.let { keys -> FeatureSet(keys.mapNotNull(Feature::fromKey).toSet()) }
                     ?: FeatureSet.ALL,
+                acknowledgedBudgetMonth = p[Keys.acknowledgedBudgetMonth]
+                    ?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
             )
         }
 
@@ -73,6 +78,10 @@ class UserPreferencesRepository(private val context: Context) {
             val current = prefs[Keys.enabledFeatures]?.toSet() ?: Feature.entries.map(Feature::key).toSet()
             prefs[Keys.enabledFeatures] = if (enabled) current + feature.key else current - feature.key
         }
+    }
+
+    suspend fun setAcknowledgedBudgetMonth(month: java.time.YearMonth) {
+        context.dataStore.edit { it[Keys.acknowledgedBudgetMonth] = month.toString() }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {

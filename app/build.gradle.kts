@@ -16,10 +16,24 @@ android {
         applicationId = "com.lucento.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    // Release signing comes only from the environment (CI secrets or a developer's shell); nothing is committed.
+    // Without it, release builds are produced unsigned, which is enough to verify R8, resources and packaging.
+    val releaseKeystore = System.getenv("LUCENTO_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("LUCENTO_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("LUCENTO_KEY_ALIAS")
+                keyPassword = System.getenv("LUCENTO_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -34,6 +48,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -54,11 +69,17 @@ android {
     // Exported Room schemas feed MigrationTestHelper in instrumented migration tests.
     sourceSets["androidTest"].assets.srcDir("$projectDir/schemas")
 
+    // Lint policy (see docs/QUALITY.md): errors and fatal issues block the build; warnings are reported (HTML/XML/SARIF
+    // uploaded by CI) and triaged, not hidden. lint.xml promotes the checks that matter most for this app to errors.
     lint {
-        abortOnError = false
-        checkReleaseBuilds = false
+        abortOnError = true
+        warningsAsErrors = false
+        checkReleaseBuilds = true
+        checkDependencies = false
+        lintConfig = file("lint.xml")
         htmlReport = true
         xmlReport = true
+        sarifReport = true
     }
 
     packaging {
@@ -106,6 +127,9 @@ dependencies {
 
     // On-device receipt OCR (bundled model; works offline).
     implementation(libs.mlkit.text.recognition)
+
+    // Bundled vector animations (res/raw); no runtime downloads, no network permission.
+    implementation(libs.lottie.compose)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

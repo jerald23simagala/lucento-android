@@ -9,6 +9,7 @@ import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.NetWorthCalculator
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletType
+import com.lucento.app.domain.WalletUsage
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -37,8 +38,16 @@ sealed interface DraftError {
     data object AmountInvalid : DraftError
     data class AmountTooPrecise(val digits: Int) : DraftError
     data object AmountTooLarge : DraftError
-    data object CurrencyLocked : DraftError
+    data class CurrencyLocked(val usage: WalletUsage) : DraftError
+    data class TypeLocked(val usage: WalletUsage) : DraftError
+    data object NotFound : DraftError
 }
+
+/** Plain-language explanation of what still uses a wallet, e.g. "3 transactions and 1 recurring payment". */
+fun WalletUsage.describe(): String = listOfNotNull(
+    transactionCount.takeIf { it > 0 }?.let { "$it ${if (it == 1) "transaction" else "transactions"}" },
+    scheduleCount.takeIf { it > 0 }?.let { "$it recurring ${if (it == 1) "payment" else "payments"}" },
+).joinToString(" and ")
 
 class WalletsViewModel(
     private val wallets: WalletRepository,
@@ -87,7 +96,9 @@ class WalletsViewModel(
                     WalletRepository.SaveResult.BlankName -> DraftError.NameRequired
                     WalletRepository.SaveResult.DuplicateName -> DraftError.NameTaken
                     WalletRepository.SaveResult.NegativeBalance -> DraftError.AmountInvalid
-                    WalletRepository.SaveResult.CurrencyLocked -> DraftError.CurrencyLocked
+                    is WalletRepository.SaveResult.CurrencyLocked -> DraftError.CurrencyLocked(result.usage)
+                    is WalletRepository.SaveResult.TypeLocked -> DraftError.TypeLocked(result.usage)
+                    WalletRepository.SaveResult.NotFound -> DraftError.NotFound
                 }
             )
         }

@@ -61,8 +61,10 @@ object CategoryIcons {
 val Category.icon: ImageVector get() = CategoryIcons.forKey(iconKey)
 
 /**
- * Category icon tile. Expense categories sit on a neutral tile; income uses the positive tone so
- * money coming in is distinguishable before reading the amount (the amount still carries a "+").
+ * Category icon tile: a saturated tile in the category's hue with a white glyph (see
+ * [com.lucento.app.core.designsystem.theme.LucentoExtendedColors.categoryTones]). Transfers use the brand tint;
+ * uncategorised income uses the income hue so money coming in is recognisable at a glance (the amount still
+ * carries a "+").
  */
 @Composable
 fun CategoryTile(
@@ -81,22 +83,17 @@ fun CategoryTile(
         )
         return
     }
-    val icon = category?.icon ?: CategoryIcons.Uncategorized
-    if (type == TransactionType.INCOME) {
-        IconTile(
-            icon = icon,
-            modifier = modifier,
-            container = LucentoTheme.extendedColors.positiveContainer,
-            content = LucentoTheme.extendedColors.positive,
-            size = size,
-        )
-    } else {
-        IconTile(
-            icon = icon,
-            modifier = modifier,
-            container = MaterialTheme.colorScheme.surfaceContainerHigh,
-            content = MaterialTheme.colorScheme.onSurface,
-            size = size,
-        )
+    val colors = LucentoTheme.extendedColors
+    val tone = when {
+        category != null -> colors.categoryTone(category.iconKey)
+        type == TransactionType.INCOME -> colors.categoryTone("income")
+        else -> colors.categoryFallback
     }
+    IconTile(
+        icon = category?.icon ?: CategoryIcons.Uncategorized,
+        modifier = modifier,
+        container = tone.container,
+        content = tone.content,
+        size = size,
+    )
 }

@@ -1,5 +1,9 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.Confirmation
+import com.lucento.app.core.designsystem.component.ConfirmationHost
+import com.lucento.app.core.designsystem.component.LucentoAnimation
+import com.lucento.app.core.designsystem.component.EmptyIllustration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -101,6 +105,7 @@ fun RecurringScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(fac
     var tab by rememberSaveable { mutableStateOf(RecurringTab.UPCOMING) }
     var editing by remember { mutableStateOf<ScheduleDraft?>(null) }
     var actingOn by remember { mutableStateOf<Long?>(null) }
+    var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
     val shown = state.schedules
         .filter { s ->
@@ -128,7 +133,7 @@ fun RecurringScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(fac
                         } else {
                             "Add rent, subscriptions or your salary. Lucento reminds you here and on Home, and you confirm each one."
                         },
-                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
+                        illustration = { EmptyIllustration(LucentoAnimation.EmptyRecurring) },
                         action = if (state.wallets.isEmpty()) {
                             null
                         } else {
@@ -184,13 +189,22 @@ fun RecurringScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(fac
                 modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.gutter),
             )
         }
+        ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
     }
 
     state.schedules.firstOrNull { it.id == actingOn }?.let { schedule ->
         ScheduleActionsSheet(
             schedule = schedule,
             state = state,
-            onMarkPaid = { amount, date, done -> viewModel.markPaid(schedule.id, amount, date, done) },
+            onMarkPaid = { amount, date, done ->
+                viewModel.markPaid(schedule.id, amount, date) { result ->
+                    done(result)
+                    // Only after the transaction was recorded and the schedule advanced in one database transaction.
+                    if (result is RecurringRepository.PayResult.Recorded) {
+                        confirmation = Confirmation(if (schedule.type == TransactionType.INCOME) "Income recorded" else "Payment recorded")
+                    }
+                }
+            },
             onSkip = { viewModel.skip(schedule.id) },
             onPause = { viewModel.setPaused(schedule.id, !schedule.paused) },
             onEdit = {

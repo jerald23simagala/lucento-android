@@ -1,5 +1,8 @@
 name: Android CI
 
+# What each job proves (and what it does not) is written to the run summary, so a green run never implies a
+# check that did not execute. See docs/QUALITY.md.
+
 on:
   push:
     branches: [main]
@@ -13,12 +16,14 @@ concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
 jobs:
   build:
-    name: Test and build debug APK
+    name: Unit tests, lint, debug + release builds
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    timeout-minutes: 50
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -50,9 +55,6 @@ jobs:
             echo "::error::sdkmanager not found under $SDK/cmdline-tools"
             exit 1
           fi
-          echo "Using SDK at $SDK"
-          echo "Using $SDKMANAGER"
-          "$SDKMANAGER" --version
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
           echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
@@ -70,15 +72,81 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run unit tests
-        run: ./gradlew --no-daemon --stacktrace testDebugUnitTest
+      - name: JVM unit tests
+        run: ./gradlew --stacktrace testDebugUnitTest
 
-      - name: Build debug APK
-        run: ./gradlew --no-daemon --stacktrace assembleDebug
+      - name: Debug build (compiles Kotlin/Compose, runs Room KSP and exports schemas)
+        run: ./gradlew --stacktrace assembleDebug
 
-      - name: Run Android lint
-        run: ./gradlew --no-daemon lintDebug
-        continue-on-error: true
+      - name: Room schema is committed and matches the entities
+        # KSP re-exports the current schema during the build. A diff means the entities changed without a
+        # committed schema (and therefore without a reviewed migration). Missing history is reported, not invented.
+        run: |
+          DIR=app/schemas/com.lucento.app.data.local.LucentoDatabase
+          VERSION=$(grep -oE 'version = [0-9]+' app/src/main/java/com/lucento/app/data/local/LucentoDatabase.kt | grep -oE '[0-9]+')
+          echo "Database version: $VERSION"
+          if ! git ls-files --error-unmatch "$DIR/$VERSION.json" > /dev/null 2>&1; then
+            echo "::error::$DIR/$VERSION.json is not committed. Commit the exported schema (see the room-schemas artifact)."
+            exit 1
+          fi
+          git diff --exit-code -- "$DIR" || { echo "::error::Exported Room schema differs from the committed one."; exit 1; }
+          for v in $(seq 1 "$VERSION"); do
+            if git ls-files --error-unmatch "$DIR/$v.json" > /dev/null 2>&1; then echo "schema $v.json: committed"; else echo "::warning::schema $v.json missing — migration tests for it cannot run"; fi
+          done
+
+      - name: Migration SQL matches the exported schemas (offline check)
+        # Replays each Migration's SQL on SQLite and compares tables, columns, indices and foreign keys with the
+        # next exported schema. Complements (does not replace) the instrumented MigrationTest job below.
+        run: python3 tools/check_migrations.py
+
+      - name: Lint (errors block, warnings reported)
+        run: ./gradlew --stacktrace lintDebug
+
+      - name: Release build (R8 + resource shrinking) and App Bundle
+        # Signed only when the repository defines the four signing secrets (keystore as base64); otherwise the
+        # release APK/AAB are built unsigned, which still proves R8, resource shrinking and packaging.
+        env:
+          KEYSTORE_BASE64: ${{ secrets.LUCENTO_KEYSTORE_BASE64 }}
+          LUCENTO_KEYSTORE_PASSWORD: ${{ secrets.LUCENTO_KEYSTORE_PASSWORD }}
+          LUCENTO_KEY_ALIAS: ${{ secrets.LUCENTO_KEY_ALIAS }}
+          LUCENTO_KEY_PASSWORD: ${{ secrets.LUCENTO_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lucento-release.jks"
+            export LUCENTO_KEYSTORE_FILE="$RUNNER_TEMP/lucento-release.jks"
+            echo "SIGNED_RELEASE=true" >> "$GITHUB_ENV"
+          fi
+          ./gradlew --stacktrace assembleRelease bundleRelease
+
+      - name: Inspect release artifacts (permissions, debuggable, application id, size)
+        run: |
+          AAPT2="$ANDROID_HOME/build-tools/35.0.0/aapt2"
+          RELEASE_APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          DEBUG_APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
+          AAB=$(ls app/build/outputs/bundle/release/*.aab | head -n 1)
+          "$AAPT2" dump badging "$RELEASE_APK" > badging.txt
+          "$AAPT2" dump permissions "$RELEASE_APK" > permissions.txt
+          cat permissions.txt
+          grep -q "package: name='com.lucento.app'" badging.txt || { echo "::error::release application id is not com.lucento.app"; exit 1; }
+          if grep -q "application-debuggable" badging.txt; then echo "::error::release APK is debuggable"; exit 1; fi
+          if grep -qE "android.permission.(INTERNET|ACCESS_NETWORK_STATE)" permissions.txt; then
+            echo "::error::release APK requests network access"; exit 1
+          fi
+          "$AAPT2" dump badging "$DEBUG_APK" | grep -q "package: name='com.lucento.app.debug'" || { echo "::error::debug application id is not com.lucento.app.debug"; exit 1; }
+          {
+            echo "### Lucento build"
+            echo "| Artifact | Size |"
+            echo "|---|---|"
+            echo "| Debug APK | $(du -h "$DEBUG_APK" | cut -f1) |"
+            echo "| Release APK ($(basename "$RELEASE_APK")) | $(du -h "$RELEASE_APK" | cut -f1) |"
+            echo "| Release App Bundle | $(du -h "$AAB" | cut -f1) |"
+            echo ""
+            echo "Release permissions:"
+            echo '```'
+            cat permissions.txt
+            echo '```'
+            if [ "${SIGNED_RELEASE:-false}" != "true" ]; then echo "Release artifacts are **unsigned** (no signing secrets configured)."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Name APK
         id: apk
@@ -88,8 +156,6 @@ jobs:
           DEST="app/build/outputs/apk/debug/Lucento-debug-${SHORT_SHA}.apk"
           cp "$SRC" "$DEST"
           echo "path=$DEST" >> "$GITHUB_OUTPUT"
-          echo "### Lucento debug APK" >> "$GITHUB_STEP_SUMMARY"
-          echo "Built \`$(basename "$DEST")\` ($(du -h "$DEST" | cut -f1)). Download it from the **Artifacts** section below." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -99,14 +165,25 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload release App Bundle and APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lucento-release
+          path: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload Room schemas
-        if: success()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: room-schemas
           path: app/schemas/
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 90
 
       - name: Upload test and lint reports
         if: always()
@@ -116,5 +193,61 @@ jobs:
           path: |
             app/build/reports/
             app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  migrations:
+    name: Room migration tests (emulator)
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Require authentic schema history
+        # MigrationTestHelper needs every exported version. They must be real Room exports (from CI artifacts of
+        # the commits that introduced each version), never hand-written — so a gap fails loudly here.
+        run: |
+          DIR=app/schemas/com.lucento.app.data.local.LucentoDatabase
+          missing=""
+          for v in 1 2 3; do [ -f "$DIR/$v.json" ] || missing="$missing $v.json"; done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing Room schema history:$missing. Migration tests NOT RUN. See docs/QUALITY.md › Room schemas."
+            echo "### Migration tests NOT RUN — missing schema history:$missing" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented migration tests on an API 30 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.data.local.MigrationTest
+
+      - name: Upload instrumented test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-test-reports
+          path: app/build/reports/androidTests/
           if-no-files-found: ignore
           retention-days: 14

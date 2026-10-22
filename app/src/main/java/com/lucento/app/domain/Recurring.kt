@@ -40,8 +40,17 @@ data class RecurringSchedule(
 
     val isFinished: Boolean get() = nextDue == null
 
-    /** Stable idempotency key for the transaction recorded when occurrence [index] is paid. */
-    fun occurrenceKey(index: Int): String = "recurring-$id-$index"
+    /**
+     * Stable idempotency key for the transaction recorded when occurrence [index] is paid: the schedule id plus
+     * the occurrence's *due date*. Keying by date (not by index) matters because editing a schedule's timing
+     * restarts the index at 0 — an index key would then match an occurrence paid under the old timing, and the
+     * new payment would be silently swallowed as a "duplicate". Keys written by v0.3 (`recurring-<id>-<index>`)
+     * can never collide with this format.
+     */
+    fun occurrenceKey(index: Int): String {
+        val due = RecurringMath.occurrence(this, index) ?: return "recurring-$id-$index"
+        return "recurring-$id-on-${due.toEpochDay()}"
+    }
 }
 
 enum class RecurringState { UPCOMING, ACTIVE, PAUSED, FINISHED }

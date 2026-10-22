@@ -21,6 +21,9 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 | Goal projection (labelled estimate) | remaining ÷ average daily pace since first contribution (min. 30 days) | `GoalCalculator.projectCompletion` |
 | Required per month | remaining ÷ started months until target date, rounded up | `GoalCalculator.requiredPerMonth` |
 | Recurring occurrence *k* | start + k × interval × frequency (month-end anchors kept: Jan 31 → Feb 28 → Mar 31) | `RecurringMath` |
+| Recurring idempotency key | `recurring-<schedule id>-on-<due epoch day>` (v0.4). Keyed by due date, not index, so editing a schedule's timing (which restarts the index) never makes a new payment look like a duplicate of an old one. v0.3 keys (`recurring-<id>-<index>`) cannot collide | `RecurringSchedule.occurrenceKey` |
+| Goal milestone | halfway / reached, when saved × 100 crosses target × 50 / × 100 because of a contribution (never a withdrawal) | `GoalMilestones` |
+| Budget month kept | the previous calendar month, overall budget in the main currency that existed all month, real spending, spent ≤ limit. Acknowledged once (persisted) | `BudgetMilestones` |
 
 ## Debt rules
 - Credit-card purchase: EXPENSE on the card (raises owed). Paying the card: TRANSFER from bank to card (lowers owed;
@@ -32,3 +35,35 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 ## Transfers
 Two legs (TRANSFER_OUT on the source, TRANSFER_IN on the destination) sharing `transfer_group`, written in one Room
 transaction, idempotent on the client key. Same currency only. Deleting or editing either leg affects both.
+
+## Record integrity (v0.4)
+- **Wallet type** (`WalletChangePolicy`): an asset wallet (cash, bank, e-wallet, savings) and a liability wallet
+  (credit card, loan) compute balances in opposite directions, so switching between the two sides is refused while any
+  transaction (including transfer legs) or recurring schedule references the wallet. Same-side changes (cash → bank,
+  card → loan) keep the formula and are allowed. Nothing is rewritten; a conversion would be a separate, explicit
+  operation (not implemented).
+- **Wallet currency**: refused while transactions *or recurring schedules* reference the wallet (a schedule stores its
+  currency; changing the wallet would make it unpayable). Never converted.
+- **Category removal** (`CategoryRepository.remove`): deleted only when nothing references it. A category used by
+  transactions, budgets or recurring schedules is **archived** (hidden from pickers, still labels history; its budget
+  keeps working; `restore` brings it back). This avoids the budgets foreign key's `ON DELETE CASCADE` and the
+  schedules' `SET NULL` ever firing through the app.
+- **Writes**: transfer legs are inserted inside one Room transaction with the duplicate check repeated inside it; a
+  unique-key race returns the row that won. Screens use `saveOrNull` / `saveTransferOrNull` and the Plan view model
+  catches failures, so a refused write shows an error and never a success confirmation.
+
+## CSV export
+RFC 4180 quoting (commas, quotes, CR/LF) for every field. User-entered text (account, category, note) whose first
+meaningful character — after leading whitespace, control characters or a BOM — is `=`, `+`, `-`, `@` (or the
+full-width forms), or that starts with a tab/CR/LF, gets a leading apostrophe (OWASP CSV-injection guidance).
+Generated values (date, type, amount, currency, transfer id) are not altered, so negative amounts stay numeric. This
+reduces, but cannot guarantee against, every spreadsheet's import behaviour (e.g. an importer that strips the
+apostrophe).
+
+## Receipt amounts
+Amounts are read with the minor-unit digits of the currency printed on the receipt (unambiguous symbols/ISO codes
+only; `$` and `¥` are ambiguous and ignored), else the default wallet's currency, else 2. A group of three after a
+single separator is thousands (`1,250`, `12.500`) except for 3-decimal currencies with a `.` (`12.500` KWD). Plain
+integers count only on a line labelled as the total. Dates, times, percentages, phone/TIN/reference numbers and
+quantities are masked first. The result is always a suggestion on an editable review screen; missing values stay
+missing.

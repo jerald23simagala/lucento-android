@@ -135,13 +135,25 @@ fun WalletEditorSheet(
                 onSelect = {
                     haptics.tick()
                     draft = draft.copy(type = it)
+                    if (error is DraftError.TypeLocked) error = null
                 },
             )
+            (error as? DraftError.TypeLocked)?.let { locked ->
+                Text(
+                    "“${initial.name}” has ${locked.usage.describe()}. Switching between an account you own and one you owe " +
+                        "would change what every one of them means, so it stays a${if (initial.type.isLiability) " liability" else "n asset"}. " +
+                        "Create a new wallet of the other kind instead.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = Spacing.xs),
+                )
+            }
 
             Spacer(Modifier.height(Spacing.lg))
             val nameMessage = when (error) {
                 DraftError.NameRequired -> "Give this wallet a name."
                 DraftError.NameTaken -> "You already have a wallet with this name."
+                DraftError.NotFound -> "This wallet no longer exists."
                 else -> null
             }
             OutlinedTextField(
@@ -164,7 +176,7 @@ fun WalletEditorSheet(
                     )
                 },
                 singleLine = true,
-                isError = error is DraftError.NameRequired || error is DraftError.NameTaken,
+                isError = error is DraftError.NameRequired || error is DraftError.NameTaken || error is DraftError.NotFound,
                 supportingText = if (nameMessage != null) {
                     { Text(nameMessage) }
                 } else {
@@ -205,9 +217,10 @@ fun WalletEditorSheet(
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
             }
-            if (error is DraftError.CurrencyLocked) {
+            (error as? DraftError.CurrencyLocked)?.let { locked ->
                 Text(
-                    "This wallet has transactions, so its currency can't change.",
+                    "This wallet has ${locked.usage.describe()}, so its currency can’t change. " +
+                        "Amounts are never converted; create a wallet in the other currency instead.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = Spacing.xs, start = Spacing.lg),

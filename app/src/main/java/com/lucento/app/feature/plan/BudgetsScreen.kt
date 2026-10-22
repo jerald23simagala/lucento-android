@@ -1,5 +1,11 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.Confirmation
+import com.lucento.app.core.designsystem.component.ConfirmationHost
+import com.lucento.app.domain.BudgetMilestones
+import androidx.compose.runtime.LaunchedEffect
+import com.lucento.app.core.designsystem.component.LucentoAnimation
+import com.lucento.app.core.designsystem.component.EmptyIllustration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -100,6 +106,23 @@ fun BudgetsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(facto
     val overall = progress.filter { it.budget.isOverall }
     val byCategory = progress.filterNot { it.budget.isOverall }
 
+    // A finished month kept within the overall budget is acknowledged once (persisted), never for overspending.
+    var celebration by remember { mutableStateOf<Confirmation?>(null) }
+    var acknowledgedThisVisit by remember { mutableStateOf(false) }
+    LaunchedEffect(state.loading, state.acknowledgedBudgetMonth, state.budgets, state.transactions) {
+        if (state.loading || acknowledgedThisVisit) return@LaunchedEffect
+        val kept = BudgetMilestones.monthToAcknowledge(
+            budgets = state.budgets,
+            transactions = state.transactions,
+            currencyCode = state.primaryCurrency,
+            today = state.today,
+            lastAcknowledged = state.acknowledgedBudgetMonth,
+        ) ?: return@LaunchedEffect
+        acknowledgedThisVisit = true
+        viewModel.acknowledgeBudgetMonth(kept.month)
+        celebration = Confirmation("You stayed within ${monthLabel(kept.month)}’s budget", kind = Confirmation.Kind.Milestone)
+    }
+
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -129,7 +152,7 @@ fun BudgetsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(facto
                         title = "No budgets yet",
                         body = "Set a monthly limit for everything you spend, or for categories like dining or transport. " +
                             "Home then shows what’s safe to spend.",
-                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
+                        illustration = { EmptyIllustration(LucentoAnimation.EmptyBudgets) },
                         action = {
                             LucentoPrimaryButton(
                                 text = "Create a monthly budget",
@@ -177,6 +200,7 @@ fun BudgetsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(facto
                 modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.gutter),
             )
         }
+        ConfirmationHost(confirmation = celebration, onDismissed = { celebration = null })
     }
 
     editing?.let { draft ->

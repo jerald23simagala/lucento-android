@@ -12,6 +12,9 @@ datastore = "1.1.1"
 splashscreen = "1.0.1"
 kotlinxSerialization = "1.7.3"
 coroutines = "1.9.0"
+# Airbnb Lottie for Compose. 6.6.7 is the last release before the library moved to compileSdk 36 (6.6.8);
+# it was built against Compose BOM 2024.02 / Kotlin 1.9, so this project's newer Compose and Kotlin win resolution.
+lottie = "6.6.7"
 junit = "4.13.2"
 androidxTestExt = "1.2.1"
 androidxTestRunner = "1.6.2"
@@ -39,6 +42,7 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }

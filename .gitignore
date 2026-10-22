@@ -12,3 +12,6 @@
 *.jks
 keystore.properties
 .kotlin/
+
+# Downloaded CI artifacts (schemas are copied into app/schemas deliberately)
+_ci_artifacts/

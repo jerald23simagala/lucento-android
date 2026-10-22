@@ -8,6 +8,8 @@ import com.lucento.app.core.money.MoneyParser
 import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
+import com.lucento.app.data.repository.saveOrNull
+import com.lucento.app.data.repository.saveTransferOrNull
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
@@ -146,7 +148,7 @@ class TransactionEditorViewModel(
         saving = true
         viewModelScope.launch {
             val result = try {
-                transactions.save(
+                transactions.saveOrNull(
                     TransactionRepository.Input(
                         id = draft.id,
                         clientUuid = draft.clientUuid,
@@ -197,7 +199,7 @@ class TransactionEditorViewModel(
         savingTransfer = true
         viewModelScope.launch {
             val result = try {
-                transactions.saveTransfer(
+                transactions.saveTransferOrNull(
                     TransactionRepository.TransferInput(
                         group = draft.group,
                         clientUuid = draft.clientUuid,
@@ -221,7 +223,8 @@ class TransactionEditorViewModel(
                     TransactionRepository.TransferResult.CurrencyMismatch -> TransferDraftError.CurrencyMismatch
                     TransactionRepository.TransferResult.AmountNotPositive -> TransferDraftError.AmountZero
                     TransactionRepository.TransferResult.WalletNotFound,
-                    TransactionRepository.TransferResult.TransferNotFound -> TransferDraftError.Rejected
+                    TransactionRepository.TransferResult.TransferNotFound,
+                    null -> TransferDraftError.Rejected
                 }
             )
         }

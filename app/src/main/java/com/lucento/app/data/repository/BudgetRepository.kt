@@ -63,4 +63,9 @@ class BudgetRepository(
     suspend fun delete(id: Long) = dao.deleteById(id)
 }
 
-internal fun BudgetEntity.toDomain(): Budget = Budget(id = id, categoryId = categoryId, limit = Money(limitMinor, currencyCode))
+internal fun BudgetEntity.toDomain(): Budget = Budget(
+    id = id,
+    categoryId = categoryId,
+    limit = Money(limitMinor, currencyCode),
+    createdOn = java.time.Instant.ofEpochMilli(createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+)

@@ -66,6 +66,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.lucento.app.AppViewModel
+import com.lucento.app.core.designsystem.component.Confirmation
+import com.lucento.app.core.designsystem.component.ConfirmationHost
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.LucentoMascot
@@ -188,6 +190,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var transferDraft by remember { mutableStateOf<TransferDraft?>(null) }
     var transferNote by remember { mutableStateOf<String?>(null) }
     val separator = remember { MoneyFormatter.decimalSeparator() }
+    // Set only from a save callback that reported success, i.e. after the database write committed.
+    var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
     fun navigateTo(route: Any) {
         navController.navigate(route) {
@@ -270,8 +274,19 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     fun reviewReceipt(r: ReceiptResult) {
         if (!requireWallets()) return
         navController.popBackStack()
-        editorNote = if (r.amount == null && r.merchant == null) null else "From your receipt — check the amount, date and account before saving."
-        editorDraft = editorViewModel.newDraft(TransactionType.EXPENSE).copy(
+        val base = editorViewModel.newDraft(TransactionType.EXPENSE)
+        val baseCurrency = editorState.wallets.firstOrNull { it.id == base.walletId }?.currencyCode
+        // A receipt in another currency goes to a wallet in that currency when there is one; never converted.
+        val matchingWallet = r.currencyCode
+            ?.takeIf { it != baseCurrency }
+            ?.let { code -> editorState.wallets.firstOrNull { it.currencyCode == code }?.id }
+        editorNote = when {
+            r.amount == null && r.merchant == null -> null
+            r.currencyCode != null && r.currencyCode != baseCurrency && matchingWallet == null ->
+                "This receipt looks like it’s in ${r.currencyCode}, but none of your accounts use it. Lucento never converts — check the amount and account."
+            else -> "From your receipt — check the amount, date and account before saving."
+        }
+        editorDraft = (if (matchingWallet != null) base.copy(walletId = matchingWallet) else base).copy(
             amountText = r.amount?.toPlainString()?.replace('.', separator).orEmpty(),
             date = r.date ?: LocalDate.now(),
             note = r.merchant.orEmpty(),
@@ -343,10 +358,11 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             }
         },
     ) { innerPadding ->
+      Box(Modifier.fillMaxSize().padding(innerPadding)) {
         NavHost(
             navController = navController,
             startDestination = HomeRoute,
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            modifier = Modifier.fillMaxSize(),
             // Top-level switches fade through; pushed screens slide in from the trailing edge.
             enterTransition = { if (reducedMotion) fadeIn(tween(0)) else fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.985f) },
             exitTransition = { fadeOut(tween(if (reducedMotion) 0 else 120)) },
@@ -363,6 +379,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         onOpenInsights = { navigateTo(InsightsRoute) },
                         onOpenBudgets = { push(BudgetsRoute) },
                         onOpenRecurring = { push(RecurringRoute) },
+                        onOpenQuickAdd = { navigateTo(QuickAddRoute) },
                     ),
                 )
             }
@@ -371,6 +388,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     onAddTransaction = { navigateTo(QuickAddRoute) },
                     onEditTransaction = { edit(it) },
                     onAddWallet = { push(WalletsRoute) },
+                    onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ push(ScanReceiptRoute) }) else null,
+                    onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ push(VoiceEntryRoute) }) else null,
                 )
             }
             composable<QuickAddRoute> {
@@ -439,7 +458,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
             pushed<ScanReceiptRoute>(reducedMotion) {
                 Gated(Feature.RECEIPT_SCANNING, features, enableFeature, back) {
-                    ReceiptScanScreen(onBack = back, onReview = { reviewReceipt(it) })
+                    ReceiptScanScreen(
+                        onBack = back,
+                        onReview = { reviewReceipt(it) },
+                        expectedCurrency = editorViewModel.newDraft(TransactionType.EXPENSE).walletId
+                            ?.let { id -> editorState.wallets.firstOrNull { it.id == id }?.currencyCode },
+                    )
                 }
             }
             pushed<VoiceEntryRoute>(reducedMotion) {
@@ -453,6 +477,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 }
             }
         }
+        ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
+      }
     }
 
     editorDraft?.let { draft ->
@@ -464,7 +490,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 editorViewModel.save(toSave, decimal) { error ->
                     onResult(error)
                     if (error == null) {
-                        notify(
+                        confirmation = Confirmation(
                             when {
                                 toSave.id != null -> "Changes saved"
                                 toSave.type == TransactionType.INCOME -> "Income added"
@@ -499,7 +525,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             onSave = { toSave, decimal, onResult ->
                 editorViewModel.saveTransfer(toSave, decimal) { error ->
                     onResult(error)
-                    if (error == null) notify(if (toSave.group != null) "Transfer updated" else "Transfer saved")
+                    if (error == null) confirmation = Confirmation(if (toSave.group != null) "Transfer updated" else "Transfer saved")
                 }
             },
             onDelete = draft.group?.let { group ->

@@ -64,7 +64,17 @@ class FakeCategoryDao : CategoryDao {
 
     override suspend fun maxSortOrder(kind: String) = rows.value.filter { it.kind == kind }.maxOfOrNull { it.sortOrder } ?: -1
 
-    override suspend fun transactionCount(id: Long) = transactionCounts[id] ?: 0
+    override suspend fun transactionCount(id: Long) =
+        (transactionCounts[id] ?: 0) + (transactions?.rows?.value?.count { it.categoryId == id } ?: 0)
+
+    /** Optional links so the fake mirrors the real foreign keys (budgets CASCADE, recurring SET NULL). */
+    var transactions: FakeTransactionDao? = null
+    var budgets: FakeBudgetDao? = null
+    var recurring: FakeRecurringDao? = null
+
+    override suspend fun budgetCount(id: Long) = budgets?.rows?.value?.count { it.categoryId == id } ?: 0
+
+    override suspend fun recurringCount(id: Long) = recurring?.rows?.value?.count { it.categoryId == id } ?: 0
 
     override suspend fun insert(category: CategoryEntity): Long {
         val id = nextId++
@@ -78,6 +88,9 @@ class FakeCategoryDao : CategoryDao {
 
     override suspend fun deleteById(id: Long) {
         rows.value = rows.value.filterNot { it.id == id }
+        budgets?.let { b -> b.rows.value = b.rows.value.filterNot { it.categoryId == id } } // ON DELETE CASCADE
+        recurring?.let { r -> r.rows.value = r.rows.value.map { if (it.categoryId == id) it.copy(categoryId = null) else it } }
+        transactions?.let { t -> t.rows.value = t.rows.value.map { if (it.categoryId == id) it.copy(categoryId = null) else it } }
     }
 }
 

@@ -1,0 +1,9 @@
+{
+  "name": "lucento-lottie-tools",
+  "private": true,
+  "description": "Renders Lucento's Lottie files with lottie-web into contact sheets for visual review (dev-only, not shipped).",
+  "dependencies": {
+    "lottie-web": "5.12.2",
+    "playwright-core": "^1.48.0"
+  }
+}

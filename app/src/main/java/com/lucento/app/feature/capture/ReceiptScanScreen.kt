@@ -1,5 +1,11 @@
 package com.lucento.app.feature.capture
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import com.lucento.app.core.designsystem.component.LucentoAnimation
+import com.lucento.app.core.designsystem.component.LucentoLottieAnimation
 import android.content.ActivityNotFoundException
 import android.graphics.Bitmap
 import android.net.Uri
@@ -65,7 +71,13 @@ import java.math.BigDecimal
 import java.time.LocalDate
 
 /** What the user confirmed on the scan screen; the transaction editor opens with these values. */
-data class ReceiptResult(val merchant: String?, val amount: BigDecimal?, val date: LocalDate?)
+data class ReceiptResult(
+    val merchant: String?,
+    val amount: BigDecimal?,
+    val date: LocalDate?,
+    /** Currency printed on the receipt, if one was recognised unambiguously. Never converted. */
+    val currencyCode: String? = null,
+)
 
 private sealed interface ScanState {
     data object Idle : ScanState
@@ -80,7 +92,12 @@ private sealed interface ScanState {
  * transaction editor. Nothing is saved from this screen.
  */
 @Composable
-fun ReceiptScanScreen(onBack: () -> Unit, onReview: (ReceiptResult) -> Unit) {
+fun ReceiptScanScreen(
+    onBack: () -> Unit,
+    onReview: (ReceiptResult) -> Unit,
+    /** Currency of the wallet the expense will most likely go to; decides how "1,250" or "12.500" is read. */
+    expectedCurrency: String? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<ScanState>(ScanState.Idle) }
@@ -97,7 +114,7 @@ fun ReceiptScanScreen(onBack: () -> Unit, onReview: (ReceiptResult) -> Unit) {
                 if (lines.isEmpty()) {
                     ScanState.Failed("No text was found. Try again with the whole receipt in view, flat and well lit.")
                 } else {
-                    val suggestion = ReceiptParser.parse(lines, LocalDate.now())
+                    val suggestion = ReceiptParser.parse(lines, LocalDate.now(), expectedCurrency)
                     chosenAmount = suggestion.total
                     ScanState.Done(suggestion, lines, preview)
                 }
@@ -168,13 +185,32 @@ fun ReceiptScanScreen(onBack: () -> Unit, onReview: (ReceiptResult) -> Unit) {
                     Modifier.fillMaxWidth().padding(vertical = Spacing.xxxl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    CircularProgressIndicator()
+                    // Loops only while recognition is actually running; replaced by results or an error as soon as
+                    // it finishes, which disposes the animation. Under reduced motion it is a still frame.
+                    LucentoLottieAnimation(
+                        animation = LucentoAnimation.ReceiptScanning,
+                        modifier = Modifier.size(width = 220.dp, height = 184.dp),
+                        fallback = { CircularProgressIndicator() },
+                    )
                     Spacer(Modifier.height(Spacing.md))
-                    Text("Reading the receipt…", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Reading the receipt on this phone…",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                    Text(
+                        "Nothing is saved until you review it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             is ScanState.Failed -> {
-                InfoNote(s.message, modifier = Modifier.padding(vertical = Spacing.md))
+                EmptyState(
+                    title = "Couldn’t read this receipt",
+                    body = s.message,
+                    illustration = { LucentoMascot(size = 88.dp, mood = MascotMood.Curious) },
+                )
                 CaptureButtons(::launchCamera, ::launchPicker)
                 Spacer(Modifier.height(Spacing.md))
                 LucentoTextButton(text = "Enter it manually instead", onClick = { onReview(ReceiptResult(null, null, null)) })
@@ -184,7 +220,7 @@ fun ReceiptScanScreen(onBack: () -> Unit, onReview: (ReceiptResult) -> Unit) {
                 chosenAmount = chosenAmount,
                 onChooseAmount = { chosenAmount = it },
                 onRetake = { state = ScanState.Idle },
-                onReview = { onReview(ReceiptResult(s.suggestion.merchant, chosenAmount, s.suggestion.date)) },
+                onReview = { onReview(ReceiptResult(s.suggestion.merchant, chosenAmount, s.suggestion.date, s.suggestion.currencyCode)) },
             )
         }
         Spacer(Modifier.height(Spacing.xxl))

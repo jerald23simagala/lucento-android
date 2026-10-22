@@ -1,5 +1,10 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.Confirmation
+import com.lucento.app.core.designsystem.component.ConfirmationHost
+import com.lucento.app.domain.GoalMilestone
+import com.lucento.app.core.designsystem.component.LucentoAnimation
+import com.lucento.app.core.designsystem.component.EmptyIllustration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,6 +93,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<GoalDraft?>(null) }
     var openGoalId by remember { mutableStateOf<Long?>(null) }
+    var celebration by remember { mutableStateOf<Confirmation?>(null) }
     val progress = remember(state.goals, state.contributions, state.today) {
         state.goals.map { GoalCalculator.progress(it, state.contributions, state.today) }
     }
@@ -103,7 +109,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                     EmptyState(
                         title = "No goals yet",
                         body = "An emergency fund, a trip, a new laptop — set a target and Lucento tracks progress and when you’ll get there.",
-                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
+                        illustration = { EmptyIllustration(LucentoAnimation.EmptyGoals) },
                         action = { LucentoPrimaryButton(text = "Create a goal", onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) }) },
                     )
                 }
@@ -129,6 +135,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                 modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.gutter),
             )
         }
+        ConfirmationHost(confirmation = celebration, onDismissed = { celebration = null })
     }
 
     val open = progress.firstOrNull { it.goal.id == openGoalId }
@@ -138,7 +145,18 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
             history = state.contributions.filter { it.goalId == open.goal.id },
             linkedWallet = open.goal.linkedWalletId?.let { state.walletsById[it]?.name },
             onContribute = { amount, done ->
-                viewModel.contribute(open.goal.id, amount, state.today, "", PlanViewModel.newKey(), done)
+                val name = open.goal.name
+                viewModel.contribute(open.goal.id, amount, state.today, "", PlanViewModel.newKey(), done) { milestone ->
+                    // Close the sheet so the celebration is visible above the goal list (sheets are their own window).
+                    openGoalId = null
+                    celebration = Confirmation(
+                        when (milestone) {
+                            GoalMilestone.HALFWAY -> "Halfway to $name"
+                            GoalMilestone.REACHED -> "$name: goal reached"
+                        },
+                        kind = Confirmation.Kind.Milestone,
+                    )
+                }
             },
             onEdit = {
                 openGoalId = null

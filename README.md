@@ -5,9 +5,10 @@
 Lucento is a native Android personal finance app — income & expenses, budgets, goals, manual wallets,
 and AI-assisted entry — built local-first: your data stays on your device and every core feature works offline.
 
-> Status: **v0.3.0 — design-led refactor: new identity, five-tab navigation, transfers, Plan (budgets, goals,
-> debts, recurring), Insights, receipt OCR, voice/text entry, feature toggles.** See [docs/ROADMAP.md](docs/ROADMAP.md),
-> [docs/DESIGN.md](docs/DESIGN.md) and [docs/CALCULATIONS.md](docs/CALCULATIONS.md).
+> Status: **v0.4.0 — financial-integrity hardening, authentic Room schema history, a stricter CI pipeline,
+> mockup-led UI refinements and an original Lottie motion system.** v0.4.0 has **not yet been compiled** — see
+> [docs/QUALITY.md](docs/QUALITY.md) for exactly what was and wasn't verified. Also: [docs/ROADMAP.md](docs/ROADMAP.md),
+> [docs/DESIGN.md](docs/DESIGN.md), [docs/CALCULATIONS.md](docs/CALCULATIONS.md), [CHANGELOG.md](CHANGELOG.md).
 
 ## What works today
 - **Onboarding**: welcome → financial focus → features → currency & appearance → confirmation. Skippable; choices
@@ -28,12 +29,16 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Voice & text entry**: system speech recogniser (prefers offline) or typing → offline parser → editable review.
 - **Settings**: theme, main currency, **Enabled features** (turn modules off/on without losing data), CSV export,
   privacy facts.
-- Exact money math in minor units; 146 JVM unit tests.
+- **Motion**: original Lottie Sun/Moon mascot (idle, curious, success, celebrate), onboarding mark, four empty-state
+  illustrations, receipt-scanning beam, saved confirmation, calm milestones — all bundled, reduced-motion aware.
+- **Data safety**: wallet type/currency locked while history or schedules depend on it; used categories are archived,
+  never cascade-deleting budgets; CSV export neutralises spreadsheet formulas; currency-aware receipt amounts.
+- Exact money math in minor units; 215 JVM unit tests.
 - No internet permission (network permissions merged by libraries are stripped); Android cloud backup disabled.
 
 ## Not yet
-Full backup/restore (CSV export only), reminder notifications, Lottie animations, category management screen,
-cross-currency transfers, automatic principal/interest split. See the roadmap.
+Full backup/restore (CSV export only), reminder notifications, category management screen (the safe rules exist and
+are tested), cross-currency transfers, automatic principal/interest split. See the roadmap.
 
 ## Tech
 Kotlin · Jetpack Compose · Material 3 · Room · DataStore · ViewModel · Coroutines/Flow · Navigation Compose (type-safe).
@@ -57,12 +62,12 @@ JDK 17, compileSdk 35, minSdk 26 (Android 8.0+). Application ID `com.lucento.app
    ./gradlew testDebugUnitTest   # unit tests
    ./gradlew assembleDebug       # APK at app/build/outputs/apk/debug/
    ```
-   On Windows use `gradlew.bat`.
+   On Windows use `gradlew.bat`, or run everything CI runs with
+   `powershell -ExecutionPolicy Bypass -File tools\verify.ps1` (writes `build\verify-summary.txt`).
 
 ## Project layout
 See [CLAUDE.md](CLAUDE.md) for architecture, money rules and engineering standards.
 
 ## Licenses
 Inter typeface © The Inter Project Authors, SIL Open Font License 1.1 — see `docs/licenses/Inter-OFL.txt`.
-"# lucento-android-app" 
-"# lucento-android" 
+Airbnb Lottie, Apache License 2.0. All animation files are original to Lucento (`docs/design/ANIMATION_ASSETS.md`).

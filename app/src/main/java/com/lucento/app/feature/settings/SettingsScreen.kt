@@ -295,7 +295,8 @@ private fun SettingsContent(
         }
         Spacer(Modifier.height(Spacing.md))
         Text(
-            "Set in Inter, licensed under the SIL Open Font License 1.1. Text recognition by Google ML Kit (on-device).",
+            "Set in Inter, licensed under the SIL Open Font License 1.1. Text recognition by Google ML Kit (on-device). " +
+                "Animations play with Airbnb Lottie (Apache License 2.0); the Sun and Moon, illustrations and motion are original to Lucento.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

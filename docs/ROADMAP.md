@@ -61,6 +61,19 @@ Presentation-layer only: no schema, entity, DAO or repository changes. See `docs
   model, system camera / photo picker — no camera permission).
 - Feature toggles + personalised onboarding. Safe to spend / burn rate / net flow per `docs/CALCULATIONS.md`.
 
+## Done — v0.4.0 integrity, schemas, CI, mockup UI, Lottie (not yet compiled — see docs/QUALITY.md)
+- Integrity: `WalletChangePolicy` (asset ↔ liability and currency locks incl. recurring schedules), category archive
+  instead of delete when budgets/schedules/transactions use it (+ `restore`), date-keyed recurring idempotency (fixes a
+  swallowed payment after editing a schedule's timing), race-safe transaction/transfer inserts, crash-free write
+  failures, OWASP-style CSV formula neutralisation, currency-aware receipt amounts (0/2/3 decimals, integer totals,
+  masking dates/phones/IDs/quantities, currency detection that never converts). 69 new JVM tests (215 total).
+- Room: authentic schemas 1–3 committed from CI artifacts; offline migration checker; stronger instrumented tests.
+- CI: blocking lint policy, schema drift check, release APK + AAB with `aapt2` permission/debuggable checks, optional
+  signing from secrets, emulator migration job. `tools/verify.ps1` for local runs.
+- UI from the reference mockup: category hues, Home actions/net-flow layout, Transactions type tabs, richer empty
+  states; Lottie: mascot expressions, onboarding, empty states, scan, saved, milestones (goal halfway/reached, month
+  kept within budget — once).
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).
@@ -101,19 +114,18 @@ Presentation-layer only: no schema, entity, DAO or repository changes. See `docs
   and a dry-run summary before overwriting.
 
 ## M11 — Polish & release readiness
-- Lottie animations for key moments (first transaction, goal reached) — bundled assets, reduced-motion aware.
+- ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,
   stable signing via GitHub secrets, Play-ready release workflow.
 
 ## Next recommended milestone
-1. Push v0.3.0, fix any CI compile errors, commit Room schemas 1–3 from the CI artifact, run `connectedDebugAndroidTest`.
-2. Device QA: light/dark, small phones, font scale 200%, TalkBack; receipt OCR on real receipts; speech on devices
-   without Google services.
-3. Full backup/restore (versioned JSON + checksum), category management, reminder notifications (opt-in).
+1. Push v0.4.0 (or run `tools/verify.ps1`), fix any compile errors CI reports, confirm the migration job is green.
+2. Device QA against `docs/design-reference/lucento-mock.png`: light/dark, small phones, font scale 200%, TalkBack,
+   reduced motion; Lottie on lottie-android; receipts in PHP/JPY/KWD/EUR; speech without Google services.
+3. Category management screen on top of the tested archive/restore rules; full backup/restore; opt-in reminders.
 
-## Known gaps in the foundation
-- The authoring environment (cloud + device VM) has no Android SDK or Maven access, so code changes are verified
-  only by GitHub Actions. Never treat a change as working until CI is green.
-- Lottie is not yet integrated (planned M11); current motion uses Compose animation APIs and honours "Remove animations".
-- No instrumented/UI tests yet; Room DAO tests arrive with M1 (Robolectric or emulator in CI).
-- Debug APK signing key varies per CI runner (see README).
+## Known gaps
+- The authoring environment (cloud + device VM) has no Android SDK or Maven access, so Compose/Android code is
+  verified only by GitHub Actions (or a local run). Never treat a change as working until CI is green.
+- No UI/screenshot tests; DAO behaviour is tested with in-memory fakes, real SQLite only in the migration job.
+- Debug APK signing key varies per CI runner (see README); release signing needs repository secrets.

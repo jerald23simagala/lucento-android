@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -51,6 +52,9 @@ import com.lucento.app.core.designsystem.component.CurrencyList
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.LucentoAnimation
+import com.lucento.app.core.designsystem.component.LucentoLottieAnimation
+import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.SegmentedToggle
@@ -152,8 +156,14 @@ private fun WelcomeStep(onContinue: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            LucentoMark(size = 96.dp)
-            Spacer(Modifier.height(Spacing.md))
+            // The mark assembles once (≈2.5 s, never blocks the button); reduced motion shows it complete.
+            LucentoLottieAnimation(
+                animation = LucentoAnimation.Welcome,
+                modifier = Modifier.size(width = 132.dp, height = 110.dp),
+                contentDescription = "Lucento",
+                fallback = { LucentoMark(size = 96.dp, animate = false) },
+            )
+            Spacer(Modifier.height(Spacing.sm))
             Text("Lucento", style = MaterialTheme.typography.displayMedium, modifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(Spacing.sm))
             Text(
@@ -277,7 +287,7 @@ private fun ConfirmStep(currency: String, theme: ThemeMode, features: Set<Featur
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                LucentoMascot(size = 72.dp)
+                LucentoMascot(size = 72.dp, mood = MascotMood.Success)
             }
             Spacer(Modifier.height(Spacing.lg))
             SummaryRow("Main currency", "$currency · ${MoneyFormatter.currencyName(currency)}")

@@ -1,5 +1,7 @@
 package com.lucento.app.feature.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -23,7 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.KeyboardVoice
@@ -100,6 +102,8 @@ data class HomeActions(
     val onOpenInsights: () -> Unit,
     val onOpenBudgets: () -> Unit,
     val onOpenRecurring: () -> Unit,
+    /** The Add hub (manual, scan, speak, transfer). */
+    val onOpenQuickAdd: () -> Unit = {},
 )
 
 @Composable
@@ -172,7 +176,12 @@ private fun Greeting(today: LocalDate) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(greeting, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+            Text(
+                greeting,
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+            Spacer(Modifier.height(Spacing.xxs))
             Text(
                 dateLabel,
                 style = MaterialTheme.typography.bodyMedium,
@@ -181,7 +190,7 @@ private fun Greeting(today: LocalDate) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        LucentoMascot(size = 60.dp)
+        LucentoMascot(size = 72.dp)
     }
 }
 
@@ -394,9 +403,9 @@ private fun explanation(safe: SafeToSpend): String = when (safe.basis) {
 @Composable
 private fun QuickActions(state: HomeUiState, actions: HomeActions) {
     val f = state.features
+    // As in the reference design: one filled primary action, then tonal circles for the other ways to record.
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        ActionTile("Expense", Icons.Filled.Remove, { actions.onAddTransaction(TransactionType.EXPENSE) }, Modifier.weight(1f), primary = true)
-        ActionTile("Income", Icons.Filled.Add, { actions.onAddTransaction(TransactionType.INCOME) }, Modifier.weight(1f))
+        ActionTile("Add", Icons.Filled.Add, { actions.onAddTransaction(TransactionType.EXPENSE) }, Modifier.weight(1f), primary = true)
         if (f.isEnabled(Feature.MULTIPLE_WALLETS)) {
             ActionTile("Transfer", Icons.Outlined.SwapHoriz, actions.onTransfer, Modifier.weight(1f))
         }
@@ -406,6 +415,7 @@ private fun QuickActions(state: HomeUiState, actions: HomeActions) {
         if (f.isEnabled(Feature.VOICE_ENTRY)) {
             ActionTile("Speak", Icons.Outlined.KeyboardVoice, actions.onSpeak, Modifier.weight(1f))
         }
+        ActionTile("More", Icons.Filled.MoreHoriz, actions.onOpenQuickAdd, Modifier.weight(1f))
     }
 }
 
@@ -430,31 +440,47 @@ private fun FlowCard(state: HomeUiState, onOpenInsights: (() -> Unit)?) {
             }
         }
         Spacer(Modifier.height(Spacing.sm))
-        MoneyText(
-            money = flow.net,
-            style = AmountStyles.hero,
-            showPlus = true,
-            color = if (flow.net.isNegative) colors.negative else MaterialTheme.colorScheme.onSurface,
-        )
-        flow.changeVsPrevious?.let { change ->
-            val previousName = monthLabel(flow.month.minusMonths(1))
-            Text(
-                when {
-                    change.isZero -> "Same as $previousName"
-                    change.isNegative -> "${MoneyFormatter.format(-change)} lower than $previousName"
-                    else -> "${MoneyFormatter.format(change)} higher than $previousName"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(Spacing.md))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Figure("Income", Modifier.weight(1f)) {
-                MoneyText(money = flow.income, style = AmountStyles.medium, showPlus = true, color = colors.positive, fractionScale = 1f)
+        // Reference layout: the net figure on the left, income and expenses stacked on the right.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1.15f)) {
+                MoneyText(
+                    money = flow.net,
+                    style = AmountStyles.hero,
+                    showPlus = true,
+                    color = if (flow.net.isNegative) colors.negative else MaterialTheme.colorScheme.onSurface,
+                )
+                flow.changeVsPrevious?.let { change ->
+                    val previousName = monthLabel(flow.month.minusMonths(1))
+                    Text(
+                        when {
+                            change.isZero -> "Same as $previousName"
+                            change.isNegative -> "${MoneyFormatter.format(-change)} lower than $previousName"
+                            else -> "${MoneyFormatter.format(change)} higher than $previousName"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when {
+                            change.isZero -> MaterialTheme.colorScheme.onSurfaceVariant
+                            change.isNegative -> colors.negative
+                            else -> colors.positive
+                        },
+                    )
+                }
             }
-            Figure("Expenses", Modifier.weight(1f)) {
-                MoneyText(money = -flow.expense, style = AmountStyles.medium, fractionScale = 1f)
+            Spacer(Modifier.width(Spacing.md))
+            Box(
+                Modifier
+                    .width(1.dp)
+                    .height(52.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                FlowLine("Income") {
+                    MoneyText(money = flow.income, style = AmountStyles.medium, showPlus = true, color = colors.positive, fractionScale = 1f)
+                }
+                FlowLine("Expenses") {
+                    MoneyText(money = -flow.expense, style = AmountStyles.medium, color = colors.negative, fractionScale = 1f)
+                }
             }
         }
         if (burn != null) {
@@ -504,6 +530,14 @@ private fun FlowCard(state: HomeUiState, onOpenInsights: (() -> Unit)?) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun FlowLine(label: String, value: @Composable () -> Unit) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        value()
     }
 }
 

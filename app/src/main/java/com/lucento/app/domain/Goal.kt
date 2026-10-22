@@ -105,3 +105,22 @@ object GoalCalculator {
     private const val DAYS_PER_MONTH = 30
     private const val MAX_PROJECTION_DAYS = 365L * 100
 }
+
+/** Progress points worth a (calm) celebration. Only ever triggered by money being set aside, never by spending. */
+enum class GoalMilestone(val percent: Int) { HALFWAY(50), REACHED(100) }
+
+object GoalMilestones {
+
+    /**
+     * The highest milestone crossed when a goal's saved amount moved from [before] to [after] — null when none
+     * was crossed, when money was taken back out, or for a non-positive target. Exact integer comparison:
+     * `saved × 100 ≥ target × percent`, so rounding can never trigger (or miss) a milestone.
+     */
+    fun crossed(target: Money, before: Money, after: Money): GoalMilestone? {
+        if (target.amountMinor <= 0L || after <= before) return null
+        fun reached(saved: Money, m: GoalMilestone) =
+            java.math.BigInteger.valueOf(saved.amountMinor).multiply(java.math.BigInteger.valueOf(100)) >=
+                java.math.BigInteger.valueOf(target.amountMinor).multiply(java.math.BigInteger.valueOf(m.percent.toLong()))
+        return GoalMilestone.entries.reversed().firstOrNull { reached(after, it) && !reached(before, it) }
+    }
+}
