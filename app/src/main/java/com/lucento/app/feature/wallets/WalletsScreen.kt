@@ -32,7 +32,9 @@ import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Figure
 import com.lucento.app.core.designsystem.component.Hairline
-import com.lucento.app.core.designsystem.component.LucentoMark
+import com.lucento.app.core.designsystem.component.InfoNote
+import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MoneyText
@@ -48,10 +50,17 @@ import com.lucento.app.domain.Insights
 import com.lucento.app.domain.Wallet
 
 @Composable
-fun WalletsScreen(viewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory)) {
+fun WalletsScreen(
+    onBack: () -> Unit,
+    onOpenWallet: (Long) -> Unit,
+    /** False when Multiple wallets is off and one account already exists. */
+    allowAdding: Boolean,
+    viewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
     val newDraft = { WalletDraft(currencyCode = state.primaryCurrency) }
+    val canAdd = allowAdding || state.wallets.isEmpty()
 
     // Assets by type order, then liabilities: the two halves of net worth.
     val assets = state.wallets.filterNot { it.type.isLiability }.sortedBy { it.type.ordinal }
@@ -62,7 +71,7 @@ fun WalletsScreen(viewModel: WalletsViewModel = viewModel(factory = WalletsViewM
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
         ) {
-            item(key = "title") { LucentoTopBar(title = "Wallets") }
+            item(key = "title") { LucentoTopBar(title = "Wallets", onBack = onBack) }
 
             if (!state.loading && state.wallets.isEmpty()) {
                 item(key = "empty") {
@@ -70,7 +79,7 @@ fun WalletsScreen(viewModel: WalletsViewModel = viewModel(factory = WalletsViewM
                         title = "No wallets yet",
                         body = "Add the cash, bank accounts, e-wallets, savings and cards you use. " +
                             "Balances are entered by you and stay on this device — no bank connection needed.",
-                        illustration = { LucentoMark(size = 72.dp, animate = false) },
+                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
                         action = { LucentoPrimaryButton(text = "Add wallet", onClick = { editing = newDraft() }) },
                     )
                 }
@@ -87,19 +96,27 @@ fun WalletsScreen(viewModel: WalletsViewModel = viewModel(factory = WalletsViewM
                 title = "Assets",
                 wallets = assets,
                 primaryCurrency = state.primaryCurrency,
-                onEdit = { editing = it.toDraft() },
+                onEdit = { onOpenWallet(it.id) },
             )
             walletSection(
                 key = "liabilities",
                 title = "Liabilities",
                 wallets = liabilities,
                 primaryCurrency = state.primaryCurrency,
-                onEdit = { editing = it.toDraft() },
-                footnote = "Credit card balances are amounts owed. They reduce your net worth.",
+                onEdit = { onOpenWallet(it.id) },
+                footnote = "Credit cards and loans show what you owe. They reduce your net worth and are never counted as money you have.",
             )
+            if (!canAdd) {
+                item(key = "single") {
+                    InfoNote(
+                        "You’re tracking a single account. Turn on Multiple wallets in Settings › Enabled features to add more.",
+                        modifier = Modifier.padding(top = Spacing.lg),
+                    )
+                }
+            }
         }
 
-        if (state.wallets.isNotEmpty()) {
+        if (state.wallets.isNotEmpty() && canAdd) {
             ExtendedFloatingActionButton(
                 onClick = { editing = newDraft() },
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },

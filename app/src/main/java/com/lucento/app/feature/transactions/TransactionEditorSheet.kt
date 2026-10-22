@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.IconTile
+import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.SectionHeader
@@ -103,6 +104,12 @@ fun TransactionEditorSheet(
     onSave: (TransactionDraft, Char, (TransactionDraftError?) -> Unit) -> Unit,
     onDelete: ((Long) -> Unit)?,
     onDismiss: () -> Unit,
+    /** Offered as a third type for new entries when transfers are possible; switches to the transfer sheet. */
+    onSwitchToTransfer: (() -> Unit)? = null,
+    /** False when the user tracks a single account (Multiple wallets off) and it is the only choice. */
+    showWalletPicker: Boolean = true,
+    /** Shown above the form, e.g. "From your receipt — check the amount" for scanned or spoken drafts. */
+    sourceNote: String? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -157,12 +164,23 @@ fun TransactionEditorSheet(
             }
             Spacer(Modifier.height(Spacing.lg))
 
+            if (sourceNote != null) {
+                InfoNote(sourceNote)
+                Spacer(Modifier.height(Spacing.md))
+            }
+
+            val canSwitch = isNew && onSwitchToTransfer != null
             SegmentedToggle(
-                options = listOf(TransactionType.EXPENSE to "Expense", TransactionType.INCOME to "Income"),
+                options = listOf(TransactionType.EXPENSE to "Expense", TransactionType.INCOME to "Income") +
+                    (if (canSwitch) listOf(TransactionType.TRANSFER_OUT to "Transfer") else emptyList()),
                 selected = draft.type,
                 onSelect = { type ->
-                    // A category belongs to one kind; drop it when the kind changes.
-                    draft = draft.copy(type = type, categoryId = null)
+                    if (type.isTransfer) {
+                        onSwitchToTransfer?.invoke()
+                    } else {
+                        // A category belongs to one kind; drop it when the kind changes.
+                        draft = draft.copy(type = type, categoryId = null)
+                    }
                 },
             )
 
@@ -195,26 +213,28 @@ fun TransactionEditorSheet(
             )
 
             Spacer(Modifier.height(Spacing.lg))
-            SectionHeader(if (draft.type == TransactionType.INCOME) "Into wallet" else "From wallet")
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                wallets.forEach { w ->
-                    ChoicePill(
-                        label = "${w.name} · ${w.currencyCode}",
-                        selected = draft.walletId == w.id,
-                        leadingIcon = w.type.icon,
-                        onClick = {
-                            haptics.tick()
-                            draft = draft.copy(walletId = w.id)
-                            if (error is TransactionDraftError.WalletRequired || amountError) error = null
-                        },
-                    )
+            if (showWalletPicker || wallets.size > 1) {
+                SectionHeader(if (draft.type == TransactionType.INCOME) "Into wallet" else "From wallet")
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    wallets.forEach { w ->
+                        ChoicePill(
+                            label = "${w.name} · ${w.currencyCode}",
+                            selected = draft.walletId == w.id,
+                            leadingIcon = w.type.icon,
+                            onClick = {
+                                haptics.tick()
+                                draft = draft.copy(walletId = w.id)
+                                if (error is TransactionDraftError.WalletRequired || amountError) error = null
+                            },
+                        )
+                    }
                 }
-            }
-            if (error is TransactionDraftError.WalletRequired) {
-                Text("Choose a wallet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                if (error is TransactionDraftError.WalletRequired) {
+                    Text("Choose a wallet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
             }
 
             Spacer(Modifier.height(Spacing.md))
@@ -330,7 +350,7 @@ fun TransactionEditorSheet(
 
 /** Large, centred amount input with the wallet's currency symbol. Shrinks for long values. */
 @Composable
-private fun AmountEntry(
+internal fun AmountEntry(
     text: String,
     currencyCode: String?,
     type: TransactionType,
@@ -370,7 +390,13 @@ private fun AmountEntry(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = (if (type == TransactionType.INCOME) "+" else MoneyFormatter.MINUS) +
+            text = (
+                when {
+                    type.isTransfer -> ""
+                    type == TransactionType.INCOME -> "+"
+                    else -> MoneyFormatter.MINUS
+                }
+                ) +
                 (currencyCode?.let { MoneyFormatter.currencySymbol(it) } ?: ""),
             style = style.copy(fontSize = style.fontSize * 0.7f),
             color = colors.onSurfaceVariant,
@@ -481,7 +507,7 @@ private fun CategoryChoice(
 
 /** Today / Yesterday shortcuts plus a picker; the picker pill shows any other chosen date. */
 @Composable
-private fun DateChoices(date: LocalDate, onDate: (LocalDate) -> Unit, onPick: () -> Unit) {
+internal fun DateChoices(date: LocalDate, onDate: (LocalDate) -> Unit, onPick: () -> Unit) {
     val today = LocalDate.now()
     val yesterday = today.minusDays(1)
     val haptics = rememberHaptics()

@@ -1,6 +1,13 @@
 package com.lucento.app.core.designsystem.component
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +25,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -113,6 +124,56 @@ fun QuickActionButton(
         ),
     ) {
         ButtonContent(text, icon)
+    }
+}
+
+/**
+ * Round icon action with a label underneath (Home quick actions). The whole tile is one touch target.
+ * [primary] fills the circle with the brand colour for the single most common action.
+ */
+@Composable
+fun ActionTile(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+) {
+    val haptics = rememberHaptics()
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(role = Role.Button, onClickLabel = label) {
+                haptics.tick()
+                onClick()
+            }
+            .padding(vertical = Spacing.sm),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(if (primary) colors.primary else colors.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (primary) colors.onPrimary else colors.onPrimaryContainer,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

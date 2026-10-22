@@ -1,0 +1,56 @@
+package com.lucento.app.data.local
+
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+/** A savings goal. The optional linked wallet is informational; clearing it never affects the goal. */
+@Entity(
+    tableName = "goals",
+    foreignKeys = [
+        ForeignKey(
+            entity = WalletEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["wallet_id"],
+            onDelete = ForeignKey.SET_NULL,
+        ),
+    ],
+    indices = [Index(value = ["wallet_id"])],
+)
+data class GoalEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    @ColumnInfo(name = "target_minor") val targetMinor: Long,
+    @ColumnInfo(name = "currency_code") val currencyCode: String,
+    /** Epoch day, or null for an open-ended goal. */
+    @ColumnInfo(name = "target_date") val targetDate: Long?,
+    @ColumnInfo(name = "wallet_id") val walletId: Long?,
+    val archived: Boolean = false,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)
+
+/** Money earmarked for (positive) or taken back from (negative) a goal. Deleted with its goal. */
+@Entity(
+    tableName = "goal_contributions",
+    foreignKeys = [
+        ForeignKey(
+            entity = GoalEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["goal_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["goal_id"]), Index(value = ["client_uuid"], unique = true)],
+)
+data class GoalContributionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "goal_id") val goalId: Long,
+    @ColumnInfo(name = "amount_minor") val amountMinor: Long,
+    @ColumnInfo(name = "occurred_on") val occurredOn: Long,
+    val note: String,
+    @ColumnInfo(name = "client_uuid") val clientUuid: String,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+)

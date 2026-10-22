@@ -31,6 +31,7 @@ import androidx.room.PrimaryKey
         Index(value = ["category_id"]),
         Index(value = ["occurred_on"]),
         Index(value = ["client_uuid"], unique = true),
+        Index(value = ["transfer_group"]),
     ],
 )
 data class TransactionEntity(
@@ -49,4 +50,6 @@ data class TransactionEntity(
     @ColumnInfo(name = "client_uuid") val clientUuid: String,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** Shared by the two legs of a transfer (TRANSFER_OUT + TRANSFER_IN); null for income and expense. Added in v3. */
+    @ColumnInfo(name = "transfer_group") val transferGroup: String? = null,
 )

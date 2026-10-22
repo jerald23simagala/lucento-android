@@ -11,6 +11,7 @@ import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.Transfer
 import com.lucento.app.domain.Wallet
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +44,39 @@ fun Transaction.toDraft(): TransactionDraft = TransactionDraft(
     note = note,
 )
 
+/** Editable form state for creating or updating a transfer between two of the user's wallets. */
+data class TransferDraft(
+    /** Transfer group when editing; null for a new transfer. */
+    val group: String? = null,
+    val clientUuid: String = UUID.randomUUID().toString(),
+    val fromWalletId: Long? = null,
+    val toWalletId: Long? = null,
+    val amountText: String = "",
+    val date: LocalDate = LocalDate.now(),
+    val note: String = "",
+)
+
+fun Transfer.toDraft(): TransferDraft = TransferDraft(
+    group = group,
+    fromWalletId = fromWalletId,
+    toWalletId = toWalletId,
+    amountText = MoneyFormatter.formatPlain(amount),
+    date = date,
+    note = note,
+)
+
+sealed interface TransferDraftError {
+    data object FromRequired : TransferDraftError
+    data object ToRequired : TransferDraftError
+    data object SameWallet : TransferDraftError
+    data object CurrencyMismatch : TransferDraftError
+    data object AmountInvalid : TransferDraftError
+    data object AmountZero : TransferDraftError
+    data class AmountTooPrecise(val digits: Int) : TransferDraftError
+    data object AmountTooLarge : TransferDraftError
+    data object Rejected : TransferDraftError
+}
+
 sealed interface TransactionDraftError {
     data object WalletRequired : TransactionDraftError
     data object AmountInvalid : TransactionDraftError
@@ -57,6 +91,8 @@ data class TransactionEditorState(
     val loaded: Boolean = false,
     val wallets: List<Wallet> = emptyList(),
     val categories: List<Category> = emptyList(),
+    /** Every transfer by group, so tapping either leg anywhere opens the whole transfer. */
+    val transfers: Map<String, Transfer> = emptyMap(),
 ) {
     val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
 }
@@ -72,18 +108,20 @@ class TransactionEditorViewModel(
 ) : ViewModel() {
 
     val state: StateFlow<TransactionEditorState> =
-        combine(wallets.observeWallets(), categories.observeCategories()) { walletList, categoryList ->
-            TransactionEditorState(loaded = true, wallets = walletList, categories = categoryList)
+        combine(wallets.observeWallets(), categories.observeCategories(), transactions.observeTransactions()) { walletList, categoryList, all ->
+            TransactionEditorState(loaded = true, wallets = walletList, categories = categoryList, transfers = Transfer.pair(all))
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionEditorState())
 
     /** The wallet used for the most recent successful save in this session; pre-selected next time. */
     private var lastWalletId: Long? = null
 
     /** A fresh draft of [type], pre-selecting the last-used wallet when it still exists. */
-    fun newDraft(type: TransactionType = TransactionType.EXPENSE): TransactionDraft {
+    fun newDraft(type: TransactionType = TransactionType.EXPENSE, walletId: Long? = null): TransactionDraft {
         val wallets = state.value.wallets
-        val walletId = lastWalletId?.takeIf { id -> wallets.any { it.id == id } } ?: wallets.firstOrNull()?.id
-        return TransactionDraft(type = type, walletId = walletId)
+        val chosen = walletId?.takeIf { id -> wallets.any { it.id == id } }
+            ?: lastWalletId?.takeIf { id -> wallets.any { it.id == id } }
+            ?: wallets.firstOrNull()?.id
+        return TransactionDraft(type = type, walletId = chosen)
     }
 
     private var saving = false
@@ -126,6 +164,66 @@ class TransactionEditorViewModel(
             val saved = result is TransactionRepository.SaveResult.Saved
             if (saved) lastWalletId = wallet.id
             onResult(if (saved) null else TransactionDraftError.Rejected)
+        }
+    }
+
+    /** A fresh transfer draft; the source defaults to the last-used wallet, the destination to another one. */
+    fun newTransferDraft(fromWalletId: Long? = null, toWalletId: Long? = null): TransferDraft {
+        val wallets = state.value.wallets
+        val from = fromWalletId ?: lastWalletId?.takeIf { id -> wallets.any { it.id == id } } ?: wallets.firstOrNull()?.id
+        val fromCurrency = wallets.firstOrNull { it.id == from }?.currencyCode
+        val to = toWalletId ?: wallets.firstOrNull { it.id != from && it.currencyCode == fromCurrency }?.id
+        return TransferDraft(fromWalletId = from, toWalletId = to)
+    }
+
+    private var savingTransfer = false
+
+    /** Validates and saves a transfer; [onResult] receives null on success or the first error. */
+    fun saveTransfer(draft: TransferDraft, decimalSeparator: Char, onResult: (TransferDraftError?) -> Unit) {
+        if (savingTransfer) return
+        val wallets = state.value.walletsById
+        val from = wallets[draft.fromWalletId] ?: return onResult(TransferDraftError.FromRequired)
+        val to = wallets[draft.toWalletId] ?: return onResult(TransferDraftError.ToRequired)
+        if (from.id == to.id) return onResult(TransferDraftError.SameWallet)
+        if (from.currencyCode != to.currencyCode) return onResult(TransferDraftError.CurrencyMismatch)
+        val amount = when (val parsed = MoneyParser.parse(draft.amountText, from.currencyCode, decimalSeparator)) {
+            is MoneyParser.Result.Success -> parsed.money
+            MoneyParser.Result.Empty, MoneyParser.Result.Invalid -> return onResult(TransferDraftError.AmountInvalid)
+            is MoneyParser.Result.TooManyDecimals -> return onResult(TransferDraftError.AmountTooPrecise(parsed.allowed))
+            MoneyParser.Result.TooLarge -> return onResult(TransferDraftError.AmountTooLarge)
+        }
+        if (amount.amountMinor <= 0L) return onResult(TransferDraftError.AmountZero)
+
+        savingTransfer = true
+        viewModelScope.launch {
+            val result = try {
+                transactions.saveTransfer(
+                    TransactionRepository.TransferInput(
+                        group = draft.group,
+                        clientUuid = draft.clientUuid,
+                        fromWalletId = from.id,
+                        toWalletId = to.id,
+                        amount = amount,
+                        date = draft.date,
+                        note = draft.note,
+                    )
+                )
+            } finally {
+                savingTransfer = false
+            }
+            onResult(
+                when (result) {
+                    is TransactionRepository.TransferResult.Saved -> {
+                        lastWalletId = from.id
+                        null
+                    }
+                    TransactionRepository.TransferResult.SameWallet -> TransferDraftError.SameWallet
+                    TransactionRepository.TransferResult.CurrencyMismatch -> TransferDraftError.CurrencyMismatch
+                    TransactionRepository.TransferResult.AmountNotPositive -> TransferDraftError.AmountZero
+                    TransactionRepository.TransferResult.WalletNotFound,
+                    TransactionRepository.TransferResult.TransferNotFound -> TransferDraftError.Rejected
+                }
+            )
         }
     }
 

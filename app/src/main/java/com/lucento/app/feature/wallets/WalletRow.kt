@@ -39,7 +39,7 @@ fun WalletRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .let { if (onClick != null) it.clickable(role = Role.Button, onClickLabel = "Edit wallet", onClick = onClick) else it }
+            .let { if (onClick != null) it.clickable(role = Role.Button, onClickLabel = "Open account", onClick = onClick) else it }
             .padding(vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {

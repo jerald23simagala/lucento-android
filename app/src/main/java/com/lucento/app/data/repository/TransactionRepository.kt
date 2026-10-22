@@ -16,6 +16,7 @@ class TransactionRepository(
     private val wallets: WalletDao,
     private val categories: CategoryDao,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val runner: TransactionRunner = TransactionRunner.Direct,
 ) {
 
     /** Everything needed to create or update a transaction. [clientUuid] makes creation idempotent. */
@@ -37,12 +38,36 @@ class TransactionRepository(
         data object CurrencyMismatch : SaveResult
         data object CategoryMismatch : SaveResult
         data object TransactionNotFound : SaveResult
+        /** Transfers are saved with [saveTransfer]; a transfer leg can't be edited as income or expense. */
+        data object InvalidType : SaveResult
+    }
+
+    /** A movement between two of the user's wallets. [group] is null when creating. */
+    data class TransferInput(
+        val group: String?,
+        val clientUuid: String,
+        val fromWalletId: Long,
+        val toWalletId: Long,
+        val amount: Money,
+        val date: LocalDate,
+        val note: String,
+    )
+
+    sealed interface TransferResult {
+        data class Saved(val group: String) : TransferResult
+        data object AmountNotPositive : TransferResult
+        data object WalletNotFound : TransferResult
+        data object SameWallet : TransferResult
+        /** Both wallets must use the transfer's currency; Lucento never converts with a guessed rate. */
+        data object CurrencyMismatch : TransferResult
+        data object TransferNotFound : TransferResult
     }
 
     fun observeTransactions(): Flow<List<Transaction>> =
         transactions.observeAll().map { list -> list.map { it.toDomain() } }
 
     suspend fun save(input: Input): SaveResult {
+        if (input.type.isTransfer) return SaveResult.InvalidType
         if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
 
         val wallet = wallets.getById(input.walletId)
@@ -78,6 +103,7 @@ class TransactionRepository(
         }
 
         val existing = transactions.getById(input.id) ?: return SaveResult.TransactionNotFound
+        if (existing.transferGroup != null) return SaveResult.InvalidType
         transactions.update(
             existing.copy(
                 type = input.type.name,
@@ -93,10 +119,77 @@ class TransactionRepository(
         return SaveResult.Saved(input.id)
     }
 
-    suspend fun delete(id: Long) = transactions.deleteById(id)
+    /** Deletes a transaction; deleting either leg of a transfer deletes the whole transfer. */
+    suspend fun delete(id: Long) {
+        val existing = transactions.getById(id) ?: return
+        val group = existing.transferGroup
+        if (group != null) runner.run { transactions.deleteByTransferGroup(group) } else transactions.deleteById(id)
+    }
+
+    /**
+     * Creates or updates a transfer as two linked legs written atomically: TRANSFER_OUT on the source and
+     * TRANSFER_IN on the destination, both with the same amount, currency, date and note. Creation is
+     * idempotent on [TransferInput.clientUuid].
+     */
+    suspend fun saveTransfer(input: TransferInput): TransferResult {
+        if (input.amount.amountMinor <= 0L) return TransferResult.AmountNotPositive
+        if (input.fromWalletId == input.toWalletId) return TransferResult.SameWallet
+        val from = wallets.getById(input.fromWalletId)
+        val to = wallets.getById(input.toWalletId)
+        if (from == null || from.archived || to == null || to.archived) return TransferResult.WalletNotFound
+        if (from.currencyCode != input.amount.currencyCode || to.currencyCode != input.amount.currencyCode) {
+            return TransferResult.CurrencyMismatch
+        }
+        val note = input.note.trim().take(MAX_NOTE)
+        val now = clock()
+
+        if (input.group == null) {
+            val outKey = input.clientUuid + OUT_SUFFIX
+            transactions.findByClientUuid(outKey)?.transferGroup?.let { return TransferResult.Saved(it) }
+            val group = input.clientUuid
+            fun leg(type: TransactionType, walletId: Long, key: String) = TransactionEntity(
+                type = type.name,
+                amountMinor = input.amount.amountMinor,
+                currencyCode = input.amount.currencyCode,
+                walletId = walletId,
+                categoryId = null,
+                occurredOn = input.date.toEpochDay(),
+                note = note,
+                clientUuid = key,
+                createdAt = now,
+                updatedAt = now,
+                transferGroup = group,
+            )
+            runner.run {
+                transactions.insert(leg(TransactionType.TRANSFER_OUT, from.id, outKey))
+                transactions.insert(leg(TransactionType.TRANSFER_IN, to.id, input.clientUuid + IN_SUFFIX))
+            }
+            return TransferResult.Saved(group)
+        }
+
+        val legs = transactions.getByTransferGroup(input.group)
+        val outLeg = legs.firstOrNull { it.type == TransactionType.TRANSFER_OUT.name }
+        val inLeg = legs.firstOrNull { it.type == TransactionType.TRANSFER_IN.name }
+        if (outLeg == null || inLeg == null) return TransferResult.TransferNotFound
+        fun TransactionEntity.edited(walletId: Long) = copy(
+            amountMinor = input.amount.amountMinor,
+            currencyCode = input.amount.currencyCode,
+            walletId = walletId,
+            occurredOn = input.date.toEpochDay(),
+            note = note,
+            updatedAt = now,
+        )
+        runner.run {
+            transactions.update(outLeg.edited(from.id))
+            transactions.update(inLeg.edited(to.id))
+        }
+        return TransferResult.Saved(input.group)
+    }
 
     companion object {
         const val MAX_NOTE = 200
+        private const val OUT_SUFFIX = "-out"
+        private const val IN_SUFFIX = "-in"
     }
 }
 
@@ -109,4 +202,5 @@ internal fun TransactionEntity.toDomain(): Transaction = Transaction(
     date = LocalDate.ofEpochDay(occurredOn),
     note = note,
     createdAtEpochMillis = createdAt,
+    transferGroup = transferGroup,
 )

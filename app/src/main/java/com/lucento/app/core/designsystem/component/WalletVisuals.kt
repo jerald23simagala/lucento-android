@@ -5,6 +5,7 @@ import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.RequestQuote
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -21,6 +22,7 @@ val WalletType.icon: ImageVector
         WalletType.E_WALLET -> Icons.Outlined.PhoneAndroid
         WalletType.SAVINGS -> Icons.Outlined.Savings
         WalletType.CREDIT_CARD -> Icons.Outlined.CreditCard
+        WalletType.LOAN -> Icons.Outlined.RequestQuote
     }
 
 val WalletType.label: String
@@ -30,6 +32,7 @@ val WalletType.label: String
         WalletType.E_WALLET -> "E-wallet"
         WalletType.SAVINGS -> "Savings"
         WalletType.CREDIT_CARD -> "Credit card"
+        WalletType.LOAN -> "Loan"
     }
 
 /** Plural group title used when wallets are listed by type. */
@@ -40,6 +43,7 @@ val WalletType.groupLabel: String
         WalletType.E_WALLET -> "E-wallets"
         WalletType.SAVINGS -> "Savings"
         WalletType.CREDIT_CARD -> "Credit cards"
+        WalletType.LOAN -> "Loans"
     }
 
 /** Wallet type icon on its own restrained tone, so account kinds are recognisable at a glance. */

@@ -15,6 +15,8 @@ class WalletRepository(
     private val dao: WalletDao,
     private val transactionDao: TransactionDao,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Counts recurring schedules that use a wallet; null when schedules are not wired (tests). */
+    private val scheduleCount: (suspend (Long) -> Int)? = null,
 ) {
 
     sealed interface SaveResult {
@@ -30,6 +32,8 @@ class WalletRepository(
         data object Deleted : DeleteResult
         /** The wallet still owns [count] transactions; they must be removed first. */
         data class HasTransactions(val count: Int) : DeleteResult
+        /** The wallet is used by [count] recurring schedules; they must be removed first. */
+        data class HasSchedules(val count: Int) : DeleteResult
     }
 
     /** Active wallets with balances derived from opening balance plus transactions. */
@@ -81,6 +85,8 @@ class WalletRepository(
     suspend fun delete(id: Long): DeleteResult {
         val count = transactionDao.countForWallet(id)
         if (count > 0) return DeleteResult.HasTransactions(count)
+        val schedules = scheduleCount?.invoke(id) ?: 0
+        if (schedules > 0) return DeleteResult.HasSchedules(schedules)
         dao.deleteById(id)
         return DeleteResult.Deleted
     }
@@ -105,6 +111,8 @@ internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null): Wallet {
             type = walletType,
             incomeMinor = flow?.incomeMinor ?: 0L,
             expenseMinor = flow?.expenseMinor ?: 0L,
+            transferInMinor = flow?.transferInMinor ?: 0L,
+            transferOutMinor = flow?.transferOutMinor ?: 0L,
         ),
         createdAtEpochMillis = createdAt,
         openingBalance = opening,

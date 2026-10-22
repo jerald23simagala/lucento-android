@@ -13,6 +13,7 @@ import com.lucento.app.data.preferences.ThemeMode
 
 private val LocalExtendedColors = staticCompositionLocalOf { LightExtended }
 private val LocalReducedMotion = staticCompositionLocalOf { false }
+private val LocalIsDark = staticCompositionLocalOf { false }
 
 @Composable
 fun ThemeMode.isDark(): Boolean = when (this) {
@@ -41,6 +42,7 @@ fun LucentoTheme(
     CompositionLocalProvider(
         LocalExtendedColors provides extended,
         LocalReducedMotion provides reducedMotion,
+        LocalIsDark provides darkTheme,
     ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColors else LightColors,
@@ -58,4 +60,8 @@ object LucentoTheme {
     /** True when the user asked the system to remove animations; decorative motion is skipped. */
     val reducedMotion: Boolean
         @Composable @ReadOnlyComposable get() = LocalReducedMotion.current
+
+    /** True in the night theme; the mascot switches from Sun to Moon. */
+    val isDark: Boolean
+        @Composable @ReadOnlyComposable get() = LocalIsDark.current
 }

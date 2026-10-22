@@ -11,41 +11,42 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
- * The Lucento mark: an open lens with a single point of light. Matches the launcher icon geometry
- * (ring radius 21/108, stroke 6/108, 300° sweep starting at -15°, dot at -45°).
+ * The Lucento mark: a rounded blue "L" with a sun-yellow leaf growing from its corner — clarity (the
+ * clean letterform) with a sign of growth (the leaf). Same geometry as the launcher icon, drawn on a
+ * 100-unit grid.
  *
- * When [animate] is true the ring draws itself once and the point of light settles in —
- * a brief, purposeful brand moment on first launch.
+ * When [animate] is true the leaf grows in once — a brief brand moment on first launch.
  */
 @Composable
 fun LucentoMark(
     modifier: Modifier = Modifier,
     size: Dp = 96.dp,
-    ringColor: Color = LucentoTheme.extendedColors.brandMark,
-    lightColor: Color = LucentoTheme.extendedColors.accent,
+    markColor: Color = LucentoTheme.extendedColors.brandMark,
+    leafColor: Color = LucentoTheme.extendedColors.brandLeaf,
     animate: Boolean = true,
 ) {
-    val sweep = remember { Animatable(if (animate) 0f else 1f) }
-    val dot = remember { Animatable(if (animate) 0f else 1f) }
+    val reducedMotion = LucentoTheme.reducedMotion
+    val play = animate && !reducedMotion
+    val stem = remember { Animatable(if (play) 0f else 1f) }
+    val leaf = remember { Animatable(if (play) 0f else 1f) }
 
-    LaunchedEffect(animate) {
-        if (animate) {
-            sweep.animateTo(1f, tween(durationMillis = 900, easing = FastOutSlowInEasing))
-            dot.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+    LaunchedEffect(play) {
+        if (play) {
+            stem.animateTo(1f, tween(durationMillis = 520, easing = FastOutSlowInEasing))
+            leaf.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
         }
     }
 
@@ -54,27 +55,36 @@ fun LucentoMark(
             .size(size)
             .semantics { contentDescription = "Lucento" },
     ) {
-        val unit = this.size.minDimension / 66f // the mark occupies the 66/108 safe zone
-        val radius = 21f * unit
-        val stroke = 6f * unit
-        val center = Offset(this.size.width / 2f, this.size.height / 2f)
-
-        // Compose arcs start at 3 o'clock and sweep clockwise, like the vector path.
-        drawArc(
-            color = ringColor,
-            startAngle = -15f,
-            sweepAngle = 300f * sweep.value,
-            useCenter = false,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = Size(radius * 2, radius * 2),
-            style = Stroke(width = stroke, cap = StrokeCap.Round),
+        val u = this.size.minDimension / 100f
+        val radius = CornerRadius(10f * u, 10f * u)
+        // Stem grows downward, then the foot extends to the right.
+        val stemHeight = 72f * u * stem.value.coerceAtLeast(0.01f)
+        drawRoundRect(
+            color = markColor,
+            topLeft = Offset(20f * u, 14f * u),
+            size = Size(21f * u, stemHeight),
+            cornerRadius = radius,
         )
-
-        val angle = Math.toRadians(-45.0)
-        val dotCenter = Offset(
-            x = center.x + (radius * cos(angle)).toFloat(),
-            y = center.y + (radius * sin(angle)).toFloat(),
-        )
-        drawCircle(color = lightColor, radius = 4.4f * unit * dot.value, center = dotCenter)
+        if (stem.value > 0.6f) {
+            val footWidth = 58f * u * ((stem.value - 0.6f) / 0.4f)
+            drawRoundRect(
+                color = markColor,
+                topLeft = Offset(20f * u, 65f * u),
+                size = Size(footWidth.coerceAtLeast(21f * u), 21f * u),
+                cornerRadius = radius,
+            )
+        }
+        val base = Offset(50f * u, 58f * u)
+        val leafPath = Path().apply {
+            moveTo(base.x, base.y)
+            cubicTo(48f * u, 38f * u, 62f * u, 22f * u, 84f * u, 16f * u)
+            cubicTo(84f * u, 38f * u, 72f * u, 56f * u, base.x, base.y)
+            close()
+        }
+        if (leaf.value > 0f) {
+            scale(scale = leaf.value, pivot = base) {
+                drawPath(leafPath, color = leafColor)
+            }
+        }
     }
 }

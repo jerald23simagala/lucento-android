@@ -57,12 +57,19 @@ object TransactionQueries {
     ): List<Transaction> {
         val q = filter.query.trim().lowercase().replace(',', '.')
         return transactions.filter { t ->
-            (filter.type == null || t.type == filter.type) &&
+            matchesType(t.type, filter.type) &&
                 (filter.walletId == null || t.walletId == filter.walletId) &&
                 (filter.categoryId == null || t.categoryId == filter.categoryId) &&
                 (filter.range == null || t.date in filter.range) &&
                 (q.isEmpty() || matches(t, q, categoryNames, walletNames))
         }
+    }
+
+    /** A transfer filter (either leg type) matches both legs; other types match exactly. */
+    private fun matchesType(type: TransactionType, wanted: TransactionType?): Boolean = when {
+        wanted == null -> true
+        wanted.isTransfer -> type.isTransfer
+        else -> type == wanted
     }
 
     private fun matches(t: Transaction, q: String, categoryNames: Map<Long, String>, walletNames: Map<Long, String>): Boolean =
@@ -90,7 +97,7 @@ object TransactionQueries {
 
     /**
      * Income and expense totals per currency within [range]; primary currency first, then alphabetical.
-     * Currencies are never mixed. Transfers (M2) will be excluded by construction.
+     * Currencies are never mixed. Transfers are excluded by construction (only INCOME and EXPENSE count).
      */
     fun totalsByCurrency(
         transactions: List<Transaction>,

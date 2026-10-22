@@ -48,7 +48,8 @@ import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Figure
 import com.lucento.app.core.designsystem.component.Hairline
-import com.lucento.app.core.designsystem.component.LucentoMark
+import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
@@ -95,7 +96,7 @@ fun TransactionsScreen(
                         title = "Add a wallet first",
                         body = "Every transaction belongs to a wallet — cash, a bank account, a card. " +
                             "It only takes a moment, and stays on this device.",
-                        illustration = { LucentoMark(size = 72.dp, animate = false) },
+                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
                         action = { LucentoPrimaryButton(text = "Add wallet", onClick = onAddWallet) },
                     )
                 }
@@ -104,7 +105,7 @@ fun TransactionsScreen(
                     EmptyState(
                         title = "No transactions yet",
                         body = "Record what comes in and goes out. Wallet balances and your monthly picture update as you go.",
-                        illustration = { LucentoMark(size = 72.dp, animate = false) },
+                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
                         action = { LucentoPrimaryButton(text = "Add transaction", onClick = onAddTransaction) },
                     )
                 }
@@ -118,7 +119,7 @@ fun TransactionsScreen(
                                     query = it.take(60)
                                     viewModel.setQuery(query)
                                 },
-                                placeholder = "Search notes, categories, amounts",
+                                placeholder = "Search transactions",
                             )
                             Spacer(Modifier.height(Spacing.sm))
                             FilterRow(state = state, viewModel = viewModel, onClear = clearFilters)
@@ -150,6 +151,9 @@ fun TransactionsScreen(
                                     category = transaction.categoryId?.let { state.categoriesById[it] },
                                     wallet = state.walletsById[transaction.walletId],
                                     onClick = { onEditTransaction(transaction) },
+                                    transfer = transaction.transferGroup?.let { state.transfers[it] },
+                                    walletNames = state.walletNames,
+                                    perspectiveOfWallet = state.filter.walletId != null,
                                 )
                                 if (index < section.group.items.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
                             }
@@ -261,12 +265,14 @@ private fun FilterRow(state: TransactionsUiState, viewModel: TransactionsViewMod
                 null -> "All types"
                 TransactionType.EXPENSE -> "Expenses"
                 TransactionType.INCOME -> "Income"
+                TransactionType.TRANSFER_OUT, TransactionType.TRANSFER_IN -> "Transfers"
             },
             active = f.type != null,
             options = listOf<Pair<String, () -> Unit>>(
                 "All types" to { viewModel.setType(null) },
                 "Expenses" to { viewModel.setType(TransactionType.EXPENSE) },
                 "Income" to { viewModel.setType(TransactionType.INCOME) },
+                "Transfers" to { viewModel.setType(TransactionType.TRANSFER_OUT) },
             ),
         )
         MenuPill(

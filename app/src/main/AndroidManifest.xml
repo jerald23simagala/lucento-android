@@ -2,7 +2,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Lucento is local-first: no INTERNET permission is requested. -->
+    <!--
+        Lucento is local-first and has no network access. Libraries that would merge network permissions
+        (ML Kit's optional telemetry) are stripped here, so nothing can leave the device. Text recognition
+        uses the model bundled in the APK and works offline.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+
+    <!-- The camera and speech recogniser are other apps the user hands off to; Lucento itself needs no
+         CAMERA or RECORD_AUDIO permission. Declared so Android 11+ lets Lucento see whether they exist. -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
 
     <application
         android:name=".LucentoApplication"
@@ -26,5 +43,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Shares one cached receipt photo with the camera app during capture; deleted after reading. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

@@ -24,7 +24,7 @@ app/src/main/java/com/lucento/app/
   data/repository/     Repositories mapping entities <-> domain, enforcing validation
   domain/              Pure Kotlin models and calculators (unit-tested, no Android deps)
   feature/<name>/      Screen + ViewModel per feature
-  navigation/          LucentoRoot, routes, bottom navigation (Home · Transactions · Wallets; Settings pushed)
+  navigation/          LucentoRoot, routes, bottom navigation (Home · Transactions · Add · Insights · More; the rest pushed)
 ```
 - Dependency wiring: `AppContainer` in `LucentoApplication` (manual DI). ViewModels use `containerFactory`.
 - Keep financial logic in `domain/` or `core/money/` as pure functions so it is testable on the JVM.
@@ -34,7 +34,8 @@ app/src/main/java/com/lucento/app/
 - Never convert between currencies implicitly. Totals are per currency.
 - Use `Math.addExact`-style arithmetic; overflow must throw, not wrap.
 - Parse user input only through `MoneyParser`.
-- Transfers (future) must be a single atomic DB transaction producing two linked legs; never double-count.
+- Transfers are a single atomic DB transaction producing two linked legs (`transfer_group`); never double-count.
+- Financial definitions (Safe to spend, burn rate, net flow, budgets, goals, debts) live in `docs/CALCULATIONS.md`.
 - Guard against duplicate submissions (in-flight flags, idempotency keys for imports).
 
 ## Database
@@ -43,14 +44,18 @@ app/src/main/java/com/lucento/app/
 
 ## Privacy & cost
 - Core features work fully offline. No mandatory paid APIs, accounts, cloud, or bank integrations.
-- The app currently requests **no INTERNET permission**. Adding it requires an explicit, opt-in feature
-  (e.g. optional remote AI) with clear user consent before any financial data leaves the device.
+- The app has **no INTERNET permission**; the manifest strips network permissions merged by libraries (ML Kit).
+  Adding network access requires an explicit, opt-in feature (e.g. optional remote AI) with clear user consent
+  before any financial data leaves the device. OCR uses ML Kit's bundled on-device model.
 - Never hardcode API keys or secrets. Never commit keystores. Android auto-backup is disabled; Lucento
   provides its own explicit backup/restore.
 
 ## Design standards
-- Palette: deep pine primary, single brass accent (sparingly), warm ivory/ink neutrals. No dynamic colour.
-  Tokens, components and rules are documented in `docs/DESIGN.md`; never hardcode colours in features.
+- Palette: brand blue `#2563EB` primary, sun-yellow accent (sparingly), warm cream / deep navy neutrals, midnight-navy
+  dark theme. No dynamic colour. Tokens, components and rules are in `docs/DESIGN.md`; never hardcode colours.
+- Brand: blue L + yellow leaf mark; original Sun (light) / Moon (dark) mascot (`LucentoMascot`), small on dashboards.
+- Optional modules are switched through the typed `FeatureSet` (DataStore). Disabling a module hides it and never
+  deletes data; core transactions/accounts are never optional.
 - Amounts are always signed via `MoneyFormatter.formatSigned` so meaning never depends on colour alone.
 - Typography: Inter (body) + Inter Display (headings), bundled under OFL. Amounts use tabular figures (`AmountStyles`).
 - Flat surfaces with hairline borders; no heavy gradients, glassmorphism, or decorative charts.

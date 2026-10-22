@@ -25,6 +25,7 @@ import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.Transfer
 import com.lucento.app.domain.Wallet
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -35,6 +36,10 @@ import java.util.Locale
  * One line of history: category tile, what it was (note, or category when there is no note),
  * where it came from, and the signed amount. Income shows "+" and the positive tone; expenses show
  * "−" in ink — the sign carries the meaning, colour only reinforces it.
+ *
+ * Transfers show "From → To". In combined history they are neutral and unsigned (money only moved
+ * between the user's own accounts); in a single account's history ([perspectiveOfWallet]) they are signed
+ * for that account.
  */
 @Composable
 fun TransactionRow(
@@ -44,20 +49,33 @@ fun TransactionRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     trailingCaption: String? = null,
+    transfer: Transfer? = null,
+    walletNames: Map<Long, String> = emptyMap(),
+    perspectiveOfWallet: Boolean = false,
 ) {
     val isIncome = transaction.type == TransactionType.INCOME
+    val isTransfer = transaction.isTransfer
     val categoryName = category?.name ?: "Uncategorized"
-    val title = transaction.note.ifBlank { categoryName }
-    val subtitle = listOfNotNull(
-        categoryName.takeIf { transaction.note.isNotBlank() },
-        wallet?.name,
-    ).joinToString(" · ")
+    val title: String
+    val subtitle: String
+    if (isTransfer) {
+        val from = transfer?.let { walletNames[it.fromWalletId] } ?: "Account"
+        val to = transfer?.let { walletNames[it.toWalletId] } ?: "Account"
+        title = transaction.note.ifBlank { "Transfer" }
+        subtitle = "$from → $to"
+    } else {
+        title = transaction.note.ifBlank { categoryName }
+        subtitle = listOfNotNull(
+            categoryName.takeIf { transaction.note.isNotBlank() },
+            wallet?.name,
+        ).joinToString(" · ")
+    }
 
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .clickable(role = Role.Button, onClickLabel = "Edit transaction", onClick = onClick)
+            .clickable(role = Role.Button, onClickLabel = if (isTransfer) "Edit transfer" else "Edit transaction", onClick = onClick)
             .padding(vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -77,12 +95,24 @@ fun TransactionRow(
         }
         Spacer(Modifier.width(Spacing.md))
         Column(horizontalAlignment = Alignment.End) {
-            AmountText(
-                money = transaction.signedAmount,
-                style = AmountStyles.row,
-                showPlus = true,
-                color = if (isIncome) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
-            )
+            when {
+                isTransfer && !perspectiveOfWallet -> AmountText(
+                    money = transaction.amount,
+                    style = AmountStyles.row,
+                    signed = false,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                else -> AmountText(
+                    money = transaction.signedAmount,
+                    style = AmountStyles.row,
+                    showPlus = true,
+                    color = when {
+                        isIncome -> LucentoTheme.extendedColors.positive
+                        isTransfer -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
+                )
+            }
             if (trailingCaption != null) {
                 Text(
                     trailingCaption,

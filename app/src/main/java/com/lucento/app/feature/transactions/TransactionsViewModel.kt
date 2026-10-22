@@ -16,6 +16,7 @@ import com.lucento.app.domain.RangePreset
 import com.lucento.app.domain.TransactionFilter
 import com.lucento.app.domain.TransactionQueries
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.Transfer
 import com.lucento.app.domain.Wallet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -51,8 +52,10 @@ data class TransactionsUiState(
     val shownTotals: List<PeriodTotals> = emptyList(),
     val totalCount: Int = 0,
     val matchCount: Int = 0,
+    val transfers: Map<String, Transfer> = emptyMap(),
 ) {
     val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
+    val walletNames: Map<Long, String> = wallets.associate { it.id to it.name }
     val categoriesById: Map<Long, Category> = categories.associateBy { it.id }
 }
 
@@ -72,8 +75,17 @@ class TransactionsViewModel(
         filterState,
         preferences.preferences,
     ) { all, walletList, categoryList, filter, prefs ->
+        // In combined history a transfer is listed once (its outgoing leg). Filtered to one wallet,
+        // that wallet's own leg is shown instead, so its history reads correctly.
+        val visible = all.filter { t ->
+            when {
+                !t.isTransfer -> true
+                filter.walletId == null -> t.type == TransactionType.TRANSFER_OUT
+                else -> true
+            }
+        }
         val matches = TransactionQueries.filter(
-            transactions = all,
+            transactions = visible,
             filter = TransactionFilter(
                 query = filter.query,
                 type = filter.type,
@@ -94,8 +106,9 @@ class TransactionsViewModel(
                 DaySection(group, Insights.netByCurrency(group.items, prefs.primaryCurrency))
             },
             shownTotals = TransactionQueries.totalsByCurrency(matches, prefs.primaryCurrency),
-            totalCount = all.size,
+            totalCount = visible.size,
             matchCount = matches.size,
+            transfers = Transfer.pair(all),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionsUiState())
 

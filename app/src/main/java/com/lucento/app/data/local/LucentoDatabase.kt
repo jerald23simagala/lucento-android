@@ -12,14 +12,25 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * destructive fallback is intentionally not enabled because it would erase financial data.
  */
 @Database(
-    entities = [WalletEntity::class, CategoryEntity::class, TransactionEntity::class],
-    version = 2,
+    entities = [
+        WalletEntity::class,
+        CategoryEntity::class,
+        TransactionEntity::class,
+        BudgetEntity::class,
+        GoalEntity::class,
+        GoalContributionEntity::class,
+        RecurringEntity::class,
+    ],
+    version = 3,
     exportSchema = true,
 )
 abstract class LucentoDatabase : RoomDatabase() {
     abstract fun walletDao(): WalletDao
     abstract fun categoryDao(): CategoryDao
     abstract fun transactionDao(): TransactionDao
+    abstract fun budgetDao(): BudgetDao
+    abstract fun goalDao(): GoalDao
+    abstract fun recurringDao(): RecurringDao
 
     companion object {
         private const val NAME = "lucento.db"

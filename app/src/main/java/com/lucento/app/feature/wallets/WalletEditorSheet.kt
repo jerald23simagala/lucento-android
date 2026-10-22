@@ -63,6 +63,7 @@ import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
+import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.launch
@@ -81,8 +82,8 @@ fun Wallet.toDraft(): WalletDraft = WalletDraft(
 fun WalletEditorSheet(
     initial: WalletDraft,
     onSave: (WalletDraft, Char, (DraftError?) -> Unit) -> Unit,
-    /** Deletes the wallet; the callback receives 0 on success or the number of transactions blocking deletion. */
-    onDelete: ((Long, (Int) -> Unit) -> Unit)?,
+    /** Deletes the wallet; the callback says whether it was deleted or what still uses it. */
+    onDelete: ((Long, (WalletRepository.DeleteResult) -> Unit) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -94,7 +95,7 @@ fun WalletEditorSheet(
     var error by remember { mutableStateOf<DraftError?>(null) }
     var pickingCurrency by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
-    var blockedByTransactions by remember { mutableStateOf<Int?>(null) }
+    var blocked by remember { mutableStateOf<WalletRepository.DeleteResult?>(null) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -158,6 +159,7 @@ fun WalletEditorSheet(
                             WalletType.E_WALLET -> "e.g. Mobile wallet"
                             WalletType.SAVINGS -> "e.g. Emergency fund"
                             WalletType.CREDIT_CARD -> "e.g. Travel card"
+                            WalletType.LOAN -> "e.g. Car loan"
                         }
                     )
                 },
@@ -246,6 +248,7 @@ fun WalletEditorSheet(
                             DraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
                             else -> when {
                                 initial.id != null -> "Where this wallet started, before the transactions you record."
+                                draft.type == WalletType.LOAN -> "What you still owe on this loan. It counts against your net worth."
                                 draft.type.isLiability -> "What you currently owe on this card. It counts against your net worth."
                                 else -> "Leave empty to start at zero."
                             }
@@ -294,23 +297,31 @@ fun WalletEditorSheet(
             destructive = true,
             onConfirm = {
                 confirmingDelete = false
-                onDelete(initial.id) { blocking ->
-                    if (blocking == 0) close() else blockedByTransactions = blocking
+                onDelete(initial.id) { result ->
+                    if (result == WalletRepository.DeleteResult.Deleted) close() else blocked = result
                 }
             },
             onDismiss = { confirmingDelete = false },
         )
     }
 
-    blockedByTransactions?.let { count ->
+    blocked?.let { result ->
+        val text = when (result) {
+            is WalletRepository.DeleteResult.HasTransactions ->
+                "“${initial.name}” still has ${result.count} ${if (result.count == 1) "transaction" else "transactions"}. " +
+                    "Delete them from Transactions first, so no financial history disappears by accident."
+            is WalletRepository.DeleteResult.HasSchedules ->
+                "“${initial.name}” is used by ${result.count} recurring ${if (result.count == 1) "payment" else "payments"}. " +
+                    "Delete or change them in Plan › Recurring payments first."
+            WalletRepository.DeleteResult.Deleted -> ""
+        }
         ConfirmDialog(
             title = "Can’t delete yet",
-            text = "“${initial.name}” still has $count ${if (count == 1) "transaction" else "transactions"}. " +
-                "Delete them from Transactions first, so no financial history disappears by accident.",
+            text = text,
             confirmLabel = "OK",
             dismissLabel = null,
-            onConfirm = { blockedByTransactions = null },
-            onDismiss = { blockedByTransactions = null },
+            onConfirm = { blocked = null },
+            onDismiss = { blocked = null },
         )
     }
 }
@@ -320,7 +331,7 @@ fun WalletEditorSheet(
 @Composable
 private fun TypeGrid(selected: WalletType, onSelect: (WalletType) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = if (maxWidth >= 420.dp) 5 else 3
+        val columns = if (maxWidth >= 420.dp) 6 else 3
         val gap = Spacing.sm
         val tileWidth = (maxWidth - gap * (columns - 1)) / columns
         FlowRow(

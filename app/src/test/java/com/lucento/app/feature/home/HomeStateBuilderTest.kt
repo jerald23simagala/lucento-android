@@ -81,4 +81,38 @@ class HomeStateBuilderTest {
         val state = HomeStateBuilder.build(all, listOf(wallet("USD")), emptyList(), "USD", today)
         assertEquals(all.take(HomeStateBuilder.RECENT_COUNT), state.recent)
     }
+
+    @Test fun transfersAppearOnceAndNeverAsIncomeOrSpending() {
+        val out = Transaction(100, TransactionType.TRANSFER_OUT, Money(5_000, "USD"), 1L, null, LocalDate.parse("2025-03-19"), "", 0L, "g1")
+        val inn = Transaction(101, TransactionType.TRANSFER_IN, Money(5_000, "USD"), 2L, null, LocalDate.parse("2025-03-19"), "", 0L, "g1")
+        val spend = tx(1_000, "2025-03-18")
+        val state = HomeStateBuilder.build(listOf(inn, out, spend), listOf(wallet("USD", 10_000), wallet("USD")), emptyList(), "USD", today)
+        assertEquals(listOf(100L, spend.id), state.recent.map { it.id })
+        assertEquals(2, state.transactionCount)
+        assertEquals(Money(1_000, "USD"), state.netFlow!!.expense)
+        assertTrue(state.netFlow!!.income.isZero)
+        assertEquals(1L, state.transfers.getValue("g1").fromWalletId)
+    }
+
+    @Test fun disabledModulesKeepDataButLeaveTheDashboard() {
+        val budget = com.lucento.app.domain.Budget(1, null, Money(2_000, "USD"))
+        val rent = com.lucento.app.domain.RecurringSchedule(
+            1, "Rent", TransactionType.EXPENSE, Money(500, "USD"), 1L, null,
+            com.lucento.app.domain.Frequency.MONTHLY, 1, LocalDate.parse("2025-03-25"), null, 0, false,
+        )
+        val all = listOf(tx(1_900, "2025-03-10"))
+        val wallets = listOf(wallet("USD", 50_000))
+        val on = HomeStateBuilder.build(all, wallets, emptyList(), "USD", today, listOf(budget), listOf(rent))
+        assertEquals(com.lucento.app.domain.SafeToSpend.Basis.BUDGET, on.safeToSpend!!.basis)
+        assertEquals(Money(-400, "USD"), on.safeToSpend!!.amount) // 2,000 − 1,900 − 500
+        assertEquals(1, on.budgetAlerts.size)
+        assertEquals(1, on.upcoming.size)
+
+        val off = com.lucento.app.domain.FeatureSet(setOf(com.lucento.app.domain.Feature.INSIGHTS))
+        val hidden = HomeStateBuilder.build(all, wallets, emptyList(), "USD", today, listOf(budget), listOf(rent), off)
+        assertEquals(com.lucento.app.domain.SafeToSpend.Basis.BALANCES, hidden.safeToSpend!!.basis)
+        assertEquals(Money(50_000, "USD"), hidden.safeToSpend!!.amount)
+        assertTrue(hidden.budgetAlerts.isEmpty())
+        assertTrue(hidden.upcoming.isEmpty())
+    }
 }

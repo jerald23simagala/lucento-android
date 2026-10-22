@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -70,6 +71,16 @@ fun CategoryTile(
     modifier: Modifier = Modifier,
     size: Dp = Sizes.iconTile,
 ) {
+    if (type.isTransfer) {
+        IconTile(
+            icon = Icons.Filled.SwapHoriz,
+            modifier = modifier,
+            container = MaterialTheme.colorScheme.primaryContainer,
+            content = MaterialTheme.colorScheme.onPrimaryContainer,
+            size = size,
+        )
+        return
+    }
     val icon = category?.icon ?: CategoryIcons.Uncategorized
     if (type == TransactionType.INCOME) {
         IconTile(

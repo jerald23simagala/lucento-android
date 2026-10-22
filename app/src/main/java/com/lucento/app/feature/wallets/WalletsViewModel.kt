@@ -93,16 +93,9 @@ class WalletsViewModel(
         }
     }
 
-    /** [onResult] receives 0 when the wallet was deleted, or the number of transactions that block deletion. */
-    fun delete(id: Long, onResult: (blockingTransactions: Int) -> Unit) {
-        viewModelScope.launch {
-            onResult(
-                when (val result = wallets.delete(id)) {
-                    WalletRepository.DeleteResult.Deleted -> 0
-                    is WalletRepository.DeleteResult.HasTransactions -> result.count
-                }
-            )
-        }
+    /** Deletes an empty wallet; [onResult] says whether it was deleted or what still uses it. */
+    fun delete(id: Long, onResult: (WalletRepository.DeleteResult) -> Unit) {
+        viewModelScope.launch { onResult(wallets.delete(id)) }
     }
 
     companion object {

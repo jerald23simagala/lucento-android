@@ -63,10 +63,12 @@ object Insights {
 
     /**
      * Net movement (income minus expense) per currency for a set of transactions — used for daily
-     * subtotals in history. Primary currency first, then alphabetical.
+     * subtotals in history. Transfers between the user's own wallets are excluded. Primary currency
+     * first, then alphabetical.
      */
     fun netByCurrency(transactions: List<Transaction>, primaryCurrency: String): List<Money> =
         transactions
+            .filterNot { it.isTransfer }
             .groupBy { it.currencyCode }
             .map { (code, list) -> Money.sum(code, list.map { it.signedAmount }) }
             .sortedWith(compareBy<Money> { it.currencyCode != primaryCurrency }.thenBy { it.currencyCode })

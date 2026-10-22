@@ -56,7 +56,8 @@ fun LucentoCard(
 ) {
     val shape = MaterialTheme.shapes.large
     val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    val color = MaterialTheme.colorScheme.surfaceContainerLowest
+    // Cards lift off the canvas: white on cream by day, a lighter navy by night.
+    val color = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest
     if (onClick != null) {
         Surface(onClick = onClick, modifier = modifier, shape = shape, color = color, border = border) {
             Column(Modifier.padding(contentPadding), content = content)
@@ -69,8 +70,8 @@ fun LucentoCard(
 }
 
 /**
- * Lucento's signature "statement" panel: solid pine with ivory type and a short brass rule.
- * Reserved for the one figure a screen is about (net worth). Content colour is set for children.
+ * Lucento's "statement" panel: solid brand blue with white type and a short sun-yellow rule.
+ * Reserved for the one message a screen is about (first-run setup). Content colour is set for children.
  */
 @Composable
 fun StatementPanel(

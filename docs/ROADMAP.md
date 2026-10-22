@@ -50,7 +50,18 @@ Presentation-layer only: no schema, entity, DAO or repository changes. See `docs
   `TransactionQueries.totalsByCurrency` (unbounded), `MoneyFormatter.formatSigned` / `fractionSpan`,
   `HomeStateBuilder`.
 
-## M2 — Transfers between wallets
+## Done — v0.3.0 design-led refactor (pending CI)
+- Identity: blue/yellow/cream palette + midnight dark theme (AA-checked), L+leaf mark and launcher icon, original
+  vector Sun/Moon mascots. Navigation: Home · Transactions · Add · Insights · More.
+- Room v3 (`MIGRATION_2_3`, additive): `transactions.transfer_group`, `budgets`, `goals`, `goal_contributions`,
+  `recurring`. Instrumented migration tests for 2→3 and 1→3 written (need schemas + emulator; not run).
+- Transfers (M2, same currency), loans as liability accounts, Budgets (M3, monthly, no rollover), Goals (M4),
+  Recurring (M8, user-confirmed; no WorkManager auto-posting), Insights (M9 subset), CSV export (M10 part).
+- Natural-language entry (M6, offline English parser) + system speech recogniser; receipt OCR (M7, ML Kit bundled
+  model, system camera / photo picker — no camera permission).
+- Feature toggles + personalised onboarding. Safe to spend / burn rate / net flow per `docs/CALCULATIONS.md`.
+
+## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).
 - Tests: balances conserved, no double counting, deleting one leg deletes both.
@@ -93,6 +104,12 @@ Presentation-layer only: no schema, entity, DAO or repository changes. See `docs
 - Lottie animations for key moments (first transaction, goal reached) — bundled assets, reduced-motion aware.
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,
   stable signing via GitHub secrets, Play-ready release workflow.
+
+## Next recommended milestone
+1. Push v0.3.0, fix any CI compile errors, commit Room schemas 1–3 from the CI artifact, run `connectedDebugAndroidTest`.
+2. Device QA: light/dark, small phones, font scale 200%, TalkBack; receipt OCR on real receipts; speech on devices
+   without Google services.
+3. Full backup/restore (versioned JSON + checksum), category management, reminder notifications (opt-in).
 
 ## Known gaps in the foundation
 - The authoring environment (cloud + device VM) has no Android SDK or Maven access, so code changes are verified

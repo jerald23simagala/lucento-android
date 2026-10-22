@@ -12,6 +12,8 @@ data class WalletFlowRow(
     @ColumnInfo(name = "wallet_id") val walletId: Long,
     @ColumnInfo(name = "income_minor") val incomeMinor: Long,
     @ColumnInfo(name = "expense_minor") val expenseMinor: Long,
+    @ColumnInfo(name = "transfer_in_minor") val transferInMinor: Long = 0,
+    @ColumnInfo(name = "transfer_out_minor") val transferOutMinor: Long = 0,
 )
 
 @Dao
@@ -23,7 +25,9 @@ interface TransactionDao {
     @Query(
         "SELECT wallet_id AS wallet_id, " +
             "COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount_minor ELSE 0 END), 0) AS income_minor, " +
-            "COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount_minor ELSE 0 END), 0) AS expense_minor " +
+            "COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount_minor ELSE 0 END), 0) AS expense_minor, " +
+            "COALESCE(SUM(CASE WHEN type = 'TRANSFER_IN' THEN amount_minor ELSE 0 END), 0) AS transfer_in_minor, " +
+            "COALESCE(SUM(CASE WHEN type = 'TRANSFER_OUT' THEN amount_minor ELSE 0 END), 0) AS transfer_out_minor " +
             "FROM transactions GROUP BY wallet_id"
     )
     fun observeWalletFlows(): Flow<List<WalletFlowRow>>
@@ -33,6 +37,9 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE client_uuid = :clientUuid LIMIT 1")
     suspend fun findByClientUuid(clientUuid: String): TransactionEntity?
+
+    @Query("SELECT * FROM transactions WHERE transfer_group = :group")
+    suspend fun getByTransferGroup(group: String): List<TransactionEntity>
 
     @Query("SELECT COUNT(*) FROM transactions WHERE wallet_id = :walletId")
     suspend fun countForWallet(walletId: Long): Int
@@ -45,4 +52,7 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM transactions WHERE transfer_group = :group")
+    suspend fun deleteByTransferGroup(group: String)
 }

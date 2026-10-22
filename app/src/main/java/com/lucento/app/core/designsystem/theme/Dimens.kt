@@ -36,13 +36,13 @@ object Sizes {
 }
 
 /*
- * Shapes are restrained: small radii for controls, a single larger radius for sheets and the hero.
- * Lists are not wrapped in cards; grouping comes from spacing and hairlines.
+ * Soft, friendly radii: 12dp for controls, 16dp for inputs and tiles, 24dp for cards and sheets.
+ * Lists are grouped by cards or hairlines, never both.
  */
 val LucentoShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(14.dp),
-    large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(28.dp),
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(32.dp),
 )

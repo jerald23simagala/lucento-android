@@ -9,16 +9,23 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import com.lucento.app.domain.Feature
 
 sealed interface AppUiState {
     data object Loading : AppUiState
     data class Ready(val preferences: UserPreferences) : AppUiState
 }
 
-class AppViewModel(preferences: UserPreferencesRepository) : ViewModel() {
+class AppViewModel(private val preferences: UserPreferencesRepository) : ViewModel() {
     val uiState: StateFlow<AppUiState> = preferences.preferences
         .map<UserPreferences, AppUiState> { AppUiState.Ready(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState.Loading)
+
+    /** Used when a disabled module is opened from a link: the user can switch it back on in place. */
+    fun setFeatureEnabled(feature: Feature, enabled: Boolean) {
+        viewModelScope.launch { preferences.setFeatureEnabled(feature, enabled) }
+    }
 
     companion object {
         val Factory = containerFactory { AppViewModel(it.preferences) }

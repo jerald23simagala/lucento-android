@@ -5,20 +5,35 @@
 Lucento is a native Android personal finance app — income & expenses, budgets, goals, manual wallets,
 and AI-assisted entry — built local-first: your data stays on your device and every core feature works offline.
 
-> Status: **v0.2.0 — transactions + full UI/UX redesign**. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes
-> next and [docs/DESIGN.md](docs/DESIGN.md) for the design system.
+> Status: **v0.3.0 — design-led refactor: new identity, five-tab navigation, transfers, Plan (budgets, goals,
+> debts, recurring), Insights, receipt OCR, voice/text entry, feature toggles.** See [docs/ROADMAP.md](docs/ROADMAP.md),
+> [docs/DESIGN.md](docs/DESIGN.md) and [docs/CALCULATIONS.md](docs/CALCULATIONS.md).
 
 ## What works today
-- First-run onboarding with main-currency selection (all ISO 4217 currencies, searchable).
-- Wallets: create, edit and delete cash, bank, e-wallet, savings and credit-card wallets, each in its own currency.
-- Home: guided first-run setup; net-worth statement (assets vs owed, per currency); one-tap Expense / Income;
-  this month's in/out and spend-to-income ratio; recent transactions; 6-month spending trend; top categories.
-- Transactions: amount-first editor (type, wallet, category grid, date shortcuts, note); search and filter history
-  with in/out/net for what's shown and daily totals; wallet balances update from your transactions.
-- Wallets: assets and liabilities with per-currency subtotals and an owed-to-owned ratio.
-- Settings (gear on Home): light / dark / system theme, main currency, privacy facts.
-- Exact money math in minor units with JVM unit tests.
-- No internet permission; Android cloud backup disabled for financial data.
+- **Onboarding**: welcome → financial focus → features → currency & appearance → confirmation. Skippable; choices
+  only set the initial modules.
+- **Home**: greeting with the Sun (light) / Moon (dark) mascot; **Safe to spend** (budget-based, or a labelled
+  estimate from spendable balances, minus bills still due); quick actions (expense, income, transfer, scan, speak);
+  **Net flow** with income/expenses and **burn rate** (actual, projected, vs last month); budget and bill alerts;
+  recent transactions.
+- **Transactions**: search, filters (date, type incl. transfers, wallet, category), day groups, edit/delete.
+- **Add tab**: Scan receipt, Speak or type, Manual entry, recent categories.
+- **Transfers** between your own accounts (two linked legs, atomic, never income or spending).
+- **Wallets** (via More): cash, bank, e-wallet, savings, credit card and **loan**; account detail with history and
+  the right actions for assets vs debts.
+- **Plan** hub: **Budgets** (overall + category, monthly), **Savings goals** (contributions, projection,
+  required per month), **Debts & loans**, **Recurring payments** (mark paid / skip / pause — never auto-posted).
+- **Insights**: net flow by period, spending/income breakdown donut, 6-month spending, budget performance, net worth.
+- **Receipt scanning**: system camera or photo picker → on-device ML Kit OCR (bundled model) → editable suggestions.
+- **Voice & text entry**: system speech recogniser (prefers offline) or typing → offline parser → editable review.
+- **Settings**: theme, main currency, **Enabled features** (turn modules off/on without losing data), CSV export,
+  privacy facts.
+- Exact money math in minor units; 146 JVM unit tests.
+- No internet permission (network permissions merged by libraries are stripped); Android cloud backup disabled.
+
+## Not yet
+Full backup/restore (CSV export only), reminder notifications, Lottie animations, category management screen,
+cross-currency transfers, automatic principal/interest split. See the roadmap.
 
 ## Tech
 Kotlin · Jetpack Compose · Material 3 · Room · DataStore · ViewModel · Coroutines/Flow · Navigation Compose (type-safe).
