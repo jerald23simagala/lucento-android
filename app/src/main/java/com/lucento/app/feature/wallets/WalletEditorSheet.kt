@@ -1,7 +1,12 @@
 package com.lucento.app.feature.wallets
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -9,24 +14,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,16 +42,25 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.CurrencyPickerSheet
+import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
-import com.lucento.app.core.designsystem.component.icon
+import com.lucento.app.core.designsystem.component.SectionHeader
+import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.component.label
 import com.lucento.app.core.designsystem.component.rememberHaptics
+import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.Wallet
@@ -61,7 +76,7 @@ fun Wallet.toDraft(): WalletDraft = WalletDraft(
     amountText = if (openingBalance.isZero) "" else MoneyFormatter.formatPlain(openingBalance),
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletEditorSheet(
     initial: WalletDraft,
@@ -81,11 +96,16 @@ fun WalletEditorSheet(
     var confirmingDelete by remember { mutableStateOf(false) }
     var blockedByTransactions by remember { mutableStateOf<Int?>(null) }
 
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    )
+
     fun close() {
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -94,12 +114,35 @@ fun WalletEditorSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Text(
-                if (initial.id == null) "New wallet" else "Edit wallet",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            Spacer(Modifier.height(Spacing.xl))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (initial.id == null) "New wallet" else "Edit wallet",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                if (initial.id != null && onDelete != null) {
+                    IconButton(onClick = { confirmingDelete = true }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete wallet", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
 
+            Spacer(Modifier.height(Spacing.sm))
+            SectionHeader("Type")
+            TypeGrid(
+                selected = draft.type,
+                onSelect = {
+                    haptics.tick()
+                    draft = draft.copy(type = it)
+                },
+            )
+
+            Spacer(Modifier.height(Spacing.lg))
+            val nameMessage = when (error) {
+                DraftError.NameRequired -> "Give this wallet a name."
+                DraftError.NameTaken -> "You already have a wallet with this name."
+                else -> null
+            }
             OutlinedTextField(
                 value = draft.name,
                 onValueChange = {
@@ -107,68 +150,69 @@ fun WalletEditorSheet(
                     if (error is DraftError.NameRequired || error is DraftError.NameTaken) error = null
                 },
                 label = { Text("Name") },
-                placeholder = { Text("e.g. Everyday account") },
+                placeholder = {
+                    Text(
+                        when (draft.type) {
+                            WalletType.CASH -> "e.g. Wallet cash"
+                            WalletType.BANK -> "e.g. Everyday account"
+                            WalletType.E_WALLET -> "e.g. Mobile wallet"
+                            WalletType.SAVINGS -> "e.g. Emergency fund"
+                            WalletType.CREDIT_CARD -> "e.g. Travel card"
+                        }
+                    )
+                },
                 singleLine = true,
                 isError = error is DraftError.NameRequired || error is DraftError.NameTaken,
-                supportingText = {
-                    when (error) {
-                        DraftError.NameRequired -> Text("Give this wallet a name.")
-                        DraftError.NameTaken -> Text("You already have a wallet with this name.")
-                        else -> Unit
-                    }
+                supportingText = if (nameMessage != null) {
+                    { Text(nameMessage) }
+                } else {
+                    null
                 },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Next,
                 ),
                 shape = MaterialTheme.shapes.medium,
+                colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(Spacing.lg))
-            Text("Type", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(Spacing.sm))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                WalletType.entries.forEach { type ->
-                    FilterChip(
-                        selected = draft.type == type,
-                        onClick = {
-                            haptics.tick()
-                            draft = draft.copy(type = type)
-                        },
-                        label = { Text(type.label) },
-                        leadingIcon = { Icon(type.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.md))
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clickable(role = Role.Button) { pickingCurrency = true }
-                    .padding(vertical = Spacing.md),
+                    .heightIn(min = 56.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), MaterialTheme.shapes.medium)
+                    .clickable(role = Role.Button, onClickLabel = "Change currency") { pickingCurrency = true }
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Currency", style = MaterialTheme.typography.labelLarge)
                     Text(
-                        "${draft.currencyCode} · ${MoneyFormatter.currencyName(draft.currencyCode)}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Currency",
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(
+                        "${draft.currencyCode} · ${MoneyFormatter.currencyName(draft.currencyCode)}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Change currency")
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
             }
             if (error is DraftError.CurrencyLocked) {
                 Text(
                     "This wallet has transactions, so its currency can't change.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = Spacing.xs, start = Spacing.lg),
                 )
             }
 
-            Spacer(Modifier.height(Spacing.sm))
+            Spacer(Modifier.height(Spacing.md))
             val amountError = error is DraftError.AmountInvalid ||
                 error is DraftError.AmountTooPrecise || error is DraftError.AmountTooLarge
             OutlinedTextField(
@@ -182,7 +226,7 @@ fun WalletEditorSheet(
                         when {
                             initial.id != null && draft.type.isLiability -> "Opening amount owed"
                             initial.id != null -> "Opening balance"
-                            draft.type.isLiability -> "Amount owed"
+                            draft.type.isLiability -> "Amount owed now"
                             else -> "Current balance"
                         }
                     )
@@ -191,6 +235,7 @@ fun WalletEditorSheet(
                 placeholder = { Text("0") },
                 singleLine = true,
                 isError = amountError,
+                textStyle = AmountStyles.medium,
                 supportingText = {
                     Text(
                         when (val e = error) {
@@ -201,7 +246,7 @@ fun WalletEditorSheet(
                             DraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
                             else -> when {
                                 initial.id != null -> "Where this wallet started, before the transactions you record."
-                                draft.type.isLiability -> "Counts against your net worth."
+                                draft.type.isLiability -> "What you currently owe on this card. It counts against your net worth."
                                 else -> "Leave empty to start at zero."
                             }
                         }
@@ -209,6 +254,7 @@ fun WalletEditorSheet(
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 shape = MaterialTheme.shapes.medium,
+                colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -224,16 +270,6 @@ fun WalletEditorSheet(
                     }
                 },
             )
-
-            if (initial.id != null && onDelete != null) {
-                Spacer(Modifier.height(Spacing.sm))
-                TextButton(
-                    onClick = { confirmingDelete = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Delete wallet", color = MaterialTheme.colorScheme.error)
-                }
-            }
             Spacer(Modifier.height(Spacing.lg))
         }
     }
@@ -251,35 +287,74 @@ fun WalletEditorSheet(
     }
 
     if (confirmingDelete && initial.id != null && onDelete != null) {
-        AlertDialog(
-            onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete “${initial.name}”?") },
-            text = { Text("This empty wallet will be removed from this device. This can’t be undone.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmingDelete = false
-                    onDelete(initial.id) { blocking ->
-                        if (blocking == 0) close() else blockedByTransactions = blocking
-                    }
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+        ConfirmDialog(
+            title = "Delete “${initial.name}”?",
+            text = "This empty wallet will be removed from this device. This can’t be undone.",
+            confirmLabel = "Delete",
+            destructive = true,
+            onConfirm = {
+                confirmingDelete = false
+                onDelete(initial.id) { blocking ->
+                    if (blocking == 0) close() else blockedByTransactions = blocking
+                }
             },
-            dismissButton = {
-                TextButton(onClick = { confirmingDelete = false }) { Text("Cancel") }
-            },
+            onDismiss = { confirmingDelete = false },
         )
     }
 
     blockedByTransactions?.let { count ->
-        AlertDialog(
-            onDismissRequest = { blockedByTransactions = null },
-            title = { Text("Can’t delete yet") },
-            text = {
-                Text(
-                    "“${initial.name}” still has $count ${if (count == 1) "transaction" else "transactions"}. " +
-                        "Delete them from Activity first, so no financial history disappears by accident."
-                )
-            },
-            confirmButton = { TextButton(onClick = { blockedByTransactions = null }) { Text("OK") } },
+        ConfirmDialog(
+            title = "Can’t delete yet",
+            text = "“${initial.name}” still has $count ${if (count == 1) "transaction" else "transactions"}. " +
+                "Delete them from Transactions first, so no financial history disappears by accident.",
+            confirmLabel = "OK",
+            dismissLabel = null,
+            onConfirm = { blockedByTransactions = null },
+            onDismiss = { blockedByTransactions = null },
         )
+    }
+}
+
+/** Wallet kinds as recognisable tiles: three per row on narrow phones, five on wider screens. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TypeGrid(selected: WalletType, onSelect: (WalletType) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val columns = if (maxWidth >= 420.dp) 5 else 3
+        val gap = Spacing.sm
+        val tileWidth = (maxWidth - gap * (columns - 1)) / columns
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalArrangement = Arrangement.spacedBy(gap),
+            maxItemsInEachRow = columns,
+        ) {
+            WalletType.entries.forEach { type ->
+                val isSelected = type == selected
+                val border by animateColorAsState(
+                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    tween(160),
+                    label = "type-border",
+                )
+                Column(
+                    Modifier
+                        .width(tileWidth)
+                        .clip(MaterialTheme.shapes.medium)
+                        .border(BorderStroke(if (isSelected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
+                        .selectable(selected = isSelected, role = Role.RadioButton) { onSelect(type) }
+                        .padding(vertical = Spacing.md, horizontal = Spacing.xs),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    WalletTypeTile(type, size = 36.dp)
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        type.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
     }
 }

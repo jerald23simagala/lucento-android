@@ -11,14 +11,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -75,14 +70,11 @@ fun CurrencyList(
     val haptics = rememberHaptics()
 
     Column(modifier) {
-        OutlinedTextField(
+        SearchField(
             value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.sm),
-            placeholder = { Text("Search currency or code") },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            singleLine = true,
-            shape = MaterialTheme.shapes.medium,
+            onValueChange = { query = it.take(40) },
+            placeholder = "Search currency or code",
+            modifier = Modifier.padding(bottom = Spacing.sm),
         )
         LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
             items(filtered, key = { it.code }) { option ->
@@ -102,7 +94,7 @@ fun CurrencyList(
                         text = option.code,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(56.dp),
                     )
                     Column(Modifier.weight(1f)) {
@@ -128,18 +120,16 @@ fun CurrencyList(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CurrencyPickerSheet(
     selected: String,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = Spacing.gutter).fillMaxHeight(0.9f)) {
             Text(
-                "Currency",
+                "Choose currency",
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = Spacing.md),
             )

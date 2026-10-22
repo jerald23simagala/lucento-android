@@ -1,56 +1,24 @@
-package com.lucento.app.feature.activity
+package com.lucento.app.feature.transactions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lucento.app.core.containerFactory
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.core.money.MoneyParser
-import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.Category
-import com.lucento.app.domain.DayGroup
-import com.lucento.app.domain.RangePreset
 import com.lucento.app.domain.Transaction
-import com.lucento.app.domain.TransactionFilter
-import com.lucento.app.domain.TransactionQueries
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.Wallet
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.UUID
-
-/** User-chosen filter controls; resolved into a domain [TransactionFilter] at query time. */
-data class ActivityFilterState(
-    val query: String = "",
-    val type: TransactionType? = null,
-    val walletId: Long? = null,
-    val categoryId: Long? = null,
-    val preset: RangePreset = RangePreset.ALL,
-) {
-    val isActive: Boolean
-        get() = query.isNotBlank() || type != null || walletId != null || categoryId != null || preset != RangePreset.ALL
-}
-
-data class ActivityUiState(
-    val loading: Boolean = true,
-    val wallets: List<Wallet> = emptyList(),
-    val categories: List<Category> = emptyList(),
-    val filter: ActivityFilterState = ActivityFilterState(),
-    val groups: List<DayGroup> = emptyList(),
-    val totalCount: Int = 0,
-    val matchCount: Int = 0,
-) {
-    val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
-    val categoriesById: Map<Long, Category> = categories.associateBy { it.id }
-}
 
 /** Editable form state for creating or updating a transaction. */
 data class TransactionDraft(
@@ -85,53 +53,38 @@ sealed interface TransactionDraftError {
     data object Rejected : TransactionDraftError
 }
 
-class ActivityViewModel(
+data class TransactionEditorState(
+    val loaded: Boolean = false,
+    val wallets: List<Wallet> = emptyList(),
+    val categories: List<Category> = emptyList(),
+) {
+    val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
+}
+
+/**
+ * Owns transaction creation, editing and deletion for the whole app, so the same editor opens from
+ * Home's quick actions, recent rows and the Transactions screen. Scoped to the activity.
+ */
+class TransactionEditorViewModel(
     private val transactions: TransactionRepository,
     wallets: WalletRepository,
     categories: CategoryRepository,
-    preferences: UserPreferencesRepository,
 ) : ViewModel() {
 
-    private val filterState = MutableStateFlow(ActivityFilterState())
+    val state: StateFlow<TransactionEditorState> =
+        combine(wallets.observeWallets(), categories.observeCategories()) { walletList, categoryList ->
+            TransactionEditorState(loaded = true, wallets = walletList, categories = categoryList)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionEditorState())
 
-    val uiState: StateFlow<ActivityUiState> = combine(
-        transactions.observeTransactions(),
-        wallets.observeWallets(),
-        categories.observeCategories(),
-        filterState,
-        preferences.preferences,
-    ) { all, walletList, categoryList, filter, _ ->
-        val categoryNames = categoryList.associate { it.id to it.name }
-        val walletNames = walletList.associate { it.id to it.name }
-        val matches = TransactionQueries.filter(
-            transactions = all,
-            filter = TransactionFilter(
-                query = filter.query,
-                type = filter.type,
-                walletId = filter.walletId,
-                categoryId = filter.categoryId,
-                range = filter.preset.resolve(LocalDate.now()),
-            ),
-            categoryNames = categoryNames,
-            walletNames = walletNames,
-        )
-        ActivityUiState(
-            loading = false,
-            wallets = walletList,
-            categories = categoryList,
-            filter = filter,
-            groups = TransactionQueries.groupByDay(matches),
-            totalCount = all.size,
-            matchCount = matches.size,
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ActivityUiState())
+    /** The wallet used for the most recent successful save in this session; pre-selected next time. */
+    private var lastWalletId: Long? = null
 
-    fun setQuery(query: String) = filterState.update { it.copy(query = query.take(60)) }
-    fun setType(type: TransactionType?) = filterState.update { it.copy(type = type) }
-    fun setWallet(walletId: Long?) = filterState.update { it.copy(walletId = walletId) }
-    fun setCategory(categoryId: Long?) = filterState.update { it.copy(categoryId = categoryId) }
-    fun setPreset(preset: RangePreset) = filterState.update { it.copy(preset = preset) }
-    fun clearFilters() = filterState.update { ActivityFilterState() }
+    /** A fresh draft of [type], pre-selecting the last-used wallet when it still exists. */
+    fun newDraft(type: TransactionType = TransactionType.EXPENSE): TransactionDraft {
+        val wallets = state.value.wallets
+        val walletId = lastWalletId?.takeIf { id -> wallets.any { it.id == id } } ?: wallets.firstOrNull()?.id
+        return TransactionDraft(type = type, walletId = walletId)
+    }
 
     private var saving = false
 
@@ -142,7 +95,7 @@ class ActivityViewModel(
      */
     fun save(draft: TransactionDraft, decimalSeparator: Char, onResult: (TransactionDraftError?) -> Unit) {
         if (saving) return
-        val wallet = uiState.value.walletsById[draft.walletId] ?: return onResult(TransactionDraftError.WalletRequired)
+        val wallet = state.value.walletsById[draft.walletId] ?: return onResult(TransactionDraftError.WalletRequired)
 
         val amount = when (val parsed = MoneyParser.parse(draft.amountText, wallet.currencyCode, decimalSeparator)) {
             is MoneyParser.Result.Success -> parsed.money
@@ -170,17 +123,22 @@ class ActivityViewModel(
             } finally {
                 saving = false
             }
-            onResult(if (result is TransactionRepository.SaveResult.Saved) null else TransactionDraftError.Rejected)
+            val saved = result is TransactionRepository.SaveResult.Saved
+            if (saved) lastWalletId = wallet.id
+            onResult(if (saved) null else TransactionDraftError.Rejected)
         }
     }
 
-    fun delete(id: Long) {
-        viewModelScope.launch { transactions.delete(id) }
+    fun delete(id: Long, onDeleted: () -> Unit = {}) {
+        viewModelScope.launch {
+            transactions.delete(id)
+            onDeleted()
+        }
     }
 
     companion object {
         val Factory = containerFactory {
-            ActivityViewModel(it.transactions, it.wallets, it.categories, it.preferences)
+            TransactionEditorViewModel(it.transactions, it.wallets, it.categories)
         }
     }
 }

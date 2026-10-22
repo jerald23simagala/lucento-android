@@ -10,15 +10,15 @@ JVM tests; every Room schema change ships a `Migration` and a migration test.
 - Onboarding (welcome → principles → main currency), DataStore preferences, bottom navigation.
 - Wallets CRUD (Room v1) + net worth per currency. Unit tests for Money, MoneyParser, MoneyFormatter, NetWorthCalculator.
 
-## M1 — Transactions (income & expense)  ← code complete, awaiting first CI run
-Implemented (written without a local compiler; **not yet built or tested in CI**):
+## M1 — Transactions (income & expense)  ← done (`b55d7a2`, CI verified)
+Implemented:
 - Room v2: `categories`, `transactions` with explicit `MIGRATION_1_2` (also seeds 20 default categories on upgrade and,
   via a database callback, on fresh install). Foreign keys: wallet `RESTRICT`, category `SET NULL`.
 - Design decision: `occurred_on` is an **epoch day** (calendar date), not a timestamp, so a transaction never shifts
   day when the user changes time zone. `client_uuid` has a unique index → idempotent creates (double-tap safe).
 - Wallet balance = opening balance ± transactions (SQL aggregate; credit cards track amount owed). Wallets with
   transactions cannot be deleted, and their currency is locked.
-- Activity tab: day-grouped history, search (note / category / wallet / amount), filters (date preset, type, wallet,
+- Activity tab (now **Transactions**): day-grouped history, search (note / category / wallet / amount), filters (date preset, type, wallet,
   category), add / edit / delete sheet with date picker. Home shows this month's income and spending per currency.
 - Tests: `WalletBalanceCalculator`, `TransactionQueries` (ranges, filters, grouping, totals), default categories,
   and repository rules via in-memory DAO fakes (validation, idempotency, balances, wallet/category guards).
@@ -30,6 +30,25 @@ Still open in M1:
   `2.json` committed, and an emulator run (`connectedDebugAndroidTest`). It has not been run.
 - Room DAO tests against a real database (Robolectric or emulator).
 - Filtering is done in memory over all transactions; revisit with paging/SQL if lists reach tens of thousands.
+
+## Done — UI/UX redesign (v0.2.0, pending CI)
+Presentation-layer only: no schema, entity, DAO or repository changes. See `docs/DESIGN.md`.
+- Refined pine/brass/ivory palette with semantic tokens (positive, negative, statement panel, chart, wallet tones),
+  AA-checked in light and dark; editorial overline labels; tabular amount scale; signed amounts everywhere.
+- Navigation: Home · Transactions · Wallets; Settings moved behind Home's gear (pushed screen, bottom bar hidden).
+  One app-wide transaction editor (activity-scoped `TransactionEditorViewModel`) with snackbar confirmation.
+- Home: first-run setup panel; pine net-worth statement; Expense/Income quick actions; this month's in/out with
+  spend-to-income ratio; recent transactions; 6-month spending bars; top categories this month.
+- Transaction editor: amount-first (large, auto-focused, shrinking), Expense/Income toggle, wallet pills,
+  category icon grid, Today/Yesterday/Other date, note. Validation unchanged.
+- Transactions: filled search, filter pills, in/out/net for what's shown, sticky day headers with daily net,
+  animated rows.
+- Wallets: net worth split (have / owe + ratio), Assets and Liabilities sections with per-currency subtotals,
+  wallet-type tiles; editor with type grid.
+- Settings: theme previews, main currency, honest privacy facts (and the current lack of backup), about.
+- New pure logic with JVM tests: `Insights` (monthly totals, category breakdown, daily net, percentages),
+  `TransactionQueries.totalsByCurrency` (unbounded), `MoneyFormatter.formatSigned` / `fractionSpan`,
+  `HomeStateBuilder`.
 
 ## M2 — Transfers between wallets
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
@@ -78,6 +97,6 @@ Still open in M1:
 ## Known gaps in the foundation
 - The authoring environment (cloud + device VM) has no Android SDK or Maven access, so code changes are verified
   only by GitHub Actions. Never treat a change as working until CI is green.
-- Lottie is not yet integrated (planned M11); current motion uses Compose animation APIs.
+- Lottie is not yet integrated (planned M11); current motion uses Compose animation APIs and honours "Remove animations".
 - No instrumented/UI tests yet; Room DAO tests arrive with M1 (Robolectric or emulator in CI).
 - Debug APK signing key varies per CI runner (see README).

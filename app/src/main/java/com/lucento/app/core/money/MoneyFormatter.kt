@@ -16,6 +16,44 @@ object MoneyFormatter {
         return nf.format(money.toBigDecimal())
     }
 
+    /**
+     * Formats with an explicit, typographic sign so direction never depends on colour alone:
+     * "−$12.50" (U+2212 minus) for negative values and, when [showPlus], "+$12.50" for positive ones.
+     * Zero is shown unsigned.
+     */
+    fun formatSigned(money: Money, showPlus: Boolean = true, locale: Locale = Locale.getDefault()): String {
+        val body = format(money.abs(), locale)
+        return when {
+            money.isNegative -> "$MINUS$body"
+            showPlus && !money.isZero -> "+$body"
+            else -> body
+        }
+    }
+
+    /**
+     * Locates the decimal separator and fraction digits inside [formatted] (output of [format] or
+     * [formatSigned]) so the UI can typeset cents smaller than whole units. Returns the half-open
+     * index range `[start, end)` covering separator + digits, or null when the currency has no minor
+     * unit or the pattern can't be found reliably.
+     */
+    fun fractionSpan(formatted: String, fractionDigits: Int, locale: Locale = Locale.getDefault()): IntRange? {
+        if (fractionDigits <= 0) return null
+        val separator = DecimalFormatSymbols.getInstance(locale).monetaryDecimalSeparator
+        var index = formatted.lastIndexOf(separator)
+        while (index >= 0) {
+            val end = index + 1 + fractionDigits
+            val digitsFollow = end <= formatted.length &&
+                (index + 1 until end).all { Character.isDigit(formatted[it]) } &&
+                (end == formatted.length || !Character.isDigit(formatted[end]))
+            if (digitsFollow) return index until end
+            index = if (index == 0) -1 else formatted.lastIndexOf(separator, index - 1)
+        }
+        return null
+    }
+
+    /** U+2212 MINUS SIGN: same width as "+" in Inter, unlike the hyphen-minus. */
+    const val MINUS = "−"
+
     /** Plain number without currency symbol, suitable for pre-filling an input field. */
     fun formatPlain(money: Money, locale: Locale = Locale.getDefault()): String {
         val nf = NumberFormat.getNumberInstance(locale)

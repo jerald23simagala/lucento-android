@@ -5,17 +5,18 @@
 Lucento is a native Android personal finance app — income & expenses, budgets, goals, manual wallets,
 and AI-assisted entry — built local-first: your data stays on your device and every core feature works offline.
 
-> Status: **foundation (v0.1.0)**. Onboarding, design system, navigation, wallets with net worth, and settings
-> are implemented. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+> Status: **v0.2.0 — transactions + full UI/UX redesign**. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes
+> next and [docs/DESIGN.md](docs/DESIGN.md) for the design system.
 
 ## What works today
 - First-run onboarding with main-currency selection (all ISO 4217 currencies, searchable).
 - Wallets: create, edit and delete cash, bank, e-wallet, savings and credit-card wallets, each in its own currency.
-- Home: net worth per currency (credit cards count as amounts owed), assets vs owed, this month's income and
-  spending, wallet overview.
-- Activity (M1, pending first CI verification): record income and expenses with categories, notes and dates; search
-  and filter history; wallet balances update from your transactions.
-- Settings: light / dark / system theme, main currency, privacy statement.
+- Home: guided first-run setup; net-worth statement (assets vs owed, per currency); one-tap Expense / Income;
+  this month's in/out and spend-to-income ratio; recent transactions; 6-month spending trend; top categories.
+- Transactions: amount-first editor (type, wallet, category grid, date shortcuts, note); search and filter history
+  with in/out/net for what's shown and daily totals; wallet balances update from your transactions.
+- Wallets: assets and liabilities with per-currency subtotals and an owed-to-owned ratio.
+- Settings (gear on Home): light / dark / system theme, main currency, privacy facts.
 - Exact money math in minor units with JVM unit tests.
 - No internet permission; Android cloud backup disabled for financial data.
 

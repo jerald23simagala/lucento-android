@@ -24,7 +24,7 @@ app/src/main/java/com/lucento/app/
   data/repository/     Repositories mapping entities <-> domain, enforcing validation
   domain/              Pure Kotlin models and calculators (unit-tested, no Android deps)
   feature/<name>/      Screen + ViewModel per feature
-  navigation/          LucentoRoot, routes, bottom navigation
+  navigation/          LucentoRoot, routes, bottom navigation (Home · Transactions · Wallets; Settings pushed)
 ```
 - Dependency wiring: `AppContainer` in `LucentoApplication` (manual DI). ViewModels use `containerFactory`.
 - Keep financial logic in `domain/` or `core/money/` as pure functions so it is testable on the JVM.
@@ -49,7 +49,9 @@ app/src/main/java/com/lucento/app/
   provides its own explicit backup/restore.
 
 ## Design standards
-- Palette: deep pine primary, single brass accent (sparingly), warm paper/ink neutrals. No dynamic colour.
+- Palette: deep pine primary, single brass accent (sparingly), warm ivory/ink neutrals. No dynamic colour.
+  Tokens, components and rules are documented in `docs/DESIGN.md`; never hardcode colours in features.
+- Amounts are always signed via `MoneyFormatter.formatSigned` so meaning never depends on colour alone.
 - Typography: Inter (body) + Inter Display (headings), bundled under OFL. Amounts use tabular figures (`AmountStyles`).
 - Flat surfaces with hairline borders; no heavy gradients, glassmorphism, or decorative charts.
 - Every screen has one clear purpose. **No buttons that do nothing. No fake financial data.**

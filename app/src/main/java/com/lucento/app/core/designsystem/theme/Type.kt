@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.lucento.app.R
 
-/** Inter for UI text; Inter Display (optically tuned for large sizes) for headings. */
+/** Inter for UI text; Inter Display (optically tuned for large sizes) for headings and hero figures. */
 val InterFamily = FontFamily(
     Font(R.font.inter_regular, FontWeight.Normal),
     Font(R.font.inter_medium, FontWeight.Medium),
@@ -42,6 +42,10 @@ private fun text(size: Int, line: Int, weight: FontWeight = FontWeight.Normal, t
         letterSpacing = tracking.em,
     )
 
+/*
+ * Scale: screen titles are deliberately modest (headlineMedium, 26sp) so the money — not the chrome —
+ * carries the visual weight. Large display sizes are reserved for hero figures.
+ */
 val LucentoTypography = Typography(
     displayLarge = display(52, 58),
     displayMedium = display(42, 48),
@@ -50,7 +54,7 @@ val LucentoTypography = Typography(
     headlineMedium = display(26, 32),
     headlineSmall = display(22, 28, tracking = -0.01),
     titleLarge = display(20, 26, weight = FontWeight.Medium, tracking = -0.01),
-    titleMedium = text(16, 22, FontWeight.SemiBold),
+    titleMedium = text(16, 22, FontWeight.Medium),
     titleSmall = text(14, 20, FontWeight.SemiBold),
     bodyLarge = text(16, 24),
     bodyMedium = text(14, 20),
@@ -60,9 +64,18 @@ val LucentoTypography = Typography(
     labelSmall = text(11, 14, FontWeight.Medium, tracking = 0.04),
 )
 
+/** Editorial overline used for section labels ("THIS MONTH", "RECENT"). Uppercased by the caller. */
+val OverlineStyle = text(11, 16, FontWeight.SemiBold, tracking = 0.09)
+
 /** Amount styles. Always tabular. */
 object AmountStyles {
-    val hero = display(40, 46).copy(fontFeatureSettings = TabularFigures)
-    val large = display(24, 30).copy(fontFeatureSettings = TabularFigures)
-    val row = text(16, 22, FontWeight.Medium).copy(fontFeatureSettings = TabularFigures)
+    /** The single most important number on a screen (net worth). */
+    val display = display(44, 50).copy(fontFeatureSettings = TabularFigures)
+    /** Large amount entry in the transaction editor. */
+    val entry = display(40, 46, weight = FontWeight.Medium).copy(fontFeatureSettings = TabularFigures)
+    val hero = display(34, 40).copy(fontFeatureSettings = TabularFigures)
+    val large = display(22, 28).copy(fontFeatureSettings = TabularFigures)
+    val medium = text(16, 22, FontWeight.SemiBold).copy(fontFeatureSettings = TabularFigures)
+    val row = text(15, 20, FontWeight.Medium).copy(fontFeatureSettings = TabularFigures)
+    val small = text(12, 16, FontWeight.Medium).copy(fontFeatureSettings = TabularFigures)
 }

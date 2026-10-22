@@ -96,9 +96,14 @@ object TransactionQueries {
         transactions: List<Transaction>,
         range: DateRange,
         primaryCurrency: String,
+    ): List<PeriodTotals> = totalsByCurrency(transactions.filter { it.date in range }, primaryCurrency)
+
+    /** Income and expense totals per currency over all of [transactions]; primary currency first. */
+    fun totalsByCurrency(
+        transactions: List<Transaction>,
+        primaryCurrency: String,
     ): List<PeriodTotals> =
         transactions
-            .filter { it.date in range }
             .groupBy { it.currencyCode }
             .map { (code, list) ->
                 PeriodTotals(
