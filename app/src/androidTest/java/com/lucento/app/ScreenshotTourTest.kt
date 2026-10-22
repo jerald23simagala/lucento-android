@@ -142,7 +142,7 @@ class ScreenshotTourTest {
             val wallets = container.wallets
             fun id(r: WalletRepository.SaveResult) = (r as WalletRepository.SaveResult.Saved).id
             val bank = id(wallets.create("Everyday bank", WalletType.BANK, money(3_250)))
-            val cash = id(wallets.create("Cash", WalletType.CASH, money(180)))
+            val cash = id(wallets.create("Cash", WalletType.CASH, money(1_200)))
             val savings = id(wallets.create("Savings", WalletType.SAVINGS, money(8_400)))
             id(wallets.create("Visa card", WalletType.CREDIT_CARD, money(640)))
 
@@ -200,7 +200,7 @@ class ScreenshotTourTest {
         waitForText("BUDGET LEFT")
         waitForText("of $total") // the hero total is the sum of the category amounts
         shot("06-home-within-budget")
-        runCatching { compose.onNodeWithText("Upcoming payments", substring = true, ignoreCase = true).performScrollTo() }
+        runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
 
         // ---------------------------------------------------------------- the + sheet: four workflows
@@ -229,12 +229,13 @@ class ScreenshotTourTest {
         tab("Insights")
         waitForText("Income and expenses")
         shot("13-insights-trends")
-        runCatching { compose.onNodeWithText("What your net worth is made of", ignoreCase = true).performScrollTo() }
+        runCatching { compose.onNodeWithText("Savings goals aren’t added here", substring = true).performScrollTo() }
         shot("14-insights-net-worth")
         tab("Budget")
         waitForText("left of $total")
         shot("15-budget")
-        click("Manage categories")
+        compose.onNodeWithContentDescription("Manage categories").performClick()
+        compose.waitForIdle()
         waitForText("Active", substring = true)
         shot("16-manage-categories")
         compose.onNodeWithContentDescription("Back").performClick()

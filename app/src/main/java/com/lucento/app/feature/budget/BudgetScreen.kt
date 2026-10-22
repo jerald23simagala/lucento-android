@@ -136,7 +136,17 @@ fun BudgetScreen(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
         ) {
-            item(key = "bar") { LucentoTopBar(title = "Budget", actions = { ProfileButton() }) }
+            item(key = "bar") {
+                LucentoTopBar(
+                    title = "Budget",
+                    actions = {
+                        IconButton(onClick = onManageCategories) {
+                            Icon(Icons.Outlined.Category, contentDescription = "Manage categories")
+                        }
+                        ProfileButton()
+                    },
+                )
+            }
 
             if (state.loading) return@LazyColumn
 
@@ -287,7 +297,7 @@ private fun BudgetSummaryCard(plan: BudgetPlan, today: java.time.LocalDate, isCu
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
-            if (plan.hasBudget) StatusPill(healthLabel(plan.health), healthTone(plan.health))
+            if (plan.hasBudget) StatusPill(healthLabel(plan.health, plan.remaining), healthTone(plan.health))
         }
         Spacer(Modifier.height(Spacing.sm))
         if (!plan.hasBudget) {
@@ -374,7 +384,7 @@ private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
                     color = if (remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
                 )
                 if (line.health != BudgetHealth.ON_TRACK) {
-                    StatusPill(healthLabel(line.health), healthTone(line.health), Modifier.padding(top = 2.dp))
+                    StatusPill(healthLabel(line.health, remaining), healthTone(line.health), Modifier.padding(top = 2.dp))
                 }
             }
         }

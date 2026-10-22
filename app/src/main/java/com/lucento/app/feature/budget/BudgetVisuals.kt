@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.TonePair
+import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.BudgetHealth
 import com.lucento.app.domain.BudgetPlan
@@ -42,13 +43,16 @@ fun healthTone(health: BudgetHealth): TonePair = when (health) {
     BudgetHealth.EXCEEDED -> StatusTones.negative
 }
 
-/** Short, supportive status words. Never judgemental; always paired with the figures. */
-fun healthLabel(health: BudgetHealth): String = when (health) {
+/**
+ * Short, supportive status words. Never judgemental; always paired with the figures. [remaining] distinguishes a
+ * budget used exactly to the limit ("Fully used") from one that went over.
+ */
+fun healthLabel(health: BudgetHealth, remaining: Money? = null): String = when (health) {
     BudgetHealth.NOT_SET -> "Not set"
     BudgetHealth.ON_TRACK -> "On track"
     BudgetHealth.APPROACHING -> "Getting close"
     BudgetHealth.LOW -> "Almost used"
-    BudgetHealth.EXCEEDED -> "Over budget"
+    BudgetHealth.EXCEEDED -> if (remaining != null && remaining.isZero) "Fully used" else "Over budget"
 }
 
 /** One encouraging sentence for the month, from the plan's real figures. */
