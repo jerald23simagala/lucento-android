@@ -11,8 +11,9 @@ enum class WalletType(val isLiability: Boolean) {
 }
 
 /**
- * A manually maintained account. For liabilities (credit cards) [balance] is the amount owed,
- * entered as a positive number; it reduces net worth.
+ * A manually maintained account. [balance] is the current balance: [openingBalance] adjusted by
+ * recorded transactions (see [WalletBalanceCalculator]). For liabilities (credit cards) it is the
+ * amount owed, entered as a positive number; it reduces net worth.
  */
 data class Wallet(
     val id: Long,
@@ -20,6 +21,7 @@ data class Wallet(
     val type: WalletType,
     val balance: Money,
     val createdAtEpochMillis: Long,
+    val openingBalance: Money = balance,
 ) {
     val currencyCode: String get() = balance.currencyCode
 

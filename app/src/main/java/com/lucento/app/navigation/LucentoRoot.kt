@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +37,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.data.preferences.UserPreferences
+import com.lucento.app.feature.activity.ActivityScreen
 import com.lucento.app.feature.home.HomeScreen
 import com.lucento.app.feature.onboarding.OnboardingScreen
 import com.lucento.app.feature.settings.SettingsScreen
@@ -42,6 +45,7 @@ import com.lucento.app.feature.wallets.WalletsScreen
 import kotlinx.serialization.Serializable
 
 @Serializable data object HomeRoute
+@Serializable data object ActivityRoute
 @Serializable data object WalletsRoute
 @Serializable data object SettingsRoute
 
@@ -54,6 +58,7 @@ private data class TopLevelDestination(
 
 private val topLevelDestinations = listOf(
     TopLevelDestination(HomeRoute, "Home", Icons.Filled.Home, Icons.Outlined.Home),
+    TopLevelDestination(ActivityRoute, "Activity", Icons.Filled.Receipt, Icons.Outlined.Receipt),
     TopLevelDestination(WalletsRoute, "Wallets", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
     TopLevelDestination(SettingsRoute, "Settings", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
@@ -118,7 +123,13 @@ private fun MainScaffold(navController: NavHostController = rememberNavControlle
             enterTransition = { fadeIn(tween(220)) },
             exitTransition = { fadeOut(tween(120)) },
         ) {
-            composable<HomeRoute> { HomeScreen(onManageWallets = { navigateTo(WalletsRoute) }) }
+            composable<HomeRoute> {
+                HomeScreen(
+                    onManageWallets = { navigateTo(WalletsRoute) },
+                    onOpenActivity = { navigateTo(ActivityRoute) },
+                )
+            }
+            composable<ActivityRoute> { ActivityScreen(onAddWallet = { navigateTo(WalletsRoute) }) }
             composable<WalletsRoute> { WalletsScreen() }
             composable<SettingsRoute> { SettingsScreen() }
         }

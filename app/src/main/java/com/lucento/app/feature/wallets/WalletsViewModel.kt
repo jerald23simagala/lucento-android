@@ -37,6 +37,7 @@ sealed interface DraftError {
     data object AmountInvalid : DraftError
     data class AmountTooPrecise(val digits: Int) : DraftError
     data object AmountTooLarge : DraftError
+    data object CurrencyLocked : DraftError
 }
 
 class WalletsViewModel(
@@ -86,13 +87,22 @@ class WalletsViewModel(
                     WalletRepository.SaveResult.BlankName -> DraftError.NameRequired
                     WalletRepository.SaveResult.DuplicateName -> DraftError.NameTaken
                     WalletRepository.SaveResult.NegativeBalance -> DraftError.AmountInvalid
+                    WalletRepository.SaveResult.CurrencyLocked -> DraftError.CurrencyLocked
                 }
             )
         }
     }
 
-    fun delete(id: Long) {
-        viewModelScope.launch { wallets.delete(id) }
+    /** [onResult] receives 0 when the wallet was deleted, or the number of transactions that block deletion. */
+    fun delete(id: Long, onResult: (blockingTransactions: Int) -> Unit) {
+        viewModelScope.launch {
+            onResult(
+                when (val result = wallets.delete(id)) {
+                    WalletRepository.DeleteResult.Deleted -> 0
+                    is WalletRepository.DeleteResult.HasTransactions -> result.count
+                }
+            )
+        }
     }
 
     companion object {

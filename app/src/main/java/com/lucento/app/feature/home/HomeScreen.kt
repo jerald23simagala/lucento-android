@@ -42,6 +42,7 @@ import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
+import com.lucento.app.domain.PeriodTotals
 import com.lucento.app.feature.wallets.WalletDraft
 import com.lucento.app.feature.wallets.WalletEditorSheet
 import com.lucento.app.feature.wallets.WalletRow
@@ -58,9 +59,12 @@ private const val HOME_WALLET_LIMIT = 4
 @Composable
 fun HomeScreen(
     onManageWallets: () -> Unit,
+    onOpenActivity: () -> Unit,
     viewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
+    monthViewModel: MonthSummaryViewModel = viewModel(factory = MonthSummaryViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val month by monthViewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
 
     Column(
@@ -97,8 +101,10 @@ fun HomeScreen(
                 }
                 HomeContent.Overview -> Overview(
                     state = state,
+                    month = month,
                     onWalletClick = { editing = it },
                     onManageWallets = onManageWallets,
+                    onOpenActivity = onOpenActivity,
                 )
             }
         }
@@ -145,8 +151,10 @@ private fun Header() {
 @Composable
 private fun Overview(
     state: WalletsUiState,
+    month: MonthSummaryState,
     onWalletClick: (WalletDraft) -> Unit,
     onManageWallets: () -> Unit,
+    onOpenActivity: () -> Unit,
 ) {
     val summary = state.summary ?: return
     val primary = summary.totalFor(state.primaryCurrency) ?: summary.totals.first()
@@ -187,6 +195,9 @@ private fun Overview(
             }
         }
 
+        Spacer(Modifier.height(Spacing.lg))
+        MonthCard(month = month, onOpenActivity = onOpenActivity)
+
         Spacer(Modifier.height(Spacing.xl))
         SectionHeader(title = "Wallets") {
             LucentoTextButton(
@@ -209,5 +220,57 @@ private fun Figure(label: String, money: Money, modifier: Modifier = Modifier) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(Spacing.xxs))
         AmountText(money = money)
+    }
+}
+
+@Composable
+private fun MonthCard(month: MonthSummaryState, onOpenActivity: () -> Unit) {
+    val monthName = remember {
+        LocalDate.now().format(DateTimeFormatter.ofPattern("LLLL yyyy"))
+    }
+    val primary = month.totals.firstOrNull { it.currencyCode == month.primaryCurrency }
+        ?: PeriodTotals(Money.zero(month.primaryCurrency), Money.zero(month.primaryCurrency))
+    val others = month.totals.filter { it.currencyCode != primary.currencyCode }
+
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.xl) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "This month",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                monthName,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(Spacing.md))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
+            Figure("Income", primary.income, Modifier.weight(1f))
+            Figure("Spent", primary.expense, Modifier.weight(1f))
+        }
+        if (month.totals.isEmpty()) {
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                "Nothing recorded yet this month.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        others.forEach { t ->
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                "${t.currencyCode}: ${MoneyFormatter.format(t.income)} in · ${MoneyFormatter.format(t.expense)} out",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        LucentoTextButton(
+            text = if (month.totals.isEmpty()) "Add a transaction" else "See activity",
+            onClick = onOpenActivity,
+        )
     }
 }

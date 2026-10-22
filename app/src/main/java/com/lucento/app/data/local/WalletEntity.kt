@@ -15,7 +15,7 @@ data class WalletEntity(
     /** [com.lucento.app.domain.WalletType] name. */
     val type: String,
     @ColumnInfo(name = "currency_code") val currencyCode: String,
-    /** Opening balance in minor units. Transactions will adjust the derived balance in a later schema. */
+    /** Opening balance in minor units. The current balance is derived: this plus recorded transactions. */
     @ColumnInfo(name = "opening_balance_minor") val openingBalanceMinor: Long,
     @ColumnInfo(name = "sort_order") val sortOrder: Int = 0,
     val archived: Boolean = false,

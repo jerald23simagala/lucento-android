@@ -10,12 +10,26 @@ JVM tests; every Room schema change ships a `Migration` and a migration test.
 - Onboarding (welcome → principles → main currency), DataStore preferences, bottom navigation.
 - Wallets CRUD (Room v1) + net worth per currency. Unit tests for Money, MoneyParser, MoneyFormatter, NetWorthCalculator.
 
-## M1 — Transactions (income & expense)  ← next
-- Room v2: `categories`, `transactions` (amount minor, type, wallet_id, category_id, occurred_at, note, created_at,
-  client_uuid for idempotency); migration 1→2 + test. Wallet balance = opening balance + Σ transactions (SQL aggregate, tested).
-- Default category set (editable), add/edit/delete transaction sheet with numeric keypad, Activity tab with
-  day-grouped history, search (note/category/amount) and filters (date range, wallet, category, type).
-- Home: this month's income / spending.
+## M1 — Transactions (income & expense)  ← code complete, awaiting first CI run
+Implemented (written without a local compiler; **not yet built or tested in CI**):
+- Room v2: `categories`, `transactions` with explicit `MIGRATION_1_2` (also seeds 20 default categories on upgrade and,
+  via a database callback, on fresh install). Foreign keys: wallet `RESTRICT`, category `SET NULL`.
+- Design decision: `occurred_on` is an **epoch day** (calendar date), not a timestamp, so a transaction never shifts
+  day when the user changes time zone. `client_uuid` has a unique index → idempotent creates (double-tap safe).
+- Wallet balance = opening balance ± transactions (SQL aggregate; credit cards track amount owed). Wallets with
+  transactions cannot be deleted, and their currency is locked.
+- Activity tab: day-grouped history, search (note / category / wallet / amount), filters (date preset, type, wallet,
+  category), add / edit / delete sheet with date picker. Home shows this month's income and spending per currency.
+- Tests: `WalletBalanceCalculator`, `TransactionQueries` (ranges, filters, grouping, totals), default categories,
+  and repository rules via in-memory DAO fakes (validation, idempotency, balances, wallet/category guards).
+
+Still open in M1:
+- Category management UI (the repository supports create / rename / archive and is tested; no screen yet).
+- Custom numeric keypad (the system decimal keyboard is used for now).
+- Instrumented migration test (`app/src/androidTest/.../MigrationTest.kt`) exists but needs `app/schemas/**/1.json` and
+  `2.json` committed, and an emulator run (`connectedDebugAndroidTest`). It has not been run.
+- Room DAO tests against a real database (Robolectric or emulator).
+- Filtering is done in memory over all transactions; revisit with paging/SQL if lists reach tens of thousands.
 
 ## M2 — Transfers between wallets
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
@@ -62,6 +76,8 @@ JVM tests; every Room schema change ships a `Migration` and a migration test.
   stable signing via GitHub secrets, Play-ready release workflow.
 
 ## Known gaps in the foundation
+- The authoring environment (cloud + device VM) has no Android SDK or Maven access, so code changes are verified
+  only by GitHub Actions. Never treat a change as working until CI is green.
 - Lottie is not yet integrated (planned M11); current motion uses Compose animation APIs.
 - No instrumented/UI tests yet; Room DAO tests arrive with M1 (Robolectric or emulator in CI).
 - Debug APK signing key varies per CI runner (see README).

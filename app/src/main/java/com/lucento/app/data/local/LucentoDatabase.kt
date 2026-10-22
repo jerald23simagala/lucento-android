@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Local-first source of truth. Schema JSON is exported to app/schemas for migration review.
@@ -11,18 +12,27 @@ import androidx.room.RoomDatabase
  * destructive fallback is intentionally not enabled because it would erase financial data.
  */
 @Database(
-    entities = [WalletEntity::class],
-    version = 1,
+    entities = [WalletEntity::class, CategoryEntity::class, TransactionEntity::class],
+    version = 2,
     exportSchema = true,
 )
 abstract class LucentoDatabase : RoomDatabase() {
     abstract fun walletDao(): WalletDao
+    abstract fun categoryDao(): CategoryDao
+    abstract fun transactionDao(): TransactionDao
 
     companion object {
         private const val NAME = "lucento.db"
 
         fun build(context: Context): LucentoDatabase =
             Room.databaseBuilder(context.applicationContext, LucentoDatabase::class.java, NAME)
+                .addMigrations(*Migrations.ALL)
+                .addCallback(object : RoomDatabase.Callback() {
+                    // Fresh installs only; upgrades are seeded by MIGRATION_1_2.
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        CategorySeed.insertDefaults(db, createdAt = System.currentTimeMillis())
+                    }
+                })
                 .build()
     }
 }

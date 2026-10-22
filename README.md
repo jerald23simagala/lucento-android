@@ -11,7 +11,10 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 ## What works today
 - First-run onboarding with main-currency selection (all ISO 4217 currencies, searchable).
 - Wallets: create, edit and delete cash, bank, e-wallet, savings and credit-card wallets, each in its own currency.
-- Home: net worth per currency (credit cards count as amounts owed), assets vs owed, wallet overview.
+- Home: net worth per currency (credit cards count as amounts owed), assets vs owed, this month's income and
+  spending, wallet overview.
+- Activity (M1, pending first CI verification): record income and expenses with categories, notes and dates; search
+  and filter history; wallet balances update from your transactions.
 - Settings: light / dark / system theme, main currency, privacy statement.
 - Exact money math in minor units with JVM unit tests.
 - No internet permission; Android cloud backup disabled for financial data.

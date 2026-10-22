@@ -57,7 +57,8 @@ fun Wallet.toDraft(): WalletDraft = WalletDraft(
     name = name,
     type = type,
     currencyCode = currencyCode,
-    amountText = if (balance.isZero) "" else MoneyFormatter.formatPlain(balance),
+    // The editor edits the opening balance; the current balance is derived from transactions.
+    amountText = if (openingBalance.isZero) "" else MoneyFormatter.formatPlain(openingBalance),
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -65,7 +66,8 @@ fun Wallet.toDraft(): WalletDraft = WalletDraft(
 fun WalletEditorSheet(
     initial: WalletDraft,
     onSave: (WalletDraft, Char, (DraftError?) -> Unit) -> Unit,
-    onDelete: ((Long) -> Unit)?,
+    /** Deletes the wallet; the callback receives 0 on success or the number of transactions blocking deletion. */
+    onDelete: ((Long, (Int) -> Unit) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -77,6 +79,7 @@ fun WalletEditorSheet(
     var error by remember { mutableStateOf<DraftError?>(null) }
     var pickingCurrency by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
+    var blockedByTransactions by remember { mutableStateOf<Int?>(null) }
 
     fun close() {
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
@@ -157,6 +160,13 @@ fun WalletEditorSheet(
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Change currency")
             }
+            if (error is DraftError.CurrencyLocked) {
+                Text(
+                    "This wallet has transactions, so its currency can't change.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
             Spacer(Modifier.height(Spacing.sm))
             val amountError = error is DraftError.AmountInvalid ||
@@ -167,7 +177,16 @@ fun WalletEditorSheet(
                     draft = draft.copy(amountText = it.take(20))
                     if (amountError) error = null
                 },
-                label = { Text(if (draft.type.isLiability) "Amount owed" else "Current balance") },
+                label = {
+                    Text(
+                        when {
+                            initial.id != null && draft.type.isLiability -> "Opening amount owed"
+                            initial.id != null -> "Opening balance"
+                            draft.type.isLiability -> "Amount owed"
+                            else -> "Current balance"
+                        }
+                    )
+                },
                 prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
                 placeholder = { Text("0") },
                 singleLine = true,
@@ -180,7 +199,11 @@ fun WalletEditorSheet(
                                 if (e.digits == 0) "${draft.currencyCode} has no decimal places."
                                 else "${draft.currencyCode} allows up to ${e.digits} decimal places."
                             DraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
-                            else -> if (draft.type.isLiability) "Counts against your net worth." else "Leave empty to start at zero."
+                            else -> when {
+                                initial.id != null -> "Where this wallet started, before the transactions you record."
+                                draft.type.isLiability -> "Counts against your net worth."
+                                else -> "Leave empty to start at zero."
+                            }
                         }
                     )
                 },
@@ -220,7 +243,7 @@ fun WalletEditorSheet(
             selected = draft.currencyCode,
             onSelect = {
                 draft = draft.copy(currencyCode = it)
-                if (error is DraftError.AmountTooPrecise) error = null
+                if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked) error = null
                 pickingCurrency = false
             },
             onDismiss = { pickingCurrency = false },
@@ -231,17 +254,32 @@ fun WalletEditorSheet(
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
             title = { Text("Delete “${initial.name}”?") },
-            text = { Text("This wallet will be removed from this device. This can’t be undone.") },
+            text = { Text("This empty wallet will be removed from this device. This can’t be undone.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmingDelete = false
-                    onDelete(initial.id)
-                    close()
+                    onDelete(initial.id) { blocking ->
+                        if (blocking == 0) close() else blockedByTransactions = blocking
+                    }
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmingDelete = false }) { Text("Cancel") }
             },
+        )
+    }
+
+    blockedByTransactions?.let { count ->
+        AlertDialog(
+            onDismissRequest = { blockedByTransactions = null },
+            title = { Text("Can’t delete yet") },
+            text = {
+                Text(
+                    "“${initial.name}” still has $count ${if (count == 1) "transaction" else "transactions"}. " +
+                        "Delete them from Activity first, so no financial history disappears by accident."
+                )
+            },
+            confirmButton = { TextButton(onClick = { blockedByTransactions = null }) { Text("OK") } },
         )
     }
 }
