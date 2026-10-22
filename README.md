@@ -46,3 +46,4 @@ See [CLAUDE.md](CLAUDE.md) for architecture, money rules and engineering standar
 ## Licenses
 Inter typeface © The Inter Project Authors, SIL Open Font License 1.1 — see `docs/licenses/Inter-OFL.txt`.
 "# lucento-android-app" 
+"# lucento-android" 
