@@ -5,6 +5,8 @@ import android.view.KeyEvent
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -51,9 +53,17 @@ class ScreenshotTourTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val container get() = (instrumentation.targetContext.applicationContext as LucentoApplication).container
 
-    private fun waitForText(text: String, substring: Boolean = true, timeout: Long = 10_000) =
-        // Case-insensitive: section headers are rendered in upper case.
-        compose.waitUntilAtLeastOneExists(hasText(text, substring = substring, ignoreCase = true), timeout)
+    private fun waitForText(text: String, substring: Boolean = true, timeout: Long = 10_000) {
+        try {
+            // Case-insensitive: section headers are rendered in upper case.
+            compose.waitUntilAtLeastOneExists(hasText(text, substring = substring, ignoreCase = true), timeout)
+        } catch (e: Throwable) {
+            // Make the failure self-explanatory in CI annotations: what was on screen instead.
+            shot("zz-failure-waiting-for-${text.filter { it.isLetterOrDigit() }.take(30)}")
+            val tree = runCatching { compose.onAllNodes(isRoot()).printToString(maxDepth = 12) }.getOrDefault("(no tree)")
+            throw AssertionError("Waited for '$text'. Screen text:\n" + tree.lines().filter { "Text" in it || "ContentDescription" in it }.joinToString("\n").take(2500), e)
+        }
+    }
 
     private fun waitForDescription(description: String, timeout: Long = 10_000) =
         compose.waitUntilAtLeastOneExists(hasContentDescription(description), timeout)
@@ -251,7 +261,13 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         tab("Home")
+        waitForText("BUDGET LEFT")
         compose.onNodeWithContentDescription("Profile and settings").performClick()
+        compose.waitForIdle()
+        if (!exists("Account and app")) {
+            Thread.sleep(1_000)
+            if (!exists("Account and app")) compose.onNodeWithContentDescription("Profile and settings").performClick()
+        }
         waitForText("Account and app")
         shot("19-profile-menu")
 
