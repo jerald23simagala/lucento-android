@@ -262,12 +262,10 @@ class ScreenshotTourTest {
         compose.waitForIdle()
         tab("Home")
         waitForText("BUDGET LEFT")
-        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        // Home keeps its scroll position from the earlier "lower cards" screenshot: bring the profile button back
+        // into view first (a tap on an off-screen node does nothing).
+        compose.onNodeWithContentDescription("Profile and settings").performScrollTo().performClick()
         compose.waitForIdle()
-        if (!exists("Account and app")) {
-            Thread.sleep(1_000)
-            if (!exists("Account and app")) compose.onNodeWithContentDescription("Profile and settings").performClick()
-        }
         waitForText("Account and app")
         shot("19-profile-menu")
 
@@ -275,6 +273,7 @@ class ScreenshotTourTest {
         click("Dark")
         backUntilGone("Account and app")
         waitForText("BUDGET LEFT")
+        runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
         shot("20-home-dark")
         tab("Budget")
         shot("21-budget-dark")
@@ -291,6 +290,7 @@ class ScreenshotTourTest {
         }
         waitForText("left this month", substring = true)
         compose.waitUntilAtLeastOneExists(hasContentDescription("gently concerned", substring = true), 10_000)
+        runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
         shot("22-home-budget-almost-used-dark")
     }
 }
