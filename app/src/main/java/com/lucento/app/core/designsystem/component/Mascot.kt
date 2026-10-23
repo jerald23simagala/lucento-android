@@ -4,6 +4,8 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -17,6 +19,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -62,8 +65,8 @@ enum class MascotMood(val pose: MascotPose, val idleCycles: Int) {
  *
  * Use it small and secondary on dashboards (56–84dp), larger in onboarding (140dp) and empty states (~96dp). Outside
  * budget contexts the default tier is [WellnessTier.THRIVING] (the character's clean, everyday look). When [animate] is
- * true and the system has not removed animations, it floats gently for [MascotMood.idleCycles] and rests; pose and
- * tier changes cross-fade. Decorative by default (no accessibility label) unless [contentDescription] is given.
+ * true and the system has not removed animations, it arrives with a small hop (greeting adds two gentle rocks),
+ * floats for [MascotMood.idleCycles] and rests; pose and tier changes cross-fade. Decorative by default (no accessibility label) unless [contentDescription] is given.
  */
 @Composable
 fun LucentoMascot(
@@ -76,16 +79,34 @@ fun LucentoMascot(
 ) {
     val moving = animate && !LucentoTheme.reducedMotion
     val float = remember { Animatable(0f) }
+    val hop = remember { Animatable(0f) }
+    val rock = remember { Animatable(0f) }
+    val small = size < 96.dp
     LaunchedEffect(moving, mood) {
         float.snapTo(0f)
+        hop.snapTo(0f)
+        rock.snapTo(0f)
         if (!moving) return@LaunchedEffect
+        // Arrival: a small hop that settles with a soft spring, so the character reads as alive on screen entry.
+        hop.animateTo(1f, tween(durationMillis = 260, easing = FastOutSlowInEasing))
+        hop.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow))
+        // Greeting: two gentle rocks of the whole sprite (the wave itself is in the artwork). Skipped below 96dp.
+        if (mood.pose == MascotPose.GreetingHappy && !small) {
+            repeat(2) {
+                rock.animateTo(1f, tween(durationMillis = 180, easing = FastOutSlowInEasing))
+                rock.animateTo(-1f, tween(durationMillis = 260, easing = FastOutSlowInEasing))
+                rock.animateTo(0f, tween(durationMillis = 180, easing = FastOutSlowInEasing))
+            }
+        }
         repeat(mood.idleCycles) {
             float.animateTo(1f, tween(durationMillis = 1600, easing = FastOutSlowInEasing))
             float.animateTo(0f, tween(durationMillis = 1600, easing = FastOutSlowInEasing))
         }
     }
-    // Float ±1.5% of the height (±1% below 96dp, per the animation guide); the glow breathes a little with it.
-    val amplitude = if (size < 96.dp) 0.01f else 0.015f
+    // Float 4.5% of the height (3% below 96dp) — visible on a phone but still calm; hop 6% (4% small) with a 4% lift
+    // in scale. The glow breathes a little with the float.
+    val amplitude = if (small) 0.03f else 0.045f
+    val hopHeight = if (small) 0.04f else 0.06f
     val semantics = if (contentDescription != null) {
         Modifier.semantics { this.contentDescription = contentDescription }
     } else {
@@ -103,7 +124,14 @@ fun LucentoMascot(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { translationY = -float.value * amplitude * this.size.height }
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin(0.5f, 0.8f) // the feet
+                        translationY = -(float.value * amplitude + hop.value * hopHeight) * this.size.height
+                        val lift = 1f + 0.04f * hop.value
+                        scaleX = lift
+                        scaleY = lift
+                        rotationZ = rock.value * 4f
+                    }
                     .drawBehind {
                         val glow = if (shownPose == MascotPose.Sleeping) GlowCenterSleeping else GlowCenter
                         val center = Offset(glow.x * this.size.width, glow.y * this.size.height)

@@ -80,8 +80,10 @@ balances say "owed", budget states say "Over" / a percentage, and transfers are 
   ≥ 80 % used → getting tight; ≤ 10 % left or used exactly → concerned; overspent → over plan. Elsewhere the default
   is thriving (the everyday look). Moods → poses: Happy hero_neutral · Greeting greeting_happy · Curious thinking ·
   Success/Celebrate success · Concerned caution (pointing and sleeping ship for later use).
-- Motion: a slow float (±1.5 %, ±1 % below 96dp) for a few cycles then rest; glow breathes 6 % with it; pose and
-  tier changes cross-fade (300 ms). Reduced motion: still, instant swaps.
+- Motion: arrives with a small hop (6 % of its height, 4 % below 96dp, +4 % scale, soft spring); Greeting adds two
+  ±4° rocks (≥ 96dp); then a float of 4.5 % (3 % below 96dp) for a few 3.2 s cycles and rest; glow breathes 6 % with
+  it; pose and tier changes cross-fade (300 ms). Amplitudes are ~3× the original guide so the motion reads on a
+  phone. Reduced motion: still, instant swaps.
 - Usage: small and secondary on Home (beside the greeting, 72dp); larger in onboarding (140dp) and empty states.
   Never on every screen; never competing with a financial figure.
 

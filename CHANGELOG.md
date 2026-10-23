@@ -15,6 +15,7 @@
   (5 wellness tiers × 7 poses, ~1.7 MB) in `drawable-nodpi`, a code-drawn torch glow, gentle float and cross-fades.
   The Budget hero picks the tier from budget health via `WellnessTier` (unit-tested). Removed
   `lucento_mascot_sun/moon.json`, their generator and the vector drawing; mascot colour tokens dropped.
+- Mascot motion made visible on a phone: arrival hop with a soft spring, greeting rocks, float 4.5 % of height.
 - `ThemeContrastTest` checks AA contrast for every text/background pair in both themes.
 - Palette use aligned with the reference board: tonal category tiles (pale tint + saturated glyph; deep tint +
   light glyph at night), pale-sky secondary buttons, solid-blue selected chips, an elevated-navy night budget hero,
