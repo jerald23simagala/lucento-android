@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.theme.Elevation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import kotlinx.coroutines.delay
@@ -130,7 +131,7 @@ fun ConfirmationHost(
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.inverseSurface,
                 contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                shadowElevation = 6.dp,
+                shadowElevation = Elevation.md,
                 modifier = Modifier
                     .widthIn(min = 184.dp, max = 280.dp)
                     .semantics { liveRegion = LiveRegionMode.Polite },

@@ -38,7 +38,6 @@ enum class LucentoAnimation(@RawRes val day: Int, @RawRes val night: Int, val lo
     Saved(R.raw.feedback_saved, R.raw.feedback_saved, loops = false),
     Milestone(R.raw.feedback_milestone, R.raw.feedback_milestone, loops = false),
     Loading(R.raw.loading_dots, R.raw.loading_dots, loops = true),
-    Mascot(R.raw.lucento_mascot_sun, R.raw.lucento_mascot_moon, loops = false),
     /** Home net-flow indicator; markers `up`, `down`, `flat` (one-shot each). */
     NetFlow(R.raw.net_flow_indicator, R.raw.net_flow_indicator_night, loops = false),
 }

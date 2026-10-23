@@ -70,6 +70,7 @@ import com.lucento.app.domain.Feature
 import com.lucento.app.domain.GoalsOverview
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.UpcomingPayment
+import com.lucento.app.domain.WellnessTier
 import com.lucento.app.feature.budget.burnColor
 import com.lucento.app.feature.budget.encouragement
 import com.lucento.app.feature.transactions.shortDayLabel
@@ -258,8 +259,9 @@ private fun Overview(state: HomeUiState, actions: HomeActions) {
 
 /**
  * The most prominent card: what's left of this month's budget (the sum of category amounts), with the total and
- * the amount spent beneath it, and the Sun (Moon at night) showing how the month is going — happy while comfortably
- * within budget, supportively concerned when 10% or less is left or the budget is used up.
+ * the amount spent beneath it, and Lucento (the mascot) whose torch light and look follow the month's
+ * [WellnessTier] — bright and tidy while within budget at pace, dimmer and more worn as the budget runs out, with a
+ * supportive (never judging) pose when 10% or less is left or the budget is used up.
  */
 @Composable
 private fun BudgetHero(state: HomeUiState, plan: BudgetPlan, actions: HomeActions) {
@@ -270,11 +272,16 @@ private fun BudgetHero(state: HomeUiState, plan: BudgetPlan, actions: HomeAction
         plan.health.isConcerning -> MascotMood.Concerned
         else -> MascotMood.Happy
     }
-    val mascot = if (LucentoTheme.isDark) "Lucento’s moon" else "Lucento’s sun"
+    val tier = if (plan.hasBudget) {
+        WellnessTier.of(plan.health, aheadOfPace = state.burn?.aheadOfPace == true, overspent = plan.remaining.isNegative)
+    } else {
+        WellnessTier.STEADY
+    }
     val mascotLabel = when {
-        !plan.hasBudget -> "$mascot, ready when your budget is"
-        plan.health.isConcerning -> "$mascot, gently concerned: little or none of this month’s budget is left"
-        else -> "$mascot, happy: you’re comfortably within budget"
+        !plan.hasBudget -> "Lucento, ready when your budget is"
+        plan.health.isConcerning -> "Lucento, torch dimmed, gently concerned: little or none of this month’s budget is left"
+        tier == WellnessTier.GETTING_TIGHT -> "Lucento, torch a little dimmer: most of this month’s budget is used"
+        else -> "Lucento, torch bright: you’re within budget"
     }
     Surface(
         onClick = if (state.expenseCategoryCount == 0) actions.onChooseCategories else actions.onOpenBudget,
@@ -342,7 +349,7 @@ private fun BudgetHero(state: HomeUiState, plan: BudgetPlan, actions: HomeAction
                 }
             }
             Spacer(Modifier.width(Spacing.sm))
-            LucentoMascot(size = 84.dp, mood = mood, contentDescription = mascotLabel)
+            LucentoMascot(size = 84.dp, mood = mood, tier = tier, contentDescription = mascotLabel)
         }
     }
 }

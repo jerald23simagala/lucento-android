@@ -19,8 +19,8 @@ fun healthColor(health: BudgetHealth): Color {
     return when (health) {
         BudgetHealth.NOT_SET -> MaterialTheme.colorScheme.outline
         BudgetHealth.ON_TRACK -> ext.success
-        BudgetHealth.APPROACHING, BudgetHealth.LOW -> ext.warning
-        BudgetHealth.EXCEEDED -> ext.negative
+        BudgetHealth.APPROACHING, BudgetHealth.LOW -> ext.warningIndicator
+        BudgetHealth.EXCEEDED -> ext.negativeIndicator
     }
 }
 
@@ -30,8 +30,8 @@ fun burnColor(level: BurnLevel): Color {
     return when (level) {
         BurnLevel.NO_BUDGET -> MaterialTheme.colorScheme.outline
         BurnLevel.NORMAL -> MaterialTheme.colorScheme.primary
-        BurnLevel.APPROACHING -> ext.warning
-        BurnLevel.EXHAUSTED -> ext.negative
+        BurnLevel.APPROACHING -> ext.warningIndicator
+        BurnLevel.EXHAUSTED -> ext.negativeIndicator
     }
 }
 

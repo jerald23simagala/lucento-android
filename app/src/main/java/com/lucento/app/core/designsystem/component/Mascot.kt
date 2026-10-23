@@ -1,56 +1,69 @@
 package com.lucento.app.core.designsystem.component
 
-import androidx.compose.foundation.Canvas
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.lucento.app.core.designsystem.theme.LucentoExtendedColors
+import com.lucento.app.R
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.domain.WellnessTier
 
 /**
- * Expression for the mascot; kept small on purpose — Lucento's friend, not a cartoon cast.
- * [marker] names the matching segment in the mascot Lottie files; [cycles] is how often it plays before resting.
+ * The seven poses of the approved Lucento character (docs/mascot). Facial and hand changes are separate artwork per
+ * pose; switching pose cross-fades between them (the art is never morphed, redrawn or re-tinted).
  */
-enum class MascotMood(val marker: String, val cycles: Int) {
-    /** Gentle idle: a slow float and one blink, a few cycles, then still. */
-    Happy("idle", 3),
-    /** Empty states and "let's start": a head tilt and a look around. */
-    Curious("curious", 2),
-    /** Something was done well: a small hop and a wider smile. Plays once. */
-    Success("success", 1),
-    /** A meaningful milestone: the rays turn one step and four sparkles appear. Plays once. */
-    Celebrate("celebrate", 1),
-    /**
-     * Supportive concern (the month's budget is nearly used or used up): a slow nod, inner brows lifted, a calm
-     * mouth. Never a frown or tears — Lucento encourages rather than judges. Plays twice, then rests.
-     */
-    Concerned("concerned", 2),
+enum class MascotPose { HeroNeutral, GreetingHappy, Thinking, Pointing, Success, Caution, Sleeping }
+
+/**
+ * What the character is doing in a given moment; kept small on purpose — Lucento's friend, not a cartoon cast.
+ * [idleCycles] is how many slow float cycles play before the character rests (0 = still).
+ */
+enum class MascotMood(val pose: MascotPose, val idleCycles: Int) {
+    /** Default on dashboards: neutral pose, a slow float a few times, then still. */
+    Happy(MascotPose.HeroNeutral, 3),
+    /** Welcome moments (onboarding). */
+    Greeting(MascotPose.GreetingHappy, 2),
+    /** Empty states, "let's start", reading a receipt. */
+    Curious(MascotPose.Thinking, 2),
+    /** Something was done well. */
+    Success(MascotPose.Success, 1),
+    /** A meaningful milestone. */
+    Celebrate(MascotPose.Success, 2),
+    /** Supportive concern: the month's budget is nearly or fully used. Palm out, calm — never judgement. */
+    Concerned(MascotPose.Caution, 1),
 }
 
 /**
- * Lucento's original mascot pair, drawn entirely in vectors (no image assets, no downloads):
- * the **Sun** in the light theme and its night-time counterpart, the **Moon**, in the dark theme. They
- * share one face — confident brows, bright eyes, a restrained smile — so they read as the same
- * character at different times of day.
+ * Lucento, the approved mascot: a golden orb with a hair crest, cream scarf, satchel and a crystal torch whose light
+ * reflects the month's [tier] (thriving → over plan). The artwork ships unchanged as WebP sprites
+ * (`res/drawable-nodpi/mascot_<tier>_<pose>`, cropped only of transparent margin); the torch glow is a separate warm
+ * light drawn behind the sprite at the tier's brightness, so dimming never darkens the character itself.
  *
- * Use it small and secondary on dashboards; it may be larger in onboarding and empty states. When [animate]
- * is true and the system has not asked to remove animations, the Lottie character plays [mood]'s segment a
- * few times and then rests; otherwise this exact vector drawing is shown still.
- * Decorative by default (no accessibility label) unless [contentDescription] is given.
+ * Use it small and secondary on dashboards (56–84dp), larger in onboarding (140dp) and empty states (~96dp). Outside
+ * budget contexts the default tier is [WellnessTier.THRIVING] (the character's clean, everyday look). When [animate] is
+ * true and the system has not removed animations, it floats gently for [MascotMood.idleCycles] and rests; pose and
+ * tier changes cross-fade. Decorative by default (no accessibility label) unless [contentDescription] is given.
  */
 @Composable
 fun LucentoMascot(
@@ -58,109 +71,131 @@ fun LucentoMascot(
     size: Dp = 64.dp,
     animate: Boolean = true,
     mood: MascotMood = MascotMood.Happy,
-    night: Boolean = LucentoTheme.isDark,
+    tier: WellnessTier = WellnessTier.THRIVING,
     contentDescription: String? = null,
 ) {
-    // The animated character (Lottie) is the default; the vector drawing below is its still form, used when
-    // motion is off, when a non-theme variant is requested, or if the animation can't be loaded.
-    if (animate && !LucentoTheme.reducedMotion && night == LucentoTheme.isDark) {
-        LucentoLottieAnimation(
-            animation = LucentoAnimation.Mascot,
-            modifier = modifier.size(size),
-            marker = mood.marker,
-            iterations = mood.cycles,
-            contentDescription = contentDescription,
-            fallback = { LucentoMascot(size = size, animate = false, mood = mood, night = night, contentDescription = null) },
-        )
-        return
+    val moving = animate && !LucentoTheme.reducedMotion
+    val float = remember { Animatable(0f) }
+    LaunchedEffect(moving, mood) {
+        float.snapTo(0f)
+        if (!moving) return@LaunchedEffect
+        repeat(mood.idleCycles) {
+            float.animateTo(1f, tween(durationMillis = 1600, easing = FastOutSlowInEasing))
+            float.animateTo(0f, tween(durationMillis = 1600, easing = FastOutSlowInEasing))
+        }
     }
-    val colors = LucentoTheme.extendedColors
+    // Float ±1.5% of the height (±1% below 96dp, per the animation guide); the glow breathes a little with it.
+    val amplitude = if (size < 96.dp) 0.01f else 0.015f
     val semantics = if (contentDescription != null) {
         Modifier.semantics { this.contentDescription = contentDescription }
     } else {
         Modifier.clearAndSetSemantics { }
     }
-    Canvas(modifier.size(size).then(semantics)) {
-        val u = this.size.minDimension / 100f
-        if (night) drawMoon(u, colors, mood) else drawSun(u, colors, mood)
-    }
-}
-
-private val MascotCenter = Offset(50f, 52f)
-
-private fun DrawScope.drawSun(u: Float, c: LucentoExtendedColors, mood: MascotMood) {
-    val center = Offset(MascotCenter.x * u, MascotCenter.y * u)
-    // Twelve rounded rays, alternating long and short, slightly warmer than the face.
-    for (i in 0 until 12) {
-        val long = i % 2 == 0
-        rotate(degrees = i * 30f, pivot = center) {
-            val h = (if (long) 15f else 11f) * u
-            drawRoundRect(
-                color = c.mascotShade,
-                topLeft = Offset(center.x - 4.5f * u, center.y - 46f * u + (if (long) 0f else 3f * u)),
-                size = Size(9f * u, h),
-                cornerRadius = CornerRadius(4.5f * u, 4.5f * u),
+    Box(modifier.size(size).then(semantics)) {
+        Crossfade(
+            targetState = tier to mood.pose,
+            animationSpec = tween(durationMillis = if (moving) 300 else 0),
+            label = "mascot-pose",
+        ) { (shownTier, shownPose) ->
+            Image(
+                painter = painterResource(spriteFor(shownTier, shownPose)),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { translationY = -float.value * amplitude * this.size.height }
+                    .drawBehind {
+                        val glow = if (shownPose == MascotPose.Sleeping) GlowCenterSleeping else GlowCenter
+                        val center = Offset(glow.x * this.size.width, glow.y * this.size.height)
+                        val alpha = glowAlpha(shownTier) * (1f + 0.06f * float.value)
+                        val stops = GlowFalloff.map { (stop, k) -> stop to TorchLight.copy(alpha = (alpha * k).coerceIn(0f, 1f)) }
+                            .toTypedArray()
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                *stops,
+                                center = center,
+                                radius = GlowRadius * this.size.width,
+                            ),
+                            radius = GlowRadius * this.size.width,
+                            center = center,
+                        )
+                    },
             )
         }
     }
-    // Face with a soft, flat inner shade for depth (no gradient).
-    drawCircle(color = c.mascotShade, radius = 31f * u, center = center)
-    drawCircle(color = c.mascotBody, radius = 29f * u, center = Offset(center.x - 1.2f * u, center.y - 1.2f * u))
-    drawFace(u, c, mood, sleepyEyes = false)
 }
 
-private fun DrawScope.drawMoon(u: Float, c: LucentoExtendedColors, mood: MascotMood) {
-    val center = Offset(MascotCenter.x * u, MascotCenter.y * u)
-    drawCircle(color = c.mascotShade, radius = 33f * u, center = center)
-    drawCircle(color = c.mascotBody, radius = 31f * u, center = Offset(center.x - 1.2f * u, center.y - 1.2f * u))
-    // Craters, kept away from the face.
-    drawCircle(color = c.mascotShade, radius = 4.5f * u, center = Offset(68f * u, 32f * u))
-    drawCircle(color = c.mascotShade, radius = 3f * u, center = Offset(31f * u, 72f * u))
-    drawCircle(color = c.mascotShade, radius = 2.2f * u, center = Offset(72f * u, 70f * u))
-    // Two small sparkles in sun yellow — the Sun's light, reflected.
-    drawSparkle(Offset(14f * u, 18f * u), 6f * u, c.accent)
-    drawSparkle(Offset(88f * u, 12f * u), 4f * u, c.accent)
-    drawFace(u, c, mood, sleepyEyes = true)
+/** Torch light colour from the character spec (crystal glow #FFCE78) — artwork, not a UI token. */
+private val TorchLight = Color(0xFFFFCE78)
+
+/**
+ * Glow geometry in sprite units (the sprites are the 2048² masters cropped to x 298–1778, y 272–1752): the crystal
+ * sits at (1620, 660) — (1535, 830) when sleeping — with a radius of 0.17 × the master width.
+ */
+private val GlowCenter = Offset(0.893f, 0.262f)
+private val GlowCenterSleeping = Offset(0.836f, 0.377f)
+private const val GlowRadius = 0.235f
+
+/** Radial falloff measured from the procedural glow layers in docs/mascot/assets/layers/torch_glow. */
+private val GlowFalloff = listOf(
+    0f to 1f, 0.1f to 0.8f, 0.2f to 0.63f, 0.3f to 0.48f, 0.4f to 0.35f, 0.5f to 0.25f,
+    0.6f to 0.16f, 0.7f to 0.094f, 0.8f to 0.043f, 0.9f to 0.016f, 1f to 0f,
+)
+
+/** Peak glow per tier (MASCOT_DESIGN_SPEC: 100 / 80 / 60 / 42 / 28 %). */
+private fun glowAlpha(tier: WellnessTier): Float = when (tier) {
+    WellnessTier.THRIVING -> 1.00f
+    WellnessTier.STEADY -> 0.80f
+    WellnessTier.GETTING_TIGHT -> 0.60f
+    WellnessTier.CONCERNED -> 0.42f
+    WellnessTier.OVER_PLAN -> 0.28f
 }
 
-private fun DrawScope.drawFace(u: Float, c: LucentoExtendedColors, mood: MascotMood, sleepyEyes: Boolean) {
-    val ink = c.mascotFace
-    val stroke = Stroke(width = 2.6f * u, cap = StrokeCap.Round)
-    // Brows: level and confident; the right one lifts a little when curious; inner ends lift when concerned.
-    val lift = if (mood == MascotMood.Curious) 2.5f * u else 0f
-    val concerned = mood == MascotMood.Concerned
-    val inner = if (concerned) 2.6f * u else 0f
-    drawLine(ink, Offset(34f * u, 39f * u), Offset(43f * u, 37f * u - inner), strokeWidth = 2.4f * u, cap = StrokeCap.Round)
-    drawLine(ink, Offset(57f * u, 37f * u - lift - inner), Offset(66f * u, 39f * u - lift), strokeWidth = 2.4f * u, cap = StrokeCap.Round)
-    if (sleepyEyes) {
-        // Contented, half-closed eyes for the night.
-        drawArc(ink, 200f, 140f, false, Offset(34f * u, 44f * u), Size(10f * u, 8f * u), style = stroke)
-        drawArc(ink, 200f, 140f, false, Offset(56f * u, 44f * u), Size(10f * u, 8f * u), style = stroke)
-    } else {
-        drawOval(ink, Offset(36f * u, 42f * u), Size(7f * u, 9f * u))
-        drawOval(ink, Offset(57f * u, 42f * u), Size(7f * u, 9f * u))
-        drawCircle(Color.White, 1.5f * u, Offset(38.4f * u, 44.6f * u))
-        drawCircle(Color.White, 1.5f * u, Offset(59.4f * u, 44.6f * u))
+@DrawableRes
+private fun spriteFor(tier: WellnessTier, pose: MascotPose): Int = when (tier) {
+    WellnessTier.THRIVING -> when (pose) {
+        MascotPose.HeroNeutral -> R.drawable.mascot_thriving_hero_neutral
+        MascotPose.GreetingHappy -> R.drawable.mascot_thriving_greeting_happy
+        MascotPose.Thinking -> R.drawable.mascot_thriving_thinking
+        MascotPose.Pointing -> R.drawable.mascot_thriving_pointing
+        MascotPose.Success -> R.drawable.mascot_thriving_success
+        MascotPose.Caution -> R.drawable.mascot_thriving_caution
+        MascotPose.Sleeping -> R.drawable.mascot_thriving_sleeping
     }
-    // Cheeks and a restrained, slightly asymmetric smile.
-    drawCircle(c.mascotCheek.copy(alpha = 0.45f), 4f * u, Offset(31f * u, 58f * u))
-    drawCircle(c.mascotCheek.copy(alpha = 0.45f), 4f * u, Offset(69f * u, 58f * u))
-    if (concerned) {
-        // A calm, gentle mouth: still turned up a touch, never a frown.
-        drawArc(ink, 35f, 110f, false, Offset(43f * u, 54f * u), Size(15f * u, 5f * u), style = stroke)
-    } else {
-        drawArc(ink, 25f, 125f, false, Offset(41f * u, 50f * u), Size(19f * u, 13f * u), style = stroke)
+    WellnessTier.STEADY -> when (pose) {
+        MascotPose.HeroNeutral -> R.drawable.mascot_steady_hero_neutral
+        MascotPose.GreetingHappy -> R.drawable.mascot_steady_greeting_happy
+        MascotPose.Thinking -> R.drawable.mascot_steady_thinking
+        MascotPose.Pointing -> R.drawable.mascot_steady_pointing
+        MascotPose.Success -> R.drawable.mascot_steady_success
+        MascotPose.Caution -> R.drawable.mascot_steady_caution
+        MascotPose.Sleeping -> R.drawable.mascot_steady_sleeping
     }
-}
-
-private fun DrawScope.drawSparkle(center: Offset, r: Float, color: Color) {
-    val path = Path().apply {
-        moveTo(center.x, center.y - r)
-        cubicTo(center.x, center.y, center.x, center.y, center.x + r, center.y)
-        cubicTo(center.x, center.y, center.x, center.y, center.x, center.y + r)
-        cubicTo(center.x, center.y, center.x, center.y, center.x - r, center.y)
-        cubicTo(center.x, center.y, center.x, center.y, center.x, center.y - r)
-        close()
+    WellnessTier.GETTING_TIGHT -> when (pose) {
+        MascotPose.HeroNeutral -> R.drawable.mascot_getting_tight_hero_neutral
+        MascotPose.GreetingHappy -> R.drawable.mascot_getting_tight_greeting_happy
+        MascotPose.Thinking -> R.drawable.mascot_getting_tight_thinking
+        MascotPose.Pointing -> R.drawable.mascot_getting_tight_pointing
+        MascotPose.Success -> R.drawable.mascot_getting_tight_success
+        MascotPose.Caution -> R.drawable.mascot_getting_tight_caution
+        MascotPose.Sleeping -> R.drawable.mascot_getting_tight_sleeping
     }
-    drawPath(path, color = color)
+    WellnessTier.CONCERNED -> when (pose) {
+        MascotPose.HeroNeutral -> R.drawable.mascot_concerned_hero_neutral
+        MascotPose.GreetingHappy -> R.drawable.mascot_concerned_greeting_happy
+        MascotPose.Thinking -> R.drawable.mascot_concerned_thinking
+        MascotPose.Pointing -> R.drawable.mascot_concerned_pointing
+        MascotPose.Success -> R.drawable.mascot_concerned_success
+        MascotPose.Caution -> R.drawable.mascot_concerned_caution
+        MascotPose.Sleeping -> R.drawable.mascot_concerned_sleeping
+    }
+    WellnessTier.OVER_PLAN -> when (pose) {
+        MascotPose.HeroNeutral -> R.drawable.mascot_over_plan_hero_neutral
+        MascotPose.GreetingHappy -> R.drawable.mascot_over_plan_greeting_happy
+        MascotPose.Thinking -> R.drawable.mascot_over_plan_thinking
+        MascotPose.Pointing -> R.drawable.mascot_over_plan_pointing
+        MascotPose.Success -> R.drawable.mascot_over_plan_success
+        MascotPose.Caution -> R.drawable.mascot_over_plan_caution
+        MascotPose.Sleeping -> R.drawable.mascot_over_plan_sleeping
+    }
 }

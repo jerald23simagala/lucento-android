@@ -135,7 +135,7 @@ fun CategoryPresetPicker(
                 null
             },
             singleLine = true,
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(Spacing.sm))
@@ -226,7 +226,7 @@ fun CategoryPresetPicker(
                 },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { addCustom() }),
-                shape = MaterialTheme.shapes.medium,
+                shape = MaterialTheme.shapes.small,
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(Spacing.sm))

@@ -28,6 +28,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -37,6 +38,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.theme.Elevation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Sizes
@@ -44,8 +46,8 @@ import com.lucento.app.core.designsystem.theme.Spacing
 import java.util.Locale
 
 /**
- * Flat card: hairline border instead of elevation. Use sparingly — most lists sit directly on the
- * background and are grouped by spacing and section labels, not boxes.
+ * Card: hairline border plus, by day only, the faint navy shadow-xs (night uses tonal separation). Use sparingly —
+ * most lists sit directly on the background and are grouped by spacing and section labels, not boxes.
  */
 @Composable
 fun LucentoCard(
@@ -56,14 +58,23 @@ fun LucentoCard(
 ) {
     val shape = MaterialTheme.shapes.large
     val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    // Cards lift off the canvas: white on cream by day, a lighter navy by night.
-    val color = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest
+    // Cards lift off the canvas: white on ivory by day, a lighter navy by night.
+    val dark = LucentoTheme.isDark
+    val color = if (dark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest
+    val tint = LucentoTheme.extendedColors.shadow
+    val cardModifier = if (dark) modifier else modifier.shadow(
+        elevation = Elevation.xs,
+        shape = shape,
+        clip = false,
+        ambientColor = tint.copy(alpha = 0.04f),
+        spotColor = tint.copy(alpha = 0.08f),
+    )
     if (onClick != null) {
-        Surface(onClick = onClick, modifier = modifier, shape = shape, color = color, border = border) {
+        Surface(onClick = onClick, modifier = cardModifier, shape = shape, color = color, border = border) {
             Column(Modifier.padding(contentPadding), content = content)
         }
     } else {
-        Surface(modifier = modifier, shape = shape, color = color, border = border) {
+        Surface(modifier = cardModifier, shape = shape, color = color, border = border) {
             Column(Modifier.padding(contentPadding), content = content)
         }
     }

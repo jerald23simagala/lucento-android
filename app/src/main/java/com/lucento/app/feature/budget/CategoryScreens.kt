@@ -261,7 +261,7 @@ private fun NameDialog(
                     null
                 },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-                shape = MaterialTheme.shapes.medium,
+                shape = MaterialTheme.shapes.small,
             )
         },
         confirmButton = { TextButton(onClick = { onConfirm(name) { error = it } }) { Text(confirmLabel) } },

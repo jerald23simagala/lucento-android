@@ -187,7 +187,7 @@ private fun WelcomeStep(onContinue: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Spacing.xl))
-            LucentoMascot(size = 140.dp, contentDescription = "Lucento’s sun, smiling")
+            LucentoMascot(size = 140.dp, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
             Spacer(Modifier.height(Spacing.lg))
             Text(
                 "Track what you spend, plan what’s next — privately, on this phone. No account, no bank login.",

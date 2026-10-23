@@ -2,8 +2,8 @@
 
 Every animation shipped in Lucento is listed here. **There are currently no third-party animation assets.**
 All Lottie files are original to Lucento: they are generated from code in `tools/lottie/gen/` (Python, no
-templates, no traced artwork) using Lucento's own shapes — the L + leaf mark from `LucentoMark.kt` and the Sun/Moon
-mascot geometry from `Mascot.kt` — and Lucento's palette. No asset was downloaded from LottieFiles or any other
+templates, no traced artwork) using Lucento's own shapes — the L + leaf mark from `LucentoMark.kt` — and Lucento's palette. The mascot is not a
+Lottie file: the approved character ships as WebP sprites with a code-drawn torch glow (`Mascot.kt`, `docs/mascot/`). No asset was downloaded from LottieFiles or any other
 library: the authoring environment could not reach lottiefiles.com, and original work also keeps the brand coherent.
 
 Runtime: [Airbnb Lottie for Android/Compose](https://github.com/airbnb/lottie-android) `com.airbnb.android:lottie-compose:6.6.7`,
@@ -17,8 +17,6 @@ lottie-android; on-device appearance has **not yet been verified** (no emulator/
 
 | File (`res/raw/`) | Purpose | Where it plays | Playback | Size (raw / gzip) | Source · licence |
 |---|---|---|---|---|---|
-| `lucento_mascot_sun.json` | Sun mascot (day theme); markers `idle`, `success`, `curious`, `celebrate`, `concerned` (v0.5) | `LucentoMascot` everywhere; on the Home budget hero its mood follows the budget: `idle` while comfortably within budget, `concerned` when ≤ 10 % is left or the budget is used up, `curious` before a budget exists | idle ×3 then rests; curious ×2; concerned ×2 then rests; success/celebrate once | 27.4 KB / 2.3 KB | Original (Lucento) |
-| `lucento_mascot_moon.json` | Moon mascot (night theme), same markers | as above, dark theme | as above | 22.9 KB / 2.2 KB | Original (Lucento) |
 | `net_flow_indicator.json` (+`_night`) | Trend glyph on a tinted tile; markers `up` (green, rising), `down` (red, falling), `flat` (neutral level line for exactly zero) | Home net-flow card (`NetFlowIndicator`), chosen from the calculated net flow | once per direction (≈0.6 s), holds the finished glyph; static icon under reduced motion | 9.1 KB / 1.0 KB each | Original (Lucento) |
 | `onboarding_welcome.json` (+`_night`) | The mark assembles: backdrop, L drawn, leaf grows, three sparkles | Onboarding welcome step | once, 2.5 s, never blocks "Get started" | 6.5 KB / 1.0 KB each | Original (Lucento) |
 | `empty_transactions.json` (+`_night`) | Ledger card with rows and a lens | Transactions: no transactions yet | once, 2 s, holds last frame | 11.1 KB / 1.0 KB each | Original (Lucento) |
@@ -53,10 +51,10 @@ removes what is unused.
 ## Playback rules (enforced by `LucentoLottieAnimation`)
 
 - Reduced motion (system "Remove animations" → `LucentoTheme.reducedMotion`): nothing animates. One-shots show their
-  final frame; loops show their first; the mascot falls back to its vector drawing. Confirmations stay on screen for
+  final frame; loops show their first; the mascot shows its still pose with its glow. Confirmations stay on screen for
   the same time, so a save never looks unfinished.
 - Loops stop when their composable leaves the screen; one-shots fire `onFinished` once (immediately under reduced motion).
-- A file that fails to parse shows a fallback (vector mascot, static mark or a progress indicator).
+- A file that fails to parse shows a fallback (the mascot sprite, static mark or a progress indicator).
 - Compositions are cached by Lottie per raw resource id; only the visible screen's animations are loaded.
 - Animations never drive app logic: confirmations are triggered by repository results, after the write.
 

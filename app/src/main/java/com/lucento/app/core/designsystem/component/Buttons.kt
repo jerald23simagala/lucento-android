@@ -1,6 +1,5 @@
 package com.lucento.app.core.designsystem.component
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 
@@ -76,8 +76,12 @@ fun LucentoSecondaryButton(
         modifier = (if (fillWidth) modifier.fillMaxWidth() else modifier).heightIn(min = Sizes.button),
         shape = MaterialTheme.shapes.medium,
         contentPadding = ButtonPadding,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+        // Sunrise secondary: a pale-sky (night: elevated navy) fill with ink text; no outline.
+        border = null,
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
     ) {
         ButtonContent(text, icon)
     }

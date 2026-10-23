@@ -9,33 +9,23 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.lucento.app.R
 
-/** Inter for UI text; Inter Display (optically tuned for large sizes) for headings and hero figures. */
-val InterFamily = FontFamily(
-    Font(R.font.inter_regular, FontWeight.Normal),
-    Font(R.font.inter_medium, FontWeight.Medium),
-    Font(R.font.inter_semibold, FontWeight.SemiBold),
+/**
+ * Plus Jakarta Sans (OFL, bundled as static 400/500/600/700 instances — see docs/licenses) for the whole UI.
+ * The Lucento logo is artwork, never typeset with this family.
+ */
+val LucentoFontFamily = FontFamily(
+    Font(R.font.plus_jakarta_sans_regular, FontWeight.Normal),
+    Font(R.font.plus_jakarta_sans_medium, FontWeight.Medium),
+    Font(R.font.plus_jakarta_sans_semibold, FontWeight.SemiBold),
+    Font(R.font.plus_jakarta_sans_bold, FontWeight.Bold),
 )
 
-val InterDisplayFamily = FontFamily(
-    Font(R.font.inter_display_medium, FontWeight.Medium),
-    Font(R.font.inter_display_semibold, FontWeight.SemiBold),
-)
+/** Tabular figures so amounts align in columns and do not jitter while animating (Plus Jakarta's figures are lining). */
+const val TabularFigures = "tnum"
 
-/** Tabular, lining figures so amounts align in columns and do not jitter while animating. */
-const val TabularFigures = "tnum, lnum"
-
-private fun display(size: Int, line: Int, weight: FontWeight = FontWeight.SemiBold, tracking: Double = -0.02) =
+private fun style(size: Int, line: Int, weight: FontWeight = FontWeight.Normal, tracking: Double = 0.0) =
     TextStyle(
-        fontFamily = InterDisplayFamily,
-        fontWeight = weight,
-        fontSize = size.sp,
-        lineHeight = line.sp,
-        letterSpacing = tracking.em,
-    )
-
-private fun text(size: Int, line: Int, weight: FontWeight = FontWeight.Normal, tracking: Double = 0.0) =
-    TextStyle(
-        fontFamily = InterFamily,
+        fontFamily = LucentoFontFamily,
         fontWeight = weight,
         fontSize = size.sp,
         lineHeight = line.sp,
@@ -43,39 +33,41 @@ private fun text(size: Int, line: Int, weight: FontWeight = FontWeight.Normal, t
     )
 
 /*
- * Scale: screen titles are deliberately modest (headlineMedium, 26sp) so the money — not the chrome —
- * carries the visual weight. Large display sizes are reserved for hero figures.
+ * Sunrise Energy scale (sp, so it follows the system font size):
+ *   display 36 Bold · screen title 28 Bold · section heading 20 SemiBold · card heading 16 SemiBold
+ *   body 14–16 Regular · form labels 14 Medium · supporting 12 Regular · buttons 16 SemiBold · metadata 12 Medium
+ * Large sizes beyond the display style are reserved for the single hero figure on a screen.
  */
 val LucentoTypography = Typography(
-    displayLarge = display(52, 58),
-    displayMedium = display(42, 48),
-    displaySmall = display(34, 40),
-    headlineLarge = display(30, 36),
-    headlineMedium = display(26, 32),
-    headlineSmall = display(22, 28, tracking = -0.01),
-    titleLarge = display(20, 26, weight = FontWeight.Medium, tracking = -0.01),
-    titleMedium = text(16, 22, FontWeight.Medium),
-    titleSmall = text(14, 20, FontWeight.SemiBold),
-    bodyLarge = text(16, 24),
-    bodyMedium = text(14, 20),
-    bodySmall = text(12, 16),
-    labelLarge = text(14, 20, FontWeight.Medium, tracking = 0.005),
-    labelMedium = text(12, 16, FontWeight.Medium, tracking = 0.01),
-    labelSmall = text(11, 14, FontWeight.Medium, tracking = 0.04),
+    displayLarge = style(40, 48, FontWeight.Bold, tracking = -0.02),
+    displayMedium = style(36, 44, FontWeight.Bold, tracking = -0.02),
+    displaySmall = style(32, 40, FontWeight.Bold, tracking = -0.02),
+    headlineLarge = style(30, 38, FontWeight.Bold, tracking = -0.015),
+    headlineMedium = style(28, 36, FontWeight.Bold, tracking = -0.015),
+    headlineSmall = style(22, 30, FontWeight.SemiBold, tracking = -0.01),
+    titleLarge = style(20, 28, FontWeight.SemiBold, tracking = -0.005),
+    titleMedium = style(16, 24, FontWeight.SemiBold),
+    titleSmall = style(14, 20, FontWeight.SemiBold),
+    bodyLarge = style(16, 24),
+    bodyMedium = style(14, 20),
+    bodySmall = style(12, 18),
+    labelLarge = style(14, 20, FontWeight.Medium),
+    labelMedium = style(12, 16, FontWeight.Medium, tracking = 0.005),
+    labelSmall = style(11, 16, FontWeight.Medium, tracking = 0.02),
 )
 
 /** Editorial overline used for section labels ("THIS MONTH", "RECENT"). Uppercased by the caller. */
-val OverlineStyle = text(11, 16, FontWeight.SemiBold, tracking = 0.09)
+val OverlineStyle = style(11, 16, FontWeight.SemiBold, tracking = 0.08)
 
-/** Amount styles. Always tabular. */
+/** Amount styles. Always tabular. Prominent but never crowding the layout. */
 object AmountStyles {
     /** The single most important number on a screen (net worth). */
-    val display = display(44, 50).copy(fontFeatureSettings = TabularFigures)
+    val display = style(40, 48, FontWeight.Bold, tracking = -0.02).copy(fontFeatureSettings = TabularFigures)
     /** Large amount entry in the transaction editor. */
-    val entry = display(40, 46, weight = FontWeight.Medium).copy(fontFeatureSettings = TabularFigures)
-    val hero = display(34, 40).copy(fontFeatureSettings = TabularFigures)
-    val large = display(22, 28).copy(fontFeatureSettings = TabularFigures)
-    val medium = text(16, 22, FontWeight.SemiBold).copy(fontFeatureSettings = TabularFigures)
-    val row = text(15, 20, FontWeight.Medium).copy(fontFeatureSettings = TabularFigures)
-    val small = text(12, 16, FontWeight.Medium).copy(fontFeatureSettings = TabularFigures)
+    val entry = style(36, 44, FontWeight.SemiBold, tracking = -0.02).copy(fontFeatureSettings = TabularFigures)
+    val hero = style(32, 40, FontWeight.Bold, tracking = -0.02).copy(fontFeatureSettings = TabularFigures)
+    val large = style(22, 28, FontWeight.Bold, tracking = -0.01).copy(fontFeatureSettings = TabularFigures)
+    val medium = style(16, 22, FontWeight.SemiBold).copy(fontFeatureSettings = TabularFigures)
+    val row = style(15, 20, FontWeight.SemiBold).copy(fontFeatureSettings = TabularFigures)
+    val small = style(12, 16, FontWeight.Medium).copy(fontFeatureSettings = TabularFigures)
 }

@@ -179,7 +179,7 @@ fun VoiceEntryScreen(
             placeholder = { Text("e.g. Grab 180 yesterday from GCash") },
             minLines = 2,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
         )
         Spacer(Modifier.height(Spacing.md))

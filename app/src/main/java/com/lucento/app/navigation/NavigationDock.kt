@@ -96,7 +96,7 @@ fun NavigationDock(
                     Modifier
                         .width(56.dp)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(MaterialTheme.shapes.medium)
                         .selectable(selected = false, role = Role.Button, onClick = {
                             haptics.tick()
                             onMore()
@@ -120,7 +120,7 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
         label = "dock-indicator",
     )
     val tint by animateColorAsState(
-        if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
+        if (selected) colors.primary else colors.onSurfaceVariant,
         tween(180),
         label = "dock-tint",
     )

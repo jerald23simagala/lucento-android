@@ -186,7 +186,7 @@ fun WalletEditorSheet(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Next,
                 ),
-                shape = MaterialTheme.shapes.medium,
+                shape = MaterialTheme.shapes.small,
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -269,7 +269,7 @@ fun WalletEditorSheet(
                     )
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-                shape = MaterialTheme.shapes.medium,
+                shape = MaterialTheme.shapes.small,
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )

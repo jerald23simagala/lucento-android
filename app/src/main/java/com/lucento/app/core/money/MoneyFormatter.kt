@@ -51,7 +51,7 @@ object MoneyFormatter {
         return null
     }
 
-    /** U+2212 MINUS SIGN: same width as "+" in Inter, unlike the hyphen-minus. */
+    /** U+2212 MINUS SIGN: same width as "+" in Plus Jakarta Sans, unlike the hyphen-minus. */
     const val MINUS = "−"
 
     /** Plain number without currency symbol, suitable for pre-filling an input field. */

@@ -59,13 +59,14 @@ app/src/main/java/com/lucento/app/
   provides its own explicit backup/restore.
 
 ## Design standards
-- Palette: brand blue `#2563EB` primary, sun-yellow accent (sparingly), warm cream / deep navy neutrals, midnight-navy
+- Palette: Sunrise Energy — Electric Blue `#3563F5` for interaction, sunlight `#FFC928` / tangerine `#FF8A24` accents (sparingly), soft ivory / midnight navy neutrals, navy
   dark theme. No dynamic colour. Tokens, components and rules are in `docs/DESIGN.md`; never hardcode colours.
-- Brand: blue L + yellow leaf mark; original Sun (light) / Moon (dark) mascot (`LucentoMascot`), small on dashboards.
+- Brand: blue L + yellow leaf mark; Lucento mascot (`LucentoMascot`, golden orb with a crystal torch; spec in `docs/mascot/`), small on dashboards.
 - Optional modules are switched through the typed `FeatureSet` (DataStore). Disabling a module hides it and never
   deletes data; core transactions/accounts are never optional.
 - Amounts are always signed via `MoneyFormatter.formatSigned` so meaning never depends on colour alone.
-- Typography: Inter (body) + Inter Display (headings), bundled under OFL. Amounts use tabular figures (`AmountStyles`).
+- Typography: Plus Jakarta Sans (static 400–700), bundled under OFL. Amounts use tabular figures (`AmountStyles`).
+- The logo and mascot are approved artwork: never redraw, regenerate or re-tint them to match the UI palette.
 - Flat surfaces with hairline borders; no heavy gradients, glassmorphism, or decorative charts.
 - Every screen has one clear purpose. **No buttons that do nothing. No fake financial data.**
 - Haptics through `rememberHaptics()`; structural motion via Compose animation APIs, short and purposeful.

@@ -295,7 +295,7 @@ private fun SettingsContent(
         }
         Spacer(Modifier.height(Spacing.md))
         Text(
-            "Set in Inter, licensed under the SIL Open Font License 1.1. Text recognition by Google ML Kit (on-device). " +
+            "Set in Plus Jakarta Sans, licensed under the SIL Open Font License 1.1. Text recognition by Google ML Kit (on-device). " +
                 "Animations play with Airbnb Lottie (Apache License 2.0); the Sun and Moon, illustrations and motion are original to Lucento.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -309,8 +309,8 @@ private fun ThemeOption(mode: ThemeMode, selected: Boolean, onSelect: () -> Unit
     val colors = MaterialTheme.colorScheme
     val border by animateColorAsState(if (selected) colors.primary else colors.outlineVariant, tween(160), label = "theme-border")
     // Literal previews of each theme (not tokens), so they look the same whichever theme is active.
-    val light = Color(0xFFFFFDF8) to Color(0xFF2563EB)
-    val dark = Color(0xFF0B1226) to Color(0xFF8AB0FF)
+    val light = Color(0xFFFFFDF5) to Color(0xFF3563F5)
+    val dark = Color(0xFF10182B) to Color(0xFF7C9AFF)
     Column(
         modifier
             .clip(MaterialTheme.shapes.medium)

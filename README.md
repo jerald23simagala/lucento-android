@@ -16,7 +16,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   appearance, Settings, Enabled features). An app-wide **+** opens **Manual · Scan · Speak · Type it**.
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation.
-- **Home**: budget hero with the Sun/Moon mascot (happy within budget, supportively concerned when ≤ 10 % is left),
+- **Home**: budget hero with Lucento, the mascot, whose torch light and look follow the month's budget (five wellness tiers),
   compact net flow with an animated trend glyph, burn-rate bar against the calendar, savings goals level, upcoming
   recurring payments (tap to review and mark paid).
 - **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
@@ -29,7 +29,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Savings goals**, **Debts & loans**, **Recurring payments** (mark paid / skip / pause — never auto-posted).
 - **Receipt scanning** (on-device ML Kit OCR) and **Speak / Type it** (offline parser) → always reviewed before saving.
 - **Settings**: theme, main currency, Enabled features, CSV export, privacy facts.
-- **Motion**: original Lottie Sun/Moon (idle, curious, success, celebrate, concerned), net-flow glyphs, onboarding mark,
+- **Motion**: the mascot's gentle float and pose cross-fades; original Lottie net-flow glyphs, onboarding mark,
   empty states, receipt scan beam, saved confirmation, milestones — bundled and reduced-motion aware.
 - Exact money math in minor units; 253 JVM unit tests; an emulator screenshot tour in CI.
 - No internet permission; Android cloud backup disabled.
@@ -67,5 +67,5 @@ JDK 17, compileSdk 35, minSdk 26 (Android 8.0+). Application ID `com.lucento.app
 See [CLAUDE.md](CLAUDE.md) for architecture, money rules and engineering standards.
 
 ## Licenses
-Inter typeface © The Inter Project Authors, SIL Open Font License 1.1 — see `docs/licenses/Inter-OFL.txt`.
+Plus Jakarta Sans © The Plus Jakarta Sans Project Authors, SIL Open Font License 1.1 — see `docs/licenses/PlusJakartaSans-OFL.txt`.
 Airbnb Lottie, Apache License 2.0. All animation files are original to Lucento (`docs/design/ANIMATION_ASSETS.md`).

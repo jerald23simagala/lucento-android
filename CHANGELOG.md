@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Sunrise Energy brand refresh (not compiled locally; awaiting CI)
+
+- Palette: Sunlight Yellow `#FFC928`, Bright Tangerine `#FF8A24`, Electric Blue `#3563F5`, Soft Ivory `#FFFDF5`,
+  Midnight Navy `#17233F`, Pale Sky `#EAF1FF`; new night theme on `#10182B` / `#17233F` / `#202E4D`.
+- Separate semantic status tokens (positive, warning, negative, info) with text-safe variants; new `info`,
+  `warmAccent` and `highlight` extended colours. Sunrise chart order for categorical series.
+- UI Lottie illustrations (empty states, feedback, loading, net flow, receipt scan) recoloured to the palette. The
+  logo (mark, launcher, splash, onboarding animation) and the mascot keep their original artwork and colours.
+- Typography: Plus Jakarta Sans (bundled static 400/500/600/700, OFL) replaces Inter; Sunrise type scale.
+- Radii 6/10/14/20/28 (`Radii`), `Elevation` scale with navy-tinted card shadow by day, border tokens
+  (`outlineVariant` `#E8EAF0`, `borderDefault`), muted ink `#5E687D`, blue active dock icon, inputs on radius-sm.
+- **Mascot:** the approved Lucento character replaces the interim vector/Lottie Sun and Moon. 35 WebP sprites
+  (5 wellness tiers × 7 poses, ~1.7 MB) in `drawable-nodpi`, a code-drawn torch glow, gentle float and cross-fades.
+  The Budget hero picks the tier from budget health via `WellnessTier` (unit-tested). Removed
+  `lucento_mascot_sun/moon.json`, their generator and the vector drawing; mascot colour tokens dropped.
+- `ThemeContrastTest` checks AA contrast for every text/background pair in both themes.
+- Palette use aligned with the reference board: tonal category tiles (pale tint + saturated glyph; deep tint +
+  light glyph at night), pale-sky secondary buttons, solid-blue selected chips, an elevated-navy night budget hero,
+  and indicator colours (not text colours) for approaching/over budget bars.
+- No behaviour, layout or dependency changes.
+
 ## 0.5.0 — 2026-10-22 (UI/UX refinement; JVM-tested locally, awaiting CI compile)
 
 ### Navigation

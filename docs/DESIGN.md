@@ -1,51 +1,110 @@
 # Lucento Design System
 
-Philosophy: **financial clarity without the complexity.** The identity comes from a friendly palette, clear type and
-calm composition — not effects. No gradients, glassmorphism, glows or charts that answer no question.
+Philosophy: **financial clarity without the complexity.** The identity comes from a bright, restrained palette, clear
+type and calm composition — not effects. No gradients in UI chrome, no glassmorphism, no glows, no charts that answer
+no question. Feeling: *a little sunlight, a lot of clarity, and confidence about tomorrow.*
 
-## Identity: daylight blue on warm cream, midnight navy at night
+## Identity: Sunrise Energy
+**Gold and orange are Lucento's light and optimism. Blue is trust, clarity and interaction. Navy is structure.**
+Distribution (guidance, not maths): 60–70 % neutral surfaces, 15–20 % navy text and structure, 10–15 % blue
+interaction, small deliberate touches of sunlight and tangerine. Most cards stay neutral.
+
+Canonical palette: Sunlight Yellow `#FFC928` · Bright Tangerine `#FF8A24` · Electric Blue `#3563F5` ·
+Soft Ivory `#FFFDF5` · Midnight Navy `#17233F` · Pale Sky `#EAF1FF`.
+
 | Role | Light | Dark | Use |
 |---|---|---|---|
-| Background / surface | `#FFFDF8` cream | `#0B1226` midnight | Screens sit on it. |
-| Card | `#FFFFFF` + hairline | `#16203B` + hairline | `LucentoCard`; lifts content off the canvas. |
-| Tinted surface | `#F3F6FF` | `#16203B` | Info notes, search, segmented controls. |
-| Ink (onSurface) | `#0F1B3D` deep navy | `#E8EDF8` | Body text and amounts (16.6:1 / 15.9:1). |
-| Muted ink | `#5B6478` | `#A4AFC7` | Labels, captions (5.8:1 / 8.5:1). |
-| Primary — blue | `#2563EB` | `#8AB0FF` | Primary actions, selection, the Add tab, the mark. |
-| Secondary blue | `#60A5FA` family | — | Chart tints (`chartBarMuted`), never small text. |
-| Accent — sun | `#FBBF24` (decorative), `#8A5A00` (text) | `#FBBF24` / `#FCD34D` | The leaf, the Sun mascot, onboarding highlights. Sparingly. |
-| Highlight | `#FFE6C7` peach | — | Cash tone, warm containers. |
-| Success | `#22C55E` (rings/bars), `#15803D` (text) | `#4ADE80` | Income (with "+"), budgets on track, goals. |
-| Error / negative | `#F87171` (indicators), `#C53030` (text) | `#FC8A8A` | Over budget, money owed, destructive actions. |
+| Background / surface | `#FFFDF5` ivory | `#10182B` | Screens sit on it. |
+| Card | `#FFFFFF` + `#E2E8F3` hairline | `#17233F` + `#26365C` hairline | `LucentoCard`; white on ivory by day. |
+| Elevated / selected | `#EAF1FF` pale sky (`surfaceContainer`) | `#202E4D` (`surfaceContainerHigh`) | Info notes, search, segmented controls, selected cards. |
+| Brand highlight surface | `#FFF4D1` (`highlight`, navy text) | `#3D3214` (`#FFE9A8` text) | Rare brand moments (milestones). Never whole screens. |
+| Ink (onSurface) | `#17233F` midnight navy | `#F8FAFF` | Body text and amounts (15.3:1 / 14.9:1 on cards). |
+| Muted ink | `#5E687D` | `#B8C5DC` | Labels, captions (5.5:1, 4.9:1 on pale sky / 8.9:1). Derived from the brief's `#667085` (4.4:1 on pale sky). |
+| Primary — Electric Blue | `#3563F5`, white label 4.9:1 | `#7C9AFF`, navy label 6.7:1 | Primary actions, selection, the Add tab, links. |
+| On primary container | `#2447C7` on `#EAF1FF` | `#E4EBFF` on `#26397A` | Tonal actions (ActionTile, IconBadge), selected text. |
+| Statement panel (hero) | `#2F56E8` Electric Blue, white text, `#DCE5FF` muted | `#202E4D` elevated navy, `#F8FAFF` / `#B8C5DC` text | Budget hero. At night blue stays for interaction only. |
+| Accent — sunlight | `#FFC928` (decorative only), `#9A5806` (text) | `#FFC928` (text-safe 11.5:1) | The leaf, the mascot, hero rule, milestones. Sparingly. |
+| Warm accent — tangerine | `#FF8A24` (decorative only) | `#FF8A24` | Logo warmth, secondary chart series. Never a status. |
 
-The brief's `#FFFD F8` background is implemented as `#FFFDF8`. Every text/background pair was checked with a
-script for WCAG AA (≥ 4.5:1 body, ≥ 3:1 large text and boundaries) in both themes. All tokens live in
-`core/designsystem/theme/Color.kt` (`MaterialTheme.colorScheme` + `LucentoTheme.extendedColors`); features never
-hardcode colours (the literal theme-preview swatches in Settings are the single, intentional exception).
+The night-theme primary is `#7C9AFF` rather than the proposed `#5278FF`: white on `#5278FF` is 3.8:1 and
+`#5278FF` text on night cards is 4.1:1, both under AA; `#7C9AFF` with a navy label passes everywhere.
+
+### Palette in components
+- **Buttons:** primary = Electric Blue fill, white label; secondary = pale-sky fill (night: `#202E4D`) with ink label,
+  no outline; text buttons in primary; destructive confirmations use `error`.
+- **Chips / pills** (`ChoicePill`): selected = solid primary with `onPrimary`; unselected = white (night: lowest
+  surface) with a hairline and ink label.
+- **Navigation dock:** selected tab in primary tones on a pale-sky indicator; others muted ink.
+- **Icon tiles:** tonal pairs (category, wallet, brand tint for transfers). Never a saturated tile with a white glyph.
+- **Progress bars and rings:** `success` green on track, `warningIndicator` approaching, `negativeIndicator` over;
+  the status always also appears in words.
+
+### Financial status (separate from the brand palette)
+| Status | Light indicator / text / container | Dark text / container | Meaning |
+|---|---|---|---|
+| Positive | `#16865C` / `#137A53` / `#E3F5EC` | `#3DD68C` / `#123B2A` | Income (with "+"), on track, goals. |
+| Warning | `#B86A08` / `#9A5806` / `#FFEFD9` | `#FFB547` / `#3D2C10` | Approaching a limit. |
+| Negative | `#D64545` / `#B83838` / `#FDE7E7` | `#FF8A8A` / `#4A1A1F` | Over budget, money owed, errors, destructive. |
+| Info | `#3563F5` / `#EAF1FF` | `#7C9AFF` / `#1C2B55` | Guidance and neutral notes. |
+
+The suggested `#16865C`, `#B86A08` and `#D64545` are 4.5, 4.0 and 4.3:1 on ivory, so they are used for rings, bars
+and icons; text uses the darker variants above. Warnings inform without shaming: soft containers, words, never a
+red screen.
+
+### Charts
+Series order: Electric Blue → Tangerine → Sunlight → Emerald `#16865C` → blue-gray `#8A97B0` → sky `#38A3E8` →
+violet `#8B7CF6` (night: `#7C9AFF`, `#FF9F4D`, `#FFC928`, `#3DD68C`, `#8A97B0`, `#6CC4F5`, `#A99BFF`). Sunlight
+and tangerine are under 3:1 on ivory, so every series keeps its legend label and exact figure beside the chart.
+Bars: `chartBar` blue, `chartBarMuted` `#C7D5FC` / `#2C3D66`, `track` `#E8EDF7` / `#26365C`.
+
+Every text/background pair is checked for WCAG AA (≥ 4.5:1 body, ≥ 3:1 large text, boundaries and marks) in both
+themes by `ThemeContrastTest` (unit test). All tokens live in `core/designsystem/theme/Color.kt`
+(`MaterialTheme.colorScheme` + `LucentoTheme.extendedColors`); features never hardcode colours (the literal
+theme-preview swatches in Settings are the single, intentional exception). Lottie files carry the same palette.
 
 **Colour never carries meaning alone:** amounts use `MoneyFormatter.formatSigned` (typographic `−` / `+`), owed
 balances say "owed", budget states say "Over" / a percentage, and transfers are labelled "From → To".
 
 ## Brand mark and mascots
-- **Mark** (`LucentoMark`, launcher icon, splash): a rounded blue **L** with a sun-yellow **leaf** — clarity plus
-  growth. Drawn on a 100-unit grid; the launcher/splash vectors are generated from the same geometry.
-- **Handsome Sun** (light theme) and **Handsome Moon** (dark theme), `LucentoMascot`: an original character pair
-  drawn entirely in Compose vectors (no image assets, no downloads). They share one face — level, confident brows,
-  bright eyes, cheeks and a restrained smile — so they read as the same character by day and night. Moods: `Happy`,
-  `Curious`, `Success`, `Celebrate` — animated with the original Lottie files, still vector otherwise.
+- **Mark** (`LucentoMark`, launcher icon, splash, onboarding animation): a rounded blue **L** (`#2563EB`, night
+  `#8AB0FF`) with a yellow **leaf** (`#FBBF24`) — clarity plus growth. Drawn on a 100-unit grid; the launcher/splash
+  vectors are generated from the same geometry. **Approved artwork: never redrawn, retyped or re-tinted** to the UI
+  palette (`brandMark` / `brandLeaf` keep the artwork colours).
+- **Mascot** (`LucentoMascot`): **Lucento**, a golden orb with a tousled hair crest, cream scarf, brown satchel and a
+  crystal torch whose light reflects financial wellness (thriving → steady → getting tight → concerned → over plan).
+  The canonical spec, tiers, poses and masters live in `docs/mascot/` (`MASCOT_DESIGN_SPEC.md`). In the app,
+  `LucentoMascot(mood, tier)` shows the approved art as 512px WebP sprites (`res/drawable-nodpi/mascot_<tier>_<pose>`:
+  the 2048² masters cropped only of transparent margin, x 298–1778 / y 272–1752, so every pose shares one frame) with
+  the torch glow drawn behind at 100/80/60/42/28 %. The art is never re-tinted, redrawn or regenerated.
+- Tier (`domain/WellnessTier`): Budget hero only — on track at pace → thriving; ahead of pace or no budget → steady;
+  ≥ 80 % used → getting tight; ≤ 10 % left or used exactly → concerned; overspent → over plan. Elsewhere the default
+  is thriving (the everyday look). Moods → poses: Happy hero_neutral · Greeting greeting_happy · Curious thinking ·
+  Success/Celebrate success · Concerned caution (pointing and sleeping ship for later use).
+- Motion: a slow float (±1.5 %, ±1 % below 96dp) for a few cycles then rest; glow breathes 6 % with it; pose and
+  tier changes cross-fade (300 ms). Reduced motion: still, instant swaps.
 - Usage: small and secondary on Home (beside the greeting, 72dp); larger in onboarding (140dp) and empty states.
   Never on every screen; never competing with a financial figure.
 
 ## Typography
-- Inter Display for headings and hero figures, Inter for UI text (bundled, OFL).
-- Screen titles are modest (`headlineMedium`, 26sp) so the money carries the visual weight.
+- **Plus Jakarta Sans** for the whole UI, bundled as static 400/500/600/700 TTFs (OFL, `docs/licenses`). Manrope is
+  for marketing material only. The logo is artwork and is never typeset.
+- Scale (sp): display 36 Bold · screen title 28 Bold (`headlineMedium`) · section 20 SemiBold (`titleLarge`) ·
+  card heading / buttons 16 SemiBold (`titleMedium`) · body 14–16 · form labels 14 Medium (`labelLarge`) ·
+  supporting 12 (`bodySmall`) · financial metadata 12 Medium (`labelMedium`). Hero amounts top out at 40sp.
 - Overline labels (`OverlineStyle`, 11sp, tracked, uppercase) name every card ("SAFE TO SPEND", "NET FLOW").
-- Amounts always use tabular lining figures (`AmountStyles`). `MoneyText` sets minor units smaller, shrinks to fit
+- Amounts always use tabular figures (`AmountStyles`, `tnum`; Plus Jakarta's figures are lining, `−` matches `+`). `MoneyText` sets minor units smaller, shrinks to fit
   narrow screens instead of wrapping, and rolls value changes.
 
 ## Space & shape
-4dp grid (`Spacing`), 20dp gutter, 28dp between sections. Radii: 12 (controls), 16 (fields, tiles, buttons),
-24 (cards, panels), 32 (sheets). Hairlines separate rows inside cards.
+4dp grid (`Spacing`: xs 4 · sm 8 · md 12 · lg 16 · gutter 20 · xl 24 · xxl 32 · xxxl 48 = space-1 … space-12),
+28dp between sections.
+Radii (`Radii` / `LucentoShapes`): xs 6 badges · sm 10 inputs, icon tiles · md 14 buttons, dropdowns, chips, dock ·
+lg 20 cards, panels · xl 28 sheets, feature cards; `CircleShape` only for circular controls and thin tracks.
+Borders: `outlineVariant` `#E8EAF0` (subtle: cards, separators), `borderDefault` `#D8DDE7` (stronger, decorative),
+`outline` `#7A869F` for input/control boundaries (the brief's `#D8DDE7` is 1.4:1, below the 3:1 a control needs),
+focus = 2dp primary. Elevation (`Elevation` xs 1 · sm 2 · md 4 · lg 8 · xl 16dp, navy-tinted `shadow`): day cards
+xs with their hairline, FAB sm→md, toast md, dialogs lg; the night theme uses tonal surfaces instead.
+Hairlines separate rows inside cards.
 
 ## Components (`core/designsystem/component`)
 | Component | Purpose |
@@ -73,7 +132,7 @@ files (`res/raw`, register in `docs/design/ANIMATION_ASSETS.md`) through two com
 | Component | Behaviour |
 |---|---|
 | `LucentoLottieAnimation(animation, marker, iterations, playing, onFinished, fallback)` | Day/night variant by theme; one-shots hold the final frame; loops stop when disposed; reduced motion shows a still (final frame for one-shots, first for loops); parse failure → fallback. |
-| `LucentoMascot(mood)` | Lottie Sun/Moon with markers: `Happy` (idle ×3, then rests), `Curious` (empty states), `Success` (onboarding done), `Celebrate`, `Concerned` (v0.5: budget nearly or fully used — supportive, never a frown). Vector drawing as still/fallback. |
+| `LucentoMascot(mood, tier)` | Mascot with moods: `Happy` (idle ×3, then rests), `Curious` (empty states), `Success` (onboarding done), `Celebrate`, `Concerned` (v0.5: budget nearly or fully used — supportive, never a frown). See `docs/mascot/` for the character. |
 | `EmptyIllustration` / `LucentoEmptyState` | Empty-state illustration (200×166dp) that drops out on narrow/short layouts. |
 | `ConfirmationHost(Confirmation)` | Saved check or calm milestone with one line of text, shown **after** a committed write; does not block touches; announced as a live region. |
 | `LucentoWorkingIndicator` | Brand dots + label for genuine background work. |
@@ -84,7 +143,7 @@ kept within budget (once). With "Remove animations" on (`LucentoTheme.reducedMot
 
 ## Reference mockup (v0.4)
 `docs/design-reference/lucento-mock.png` is the visual source of truth. Implemented from it:
-- **Category tiles**: saturated hue per spending family with a white glyph (food coral, transport green, shopping
+- **Category tiles**: tonal — pale tint with a saturated glyph by day, deep tint with a light glyph at night (≥ 3:1) — one hue per spending family (food coral, transport green, shopping
   rose, bills amber, housing blue, health teal, education/subscriptions indigo, entertainment violet, travel sky,
   income green) — `LucentoExtendedColors.categoryTones`, used by `CategoryTile` in every list.
 - **Home**: greeting with a larger mascot (72dp); quick actions as one filled **Add** circle + tonal Transfer / Scan /
@@ -119,7 +178,7 @@ environment (see `docs/QUALITY.md`).
 ## Home dashboard (v0.5)
 Top to bottom, nothing duplicated from the dock or the + button:
 1. **Budget hero** — solid brand panel (the most prominent element, ≈30 % shorter than v0.4's card): budget left
-   (or over) this month, "of total · spent", one supportive sentence, and the **Sun** (Moon at night) — happy while
+   (or over) this month, "of total · spent", one supportive sentence, and the **mascot** — happy while
    comfortably within budget, *supportively concerned* when ≤ 10 % is left or the budget is used up, curious before a
    budget exists. Taps through to Budget (or category setup when none is chosen).
 2. **Net flow** — one compact row: Lottie trend glyph (green up / red down / neutral level line at exactly zero), the

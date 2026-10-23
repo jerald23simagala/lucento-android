@@ -61,7 +61,7 @@ object LucentoTheme {
     val reducedMotion: Boolean
         @Composable @ReadOnlyComposable get() = LocalReducedMotion.current
 
-    /** True in the night theme; the mascot switches from Sun to Moon. */
+    /** True in the night theme. */
     val isDark: Boolean
         @Composable @ReadOnlyComposable get() = LocalIsDark.current
 }

@@ -81,7 +81,7 @@ internal fun MoneyField(
             null
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.small,
         colors = fieldColors(),
         modifier = modifier.fillMaxWidth(),
     )
@@ -114,7 +114,7 @@ internal fun TextInput(
             null
         },
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.small,
         colors = fieldColors(),
         modifier = modifier.fillMaxWidth(),
     )

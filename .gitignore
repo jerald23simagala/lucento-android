@@ -18,3 +18,17 @@ _ci_artifacts/
 
 # Python bytecode from tools/lottie
 __pycache__/
+
+# Mascot studio: keep the spec, scripts, final masters (wellness_tiers, expressions, layers), contact sheets and the
+# concept sheet; leave out superseded rounds, intermediates, raw generations, per-asset renders and the bundle zip.
+docs/mascot/assets/backup_v1/
+docs/mascot/assets/backup_v2/
+docs/mascot/assets/processed/
+docs/mascot/assets/previews/individual/
+docs/mascot/assets/source/generated_chroma/
+docs/mascot/assets/source/rejected_generations/
+docs/mascot/assets/source/01M5MZKDTJ1NM8NA87K8DHBTQ7.png
+docs/mascot/lucento-mascot-studio*.zip
+
+# Local Claude scratch output
+/Claude outputs/

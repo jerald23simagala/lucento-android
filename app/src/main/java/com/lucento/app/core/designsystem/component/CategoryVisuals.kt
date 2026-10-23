@@ -165,7 +165,7 @@ object CategoryIcons {
 val Category.icon: ImageVector get() = CategoryIcons.forKey(iconKey)
 
 /**
- * Category icon tile: a saturated tile in the category's hue with a white glyph (see
+ * Category icon tile: a tonal tile in the category's hue with a saturated glyph (see
  * [com.lucento.app.core.designsystem.theme.LucentoExtendedColors.categoryTones]). Transfers use the brand tint;
  * uncategorised income uses the income hue so money coming in is recognisable at a glance (the amount still
  * carries a "+").

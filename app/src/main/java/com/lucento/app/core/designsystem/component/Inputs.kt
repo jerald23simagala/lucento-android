@@ -167,10 +167,11 @@ fun ChoicePill(
 ) {
     val colors = MaterialTheme.colorScheme
     val container by animateColorAsState(
-        if (selected) colors.primaryContainer else colors.surfaceContainerLowest,
+        if (selected) colors.primary else colors.surfaceContainerLowest,
         tween(160),
         label = "pill",
     )
+    // Selected: solid primary with its label colour; unselected: a neutral pill with a hairline.
     val border = if (selected) colors.primary else colors.outlineVariant
     Surface(
         modifier = modifier
@@ -180,7 +181,7 @@ fun ChoicePill(
             .selectable(selected = selected, role = role, onClick = onClick),
         shape = MaterialTheme.shapes.small,
         color = container,
-        contentColor = if (selected) colors.onPrimaryContainer else colors.onSurface,
+        contentColor = if (selected) colors.onPrimary else colors.onSurface,
         border = BorderStroke(1.dp, border),
     ) {
         Row(

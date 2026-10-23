@@ -129,7 +129,7 @@ fun ProfileSheet(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { saveName() }),
-                    shape = MaterialTheme.shapes.medium,
+                    shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End) {

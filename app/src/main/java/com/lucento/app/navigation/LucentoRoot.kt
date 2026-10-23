@@ -77,6 +77,7 @@ import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.ProfileChrome
 import com.lucento.app.core.designsystem.component.rememberHaptics
+import com.lucento.app.core.designsystem.theme.Elevation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
@@ -369,7 +370,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     shape = CircleShape,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = Elevation.sm, pressedElevation = Elevation.md),
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "Add transaction", modifier = Modifier.size(28.dp))
                 }
