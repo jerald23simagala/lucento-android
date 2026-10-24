@@ -211,7 +211,7 @@ jobs:
         run: |
           DIR=app/schemas/com.lucento.app.data.local.LucentoDatabase
           missing=""
-          for v in 1 2 3 4; do [ -f "$DIR/$v.json" ] || missing="$missing $v.json"; done
+          for v in 1 2 3 4 5; do [ -f "$DIR/$v.json" ] || missing="$missing $v.json"; done
           if [ -n "$missing" ]; then
             echo "::error::Missing Room schema history:$missing. Migration tests NOT RUN. See docs/QUALITY.md › Room schemas."
             echo "### Migration tests NOT RUN — missing schema history:$missing" >> "$GITHUB_STEP_SUMMARY"

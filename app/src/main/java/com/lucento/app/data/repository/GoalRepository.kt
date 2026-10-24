@@ -48,6 +48,7 @@ class GoalRepository(
         targetDate: LocalDate?,
         linkedWalletId: Long?,
         sceneKey: String? = null,
+        photoPath: String? = null,
     ): SaveResult {
         val scene = GoalScene.fromKey(sceneKey)?.key
         val trimmed = name.trim().take(MAX_NAME)
@@ -65,6 +66,7 @@ class GoalRepository(
                     createdAt = now,
                     updatedAt = now,
                     sceneKey = scene,
+                    photoPath = photoPath,
                 )
             )
             return SaveResult.Saved(newId)
@@ -79,6 +81,7 @@ class GoalRepository(
                 walletId = linkedWalletId,
                 updatedAt = now,
                 sceneKey = scene,
+                photoPath = photoPath,
             )
         )
         return SaveResult.Saved(id)
@@ -138,6 +141,7 @@ internal fun GoalEntity.toDomain(): Goal = Goal(
     linkedWalletId = walletId,
     createdAtEpochMillis = createdAt,
     sceneKey = sceneKey,
+    photoPath = photoPath,
 )
 
 internal fun GoalContributionRow.toDomain(): GoalContribution =

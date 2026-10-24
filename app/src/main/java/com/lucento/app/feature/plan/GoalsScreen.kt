@@ -83,6 +83,17 @@ import com.lucento.app.core.designsystem.component.IllustrationScrims
 import com.lucento.app.core.designsystem.component.LucentoIllustration
 import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalPresets
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import android.graphics.BitmapFactory
+import com.lucento.app.data.media.GoalPhotos
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -105,6 +116,8 @@ private data class GoalDraft(
     val walletId: Long? = null,
     /** Chosen card picture ([GoalScene.key]); null = automatic from the name. */
     val sceneKey: String? = null,
+    /** The user's own card photo (private copy); when set it is the picture shown. */
+    val photoPath: String? = null,
 )
 
 /** Savings goals with progress from earmarked contributions (wallet balances are never changed). */
@@ -113,6 +126,8 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<GoalDraft?>(null) }
     var openGoalId by remember { mutableStateOf<Long?>(null) }
+    val context = LocalContext.current.applicationContext
+    val photos = remember(context) { GoalPhotos(context) }
     var celebration by remember { mutableStateOf<Confirmation?>(null) }
     val progress = remember(state.goals, state.contributions, state.today) {
         state.goals.map { GoalCalculator.progress(it, state.contributions, state.today) }
@@ -188,9 +203,11 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                     targetDate = open.goal.targetDate,
                     walletId = open.goal.linkedWalletId,
                     sceneKey = open.goal.sceneKey,
+                    photoPath = open.goal.photoPath,
                 )
             },
             onDelete = {
+                photos.delete(open.goal.photoPath)
                 viewModel.deleteGoal(open.goal.id)
                 openGoalId = null
             },
@@ -203,7 +220,8 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
         GoalEditorSheet(
             initial = draft,
             state = state,
-            onSave = { d, money, done -> viewModel.saveGoal(d.id, d.name, money, d.targetDate, d.walletId, d.sceneKey, done) },
+            photos = photos,
+            onSave = { d, money, done -> viewModel.saveGoal(d.id, d.name, money, d.targetDate, d.walletId, d.sceneKey, d.photoPath, done) },
             onDismiss = { editing = null },
         )
     }
@@ -216,6 +234,22 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
  */
 @Composable
 private fun GoalCard(p: GoalProgress, onClick: () -> Unit) {
+    val photo = rememberGoalPhoto(p.goal.photoPath)
+    if (photo != null) {
+        LucentoCard(Modifier.fillMaxWidth(), onClick = onClick) {
+            Column {
+                Image(
+                    bitmap = photo,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(104.dp).clip(MaterialTheme.shapes.medium),
+                )
+                Spacer(Modifier.height(Spacing.md))
+                GoalCardContent(p)
+            }
+        }
+        return
+    }
     val scene = remember(p.goal.name, p.goal.sceneKey) { GoalScene.forGoal(p.goal.name, p.goal.sceneKey) }
     val illustration = scene.illustration()
     if (illustration == null) {
@@ -412,6 +446,7 @@ private fun GoalDetailSheet(
 private fun GoalEditorSheet(
     initial: GoalDraft,
     state: PlanUiState,
+    photos: GoalPhotos,
     onSave: (GoalDraft, Money, (GoalRepository.SaveResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -421,12 +456,38 @@ private fun GoalEditorSheet(
     var draft by remember { mutableStateOf(initial) }
     var nameError by remember { mutableStateOf<String?>(null) }
     var amountError by remember { mutableStateOf<String?>(null) }
-
-    fun close() {
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    var photoError by remember { mutableStateOf<String?>(null) }
+    var saved by remember { mutableStateOf(false) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val path = withContext(Dispatchers.IO) { photos.import(uri) }
+                if (path != null) {
+                    draft = draft.copy(photoPath = path)
+                    photoError = null
+                } else {
+                    photoError = "That picture couldn’t be opened. Try another one."
+                }
+            }
+        }
     }
 
-    LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    fun dismiss() {
+        // A photo copied during this edit but never saved is removed; the goal's own photo is left alone.
+        if (!saved && draft.photoPath != initial.photoPath) photos.delete(draft.photoPath)
+        onDismiss()
+    }
+
+    fun close() {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { dismiss() }
+    }
+
+    fun chooseBuiltIn(key: String?) {
+        if (draft.photoPath != initial.photoPath) photos.delete(draft.photoPath)
+        draft = draft.copy(sceneKey = key, photoPath = null)
+    }
+
+    LucentoBottomSheet(onDismissRequest = { dismiss() }, sheetState = sheetState) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -448,7 +509,8 @@ private fun GoalEditorSheet(
                     options = GoalPresets.all.map { it to it.name },
                     selected = GoalPresets.all.firstOrNull { it.name == draft.name },
                     onSelect = { preset ->
-                        draft = draft.copy(name = preset.name, sceneKey = preset.scene.key)
+                        chooseBuiltIn(preset.scene.key)
+                        draft = draft.copy(name = preset.name)
                         nameError = null
                     },
                 )
@@ -482,7 +544,16 @@ private fun GoalEditorSheet(
                 )
             }
             SectionHeader("Card picture")
-            ScenePicker(name = draft.name, selectedKey = draft.sceneKey, onSelect = { draft = draft.copy(sceneKey = it) })
+            ScenePicker(
+                name = draft.name,
+                selectedKey = draft.sceneKey,
+                photoPath = draft.photoPath,
+                onSelect = { chooseBuiltIn(it) },
+                onAddPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            )
+            photoError?.let {
+                Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+            }
             LucentoPrimaryButton(
                 text = if (initial.id == null) "Create goal" else "Save changes",
                 onClick = {
@@ -497,7 +568,11 @@ private fun GoalEditorSheet(
                     }
                     onSave(draft, money) { result ->
                         when (result) {
-                            is GoalRepository.SaveResult.Saved -> close()
+                            is GoalRepository.SaveResult.Saved -> {
+                                saved = true
+                                if (initial.photoPath != null && initial.photoPath != draft.photoPath) photos.delete(initial.photoPath)
+                                close()
+                            }
                             GoalRepository.SaveResult.BlankName -> nameError = "Give this goal a name."
                             GoalRepository.SaveResult.TargetNotPositive -> amountError = "The target must be greater than zero."
                             GoalRepository.SaveResult.CurrencyLocked -> amountError = "A goal’s currency can’t change."
@@ -533,7 +608,13 @@ private fun GoalScene.label(): String = when (this) {
  * what it currently resolves to. Pictures are decorative; each option is a radio button with a text label.
  */
 @Composable
-private fun ScenePicker(name: String, selectedKey: String?, onSelect: (String?) -> Unit) {
+private fun ScenePicker(
+    name: String,
+    selectedKey: String?,
+    photoPath: String?,
+    onSelect: (String?) -> Unit,
+    onAddPhoto: () -> Unit,
+) {
     val automatic = GoalScene.of(name)
     val options: List<Pair<String?, Pair<String, LucentoIllustration?>>> =
         listOf<Pair<String?, Pair<String, LucentoIllustration?>>>(null to ("Automatic" to automatic.illustration())) +
@@ -545,7 +626,7 @@ private fun ScenePicker(name: String, selectedKey: String?, onSelect: (String?) 
     ) {
         options.forEach { (key, labelAndArt) ->
             val (label, art) = labelAndArt
-            val selected = key == selectedKey
+            val selected = key == selectedKey && photoPath == null
             Column(
                 Modifier
                     .width(88.dp)
@@ -583,5 +664,59 @@ private fun ScenePicker(name: String, selectedKey: String?, onSelect: (String?) 
                 )
             }
         }
+        val photo = rememberGoalPhoto(photoPath)
+        val photoSelected = photoPath != null
+        Column(
+            Modifier
+                .width(88.dp)
+                .clip(MaterialTheme.shapes.small)
+                .selectable(selected = photoSelected, role = Role.RadioButton, onClick = onAddPhoto)
+                .padding(vertical = Spacing.xs),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(colors.surfaceContainer)
+                    .border(
+                        BorderStroke(if (photoSelected) 2.dp else 1.dp, if (photoSelected) colors.primary else colors.outlineVariant),
+                        MaterialTheme.shapes.small,
+                    ),
+            ) {
+                if (photo != null) {
+                    Image(
+                        bitmap = photo,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = null,
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                if (photoSelected) "Your photo" else "Add photo",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (photoSelected) colors.primary else colors.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
     }
+}
+
+/** The user's own goal photo, decoded off the main thread; null while loading or when the file is gone. */
+@Composable
+private fun rememberGoalPhoto(path: String?): ImageBitmap? {
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, path) {
+        value = if (path == null) null else withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path)?.asImageBitmap() }
+    }
+    return bitmap
 }

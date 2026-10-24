@@ -20,6 +20,8 @@ data class Goal(
     val createdAtEpochMillis: Long,
     /** The card picture the user chose ([GoalScene.key]); null = automatic from the name. Presentation only. */
     val sceneKey: String? = null,
+    /** The user's own photo for the card (a private copy in app storage). Takes precedence over [sceneKey]. */
+    val photoPath: String? = null,
 ) {
     val currencyCode: String get() = target.currencyCode
 }

@@ -2,6 +2,9 @@
 
 ## Unreleased — Sunrise Energy brand refresh (not compiled locally; awaiting CI)
 
+- Goals: optional suggestions (Japan trip, holiday, emergency fund, laptop) and a card picture picker.
+- Goals: a chosen photo can be the card picture (private copy in app storage, database v5 `photo_path`).
+  Photos are not in any backup because the app has no backup or restore yet.
 - Palette: Sunlight Yellow `#FFC928`, Bright Tangerine `#FF8A24`, Electric Blue `#3563F5`, Soft Ivory `#FFFDF5`,
   Midnight Navy `#17233F`, Pale Sky `#EAF1FF`; new night theme on `#10182B` / `#17233F` / `#202E4D`.
 - Separate semantic status tokens (positive, warning, negative, info) with text-safe variants; new `info`,
