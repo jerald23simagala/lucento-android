@@ -210,10 +210,16 @@ fun TransactionComposerScreen(
         }
     }
 
-    // Keep the newest message and its rows in view.
+    // Bring the newest message to the top: its bubble, Lucento's one-line reply and as many of its rows as fit.
+    // Scrolling to the list's last item instead would push the bubble and reply off-screen whenever a message
+    // produces more rows than fit. Index arithmetic mirrors the items emitted below (optional notice, then per
+    // message: bubble, reply, rows).
     val itemCount = state.messages.size
     LaunchedEffect(itemCount) {
-        if (itemCount > 0) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1)
+        if (itemCount == 0) return@LaunchedEffect
+        val notice = if (state.loaded && state.wallets.isEmpty()) 1 else 0
+        val before = state.messages.dropLast(1).sumOf { m -> 2 + state.rows.count { it.messageId == m.id } }
+        listState.animateScrollToItem(notice + before)
     }
 
     fun requestBack() {
