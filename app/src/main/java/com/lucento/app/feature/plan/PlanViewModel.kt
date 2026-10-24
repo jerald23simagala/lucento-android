@@ -162,8 +162,9 @@ class PlanViewModel(
         target: Money,
         targetDate: LocalDate?,
         walletId: Long?,
+        sceneKey: String?,
         onResult: (GoalRepository.SaveResult) -> Unit,
-    ) = write({ goals.save(id, name, target, targetDate, walletId) }, onResult)
+    ) = write({ goals.save(id, name, target, targetDate, walletId, sceneKey) }, onResult)
 
     /**
      * Saves a contribution. [onMilestone] is called once, after the write succeeded, if this contribution moved

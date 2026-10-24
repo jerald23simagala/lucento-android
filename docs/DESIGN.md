@@ -87,6 +87,23 @@ balances say "owed", budget states say "Over" / a percentage, and transfers are 
 - Usage: small and secondary on Home (beside the greeting, 72dp); larger in onboarding (140dp) and empty states.
   Never on every screen; never competing with a financial figure.
 
+## Illustrations — "A Brighter Little World"
+Three landscape backgrounds cropped from one painterly sunrise panorama (supplied by the owner) so the style is
+always consistent: `illustration_sunrise_landscape`, `illustration_soft_mountains`, `illustration_japan_fuji`
+(`res/drawable-nodpi`, WebP, 46–55 KB). Source and crop boxes: `docs/design/illustrations/`. No text, figures,
+logos or UI in the art.
+- `IllustratedSurface(illustration, overlay, artworkAlignment, contentPadding, onClick…)` puts the art behind content,
+  cropped and clipped to the shape; the content sets the height. Scrims (`IllustrationScrims`) keep every figure on
+  solid colour: `trailingWindow` (art only in the last 120dp), `topWindow` (art in a top band that fades into the card).
+- Used on: the Home budget hero (soft mountains behind Lucento; the hero stays electric blue / navy under the text),
+  goal cards (`GoalScene`: the picture chosen in the goal form — Automatic, Mount Fuji, Sunrise, Mountains or No
+  picture — where Automatic means Japan → Fuji, other trips → sunrise, others plain), and the
+  onboarding welcome (Lucento in the sunrise landscape). Lists, forms and settings stay clean.
+- Decorative: no content descriptions. Night: art dimmed by the scrim / a background wash.
+
+- New-goal form: optional suggestions (Trip to Japan, Holiday, Emergency fund, New laptop) fill in the name and
+  picture only; nothing is created until the user saves.
+
 ## Typography
 - **Plus Jakarta Sans** for the whole UI, bundled as static 400/500/600/700 TTFs (OFL, `docs/licenses`). Manrope is
   for marketing material only. The logo is artwork and is never typeset.

@@ -16,6 +16,11 @@
   The Budget hero picks the tier from budget health via `WellnessTier` (unit-tested). Removed
   `lucento_mascot_sun/moon.json`, their generator and the vector drawing; mascot colour tokens dropped.
 - Mascot motion made visible on a phone: arrival hop with a soft spring, greeting rocks, float 4.5 % of height.
+- "A Brighter Little World" illustrations (crops of one painterly sunrise/Fuji panorama) with `IllustratedSurface` +
+  scrims; on the Home budget hero, travel savings goals (`GoalScene`, unit-tested) and the onboarding welcome.
+- Savings goals: optional suggestions in the new-goal form (Trip to Japan, Holiday, Emergency fund, New laptop) and a
+  card-picture picker (Automatic / Mount Fuji / Sunrise / Mountains / No picture). **Database v4**: nullable
+  `goals.scene_key` (MIGRATION_3_4 + MigrationTest); 4.json must be committed from the CI `room-schemas` artifact.
 - `ThemeContrastTest` checks AA contrast for every text/background pair in both themes.
 - Palette use aligned with the reference board: tonal category tiles (pale tint + saturated glyph; deep tint +
   light glyph at night), pale-sky secondary buttons, solid-blue selected chips, an elevated-navy night budget hero,

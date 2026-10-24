@@ -149,12 +149,32 @@ class MigrationTest {
     }
 
     @Test
-    fun migrate1To3_runsTheFullChainAndRoomOpensTheResult() {
+    fun migrate3To4_keepsGoalsAndLeavesTheirPictureAutomatic() {
+        helper.createDatabase(TEST_DB, 3).apply {
+            execSQL(
+                "INSERT INTO goals (id, name, target_minor, currency_code, target_date, wallet_id, archived, created_at, updated_at) " +
+                    "VALUES (1, 'Vacation to Japan', 300000, 'USD', NULL, NULL, 0, 1, 1)"
+            )
+            execSQL("INSERT INTO goal_contributions (goal_id, amount_minor, occurred_on, note, client_uuid, created_at) VALUES (1, 120000, 20000, '', 'c1', 1)")
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 4, true, Migrations.MIGRATION_3_4)
+        db.query("SELECT name, target_minor, scene_key FROM goals WHERE id = 1").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("Vacation to Japan", c.getString(0)); assertEquals(300000L, c.getLong(1)); assertTrue(c.isNull(2))
+        }
+        assertEquals(120000L, db.long("SELECT SUM(amount_minor) FROM goal_contributions WHERE goal_id = 1"))
+        db.execSQL("UPDATE goals SET scene_key = 'japan_fuji' WHERE id = 1")
+        db.assertNoForeignKeyViolations()
+    }
+
+    @Test
+    fun migrate1To4_runsTheFullChainAndRoomOpensTheResult() {
         helper.createDatabase(TEST_DB, 1).apply {
             seedV1Wallets()
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 3, true, *Migrations.ALL)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 4, true, *Migrations.ALL)
         assertEquals(12345L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 1"))
         assertEquals(50000L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 2"))
         assertEquals(DefaultCategories.all.size.toLong(), db.long("SELECT COUNT(*) FROM categories"))

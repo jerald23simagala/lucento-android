@@ -7,7 +7,7 @@ Rule: a check counts only if it actually ran and passed. Anything not executed i
 | Check | Result | How |
 |---|---|---|
 | JVM unit tests | **253 passed, 0 failed** (38 new: category budget plan, health thresholds, burn consistency, presets/selection, existing-user setup, allocations, legacy overall, goals level, net worth composition, trends, upcoming payments, Home state) | `tools/jvm-harness/run.sh` (kotlinc 2.0.21, JUnit 4.13.2, Room annotation stubs, `runTest` → `runBlocking`). Not Gradle. |
-| Migration SQL vs schemas | **1→2, 2→3 match** — no schema change in 0.5 (database stays v3) | `python3 tools/check_migrations.py` |
+| Migration SQL vs schemas | **1→2, 2→3 match**; 3→4 (`ALTER TABLE goals ADD COLUMN scene_key TEXT`) replayed on 3.json by hand — the automatic check runs once 4.json is committed | `python3 tools/check_migrations.py` |
 | New Lottie (mascot `concerned`, net-flow glyphs) | **Render without errors in lottie-web** | previews in `docs/design/` |
 | Kotlin/Compose compilation, lint, release APK/AAB | **NOT VERIFIED locally** — no Android SDK/Maven access | CI on push (`feature/**` branches now trigger it) |
 | Instrumented migration tests + `ScreenshotTourTest` | **NOT VERIFIED locally** | CI emulator job (API 30, Pixel 6 profile); screenshots uploaded as the `ui-screenshots` artifact |
@@ -19,7 +19,7 @@ Rule: a check counts only if it actually ran and passed. Anything not executed i
 |---|---|---|
 | JVM unit tests (pure Kotlin: money, domain, repositories with in-memory DAO fakes) | **215 passed, 0 failed** | Local harness: kotlinc 2.0.21 + JUnit 4.13.2 with stub Room annotations and `runTest` → `runBlocking`. Not Gradle; Android-dependent tests (none exist) would not run here. |
 | Migration SQL vs exported schemas | **1→2 and 2→3 match exactly** (tables, columns, indices, FKs) | `python3 tools/check_migrations.py` (SQLite) |
-| Room schema history | **Authentic 1.json, 2.json, 3.json committed** | Room exports from CI artifacts `room-schemas` of commits `11e2f3d` (v1), `b55d7a2` (v2), `6eec35b` (v3). Entities did not change between those commits and the next schema bump (checked with `git diff`). SHA-256: 1 `7e1f0df5…`, 2 `31202eb2…`, 3 `da0bebe4…`. |
+| Room schema history | **Authentic 1.json, 2.json, 3.json committed; 4.json pending** — commit it from the `room-schemas` artifact of the first CI run of the v4 change (never hand-written) | Room exports from CI artifacts `room-schemas` of commits `11e2f3d` (v1), `b55d7a2` (v2), `6eec35b` (v3). Entities did not change between those commits and the next schema bump (checked with `git diff`). SHA-256: 1 `7e1f0df5…`, 2 `31202eb2…`, 3 `da0bebe4…`. |
 | Lottie files render | **All 17 render without errors in lottie-web 5.12.2** | `tools/lottie/render.js` (headless Chromium); previews in `docs/design/`. Not lottie-android. |
 | Kotlin/Compose/Android compilation (`assembleDebug`) | **NOT VERIFIED** | No Android SDK or Maven/Google repository access in the authoring environment. Run CI or `tools/verify.ps1`. |
 | Lint | **NOT VERIFIED** for v0.4 | v0.3.0 baseline (CI `6eec35b`): 0 errors, 48 warnings — 42 GradleDependency, 3 AndroidGradlePluginVersion, 2 UnusedResources, 1 OldTargetApi. |

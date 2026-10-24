@@ -30,6 +30,8 @@ data class GoalEntity(
     val archived: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** Chosen card picture (`GoalScene.key`); null = automatic from the name. Added in database v4. */
+    @ColumnInfo(name = "scene_key") val sceneKey: String? = null,
 )
 
 /** Money earmarked for (positive) or taken back from (negative) a goal. Deleted with its goal. */

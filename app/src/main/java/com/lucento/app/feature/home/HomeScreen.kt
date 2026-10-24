@@ -24,7 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -71,6 +71,10 @@ import com.lucento.app.domain.GoalsOverview
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.UpcomingPayment
 import com.lucento.app.domain.WellnessTier
+import androidx.compose.ui.platform.LocalDensity
+import com.lucento.app.core.designsystem.component.IllustratedSurface
+import com.lucento.app.core.designsystem.component.IllustrationScrims
+import com.lucento.app.core.designsystem.component.LucentoIllustration
 import com.lucento.app.feature.budget.burnColor
 import com.lucento.app.feature.budget.encouragement
 import com.lucento.app.feature.transactions.shortDayLabel
@@ -283,12 +287,23 @@ private fun BudgetHero(state: HomeUiState, plan: BudgetPlan, actions: HomeAction
         tier == WellnessTier.GETTING_TIGHT -> "Lucento, torch a little dimmer: most of this month’s budget is used"
         else -> "Lucento, torch bright: you’re within budget"
     }
-    Surface(
+    // The hero stays solid brand blue (navy at night) under every figure; the soft-mountain landscape shows only in
+    // the trailing band behind Lucento, so the character stands in its little world without touching the numbers.
+    val density = LocalDensity.current
+    val dark = LucentoTheme.isDark
+    val heroScrim = remember(ext.hero, dark, density) {
+        with(density) { IllustrationScrims.trailingWindow(ext.hero, fadeWidthPx = 120.dp.toPx(), endAlpha = if (dark) 0.45f else 0.15f) }
+    }
+    IllustratedSurface(
+        illustration = LucentoIllustration.SoftMountains,
         onClick = if (state.expenseCategoryCount == 0) actions.onChooseCategories else actions.onOpenBudget,
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        color = ext.hero,
+        containerColor = ext.hero,
         contentColor = ext.onHero,
+        overlay = heroScrim,
+        artworkAlignment = Alignment.BottomEnd,
+        contentPadding = PaddingValues(0.dp),
     ) {
         Row(Modifier.padding(start = Spacing.xl, end = Spacing.lg, top = Spacing.lg, bottom = Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

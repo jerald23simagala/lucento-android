@@ -65,6 +65,11 @@ import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.domain.Feature
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.graphics.SolidColor
+import com.lucento.app.core.designsystem.component.IllustratedSurface
+import com.lucento.app.core.designsystem.component.LucentoIllustration
+import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.domain.FinancialFocus
 import com.lucento.app.feature.budget.CategoryPicks
 import com.lucento.app.feature.budget.CategoryPresetPicker
@@ -187,7 +192,19 @@ private fun WelcomeStep(onContinue: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Spacing.xl))
-            LucentoMascot(size = 140.dp, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
+            // Lucento greets the user standing in its sunrise landscape (decorative artwork; the mascot keeps its label).
+            IllustratedSurface(
+                illustration = LucentoIllustration.SunriseLandscape,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = MaterialTheme.colorScheme.background,
+                overlay = if (LucentoTheme.isDark) SolidColor(MaterialTheme.colorScheme.background.copy(alpha = 0.45f)) else null,
+                artworkAlignment = Alignment.BottomCenter,
+                contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.sm),
+            ) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    LucentoMascot(size = 140.dp, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
+                }
+            }
             Spacer(Modifier.height(Spacing.lg))
             Text(
                 "Track what you spend, plan what’s next — privately, on this phone. No account, no bank login.",

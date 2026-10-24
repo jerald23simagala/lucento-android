@@ -21,7 +21,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         GoalContributionEntity::class,
         RecurringEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class LucentoDatabase : RoomDatabase() {

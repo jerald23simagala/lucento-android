@@ -149,4 +149,15 @@ class PlanRepositoriesTest {
         assertEquals(RecurringRepository.SaveResult.EndBeforeStart, recurring.save(input(end = start.minusDays(1))))
         assertEquals(RecurringRepository.SaveResult.CategoryMismatch, recurring.save(input(type = TransactionType.INCOME)))
     }
+
+    @Test fun goalPictureChoiceIsStoredAndEditable() = runTest {
+        val id = (goals.save(null, "Trip to Japan", Money(300_000, "USD"), null, null, "japan_fuji") as GoalRepository.SaveResult.Saved).id
+        assertEquals("japan_fuji", goals.observeGoals().first().single { it.id == id }.sceneKey)
+        goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "none")
+        assertEquals("none", goals.observeGoals().first().single { it.id == id }.sceneKey)
+        goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "not-a-scene")
+        assertEquals(null, goals.observeGoals().first().single { it.id == id }.sceneKey)
+        val plain = (goals.save(null, "Laptop", Money(100_000, "USD"), null, null) as GoalRepository.SaveResult.Saved).id
+        assertEquals(null, goals.observeGoals().first().single { it.id == plain }.sceneKey)
+    }
 }

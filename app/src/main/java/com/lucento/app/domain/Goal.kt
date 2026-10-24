@@ -18,6 +18,8 @@ data class Goal(
     val targetDate: LocalDate?,
     val linkedWalletId: Long?,
     val createdAtEpochMillis: Long,
+    /** The card picture the user chose ([GoalScene.key]); null = automatic from the name. Presentation only. */
+    val sceneKey: String? = null,
 ) {
     val currencyCode: String get() = target.currencyCode
 }

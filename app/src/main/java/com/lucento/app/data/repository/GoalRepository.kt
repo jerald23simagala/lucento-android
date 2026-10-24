@@ -7,6 +7,7 @@ import com.lucento.app.data.local.GoalDao
 import com.lucento.app.data.local.GoalEntity
 import com.lucento.app.domain.Goal
 import com.lucento.app.domain.GoalContribution
+import com.lucento.app.domain.GoalScene
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -39,7 +40,16 @@ class GoalRepository(
     fun observeContributions(): Flow<List<GoalContribution>> =
         dao.observeContributions().map { list -> list.map { it.toDomain() } }
 
-    suspend fun save(id: Long?, name: String, target: Money, targetDate: LocalDate?, linkedWalletId: Long?): SaveResult {
+    /** [sceneKey] is the chosen card picture (`GoalScene.key`), or null for automatic; unknown keys are stored as null. */
+    suspend fun save(
+        id: Long?,
+        name: String,
+        target: Money,
+        targetDate: LocalDate?,
+        linkedWalletId: Long?,
+        sceneKey: String? = null,
+    ): SaveResult {
+        val scene = GoalScene.fromKey(sceneKey)?.key
         val trimmed = name.trim().take(MAX_NAME)
         if (trimmed.isEmpty()) return SaveResult.BlankName
         if (target.amountMinor <= 0L) return SaveResult.TargetNotPositive
@@ -54,6 +64,7 @@ class GoalRepository(
                     walletId = linkedWalletId,
                     createdAt = now,
                     updatedAt = now,
+                    sceneKey = scene,
                 )
             )
             return SaveResult.Saved(newId)
@@ -67,6 +78,7 @@ class GoalRepository(
                 targetDate = targetDate?.toEpochDay(),
                 walletId = linkedWalletId,
                 updatedAt = now,
+                sceneKey = scene,
             )
         )
         return SaveResult.Saved(id)
@@ -125,6 +137,7 @@ internal fun GoalEntity.toDomain(): Goal = Goal(
     targetDate = targetDate?.let(LocalDate::ofEpochDay),
     linkedWalletId = walletId,
     createdAtEpochMillis = createdAt,
+    sceneKey = sceneKey,
 )
 
 internal fun GoalContributionRow.toDomain(): GoalContribution =
