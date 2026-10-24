@@ -129,8 +129,12 @@ jobs:
           cat permissions.txt
           grep -q "package: name='com.lucento.app'" badging.txt || { echo "::error::release application id is not com.lucento.app"; exit 1; }
           if grep -q "application-debuggable" badging.txt; then echo "::error::release APK is debuggable"; exit 1; fi
-          if grep -qE "android.permission.(INTERNET|ACCESS_NETWORK_STATE)" permissions.txt; then
-            echo "::error::release APK requests network access"; exit 1
+          # Allow-list (see docs/SYNC.md): network access exists only for opt-in cloud sync; WAKE_LOCK and
+          # RECEIVE_BOOT_COMPLETED come from WorkManager. Any other permission fails the build until reviewed.
+          ALLOWED="android.permission.INTERNET|android.permission.ACCESS_NETWORK_STATE|android.permission.WAKE_LOCK|android.permission.RECEIVE_BOOT_COMPLETED|com.lucento.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+          UNEXPECTED=$(grep "uses-permission" permissions.txt | sed -E "s/.*name='([^']+)'.*/\1/" | grep -vxE "$ALLOWED" || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "::error::release APK requests unreviewed permissions: $UNEXPECTED"; exit 1
           fi
           "$AAPT2" dump badging "$DEBUG_APK" | grep -q "package: name='com.lucento.app.debug'" || { echo "::error::debug application id is not com.lucento.app.debug"; exit 1; }
           {

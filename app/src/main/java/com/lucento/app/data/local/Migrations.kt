@@ -3,6 +3,7 @@ package com.lucento.app.data.local
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lucento.app.domain.DefaultCategories
+import java.util.UUID
 
 /**
  * Explicit, frozen migrations. Never edit a released migration; add a new one.
@@ -148,7 +149,89 @@ object Migrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+    /**
+     * v6: optional cloud sync bookkeeping (see docs/SYNC.md). Purely additive and backward compatible —
+     * nothing here changes what any existing row means, and an app that never signs in never looks at
+     * these columns.
+     *
+     * - `wallets`, `categories`, `budgets`, `goals` gain a `client_uuid`: a stable id shared across a
+     *   user's devices. `transactions` and `goal_contributions` already had one. Existing rows are
+     *   backfilled with a freshly generated UUID (there is nothing to reconcile with yet — this device
+     *   has never synced).
+     * - Every syncable table gains `dirty` (1 = not yet pushed; existing rows start dirty so the first
+     *   sync uploads full history) and `synced_at` (this device's last confirmed push/pull for the row).
+     * - `categories` additionally gains `updated_at` (it never needed one locally), so it can take part
+     *   in the same last-write-wins ordering as every other table.
+     * - A new `sync_tombstones` table plus an `AFTER DELETE` trigger on every syncable table records a
+     *   deletion's `client_uuid` automatically, however the delete happened (including ON DELETE CASCADE),
+     *   so the sync engine can push a tombstone without any existing repository knowing sync exists.
+     * - An `AFTER UPDATE` trigger on every table that can be edited sets `dirty = 1` whenever a row's
+     *   `updated_at` changes. It is guarded so the sync engine's own writes never re-trigger it: a plain
+     *   repository edit always leaves `synced_at` untouched (`NEW.synced_at IS OLD.synced_at`), while the
+     *   sync engine's pull-merge always sets a fresh `synced_at` in the same statement — so only genuine
+     *   user edits are ever marked dirty by the trigger.
+     */
+    val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // --- dirty / synced_at on every syncable table ---
+            listOf("wallets", "categories", "transactions", "budgets", "goals", "goal_contributions").forEach { table ->
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `synced_at` INTEGER")
+            }
+
+            // --- stable client_uuid for the tables that didn't already have one ---
+            listOf("wallets", "categories", "budgets", "goals").forEach { table ->
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `client_uuid` TEXT")
+                db.query("SELECT id FROM `$table`").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(0)
+                        db.execSQL(
+                            "UPDATE `$table` SET client_uuid = ? WHERE id = ?",
+                            arrayOf(UUID.randomUUID().toString(), id),
+                        )
+                    }
+                }
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_${table}_client_uuid` ON `$table` (`client_uuid`)")
+            }
+
+            // --- categories gains updated_at (needed for last-write-wins) ---
+            db.execSQL("ALTER TABLE `categories` ADD COLUMN `updated_at` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("UPDATE `categories` SET updated_at = created_at")
+
+            // --- tombstones: one row per deletion of a row that had a client_uuid ---
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `sync_tombstones` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`table_name` TEXT NOT NULL, " +
+                    "`client_uuid` TEXT NOT NULL, " +
+                    "`deleted_at` INTEGER NOT NULL, " +
+                    "`pushed` INTEGER NOT NULL DEFAULT 0)"
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_tombstones_pushed` ON `sync_tombstones` (`pushed`)")
+
+            listOf("wallets", "categories", "transactions", "budgets", "goals", "goal_contributions").forEach { table ->
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS `trg_${table}_tombstone` AFTER DELETE ON `$table` " +
+                        "WHEN OLD.client_uuid IS NOT NULL BEGIN " +
+                        "INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at) " +
+                        "VALUES ('$table', OLD.client_uuid, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); " +
+                        "END"
+                )
+            }
+
+            // --- dirty-on-edit trigger (not needed for goal_contributions: it is append/delete-only) ---
+            listOf("wallets", "categories", "transactions", "budgets", "goals").forEach { table ->
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS `trg_${table}_dirty` AFTER UPDATE ON `$table` " +
+                        "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at BEGIN " +
+                        "UPDATE `$table` SET dirty = 1 WHERE id = NEW.id; " +
+                        "END"
+                )
+            }
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 }
 
 /**
@@ -165,6 +248,10 @@ object CategorySeed {
         seeds.forEach { seed ->
             val order = nextOrderByKind[seed.kind.name] ?: 0
             nextOrderByKind[seed.kind.name] = order + 1
+            // `updated_at`, `dirty`, `synced_at` and `client_uuid` (added in v6, see MIGRATION_5_6) are left to
+            // their column defaults here: this seeding runs both inside MIGRATION_1_2 (schema v2, which has
+            // none of those columns yet) and for fresh installs at the current schema, so it must stay valid
+            // at every version — never add a v6+ column to this statement.
             db.execSQL(
                 "INSERT INTO `categories` (`name`, `kind`, `icon_key`, `sort_order`, `archived`, `created_at`) " +
                     "VALUES ('${seed.name}', '${seed.kind.name}', '${seed.iconKey}', $order, 0, $createdAt)"

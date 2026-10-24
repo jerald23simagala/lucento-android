@@ -28,13 +28,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -104,6 +108,9 @@ fun SettingsScreen(
                     exporter.launch("lucento-transactions-${LocalDate.now()}.csv")
                 },
                 exportMessage = exportMessage,
+                onConnectGoogle = viewModel::connectGoogleAccount,
+                onDisconnect = viewModel::disconnectAccount,
+                onSyncNow = viewModel::syncNow,
             )
         }
         Spacer(Modifier.height(Spacing.xxl))
@@ -194,6 +201,9 @@ private fun SettingsContent(
     onFeature: (Feature, Boolean) -> Unit,
     onExport: () -> Unit,
     exportMessage: String?,
+    onConnectGoogle: () -> Unit,
+    onDisconnect: () -> Unit,
+    onSyncNow: () -> Unit,
 ) {
     val prefs = current.preferences
     Column {
@@ -255,6 +265,8 @@ private fun SettingsContent(
 
         EnabledFeaturesSection(current, onFeature)
 
+        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow)
+
         SectionHeader("Your data", Modifier.padding(top = Spacing.section))
         NavRow(
             icon = Icons.Outlined.FileDownload,
@@ -272,9 +284,16 @@ private fun SettingsContent(
         )
 
         SectionHeader("Privacy", Modifier.padding(top = Spacing.section))
-        Fact(Icons.Outlined.PhoneAndroid, "Stored only on this device", "Wallets, transactions, budgets and goals live in Lucento’s private storage.")
+        Fact(Icons.Outlined.PhoneAndroid, "Stored only on this device", "Wallets, transactions, budgets and goals live in Lucento’s private storage, whether or not cloud sync is on.")
         Hairline(inset = Sizes.iconTile + Spacing.md)
-        Fact(Icons.Outlined.WifiOff, "No internet access", "Lucento doesn’t have the internet permission, so nothing can be sent anywhere. Receipt reading runs on the phone.")
+        Fact(
+            Icons.Outlined.CloudOff,
+            "Offline unless you turn sync on",
+            if (current.cloudSync.status.enabled)
+                "Cloud sync is on for this account; everything else still works offline. Receipt reading runs on the phone either way."
+            else
+                "Lucento makes no network connection until you connect an account above. Receipt reading runs on the phone.",
+        )
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.KeyboardVoice, "Voice uses your phone’s recogniser", "Speech is converted to text by your device’s speech service; Lucento interprets it offline.")
         Hairline(inset = Sizes.iconTile + Spacing.md)
@@ -363,6 +382,100 @@ private fun Swatch(colors: Pair<Color, Color>, modifier: Modifier) {
                 .height(6.dp)
                 .background(colors.second, RoundedCornerShape(3.dp)),
         )
+    }
+}
+
+/**
+ * Optional Google Sign-In + cloud sync (see docs/SYNC.md). Every core feature works without this section
+ * ever being touched — it only explains and controls something extra, never something required.
+ */
+@Composable
+private fun CloudSyncSection(
+    state: CloudSyncUiState,
+    onConnectGoogle: () -> Unit,
+    onDisconnect: () -> Unit,
+    onSyncNow: () -> Unit,
+) {
+    Column {
+        SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
+        when {
+            !state.configured -> {
+                InfoNote(
+                    "Cloud sync setup isn't finished yet. This build has no Supabase project configured, so " +
+                        "there's nothing to connect to — see docs/SYNC.md for the remaining steps. Everything " +
+                        "else works fully offline.",
+                )
+            }
+            state.signedInEmail == null -> {
+                Text(
+                    "Back up your wallets, transactions, budgets and goals and keep them in sync across your " +
+                        "devices. Lucento stays fully usable without this — nothing is sent anywhere until you " +
+                        "connect an account.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                if (!state.googleSignInConfigured) {
+                    InfoNote("Google sign-in isn't configured for this build yet — see docs/SYNC.md \"Setup required\".")
+                } else {
+                    Button(onClick = onConnectGoogle, enabled = !state.syncing) {
+                        if (state.syncing) {
+                            CircularProgressIndicator(Modifier.size(Sizes.iconTile / 2), strokeWidth = 2.dp)
+                        } else {
+                            Text("Connect with Google")
+                        }
+                    }
+                }
+            }
+            else -> {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(
+                        icon = Icons.Filled.CloudDone,
+                        container = MaterialTheme.colorScheme.primaryContainer,
+                        content = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(Modifier.width(Spacing.md))
+                    Column(Modifier.weight(1f)) {
+                        Text(state.signedInEmail, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            syncStatusLine(state),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(Spacing.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    OutlinedButton(onClick = onSyncNow, enabled = !state.syncing) {
+                        if (state.syncing) {
+                            CircularProgressIndicator(Modifier.size(Sizes.iconTile / 2), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text("Sync now")
+                        }
+                    }
+                    OutlinedButton(onClick = onDisconnect, enabled = !state.syncing) { Text("Disconnect") }
+                }
+            }
+        }
+        state.lastMessage?.let {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun syncStatusLine(state: CloudSyncUiState): String {
+    val error = state.status.lastError
+    if (error != null) return "Last sync failed: $error"
+    val last = state.status.lastSyncedAtMillis ?: return "Not synced yet"
+    val minutesAgo = (System.currentTimeMillis() - last) / 60_000
+    return when {
+        minutesAgo < 1 -> "Synced just now"
+        minutesAgo < 60 -> "Synced $minutesAgo min ago"
+        minutesAgo < 24 * 60 -> "Synced ${minutesAgo / 60} h ago"
+        else -> "Synced ${minutesAgo / (24 * 60)} d ago"
     }
 }
 

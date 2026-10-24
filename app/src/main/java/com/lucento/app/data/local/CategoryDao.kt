@@ -46,4 +46,15 @@ interface CategoryDao {
 
     @Query("DELETE FROM categories WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    // --- cloud sync (see docs/SYNC.md); unused unless the user has opted in ---
+
+    @Query("SELECT * FROM categories WHERE dirty = 1")
+    suspend fun getDirty(): List<CategoryEntity>
+
+    @Query("SELECT * FROM categories WHERE client_uuid = :clientUuid LIMIT 1")
+    suspend fun findByClientUuid(clientUuid: String): CategoryEntity?
+
+    @Query("UPDATE categories SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid AND updated_at = :expectedUpdatedAt")
+    suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int
 }

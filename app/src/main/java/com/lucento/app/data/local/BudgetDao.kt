@@ -36,4 +36,15 @@ interface BudgetDao {
     /** Removes pre-0.5 "budget for everything" rows (category_id NULL). Transactions are never touched. */
     @Query("DELETE FROM budgets WHERE category_id IS NULL")
     suspend fun deleteLegacyOverall(): Int
+
+    // --- cloud sync (see docs/SYNC.md); unused unless the user has opted in ---
+
+    @Query("SELECT * FROM budgets WHERE dirty = 1")
+    suspend fun getDirty(): List<BudgetEntity>
+
+    @Query("SELECT * FROM budgets WHERE client_uuid = :clientUuid LIMIT 1")
+    suspend fun findByClientUuid(clientUuid: String): BudgetEntity?
+
+    @Query("UPDATE budgets SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid AND updated_at = :expectedUpdatedAt")
+    suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int
 }

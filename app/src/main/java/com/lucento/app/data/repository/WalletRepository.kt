@@ -13,6 +13,7 @@ import com.lucento.app.domain.WalletType
 import com.lucento.app.domain.WalletUsage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import java.util.UUID
 
 class WalletRepository(
     private val dao: WalletDao,
@@ -62,6 +63,7 @@ class WalletRepository(
                 sortOrder = dao.maxSortOrder() + 1,
                 createdAt = now,
                 updatedAt = now,
+                clientUuid = UUID.randomUUID().toString(),
             )
         )
         return SaveResult.Saved(id)

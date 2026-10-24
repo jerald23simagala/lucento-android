@@ -20,7 +20,11 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index(value = ["category_id"]), Index(value = ["currency_code"])],
+    indices = [
+        Index(value = ["category_id"]),
+        Index(value = ["currency_code"]),
+        Index(value = ["client_uuid"], unique = true),
+    ],
 )
 data class BudgetEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -29,4 +33,8 @@ data class BudgetEntity(
     @ColumnInfo(name = "limit_minor") val limitMinor: Long,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** Cloud sync bookkeeping, added in v6 (see MIGRATION_5_6 and docs/SYNC.md). */
+    @ColumnInfo(name = "client_uuid") val clientUuid: String? = null,
+    @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
+    @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
 )

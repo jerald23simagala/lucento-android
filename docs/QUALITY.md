@@ -33,7 +33,8 @@ Job **build** (blocking, in order): wrapper validation → JVM tests → `assemb
 export) → schema committed and unchanged (`git diff --exit-code app/schemas`) → offline migration check → `lintDebug`
 → `assembleRelease bundleRelease` (signed only if `LUCENTO_KEYSTORE_BASE64`, `LUCENTO_KEYSTORE_PASSWORD`,
 `LUCENTO_KEY_ALIAS`, `LUCENTO_KEY_PASSWORD` secrets exist; otherwise unsigned) → inspect release APK with `aapt2`
-(application id `com.lucento.app`, not debuggable, no INTERNET / ACCESS_NETWORK_STATE; debug id `com.lucento.app.debug`)
+(application id `com.lucento.app`, not debuggable, permissions limited to an allow-list — INTERNET,
+ACCESS_NETWORK_STATE for opt-in cloud sync, WAKE_LOCK, RECEIVE_BOOT_COMPLETED for WorkManager; debug id `com.lucento.app.debug`)
 → size table in the run summary → artifacts (debug APK, release AAB/APK + R8 mapping, schemas, reports).
 
 Job **migrations** (needs build): fails immediately if schema history is incomplete, otherwise boots an API 30 x86_64
@@ -55,7 +56,8 @@ something did not pass.
 ## Release configuration review (source-level)
 - IDs: release `com.lucento.app`; debug `com.lucento.app.debug` + `-debug` version suffix.
 - Manifest: `allowBackup=false`, `fullBackupContent=false`, `dataExtractionRules` exclude everything from cloud
-  backup and device transfer; INTERNET and ACCESS_NETWORK_STATE removed with `tools:node="remove"`; no camera,
+  backup and device transfer; INTERNET and ACCESS_NETWORK_STATE only for opt-in cloud sync (docs/SYNC.md), HTTPS-only
+network security config, WorkManager's unused FOREGROUND_SERVICE removed with `tools:node="remove"`; no camera,
   microphone or storage permission (system camera/photo picker/speech recogniser are external apps); FileProvider not
   exported, cache path only. Debug-only: `ui-tooling` (`debugImplementation`).
 - R8: `isMinifyEnabled` + `isShrinkResources`; Room, Navigation, kotlinx.serialization, ML Kit and Lottie ship consumer

@@ -20,8 +20,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         GoalEntity::class,
         GoalContributionEntity::class,
         RecurringEntity::class,
+        SyncTombstoneEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class LucentoDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class LucentoDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun goalDao(): GoalDao
     abstract fun recurringDao(): RecurringDao
+    abstract fun syncDao(): SyncDao
 
     companion object {
         private const val NAME = "lucento.db"

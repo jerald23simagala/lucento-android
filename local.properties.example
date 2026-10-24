@@ -1,0 +1,16 @@
+# Copy this file to local.properties (gitignored) and fill in your own paths/values.
+
+sdk.dir=/path/to/Android/Sdk
+
+# Optional cloud sync (see docs/SYNC.md). Leave these blank to build and run Lucento exactly as before —
+# every core feature works fully offline with no account. The Settings screen tells the user cloud sync
+# setup is incomplete rather than showing a button that would fail.
+#
+# SUPABASE_URL / SUPABASE_ANON_KEY: from your Supabase project's Settings > API page. The anon/publishable
+# key is safe to ship in the APK (it is enforced by Postgres Row Level Security, not by secrecy) but is kept
+# out of source control anyway, as config.
+# GOOGLE_WEB_CLIENT_ID: the Web application OAuth client id from Google Cloud Console, also entered into
+# Supabase's Authentication > Providers > Google settings. See docs/SYNC.md "Setup required" for every step.
+LUCENTO_SUPABASE_URL=
+LUCENTO_SUPABASE_ANON_KEY=
+LUCENTO_GOOGLE_WEB_CLIENT_ID=

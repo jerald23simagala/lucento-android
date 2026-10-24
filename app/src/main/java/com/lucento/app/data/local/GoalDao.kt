@@ -54,4 +54,21 @@ interface GoalDao {
 
     @Query("DELETE FROM goal_contributions WHERE id = :id")
     suspend fun deleteContribution(id: Long)
+
+    // --- cloud sync (see docs/SYNC.md); unused unless the user has opted in ---
+
+    @Query("SELECT * FROM goals WHERE dirty = 1")
+    suspend fun getDirtyGoals(): List<GoalEntity>
+
+    @Query("SELECT * FROM goals WHERE client_uuid = :clientUuid LIMIT 1")
+    suspend fun findGoalByClientUuid(clientUuid: String): GoalEntity?
+
+    @Query("UPDATE goals SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid AND updated_at = :expectedUpdatedAt")
+    suspend fun clearGoalDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int
+
+    @Query("SELECT * FROM goal_contributions WHERE dirty = 1")
+    suspend fun getDirtyContributions(): List<GoalContributionEntity>
+
+    @Query("UPDATE goal_contributions SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid")
+    suspend fun clearContributionDirty(clientUuid: String, syncedAt: Long)
 }

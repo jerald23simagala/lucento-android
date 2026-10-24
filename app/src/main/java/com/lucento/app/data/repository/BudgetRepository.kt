@@ -8,6 +8,7 @@ import com.lucento.app.domain.Budget
 import com.lucento.app.domain.CategoryKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 
 /**
  * Category allocations. Since 0.5 every budget row belongs to one active expense category; the overall budget is the
@@ -46,6 +47,7 @@ class BudgetRepository(
                     limitMinor = limit.amountMinor,
                     createdAt = now,
                     updatedAt = now,
+                    clientUuid = UUID.randomUUID().toString(),
                 )
             )
             return SaveResult.Saved(newId)

@@ -67,15 +67,17 @@ is auto-sent; the user can fix the wording with "Edit message" or fix rows direc
 
 ## AI provider — what exists and what activation would need
 
-There is **no AI provider** in Lucento and nothing in the UI claims one. The app has no backend, no account and no
-`INTERNET` permission (the manifest strips it). `LocalTransactionInterpreter` is deterministic rule-based parsing.
+There is **no AI provider** in Lucento and nothing in the UI claims one. Capture never touches the network: the only
+network use is opt-in cloud sync (docs/SYNC.md), which never sends text to a model. `LocalTransactionInterpreter`
+is deterministic rule-based parsing.
 
 A remote model can be added later behind `TransactionInterpreter` without touching the composer, but only with:
 
 1. A server you operate (a small proxy) that holds the model API key — never the APK, `BuildConfig` or resources.
 2. A new opt-in module in `FeatureSet` ("Smarter reading, sends text to …"), off by default, with a consent screen that
    names what is sent (the message text or OCR text, plus category names) and where.
-3. Re-adding `INTERNET` only for that feature, and a per-request fallback to the local interpreter when offline,
+3. Network calls only while that module is on (INTERNET now exists for cloud sync), and a per-request fallback to the
+   local interpreter when offline,
    declined or failing.
 4. The model returning the `TransactionCandidate` shape (structured JSON), validated by the same `BatchReview` rules;
    its rows labelled with `InterpreterEngine.label` so the user knows what read them.

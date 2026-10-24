@@ -55,4 +55,12 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions WHERE transfer_group = :group")
     suspend fun deleteByTransferGroup(group: String)
+
+    // --- cloud sync (see docs/SYNC.md); unused unless the user has opted in ---
+
+    @Query("SELECT * FROM transactions WHERE dirty = 1")
+    suspend fun getDirty(): List<TransactionEntity>
+
+    @Query("UPDATE transactions SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid AND updated_at = :expectedUpdatedAt")
+    suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int
 }

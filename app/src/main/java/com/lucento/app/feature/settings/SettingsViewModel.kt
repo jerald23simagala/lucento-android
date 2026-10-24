@@ -4,16 +4,25 @@ import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lucento.app.core.containerFactory
+import android.app.Application
+import com.lucento.app.core.applicationContainerFactory
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
+import com.lucento.app.data.sync.AuthRepository
+import com.lucento.app.data.sync.SupabaseModule
+import com.lucento.app.data.sync.SyncPreferences
+import com.lucento.app.data.sync.SyncRepository
+import com.lucento.app.data.sync.SyncResult
+import com.lucento.app.data.sync.SyncScheduler
+import com.lucento.app.data.sync.SyncStatus
 import com.lucento.app.domain.CsvExporter
 import com.lucento.app.domain.Feature
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -27,19 +36,116 @@ data class SettingsUiState(
     /** Active wallets; Multiple wallets can only be turned off while there is at most one. */
     val walletCount: Int,
     val transactionCount: Int,
+    val cloudSync: CloudSyncUiState,
+)
+
+/** Everything the "Cloud sync" section needs, kept separate so the rest of Settings never depends on it. */
+data class CloudSyncUiState(
+    val configured: Boolean,
+    val googleSignInConfigured: Boolean,
+    val signedInEmail: String?,
+    val status: SyncStatus,
+    val syncing: Boolean = false,
+    val lastMessage: String? = null,
 )
 
 class SettingsViewModel(
+    private val application: Application,
     private val preferences: UserPreferencesRepository,
     private val transactions: TransactionRepository,
     private val wallets: WalletRepository,
     private val categories: CategoryRepository,
+    private val auth: AuthRepository,
+    private val syncPreferences: SyncPreferences,
+    private val syncRepository: SyncRepository,
 ) : ViewModel() {
 
+    private val syncing = MutableStateFlow(false)
+    private val syncMessage = MutableStateFlow<String?>(null)
+
     val uiState: StateFlow<SettingsUiState?> =
-        combine(preferences.preferences, wallets.observeWallets(), transactions.observeTransactions()) { prefs, w, t ->
-            SettingsUiState(prefs, w.size, t.size)
+        combine(
+            preferences.preferences,
+            wallets.observeWallets(),
+            transactions.observeTransactions(),
+            syncPreferences.status,
+            syncing,
+            syncMessage,
+        ) { values ->
+            val prefs = values[0] as UserPreferences
+            @Suppress("UNCHECKED_CAST") val w = values[1] as List<*>
+            @Suppress("UNCHECKED_CAST") val t = values[2] as List<*>
+            val syncStatus = values[3] as SyncStatus
+            val isSyncing = values[4] as Boolean
+            val message = values[5] as String?
+            SettingsUiState(
+                preferences = prefs,
+                walletCount = w.size,
+                transactionCount = t.size,
+                cloudSync = CloudSyncUiState(
+                    configured = SupabaseModule.isConfigured,
+                    googleSignInConfigured = SupabaseModule.isGoogleSignInConfigured,
+                    signedInEmail = auth.currentUserEmail,
+                    status = syncStatus,
+                    syncing = isSyncing,
+                    lastMessage = message,
+                ),
+            )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Signs in, then turns cloud sync on and runs a first sync immediately. Never touches local data itself. */
+    fun connectGoogleAccount() {
+        if (syncing.value) return
+        viewModelScope.launch {
+            syncing.value = true
+            syncMessage.value = null
+            when (val result = auth.signInWithGoogle()) {
+                AuthRepository.SignInResult.Success -> {
+                    syncPreferences.setEnabled(true)
+                    SyncScheduler.ensurePeriodic(application)
+                    runSyncNow()
+                }
+                AuthRepository.SignInResult.Cancelled -> Unit
+                AuthRepository.SignInResult.NotConfigured ->
+                    syncMessage.value = "Cloud sync isn't set up yet — see docs/SYNC.md for the remaining steps."
+                is AuthRepository.SignInResult.Failed -> syncMessage.value = result.message
+            }
+            syncing.value = false
+        }
+    }
+
+    /** Signs out and turns sync off. Local wallets, transactions, budgets and goals are never touched. */
+    fun disconnectAccount() {
+        viewModelScope.launch {
+            SyncScheduler.cancelPeriodic(application)
+            syncPreferences.setEnabled(false)
+            auth.signOut()
+            syncMessage.value = null
+        }
+    }
+
+    fun syncNow() {
+        if (syncing.value) return
+        viewModelScope.launch {
+            syncing.value = true
+            runSyncNow()
+            syncing.value = false
+        }
+    }
+
+    private suspend fun runSyncNow() {
+        syncMessage.value = null
+        syncMessage.value = when (val result = syncRepository.sync()) {
+            is SyncResult.Success -> {
+                val r = result.report
+                "Synced — ${r.pushed} sent, ${r.pulled} received" +
+                    if (r.conflictsKeptLocal > 0) ", kept this device's version for ${r.conflictsKeptLocal}" else ""
+            }
+            SyncResult.NotSignedIn -> "Not connected — sign in to sync."
+            SyncResult.NotConfigured -> "Cloud sync isn't set up yet — see docs/SYNC.md for the remaining steps."
+            is SyncResult.Retryable -> "Sync couldn't finish (${result.message}) — your data is safe and it will retry."
+        }
+    }
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { preferences.setThemeMode(mode) }
@@ -83,6 +189,17 @@ class SettingsViewModel(
     }
 
     companion object {
-        val Factory = containerFactory { SettingsViewModel(it.preferences, it.transactions, it.wallets, it.categories) }
+        val Factory = applicationContainerFactory { app, container ->
+            SettingsViewModel(
+                application = app,
+                preferences = container.preferences,
+                transactions = container.transactions,
+                wallets = container.wallets,
+                categories = container.categories,
+                auth = container.auth,
+                syncPreferences = container.syncPreferences,
+                syncRepository = container.syncRepository,
+            )
+        }
     }
 }

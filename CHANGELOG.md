@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Optional cloud sync (Supabase + Google Sign-In)
+
+- **Settings → Cloud sync**: connect a Google account to back up and sync wallets, categories, transactions, budgets,
+  goals and goal contributions. Off by default; Lucento remains fully usable offline with no account; signing out
+  never deletes local data. Shows the connected account, last sync time / error, "Sync now" and "Disconnect". When the
+  build has no Supabase or Google OAuth configuration the section says so instead of showing a button that fails.
+- Offline-first engine (`data/sync`): Room stays the source of truth. Pushes dirty rows and deletion tombstones, pulls
+  changes since the last cursor, merges by last-write-wins on `updated_at` (a newer unsynced local edit is never
+  discarded), retries via WorkManager (periodic every 30 min on a network connection, plus "Sync now").
+- **Database v6** (`MIGRATION_5_6` + 2 instrumented tests, run on an API 28 emulator): `client_uuid` for wallets,
+  categories, budgets and goals (backfilled); `dirty`/`synced_at` on every synced table; `categories.updated_at`;
+  `sync_tombstones` filled by `AFTER DELETE` triggers; an `AFTER UPDATE` trigger re-marks edited rows dirty. No
+  repository's delete path changed. Categories now maintain `updated_at` on every edit.
+- Supabase (`supabase/migrations/`, applied to project `lucento`): six tables, RLS owner-only policies, composite
+  user-scoped foreign keys, server-side last-write-wins trigger, grants to `authenticated` only. Verified with a
+  rolled-back cross-account test at the SQL level; Supabase security advisor clean.
+- Manifest: INTERNET + ACCESS_NETWORK_STATE now present for sync only; HTTPS-only network security config; CI checks
+  release permissions against an allow-list instead of forbidding network access. Privacy copy in Settings updated.
+- Config via `local.properties` / CI env (`LUCENTO_SUPABASE_URL`, `LUCENTO_SUPABASE_ANON_KEY`,
+  `LUCENTO_GOOGLE_WEB_CLIENT_ID`; see `local.properties.example`). Only the publishable key reaches the APK.
+- Not yet: Google OAuth client setup (so real sign-in is untested), recurring-schedule sync. See docs/SYNC.md.
+
 ## Unreleased — Sunrise Energy brand refresh (not compiled locally; awaiting CI)
 
 - **Transaction composer replaces the Add sheet.** The + button, the Transactions empty state and a wallet's

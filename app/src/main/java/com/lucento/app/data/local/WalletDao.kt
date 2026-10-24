@@ -31,4 +31,16 @@ interface WalletDao {
 
     @Query("DELETE FROM wallets WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    // --- cloud sync (see docs/SYNC.md); unused unless the user has opted in ---
+
+    @Query("SELECT * FROM wallets WHERE dirty = 1")
+    suspend fun getDirty(): List<WalletEntity>
+
+    @Query("SELECT * FROM wallets WHERE client_uuid = :clientUuid LIMIT 1")
+    suspend fun findByClientUuid(clientUuid: String): WalletEntity?
+
+    /** No-ops (0 rows affected) if the row changed again after it was read for push; it stays dirty and is retried. */
+    @Query("UPDATE wallets SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid AND updated_at = :expectedUpdatedAt")
+    suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int
 }

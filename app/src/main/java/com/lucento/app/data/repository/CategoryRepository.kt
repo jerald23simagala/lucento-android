@@ -9,6 +9,7 @@ import com.lucento.app.domain.CategorySelectionPlan
 import com.lucento.app.domain.CategoryUsage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 
 class CategoryRepository(
     private val dao: CategoryDao,
@@ -40,13 +41,16 @@ class CategoryRepository(
         val trimmed = name.trim().take(MAX_NAME)
         if (trimmed.isEmpty()) return SaveResult.BlankName
         if (dao.countActiveWithName(kind.name, trimmed, excludeId = 0) > 0) return SaveResult.DuplicateName
+        val now = clock()
         val id = dao.insert(
             CategoryEntity(
                 name = trimmed,
                 kind = kind.name,
                 iconKey = iconKey,
                 sortOrder = dao.maxSortOrder(kind.name) + 1,
-                createdAt = clock(),
+                createdAt = now,
+                updatedAt = now,
+                clientUuid = UUID.randomUUID().toString(),
             )
         )
         return SaveResult.Saved(id)
@@ -57,7 +61,7 @@ class CategoryRepository(
         val trimmed = name.trim().take(MAX_NAME)
         if (trimmed.isEmpty()) return SaveResult.BlankName
         if (dao.countActiveWithName(existing.kind, trimmed, excludeId = id) > 0) return SaveResult.DuplicateName
-        dao.update(existing.copy(name = trimmed))
+        dao.update(existing.copy(name = trimmed, updatedAt = clock()))
         return SaveResult.Saved(id)
     }
 
@@ -79,7 +83,7 @@ class CategoryRepository(
         val existing = dao.getById(id) ?: return DeleteResult.NotFound
         val usage = usage(id)
         return if (usage.isUsed) {
-            if (!existing.archived) dao.update(existing.copy(archived = true))
+            if (!existing.archived) dao.update(existing.copy(archived = true, updatedAt = clock()))
             DeleteResult.Archived(usage)
         } else {
             dao.deleteById(id)
@@ -92,7 +96,7 @@ class CategoryRepository(
         val existing = dao.getById(id) ?: return SaveResult.NotFound
         if (!existing.archived) return SaveResult.Saved(id)
         if (dao.countActiveWithName(existing.kind, existing.name, excludeId = id) > 0) return SaveResult.DuplicateName
-        dao.update(existing.copy(archived = false))
+        dao.update(existing.copy(archived = false, updatedAt = clock()))
         return SaveResult.Saved(id)
     }
 
@@ -140,7 +144,7 @@ class CategoryRepository(
         reordered[index] = siblings[swapWith]
         reordered[swapWith] = siblings[index]
         // Re-number the whole list so equal sort orders (possible after imports) can never make a move a no-op.
-        reordered.forEachIndexed { i, c -> if (c.sortOrder != i) dao.update(c.copy(sortOrder = i)) }
+        reordered.forEachIndexed { i, c -> if (c.sortOrder != i) dao.update(c.copy(sortOrder = i, updatedAt = clock())) }
         true
     }
 

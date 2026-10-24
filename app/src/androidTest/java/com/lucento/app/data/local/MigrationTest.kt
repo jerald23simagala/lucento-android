@@ -187,12 +187,77 @@ class MigrationTest {
     }
 
     @Test
-    fun migrate1To4_runsTheFullChainAndRoomOpensTheResult() {
+    fun migrate5To6_backfillsClientUuidsAndKeepsEveryRow() {
+        helper.createDatabase(TEST_DB, 5).apply {
+            seedV1Wallets()
+            execSQL("INSERT INTO categories (id, name, kind, icon_key, sort_order, archived, created_at) VALUES (100, 'Coffee', 'EXPENSE', 'dining', 0, 0, 1000)")
+            execSQL(
+                "INSERT INTO transactions (id, type, amount_minor, currency_code, wallet_id, category_id, occurred_on, note, client_uuid, created_at, updated_at) " +
+                    "VALUES (1, 'EXPENSE', 450, 'USD', 1, 100, 20000, 'Latte', 'tx-1', 1, 1)"
+            )
+            execSQL("INSERT INTO budgets (id, category_id, currency_code, limit_minor, created_at, updated_at) VALUES (1, 100, 'USD', 20000, 1, 1)")
+            execSQL(
+                "INSERT INTO goals (id, name, target_minor, currency_code, target_date, wallet_id, archived, created_at, updated_at) " +
+                    "VALUES (1, 'Vacation', 300000, 'USD', NULL, NULL, 0, 1, 1)"
+            )
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB, 6, true, Migrations.MIGRATION_5_6)
+
+        // Every row that lacked a client_uuid got a unique, non-null one.
+        listOf("wallets" to 3, "categories" to 1, "budgets" to 1, "goals" to 1).forEach { (table, expectedCount) ->
+            db.query("SELECT COUNT(*) FROM `$table`").use { assertTrue(it.moveToFirst()); assertEquals(expectedCount.toLong(), it.getLong(0)) }
+            db.query("SELECT COUNT(DISTINCT client_uuid) FROM `$table`").use { assertTrue(it.moveToFirst()); assertEquals(expectedCount.toLong(), it.getLong(0)) }
+            db.query("SELECT COUNT(*) FROM `$table` WHERE client_uuid IS NULL").use { assertTrue(it.moveToFirst()); assertEquals(0L, it.getLong(0)) }
+        }
+        // Existing rows start dirty (never pushed) and categories' updated_at was backfilled from created_at.
+        assertEquals(1000L, db.long("SELECT updated_at FROM categories WHERE id = 100"))
+        assertEquals(3L, db.long("SELECT COUNT(*) FROM wallets WHERE dirty = 1"))
+        assertEquals(0L, db.long("SELECT COUNT(*) FROM sync_tombstones"))
+        db.assertNoForeignKeyViolations()
+    }
+
+    @Test
+    fun migrate5To6_deletingASyncedRowWritesATombstoneAndEditingOneMarksItDirtyAgain() {
+        helper.createDatabase(TEST_DB, 5).apply {
+            seedV1Wallets()
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 6, true, Migrations.MIGRATION_5_6)
+
+        // Simulate wallet 2 having already been pushed once.
+        db.execSQL("UPDATE wallets SET dirty = 0, synced_at = 500 WHERE id = 2")
+
+        // An ordinary edit (bumps updated_at, leaves synced_at alone) must flip dirty back to 1.
+        db.execSQL("UPDATE wallets SET name = 'Visa (renamed)', updated_at = 999 WHERE id = 2")
+        assertEquals(1L, db.long("SELECT dirty FROM wallets WHERE id = 2"))
+
+        // A sync pull applying a remote row sets a fresh synced_at in the same statement, so it must NOT be
+        // re-marked dirty even though updated_at also changes.
+        db.execSQL("UPDATE wallets SET name = 'From cloud', updated_at = 1500, dirty = 0, synced_at = 1500 WHERE id = 2")
+        assertEquals(0L, db.long("SELECT dirty FROM wallets WHERE id = 2"))
+
+        // Deleting a wallet that had a client_uuid must record a tombstone with that same id.
+        val uuid = db.query("SELECT client_uuid FROM wallets WHERE id = 3").let { c -> c.moveToFirst(); val v = c.getString(0); c.close(); v }
+        db.execSQL("DELETE FROM wallets WHERE id = 3")
+        db.query("SELECT table_name, client_uuid, pushed FROM sync_tombstones").use { c ->
+            assertEquals(1, c.count)
+            assertTrue(c.moveToFirst())
+            assertEquals("wallets", c.getString(0))
+            assertEquals(uuid, c.getString(1))
+            assertEquals(0, c.getInt(2))
+        }
+        db.assertNoForeignKeyViolations()
+    }
+
+    @Test
+    fun migrate1To6_runsTheFullChainAndRoomOpensTheResult() {
         helper.createDatabase(TEST_DB, 1).apply {
             seedV1Wallets()
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 5, true, *Migrations.ALL)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 6, true, *Migrations.ALL)
         assertEquals(12345L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 1"))
         assertEquals(50000L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 2"))
         assertEquals(DefaultCategories.all.size.toLong(), db.long("SELECT COUNT(*) FROM categories"))

@@ -55,9 +55,13 @@ app/src/main/java/com/lucento/app/
 
 ## Privacy & cost
 - Core features work fully offline. No mandatory paid APIs, accounts, cloud, or bank integrations.
-- The app has **no INTERNET permission**; the manifest strips network permissions merged by libraries (ML Kit).
-  Adding network access requires an explicit, opt-in feature (e.g. optional remote AI) with clear user consent
-  before any financial data leaves the device. OCR uses ML Kit's bundled on-device model.
+- INTERNET exists **only** for optional cloud sync (docs/SYNC.md): nothing leaves the device until the user signs in
+  with Google and keeps sync on. Room stays the source of truth; signing out never deletes local data. Any other
+  network use needs its own explicit opt-in with clear consent. CI allow-lists release permissions. OCR uses ML Kit's
+  bundled on-device model.
+- Supabase: schema changes ship as new files in `supabase/migrations/` (never edit applied DDL); every user-owned
+  table has RLS (`auth.uid() = user_id`) and grants to `authenticated` only. Only the publishable key may reach the
+  APK, via `local.properties`/CI env — never a service-role key or OAuth client secret.
 - Never hardcode API keys or secrets. Never commit keystores. Android auto-backup is disabled; Lucento
   provides its own explicit backup/restore.
 

@@ -84,6 +84,12 @@ One composer replaces the Add sheet and the Scan / Speak / Type it screens: seve
 inferred type/category/date/account, inline correction, receipts and speech through the same review, atomic batch
 save. Next: on-device learning from corrections (M5), optional opt-in remote interpreter (docs/CAPTURE.md).
 
+## In progress — optional cloud sync (Supabase + Google Sign-In; built and tested locally, see docs/SYNC.md)
+Done: Room v6 sync bookkeeping (emulator-tested migration), push/pull/merge engine with tombstones and
+last-write-wins, WorkManager scheduling, Settings → Cloud sync, Supabase schema + RLS applied and verified.
+Remaining: Google OAuth clients + Supabase Google provider (blocks real sign-in), an end-to-end two-device test,
+recurring-schedule sync, syncing preferences.
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).

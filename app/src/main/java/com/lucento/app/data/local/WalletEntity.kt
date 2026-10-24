@@ -7,7 +7,10 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "wallets",
-    indices = [Index(value = ["archived", "sort_order"])],
+    indices = [
+        Index(value = ["archived", "sort_order"]),
+        Index(value = ["client_uuid"], unique = true),
+    ],
 )
 data class WalletEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -21,4 +24,12 @@ data class WalletEntity(
     val archived: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /**
+     * Cloud sync bookkeeping, added in database v6 (see MIGRATION_5_6 and docs/SYNC.md). Nothing here is
+     * read unless the user has opted into cloud sync.
+     */
+    @ColumnInfo(name = "client_uuid") val clientUuid: String? = null,
+    /** True until this row's current [updatedAt] has been confirmed pushed. New rows start dirty. */
+    @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
+    @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
 )

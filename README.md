@@ -35,7 +35,10 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Motion**: the mascot's gentle float and pose cross-fades; original Lottie net-flow glyphs, onboarding mark,
   empty states, receipt scan beam, saved confirmation, milestones — bundled and reduced-motion aware.
 - Exact money math in minor units; 325 JVM unit tests; an emulator screenshot tour in CI.
-- No internet permission; Android cloud backup disabled.
+- **Optional cloud sync** (Google Sign-In + Supabase, row-level security): off until you connect an account; every
+  core feature works offline without it, and signing out keeps local data. See [docs/SYNC.md](docs/SYNC.md) —
+  sign-in needs the Google OAuth setup listed there.
+- Android cloud backup disabled.
 
 ## Not yet
 Full backup/restore (CSV export only), reminder notifications, cross-currency transfers, automatic principal/interest

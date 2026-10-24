@@ -11,6 +11,7 @@ import com.lucento.app.domain.GoalScene
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
+import java.util.UUID
 
 class GoalRepository(
     private val dao: GoalDao,
@@ -67,6 +68,7 @@ class GoalRepository(
                     updatedAt = now,
                     sceneKey = scene,
                     photoPath = photoPath,
+                    clientUuid = UUID.randomUUID().toString(),
                 )
             )
             return SaveResult.Saved(newId)

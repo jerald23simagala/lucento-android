@@ -17,7 +17,10 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.SET_NULL,
         ),
     ],
-    indices = [Index(value = ["wallet_id"])],
+    indices = [
+        Index(value = ["wallet_id"]),
+        Index(value = ["client_uuid"], unique = true),
+    ],
 )
 data class GoalEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -34,6 +37,13 @@ data class GoalEntity(
     @ColumnInfo(name = "scene_key") val sceneKey: String? = null,
     /** Path of the user's own card photo (a private copy in app storage). Added in database v5. */
     @ColumnInfo(name = "photo_path") val photoPath: String? = null,
+    /**
+     * Cloud sync bookkeeping, added in v6 (see MIGRATION_5_6 and docs/SYNC.md). [photoPath] itself is
+     * intentionally never synced — it is a local file path, meaningless on another device.
+     */
+    @ColumnInfo(name = "client_uuid") val clientUuid: String? = null,
+    @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
+    @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
 )
 
 /** Money earmarked for (positive) or taken back from (negative) a goal. Deleted with its goal. */
@@ -57,4 +67,7 @@ data class GoalContributionEntity(
     val note: String,
     @ColumnInfo(name = "client_uuid") val clientUuid: String,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    /** Cloud sync bookkeeping, added in v6 (see MIGRATION_5_6 and docs/SYNC.md). Contributions are append/delete-only. */
+    @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
+    @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
 )

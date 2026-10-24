@@ -11,6 +11,15 @@ import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.TransactionRunner
 import com.lucento.app.data.repository.WalletRepository
+import com.lucento.app.data.sync.AuthRepository
+import com.lucento.app.data.sync.SupabaseModule
+import com.lucento.app.data.sync.SyncPreferences
+import com.lucento.app.data.sync.SyncRepository
+import com.lucento.app.data.sync.SyncScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class LucentoApplication : Application() {
     lateinit var container: AppContainer
@@ -19,6 +28,11 @@ class LucentoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
+        // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            if (container.syncPreferences.isEnabled()) SyncScheduler.ensurePeriodic(this@LucentoApplication)
+        }
     }
 }
 
@@ -49,5 +63,23 @@ class AppContainer(application: Application) {
     val goals: GoalRepository by lazy { GoalRepository(database.goalDao()) }
     val recurring: RecurringRepository by lazy {
         RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner)
+    }
+
+    // --- optional cloud sync (see docs/SYNC.md); every value here is safe to hold even when unconfigured ---
+
+    private val supabaseClient by lazy { SupabaseModule.create() }
+    val syncPreferences: SyncPreferences by lazy { SyncPreferences(application) }
+    val auth: AuthRepository by lazy { AuthRepository(supabaseClient, application) }
+    val syncRepository: SyncRepository by lazy {
+        SyncRepository(
+            client = supabaseClient,
+            wallets = database.walletDao(),
+            categories = database.categoryDao(),
+            transactions = database.transactionDao(),
+            budgets = database.budgetDao(),
+            goals = database.goalDao(),
+            syncMeta = database.syncDao(),
+            preferences = syncPreferences,
+        )
     }
 }
