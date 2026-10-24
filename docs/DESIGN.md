@@ -183,12 +183,16 @@ environment (see `docs/QUALITY.md`).
   **More** button. The selected tab shows its label under a tinted indicator; the others are icon-only (each keeps its
   label as the accessibility name). Insights/Budget leave the dock when switched off. The dock stays on secondary
   screens (goals, recurring, debts, account detail, categories — the tab they were opened from stays highlighted)
-  and steps aside for focused workflows: receipt scan, Speak / Type it, category setup, Settings, Enabled features.
+  and steps aside for focused workflows: the transaction composer, category setup, Settings, Enabled features.
   Tabs keep their state (save/restore on switch).
-- **+ Add transaction** (floating, every primary screen) opens a sheet with four workflows — **Manual** (the editor),
-  **Scan** (receipt OCR), **Speak** (starts listening on arrival), **Type it** (sentence → structured fields). Scanned,
-  spoken and typed entries always open in the editor for review. A switched-off module still appears and offers to
-  turn itself back on. Transfers are a secondary row in the same sheet.
+- **+ Add transaction** (floating, every primary screen) opens the **transaction composer**: a compact top bar, the
+  conversation (the user's message on a pale-sky bubble, Lucento's one-line reply, then the rows on the background
+  separated by hairlines), a summary with one primary "Save N transactions" button, and the input with scan and
+  microphone actions (each shown only when its module is on). Rows: category tile, description and signed amount (both
+  edit in place), then compact selectors for type, category or transfer accounts, date and account. Fields needing
+  attention are amber-tinted and explained in words underneath. Lucento's reply never exceeds one line ("Found 4
+  transactions. Review anything that looks wrong."). The mascot appears once, 72dp, in the empty intro. Spec:
+  docs/CAPTURE.md.
 - **More** (sheet): Savings goals, Recurring payments, Debts & loans, Categories — each with a real status line.
 - **Profile** (avatar in every primary screen's top bar): optional name (device-only), appearance, **Settings**,
   Enabled features, version. Lucento has no account; nothing here signs in.

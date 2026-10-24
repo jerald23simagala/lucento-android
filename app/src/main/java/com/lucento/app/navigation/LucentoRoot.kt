@@ -80,21 +80,16 @@ import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.Elevation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
-import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
-import com.lucento.app.domain.capture.QuickEntryProposal
 import com.lucento.app.feature.budget.BudgetScreen
 import com.lucento.app.feature.budget.CategorySetupScreen
 import com.lucento.app.feature.budget.ManageCategoriesScreen
-import com.lucento.app.feature.capture.AddMethod
-import com.lucento.app.feature.capture.AddTransactionSheet
-import com.lucento.app.feature.capture.ReceiptResult
-import com.lucento.app.feature.capture.ReceiptScanScreen
-import com.lucento.app.feature.capture.VoiceEntryScreen
+import com.lucento.app.feature.capture.ComposerStart
+import com.lucento.app.feature.capture.TransactionComposerScreen
 import com.lucento.app.feature.home.HomeActions
 import com.lucento.app.feature.home.HomeScreen
 import com.lucento.app.feature.insights.InsightsScreen
@@ -119,7 +114,6 @@ import com.lucento.app.feature.wallets.WalletDetailScreen
 import com.lucento.app.feature.wallets.WalletsScreen
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import java.time.LocalDate
 import kotlin.reflect.KClass
 
 // Primary destinations: the five tabs of the navigation dock.
@@ -140,10 +134,11 @@ import kotlin.reflect.KClass
 @Serializable data object CategorySetupRoute
 @Serializable data object SettingsRoute
 @Serializable data object FeaturesRoute
-@Serializable data object ScanReceiptRoute
-@Serializable data class VoiceEntryRoute(val typing: Boolean = false)
+/** The transaction composer: [start] is a [ComposerStart] name; [typeHint] a TransactionType name or empty. */
+@Serializable data class ComposerRoute(val start: String = "TYPE", val walletId: Long = NO_WALLET, val typeHint: String = "")
 
 const val NO_SCHEDULE = -1L
+const val NO_WALLET = -1L
 
 private data class Tab(val item: DockItem, val route: Any)
 
@@ -172,8 +167,7 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     CategorySetupRoute::class,
     SettingsRoute::class,
     FeaturesRoute::class,
-    ScanReceiptRoute::class,
-    VoiceEntryRoute::class,
+    ComposerRoute::class,
 )
 
 private fun NavDestination?.primaryKey(): String? =
@@ -213,11 +207,9 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var editorNote by remember { mutableStateOf<String?>(null) }
     var transferDraft by remember { mutableStateOf<TransferDraft?>(null) }
     var transferNote by remember { mutableStateOf<String?>(null) }
-    val separator = remember { MoneyFormatter.decimalSeparator() }
     // Set only from a save callback that reported success, i.e. after the database write committed.
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
-    var showAdd by rememberSaveable { mutableStateOf(false) }
     var showMore by rememberSaveable { mutableStateOf(false) }
     var showProfile by rememberSaveable { mutableStateOf(false) }
     // The tab a pushed screen belongs to, so the dock keeps it highlighted (e.g. Goals opened from Home).
@@ -263,12 +255,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         return true
     }
 
-    fun openNew(type: TransactionType, walletId: Long? = null, categoryId: Long? = null) {
-        if (!requireWallets()) return
-        editorNote = null
-        editorDraft = editorViewModel.newDraft(type, walletId).copy(categoryId = categoryId)
-    }
-
     fun openTransfer(from: Long? = null, to: Long? = null) {
         if (!requireWallets()) return
         if (editorState.loaded && editorState.wallets.size < 2) {
@@ -292,50 +278,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         }
     }
 
-    fun startAdd(method: AddMethod) {
-        when (method) {
-            AddMethod.MANUAL -> openNew(TransactionType.EXPENSE)
-            AddMethod.SCAN -> push(ScanReceiptRoute)
-            AddMethod.SPEAK -> push(VoiceEntryRoute(typing = false))
-            AddMethod.TYPE -> push(VoiceEntryRoute(typing = true))
-        }
-    }
-
-    fun reviewProposal(p: QuickEntryProposal) {
+    /** The one way to add transactions: the composer (typed, spoken or scanned, reviewed as a batch). */
+    fun openComposer(start: ComposerStart = ComposerStart.TYPE, walletId: Long? = null, typeHint: TransactionType? = null) {
         if (!requireWallets()) return
-        val amountText = p.amount?.toPlainString()?.replace('.', separator).orEmpty()
-        navController.popBackStack()
-        if (p.type.isTransfer) {
-            transferNote = "From what you said — check both accounts and the amount before saving."
-            transferDraft = editorViewModel.newTransferDraft(p.walletId, p.toWalletId)
-                .copy(amountText = amountText, date = p.date, note = p.note)
-        } else {
-            editorNote = "From what you said — check every field before saving."
-            editorDraft = editorViewModel.newDraft(p.type, p.walletId)
-                .copy(categoryId = p.categoryId, amountText = amountText, date = p.date, note = p.note)
-        }
-    }
-
-    fun reviewReceipt(r: ReceiptResult) {
-        if (!requireWallets()) return
-        navController.popBackStack()
-        val base = editorViewModel.newDraft(TransactionType.EXPENSE)
-        val baseCurrency = editorState.wallets.firstOrNull { it.id == base.walletId }?.currencyCode
-        // A receipt in another currency goes to a wallet in that currency when there is one; never converted.
-        val matchingWallet = r.currencyCode
-            ?.takeIf { it != baseCurrency }
-            ?.let { code -> editorState.wallets.firstOrNull { it.currencyCode == code }?.id }
-        editorNote = when {
-            r.amount == null && r.merchant == null -> null
-            r.currencyCode != null && r.currencyCode != baseCurrency && matchingWallet == null ->
-                "This receipt looks like it’s in ${r.currencyCode}, but none of your accounts use it. Lucento never converts — check the amount and account."
-            else -> "From your receipt — check the amount, date and account before saving."
-        }
-        editorDraft = (if (matchingWallet != null) base.copy(walletId = matchingWallet) else base).copy(
-            amountText = r.amount?.toPlainString()?.replace('.', separator).orEmpty(),
-            date = r.date ?: LocalDate.now(),
-            note = r.merchant.orEmpty(),
-        )
+        push(ComposerRoute(start.name, walletId ?: NO_WALLET, typeHint?.name.orEmpty()))
     }
 
     val enableFeature: (Feature) -> Unit = { appViewModel.setFeatureEnabled(it, true) }
@@ -365,7 +311,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 FloatingActionButton(
                     onClick = {
                         haptics.tick()
-                        showAdd = true
+                        openComposer()
                     },
                     shape = CircleShape,
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -418,11 +364,11 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     }
                     composable<TransactionsRoute> {
                         TransactionsScreen(
-                            onAddTransaction = { showAdd = true },
+                            onAddTransaction = { openComposer() },
                             onEditTransaction = { edit(it) },
                             onAddWallet = { navigateTo(WalletsRoute) },
-                            onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ push(ScanReceiptRoute) }) else null,
-                            onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ push(VoiceEntryRoute(typing = false)) }) else null,
+                            onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
+                            onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ openComposer(ComposerStart.SPEAK) }) else null,
                         )
                     }
                     composable<WalletsRoute> {
@@ -449,7 +395,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         WalletDetailScreen(
                             walletId = route.walletId,
                             onBack = back,
-                            onAddTransaction = { type, walletId -> openNew(type, walletId) },
+                            onAddTransaction = { type, walletId -> openComposer(walletId = walletId, typeHint = type) },
                             onTransfer = { from, to -> openTransfer(from, to) },
                             onEditTransaction = { edit(it) },
                             transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
@@ -475,41 +421,24 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     pushed<CategorySetupRoute>(reducedMotion) { CategorySetupScreen(onDone = back) }
                     pushed<SettingsRoute>(reducedMotion) { SettingsScreen(onBack = back) }
                     pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
-                    pushed<ScanReceiptRoute>(reducedMotion) {
-                        Gated(Feature.RECEIPT_SCANNING, features, enableFeature, back) {
-                            ReceiptScanScreen(
-                                onBack = back,
-                                onReview = { reviewReceipt(it) },
-                                expectedCurrency = editorViewModel.newDraft(TransactionType.EXPENSE).walletId
-                                    ?.let { id -> editorState.wallets.firstOrNull { it.id == id }?.currencyCode },
-                            )
-                        }
-                    }
-                    pushed<VoiceEntryRoute>(reducedMotion) { entry ->
-                        val route = entry.toRoute<VoiceEntryRoute>()
-                        Gated(Feature.VOICE_ENTRY, features, enableFeature, back) {
-                            VoiceEntryScreen(
-                                wallets = editorState.wallets,
-                                categories = editorState.categories,
-                                onBack = back,
-                                onReview = { reviewProposal(it) },
-                                typing = route.typing,
-                            )
-                        }
+                    pushed<ComposerRoute>(reducedMotion) { entry ->
+                        val route = entry.toRoute<ComposerRoute>()
+                        TransactionComposerScreen(
+                            onBack = back,
+                            onSaved = { message -> confirmation = Confirmation(message) },
+                            onAddWallet = { navigateTo(WalletsRoute) },
+                            voiceEnabled = features.isEnabled(Feature.VOICE_ENTRY),
+                            scanEnabled = features.isEnabled(Feature.RECEIPT_SCANNING),
+                            transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
+                            start = runCatching { ComposerStart.valueOf(route.start) }.getOrDefault(ComposerStart.TYPE),
+                            walletId = route.walletId.takeIf { it != NO_WALLET },
+                            typeHint = route.typeHint.takeIf { it.isNotEmpty() }?.let { name -> runCatching { TransactionType.valueOf(name) }.getOrNull() },
+                        )
                     }
                 }
                 ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
             }
         }
-    }
-
-    if (showAdd) {
-        AddTransactionSheet(
-            features = features,
-            onChoose = { startAdd(it) },
-            onTransfer = if (features.isEnabled(Feature.MULTIPLE_WALLETS)) ({ openTransfer() }) else null,
-            onDismiss = { showAdd = false },
-        )
     }
 
     if (showMore) {

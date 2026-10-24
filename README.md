@@ -13,7 +13,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 ## What works today (0.5.0)
 - **Navigation**: a persistent dock — **Home · Transactions · Wallets · Insights · Budget** — plus a **More** menu
   (Savings goals, Recurring payments, Debts & loans, Categories) and a **profile** button (optional name,
-  appearance, Settings, Enabled features). An app-wide **+** opens **Manual · Scan · Speak · Type it**.
+  appearance, Settings, Enabled features). An app-wide **+** opens the **transaction composer**.
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation.
 - **Home**: budget hero with Lucento, the mascot, whose torch light and look follow the month's budget (five wellness tiers),
@@ -27,11 +27,14 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Transfers** between your own accounts (two linked legs, atomic, never income or spending).
 - **Wallets**: cash, bank, e-wallet, savings, credit card and loan; account detail with history.
 - **Savings goals**, **Debts & loans**, **Recurring payments** (mark paid / skip / pause — never auto-posted).
-- **Receipt scanning** (on-device ML Kit OCR) and **Speak / Type it** (offline parser) → always reviewed before saving.
+- **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
+  transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
+  rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,
+  idempotent). Interpretation runs on the phone — no AI service, no network. See [docs/CAPTURE.md](docs/CAPTURE.md).
 - **Settings**: theme, main currency, Enabled features, CSV export, privacy facts.
 - **Motion**: the mascot's gentle float and pose cross-fades; original Lottie net-flow glyphs, onboarding mark,
   empty states, receipt scan beam, saved confirmation, milestones — bundled and reduced-motion aware.
-- Exact money math in minor units; 253 JVM unit tests; an emulator screenshot tour in CI.
+- Exact money math in minor units; 325 JVM unit tests; an emulator screenshot tour in CI.
 - No internet permission; Android cloud backup disabled.
 
 ## Not yet

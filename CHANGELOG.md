@@ -2,6 +2,16 @@
 
 ## Unreleased — Sunrise Energy brand refresh (not compiled locally; awaiting CI)
 
+- **Transaction composer replaces the Add sheet.** The + button, the Transactions empty state and a wallet's
+  Expense/Income tiles open one screen: type, speak or scan, and every transaction in the message appears as an
+  editable row (type, category, date and account inferred; inline correction; competing amounts offered as choices;
+  receipts produce one expense for the total). One tap saves the batch atomically with per-row idempotency keys
+  (`TransactionRepository.saveBatch`). Removed `AddTransactionSheet`, `VoiceEntryScreen`, `ReceiptScanScreen` and their
+  routes. On-device only — no AI service and no network (see docs/CAPTURE.md).
+- Parser: month-name dates ("October 12", "12 Oct 2026"), spoken number words, specific-first category keywords for the
+  onboarding presets, receipt items-vs-total check. "Voice & text entry" module renamed "Voice entry" (typing is core).
+- 55 new JVM tests (batch parsing, review rules, receipts, atomic batch save with rollback, number words).
+
 - Goals: optional suggestions (Japan trip, holiday, emergency fund, laptop) and a card picture picker.
 - Goals: a chosen photo can be the card picture (private copy in app storage, database v5 `photo_path`).
   Photos are not in any backup because the app has no backup or restore yet.

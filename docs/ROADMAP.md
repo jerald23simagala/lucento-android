@@ -79,6 +79,11 @@ Dock navigation + More + profile menu, + Add sheet (Manual/Scan/Speak/Type it), 
 glyph, burn bar, savings level, upcoming payments, category-derived budget, preset category onboarding, Budget tab
 with category management, focused Insights, screenshot tour in CI.
 
+## Done — conversational transaction composer (JVM-tested; compile pending CI)
+One composer replaces the Add sheet and the Scan / Speak / Type it screens: several transactions per message,
+inferred type/category/date/account, inline correction, receipts and speech through the same review, atomic batch
+save. Next: on-device learning from corrections (M5), optional opt-in remote interpreter (docs/CAPTURE.md).
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).

@@ -25,7 +25,7 @@ app/src/main/java/com/lucento/app/
   domain/              Pure Kotlin models and calculators (unit-tested, no Android deps)
   feature/<name>/      Screen + ViewModel per feature
   navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · Wallets · Insights · Budget + More menu),
-                       app-wide + Add sheet (Manual · Scan · Speak · Type it), profile menu (Settings lives there)
+                       app-wide + opens the transaction composer (feature/capture), profile menu (Settings lives there)
 ```
 - Dependency wiring: `AppContainer` in `LucentoApplication` (manual DI). ViewModels use `containerFactory`.
 - Keep financial logic in `domain/` or `core/money/` as pure functions so it is testable on the JVM.
@@ -41,6 +41,9 @@ app/src/main/java/com/lucento/app/
   Never add a separately editable overall amount; legacy "everything" rows are ignored. Home, Budget and Insights read
   the same `BudgetPlan`.
 - Guard against duplicate submissions (in-flight flags, idempotency keys for imports).
+- New transactions are added only through the composer (`feature/capture`): `TransactionInterpreter` → `BatchReview`
+  → `TransactionRepository.saveBatch` (atomic, one idempotency key per row). The editor sheet is for editing existing
+  transactions. Never present local parsing as AI; a remote interpreter needs the opt-in described in docs/CAPTURE.md.
 
 ## Database
 - `exportSchema = true`; schemas land in `app/schemas/` and **are committed** (1–3 recovered from CI artifacts).

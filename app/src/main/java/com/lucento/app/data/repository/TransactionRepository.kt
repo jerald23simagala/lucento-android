@@ -197,6 +197,108 @@ class TransactionRepository(
         return TransferResult.Saved(input.group)
     }
 
+    /** One new transaction or transfer in a batch written by [saveBatch]. */
+    sealed interface BatchEntry {
+        data class Single(val input: Input) : BatchEntry
+        data class Move(val input: TransferInput) : BatchEntry
+    }
+
+    sealed interface BatchResult {
+        /** Every entry is in the database (entries already saved under the same key count once, not twice). */
+        data class Saved(val count: Int) : BatchResult
+        /** Nothing was written: entry [index] broke a rule. */
+        data class Rejected(val index: Int, val reason: Any) : BatchResult
+    }
+
+    /**
+     * Saves several new transactions and transfers as one unit: every entry is validated first with the same rules as
+     * [save] and [saveTransfer], then all rows are written in a single database transaction, so a failure part-way
+     * leaves nothing behind. Each entry keeps its own idempotency key, so retrying a batch after an error, or a second
+     * tap, never creates duplicates. Only creation is supported here (ids and groups must be null).
+     */
+    suspend fun saveBatch(entries: List<BatchEntry>): BatchResult {
+        if (entries.isEmpty()) return BatchResult.Saved(0)
+        entries.forEachIndexed { index, entry ->
+            val problem: Any? = when (entry) {
+                is BatchEntry.Single -> validateNew(entry.input)
+                is BatchEntry.Move -> validateNewTransfer(entry.input)
+            }
+            if (problem != null) return BatchResult.Rejected(index, problem)
+        }
+        val now = clock()
+        runner.run {
+            entries.forEach { entry ->
+                when (entry) {
+                    is BatchEntry.Single -> {
+                        val input = entry.input
+                        if (transactions.findByClientUuid(input.clientUuid) == null) {
+                            transactions.insert(
+                                TransactionEntity(
+                                    type = input.type.name,
+                                    amountMinor = input.amount.amountMinor,
+                                    currencyCode = input.amount.currencyCode,
+                                    walletId = input.walletId,
+                                    categoryId = input.categoryId,
+                                    occurredOn = input.date.toEpochDay(),
+                                    note = input.note.trim().take(MAX_NOTE),
+                                    clientUuid = input.clientUuid,
+                                    createdAt = now,
+                                    updatedAt = now,
+                                )
+                            )
+                        }
+                    }
+                    is BatchEntry.Move -> {
+                        val input = entry.input
+                        val outKey = input.clientUuid + OUT_SUFFIX
+                        if (transactions.findByClientUuid(outKey) == null) {
+                            fun leg(type: TransactionType, walletId: Long, key: String) = TransactionEntity(
+                                type = type.name,
+                                amountMinor = input.amount.amountMinor,
+                                currencyCode = input.amount.currencyCode,
+                                walletId = walletId,
+                                categoryId = null,
+                                occurredOn = input.date.toEpochDay(),
+                                note = input.note.trim().take(MAX_NOTE),
+                                clientUuid = key,
+                                createdAt = now,
+                                updatedAt = now,
+                                transferGroup = input.clientUuid,
+                            )
+                            transactions.insert(leg(TransactionType.TRANSFER_OUT, input.fromWalletId, outKey))
+                            transactions.insert(leg(TransactionType.TRANSFER_IN, input.toWalletId, input.clientUuid + IN_SUFFIX))
+                        }
+                    }
+                }
+            }
+        }
+        return BatchResult.Saved(entries.size)
+    }
+
+    private suspend fun validateNew(input: Input): SaveResult? {
+        if (input.id != null || input.type.isTransfer) return SaveResult.InvalidType
+        if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
+        val wallet = wallets.getById(input.walletId)
+        if (wallet == null || wallet.archived) return SaveResult.WalletNotFound
+        if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
+        if (input.categoryId != null) {
+            val category = categories.getById(input.categoryId) ?: return SaveResult.CategoryMismatch
+            if (category.kind != input.type.name || category.archived) return SaveResult.CategoryMismatch
+        }
+        return null
+    }
+
+    private suspend fun validateNewTransfer(input: TransferInput): TransferResult? {
+        if (input.group != null) return TransferResult.TransferNotFound
+        if (input.amount.amountMinor <= 0L) return TransferResult.AmountNotPositive
+        if (input.fromWalletId == input.toWalletId) return TransferResult.SameWallet
+        val from = wallets.getById(input.fromWalletId)
+        val to = wallets.getById(input.toWalletId)
+        if (from == null || from.archived || to == null || to.archived) return TransferResult.WalletNotFound
+        if (from.currencyCode != input.amount.currencyCode || to.currencyCode != input.amount.currencyCode) return TransferResult.CurrencyMismatch
+        return null
+    }
+
     /**
      * Inserts a row keyed by [clientUuid]. If the unique index rejects it because a concurrent submit with the
      * same key got there first, returns that row's id instead of failing; any other error is rethrown.
@@ -235,6 +337,15 @@ internal fun TransactionEntity.toDomain(): Transaction = Transaction(
 suspend fun TransactionRepository.saveOrNull(input: TransactionRepository.Input): TransactionRepository.SaveResult? =
     try {
         save(input)
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        null
+    }
+
+/** [TransactionRepository.saveBatch] that returns null instead of throwing; the whole batch is rolled back together. */
+suspend fun TransactionRepository.saveBatchOrNull(entries: List<TransactionRepository.BatchEntry>): TransactionRepository.BatchResult? =
+    try {
+        saveBatch(entries)
     } catch (e: Exception) {
         if (e is kotlinx.coroutines.CancellationException) throw e
         null

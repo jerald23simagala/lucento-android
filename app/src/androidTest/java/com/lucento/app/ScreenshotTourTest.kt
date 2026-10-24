@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.view.KeyEvent
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.printToString
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lucento.app.core.money.Money
@@ -213,19 +215,20 @@ class ScreenshotTourTest {
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
 
-        // ---------------------------------------------------------------- the + sheet: four workflows
+        // ---------------------------------------------------------------- the composer: several transactions in one message
         compose.onNodeWithContentDescription("Add transaction").performClick()
-        waitForText("Choose how you’d like to record it")
-        shot("08-add-transaction-sheet")
-        click("Manual")
-        waitForText("New transaction")
-        shot("09-add-manual-editor")
-        backUntilGone("New transaction")
-        compose.onNodeWithContentDescription("Add transaction").performClick()
-        click("Type it")
-        waitForText("What happened?")
-        shot("10-add-type-it")
+        waitForText("Describe what happened")
+        shot("08-composer-empty")
+        compose.onNode(hasSetTextAction()).performTextInput("Lunch 45, groceries 120, and paid the electricity bill")
+        compose.onNodeWithContentDescription("Send").performClick()
+        waitForText("Found 3 transactions")
+        waitForText("1 needs a look")
+        shot("09-composer-rows")
+        waitForText("Save 2 ready")
         compose.onNodeWithContentDescription("Back").performClick()
+        waitForText("Discard 3 unsaved transactions?")
+        shot("10-composer-discard")
+        click("Discard")
         compose.waitForIdle()
         waitForDescription("Add transaction")
 

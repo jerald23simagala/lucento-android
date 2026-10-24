@@ -30,7 +30,7 @@ enum class Feature(
     RECURRING("recurring", "Recurring payments", "Bills, subscriptions and salary you confirm when they happen."),
     INSIGHTS("insights", "Insights & reports", "Spending breakdowns, monthly comparisons and net flow."),
     RECEIPT_SCANNING("receipt_scanning", "Receipt scanning", "Read totals from receipt photos on this device."),
-    VOICE_ENTRY("voice_entry", "Voice & text entry", "Say or type “spent 250 on lunch” and review before saving.");
+    VOICE_ENTRY("voice_entry", "Voice entry", "Speak transactions; your phone’s speech service turns them into text for you to review.");
 
     companion object {
         fun fromKey(key: String): Feature? = entries.firstOrNull { it.key == key }
