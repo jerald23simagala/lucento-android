@@ -3,7 +3,6 @@ package com.lucento.app.data.local
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lucento.app.domain.DefaultCategories
-import java.util.UUID
 
 /**
  * Explicit, frozen migrations. Never edit a released migration; add a new one.
@@ -173,26 +172,52 @@ object Migrations {
      */
     val MIGRATION_5_6: Migration = object : Migration(5, 6) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            // --- dirty / synced_at on every syncable table ---
-            listOf("wallets", "categories", "transactions", "budgets", "goals", "goal_contributions").forEach { table ->
-                db.execSQL("ALTER TABLE `$table` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
-                db.execSQL("ALTER TABLE `$table` ADD COLUMN `synced_at` INTEGER")
-            }
+            // Explicit literal statements only (no loops or string templates): tools/check_migrations.py replays the
+            // SQL literals of this block against 5.json/6.json in CI, and released migrations must stay frozen.
 
-            // --- stable client_uuid for the tables that didn't already have one ---
-            listOf("wallets", "categories", "budgets", "goals").forEach { table ->
-                db.execSQL("ALTER TABLE `$table` ADD COLUMN `client_uuid` TEXT")
-                db.query("SELECT id FROM `$table`").use { cursor ->
-                    while (cursor.moveToNext()) {
-                        val id = cursor.getLong(0)
-                        db.execSQL(
-                            "UPDATE `$table` SET client_uuid = ? WHERE id = ?",
-                            arrayOf(UUID.randomUUID().toString(), id),
-                        )
-                    }
-                }
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_${table}_client_uuid` ON `$table` (`client_uuid`)")
-            }
+            // --- dirty / synced_at on every syncable table ---
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `synced_at` INTEGER")
+            db.execSQL("ALTER TABLE `categories` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE `categories` ADD COLUMN `synced_at` INTEGER")
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `synced_at` INTEGER")
+            db.execSQL("ALTER TABLE `budgets` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE `budgets` ADD COLUMN `synced_at` INTEGER")
+            db.execSQL("ALTER TABLE `goals` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE `goals` ADD COLUMN `synced_at` INTEGER")
+            db.execSQL("ALTER TABLE `goal_contributions` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE `goal_contributions` ADD COLUMN `synced_at` INTEGER")
+
+            // --- stable client_uuid (a random version-4 UUID per existing row, generated in SQL) ---
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `client_uuid` TEXT")
+            db.execSQL(
+                "UPDATE `wallets` SET client_uuid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE client_uuid IS NULL"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_wallets_client_uuid` ON `wallets` (`client_uuid`)")
+            db.execSQL("ALTER TABLE `categories` ADD COLUMN `client_uuid` TEXT")
+            db.execSQL(
+                "UPDATE `categories` SET client_uuid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE client_uuid IS NULL"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_categories_client_uuid` ON `categories` (`client_uuid`)")
+            db.execSQL("ALTER TABLE `budgets` ADD COLUMN `client_uuid` TEXT")
+            db.execSQL(
+                "UPDATE `budgets` SET client_uuid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE client_uuid IS NULL"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_budgets_client_uuid` ON `budgets` (`client_uuid`)")
+            db.execSQL("ALTER TABLE `goals` ADD COLUMN `client_uuid` TEXT")
+            db.execSQL(
+                "UPDATE `goals` SET client_uuid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE client_uuid IS NULL"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_goals_client_uuid` ON `goals` (`client_uuid`)")
 
             // --- categories gains updated_at (needed for last-write-wins) ---
             db.execSQL("ALTER TABLE `categories` ADD COLUMN `updated_at` INTEGER NOT NULL DEFAULT 0")
@@ -208,26 +233,63 @@ object Migrations {
                     "`pushed` INTEGER NOT NULL DEFAULT 0)"
             )
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_tombstones_pushed` ON `sync_tombstones` (`pushed`)")
-
-            listOf("wallets", "categories", "transactions", "budgets", "goals", "goal_contributions").forEach { table ->
-                db.execSQL(
-                    "CREATE TRIGGER IF NOT EXISTS `trg_${table}_tombstone` AFTER DELETE ON `$table` " +
-                        "WHEN OLD.client_uuid IS NOT NULL BEGIN " +
-                        "INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at) " +
-                        "VALUES ('$table', OLD.client_uuid, CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); " +
-                        "END"
-                )
-            }
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_wallets_tombstone` AFTER DELETE ON `wallets` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at) VALUES ('wallets', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_categories_tombstone` AFTER DELETE ON `categories` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at) VALUES ('categories', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_transactions_tombstone` AFTER DELETE ON `transactions` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at) VALUES ('transactions', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_budgets_tombstone` AFTER DELETE ON `budgets` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at) VALUES ('budgets', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_goals_tombstone` AFTER DELETE ON `goals` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at) VALUES ('goals', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_goal_contributions_tombstone` AFTER DELETE ON `goal_contributions` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at) VALUES ('goal_contributions', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)); END"
+            )
 
             // --- dirty-on-edit trigger (not needed for goal_contributions: it is append/delete-only) ---
-            listOf("wallets", "categories", "transactions", "budgets", "goals").forEach { table ->
-                db.execSQL(
-                    "CREATE TRIGGER IF NOT EXISTS `trg_${table}_dirty` AFTER UPDATE ON `$table` " +
-                        "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at BEGIN " +
-                        "UPDATE `$table` SET dirty = 1 WHERE id = NEW.id; " +
-                        "END"
-                )
-            }
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_wallets_dirty` AFTER UPDATE ON `wallets` " +
+                    "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                    "BEGIN UPDATE `wallets` SET dirty = 1 WHERE id = NEW.id; END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_categories_dirty` AFTER UPDATE ON `categories` " +
+                    "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                    "BEGIN UPDATE `categories` SET dirty = 1 WHERE id = NEW.id; END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_transactions_dirty` AFTER UPDATE ON `transactions` " +
+                    "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                    "BEGIN UPDATE `transactions` SET dirty = 1 WHERE id = NEW.id; END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_budgets_dirty` AFTER UPDATE ON `budgets` " +
+                    "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                    "BEGIN UPDATE `budgets` SET dirty = 1 WHERE id = NEW.id; END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_goals_dirty` AFTER UPDATE ON `goals` " +
+                    "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                    "BEGIN UPDATE `goals` SET dirty = 1 WHERE id = NEW.id; END"
+            )
         }
     }
 
