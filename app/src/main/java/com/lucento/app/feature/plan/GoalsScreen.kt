@@ -83,7 +83,7 @@ import com.lucento.app.core.designsystem.component.IllustrationScrims
 import com.lucento.app.core.designsystem.component.LucentoIllustration
 import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalPresets
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -715,8 +715,9 @@ private fun ScenePicker(
 /** The user's own goal photo, decoded off the main thread; null while loading or when the file is gone. */
 @Composable
 private fun rememberGoalPhoto(path: String?): ImageBitmap? {
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, path) {
-        value = if (path == null) null else withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path)?.asImageBitmap() }
+    var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(path) {
+        bitmap = if (path == null) null else withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path)?.asImageBitmap() }
     }
     return bitmap
 }
