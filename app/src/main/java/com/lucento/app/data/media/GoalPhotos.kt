@@ -24,7 +24,8 @@ class GoalPhotos(context: Context) {
     fun import(uri: Uri): String? {
         return try {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            appContext.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            // decodeStream returns null when only bounds are requested, so report the stream as opened instead.
+            appContext.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds); true }
                 ?: return null
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
             val options = BitmapFactory.Options().apply { inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight) }
