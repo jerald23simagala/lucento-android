@@ -179,8 +179,6 @@ data class LucentoExtendedColors(
     val categorical: List<Color>,
     /** Progress that is going well (budget ring, goal bar). */
     val success: Color,
-    val brandMark: Color,
-    val brandLeaf: Color,
     val cash: TonePair,
     val bank: TonePair,
     val eWallet: TonePair,
@@ -280,8 +278,6 @@ internal val LightExtended = LucentoExtendedColors(
     ),
     success = Palette.Positive,
     // Approved brand artwork: the mark keeps its original colours (not re-tinted to the UI palette).
-    brandMark = Color(0xFF2563EB),
-    brandLeaf = Color(0xFFFBBF24),
     cash = TonePair(Palette.SunlightPale, Color(0xFF8A5200)),
     bank = TonePair(Palette.PaleSky, Palette.BlueDeep),
     eWallet = TonePair(Color(0xFFE0F2FE), Color(0xFF0369A1)),
@@ -329,8 +325,6 @@ internal val DarkExtended = LucentoExtendedColors(
         Color(0xFFA99BFF),
     ),
     success = Color(0xFF3DD68C),
-    brandMark = Color(0xFF8AB0FF),
-    brandLeaf = Color(0xFFFBBF24),
     cash = TonePair(Color(0xFF3D3214), Color(0xFFFFD98A)),
     bank = TonePair(Color(0xFF22325E), Color(0xFFDCE6FF)),
     eWallet = TonePair(Color(0xFF0E3048), Color(0xFFB6E3FF)),

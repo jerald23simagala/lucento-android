@@ -29,7 +29,6 @@ import com.lucento.app.core.designsystem.theme.LucentoTheme
  * outlines and paper stay legible on the midnight theme.
  */
 enum class LucentoAnimation(@RawRes val day: Int, @RawRes val night: Int, val loops: Boolean) {
-    Welcome(R.raw.onboarding_welcome, R.raw.onboarding_welcome_night, loops = false),
     EmptyTransactions(R.raw.empty_transactions, R.raw.empty_transactions_night, loops = false),
     EmptyBudgets(R.raw.empty_budgets, R.raw.empty_budgets_night, loops = false),
     EmptyGoals(R.raw.empty_goals, R.raw.empty_goals_night, loops = false),

@@ -2,7 +2,7 @@
 
 Every animation shipped in Lucento is listed here. **There are currently no third-party animation assets.**
 All Lottie files are original to Lucento: they are generated from code in `tools/lottie/gen/` (Python, no
-templates, no traced artwork) using Lucento's own shapes — the L + leaf mark from `LucentoMark.kt` — and Lucento's palette. The mascot is not a
+templates, no traced artwork) using Lucento's own shapes and palette. (The old L + leaf welcome animation was retired with the Rising Crest logo.) The mascot is not a
 Lottie file: the approved character ships as WebP sprites with a code-drawn torch glow (`Mascot.kt`, `docs/mascot/`). No asset was downloaded from LottieFiles or any other
 library: the authoring environment could not reach lottiefiles.com, and original work also keeps the brand coherent.
 
@@ -18,7 +18,6 @@ lottie-android; on-device appearance has **not yet been verified** (no emulator/
 | File (`res/raw/`) | Purpose | Where it plays | Playback | Size (raw / gzip) | Source · licence |
 |---|---|---|---|---|---|
 | `net_flow_indicator.json` (+`_night`) | Trend glyph on a tinted tile; markers `up` (green, rising), `down` (red, falling), `flat` (neutral level line for exactly zero) | Home net-flow card (`NetFlowIndicator`), chosen from the calculated net flow | once per direction (≈0.6 s), holds the finished glyph; static icon under reduced motion | 9.1 KB / 1.0 KB each | Original (Lucento) |
-| `onboarding_welcome.json` (+`_night`) | The mark assembles: backdrop, L drawn, leaf grows, three sparkles | Onboarding welcome step | once, 2.5 s, never blocks "Get started" | 6.5 KB / 1.0 KB each | Original (Lucento) |
 | `empty_transactions.json` (+`_night`) | Ledger card with rows and a lens | Transactions: no transactions yet | once, 2 s, holds last frame | 11.1 KB / 1.0 KB each | Original (Lucento) |
 | `empty_budgets.json` (+`_night`) | Gauge filling to 62 % with a coin | Budgets: none yet | once, 1.8 s | 5.9 KB / 0.9 KB each | Original (Lucento) |
 | `empty_goals.json` (+`_night`) | Target with a sun-yellow flag | Savings goals: none yet | once, 1.8 s | 5.6 KB / 0.8 KB each | Original (Lucento) |
