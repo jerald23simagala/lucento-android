@@ -24,7 +24,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         if (!container.syncPreferences.isEnabled()) return Result.success()
         return when (val result = container.syncRepository.sync()) {
             is SyncResult.Success -> Result.success(workDataOf(KEY_PUSHED to result.report.pushed, KEY_PULLED to result.report.pulled))
-            SyncResult.NotSignedIn, SyncResult.NotConfigured -> Result.success() // nothing to retry; UI already reflects this
+            // Nothing a retry could fix; Settings shows the state (and the stored error for an account mismatch).
+            SyncResult.NotSignedIn, SyncResult.NotConfigured, SyncResult.AccountMismatch -> Result.success()
             is SyncResult.Retryable -> if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
     }

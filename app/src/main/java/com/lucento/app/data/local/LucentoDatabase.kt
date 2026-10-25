@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RecurringEntity::class,
         SyncTombstoneEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class LucentoDatabase : RoomDatabase() {
@@ -37,14 +37,21 @@ abstract class LucentoDatabase : RoomDatabase() {
     companion object {
         private const val NAME = "lucento.db"
 
-        fun build(context: Context): LucentoDatabase =
-            Room.databaseBuilder(context.applicationContext, LucentoDatabase::class.java, NAME)
+        /** [name] is overridable only so instrumented tests can open a throwaway file through the real setup. */
+        fun build(context: Context, name: String = NAME): LucentoDatabase =
+            Room.databaseBuilder(context.applicationContext, LucentoDatabase::class.java, name)
                 .addMigrations(*Migrations.ALL)
                 .addCallback(object : RoomDatabase.Callback() {
                     // Fresh installs only (income categories; expense categories come from onboarding).
                     // Upgrades from v1 are seeded by MIGRATION_1_2.
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         CategorySeed.insertFreshInstall(db, createdAt = System.currentTimeMillis())
+                    }
+
+                    // After any migrations: makes sure the sync triggers exist, including on a fresh install, which
+                    // Room creates from the entities without running any migration (see SyncTriggers).
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        SyncTriggers.ensure(db)
                     }
                 })
                 .build()

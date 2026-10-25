@@ -19,7 +19,7 @@ import org.junit.Test
 class SyncRepositoryTest {
 
     private fun newRepository(preferences: SyncPreferencesStore): SyncRepository = SyncRepository(
-        client = null,
+        remote = null,
         wallets = FakeWalletDao(),
         categories = FakeCategoryDao(),
         transactions = FakeTransactionDao(),

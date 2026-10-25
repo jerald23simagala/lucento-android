@@ -27,6 +27,9 @@ class FakeWalletDao : WalletDao {
     val rows = MutableStateFlow<List<WalletEntity>>(emptyList())
     private var nextId = 1L
 
+    /** Optional link so deleteById mirrors the real ON DELETE RESTRICT from transactions. */
+    var transactions: FakeTransactionDao? = null
+
     override fun observeActive(): Flow<List<WalletEntity>> =
         rows.map { list -> list.filter { !it.archived }.sortedBy { it.sortOrder } }
 
@@ -48,6 +51,7 @@ class FakeWalletDao : WalletDao {
     }
 
     override suspend fun deleteById(id: Long) {
+        check(transactions?.rows?.value?.none { it.walletId == id } ?: true) { "FOREIGN KEY constraint failed" }
         rows.value = rows.value.filterNot { it.id == id }
     }
 
@@ -55,9 +59,11 @@ class FakeWalletDao : WalletDao {
 
     override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
 
-    override suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int {
-        val match = rows.value.firstOrNull { it.clientUuid == clientUuid && it.updatedAt == expectedUpdatedAt } ?: return 0
-        rows.value = rows.value.map { if (it.id == match.id) it.copy(dirty = false, syncedAt = syncedAt) else it }
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
         return 1
     }
 }
@@ -113,10 +119,18 @@ class FakeCategoryDao : CategoryDao {
 
     override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
 
-    override suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int {
-        val match = rows.value.firstOrNull { it.clientUuid == clientUuid && it.updatedAt == expectedUpdatedAt } ?: return 0
-        rows.value = rows.value.map { if (it.id == match.id) it.copy(dirty = false, syncedAt = syncedAt) else it }
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
         return 1
+    }
+
+    override suspend fun getWithoutClientUuid() = rows.value.filter { it.clientUuid == null }
+
+    override suspend fun assignClientUuid(id: Long, clientUuid: String) {
+        rows.value = rows.value.map { if (it.id == id && it.clientUuid == null) it.copy(clientUuid = clientUuid) else it }
     }
 }
 
@@ -169,9 +183,11 @@ class FakeTransactionDao : TransactionDao {
 
     override suspend fun getDirty() = rows.value.filter { it.dirty }
 
-    override suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int {
-        val match = rows.value.firstOrNull { it.clientUuid == clientUuid && it.updatedAt == expectedUpdatedAt } ?: return 0
-        rows.value = rows.value.map { if (it.id == match.id) it.copy(dirty = false, syncedAt = syncedAt) else it }
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
         return 1
     }
 }
@@ -214,9 +230,11 @@ class FakeBudgetDao : BudgetDao {
 
     override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
 
-    override suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int {
-        val match = rows.value.firstOrNull { it.clientUuid == clientUuid && it.updatedAt == expectedUpdatedAt } ?: return 0
-        rows.value = rows.value.map { if (it.id == match.id) it.copy(dirty = false, syncedAt = syncedAt) else it }
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
         return 1
     }
 }
@@ -272,17 +290,19 @@ class FakeGoalDao : GoalDao {
 
     override suspend fun findGoalByClientUuid(clientUuid: String) = goals.value.firstOrNull { it.clientUuid == clientUuid }
 
-    override suspend fun clearGoalDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int {
-        val match = goals.value.firstOrNull { it.clientUuid == clientUuid && it.updatedAt == expectedUpdatedAt } ?: return 0
-        goals.value = goals.value.map { if (it.id == match.id) it.copy(dirty = false, syncedAt = syncedAt) else it }
+    override suspend fun markGoalPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = goals.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        goals.value = goals.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
         return 1
     }
 
     override suspend fun getDirtyContributions() = contributions.value.filter { it.dirty }
 
-    override suspend fun clearContributionDirty(clientUuid: String, syncedAt: Long) {
+    override suspend fun markContributionPushed(clientUuid: String, revision: Long, syncedAt: Long) {
         contributions.value = contributions.value.map {
-            if (it.clientUuid == clientUuid) it.copy(dirty = false, syncedAt = syncedAt) else it
+            if (it.clientUuid == clientUuid) it.copy(dirty = false, baseRevision = revision, syncedAt = syncedAt) else it
         }
     }
 }

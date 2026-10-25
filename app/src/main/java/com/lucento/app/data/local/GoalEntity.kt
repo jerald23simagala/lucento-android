@@ -44,6 +44,8 @@ data class GoalEntity(
     @ColumnInfo(name = "client_uuid") val clientUuid: String? = null,
     @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
     @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
+    /** Server `revision` this row was last synced at; a push based on it is a causal successor (v7, docs/SYNC.md). */
+    @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
 )
 
 /** Money earmarked for (positive) or taken back from (negative) a goal. Deleted with its goal. */
@@ -70,4 +72,6 @@ data class GoalContributionEntity(
     /** Cloud sync bookkeeping, added in v6 (see MIGRATION_5_6 and docs/SYNC.md). Contributions are append/delete-only. */
     @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
     @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
+    /** Server `revision` this row was last synced at; a push based on it is a causal successor (v7, docs/SYNC.md). */
+    @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
 )

@@ -7,6 +7,8 @@ class FakeSyncPreferences(
 ) : SyncPreferencesStore {
     var lastError: String? = null
         private set
+    var pullCursor: String? = null
+    var syncedUser: String? = null
 
     override suspend fun isEnabled(): Boolean = enabled
 
@@ -22,5 +24,17 @@ class FakeSyncPreferences(
 
     override suspend fun clearLastError() {
         lastError = null
+    }
+
+    override suspend fun pullCursorIso(): String? = pullCursor
+
+    override suspend fun setPullCursorIso(iso: String) {
+        pullCursor = iso
+    }
+
+    override suspend fun syncedUserId(): String? = syncedUser
+
+    override suspend fun setSyncedUserId(userId: String) {
+        syncedUser = userId
     }
 }

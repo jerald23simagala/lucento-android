@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -66,6 +67,7 @@ import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.component.rememberHaptics
+import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
@@ -108,7 +110,8 @@ fun SettingsScreen(
                     exporter.launch("lucento-transactions-${LocalDate.now()}.csv")
                 },
                 exportMessage = exportMessage,
-                onConnectGoogle = viewModel::connectGoogleAccount,
+                // LocalContext here is MainActivity, which Credential Manager needs to show the account picker.
+                onConnectGoogle = { viewModel.connectGoogleAccount(context) },
                 onDisconnect = viewModel::disconnectAccount,
                 onSyncNow = viewModel::syncNow,
             )
@@ -284,10 +287,17 @@ private fun SettingsContent(
         )
 
         SectionHeader("Privacy", Modifier.padding(top = Spacing.section))
-        Fact(Icons.Outlined.PhoneAndroid, "Stored only on this device", "Wallets, transactions, budgets and goals live in Lucento’s private storage, whether or not cloud sync is on.")
+        Fact(
+            Icons.Outlined.PhoneAndroid,
+            if (current.cloudSync.status.enabled) "Kept on this device, copied to your account" else "Stored only on this device",
+            if (current.cloudSync.status.enabled)
+                "Wallets, transactions, budgets and goals stay in Lucento’s private storage; cloud sync keeps a copy in your account, readable only by you."
+            else
+                "Wallets, transactions, budgets and goals live in Lucento’s private storage.",
+        )
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(
-            Icons.Outlined.CloudOff,
+            Icons.Outlined.WifiOff,
             "Offline unless you turn sync on",
             if (current.cloudSync.status.enabled)
                 "Cloud sync is on for this account; everything else still works offline. Receipt reading runs on the phone either way."
@@ -390,7 +400,7 @@ private fun Swatch(colors: Pair<Color, Color>, modifier: Modifier) {
  * ever being touched — it only explains and controls something extra, never something required.
  */
 @Composable
-private fun CloudSyncSection(
+internal fun CloudSyncSection(
     state: CloudSyncUiState,
     onConnectGoogle: () -> Unit,
     onDisconnect: () -> Unit,
@@ -400,11 +410,7 @@ private fun CloudSyncSection(
         SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
         when {
             !state.configured -> {
-                InfoNote(
-                    "Cloud sync setup isn't finished yet. This build has no Supabase project configured, so " +
-                        "there's nothing to connect to — see docs/SYNC.md for the remaining steps. Everything " +
-                        "else works fully offline.",
-                )
+                InfoNote("Cloud sync isn’t available in this version of Lucento yet. Everything else works fully offline.")
             }
             state.signedInEmail == null -> {
                 Text(
@@ -416,7 +422,9 @@ private fun CloudSyncSection(
                 )
                 Spacer(Modifier.height(Spacing.sm))
                 if (!state.googleSignInConfigured) {
-                    InfoNote("Google sign-in isn't configured for this build yet — see docs/SYNC.md \"Setup required\".")
+                    // Missing GOOGLE_WEB_CLIENT_ID (see docs/SYNC.md "Setup required"); users can't fix that, so
+                    // the note says only what they can rely on.
+                    InfoNote("Connecting an account isn’t available in this version of Lucento yet. Everything else works fully offline.")
                 } else {
                     Button(onClick = onConnectGoogle, enabled = !state.syncing) {
                         if (state.syncing) {
@@ -430,9 +438,10 @@ private fun CloudSyncSection(
             else -> {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     IconTile(
-                        icon = Icons.Filled.CloudDone,
-                        container = MaterialTheme.colorScheme.primaryContainer,
-                        content = MaterialTheme.colorScheme.onPrimaryContainer,
+                        // A check mark beside "Last sync failed" would contradict the text: failures get the warning look.
+                        icon = if (state.status.lastError != null) Icons.Outlined.CloudOff else Icons.Filled.CloudDone,
+                        container = if (state.status.lastError != null) LucentoTheme.extendedColors.warningContainer else MaterialTheme.colorScheme.primaryContainer,
+                        content = if (state.status.lastError != null) LucentoTheme.extendedColors.warning else MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                     Spacer(Modifier.width(Spacing.md))
                     Column(Modifier.weight(1f)) {
@@ -459,7 +468,8 @@ private fun CloudSyncSection(
                 }
             }
         }
-        state.lastMessage?.let {
+        // The status line already shows the stored error; don't print the same sentence twice (account mismatch).
+        state.lastMessage?.takeIf { state.signedInEmail == null || it != state.status.lastError }?.let {
             Spacer(Modifier.height(Spacing.sm))
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

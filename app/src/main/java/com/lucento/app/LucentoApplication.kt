@@ -13,6 +13,7 @@ import com.lucento.app.data.repository.TransactionRunner
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.data.sync.AuthRepository
 import com.lucento.app.data.sync.SupabaseModule
+import com.lucento.app.data.sync.SupabaseSyncRemote
 import com.lucento.app.data.sync.SyncPreferences
 import com.lucento.app.data.sync.SyncRepository
 import com.lucento.app.data.sync.SyncScheduler
@@ -69,10 +70,10 @@ class AppContainer(application: Application) {
 
     private val supabaseClient by lazy { SupabaseModule.create() }
     val syncPreferences: SyncPreferences by lazy { SyncPreferences(application) }
-    val auth: AuthRepository by lazy { AuthRepository(supabaseClient, application) }
+    val auth: AuthRepository by lazy { AuthRepository(supabaseClient) }
     val syncRepository: SyncRepository by lazy {
         SyncRepository(
-            client = supabaseClient,
+            remote = supabaseClient?.let(::SupabaseSyncRemote),
             wallets = database.walletDao(),
             categories = database.categoryDao(),
             transactions = database.transactionDao(),

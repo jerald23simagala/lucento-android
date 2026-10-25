@@ -25,6 +25,8 @@ data class SyncTombstoneEntity(
     @ColumnInfo(name = "client_uuid") val clientUuid: String,
     @ColumnInfo(name = "deleted_at") val deletedAt: Long,
     @ColumnInfo(defaultValue = "0") val pushed: Boolean = false,
+    /** The deleted row's `base_revision` (added in v7), so the server can tell a causal delete from a concurrent one. */
+    @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
 )
 
 @Dao

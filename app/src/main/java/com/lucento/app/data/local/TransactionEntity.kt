@@ -55,4 +55,6 @@ data class TransactionEntity(
     /** Cloud sync bookkeeping, added in v6 (see MIGRATION_5_6 and docs/SYNC.md). */
     @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
     @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
+    /** Server `revision` this row was last synced at; a push based on it is a causal successor (v7, docs/SYNC.md). */
+    @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
 )

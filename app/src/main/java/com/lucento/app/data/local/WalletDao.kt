@@ -40,7 +40,13 @@ interface WalletDao {
     @Query("SELECT * FROM wallets WHERE client_uuid = :clientUuid LIMIT 1")
     suspend fun findByClientUuid(clientUuid: String): WalletEntity?
 
-    /** No-ops (0 rows affected) if the row changed again after it was read for push; it stays dirty and is retried. */
-    @Query("UPDATE wallets SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid AND updated_at = :expectedUpdatedAt")
-    suspend fun clearDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int
+    /**
+     * After the server accepted a push at [revision]: always records it as the new base; clears dirty only if the row
+     * wasn't edited again meanwhile (that edit stays dirty and goes out next cycle as a causal successor).
+     */
+    @Query(
+        "UPDATE wallets SET base_revision = :revision, synced_at = :syncedAt, " +
+            "dirty = CASE WHEN updated_at = :expectedUpdatedAt THEN 0 ELSE dirty END WHERE client_uuid = :clientUuid"
+    )
+    suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
 }

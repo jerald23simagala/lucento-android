@@ -47,7 +47,67 @@ class SyncWireFormatTest {
     }
 }
 
+class PullRulesTest {
+
+    private fun decide(exists: Boolean = true, dirty: Boolean, base: Long?, local: Long, remoteRev: Long?, remote: Long) =
+        pullDecision(exists, dirty, base, local, remoteRev, remote)
+
+    @Test
+    fun `missing locally - insert`() =
+        assertEquals(PullDecision.INSERT, decide(exists = false, dirty = false, base = null, local = 0, remoteRev = 1, remote = 5))
+
+    @Test
+    fun `causal successor - local kept whatever the clocks say`() {
+        // Base equals the server's current revision: the user edited the latest version, so a slow clock can't lose it.
+        assertEquals(PullDecision.KEEP_LOCAL, decide(dirty = true, base = 4, local = 1, remoteRev = 4, remote = 999))
+        assertTrue(localEditWins(localBaseRevision = 4, localUpdatedAt = 1, remoteRevision = 4, remoteUpdatedAt = 999))
+    }
+
+    @Test
+    fun `concurrent - strictly later edit wins, a tie goes to the server`() {
+        assertEquals(PullDecision.KEEP_LOCAL, decide(dirty = true, base = 3, local = 11, remoteRev = 4, remote = 10))
+        assertEquals(PullDecision.UPDATE, decide(dirty = true, base = 3, local = 10, remoteRev = 4, remote = 10))
+        assertEquals(PullDecision.UPDATE, decide(dirty = true, base = 3, local = 9, remoteRev = 4, remote = 10))
+    }
+
+    @Test
+    fun `unknown base counts as concurrent`() {
+        assertEquals(PullDecision.KEEP_LOCAL, decide(dirty = true, base = null, local = 11, remoteRev = 4, remote = 10))
+        assertEquals(PullDecision.UPDATE, decide(dirty = true, base = null, local = 10, remoteRev = 4, remote = 10))
+    }
+
+    @Test
+    fun `clean - server wins even with an older timestamp`() =
+        assertEquals(PullDecision.UPDATE, decide(dirty = false, base = 3, local = 10, remoteRev = 4, remote = 5))
+
+    @Test
+    fun `clean and identical - nothing to write`() =
+        assertEquals(PullDecision.UNCHANGED, decide(dirty = false, base = 4, local = 7, remoteRev = 4, remote = 7))
+
+    @Test
+    fun `clean, same content but a newer revision - record the new base`() =
+        assertEquals(PullDecision.UPDATE, decide(dirty = false, base = 3, local = 7, remoteRev = 4, remote = 7))
+
+    @Test
+    fun `cursor trails the newest row by the overlap`() =
+        assertEquals(940L, nextPullCursor(sinceMillis = 0, newestSeenMillis = 1_000, oldestDeferredMillis = null, overlapMillis = 60))
+
+    @Test
+    fun `cursor never passes a deferred row`() =
+        assertEquals(300L, nextPullCursor(sinceMillis = 0, newestSeenMillis = 1_000, oldestDeferredMillis = 300, overlapMillis = 60))
+
+    @Test
+    fun `cursor stays put when nothing was seen`() =
+        assertEquals(500L, nextPullCursor(sinceMillis = 500, newestSeenMillis = null, oldestDeferredMillis = null, overlapMillis = 60))
+}
+
 class SyncTimeTest {
+
+    @Test
+    fun `parses the timestamptz format Postgres returns (offset, microseconds)`() {
+        assertEquals(SyncTime.fromIso("2026-10-24T08:56:32.123Z"), SyncTime.fromIso("2026-10-24T08:56:32.123456+00:00"))
+    }
+
 
     @Test
     fun `epoch millis survive an ISO round trip exactly`() {

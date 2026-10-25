@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.app.Application
+import android.content.Context
 import com.lucento.app.core.applicationContainerFactory
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.preferences.UserPreferences
@@ -71,13 +72,15 @@ class SettingsViewModel(
             syncPreferences.status,
             syncing,
             syncMessage,
+            auth.observeSignedInEmail(),
         ) { values ->
             val prefs = values[0] as UserPreferences
-            @Suppress("UNCHECKED_CAST") val w = values[1] as List<*>
-            @Suppress("UNCHECKED_CAST") val t = values[2] as List<*>
+            val w = values[1] as List<*>
+            val t = values[2] as List<*>
             val syncStatus = values[3] as SyncStatus
             val isSyncing = values[4] as Boolean
             val message = values[5] as String?
+            val email = values[6] as String?
             SettingsUiState(
                 preferences = prefs,
                 walletCount = w.size,
@@ -85,7 +88,7 @@ class SettingsViewModel(
                 cloudSync = CloudSyncUiState(
                     configured = SupabaseModule.isConfigured,
                     googleSignInConfigured = SupabaseModule.isGoogleSignInConfigured,
-                    signedInEmail = auth.currentUserEmail,
+                    signedInEmail = email,
                     status = syncStatus,
                     syncing = isSyncing,
                     lastMessage = message,
@@ -94,12 +97,13 @@ class SettingsViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Signs in, then turns cloud sync on and runs a first sync immediately. Never touches local data itself. */
-    fun connectGoogleAccount() {
+    /** [activity] hosts Google's account picker; it is passed through for this call only and never stored. */
+    fun connectGoogleAccount(activity: Context) {
         if (syncing.value) return
         viewModelScope.launch {
             syncing.value = true
             syncMessage.value = null
-            when (val result = auth.signInWithGoogle()) {
+            when (val result = auth.signInWithGoogle(activity)) {
                 AuthRepository.SignInResult.Success -> {
                     syncPreferences.setEnabled(true)
                     SyncScheduler.ensurePeriodic(application)
@@ -107,7 +111,7 @@ class SettingsViewModel(
                 }
                 AuthRepository.SignInResult.Cancelled -> Unit
                 AuthRepository.SignInResult.NotConfigured ->
-                    syncMessage.value = "Cloud sync isn't set up yet — see docs/SYNC.md for the remaining steps."
+                    syncMessage.value = "Cloud sync isn’t available in this version of Lucento yet."
                 is AuthRepository.SignInResult.Failed -> syncMessage.value = result.message
             }
             syncing.value = false
@@ -139,10 +143,11 @@ class SettingsViewModel(
             is SyncResult.Success -> {
                 val r = result.report
                 "Synced — ${r.pushed} sent, ${r.pulled} received" +
-                    if (r.conflictsKeptLocal > 0) ", kept this device's version for ${r.conflictsKeptLocal}" else ""
+                    if (r.conflicts > 0) ". ${r.conflicts} changed on two devices at once — the later edit was kept" else ""
             }
             SyncResult.NotSignedIn -> "Not connected — sign in to sync."
-            SyncResult.NotConfigured -> "Cloud sync isn't set up yet — see docs/SYNC.md for the remaining steps."
+            SyncResult.AccountMismatch -> SyncRepository.ACCOUNT_MISMATCH_MESSAGE
+            SyncResult.NotConfigured -> "Cloud sync isn’t available in this version of Lucento yet."
             is SyncResult.Retryable -> "Sync couldn't finish (${result.message}) — your data is safe and it will retry."
         }
     }

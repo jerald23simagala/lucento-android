@@ -63,12 +63,15 @@ interface GoalDao {
     @Query("SELECT * FROM goals WHERE client_uuid = :clientUuid LIMIT 1")
     suspend fun findGoalByClientUuid(clientUuid: String): GoalEntity?
 
-    @Query("UPDATE goals SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid AND updated_at = :expectedUpdatedAt")
-    suspend fun clearGoalDirtyIfUnchanged(clientUuid: String, expectedUpdatedAt: Long, syncedAt: Long): Int
+    @Query(
+        "UPDATE goals SET base_revision = :revision, synced_at = :syncedAt, " +
+            "dirty = CASE WHEN updated_at = :expectedUpdatedAt THEN 0 ELSE dirty END WHERE client_uuid = :clientUuid"
+    )
+    suspend fun markGoalPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
 
     @Query("SELECT * FROM goal_contributions WHERE dirty = 1")
     suspend fun getDirtyContributions(): List<GoalContributionEntity>
 
-    @Query("UPDATE goal_contributions SET dirty = 0, synced_at = :syncedAt WHERE client_uuid = :clientUuid")
-    suspend fun clearContributionDirty(clientUuid: String, syncedAt: Long)
+    @Query("UPDATE goal_contributions SET dirty = 0, base_revision = :revision, synced_at = :syncedAt WHERE client_uuid = :clientUuid")
+    suspend fun markContributionPushed(clientUuid: String, revision: Long, syncedAt: Long)
 }

@@ -252,12 +252,12 @@ class MigrationTest {
     }
 
     @Test
-    fun migrate1To6_runsTheFullChainAndRoomOpensTheResult() {
+    fun migrate1To7_runsTheFullChainAndRoomOpensTheResult() {
         helper.createDatabase(TEST_DB, 1).apply {
             seedV1Wallets()
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 6, true, *Migrations.ALL)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 7, true, *Migrations.ALL)
         assertEquals(12345L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 1"))
         assertEquals(50000L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 2"))
         assertEquals(DefaultCategories.all.size.toLong(), db.long("SELECT COUNT(*) FROM categories"))
@@ -278,7 +278,66 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun migrate6To7_addsBaseRevisionAndTombstonesRecordIt() {
+        helper.createDatabase(TEST_DB, 6).apply {
+            execSQL(
+                "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, dirty, synced_at) " +
+                    "VALUES (1, 'Cash', 'CASH', 'USD', 12345, 0, 0, 1, 1, 'w-1', 0, 5)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 7, true, Migrations.MIGRATION_6_7)
+
+        db.query("SELECT opening_balance_minor, client_uuid, dirty, base_revision FROM wallets WHERE id = 1").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(12345L, c.getLong(0)); assertEquals("w-1", c.getString(1)); assertEquals(0, c.getInt(2)); assertTrue(c.isNull(3))
+        }
+        db.execSQL("UPDATE wallets SET base_revision = 5 WHERE id = 1")
+        db.execSQL("DELETE FROM wallets WHERE id = 1")
+        db.query("SELECT client_uuid, base_revision FROM sync_tombstones").use { c ->
+            assertEquals(1, c.count)
+            assertTrue(c.moveToFirst())
+            assertEquals("w-1", c.getString(0)); assertEquals(5L, c.getLong(1))
+        }
+        db.assertNoForeignKeyViolations()
+    }
+
+    /**
+     * A fresh install never runs a migration — Room creates the tables from the entities — so the sync triggers must
+     * come from the open callback. Before SyncTriggers, a new install had none: deletes never reached other devices and
+     * edits after the first sync were never pushed.
+     */
+    @Test
+    fun freshInstall_hasTheSyncTriggers() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(FRESH_DB)
+        val room = LucentoDatabase.build(context, FRESH_DB)
+        try {
+            runBlocking {
+                val wallets = room.walletDao()
+                val id = wallets.insert(
+                    WalletEntity(name = "Cash", type = "CASH", currencyCode = "USD", openingBalanceMinor = 0, createdAt = 1, updatedAt = 1, clientUuid = "w-fresh")
+                )
+                wallets.markPushed("w-fresh", expectedUpdatedAt = 1, revision = 3, syncedAt = 10)
+                assertEquals(false, wallets.getById(id)!!.dirty)
+
+                wallets.update(wallets.getById(id)!!.copy(name = "Cash box", updatedAt = 2)) // an ordinary edit
+                assertEquals("an edit after a sync must be marked for upload", true, wallets.getById(id)!!.dirty)
+
+                wallets.deleteById(id)
+                val tombstone = room.syncDao().unpushedTombstones().single()
+                assertEquals("w-fresh", tombstone.clientUuid)
+                assertEquals(3L, tombstone.baseRevision)
+            }
+        } finally {
+            room.close()
+            context.deleteDatabase(FRESH_DB)
+        }
+    }
+
     private companion object {
+        const val FRESH_DB = "fresh-install-test"
         const val TEST_DB = "migration-test"
     }
 }

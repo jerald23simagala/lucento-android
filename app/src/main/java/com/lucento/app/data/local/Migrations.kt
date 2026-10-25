@@ -293,7 +293,128 @@ object Migrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+    /**
+     * v7: causal conflict resolution (see docs/SYNC.md "Conflict resolution"). Purely additive.
+     * - Every synced table gains a nullable `base_revision`: the server `revision` the local row was last synced at.
+     *   A push based on the current server revision is a causal successor and wins whatever the device clock says.
+     * - `sync_tombstones` gains `base_revision`, and the tombstone triggers are recreated to record it, so a delete
+     *   can be told apart from a concurrent edit too.
+     * Literal statements only: tools/check_migrations.py replays them in CI.
+     */
+    val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `base_revision` INTEGER")
+            db.execSQL("ALTER TABLE `categories` ADD COLUMN `base_revision` INTEGER")
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `base_revision` INTEGER")
+            db.execSQL("ALTER TABLE `budgets` ADD COLUMN `base_revision` INTEGER")
+            db.execSQL("ALTER TABLE `goals` ADD COLUMN `base_revision` INTEGER")
+            db.execSQL("ALTER TABLE `goal_contributions` ADD COLUMN `base_revision` INTEGER")
+            db.execSQL("ALTER TABLE `sync_tombstones` ADD COLUMN `base_revision` INTEGER")
+            db.execSQL("DROP TRIGGER IF EXISTS `trg_wallets_tombstone`")
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_wallets_tombstone` AFTER DELETE ON `wallets` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('wallets', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+            )
+            db.execSQL("DROP TRIGGER IF EXISTS `trg_categories_tombstone`")
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_categories_tombstone` AFTER DELETE ON `categories` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('categories', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+            )
+            db.execSQL("DROP TRIGGER IF EXISTS `trg_transactions_tombstone`")
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_transactions_tombstone` AFTER DELETE ON `transactions` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('transactions', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+            )
+            db.execSQL("DROP TRIGGER IF EXISTS `trg_budgets_tombstone`")
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_budgets_tombstone` AFTER DELETE ON `budgets` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('budgets', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+            )
+            db.execSQL("DROP TRIGGER IF EXISTS `trg_goals_tombstone`")
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_goals_tombstone` AFTER DELETE ON `goals` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('goals', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+            )
+            db.execSQL("DROP TRIGGER IF EXISTS `trg_goal_contributions_tombstone`")
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_goal_contributions_tombstone` AFTER DELETE ON `goal_contributions` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('goal_contributions', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+}
+
+/**
+ * The sync triggers at the current schema version (identical SQL to the latest migration that creates them).
+ * Run on every open with IF NOT EXISTS: Room builds a fresh install's tables from the entities and never runs a
+ * migration, so without this a new install would have no tombstones and no dirty-on-edit at all.
+ */
+object SyncTriggers {
+    fun ensure(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_wallets_tombstone` AFTER DELETE ON `wallets` WHEN OLD.client_uuid IS NOT NULL " +
+                "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('wallets', OLD.client_uuid, " +
+                "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_categories_tombstone` AFTER DELETE ON `categories` WHEN OLD.client_uuid IS NOT NULL " +
+                "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('categories', OLD.client_uuid, " +
+                "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_transactions_tombstone` AFTER DELETE ON `transactions` WHEN OLD.client_uuid IS NOT NULL " +
+                "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('transactions', OLD.client_uuid, " +
+                "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_budgets_tombstone` AFTER DELETE ON `budgets` WHEN OLD.client_uuid IS NOT NULL " +
+                "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('budgets', OLD.client_uuid, " +
+                "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_goals_tombstone` AFTER DELETE ON `goals` WHEN OLD.client_uuid IS NOT NULL " +
+                "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('goals', OLD.client_uuid, " +
+                "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_goal_contributions_tombstone` AFTER DELETE ON `goal_contributions` WHEN OLD.client_uuid IS NOT NULL " +
+                "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('goal_contributions', OLD.client_uuid, " +
+                "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_wallets_dirty` AFTER UPDATE ON `wallets` " +
+                "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                "BEGIN UPDATE `wallets` SET dirty = 1 WHERE id = NEW.id; END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_categories_dirty` AFTER UPDATE ON `categories` " +
+                "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                "BEGIN UPDATE `categories` SET dirty = 1 WHERE id = NEW.id; END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_transactions_dirty` AFTER UPDATE ON `transactions` " +
+                "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                "BEGIN UPDATE `transactions` SET dirty = 1 WHERE id = NEW.id; END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_budgets_dirty` AFTER UPDATE ON `budgets` " +
+                "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                "BEGIN UPDATE `budgets` SET dirty = 1 WHERE id = NEW.id; END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_goals_dirty` AFTER UPDATE ON `goals` " +
+                "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                "BEGIN UPDATE `goals` SET dirty = 1 WHERE id = NEW.id; END"
+        )
+    }
 }
 
 /**
