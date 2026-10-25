@@ -165,15 +165,15 @@ budgets and goals are never touched. The device stays tied to the account it fir
 
 ## Setup required
 
-Database: migrations 1–4 in `supabase/migrations/` are applied to project `lucento` (`hmtcuttadbgbldvzsfhz`).
-**Migration 5 (`20261025000000_server_clock_sync_cursor.sql`) is not applied yet.** It adds `server_updated_at`,
-`revision` and `base_revision`, the server-time stamp trigger, and the causal conflict rule. It was validated against
-the live database inside rolled-back transactions (existing rows get `revision = 1` and a server timestamp with their
-data unchanged; causal, concurrent, retry, clamp, delete and RLS cases all behave as documented above). Apply it
-before running a build of this code against the project — the app pulls by `server_updated_at` and sends
-`base_revision`, which don't exist until then — e.g. Supabase dashboard → SQL editor, or `supabase db push`. It is
-additive: nothing is dropped, no existing value is rewritten, and builds from commit `026c2f8` keep working against it
-(they send no base, so their writes follow the concurrent rule).
+Database: all five migrations in `supabase/migrations/` are applied to project `lucento` (`hmtcuttadbgbldvzsfhz`);
+each file is named after the version Supabase recorded, so `supabase db push` sees nothing outstanding. Migration 5
+(`20261025145902_server_clock_sync_cursor.sql`, applied 2026-10-25) adds `server_updated_at`, `revision` and
+`base_revision`, the server-time stamp trigger, and the causal conflict rule. It is additive — nothing was dropped and
+no existing value rewritten — and builds from commit `026c2f8` keep working against it (they send no base, so their
+writes follow the concurrent rule). After applying: the security advisor reports no findings, and on the live triggers
+(inside a rolled-back transaction) a causal edit from a slow clock is accepted, a stale concurrent edit is skipped and
+another user sees no rows. The performance advisor's notes (`auth.uid()` re-evaluated per row in the RLS policies,
+unindexed composite foreign keys, the old `*_user_updated` indexes now unused) predate it and are follow-ups.
 
 Google sign-in. Lucento uses **native** Google sign-in (Credential Manager → Google ID token → Supabase
 `signInWith(IDToken)`), not a browser redirect: there is no login web page, deep link or OAuth callback in the app.
