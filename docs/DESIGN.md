@@ -66,10 +66,12 @@ theme-preview swatches in Settings are the single, intentional exception). Lotti
 balances say "owed", budget states say "Over" / a percentage, and transfers are labelled "From → To".
 
 ## Brand mark and mascots
-- **Mark** (`LucentoMark`, launcher icon, splash, onboarding animation): a rounded blue **L** (`#2563EB`, night
-  `#8AB0FF`) with a yellow **leaf** (`#FBBF24`) — clarity plus growth. Drawn on a 100-unit grid; the launcher/splash
-  vectors are generated from the same geometry. **Approved artwork: never redrawn, retyped or re-tinted** to the UI
-  palette (`brandMark` / `brandLeaf` keep the artwork colours).
+- **Logo — Rising Crest** (`LucentoMark` symbol, `LucentoWordmark`, launcher icon, splash, onboarding): three
+  leaf-cut bars in `#154DFD`, `#61AEFD`, `#FECA45` and a `#FDA81B` dot; the "lucento" wordmark is outlined Manrope Bold,
+  navy `#17233F` on light and white on dark. Source of truth: the `lucento-website` repo, `brand/logo/` (its README
+  has usage rules). The vector drawables (`ic_launcher_*`, `ic_splash_mark`, `lucento_symbol`, `lucento_wordmark_*`)
+  are lossless conversions of those SVGs. **Approved artwork: never redrawn, retyped or re-tinted** to the UI palette.
+  Adaptive icon background `#FFFFFF`. Legacy density PNGs are not shipped: minSdk 26 always uses the adaptive icon.
 - **Mascot** (`LucentoMascot`): **Lucento**, a golden orb with a tousled hair crest, cream scarf, brown satchel and a
   crystal torch whose light reflects financial wellness (thriving → steady → getting tight → concerned → over plan).
   The canonical spec, tiers, poses and masters live in `docs/mascot/` (`MASCOT_DESIGN_SPEC.md`). In the app,
@@ -140,7 +142,7 @@ Hairlines separate rows inside cards.
 | `LucentoTopBar`, `SectionHeader`, `Figure`, `Hairline`, `EmptyState` | Structure. |
 | `IconTile`, `CategoryTile`, `WalletTypeTile`, `IconBadge` | Tinted icon tiles (transfers use a swap icon). |
 | Buttons, `SearchField`, `SegmentedToggle`, `ChoicePill`, `LucentoBottomSheet`, `ConfirmDialog` | Inputs and containers. |
-| `LucentoMark`, `LucentoMascot` | Brand. |
+| `LucentoMark`, `LucentoWordmark`, `LucentoMascot` | Brand: symbol, wordmark, mascot. |
 | `LucentoLottieAnimation`, `EmptyIllustration`, `LucentoEmptyState`, `ConfirmationHost`, `LucentoWorkingIndicator` | Motion (see below). |
 
 ## Motion and Lottie (v0.4)
@@ -156,7 +158,7 @@ files (`res/raw`, register in `docs/design/ANIMATION_ASSETS.md`) through two com
 | `ConfirmationHost(Confirmation)` | Saved check or calm milestone with one line of text, shown **after** a committed write; does not block touches; announced as a live region. |
 | `LucentoWorkingIndicator` | Brand dots + label for genuine background work. |
 
-Moments: onboarding mark assembles; empty Transactions/Budgets/Goals/Recurring; receipt scan beam while ML Kit runs
+Moments: empty Transactions/Budgets/Goals/Recurring; receipt scan beam while ML Kit runs
 (replaced by results or a clear error); saved transaction/transfer/recurring payment; goal halfway/reached; a month
 kept within budget (once). With "Remove animations" on (`LucentoTheme.reducedMotion`) nothing moves.
 
@@ -171,7 +173,7 @@ kept within budget (once). With "Remove animations" on (`LucentoTheme.reducedMot
 - **Transactions**: All · Income · Expenses · Transfers tabs above search (type pill removed from the filter row);
   empty state with the ledger illustration, Add transaction + outlined Scan receipt / Speak transaction.
 - **Plan**: mascot enlarged beside the tagline; **Budgets/Goals/Recurring** empty states with their illustrations.
-- **Onboarding**: animated mark above the wordmark; "You're all set" mascot plays its success expression.
+- **Onboarding**: the Rising Crest symbol settles in above the wordmark; "You're all set" mascot plays its success expression.
 - **Receipt scan**: scanning illustration while reading, "Couldn't read this receipt" state with the curious mascot.
 Not taken from the mockup on purpose: the user name/avatar (Lucento has no account), "I already have an account"
 (no sign-in exists), notification settings (no reminders yet), and emoji in the greeting.

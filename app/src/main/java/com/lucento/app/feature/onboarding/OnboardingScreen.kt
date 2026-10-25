@@ -51,10 +51,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.CurrencyList
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
-import com.lucento.app.core.designsystem.component.LucentoMark
+import com.lucento.app.core.designsystem.component.LucentoStackedLockup
 import com.lucento.app.core.designsystem.component.LucentoMascot
-import com.lucento.app.core.designsystem.component.LucentoAnimation
-import com.lucento.app.core.designsystem.component.LucentoLottieAnimation
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
@@ -175,15 +173,8 @@ private fun WelcomeStep(onContinue: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // The mark assembles once (≈2.5 s, never blocks the button); reduced motion shows it complete.
-            LucentoLottieAnimation(
-                animation = LucentoAnimation.Welcome,
-                modifier = Modifier.size(width = 132.dp, height = 110.dp),
-                contentDescription = "Lucento",
-                fallback = { LucentoMark(size = 96.dp, animate = false) },
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            Text("Lucento", style = MaterialTheme.typography.displayMedium, modifier = Modifier.semantics { heading() })
+            // The Rising Crest symbol settles in once (never blocks the button); reduced motion shows it complete.
+            LucentoStackedLockup(symbolSize = 96.dp, animate = true, wordmarkModifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(Spacing.sm))
             Text(
                 "Financial clarity without the complexity.",

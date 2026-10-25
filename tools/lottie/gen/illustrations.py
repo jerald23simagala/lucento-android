@@ -235,7 +235,8 @@ def loading(c):
 
 
 def build(out):
-    for name, fn in [("onboarding_welcome", onboarding), ("empty_transactions", empty_transactions), ("empty_budgets", empty_budgets),
+    # onboarding_welcome (the old L-and-leaf mark assembling) is retired: onboarding shows the Rising Crest symbol.
+    for name, fn in [("empty_transactions", empty_transactions), ("empty_budgets", empty_budgets),
                      ("empty_goals", empty_goals), ("empty_recurring", empty_recurring), ("receipt_scanning", receipt_scan)]:
         write(rnd(fn(DAY)), f"{out}/{name}.json")
         write(rnd(fn(NIGHT)), f"{out}/{name}_night.json")

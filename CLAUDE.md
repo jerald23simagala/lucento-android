@@ -68,7 +68,7 @@ app/src/main/java/com/lucento/app/
 ## Design standards
 - Palette: Sunrise Energy — Electric Blue `#3563F5` for interaction, sunlight `#FFC928` / tangerine `#FF8A24` accents (sparingly), soft ivory / midnight navy neutrals, navy
   dark theme. No dynamic colour. Tokens, components and rules are in `docs/DESIGN.md`; never hardcode colours.
-- Brand: blue L + yellow leaf mark; Lucento mascot (`LucentoMascot`, golden orb with a crystal torch; spec in `docs/mascot/`), small on dashboards.
+- Brand: Rising Crest logo (three leaf-cut bars + dot, "lucento" wordmark; source `lucento-website/brand/logo/`, see docs/DESIGN.md); Lucento mascot (`LucentoMascot`, golden orb with a crystal torch; spec in `docs/mascot/`), small on dashboards.
 - Optional modules are switched through the typed `FeatureSet` (DataStore). Disabling a module hides it and never
   deletes data; core transactions/accounts are never optional.
 - Amounts are always signed via `MoneyFormatter.formatSigned` so meaning never depends on colour alone.

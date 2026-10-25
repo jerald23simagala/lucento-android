@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Lucento mark: rounded L with a leaf. Generated from the 100-unit grid in LucentoMark.kt, scaled into the 66dp safe zone. -->
+<!-- Converted losslessly from lucento-website brand/logo/android/ic_launcher_foreground.svg (Rising Crest). Approved artwork: do not redraw or re-tint. Placement only: scaled 0.09333 -> 0.085 and re-centred so the whole symbol sits inside the 66dp circular safe zone (the supplied scale fills the 66dp square, and circular launcher masks clipped the blue bar). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:pathData="M40.8,30.24 H41.46 A6.6,6.6 0 0,1 48.06,36.84 V71.16 A6.6,6.6 0 0,1 41.46,77.76 H40.8 A6.6,6.6 0 0,1 34.2,71.16 V36.84 A6.6,6.6 0 0,1 40.8,30.24 Z"
-        android:fillColor="#2563EB" />
-    <path
-        android:pathData="M40.8,63.9 H65.88 A6.6,6.6 0 0,1 72.48,70.5 V71.16 A6.6,6.6 0 0,1 65.88,77.76 H40.8 A6.6,6.6 0 0,1 34.2,71.16 V70.5 A6.6,6.6 0 0,1 40.8,63.9 Z"
-        android:fillColor="#2563EB" />
-    <path
-        android:pathData="M54.0,59.28 C52.68,46.08 61.92,35.52 76.44,31.56 C76.44,46.08 68.52,57.96 54.0,59.28 Z"
-        android:fillColor="#FBBF24" />
+    <group android:translateX="28.5" android:translateY="28.5">
+        <group android:scaleX="0.085" android:scaleY="0.085">
+            <group android:translateX="-15" android:translateY="-17">
+                <path android:fillColor="#154DFD" android:pathData="M35 576V470C35 406.6 98.0 360.2 194 351Q210 346 210 362V570C210 582.1 200.1 592 188 592H51Q35 592 35 576Z" />
+                <path android:fillColor="#61AEFD" android:pathData="M240 586V345C240 282.6 299.4 237.0 389 228Q405 223 405 239V465C405 539.5 342.3 600 265 600H254Q240 600 240 586Z" />
+                <path android:fillColor="#FECA45" android:pathData="M430 571V262C430 194.9 489.4 145.9 579 136Q595 131 595 147V425C595 513.3 532.3 585 455 585H444Q430 585 430 571Z" />
+                <path android:fillColor="#FDA81B" android:pathData="M510,75 A38,38 0 1,0 586,75 A38,38 0 1,0 510,75 Z" />
+            </group>
+        </group>
+    </group>
 </vector>
