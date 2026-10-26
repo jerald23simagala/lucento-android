@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.view.KeyEvent
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -242,7 +244,9 @@ class ScreenshotTourTest {
         waitForText("Transactions")
         shot("11-transactions")
         // A left swipe reveals Edit and Delete; a tap opens the read-only View page, whose Edit pill opens the editor.
-        compose.onNodeWithText("Weekly shop").performScrollTo().performTouchInput { swipeLeft() }
+        // The history is a lazy list: rows below the fold aren't composed yet, so scroll the list itself to the row.
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Weekly shop"))
+        compose.onNodeWithText("Weekly shop").performTouchInput { swipeLeft() }
         waitForText("Delete")
         shot("11a-transaction-actions")
         compose.onNodeWithText("Weekly shop").performClick() // closes the open row
