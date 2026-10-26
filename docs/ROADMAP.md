@@ -82,7 +82,8 @@ with category management, focused Insights, screenshot tour in CI.
 ## Done — conversational transaction composer (JVM-tested; compile pending CI)
 One composer replaces the Add sheet and the Scan / Speak / Type it screens: several transactions per message,
 inferred type/category/date/account, inline correction, receipts and speech through the same review, atomic batch
-save. Next: on-device learning from corrections (M5), optional opt-in remote interpreter (docs/CAPTURE.md).
+save. Chat layout with a pinned wallet bar (default wallet, picker, one-tap transfers) and all-or-nothing saving.
+Next: on-device learning from corrections (M5), optional opt-in remote interpreter (docs/CAPTURE.md).
 
 ## In progress — optional cloud sync (Supabase + Google Sign-In; built and tested locally, see docs/SYNC.md)
 Done: Room v6 sync bookkeeping (emulator-tested migration), push/pull/merge engine with tombstones and

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lucento.app.core.containerFactory
 import com.lucento.app.core.money.MoneyFormatter
+import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
@@ -17,6 +18,7 @@ import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.capture.BatchReview
 import com.lucento.app.domain.capture.BatchSummary
+import com.lucento.app.domain.capture.CandidateFlag
 import com.lucento.app.domain.capture.CaptureSource
 import com.lucento.app.domain.capture.Interpretation
 import com.lucento.app.domain.capture.InterpretationContext
@@ -24,6 +26,7 @@ import com.lucento.app.domain.capture.LocalTransactionInterpreter
 import com.lucento.app.domain.capture.ReceiptParser
 import com.lucento.app.domain.capture.ReviewRow
 import com.lucento.app.domain.capture.ReviewSetup
+import com.lucento.app.domain.capture.TransactionCandidate
 import com.lucento.app.domain.capture.RowEdit
 import com.lucento.app.domain.capture.RowStatus
 import com.lucento.app.domain.capture.TransactionInterpreter
@@ -33,6 +36,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -68,6 +73,12 @@ data class ComposerState(
     val transfersAllowed: Boolean = false,
     /** The message being corrected; sending replaces its rows but keeps the user's edits. */
     val editingMessageId: Long? = null,
+    /** Where new rows go unless the words name an account: the chosen pill, the entry wallet, the default, the only one. */
+    val activeWalletId: Long? = null,
+    val defaultWalletId: Long? = null,
+    /** Several accounts and none active yet: the wallet picker is (or will be) asked. */
+    val needsWalletChoice: Boolean = false,
+    val showWalletPicker: Boolean = false,
 )
 
 /**
@@ -82,6 +93,7 @@ class ComposerViewModel(
     wallets: WalletRepository,
     categories: CategoryRepository,
     private val interpreter: TransactionInterpreter,
+    private val preferences: UserPreferencesRepository? = null,
     private val separator: Char = MoneyFormatter.decimalSeparator(),
     private val today: () -> LocalDate = LocalDate::now,
 ) : ViewModel() {
@@ -92,9 +104,15 @@ class ComposerViewModel(
         val saving: Boolean = false,
         val saveError: String? = null,
         val editingMessageId: Long? = null,
-        val defaultWalletId: Long? = null,
+        /** The wallet the composer was opened from (a wallet's own screen). */
+        val entryWalletId: Long? = null,
+        /** A pill the user tapped, or the picker's answer. Wins over everything else. */
+        val chosenWalletId: Long? = null,
         val typeHint: TransactionType? = null,
         val transfersEnabled: Boolean = true,
+        val showWalletPicker: Boolean = false,
+        /** A message sent before any wallet was chosen; it goes out right after the picker answers. */
+        val pending: Pair<String, CaptureSource>? = null,
     )
 
     private val session = MutableStateFlow(Session())
@@ -107,9 +125,14 @@ class ComposerViewModel(
         wallets.observeWallets(),
         categories.observeCategories(),
         transactions.observeTransactions(),
+        preferences?.preferences?.map { it.defaultWalletId } ?: flowOf(null),
         session,
-    ) { allWallets, categoryList, history, s ->
+    ) { allWallets, categoryList, history, savedDefault, s ->
         val walletList = allWallets.transactable()
+        val ids = walletList.map { it.id }.toSet()
+        val defaultId = savedDefault?.takeIf { it in ids }
+        val active = listOf(s.chosenWalletId, s.entryWalletId, defaultId).firstOrNull { it != null && it in ids }
+            ?: walletList.singleOrNull()?.id
         val transfersAllowed = s.transfersEnabled && walletList.size > 1
         val setup = ReviewSetup(walletList, categoryList, separator, transfersAllowed, history)
         val statuses = s.rows.associate { it.key to BatchReview.check(it, setup) }
@@ -126,19 +149,84 @@ class ComposerViewModel(
             saveError = s.saveError,
             transfersAllowed = transfersAllowed,
             editingMessageId = s.editingMessageId,
+            activeWalletId = active,
+            defaultWalletId = defaultId,
+            needsWalletChoice = active == null && walletList.size > 1,
+            showWalletPicker = s.showWalletPicker && active == null && walletList.size > 1,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ComposerState())
 
     /** Where the composer was opened from: a wallet pre-selects its account; "Income" makes income the default. */
     fun configure(walletId: Long?, typeHint: TransactionType?, transfersEnabled: Boolean) {
-        session.update { it.copy(defaultWalletId = walletId, typeHint = typeHint, transfersEnabled = transfersEnabled) }
+        session.update { it.copy(entryWalletId = walletId, typeHint = typeHint, transfersEnabled = transfersEnabled) }
+    }
+
+    // ------------------------------------------------------------------ the active wallet
+
+    /** Opens the "Where should these go?" picker (shown only while several accounts exist and none is active). */
+    fun askForWallet() = session.update { it.copy(showWalletPicker = true) }
+
+    fun dismissWalletPicker() = session.update { it.copy(showWalletPicker = false, pending = null) }
+
+    /**
+     * Makes [walletId] the active wallet: later messages go there, and unsaved rows that were only following the
+     * previous active wallet move with it. [remember] also makes it the default wallet (cash, bank or e-wallet only).
+     */
+    fun chooseWallet(walletId: Long, remember: Boolean = false) {
+        val wallet = state.value.wallets.firstOrNull { it.id == walletId } ?: return
+        val pending = session.value.pending
+        session.update { s ->
+            s.copy(
+                chosenWalletId = walletId,
+                rows = if (s.saving) s.rows else BatchReview.retarget(s.rows, walletId),
+                showWalletPicker = false,
+                pending = null,
+            )
+        }
+        if (remember && wallet.type.isSpendable && preferences != null) {
+            viewModelScope.launch { preferences.setDefaultWallet(walletId) }
+        }
+        pending?.let { (text, source) -> send(text, source, chosen = walletId) }
+    }
+
+    /** Starts a transfer from the active wallet as its own row: the user picks where it goes and types the amount. */
+    fun startTransfer() {
+        val current = state.value
+        if (!current.loaded || !current.transfersAllowed || current.saving) return
+        val from = current.wallets.firstOrNull { it.id == current.activeWalletId }
+        val id = nextMessageId++
+        val text = if (from != null) "New transfer from ${from.name}" else "New transfer"
+        val candidate = TransactionCandidate(
+            description = "",
+            type = TransactionType.TRANSFER_OUT,
+            amount = null,
+            walletId = from?.id,
+            toWalletId = null,
+            categoryId = null,
+            date = today(),
+            sourceText = text,
+            flags = setOf(CandidateFlag.AMOUNT_MISSING),
+        )
+        session.update { s ->
+            s.copy(
+                messages = s.messages + ComposerMessage(id, CaptureSource.TYPED, text, MessageState.Read(1)),
+                rows = s.rows + ReviewRow.from(candidate, UUID.randomUUID().toString(), id, CaptureSource.TYPED, separator),
+                saveError = null,
+            )
+        }
     }
 
     // ------------------------------------------------------------------ messages
 
-    fun send(text: String, source: CaptureSource) {
+    /** [chosen] is the wallet the picker just returned, before [state] has caught up with it. */
+    fun send(text: String, source: CaptureSource, chosen: Long? = null) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
+        if (chosen == null && state.value.needsWalletChoice) {
+            // Ask first, then send: the rows should land in the wallet the user means.
+            session.update { it.copy(showWalletPicker = true, pending = trimmed to source) }
+            return
+        }
         val replacing = session.value.editingMessageId
         val id = nextMessageId++
         session.update { s ->
@@ -181,7 +269,8 @@ class ComposerViewModel(
     private suspend fun context(): InterpretationContext {
         val loaded = state.first { it.loaded }
         val s = session.value
-        val default = s.defaultWalletId?.takeIf { id -> loaded.wallets.any { it.id == id } }
+        val default = s.chosenWalletId?.takeIf { id -> loaded.wallets.any { it.id == id } }
+            ?: loaded.activeWalletId
             ?: lastUsedWallet(loaded.wallets)
         return InterpretationContext(loaded.wallets, loaded.categories, today(), default, s.typeHint)
     }
@@ -235,21 +324,22 @@ class ComposerViewModel(
         session.update { s -> s.copy(rows = BatchReview.remove(s.rows, key)) }
     }
 
-    fun discardAll() = session.update { Session(defaultWalletId = it.defaultWalletId, typeHint = it.typeHint, transfersEnabled = it.transfersEnabled) }
+    fun discardAll() = session.update {
+        Session(entryWalletId = it.entryWalletId, chosenWalletId = it.chosenWalletId, typeHint = it.typeHint, transfersEnabled = it.transfersEnabled)
+    }
 
     fun dismissError() = session.update { it.copy(saveError = null) }
 
     // ------------------------------------------------------------------ saving
 
     /**
-     * Saves every row that is ready, in one database transaction. Rows that still need attention stay in the composer
-     * (the save button says so before it is tapped). [onSaved] runs only after the write has committed.
+     * Saves the whole batch in one database transaction — only once every row is complete; an incomplete row blocks
+     * the save (it is highlighted until fixed or removed). [onSaved] runs only after the write has committed.
      */
     fun save(onSaved: (count: Int) -> Unit) {
         val current = state.value
-        if (session.value.saving || !current.loaded) return
-        val ready = current.rows.filter { current.statuses[it.key]?.ready == true }
-        if (ready.isEmpty()) return
+        if (session.value.saving || !current.loaded || !current.summary.canSave) return
+        val ready = current.rows
         val entries = ready.map { row ->
             val money = current.statuses.getValue(row.key).money!!
             if (row.type.isTransfer) {
@@ -297,7 +387,7 @@ class ComposerViewModel(
 
     companion object {
         val Factory = containerFactory {
-            ComposerViewModel(it.transactions, it.wallets, it.categories, LocalTransactionInterpreter())
+            ComposerViewModel(it.transactions, it.wallets, it.categories, LocalTransactionInterpreter(), it.preferences)
         }
     }
 }

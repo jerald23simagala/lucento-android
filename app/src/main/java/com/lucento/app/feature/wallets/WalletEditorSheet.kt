@@ -56,6 +56,7 @@ import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.CurrencyPickerSheet
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
+import com.lucento.app.core.designsystem.component.SwitchRow
 import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.component.label
@@ -68,13 +69,14 @@ import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.launch
 
-fun Wallet.toDraft(): WalletDraft = WalletDraft(
+fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     id = id,
     name = name,
     type = type,
     currencyCode = currencyCode,
     // The editor edits the opening balance; the current balance is derived from transactions.
     amountText = if (openingBalance.isZero) "" else MoneyFormatter.formatPlain(openingBalance),
+    isDefault = isDefault,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -276,6 +278,16 @@ fun WalletEditorSheet(
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            if (draft.type.isSpendable) {
+                Spacer(Modifier.height(Spacing.sm))
+                SwitchRow(
+                    title = "Default wallet",
+                    description = "New transactions go here unless you pick another wallet in the composer.",
+                    checked = draft.isDefault,
+                    onCheckedChange = { draft = draft.copy(isDefault = it) },
+                )
+            }
 
             Spacer(Modifier.height(Spacing.xl))
             LucentoPrimaryButton(

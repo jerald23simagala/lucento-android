@@ -56,6 +56,11 @@ data class TransactionCandidate(
     /** The words this row was read from, shown when the row is expanded. */
     val sourceText: String,
     val flags: Set<CandidateFlag> = emptySet(),
+    /**
+     * True when the words named the account ([walletId], the source of a transfer); false when it is only the
+     * composer's active wallet, which may then be switched for this row.
+     */
+    val walletFromText: Boolean = false,
 )
 
 /** Who did the interpreting, so the UI never presents local rules as something else. */

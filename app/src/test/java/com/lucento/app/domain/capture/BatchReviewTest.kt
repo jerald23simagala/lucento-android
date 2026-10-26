@@ -57,6 +57,16 @@ class BatchReviewTest {
         val summary = BatchReview.summarize(list, statuses)
         assertEquals(2, summary.ready)
         assertEquals(1, summary.needsAttention)
+        assertFalse(summary.canSave)
+    }
+
+    @Test fun batchSavesOnlyWhenEveryRowIsComplete() {
+        val list = rows("Lunch 250, coffee 180, and paid the electricity bill")
+        val fixed = BatchReview.edit(list, "k2", RowEdit.Amount("1500"), categories, '.')
+        val summary = BatchReview.summarize(fixed, fixed.associate { it.key to check(it) })
+        assertEquals(0, summary.needsAttention)
+        assertTrue(summary.canSave)
+        assertFalse(BatchReview.summarize(emptyList(), emptyMap()).canSave)
     }
 
     @Test fun editingOneRowLeavesTheOthersAlone() {
@@ -163,5 +173,19 @@ class BatchReviewTest {
         val b = rows("coffee 5").single().copy(key = "x", walletId = 3)
         val statuses = mapOf(a.key to check(a), b.key to check(b))
         assertEquals(setOf(Money(250_00, "PHP"), Money(5_00, "USD")), BatchReview.summarize(listOf(a, b), statuses).expenses.toSet())
+    }
+
+    @Test fun switchingTheActiveWalletMovesOnlyRowsThatFollowedIt() {
+        val list = rows("lunch 250, coffee 180 from Savings, dinner 400")
+        val chosen = BatchReview.edit(list, "k2", RowEdit.Account(1), categories, '.')
+        val moved = BatchReview.retarget(chosen, 4)
+        assertEquals(listOf(4L, 2L, 1L), moved.map { it.walletId }) // named and user-chosen accounts stay
+    }
+
+    @Test fun switchingTheActiveWalletNeverMakesATransferPointAtItself() {
+        val transfer = rows("transfer 500 to Savings").single()
+        assertEquals(1L, transfer.walletId)
+        assertEquals(1L, BatchReview.retarget(listOf(transfer), 2).single().walletId)
+        assertEquals(3L, BatchReview.retarget(listOf(transfer), 3).single().walletId)
     }
 }

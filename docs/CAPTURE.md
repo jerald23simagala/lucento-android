@@ -41,20 +41,40 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
 - **Date**: today, yesterday, N days ago, weekdays, "October 12", "12 Oct 2026". One date in a message applies to all
   its rows; several dates carry forward. Default is today.
 - **Account**: a named account or a type word that identifies one account; a named currency picks the only account in
-  that currency; otherwise the account last used for income/expense.
+  that currency; otherwise the composer's **active wallet** (below). Rows remember whether the words named the account
+  (`walletFromText`).
+- **Transfers**: "transfer/moved X from A to B", "withdrew 2000" (bank → cash), "sent 5000 to Savings" (only when the
+  destination is one of the user's accounts; "sent 500 to mom" stays an expense). With one account named after "top up",
+  "cash in", "paid my credit card" or "paid off my loan", that account is the destination and the source is the active
+  wallet. A fee clause right after a transfer ("…, fee 15") becomes a "Transfer fee" expense on the transfer's source.
+  Transfers need the Multiple wallets module and two same-currency accounts; amounts are never converted.
 - **Receipts**: one expense for the total paid (never one transaction per item). A labelled total is pre-filled; an
   unlabelled one is offered as choices; items that don't add up and missing/unclear dates are flagged.
 
+## Active wallet
+
+- One wallet can be the **default** ("Default wallet" switch in the wallet editor; cash, bank and e-wallets only). It is a
+  device preference (`UserPreferences.defaultWalletId`), not a database column; a stale id is ignored.
+- The active wallet is, in order: the pill the user tapped, the wallet the composer was opened from, the default, or the
+  only account. With several accounts and none of these, the composer asks "Where should these go?" (with "Remember as
+  my default"), and a message sent before answering waits for the answer.
+- With two or more accounts a pinned **wallet bar** sits under the banner: one pill per account, the active one filled.
+  Tapping another moves the unsaved rows that were only following it (`BatchReview.retarget`); rows whose words named an
+  account, or whose account the user picked, stay. A trailing **Transfer** pill adds a transfer row from the active
+  wallet. A row shows its own account chip only when it differs from the active wallet; transfer rows read "A → B".
+
 ## Review and save
 
-- Blocking (row stays until fixed): missing/invalid amount, too many decimals for the account's currency, no account,
+- Blocking (outlined in red; the batch can't be saved until it is fixed or removed): missing/invalid amount, too many decimals for the account's currency, no account,
   a mentioned currency the account doesn't use (until the user changes the account or confirms the amount), transfer
   without two distinct same-currency accounts, a category that no longer fits.
 - Hints (row can be saved): no category, receipt date to check, items vs total, "a matching transaction is already
   saved for this day".
-- The save button says exactly what happens: "Save 4 transactions", or "Save 3 ready" with "The other one stays here
-  until it's fixed". Saving is all-or-nothing for those rows; each row's key is its idempotency key, so a retry or a
-  double tap never duplicates. A failure says "Nothing was saved".
+- The save button says exactly what happens: "Save 4 transactions", or — disabled — "Fix 1 highlighted to save"
+  (`BatchSummary.canSave`). The whole batch saves at once, all-or-nothing; each row's key is its idempotency key, so a
+  retry or a double tap never duplicates. A failure says "Nothing was saved". After a save the app opens Transactions.
+- Layout: a pinned banner (Lucento + "Describe what happened"), the user's messages as brand-blue bubbles on the right,
+  Lucento's replies on the left with its avatar, and each proposed transaction as its own three-row card under the reply (small date; description and amount; type and category, or From and To, sharing the width).
 - "Edit message" puts the text back in the input; sending it again re-reads it but keeps every field the user changed.
 - Leaving with unsaved rows asks before discarding.
 

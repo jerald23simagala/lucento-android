@@ -54,15 +54,20 @@ object QuickEntryParser {
         val amount = extractAmount(withoutDate)
         if (amount == null) warnings += "No amount found — enter it below."
 
-        val type = detectType(withoutDate)
         val active = wallets
+        val type = detectType(withoutDate).let { t ->
+            if (t != TransactionType.TRANSFER_OUT && sendsToOwnWallet(withoutDate, active)) TransactionType.TRANSFER_OUT else t
+        }
         val mentions = findWalletMentions(withoutDate, active)
 
         var walletId: Long? = null
         var toWalletId: Long? = null
         if (type == TransactionType.TRANSFER_OUT) {
-            val from = mentions.firstOrNull { it.afterFrom } ?: mentions.firstOrNull { !it.afterTo }
-            val to = mentions.firstOrNull { it.afterTo && it.wallet.id != from?.wallet?.id }
+            // "paid my credit card 3000", "topped up GCash 500": the one account named is where the money goes.
+            val into = mentions.singleOrNull()?.takeIf { !it.afterFrom && INTO_VERBS.containsMatchIn(withoutDate) }
+            val from = if (into != null) null else mentions.firstOrNull { it.afterFrom } ?: mentions.firstOrNull { !it.afterTo }
+            val to = into
+                ?: mentions.firstOrNull { it.afterTo && it.wallet.id != from?.wallet?.id }
                 ?: mentions.firstOrNull { it.wallet.id != from?.wallet?.id }
             walletId = from?.wallet?.id
             toWalletId = to?.wallet?.id
@@ -110,6 +115,14 @@ object QuickEntryParser {
         " transfer", " transferred ", " moved ", " move ", " withdrew ", " withdraw ", " deposited ", " deposit ",
         " top up ", " topped up ", " top-up ", " cash in ", " paid off my ", " pay off my ",
     )
+
+    /** Verbs whose one named account is the destination of the transfer. */
+    private val INTO_VERBS = Regex(" (top up|topped up|top-up|topup|cash in|cashed in|(paid|pay) (my )?(credit )?card|(paid|pay) off my) ")
+    private val SEND_WORDS = Regex(" (sent|send|sending) ")
+
+    /** "sent 5000 to savings": sending money to one of the user's own accounts is a transfer, not spending. */
+    internal fun sendsToOwnWallet(lower: String, wallets: List<Wallet>): Boolean =
+        SEND_WORDS.containsMatchIn(lower) && findWalletMentions(lower, wallets).any { it.afterTo }
 
     private val expenseWords = listOf(
         " spent ", " spend ", " spending ", " paid ", " pay ", " paying ", " bought ", " buy ", " purchased ",

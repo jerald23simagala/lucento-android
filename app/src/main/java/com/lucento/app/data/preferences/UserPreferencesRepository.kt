@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -37,6 +38,11 @@ data class UserPreferences(
      * the category setup on the Budget screen, never forced back through onboarding.
      */
     val categorySetupDone: Boolean = false,
+    /**
+     * The wallet new transactions go to unless the user picks another (cash, bank or e-wallet only). Null when none is
+     * chosen; the composer then asks. May point at a wallet that no longer exists — readers check it against the list.
+     */
+    val defaultWalletId: Long? = null,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
@@ -51,6 +57,7 @@ class UserPreferencesRepository(private val context: Context) {
         val acknowledgedBudgetMonth = stringPreferencesKey("acknowledged_budget_month")
         val displayName = stringPreferencesKey("display_name")
         val categorySetupDone = booleanPreferencesKey("category_setup_done")
+        val defaultWalletId = longPreferencesKey("default_wallet_id")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -71,6 +78,7 @@ class UserPreferencesRepository(private val context: Context) {
                     ?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
                 displayName = p[Keys.displayName]?.trim()?.takeIf { it.isNotEmpty() },
                 categorySetupDone = p[Keys.categorySetupDone] ?: false,
+                defaultWalletId = p[Keys.defaultWalletId],
             )
         }
 
@@ -110,6 +118,14 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { prefs ->
             val current = prefs[Keys.enabledFeatures]?.toSet() ?: Feature.entries.map(Feature::key).toSet()
             prefs[Keys.enabledFeatures] = if (enabled) current + feature.key else current - feature.key
+        }
+    }
+
+    /** Null clears the default. */
+    suspend fun setDefaultWallet(walletId: Long?) {
+        context.dataStore.edit { prefs ->
+            if (walletId == null) prefs.remove(Keys.defaultWalletId) else prefs[Keys.defaultWalletId] = walletId
+            Unit
         }
     }
 

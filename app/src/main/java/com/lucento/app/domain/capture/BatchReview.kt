@@ -37,6 +37,8 @@ data class ReviewRow(
     val sourceText: String,
     val flags: Set<CandidateFlag>,
     val edited: Set<RowField> = emptySet(),
+    /** The words named [walletId]; otherwise it follows the composer's active wallet (see [BatchReview.retarget]). */
+    val walletFromText: Boolean = false,
 ) {
     companion object {
         fun from(candidate: TransactionCandidate, key: String, messageId: Long, source: CaptureSource, separator: Char) = ReviewRow(
@@ -54,6 +56,7 @@ data class ReviewRow(
             mentionedCurrency = candidate.mentionedCurrency,
             sourceText = candidate.sourceText,
             flags = candidate.flags,
+            walletFromText = candidate.walletFromText,
         )
 
         fun plain(value: BigDecimal, separator: Char): String = value.toPlainString().replace('.', separator)
@@ -100,6 +103,9 @@ data class BatchSummary(
     val transfers: Int,
 ) {
     val needsAttention: Int get() = total - ready
+
+    /** The batch commits all at once: only when there is something to save and nothing is left incomplete. */
+    val canSave: Boolean get() = total > 0 && needsAttention == 0
 }
 
 object BatchReview {
@@ -134,6 +140,19 @@ object BatchReview {
         is RowEdit.Date -> row.copy(date = edit.date, flags = row.flags - CandidateFlag.DATE_UNCERTAIN, edited = row.edited + RowField.DATE)
         is RowEdit.Account -> row.copy(walletId = edit.id, edited = row.edited + RowField.WALLET)
         is RowEdit.ToAccount -> row.copy(toWalletId = edit.id, edited = row.edited + RowField.TO_WALLET)
+    }
+
+    /**
+     * The user picked another active wallet: rows whose account only came from the previous active wallet move to
+     * [walletId]. Rows whose words named an account, or whose account the user chose, stay. A transfer's source moves
+     * unless it would equal its destination.
+     */
+    fun retarget(rows: List<ReviewRow>, walletId: Long): List<ReviewRow> = rows.map { row ->
+        when {
+            row.walletFromText || RowField.WALLET in row.edited -> row
+            row.type.isTransfer && row.toWalletId == walletId -> row
+            else -> row.copy(walletId = walletId)
+        }
     }
 
     private val AMOUNT_FLAGS = setOf(CandidateFlag.AMOUNT_MISSING, CandidateFlag.AMOUNT_AMBIGUOUS, CandidateFlag.TOTAL_UNCONFIRMED)

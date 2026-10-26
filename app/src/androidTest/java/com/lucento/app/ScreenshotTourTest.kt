@@ -157,6 +157,8 @@ class ScreenshotTourTest {
             val cash = id(wallets.create("Cash", WalletType.CASH, money(1_200)))
             val savings = id(wallets.create("Savings", WalletType.SAVINGS, money(8_400)))
             id(wallets.create("Visa card", WalletType.CREDIT_CARD, money(640)))
+            // The composer's wallet bar starts on the default, so it opens without asking which wallet to use.
+            container.preferences.setDefaultWallet(bank)
 
             val categories = container.categories.observeCategories().first()
             fun cat(name: String) = categories.first { it.name == name && !it.archived }.id
@@ -225,7 +227,7 @@ class ScreenshotTourTest {
         waitForText("Found 3 transactions")
         waitForText("1 needs a look")
         shot("09-composer-rows")
-        waitForText("Save 2 ready")
+        waitForText("Fix 1 highlighted to save")
         compose.onNodeWithContentDescription("Back").performClick()
         waitForText("Discard 3 unsaved transactions?")
         shot("10-composer-discard")

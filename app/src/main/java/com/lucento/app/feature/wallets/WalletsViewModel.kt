@@ -13,6 +13,7 @@ import com.lucento.app.domain.WalletUsage
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -21,6 +22,7 @@ data class WalletsUiState(
     val wallets: List<Wallet> = emptyList(),
     val primaryCurrency: String = "USD",
     val summary: NetWorthCalculator.Summary? = null,
+    val defaultWalletId: Long? = null,
 )
 
 /** Editable form state for creating or updating a wallet. */
@@ -30,6 +32,8 @@ data class WalletDraft(
     val type: WalletType = WalletType.CASH,
     val currencyCode: String,
     val amountText: String = "",
+    /** "Default wallet": new transactions go here. Only kept for spendable types (cash, bank, e-wallet). */
+    val isDefault: Boolean = false,
 )
 
 sealed interface DraftError {
@@ -51,7 +55,7 @@ fun WalletUsage.describe(): String = listOfNotNull(
 
 class WalletsViewModel(
     private val wallets: WalletRepository,
-    preferences: UserPreferencesRepository,
+    private val preferences: UserPreferencesRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<WalletsUiState> =
@@ -61,6 +65,7 @@ class WalletsViewModel(
                 wallets = list,
                 primaryCurrency = prefs.primaryCurrency,
                 summary = if (list.isEmpty()) null else NetWorthCalculator.summarize(list, prefs.primaryCurrency),
+                defaultWalletId = prefs.defaultWalletId,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WalletsUiState())
 
@@ -90,6 +95,7 @@ class WalletsViewModel(
             } finally {
                 saving = false
             }
+            if (result is WalletRepository.SaveResult.Saved) applyDefault(result.id, draft)
             onResult(
                 when (result) {
                     is WalletRepository.SaveResult.Saved -> null
@@ -101,6 +107,15 @@ class WalletsViewModel(
                     WalletRepository.SaveResult.NotFound -> DraftError.NotFound
                 }
             )
+        }
+    }
+
+    /** Makes the saved wallet the default, or stops it being one (unticked, or changed to a non-spending type). */
+    private suspend fun applyDefault(id: Long, draft: WalletDraft) {
+        val current = preferences.preferences.first().defaultWalletId
+        when {
+            draft.isDefault && draft.type.isSpendable -> if (current != id) preferences.setDefaultWallet(id)
+            current == id -> preferences.setDefaultWallet(null)
         }
     }
 

@@ -74,6 +74,7 @@ fun WalletDetailScreen(
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val walletsState by walletsViewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
     val wallet = state.wallet
 
@@ -93,7 +94,7 @@ fun WalletDetailScreen(
                 onBack = onBack,
                 actions = {
                     if (wallet != null) {
-                        IconButton(onClick = { editing = wallet.toDraft() }) {
+                        IconButton(onClick = { editing = wallet.toDraft(isDefault = wallet.id == walletsState.defaultWalletId) }) {
                             Icon(Icons.Outlined.Edit, contentDescription = "Edit account")
                         }
                     }

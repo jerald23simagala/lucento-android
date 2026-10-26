@@ -41,17 +41,47 @@ object BatchEntryParser {
         val shared = explicitDates.singleOrNull()
         var carriedDate: LocalDate? = null
         var previousType: TransactionType? = null
+        var previous: TransactionCandidate? = null
         return raws.map { raw ->
             val date = raw.explicitDate ?: shared ?: carriedDate ?: context.today
             if (raw.explicitDate != null) carriedDate = raw.explicitDate
-            val type = raw.explicitType
-                ?: raw.inferredType
-                ?: previousType
-                ?: context.typeHint?.takeIf { !it.isTransfer }
-                ?: TransactionType.EXPENSE
-            if (!type.isTransfer) previousType = type
-            build(raw, type, date, context)
+            val transfer = previous?.takeIf { it.type.isTransfer }
+            val candidate = if (transfer != null && isFee(raw, context)) {
+                feeFor(transfer, raw, date, context)
+            } else {
+                val type = raw.explicitType
+                    ?: raw.inferredType
+                    ?: previousType
+                    ?: context.typeHint?.takeIf { !it.isTransfer }
+                    ?: TransactionType.EXPENSE
+                if (!type.isTransfer) previousType = type
+                build(raw, type, date, context)
+            }
+            previous = candidate
+            candidate
         }
+    }
+
+    private val FEE = Regex("\\b(fee|fees|charge|charges|service charge)\\b")
+
+    /** "…, fee 15" right after a transfer: the transfer's own cost, not another transfer. */
+    private fun isFee(raw: Raw, context: InterpretationContext): Boolean =
+        FEE.containsMatchIn(raw.lower) &&
+            (raw.explicitType == null || raw.explicitType == TransactionType.EXPENSE) &&
+            QuickEntryParser.parse(raw.clean, context.wallets, context.categories, context.today).let { p ->
+                // A fee that names its own account is left to the normal rules.
+                p.walletId == null || context.wallets.size == 1
+            }
+
+    /** The fee as an expense on the account the transfer left from (switching that account moves the fee too). */
+    private fun feeFor(transfer: TransactionCandidate, raw: Raw, date: LocalDate, context: InterpretationContext): TransactionCandidate {
+        val base = build(raw, TransactionType.EXPENSE, date, context)
+        val generic = base.description.lowercase(Locale.ROOT) in setOf("", "fee", "fees", "charge", "charges", "transfer fee", "service charge")
+        return base.copy(
+            description = if (generic) "Transfer fee" else base.description,
+            walletId = transfer.walletId ?: base.walletId,
+            walletFromText = transfer.walletFromText,
+        )
     }
 
     // ------------------------------------------------------------------ reading one clause
@@ -95,7 +125,9 @@ object BatchEntryParser {
             }
         }
 
-        val explicitType = QuickEntryParser.explicitType(lower)
+        val explicitType = QuickEntryParser.explicitType(lower).let { t ->
+            if (t != TransactionType.TRANSFER_OUT && QuickEntryParser.sendsToOwnWallet(lower, context.wallets)) TransactionType.TRANSFER_OUT else t
+        }
         val expense = QuickEntryParser.detectCategory(lower, TransactionType.EXPENSE, context.categories)
         val income = QuickEntryParser.detectCategory(lower, TransactionType.INCOME, context.categories)
         val inferred = when {
@@ -137,6 +169,7 @@ object BatchEntryParser {
             mentionedCurrency = proposal.mentionedCurrency,
             sourceText = raw.source,
             flags = flags,
+            walletFromText = proposal.walletId != null,
         )
     }
 
@@ -160,7 +193,7 @@ object BatchEntryParser {
         "pounds", "yen", "rupee", "rupees", "rupiah", "bucks",
     )
     private val TRANSFER_WORDS = setOf(
-        "transfer", "transferred", "moved", "move", "withdrew", "withdraw", "deposited", "deposit", "top", "topped", "up",
+        "transfer", "transferred", "moved", "move", "sent", "send", "withdrew", "withdraw", "deposited", "deposit", "top", "topped", "up",
         "cash-in", "off", "wallet", "account", "bank", "card", "credit", "savings", "e-wallet", "ewallet", "cash", "loan",
     )
 

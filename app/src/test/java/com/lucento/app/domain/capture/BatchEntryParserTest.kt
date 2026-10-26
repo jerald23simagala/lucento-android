@@ -171,6 +171,40 @@ class BatchEntryParserTest {
         assertEquals(listOf("12500", "1699"), amounts(rows))
     }
 
+    @Test fun rowsRememberWhetherTheWordsNamedTheirAccount() {
+        val list = parse("lunch 250, coffee 180 from GCash")
+        assertEquals(listOf(1L, 3L), list.map { it.walletId })
+        assertEquals(listOf(false, true), list.map { it.walletFromText })
+    }
+
+    @Test fun topUpAndCardPaymentNameTheDestination() {
+        val topUp = parse("topped up GCash 500").single()
+        assertEquals(TRANSFER_OUT, topUp.type)
+        assertEquals(3L, topUp.toWalletId)
+        assertEquals(1L, topUp.walletId) // from the active wallet
+        assertEquals(false, topUp.walletFromText)
+    }
+
+    @Test fun sendingToYourOwnAccountIsATransfer() {
+        val toSavings = parse("sent 5000 to BPI Savings").single()
+        assertEquals(TRANSFER_OUT, toSavings.type)
+        assertEquals(1L, toSavings.walletId)
+        assertEquals(2L, toSavings.toWalletId)
+        assertEquals(EXPENSE, parse("sent 500 to mom").single().type)
+    }
+
+    @Test fun aFeeAfterATransferIsAnExpenseOnItsSource() {
+        val list = parse("Sent 1000 from GCash to BPI Savings, fee 15")
+        assertEquals(listOf(TRANSFER_OUT, EXPENSE), list.map { it.type })
+        val fee = list[1]
+        assertEquals("15", fee.amount?.toPlainString())
+        assertEquals(3L, fee.walletId)
+        assertEquals("Transfer fee", fee.description)
+        assertEquals(true, fee.walletFromText)
+        // Without a transfer before it, a fee is an ordinary expense.
+        assertEquals(EXPENSE, parse("bank fee 15").single().type)
+    }
+
     @Test fun nothingToRecord() {
         assertTrue(parse("hello there").isEmpty())
         assertTrue(parse("   ").isEmpty())

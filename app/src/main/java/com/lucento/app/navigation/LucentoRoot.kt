@@ -205,11 +205,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         currentDestination.primaryKey()?.let { selectedTab = it }
     }
 
+    // A tab always opens at its own root: screens pushed on top of it (Goals, Wallets, the composer…) are cleared rather
+    // than saved and restored, so tapping Home after wandering through sub-pages shows Home itself.
     fun navigateTo(route: Any) {
         navController.navigate(route) {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            popUpTo(navController.graph.findStartDestination().id)
             launchSingleTop = true
-            restoreState = true
         }
     }
 
@@ -395,7 +396,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         val route = entry.toRoute<ComposerRoute>()
                         TransactionComposerScreen(
                             onBack = back,
-                            onSaved = { message -> confirmation = Confirmation(message) },
+                            onSaved = { message ->
+                                confirmation = Confirmation(message)
+                                // Land on the history, where the batch that was just saved is now listed.
+                                selectedTab = "transactions"
+                                navigateTo(TransactionsRoute)
+                            },
                             onAddWallet = { push(WalletsRoute) },
                             voiceEnabled = features.isEnabled(Feature.VOICE_ENTRY),
                             scanEnabled = features.isEnabled(Feature.RECEIPT_SCANNING),
