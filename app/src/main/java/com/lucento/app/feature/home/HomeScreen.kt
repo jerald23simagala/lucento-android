@@ -489,7 +489,7 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                         size = 72.dp,
                         mood = mood,
                         tier = tier,
-                        contentDescription = "Lucento says: $bubble",
+                        contentDescription = if (mood == MascotMood.Concerned) "Lucento, gently concerned, says: $bubble" else "Lucento says: $bubble",
                         modifier = Modifier.padding(top = Spacing.lg),
                     )
                     if (showBubble) SpeechBubble(bubble, Modifier.widthIn(max = 118.dp))
