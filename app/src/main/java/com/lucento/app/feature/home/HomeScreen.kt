@@ -39,7 +39,6 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CloudDone
@@ -394,11 +393,12 @@ private fun LinkedTitle(
     title: String,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    showChevron: Boolean = true,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(title, style = if (compact) Hierarchy.cardTitle else Hierarchy.sectionTitle, modifier = Modifier.semantics { heading() })
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
+        if (showChevron) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
         Spacer(Modifier.weight(1f))
         if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
     }
@@ -726,57 +726,82 @@ private fun NetWorthAndQuickLinks(state: HomeUiState, composition: NetWorthCompo
             // children's intrinsic height, which a nested BoxWithConstraints cannot provide.
             val linksContentWidth = (maxWidth - Spacing.sm) / 2.1f - Spacing.md * 2
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                NetWorthCard(state, composition, actions.onOpenWallets, Modifier.weight(1.1f).fillMaxHeight())
+                FlowAndWorthCard(state, composition, actions, Modifier.weight(1.1f).fillMaxHeight())
                 QuickLinksCard(links, asList = linksContentWidth < 140.dp, modifier = Modifier.weight(1f).fillMaxHeight())
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                NetWorthCard(state, composition, actions.onOpenWallets, Modifier.fillMaxWidth())
+                FlowAndWorthCard(state, composition, actions, Modifier.fillMaxWidth())
                 QuickLinksCard(links, asList = false, modifier = Modifier.fillMaxWidth())
             }
         }
     }
 }
 
-/** Wallets & assets, then liabilities, then net worth = assets − liabilities as the result. Opens Wallets. */
+/**
+ * One card, two tappable halves: **Net flow** for the shown month on top (opens Insights) and **Net worth** today below
+ * (opens Wallets).
+ */
 @Composable
-private fun NetWorthCard(state: HomeUiState, composition: NetWorthComposition, onOpenWallets: () -> Unit, modifier: Modifier) {
+private fun FlowAndWorthCard(state: HomeUiState, composition: NetWorthComposition, actions: HomeActions, modifier: Modifier) {
     val ext = LucentoTheme.extendedColors
-    LucentoCard(modifier, onClick = onOpenWallets, contentPadding = Spacing.md) {
-        LinkedTitle("Net worth", compact = true)
-        Spacer(Modifier.height(Spacing.xs))
-        PositionRow(
-            icon = Icons.Outlined.AccountBalanceWallet,
-            tone = TonePair(ext.positiveContainer, ext.positive),
-            money = composition.totalAssets,
-            label = "Wallets & assets",
-        )
-        PositionRow(
-            icon = Icons.Outlined.AccountBalance,
-            tone = TonePair(ext.negativeContainer, ext.negative),
-            money = -composition.totalLiabilities,
-            label = "Liabilities",
-            color = if (composition.totalLiabilities.isZero) MaterialTheme.colorScheme.onSurface else ext.negative,
-        )
-        Hairline(Modifier.padding(vertical = Spacing.xs))
-        Column(
-            Modifier.semantics(mergeDescendants = true) {
-                contentDescription = "Net worth ${MoneyFormatter.format(composition.netWorth)}: assets ${MoneyFormatter.format(composition.totalAssets)} " +
-                    "minus liabilities ${MoneyFormatter.format(composition.totalLiabilities)}"
-            },
-        ) {
-            MoneyText(money = composition.netWorth, style = AmountStyles.large, fractionScale = 0.75f, minScale = 0.55f, color = MaterialTheme.colorScheme.primary)
-            Text("Net worth", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            state.netWorthMonthChange?.let { ChangeChip(it, Modifier.padding(top = Spacing.xs)) }
+    val insightsOn = state.features.isEnabled(Feature.INSIGHTS)
+    LucentoCard(modifier, contentPadding = 0.dp) {
+        state.netFlow?.let { flow ->
+            CardHalf(onClick = if (insightsOn) actions.onOpenInsights else null, clickLabel = "Open Insights") {
+                LinkedTitle("Net flow", compact = true, showChevron = insightsOn)
+                MoneyText(
+                    money = flow.net,
+                    style = AmountStyles.large,
+                    showPlus = true,
+                    fractionScale = 0.75f,
+                    minScale = 0.55f,
+                    color = when (state.flowDirection) {
+                        FlowDirection.POSITIVE -> ext.positive
+                        FlowDirection.NEGATIVE -> ext.negative
+                        FlowDirection.NEUTRAL -> MaterialTheme.colorScheme.onSurface
+                    },
+                )
+                Text(
+                    "${monthLabel(flow.month)} · money in minus money out",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
+            }
+            Hairline()
         }
-        state.otherNetWorth.forEach { other ->
-            Text(
-                "${other.currencyCode} ${MoneyFormatter.formatSigned(other)} (separate)",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        CardHalf(onClick = actions.onOpenWallets, clickLabel = "Open wallets") {
+            LinkedTitle("Net worth", compact = true)
+            Column(
+                Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = "Net worth ${MoneyFormatter.format(composition.netWorth)}: assets ${MoneyFormatter.format(composition.totalAssets)} " +
+                        "minus liabilities ${MoneyFormatter.format(composition.totalLiabilities)}"
+                },
+            ) {
+                MoneyText(money = composition.netWorth, style = AmountStyles.large, fractionScale = 0.75f, minScale = 0.55f, color = MaterialTheme.colorScheme.primary)
+                Text("Today · assets minus debts", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                state.netWorthMonthChange?.let { ChangeChip(it, Modifier.padding(top = Spacing.xs)) }
+            }
+            state.otherNetWorth.forEach { other ->
+                Text(
+                    "${other.currencyCode} ${MoneyFormatter.formatSigned(other)} (separate)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun CardHalf(onClick: (() -> Unit)?, clickLabel: String, content: @Composable () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = clickLabel, onClick = onClick) else Modifier)
+            .padding(Spacing.md),
+    ) { content() }
 }
 
 /** This month's movement from recorded income and spending: an arrow and a signed amount, never colour alone. */
@@ -798,18 +823,6 @@ private fun ChangeChip(change: Money, modifier: Modifier = Modifier) {
             Text(MoneyFormatter.formatSigned(change, showPlus = true), style = MaterialTheme.typography.labelSmall, color = tone.content, maxLines = 1)
         }
         Text("this month", style = MaterialTheme.typography.labelSmall, color = tone.content, maxLines = 1)
-    }
-}
-
-@Composable
-private fun PositionRow(icon: ImageVector, tone: TonePair, money: Money, label: String, color: Color = MaterialTheme.colorScheme.onSurface) {
-    Row(Modifier.padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-        IconTile(icon = icon, size = 28.dp, container = tone.container, content = tone.content)
-        Spacer(Modifier.width(Spacing.sm))
-        Column {
-            MoneyText(money = money, style = AmountStyles.row, color = color, fractionScale = 1f, minScale = 0.7f)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        }
     }
 }
 

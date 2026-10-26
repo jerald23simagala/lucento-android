@@ -221,11 +221,11 @@ No greeting: the header is working space. Top to bottom, as cards with a title a
    (real calendar days) — and a legend; three figures: Spent · Remaining (or Over budget) · "16 of 31 days / 52% of
    month"; an **advice banner** with a matching glyph (up / check / info) and the daily allowance. With Budgets off, a
    plain Net flow card takes its place.
-3. **Net worth** and **Quick links** — two cards side by side (compact type; stacked under ~300dp). Net worth: Wallets
-   & assets, Liabilities, then **Net worth = assets − liabilities** with this month's change from recorded income and
-   spending (arrow + signed amount); the card opens **Wallets**. Quick links: a 2×2 grid of tiles — Savings goals,
-   Scheduled, Debts & loans (each only when its module is on) and **Wallets**. Categories are managed from the Budgets
-   tab ("Manage categories").
+3. **Net flow / Net worth** and **Quick links** — two cards side by side (compact type; stacked under ~300dp). The left
+   card has two tappable halves: **Net flow** for the shown month on top (signed, coloured by direction; opens
+   Insights) and **Net worth** today below (assets − debts, with this month's change from recorded income and
+   spending; opens Wallets). Quick links: a 2×2 grid — Savings goals, Scheduled, Debts & loans (each only when its
+   module is on) and **Wallets** (a list on small phones). Categories are managed from the Budgets tab.
 4. **Top savings goal** — the in-progress goal closest to done (ties: earlier target date; all reached: the newest):
    its picture, name, %, bar, saved of target, target (or projected) month; "View all".
 5. **Scheduled transactions** — the next recurring items within 30 days: name, category or "Recurring expense",
