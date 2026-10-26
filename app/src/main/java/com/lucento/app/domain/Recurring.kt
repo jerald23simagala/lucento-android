@@ -26,14 +26,28 @@ data class RecurringSchedule(
     val endDate: LocalDate?,
     val nextIndex: Int,
     val paused: Boolean,
+    /**
+     * Set for a debt payment: the card or loan being paid from [walletId]. [amount] is then the part that goes against
+     * the debt and [interest] the part that is interest (both entered by the user). Marking it paid records the
+     * interest as an expense on the debt (category [categoryId]) and a transfer of [total] from [walletId] to it.
+     */
+    val toWalletId: Long? = null,
+    val interest: Money = Money.zero(amount.currencyCode),
 ) {
     init {
         require(type == TransactionType.EXPENSE || type == TransactionType.INCOME) { "Schedules are income or expense" }
+        require(toWalletId == null || type == TransactionType.EXPENSE) { "Debt payments are expenses" }
+        require(!interest.isNegative && interest.currencyCode == amount.currencyCode) { "Interest must be a non-negative amount in the same currency" }
         require(interval >= 1) { "Interval must be at least 1" }
         require(nextIndex >= 0) { "Occurrence index cannot be negative" }
     }
 
     val currencyCode: String get() = amount.currencyCode
+
+    val isDebtPayment: Boolean get() = toWalletId != null
+
+    /** Everything that leaves [walletId] for one occurrence: the amount, plus interest for a debt payment. */
+    val total: Money get() = amount + interest
 
     /** Date of the occurrence still waiting, or null when the schedule has ended. */
     val nextDue: LocalDate? get() = RecurringMath.occurrence(this, nextIndex)?.takeIf { endDate == null || !it.isAfter(endDate) }
@@ -90,14 +104,23 @@ object RecurringMath {
 
     /**
      * Total still to pay for active expense schedules in [currencyCode], for occurrences due on or before
-     * [through] (overdue ones included, because they are still owed).
+     * [through] (overdue ones included, because they are still owed). A debt payment counts in full (it all leaves
+     * the wallet) unless [spendingOnly], when only its interest — the part that is spending — counts.
      */
-    fun committedExpenses(schedules: List<RecurringSchedule>, currencyCode: String, through: LocalDate): Money =
+    fun committedExpenses(
+        schedules: List<RecurringSchedule>,
+        currencyCode: String,
+        through: LocalDate,
+        spendingOnly: Boolean = false,
+    ): Money =
         Money.sum(
             currencyCode,
             schedules
                 .filter { it.type == TransactionType.EXPENSE && it.currencyCode == currencyCode }
-                .flatMap { s -> dueThrough(s, through).map { s.amount } },
+                .flatMap { s ->
+                    val each = if (spendingOnly && s.isDebtPayment) s.interest else s.total
+                    dueThrough(s, through).map { each }
+                },
         )
 
     /** Next unpaid occurrence of each active schedule due on or before [through] (overdue included), soonest first. */

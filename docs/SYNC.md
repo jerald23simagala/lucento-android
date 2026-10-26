@@ -39,7 +39,7 @@ UI (Settings → Cloud sync) ──► SettingsViewModel ──► AuthRepositor
 | `goals` | `public.goals` | `photo_path` is **never** synced (a local file path); `scene_key` is |
 | `goal_contributions` | `public.goal_contributions` | append/delete-only |
 
-Not synced yet: **recurring schedules** (`recurring`), DataStore preferences (theme, currency, enabled modules,
+Not synced yet: **recurring schedules** (`recurring`, including debt payments), **debt terms** (`debt_terms`), DataStore preferences (theme, currency, enabled modules,
 display name), goal photos. See "Known limitations".
 
 Amounts stay `bigint` minor units with their ISO 4217 code — no conversion, no floating point. `occurred_on` and
@@ -244,7 +244,7 @@ server under account 2.
   (an edge case after concurrent parent deletes), it waits for a later cycle like any deferred row.
 - One Google account per device install. Switching accounts on a device that already synced requires clearing the
   app's data (which erases local records) or signing back in with the original account.
-- Recurring schedules, preferences and goal photos are not synced.
+- Recurring schedules, debt terms (interest rate, repayment plan), preferences and goal photos are not synced.
 - Rows with identical meaning created separately before their first sync are not de-duplicated (seed categories are
   the exception). Categories seeded by older versions (before v6) carry random ids, so two upgraded devices can show
   duplicate default income categories.

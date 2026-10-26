@@ -10,6 +10,7 @@ import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -39,6 +40,10 @@ class RecurringRepository(
         val interval: Int,
         val startDate: LocalDate,
         val endDate: LocalDate?,
+        /** A debt payment: the card or loan paid from [walletId]. [amount] is then the part against the debt. */
+        val toWalletId: Long? = null,
+        /** The interest part of a debt payment (user input; zero when none). */
+        val interest: Money? = null,
     )
 
     sealed interface SaveResult {
@@ -51,15 +56,22 @@ class RecurringRepository(
         data object WalletNotFound : SaveResult
         data object CurrencyMismatch : SaveResult
         data object CategoryMismatch : SaveResult
+        /** A debt payment must go from a money account to a card or loan in the same currency, with interest >= 0. */
+        data object InvalidDebt : SaveResult
         data object NotFound : SaveResult
     }
 
     sealed interface PayResult {
-        data class Recorded(val transactionId: Long) : PayResult
+        /** Recorded; [transactionId] is the expense or income row (null for a debt payment, which writes several). */
+        data class Recorded(val transactionId: Long?) : PayResult
         data object NotDue : PayResult
         data object NotFound : PayResult
-        data class Rejected(val reason: TransactionRepository.SaveResult) : PayResult
+        /** Nothing was recorded: a [TransactionRepository.SaveResult] or [TransactionRepository.TransferResult] refusal. */
+        data class Rejected(val reason: Any) : PayResult
     }
+
+    /** Thrown inside the database transaction to undo a half-recorded debt payment. */
+    private class Rollback(val result: PayResult) : RuntimeException()
 
     fun observeSchedules(): Flow<List<RecurringSchedule>> =
         dao.observeAll().map { list -> list.mapNotNull { it.toDomainOrNull() } }
@@ -77,6 +89,19 @@ class RecurringRepository(
         if (input.categoryId != null) {
             val category = categories.getById(input.categoryId) ?: return SaveResult.CategoryMismatch
             if (category.kind != input.type.name) return SaveResult.CategoryMismatch
+        }
+        val interest = input.interest ?: Money.zero(input.amount.currencyCode)
+        if (input.toWalletId != null) {
+            val debt = wallets.getById(input.toWalletId)
+            val isDebt = debt != null && debt.acceptsTransactions &&
+                runCatching { WalletType.valueOf(debt.type) }.getOrNull()?.isLiability == true
+            if (!isDebt || input.type != TransactionType.EXPENSE || debt!!.id == wallet.id || debt.currencyCode != wallet.currencyCode ||
+                interest.isNegative || interest.currencyCode != input.amount.currencyCode
+            ) {
+                return SaveResult.InvalidDebt
+            }
+        } else if (!interest.isZero) {
+            return SaveResult.InvalidDebt
         }
         val now = clock()
         if (input.id == null) {
@@ -96,6 +121,8 @@ class RecurringRepository(
                     paused = false,
                     createdAt = now,
                     updatedAt = now,
+                    toWalletId = input.toWalletId,
+                    interestMinor = interest.amountMinor,
                 )
             )
             return SaveResult.Saved(id)
@@ -119,6 +146,8 @@ class RecurringRepository(
                 endOn = input.endDate?.toEpochDay(),
                 nextIndex = if (timingChanged) 0 else existing.nextIndex,
                 updatedAt = now,
+                toWalletId = input.toWalletId,
+                interestMinor = interest.amountMinor,
             )
         )
         return SaveResult.Saved(input.id)
@@ -128,11 +157,14 @@ class RecurringRepository(
      * Records the waiting occurrence as a real transaction dated [date] for [amount] (the scheduled
      * amount by default — bills vary), then advances the schedule. Safe to call twice.
      */
-    suspend fun markPaid(id: Long, amount: Money? = null, date: LocalDate? = null): PayResult {
+    suspend fun markPaid(id: Long, amount: Money? = null, date: LocalDate? = null, interest: Money? = null): PayResult {
         val entity = dao.getById(id) ?: return PayResult.NotFound
         val schedule = entity.toDomainOrNull() ?: return PayResult.NotFound
         val index = schedule.nextIndex
         val due = schedule.nextDue ?: return PayResult.NotDue
+        if (schedule.isDebtPayment) {
+            return markDebtPaid(entity, schedule, index, amount ?: schedule.amount, interest ?: schedule.interest, date ?: due)
+        }
         return runner.run {
             val result = transactions.save(
                 TransactionRepository.Input(
@@ -152,6 +184,61 @@ class RecurringRepository(
             } else {
                 PayResult.Rejected(result)
             }
+        }
+    }
+
+    /**
+     * A debt payment, recorded the way docs/CALCULATIONS.md "Debt rules" counts debt: the interest as an EXPENSE on the
+     * card or loan (it is spending, and raises what is owed), then a TRANSFER of principal + interest from the paying
+     * wallet into it (not spending, and lowers what is owed). Net effect on the debt: minus the principal. Both rows
+     * and the schedule's advance are one database transaction; each row is keyed by the occurrence, so a second tap
+     * can't double it.
+     */
+    private suspend fun markDebtPaid(
+        entity: RecurringEntity,
+        schedule: RecurringSchedule,
+        index: Int,
+        principal: Money,
+        interest: Money,
+        date: LocalDate,
+    ): PayResult {
+        val debtId = schedule.toWalletId ?: return PayResult.NotFound
+        if (principal.isNegative || interest.isNegative) return PayResult.Rejected(TransactionRepository.SaveResult.AmountNotPositive)
+        val key = schedule.occurrenceKey(index)
+        return try {
+            runner.run {
+                if (interest.amountMinor > 0) {
+                    val saved = transactions.save(
+                        TransactionRepository.Input(
+                            id = null,
+                            clientUuid = "$key-interest",
+                            type = TransactionType.EXPENSE,
+                            amount = interest,
+                            walletId = debtId,
+                            categoryId = schedule.categoryId,
+                            date = date,
+                            note = "${schedule.name} · interest",
+                        )
+                    )
+                    if (saved !is TransactionRepository.SaveResult.Saved) throw Rollback(PayResult.Rejected(saved))
+                }
+                val moved = transactions.saveTransfer(
+                    TransactionRepository.TransferInput(
+                        group = null,
+                        clientUuid = key,
+                        fromWalletId = schedule.walletId,
+                        toWalletId = debtId,
+                        amount = principal + interest,
+                        date = date,
+                        note = schedule.name,
+                    )
+                )
+                if (moved !is TransactionRepository.TransferResult.Saved) throw Rollback(PayResult.Rejected(moved))
+                dao.update(entity.copy(nextIndex = maxOf(entity.nextIndex, index + 1), updatedAt = clock()))
+                PayResult.Recorded(null)
+            }
+        } catch (e: Rollback) {
+            e.result
         }
     }
 
@@ -191,6 +278,8 @@ internal fun RecurringEntity.toDomainOrNull(): RecurringSchedule? = runCatching 
         endDate = endOn?.let(LocalDate::ofEpochDay),
         nextIndex = nextIndex,
         paused = paused,
+        toWalletId = toWalletId,
+        interest = Money(interestMinor, currencyCode),
     )
 }.getOrNull()
 

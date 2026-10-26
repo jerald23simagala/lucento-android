@@ -18,6 +18,8 @@ import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.Budget
 import com.lucento.app.domain.Category
+import com.lucento.app.domain.CategoryKind
+import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.FeatureSet
 import com.lucento.app.domain.Goal
 import com.lucento.app.domain.GoalContribution
@@ -82,7 +84,7 @@ fun AmountError.message(currencyCode: String, separator: Char): String = when (t
 class PlanViewModel(
     transactions: TransactionRepository,
     wallets: WalletRepository,
-    categories: CategoryRepository,
+    private val categories: CategoryRepository,
     private val budgets: BudgetRepository,
     private val goals: GoalRepository,
     private val recurring: RecurringRepository,
@@ -199,11 +201,19 @@ class PlanViewModel(
 
     // ---------------------------------------------------------------- recurring
 
+    /** A debt payment without a category gets the shared interest category, created or restored as needed. */
     fun saveSchedule(input: RecurringRepository.Input, onResult: (RecurringRepository.SaveResult) -> Unit) =
-        write({ recurring.save(input) }, onResult)
+        write({
+            val withCategory = if (input.toWalletId != null && input.categoryId == null) {
+                input.copy(categoryId = categories.ensure(DebtMath.INTEREST_CATEGORY, CategoryKind.EXPENSE, DebtMath.INTEREST_ICON))
+            } else {
+                input
+            }
+            recurring.save(withCategory)
+        }, onResult)
 
-    fun markPaid(id: Long, amount: Money?, date: LocalDate?, onResult: (RecurringRepository.PayResult) -> Unit) =
-        write({ recurring.markPaid(id, amount, date) }, onResult)
+    fun markPaid(id: Long, amount: Money?, date: LocalDate?, interest: Money? = null, onResult: (RecurringRepository.PayResult) -> Unit) =
+        write({ recurring.markPaid(id, amount, date, interest) }, onResult)
 
     fun skip(id: Long) = write({ recurring.skip(id) }) {}
 

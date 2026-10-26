@@ -103,7 +103,7 @@ object CashflowCalculator {
         val (basis, amount) = when {
             plan.hasBudget -> {
                 spent = plan.spent
-                committed = RecurringMath.committedExpenses(schedules.filter { it.categoryId in budgeted }, currencyCode, monthEnd)
+                committed = RecurringMath.committedExpenses(schedules.filter { it.categoryId in budgeted }, currencyCode, monthEnd, spendingOnly = true)
                 SafeToSpend.Basis.BUDGET to (plan.total - spent - committed)
             }
             spendable != null -> {

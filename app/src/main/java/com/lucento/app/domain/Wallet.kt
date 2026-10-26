@@ -39,6 +39,8 @@ data class Wallet(
     val balance: Money,
     val createdAtEpochMillis: Long,
     val openingBalance: Money = balance,
+    /** Interest rate and repayment plan of a card or loan, when the user entered them. Always null for assets. */
+    val debt: DebtTerms? = null,
 ) {
     val currencyCode: String get() = balance.currencyCode
 

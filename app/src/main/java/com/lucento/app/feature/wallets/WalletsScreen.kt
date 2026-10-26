@@ -46,6 +46,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Hairline
+import com.lucento.app.core.designsystem.component.HeroCard
+import com.lucento.app.core.designsystem.component.HeroPill
+import com.lucento.app.core.designsystem.component.HeroTones
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoMascot
@@ -78,6 +81,8 @@ fun WalletsScreen(
     onOpenDebts: (() -> Unit)? = null,
     /** Opens the composer on the receipt scanner; null when scanning is switched off. */
     onScanReceipt: (() -> Unit)? = null,
+    /** Opens a prefilled recurring payment for a newly saved card or loan; null when recurring payments are off. */
+    onPlanDebtPayment: ((Long, java.time.LocalDate) -> Unit)? = null,
     viewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -169,6 +174,12 @@ fun WalletsScreen(
             onSave = viewModel::save,
             onDelete = viewModel::delete,
             onDismiss = { editing = null },
+            onPlanPayment = onPlanDebtPayment?.let { plan ->
+                { id, date ->
+                    editing = null
+                    plan(id, date)
+                }
+            },
         )
     }
 }
@@ -190,61 +201,38 @@ private fun NetWorthCard(net: Money, summary: NetWorthCalculator.Summary) {
     val code = net.currencyCode
     val assets = summary.assets[code] ?: Money.zero(code)
     val owed = summary.liabilities[code] ?: Money.zero(code)
-    val sunlight = TonePair(ext.accent, ext.onAccent)
-    val tangerine = TonePair(ext.warmAccent, ext.onAccent)
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
-        shape = MaterialTheme.shapes.large,
-        color = ext.hero,
-        contentColor = ext.onHero,
-    ) {
-        Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1.15f)) {
-                    HeroPill(
-                        "Net worth · $code",
-                        if (net.isNegative) tangerine else TonePair(ext.onHero, ext.hero),
-                        Modifier.semantics { heading() },
-                    )
-                    Spacer(Modifier.height(Spacing.xs))
-                    MoneyText(money = net, style = AmountStyles.hero, color = ext.onHero)
-                }
-                VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    HalfLine("Assets", sunlight, assets)
-                    HalfLine("Liabilities", tangerine, -owed)
-                }
+    HeroCard(Modifier.padding(top = Spacing.xs)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1.15f)) {
+                HeroPill(
+                    "Net worth · $code",
+                    if (net.isNegative) HeroTones.tangerine else HeroTones.main,
+                    Modifier.semantics { heading() },
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                MoneyText(money = net, style = AmountStyles.hero, color = ext.onHero)
             }
-            val percent = Insights.percentOf(owed, assets)
-            val notes = listOfNotNull(
-                if (!owed.isZero && percent != null) "You owe $percent% of what you have." else null,
-                if (summary.totals.size > 1) {
-                    "Also: " + summary.totals.filter { it.currencyCode != code }
-                        .joinToString(" · ") { MoneyFormatter.formatSigned(it, showPlus = false) }
-                } else {
-                    null
-                },
-            )
-            if (notes.isNotEmpty()) {
-                Spacer(Modifier.height(Spacing.sm))
-                Text(notes.joinToString(" "), style = MaterialTheme.typography.bodySmall, color = ext.onHeroMuted)
+            VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                HalfLine("Assets", HeroTones.sunlight, assets)
+                HalfLine("Liabilities", HeroTones.tangerine, -owed)
             }
         }
+        val percent = Insights.percentOf(owed, assets)
+        val notes = listOfNotNull(
+            if (!owed.isZero && percent != null) "You owe $percent% of what you have." else null,
+            if (summary.totals.size > 1) {
+                "Also: " + summary.totals.filter { it.currencyCode != code }
+                    .joinToString(" · ") { MoneyFormatter.formatSigned(it, showPlus = false) }
+            } else {
+                null
+            },
+        )
+        if (notes.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(notes.joinToString(" "), style = MaterialTheme.typography.bodySmall, color = ext.onHeroMuted)
+        }
     }
-}
-
-/** A compact label pill on the hero card. */
-@Composable
-private fun HeroPill(label: String, tone: TonePair, modifier: Modifier = Modifier) {
-    Text(
-        label,
-        style = MaterialTheme.typography.labelMedium,
-        color = tone.content,
-        maxLines = 1,
-        modifier = modifier
-            .background(tone.container, RoundedCornerShape(50))
-            .padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
-    )
 }
 
 @Composable

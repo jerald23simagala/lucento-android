@@ -252,12 +252,12 @@ class MigrationTest {
     }
 
     @Test
-    fun migrate1To7_runsTheFullChainAndRoomOpensTheResult() {
+    fun migrate1To8_runsTheFullChainAndRoomOpensTheResult() {
         helper.createDatabase(TEST_DB, 1).apply {
             seedV1Wallets()
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 7, true, *Migrations.ALL)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 8, true, *Migrations.ALL)
         assertEquals(12345L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 1"))
         assertEquals(50000L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 2"))
         assertEquals(DefaultCategories.all.size.toLong(), db.long("SELECT COUNT(*) FROM categories"))
@@ -300,6 +300,33 @@ class MigrationTest {
             assertTrue(c.moveToFirst())
             assertEquals("w-1", c.getString(0)); assertEquals(5L, c.getLong(1))
         }
+        db.assertNoForeignKeyViolations()
+    }
+
+    @Test
+    fun migrate7To8_keepsSchedulesAsTheyWereAndAddsDebtTermsThatFollowTheirWallet() {
+        helper.createDatabase(TEST_DB, 7).apply {
+            execSQL(
+                "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, dirty) " +
+                    "VALUES (1, 'Bank', 'BANK', 'USD', 100000, 0, 0, 1, 1, 'w-1', 0), (2, 'Car loan', 'LOAN', 'USD', 500000, 1, 0, 1, 1, 'w-2', 0)"
+            )
+            execSQL(
+                "INSERT INTO recurring (id, name, type, amount_minor, currency_code, wallet_id, category_id, frequency, interval_count, start_on, end_on, next_index, paused, created_at, updated_at) " +
+                    "VALUES (1, 'Rent', 'EXPENSE', 120000, 'USD', 1, NULL, 'MONTHLY', 1, 20000, NULL, 3, 0, 1, 1)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 8, true, Migrations.MIGRATION_7_8)
+
+        db.query("SELECT amount_minor, next_index, to_wallet_id, interest_minor FROM recurring WHERE id = 1").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(120000L, c.getLong(0)); assertEquals(3, c.getInt(1)); assertTrue(c.isNull(2)); assertEquals(0L, c.getLong(3))
+        }
+        db.execSQL("PRAGMA foreign_keys = ON")
+        db.execSQL("INSERT INTO debt_terms (wallet_id, interest_rate_bps, repayment, term_months, installment_minor, updated_at) VALUES (2, 1250, 'MONTHLY', 24, 23654, 1)")
+        assertEquals(1L, db.long("SELECT COUNT(*) FROM debt_terms"))
+        db.execSQL("DELETE FROM wallets WHERE id = 2")
+        assertEquals(0L, db.long("SELECT COUNT(*) FROM debt_terms"))
         db.assertNoForeignKeyViolations()
     }
 

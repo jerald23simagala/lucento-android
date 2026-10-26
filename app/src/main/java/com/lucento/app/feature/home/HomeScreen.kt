@@ -1082,7 +1082,7 @@ private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () 
         }
         Spacer(Modifier.width(Spacing.md))
         AmountText(
-            money = if (income) schedule.amount else -schedule.amount,
+            money = if (income) schedule.amount else -schedule.total,
             showPlus = true,
             color = if (income) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
         )

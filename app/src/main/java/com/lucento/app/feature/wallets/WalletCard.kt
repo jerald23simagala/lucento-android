@@ -36,6 +36,8 @@ import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
+import com.lucento.app.domain.DebtMath
+import com.lucento.app.domain.DebtRepayment
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletType
 
@@ -116,7 +118,23 @@ fun WalletCard(wallet: Wallet, movements: Int, modifier: Modifier = Modifier) {
                                 ink,
                                 Modifier.weight(1f),
                             )
-                            CardField("Movements", "$movements", muted, ink, alignEnd = true)
+                            val debt = wallet.debt
+                            val rate = debt?.interestRateBps
+                            val installment = debt?.installment?.takeIf { debt.repayment == DebtRepayment.MONTHLY }
+                            // A debt's terms take the movements' place: rate, then the monthly amortization and term.
+                            if (rate != null) {
+                                CardField("Interest", DebtMath.formatRate(rate) + " / yr", muted, ink, Modifier.padding(end = Spacing.md))
+                            }
+                            when {
+                                installment != null -> CardField(
+                                    "Monthly",
+                                    MoneyFormatter.format(installment) + (debt?.termMonths?.let { " × $it" } ?: ""),
+                                    muted,
+                                    ink,
+                                    alignEnd = true,
+                                )
+                                rate == null -> CardField("Movements", "$movements", muted, ink, alignEnd = true)
+                            }
                         }
                     }
                 }

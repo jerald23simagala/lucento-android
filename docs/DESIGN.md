@@ -138,6 +138,7 @@ Hairlines separate rows inside cards.
 | Component | Purpose |
 |---|---|
 | `LucentoCard`, `StatementPanel` | Card with hairline; solid blue statement panel for first-run setup. |
+| `HeroCard`, `HeroPill`, `HeroTones` | A page's statement figure on brand blue (Wallets net worth, Recurring due soon): main figure left on a white pill, two stacked figures right on sunlight / tangerine pills with navy ink. |
 | `MoneyText` / `AmountText` | Prominent animated figure / compact tabular figure; both signed. |
 | `ProgressRing`, `DonutChart`, `ShareBar`, `MonthlyBarChart` | Data visuals; each has a spoken description and the exact figures beside it. |
 | `ActionTile` | Round quick action with label (Home, account screens). |

@@ -31,6 +31,7 @@ annotation class Dao
 annotation class Query(val value: String)
 annotation class Insert(val onConflict: Int = 3)
 annotation class Update(val onConflict: Int = 3)
+annotation class Upsert
 annotation class Delete
 annotation class Transaction
 object OnConflictStrategy {

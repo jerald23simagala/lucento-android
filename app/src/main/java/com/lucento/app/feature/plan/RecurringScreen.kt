@@ -1,13 +1,10 @@
 package com.lucento.app.feature.plan
 
-import com.lucento.app.core.designsystem.component.Confirmation
-import com.lucento.app.core.designsystem.component.ConfirmationHost
-import com.lucento.app.core.designsystem.component.LucentoAnimation
-import com.lucento.app.core.designsystem.component.EmptyIllustration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,7 +17,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -30,8 +26,10 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,50 +48,50 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.CategoryTile
 import com.lucento.app.core.designsystem.component.ConfirmDialog
+import com.lucento.app.core.designsystem.component.Confirmation
+import com.lucento.app.core.designsystem.component.ConfirmationHost
+import com.lucento.app.core.designsystem.component.EmptyIllustration
 import com.lucento.app.core.designsystem.component.EmptyState
+import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.Hairline
+import com.lucento.app.core.designsystem.component.HeroCard
+import com.lucento.app.core.designsystem.component.HeroPill
+import com.lucento.app.core.designsystem.component.HeroTones
 import com.lucento.app.core.designsystem.component.InfoNote
+import com.lucento.app.core.designsystem.component.LucentoAnimation
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
-import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
-import com.lucento.app.core.designsystem.component.MascotMood
-import com.lucento.app.core.designsystem.component.FieldHeader
+import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.StatusTones
+import com.lucento.app.core.designsystem.component.WalletTypeTile
+import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
-import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.designsystem.theme.TonePair
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
+import com.lucento.app.core.money.MoneyParser
 import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.domain.CategoryKind
+import com.lucento.app.domain.DebtMath
+import com.lucento.app.domain.DebtRepayment
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.RecurringState
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.Wallet
 import com.lucento.app.feature.transactions.shortDayLabel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 private enum class RecurringTab(val label: String) { UPCOMING("Upcoming"), ACTIVE("Active"), PAUSED("Paused") }
-
-private data class ScheduleDraft(
-    val id: Long? = null,
-    val name: String = "",
-    val type: TransactionType = TransactionType.EXPENSE,
-    val amountText: String = "",
-    val walletId: Long? = null,
-    val categoryId: Long? = null,
-    val frequency: Frequency = Frequency.MONTHLY,
-    val interval: Int = 1,
-    val startDate: LocalDate = LocalDate.now(),
-    val endDate: LocalDate? = null,
-)
 
 /**
  * Recurring payments are plans you confirm: "Mark paid" records a real transaction (once, never twice),
@@ -104,11 +102,14 @@ fun RecurringScreen(
     onBack: () -> Unit,
     /** Opens straight into this schedule's review sheet (from Home's upcoming payments), where it can be marked paid. */
     openScheduleId: Long? = null,
+    /** Opens the full-page editor for a new schedule. */
+    onAddSchedule: () -> Unit = {},
+    /** Opens the full-page editor for this schedule. */
+    onEditSchedule: (Long) -> Unit = {},
     viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(RecurringTab.UPCOMING) }
-    var editing by remember { mutableStateOf<ScheduleDraft?>(null) }
     var actingOn by rememberSaveable { mutableStateOf(openScheduleId) }
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
@@ -121,7 +122,6 @@ fun RecurringScreen(
             }
         }
         .sortedBy { it.nextDue ?: LocalDate.MAX }
-    val newDraft = { ScheduleDraft(walletId = state.wallets.firstOrNull()?.id) }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -136,23 +136,27 @@ fun RecurringScreen(
                         body = if (state.wallets.isEmpty()) {
                             "Add a wallet first — every recurring payment is paid from (or into) one."
                         } else {
-                            "Add rent, subscriptions or your salary. Lucento reminds you here and on Home, and you confirm each one."
+                            "Add rent, subscriptions, loan payments or your salary. Lucento reminds you here and on Home, and you confirm each one."
                         },
                         illustration = { EmptyIllustration(LucentoAnimation.EmptyRecurring) },
                         action = if (state.wallets.isEmpty()) {
                             null
                         } else {
-                            { LucentoPrimaryButton(text = "Add recurring payment", onClick = { editing = newDraft() }) }
+                            { LucentoPrimaryButton(text = "Add recurring payment", onClick = onAddSchedule) }
                         },
                     )
                 }
             } else if (state.schedules.isNotEmpty()) {
+                item(key = "hero") { DueSoonCard(state) }
                 item(key = "tabs") {
+                    val colors = MaterialTheme.colorScheme
                     SegmentedToggle(
                         options = RecurringTab.entries.map { it to it.label },
                         selected = tab,
                         onSelect = { tab = it },
-                        modifier = Modifier.padding(bottom = Spacing.sm),
+                        compact = true,
+                        selectedTone = { TonePair(colors.primary, colors.onPrimary) },
+                        modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.sm),
                     )
                 }
                 if (shown.isEmpty()) {
@@ -168,24 +172,28 @@ fun RecurringScreen(
                             modifier = Modifier.padding(vertical = Spacing.lg),
                         )
                     }
-                }
-                itemsIndexed(shown, key = { _, s -> "rec-${s.id}" }) { index, schedule ->
-                    Column {
-                        ScheduleRow(schedule, state, onClick = { actingOn = schedule.id })
-                        if (index < shown.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
+                } else {
+                    item(key = "card-$tab") {
+                        // One card for the list, rows split by hairlines: the Transactions and Wallets treatment.
+                        LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+                            shown.forEachIndexed { index, schedule ->
+                                ScheduleRow(schedule, state, onClick = { actingOn = schedule.id })
+                                if (index < shown.lastIndex) Hairline(strong = true)
+                            }
+                        }
                     }
                 }
                 item(key = "rule") {
                     InfoNote(
-                        "Scheduled items aren’t transactions until you mark them paid, so your balances only change when money really moves.",
-                        modifier = Modifier.padding(top = Spacing.lg),
+                        "Scheduled items aren’t transactions until you mark them paid, so balances only change when money really moves.",
+                        modifier = Modifier.padding(top = Spacing.md),
                     )
                 }
             }
         }
         if (state.schedules.isNotEmpty() && state.wallets.isNotEmpty()) {
             ExtendedFloatingActionButton(
-                onClick = { editing = newDraft() },
+                onClick = onAddSchedule,
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                 text = { Text("Add") },
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -201,10 +209,10 @@ fun RecurringScreen(
         ScheduleActionsSheet(
             schedule = schedule,
             state = state,
-            onMarkPaid = { amount, date, done ->
-                viewModel.markPaid(schedule.id, amount, date) { result ->
+            onMarkPaid = { amount, interest, date, done ->
+                viewModel.markPaid(schedule.id, amount, date, interest) { result ->
                     done(result)
-                    // Only after the transaction was recorded and the schedule advanced in one database transaction.
+                    // Only after the transaction(s) were recorded and the schedule advanced in one database transaction.
                     if (result is RecurringRepository.PayResult.Recorded) {
                         confirmation = Confirmation(if (schedule.type == TransactionType.INCOME) "Income recorded" else "Payment recorded")
                     }
@@ -214,18 +222,7 @@ fun RecurringScreen(
             onPause = { viewModel.setPaused(schedule.id, !schedule.paused) },
             onEdit = {
                 actingOn = null
-                editing = ScheduleDraft(
-                    id = schedule.id,
-                    name = schedule.name,
-                    type = schedule.type,
-                    amountText = MoneyFormatter.formatPlain(schedule.amount),
-                    walletId = schedule.walletId,
-                    categoryId = schedule.categoryId,
-                    frequency = schedule.frequency,
-                    interval = schedule.interval,
-                    startDate = schedule.startDate,
-                    endDate = schedule.endDate,
-                )
+                onEditSchedule(schedule.id)
             },
             onDelete = {
                 viewModel.deleteSchedule(schedule.id)
@@ -235,14 +232,6 @@ fun RecurringScreen(
         )
     }
 
-    editing?.let { draft ->
-        ScheduleEditorSheet(
-            initial = draft,
-            state = state,
-            onSave = { input, done -> viewModel.saveSchedule(input, done) },
-            onDismiss = { editing = null },
-        )
-    }
 }
 
 internal fun frequencyLabel(frequency: Frequency, interval: Int): String = when (frequency) {
@@ -251,39 +240,141 @@ internal fun frequencyLabel(frequency: Frequency, interval: Int): String = when 
     Frequency.YEARLY -> if (interval == 1) "Yearly" else "Every $interval years"
 }
 
+/** "Monthly", or "Once" for a schedule whose only date is its first. */
+private fun RecurringSchedule.repeatLabel(): String =
+    if (endDate == startDate) "Once" else frequencyLabel(frequency, interval)
+
+/**
+ * The page's statement, on brand blue, for the main currency and the next 30 days: what you'll pay (left), with how
+ * many payments and how many are overdue; then stacked on the right what is already overdue (tangerine) and — only
+ * when income is scheduled — the income expected, otherwise when the next payment is due (sunlight).
+ */
+@Composable
+private fun DueSoonCard(state: PlanUiState) {
+    val ext = LucentoTheme.extendedColors
+    val code = state.primaryCurrency
+    val window = RecurringMath.upcoming(state.schedules, state.today.plusDays(RecurringMath.DASHBOARD_HORIZON_DAYS))
+        .filter { (s, _) -> s.currencyCode == code }
+    val outgoing = window.filter { (s, _) -> s.type == TransactionType.EXPENSE }
+    val overdue = outgoing.filter { (_, date) -> date.isBefore(state.today) }
+    val comingUp = outgoing.filterNot { (_, date) -> date.isBefore(state.today) }
+    val income = window.filter { (s, _) -> s.type == TransactionType.INCOME }
+    val dueTotal = Money.sum(code, outgoing.map { (s, _) -> s.total })
+    val overdueTotal = Money.sum(code, overdue.map { (s, _) -> s.total })
+    val schedulesIncome = state.schedules.any { it.type == TransactionType.INCOME && !it.paused && !it.isFinished }
+    HeroCard(Modifier.padding(top = Spacing.xs)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1.15f)) {
+                HeroPill("To pay · next 30 days", HeroTones.main, Modifier.semantics { heading() })
+                Spacer(Modifier.height(Spacing.xs))
+                MoneyText(money = -dueTotal, style = AmountStyles.hero, color = ext.onHero)
+                Text(
+                    buildString {
+                        append(if (outgoing.size == 1) "1 payment" else "${outgoing.size} payments")
+                        if (overdue.isNotEmpty()) append(" · ${overdue.size} overdue")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ext.onHeroMuted,
+                    maxLines = 1,
+                )
+            }
+            VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                HeroLine("Overdue", HeroTones.tangerine) {
+                    MoneyText(money = -overdueTotal, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f)
+                }
+                if (schedulesIncome) {
+                    HeroLine("Income expected", HeroTones.sunlight) {
+                        MoneyText(
+                            money = Money.sum(code, income.map { (s, _) -> s.amount }),
+                            style = AmountStyles.row,
+                            color = ext.onHero,
+                            showPlus = true,
+                            fractionScale = 1f,
+                        )
+                    }
+                } else {
+                    // The next payment still ahead (today or later), however far off; overdue ones are counted above.
+                    val nextAhead = state.schedules
+                        .filter { !it.paused && it.type == TransactionType.EXPENSE }
+                        .mapNotNull { s -> s.nextDue?.takeIf { !it.isBefore(state.today) } }
+                        .minOrNull()
+                    HeroLine("Next due", HeroTones.sunlight) {
+                        Text(
+                            nextAhead?.let { shortDayLabel(it, state.today) } ?: "Nothing planned",
+                            style = AmountStyles.row,
+                            color = ext.onHero,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroLine(label: String, tone: TonePair, value: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        HeroPill(label, tone)
+        Spacer(Modifier.height(Spacing.xxs))
+        value()
+    }
+}
+
 @Composable
 private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick: () -> Unit) {
     val due = schedule.nextDue
     val overdue = due != null && due.isBefore(state.today)
-    val category = schedule.categoryId?.let { state.categoriesById[it] }
+    val income = schedule.type == TransactionType.INCOME
+    val debt = schedule.toWalletId?.let { state.walletsById[it] }
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
+            .heightIn(min = 56.dp)
             .clickable(role = Role.Button, onClickLabel = "Open ${schedule.name}", onClick = onClick)
-            .padding(vertical = Spacing.sm),
+            .padding(horizontal = Spacing.md, vertical = Spacing.xs + Spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryTile(category = category, type = schedule.type)
-        Spacer(Modifier.width(Spacing.md))
+        if (debt != null) {
+            WalletTypeTile(debt.type, size = 36.dp)
+        } else {
+            CategoryTile(category = schedule.categoryId?.let { state.categoriesById[it] }, type = schedule.type, size = 36.dp)
+        }
+        Spacer(Modifier.width(Spacing.md - Spacing.xxs))
         Column(Modifier.weight(1f)) {
-            Text(schedule.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 buildString {
-                    append(frequencyLabel(schedule.frequency, schedule.interval))
-                    state.walletsById[schedule.walletId]?.let { append(" · ").append(it.name) }
+                    append(schedule.repeatLabel())
+                    val from = state.walletsById[schedule.walletId]?.name
+                    when {
+                        debt != null -> append(" · ").append(from ?: "Account").append(" → ").append(debt.name)
+                        from != null -> append(" · ").append(from)
+                    }
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            if (schedule.isDebtPayment && !schedule.interest.isZero) {
+                Text(
+                    "${MoneyFormatter.format(schedule.amount)} principal · ${MoneyFormatter.format(schedule.interest)} interest",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         Spacer(Modifier.width(Spacing.sm))
         Column(horizontalAlignment = Alignment.End) {
             AmountText(
-                money = if (schedule.type == TransactionType.INCOME) schedule.amount else -schedule.amount,
+                money = if (income) schedule.amount else -schedule.total,
+                style = AmountStyles.row,
                 showPlus = true,
-                color = if (schedule.type == TransactionType.INCOME) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
+                color = if (income) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
             )
             when {
                 schedule.paused -> StatusPill("Paused", StatusTones.neutral)
@@ -295,12 +386,58 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
     }
 }
 
+/** A blank interest field is zero; anything typed must be a valid, non-negative amount. */
+private fun parseInterest(text: String, currencyCode: String, separator: Char): Pair<Money?, AmountError?> {
+    if (text.isBlank()) return Money.zero(currencyCode) to null
+    return when (val parsed = MoneyParser.parse(text, currencyCode, separator)) {
+        is MoneyParser.Result.Success -> parsed.money to null
+        MoneyParser.Result.Empty -> Money.zero(currencyCode) to null
+        MoneyParser.Result.Invalid -> null to AmountError.Invalid
+        is MoneyParser.Result.TooManyDecimals -> null to AmountError.TooPrecise(parsed.allowed)
+        MoneyParser.Result.TooLarge -> null to AmountError.TooLarge
+    }
+}
+
+/**
+ * A debt payment as paid: the whole payment and the part of it that was interest (from the statement). The rest is the
+ * principal that goes against the debt, shown as you type.
+ */
+@Composable
+private fun PaymentSplitFields(
+    paymentText: String,
+    interestText: String,
+    currencyCode: String,
+    debtName: String,
+    onPayment: (String) -> Unit,
+    onInterest: (String) -> Unit,
+    error: String?,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        MoneyField(paymentText, onPayment, label = "Payment", currencyCode = currencyCode, modifier = Modifier.weight(1f))
+        MoneyField(interestText, onInterest, label = "Of which interest", currencyCode = currencyCode, modifier = Modifier.weight(1f))
+    }
+    val separator = remember { MoneyFormatter.decimalSeparator() }
+    val payment = (MoneyParser.parse(paymentText, currencyCode, separator) as? MoneyParser.Result.Success)?.money
+    val interest = parseInterest(interestText, currencyCode, separator).first
+    val principal = if (payment != null && interest != null) payment - interest else null
+    Text(
+        error ?: when {
+            principal == null -> "Enter the payment and the interest your statement shows (0 if none)."
+            principal.isNegative -> "The interest can’t be more than the payment."
+            else -> "${MoneyFormatter.format(principal)} goes against $debtName; ${MoneyFormatter.format(interest!!)} is recorded as interest spending."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (error != null || principal?.isNegative == true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = Spacing.lg, top = Spacing.xs),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ScheduleActionsSheet(
     schedule: RecurringSchedule,
     state: PlanUiState,
-    onMarkPaid: (Money?, LocalDate?, (RecurringRepository.PayResult) -> Unit) -> Unit,
+    onMarkPaid: (Money?, Money?, LocalDate?, (RecurringRepository.PayResult) -> Unit) -> Unit,
     onSkip: () -> Unit,
     onPause: () -> Unit,
     onEdit: () -> Unit,
@@ -309,7 +446,10 @@ private fun ScheduleActionsSheet(
 ) {
     val separator = remember { MoneyFormatter.decimalSeparator() }
     val due = schedule.nextDue
-    var amountText by remember(schedule.id, schedule.nextIndex) { mutableStateOf(MoneyFormatter.formatPlain(schedule.amount)) }
+    val debt = schedule.toWalletId?.let { state.walletsById[it] }
+    // For a debt payment this is the whole payment; the interest part is entered below and the rest is principal.
+    var amountText by remember(schedule.id, schedule.nextIndex) { mutableStateOf(MoneyFormatter.formatPlain(schedule.total)) }
+    var interestText by remember(schedule.id, schedule.nextIndex) { mutableStateOf("") }
     var paidOn by remember(schedule.id, schedule.nextIndex) { mutableStateOf<LocalDate?>(due) }
     var message by remember { mutableStateOf<String?>(null) }
     var confirmingDelete by remember { mutableStateOf(false) }
@@ -324,24 +464,48 @@ private fun ScheduleActionsSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text(schedule.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            Text(
-                frequencyLabel(schedule.frequency, schedule.interval) +
-                    (due?.let { " · next on ${formatDate(it)}" } ?: " · no more dates"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (debt != null) {
+                    WalletTypeTile(debt.type)
+                } else {
+                    CategoryTile(category = schedule.categoryId?.let { state.categoriesById[it] }, type = schedule.type)
+                }
+                Spacer(Modifier.width(Spacing.md))
+                Column(Modifier.weight(1f)) {
+                    Text(schedule.name, style = MaterialTheme.typography.headlineSmall, maxLines = 2, modifier = Modifier.semantics { heading() })
+                    Text(
+                        schedule.repeatLabel() + (due?.let { " · next on ${formatDate(it)}" } ?: " · no more dates"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             if (due != null && !schedule.paused) {
-                FieldHeader(if (schedule.type == TransactionType.INCOME) "Record as received" else "Record as paid")
-                MoneyField(
-                    value = amountText,
-                    onValueChange = { amountText = it; message = null },
-                    label = "Amount",
-                    currencyCode = schedule.currencyCode,
-                    supporting = "Change it if this bill varies.",
-                    error = message,
-                )
-                DateField(label = "Date", date = paidOn, onDate = { paidOn = it ?: due }, clearable = false)
+                LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
+                    FieldHeader(if (schedule.type == TransactionType.INCOME) "Record as received" else "Record as paid")
+                    if (debt != null) {
+                        PaymentSplitFields(
+                            paymentText = amountText,
+                            interestText = interestText,
+                            currencyCode = schedule.currencyCode,
+                            debtName = debt.name,
+                            onPayment = { amountText = it; message = null },
+                            onInterest = { interestText = it; message = null },
+                            error = message,
+                        )
+                    } else {
+                        MoneyField(
+                            value = amountText,
+                            onValueChange = { amountText = it; message = null },
+                            label = "Amount",
+                            currencyCode = schedule.currencyCode,
+                            supporting = "Change it if this bill varies.",
+                            error = message,
+                        )
+                    }
+                    Spacer(Modifier.height(Spacing.sm))
+                    DateField(label = "Date", date = paidOn, onDate = { paidOn = it ?: due }, clearable = false)
+                }
                 LucentoPrimaryButton(
                     text = if (schedule.type == TransactionType.INCOME) "Mark received" else "Mark paid",
                     onClick = {
@@ -350,15 +514,27 @@ private fun ScheduleActionsSheet(
                             message = error?.message(schedule.currencyCode, separator)
                             return@LucentoPrimaryButton
                         }
-                        onMarkPaid(money, paidOn, { result ->
+                        val (interest, interestError) = parseInterest(interestText, schedule.currencyCode, separator)
+                        if (interest == null) {
+                            message = interestError?.message(schedule.currencyCode, separator)
+                            return@LucentoPrimaryButton
+                        }
+                        if (debt != null && interest.amountMinor > money.amountMinor) {
+                            message = "The interest can’t be more than the payment."
+                            return@LucentoPrimaryButton
+                        }
+                        // A debt payment records principal (payment − interest) against the debt and the interest as spending.
+                        val principal = if (debt != null) money - interest else money
+                        onMarkPaid(principal, interest.takeIf { debt != null }, paidOn) { result ->
                             when (result) {
                                 is RecurringRepository.PayResult.Recorded -> onDismiss()
                                 RecurringRepository.PayResult.NotDue -> message = "This schedule has no more dates."
                                 RecurringRepository.PayResult.NotFound -> onDismiss()
                                 is RecurringRepository.PayResult.Rejected ->
-                                    message = "Couldn’t record it — check that ${state.walletsById[schedule.walletId]?.name ?: "the wallet"} still exists."
+                                    message = "Couldn’t record it — check that ${state.walletsById[schedule.walletId]?.name ?: "the wallet"}" +
+                                        (debt?.let { " and ${it.name} still exist" } ?: " still exists") + "."
                             }
-                        })
+                        }
                     },
                 )
                 LucentoSecondaryButton(text = "Skip this one", onClick = {
@@ -390,141 +566,5 @@ private fun ScheduleActionsSheet(
             },
             onDismiss = { confirmingDelete = false },
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ScheduleEditorSheet(
-    initial: ScheduleDraft,
-    state: PlanUiState,
-    onSave: (RecurringRepository.Input, (RecurringRepository.SaveResult) -> Unit) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
-    val separator = remember { MoneyFormatter.decimalSeparator() }
-    var draft by remember { mutableStateOf(initial) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val wallet = state.walletsById[draft.walletId]
-    val kind = if (draft.type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
-    val categories = state.categories.filter { it.kind == kind && (!it.archived || it.id == draft.categoryId) }
-
-    fun close() {
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-    }
-
-    LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.gutter)
-                .navigationBarsPadding()
-                .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Text(
-                if (initial.id == null) "New recurring payment" else "Edit recurring payment",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() },
-            )
-            SegmentedToggle(
-                options = listOf(TransactionType.EXPENSE to "Bill or expense", TransactionType.INCOME to "Income"),
-                selected = draft.type,
-                onSelect = { draft = draft.copy(type = it, categoryId = null) },
-            )
-            TextInput(
-                value = draft.name,
-                onValueChange = { draft = draft.copy(name = it); error = null },
-                label = "Name",
-                placeholder = if (draft.type == TransactionType.INCOME) "e.g. Salary" else "e.g. Internet bill",
-                maxLength = RecurringRepository.MAX_NAME,
-            )
-            MoneyField(
-                value = draft.amountText,
-                onValueChange = { draft = draft.copy(amountText = it); error = null },
-                label = "Amount",
-                currencyCode = wallet?.currencyCode ?: state.primaryCurrency,
-            )
-            FieldHeader(if (draft.type == TransactionType.INCOME) "Into" else "Paid from")
-            PillRow(state.wallets.map { it.id to "${it.name} · ${it.currencyCode}" }, draft.walletId, onSelect = { draft = draft.copy(walletId = it) })
-            if (categories.isNotEmpty()) {
-                FieldHeader("Category")
-                PillRow(
-                    options = listOf<Pair<Long?, String>>(null to "None") + categories.map { it.id to it.name },
-                    selected = draft.categoryId,
-                    onSelect = { draft = draft.copy(categoryId = it) },
-                )
-            }
-            FieldHeader("Repeats")
-            PillRow(Frequency.entries.map { it to frequencyLabel(it, 1) }, draft.frequency, onSelect = { draft = draft.copy(frequency = it) })
-            PillRow(
-                options = listOf(1, 2, 3, 6).map { n -> n to frequencyLabel(draft.frequency, n) },
-                selected = draft.interval,
-                onSelect = { draft = draft.copy(interval = it) },
-            )
-            DateField(label = "First date", date = draft.startDate, onDate = { draft = draft.copy(startDate = it ?: draft.startDate) }, clearable = false)
-            DateField(label = "Ends (optional)", date = draft.endDate, onDate = { draft = draft.copy(endDate = it) }, emptyText = "Never")
-            if (initial.id != null) {
-                Text(
-                    "Changing the first date or how often it repeats restarts the schedule from the new first date. " +
-                        "Transactions already recorded stay as they are.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-            LucentoPrimaryButton(
-                text = if (initial.id == null) "Save schedule" else "Save changes",
-                onClick = {
-                    val w = wallet
-                    if (w == null) {
-                        error = "Choose an account."
-                        return@LucentoPrimaryButton
-                    }
-                    if (draft.name.isBlank()) {
-                        error = "Give it a name."
-                        return@LucentoPrimaryButton
-                    }
-                    val (money, amountError) = parsePositive(draft.amountText, w.currencyCode, separator)
-                    if (money == null) {
-                        error = amountError?.message(w.currencyCode, separator)
-                        return@LucentoPrimaryButton
-                    }
-                    onSave(
-                        RecurringRepository.Input(
-                            id = draft.id,
-                            name = draft.name,
-                            type = draft.type,
-                            amount = money,
-                            walletId = w.id,
-                            categoryId = draft.categoryId,
-                            frequency = draft.frequency,
-                            interval = draft.interval,
-                            startDate = draft.startDate,
-                            endDate = draft.endDate,
-                        ),
-                    ) { result ->
-                        error = when (result) {
-                            is RecurringRepository.SaveResult.Saved -> {
-                                close()
-                                null
-                            }
-                            RecurringRepository.SaveResult.BlankName -> "Give it a name."
-                            RecurringRepository.SaveResult.AmountNotPositive -> "The amount must be greater than zero."
-                            RecurringRepository.SaveResult.EndBeforeStart -> "The end date is before the first date."
-                            RecurringRepository.SaveResult.WalletNotFound -> "That account no longer exists."
-                            RecurringRepository.SaveResult.CurrencyMismatch -> "The amount must be in the account’s currency."
-                            RecurringRepository.SaveResult.CategoryMismatch -> "That category doesn’t match the type."
-                            RecurringRepository.SaveResult.InvalidInterval,
-                            RecurringRepository.SaveResult.InvalidType,
-                            RecurringRepository.SaveResult.NotFound -> "This schedule couldn’t be saved."
-                        }
-                    }
-                },
-            )
-            Spacer(Modifier.height(Spacing.sm))
-        }
     }
 }

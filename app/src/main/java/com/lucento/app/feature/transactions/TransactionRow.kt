@@ -57,6 +57,11 @@ fun TransactionRow(
     dense: Boolean = false,
     /** What a tap does, for TalkBack; defaults to opening the editor. */
     onClickLabel: String? = null,
+    /**
+     * On a card's or loan's own history: show each amount as its change in what is owed (a payment "−", interest "+").
+     * Display only; the stored sign is unchanged.
+     */
+    owedPerspective: Boolean = false,
 ) {
     val isIncome = transaction.type == TransactionType.INCOME
     val isTransfer = transaction.isTransfer
@@ -127,10 +132,11 @@ fun TransactionRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 else -> AmountText(
-                    money = transaction.signedAmount,
+                    money = if (owedPerspective) -transaction.signedAmount else transaction.signedAmount,
                     style = AmountStyles.row,
                     showPlus = true,
                     color = when {
+                        owedPerspective -> MaterialTheme.colorScheme.onSurface
                         isIncome -> LucentoTheme.extendedColors.positive
                         isTransfer -> MaterialTheme.colorScheme.onSurfaceVariant
                         else -> MaterialTheme.colorScheme.onSurface

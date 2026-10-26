@@ -85,6 +85,7 @@ import com.lucento.app.feature.home.HomeScreen
 import com.lucento.app.feature.insights.InsightsScreen
 import com.lucento.app.feature.onboarding.OnboardingScreen
 import com.lucento.app.feature.plan.DebtsScreen
+import com.lucento.app.feature.plan.RecurringEditorScreen
 import com.lucento.app.feature.plan.GoalsScreen
 import com.lucento.app.feature.plan.RecurringScreen
 import com.lucento.app.feature.profile.ProfileDestination
@@ -117,6 +118,16 @@ import kotlin.reflect.KClass
 @Serializable data object GoalsRoute
 @Serializable data object DebtsRoute
 @Serializable data class RecurringRoute(val scheduleId: Long = NO_SCHEDULE)
+
+/**
+ * The full-page recurring payment editor: [scheduleId] edits one; [debtWalletId] + [firstDueEpochDay] start a debt
+ * payment prefilled from that card or loan (after saving it with a payment reminder, see WalletEditorSheet).
+ */
+@Serializable data class RecurringEditRoute(
+    val scheduleId: Long = NO_SCHEDULE,
+    val debtWalletId: Long = NO_SCHEDULE,
+    val firstDueEpochDay: Long = 0,
+)
 @Serializable data object CategoriesRoute
 
 // Focused workflows: full screen, the dock is hidden.
@@ -162,6 +173,7 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     ComposerRoute::class,
     TransactionEditRoute::class,
     TransactionViewRoute::class,
+    RecurringEditRoute::class,
 )
 
 private fun NavDestination?.primaryKey(): String? =
@@ -222,6 +234,13 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
 
     fun push(route: Any) {
         navController.navigate(route) { launchSingleTop = true }
+    }
+
+    // A card or loan saved with a payment reminder opens a prefilled recurring payment (when that module is on).
+    val planDebtPayment: ((Long, java.time.LocalDate) -> Unit)? = if (features.isEnabled(Feature.RECURRING)) {
+        { walletId, firstDue -> push(RecurringEditRoute(debtWalletId = walletId, firstDueEpochDay = firstDue.toEpochDay())) }
+    } else {
+        null
     }
 
     fun notify(message: String) {
@@ -359,6 +378,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onBack = back,
                             onOpenWallet = { push(WalletDetailRoute(it)) },
                             allowAdding = features.isEnabled(Feature.MULTIPLE_WALLETS),
+                            onPlanDebtPayment = planDebtPayment,
                             onOpenDebts = if (features.isEnabled(Feature.DEBTS_LOANS)) ({ push(DebtsRoute) }) else null,
                             onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
                         )
@@ -385,6 +405,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onEditTransaction = { view(it) },
                             transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
                             onAdjusted = { notify("Balance adjusted") },
+                            onPlanDebtPayment = planDebtPayment,
                         )
                     }
                     pushed<GoalsRoute>(reducedMotion) {
@@ -392,13 +413,33 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     }
                     pushed<DebtsRoute>(reducedMotion) {
                         Gated(Feature.DEBTS_LOANS, features, enableFeature, back) {
-                            DebtsScreen(onBack = back, onOpenWallet = { push(WalletDetailRoute(it)) })
+                            DebtsScreen(onBack = back, onOpenWallet = { push(WalletDetailRoute(it)) }, onPlanDebtPayment = planDebtPayment)
                         }
                     }
                     pushed<RecurringRoute>(reducedMotion) { entry ->
                         val route = entry.toRoute<RecurringRoute>()
                         Gated(Feature.RECURRING, features, enableFeature, back) {
-                            RecurringScreen(onBack = back, openScheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE })
+                            RecurringScreen(
+                                onBack = back,
+                                openScheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE },
+                                onAddSchedule = { push(RecurringEditRoute()) },
+                                onEditSchedule = { id -> push(RecurringEditRoute(scheduleId = id)) },
+                            )
+                        }
+                    }
+                    pushed<RecurringEditRoute>(reducedMotion) { entry ->
+                        val route = entry.toRoute<RecurringEditRoute>()
+                        Gated(Feature.RECURRING, features, enableFeature, back) {
+                            RecurringEditorScreen(
+                                onBack = back,
+                                scheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE },
+                                prefillDebt = route.debtWalletId.takeIf { it != NO_SCHEDULE }
+                                    ?.let { it to java.time.LocalDate.ofEpochDay(route.firstDueEpochDay) },
+                                onSaved = {
+                                    back()
+                                    notify("Recurring payment saved")
+                                },
+                            )
                         }
                     }
                     pushed<CategoriesRoute>(reducedMotion) {

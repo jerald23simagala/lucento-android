@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -56,6 +55,8 @@ import com.lucento.app.feature.wallets.WalletsViewModel
 fun DebtsScreen(
     onBack: () -> Unit,
     onOpenWallet: (Long) -> Unit,
+    /** Opens a prefilled recurring payment after a debt is saved with a payment reminder; null when recurring is off. */
+    onPlanDebtPayment: ((Long, java.time.LocalDate) -> Unit)? = null,
     viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
@@ -102,18 +103,22 @@ fun DebtsScreen(
                 }
                 item(key = "header") { SectionHeader("Accounts", Modifier.padding(top = Spacing.md)) }
             }
-            itemsIndexed(debts, key = { _, w -> "debt-${w.id}" }) { index, wallet ->
-                Column {
-                    WalletRow(wallet = wallet, onClick = { onOpenWallet(wallet.id) })
-                    if (index < debts.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
+            if (debts.isNotEmpty()) {
+                item(key = "accounts") {
+                    LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+                        debts.forEachIndexed { index, wallet ->
+                            WalletRow(wallet = wallet, onClick = { onOpenWallet(wallet.id) }, dense = true)
+                            if (index < debts.lastIndex) Hairline(strong = true)
+                        }
+                    }
                 }
             }
             if (debts.isNotEmpty()) {
                 item(key = "rules") {
                     InfoNote(
                         "How Lucento counts debt: borrowed money is not income; repaying principal is a transfer, not new spending; " +
-                            "interest and fees are expenses. Lucento doesn’t split payments into principal and interest for you — " +
-                            "record interest separately when your statement shows it.",
+                            "interest and fees are expenses. A recurring debt payment records the split you enter — interest under " +
+                            "“Debt interest”, the rest against the debt. Lucento never guesses the split for you.",
                         modifier = Modifier.padding(top = Spacing.lg),
                     )
                 }
@@ -138,6 +143,12 @@ fun DebtsScreen(
             onSave = walletsViewModel::save,
             onDelete = null,
             onDismiss = { adding = null },
+            onPlanPayment = onPlanDebtPayment?.let { plan ->
+                { id, date ->
+                    adding = null
+                    plan(id, date)
+                }
+            },
         )
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Percent
 import androidx.compose.material.icons.outlined.Payments
@@ -29,11 +30,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.ActionTile
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Hairline
+import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MoneyText
@@ -66,6 +69,8 @@ fun WalletDetailScreen(
     transfersEnabled: Boolean,
     /** After a balance adjustment is recorded (e.g. to confirm it in a snackbar). */
     onAdjusted: () -> Unit = {},
+    /** Opens a prefilled recurring payment after a debt is saved with a reminder; null when recurring is off. */
+    onPlanDebtPayment: ((Long, java.time.LocalDate) -> Unit)? = null,
     viewModel: WalletDetailViewModel = viewModel(key = "wallet-$walletId", factory = WalletDetailViewModel.factory(walletId)),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
@@ -134,10 +139,16 @@ fun WalletDetailScreen(
         item(key = "actions") {
             Row(Modifier.fillMaxWidth().padding(top = Spacing.md), horizontalArrangement = Arrangement.SpaceBetween) {
                 if (liability) {
+                    val loan = wallet.type == WalletType.LOAN
                     if (transfersEnabled) {
-                        ActionTile("Payment", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(1f), primary = true)
+                        ActionTile(if (loan) "Repay loan" else "Payment", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(1f), primary = true)
                     }
-                    ActionTile("Purchase", Icons.Filled.Remove, { onAddTransaction(TransactionType.EXPENSE, wallet.id) }, Modifier.weight(1f))
+                    if (loan) {
+                        // A loan has no purchases: its balance is corrected with the as-of balance adjustment instead.
+                        ActionTile("Adjust loan", Icons.Filled.Tune, { adjusting = true }, Modifier.weight(1f))
+                    } else {
+                        ActionTile("Purchase", Icons.Filled.Remove, { onAddTransaction(TransactionType.EXPENSE, wallet.id) }, Modifier.weight(1f))
+                    }
                     ActionTile("Interest/fee", Icons.Outlined.Percent, { onAddTransaction(TransactionType.EXPENSE, wallet.id) }, Modifier.weight(1f))
                 } else {
                     ActionTile("Expense", Icons.Filled.Remove, { onAddTransaction(TransactionType.EXPENSE, wallet.id) }, Modifier.weight(1f), primary = true)
@@ -159,6 +170,11 @@ fun WalletDetailScreen(
                     modifier = Modifier.padding(top = Spacing.sm),
                 )
             }
+        }
+
+        if (liability && state.history.isNotEmpty()) {
+            debtHistory(wallet = wallet, state = state, onOpen = onEditTransaction)
+            return@LazyColumn
         }
 
         item(key = "history-header") { SectionHeader("History", Modifier.padding(top = Spacing.lg)) }
@@ -206,6 +222,12 @@ fun WalletDetailScreen(
                 editing = null
                 adjusting = true
             },
+            onPlanPayment = onPlanDebtPayment?.let { plan ->
+                { id, date ->
+                    editing = null
+                    plan(id, date)
+                }
+            },
         )
     }
 
@@ -219,6 +241,88 @@ fun WalletDetailScreen(
                 onAdjusted()
             },
             onDismiss = { adjusting = false },
+        )
+    }
+}
+
+/**
+ * A card's or loan's history, in two sections and as changes in what is owed (a payment reads "−", interest "+"; display
+ * only — stored amounts and signs are unchanged). A loan splits into Principal (payments, borrowing, adjustments) and
+ * Interest (interest and fees, recorded as expenses); a card into Payments and Charges (purchases, interest, fees).
+ * The note says how the balance comes from the start figure: by the principal repaid, with interest paid inside
+ * each payment.
+ */
+private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
+    wallet: com.lucento.app.domain.Wallet,
+    state: WalletDetailUiState,
+    onOpen: (Transaction) -> Unit,
+) {
+    val loan = wallet.type == WalletType.LOAN
+    val (first, second) = if (loan) {
+        state.history.partition { it.type != TransactionType.EXPENSE }
+    } else {
+        state.history.partition { it.type.isInflow }
+    }
+    val code = wallet.currencyCode
+    fun owedChange(list: List<Transaction>) = com.lucento.app.core.money.Money.sum(code, list.map { -it.signedAmount })
+    listOf(
+        (if (loan) "Principal" else "Payments") to first,
+        (if (loan) "Interest" else "Charges") to second,
+    ).forEach { (title, rows) ->
+        if (rows.isEmpty()) return@forEach
+        item(key = "section-$title") {
+            SectionHeader(title, Modifier.padding(top = Spacing.lg)) {
+                Text(
+                    MoneyFormatter.formatSigned(owedChange(rows)),
+                    style = AmountStyles.small,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+        item(key = "card-$title") {
+            LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+                rows.forEachIndexed { index, transaction ->
+                    TransactionRow(
+                        transaction = transaction,
+                        category = transaction.categoryId?.let { state.categoriesById[it] },
+                        wallet = wallet,
+                        onClick = { onOpen(transaction) },
+                        trailingCaption = shortDayLabel(transaction.date),
+                        transfer = transaction.transferGroup?.let { state.transfers[it] },
+                        walletNames = state.walletNames,
+                        perspectiveOfWallet = true,
+                        owedPerspective = true,
+                        dense = true,
+                    )
+                    if (index < rows.lastIndex) Hairline(strong = true)
+                }
+            }
+        }
+    }
+    item(key = "note") {
+        val start = MoneyFormatter.format(wallet.openingBalance)
+        val now = MoneyFormatter.format(wallet.balance)
+        val text = if (loan) {
+            val repaid = wallet.openingBalance - wallet.balance
+            val interest = com.lucento.app.core.money.Money.sum(code, second.map { it.amount })
+            buildString {
+                append("Owed = $start at start ")
+                append(if (repaid.isNegative) "+ ${MoneyFormatter.format(-repaid)} added" else "− ${MoneyFormatter.format(repaid)} principal repaid")
+                append(" = $now.")
+                if (!interest.isZero) {
+                    append(" ${MoneyFormatter.format(interest)} of interest was charged and paid within your payments, so it doesn’t change what you owe.")
+                }
+            }
+        } else {
+            "Owed = $start at start + charges ${MoneyFormatter.format(owedChange(second))} − payments " +
+                "${MoneyFormatter.format(-owedChange(first))} = $now."
+        }
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.md),
         )
     }
 }

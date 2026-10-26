@@ -349,7 +349,27 @@ object Migrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+    /**
+     * v8 — debt terms and debt payments (docs/CALCULATIONS.md, "Debt terms"):
+     * - new `debt_terms` table: optional interest rate, repayment (one-time / monthly), term and instalment per card or
+     *   loan, removed with its wallet;
+     * - `recurring` gains `to_wallet_id` (the debt a payment goes to) and `interest_minor` (its interest part, 0 for
+     *   every existing schedule, which keeps its meaning exactly).
+     * Literal statements only: tools/check_migrations.py replays them in CI.
+     */
+    val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `debt_terms` (`wallet_id` INTEGER NOT NULL, `interest_rate_bps` INTEGER, " +
+                    "`repayment` TEXT NOT NULL, `term_months` INTEGER, `installment_minor` INTEGER, `updated_at` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`wallet_id`), FOREIGN KEY(`wallet_id`) REFERENCES `wallets`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+            )
+            db.execSQL("ALTER TABLE `recurring` ADD COLUMN `to_wallet_id` INTEGER")
+            db.execSQL("ALTER TABLE `recurring` ADD COLUMN `interest_minor` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
 }
 
 /**

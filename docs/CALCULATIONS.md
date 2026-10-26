@@ -56,7 +56,32 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
   not spending, so the purchase is not counted twice).
 - Loan proceeds: TRANSFER out of the loan into a bank account (raises owed; not income).
 - Principal repayment: TRANSFER into the loan. Interest and fees: EXPENSE on the loan.
-- Lucento does not split a single payment into principal and interest automatically.
+- Lucento does not split a single payment into principal and interest automatically: the user enters the split.
+
+## Debt terms (v8)
+Optional per card or loan (`debt_terms`, local only): a yearly interest rate (basis points, parsed exactly from
+"12.5" / "7,25 %", 0–100 %, at most two decimals), repayment ONE_TIME or MONTHLY, and for monthly the term in months
+and the monthly amortization. The rate and amortization are shown on the wallet card; nothing is fetched.
+- Suggested amortization (a hint the user can apply): standard annuity `P·r·(1+r)^n / ((1+r)^n − 1)` with monthly rate
+  `r = yearly ÷ 12`, in `BigDecimal`, rounded half-up to the minor unit; without interest `P ÷ n` rounded **up** so the
+  instalments never fall short (`DebtMath.monthlyInstallment`).
+- Interest estimate shown beside a debt payment: owed × yearly ÷ 12, half-up (`DebtMath.monthlyInterest`). Never applied.
+- Creating a card or loan creates (or restores) the expense category "Debt interest" (`CategoryRepository.ensure`).
+- A payment reminder date opens a prefilled recurring debt payment: "Monthly Payment - <debt>" for the amortization,
+  first due on that date and ending after the term; "One-time Payment - <debt>" for what is owed, one date only.
+
+## Debt payments (recurring)
+A recurring schedule with `to_wallet_id` set pays a card or loan from a money account (same currency). It is planned
+as one amount (the payment, e.g. the monthly amortization; `interest_minor` stays 0). The split is entered when an
+occurrence is marked paid: the payment and "of which interest" from the statement; principal = payment − interest
+(interest may not exceed the payment). Marking it paid writes, in one database transaction and keyed by the occurrence: the interest as an EXPENSE on the debt (category
+"Debt interest"; it is spending and raises what is owed), then a TRANSFER of principal + interest from the paying wallet
+to the debt. Net: the debt falls by the principal, the paying wallet by the total, spending rises by the interest only.
+Safe to spend counts the whole payment against balances, but only its interest against a budget
+(`RecurringMath.committedExpenses(spendingOnly)`). A debt with a payment schedule can't be deleted.
+On the debt's own page, history is split into Principal and Interest (a card: Payments and Charges) and shown as the
+change in what is owed — a payment reads "−", interest "+" (display only). Its note: owed at start − principal repaid
+(start − current balance) = current balance; the interest charged is paid within the payments, so it nets out.
 
 ## Balance adjustments
 Lucento never syncs with a bank, so a balance only changes when something is recorded. When the user can't find what

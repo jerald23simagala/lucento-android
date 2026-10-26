@@ -15,7 +15,7 @@ interface RecurringDao {
     @Query("SELECT * FROM recurring WHERE id = :id")
     suspend fun getById(id: Long): RecurringEntity?
 
-    @Query("SELECT COUNT(*) FROM recurring WHERE wallet_id = :walletId")
+    @Query("SELECT COUNT(*) FROM recurring WHERE wallet_id = :walletId OR to_wallet_id = :walletId")
     suspend fun countForWallet(walletId: Long): Int
 
     @Insert

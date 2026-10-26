@@ -91,6 +91,20 @@ class CategoryRepository(
         }
     }
 
+    /**
+     * The id of the active [kind] category called [name], creating it — or restoring an archived one — when needed.
+     * Used for categories Lucento sets up itself, such as [com.lucento.app.domain.DebtMath.INTEREST_CATEGORY].
+     */
+    suspend fun ensure(name: String, kind: CategoryKind, iconKey: String): Long? = runner.run {
+        val same = dao.getAll().filter { it.kind == kind.name && it.name.equals(name, ignoreCase = true) }
+        same.firstOrNull { !it.archived }?.let { return@run it.id }
+        same.firstOrNull()?.let { archived ->
+            dao.update(archived.copy(archived = false, updatedAt = clock()))
+            return@run archived.id
+        }
+        (create(name, kind, iconKey) as? SaveResult.Saved)?.id
+    }
+
     /** Brings an archived category back. Refused (DuplicateName) when an active category already has its name. */
     suspend fun restore(id: Long): SaveResult {
         val existing = dao.getById(id) ?: return SaveResult.NotFound

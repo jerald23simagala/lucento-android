@@ -57,6 +57,8 @@ import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.CurrencyPickerSheet
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
+import com.lucento.app.core.designsystem.component.LucentoTextButton
+import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.NavRow
 import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.component.SwitchRow
@@ -67,10 +69,16 @@ import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
+import com.lucento.app.core.money.MoneyParser
 import com.lucento.app.data.repository.WalletRepository
+import com.lucento.app.domain.DebtMath
+import com.lucento.app.domain.DebtRepayment
+import com.lucento.app.domain.DebtTerms
 import com.lucento.app.domain.Wallet
+import com.lucento.app.feature.plan.DateField
 import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     id = id,
@@ -80,18 +88,27 @@ fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     // The editor edits the opening balance; the current balance is derived from transactions.
     amountText = if (openingBalance.isZero) "" else MoneyFormatter.formatPlain(openingBalance),
     isDefault = isDefault,
+    interestText = debt?.interestRateBps?.let { DebtMath.formatRate(it).removeSuffix("%") }.orEmpty(),
+    repayment = debt?.repayment ?: DebtRepayment.ONE_TIME,
+    termMonthsText = debt?.termMonths?.toString().orEmpty(),
+    installmentText = debt?.installment?.let { MoneyFormatter.formatPlain(it) }.orEmpty(),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletEditorSheet(
     initial: WalletDraft,
-    onSave: (WalletDraft, Char, (DraftError?) -> Unit) -> Unit,
+    onSave: (WalletDraft, Char, (DraftError?, Long?) -> Unit) -> Unit,
     /** Deletes the wallet; the callback says whether it was deleted or what still uses it. */
     onDelete: ((Long, (WalletRepository.DeleteResult) -> Unit) -> Unit)?,
     onDismiss: () -> Unit,
     /** Opens Adjust balance for an existing money wallet; null hides the option (new or manually valued wallets). */
     onAdjustBalance: (() -> Unit)? = null,
+    /**
+     * After a card or loan with a payment reminder date is saved: opens a prefilled recurring payment for it (wallet id,
+     * first due date). Null when recurring payments are switched off, which also hides the reminder field.
+     */
+    onPlanPayment: ((Long, LocalDate) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -284,6 +301,20 @@ fun WalletEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            if (draft.type.isLiability) {
+                DebtDetails(
+                    draft = draft,
+                    error = error,
+                    decimalSeparator = decimalSeparator,
+                    showReminder = onPlanPayment != null,
+                    fieldColors = fieldColors,
+                    onChange = {
+                        draft = it
+                        if (error is DraftError.InterestInvalid || error is DraftError.TermInvalid || error is DraftError.InstallmentInvalid) error = null
+                    },
+                )
+            }
+
             if (onAdjustBalance != null && initial.id != null && !initial.type.isValuedManually) {
                 Spacer(Modifier.height(Spacing.xs))
                 NavRow(
@@ -309,10 +340,16 @@ fun WalletEditorSheet(
             LucentoPrimaryButton(
                 text = if (initial.id == null) "Add wallet" else "Save changes",
                 onClick = {
-                    onSave(draft, decimalSeparator) { result ->
-                        if (result == null) close() else {
-                            haptics.reject()
-                            error = result
+                    onSave(draft, decimalSeparator) { result, savedId ->
+                        val remind = draft.reminderDate
+                        when {
+                            result != null -> {
+                                haptics.reject()
+                                error = result
+                            }
+                            savedId != null && remind != null && draft.type.isLiability && onPlanPayment != null ->
+                                close { onPlanPayment(savedId, remind) }
+                            else -> close()
                         }
                     }
                 },
@@ -368,6 +405,120 @@ fun WalletEditorSheet(
             onDismiss = { blocked = null },
         )
     }
+}
+
+/**
+ * A card's or loan's terms: an optional yearly interest rate, one-time or monthly repayment (months and the monthly
+ * amortisation, with a suggestion from the amount owed), and an optional payment reminder date that opens a prefilled
+ * recurring payment after saving.
+ */
+@Composable
+private fun DebtDetails(
+    draft: WalletDraft,
+    error: DraftError?,
+    decimalSeparator: Char,
+    showReminder: Boolean,
+    fieldColors: androidx.compose.material3.TextFieldColors,
+    onChange: (WalletDraft) -> Unit,
+) {
+    Spacer(Modifier.height(Spacing.md))
+    FieldHeader("Debt details")
+    OutlinedTextField(
+        value = draft.interestText,
+        onValueChange = { input -> onChange(draft.copy(interestText = input.filter { it.isDigit() || it == '.' || it == ',' }.take(6))) },
+        label = { Text("Interest rate (optional)") },
+        suffix = { Text("% a year") },
+        placeholder = { Text("0") },
+        singleLine = true,
+        isError = error == DraftError.InterestInvalid,
+        supportingText = {
+            Text(if (error == DraftError.InterestInvalid) "Enter a yearly rate from 0 to 100, like 12.5." else "Shown on the wallet card. Lucento never fetches rates.")
+        },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+        shape = MaterialTheme.shapes.small,
+        colors = fieldColors,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(Spacing.xs))
+    SegmentedToggle(
+        options = listOf(DebtRepayment.ONE_TIME to "One time", DebtRepayment.MONTHLY to "Monthly"),
+        selected = draft.repayment,
+        onSelect = { onChange(draft.copy(repayment = it)) },
+        compact = true,
+    )
+    if (draft.repayment == DebtRepayment.MONTHLY) {
+        Spacer(Modifier.height(Spacing.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            OutlinedTextField(
+                value = draft.termMonthsText,
+                onValueChange = { input -> onChange(draft.copy(termMonthsText = input.filter { it.isDigit() }.take(3))) },
+                label = { Text("Months") },
+                placeholder = { Text("12") },
+                singleLine = true,
+                isError = error == DraftError.TermInvalid,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                shape = MaterialTheme.shapes.small,
+                colors = fieldColors,
+                modifier = Modifier.weight(0.8f),
+            )
+            OutlinedTextField(
+                value = draft.installmentText,
+                onValueChange = { onChange(draft.copy(installmentText = it.take(20))) },
+                label = { Text("Monthly amortization") },
+                prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
+                placeholder = { Text("0") },
+                singleLine = true,
+                isError = error == DraftError.InstallmentInvalid,
+                textStyle = AmountStyles.medium,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                shape = MaterialTheme.shapes.small,
+                colors = fieldColors,
+                modifier = Modifier.weight(1.4f),
+            )
+        }
+        val owed = (MoneyParser.parse(draft.amountText, draft.currencyCode, decimalSeparator) as? MoneyParser.Result.Success)?.money
+        val months = draft.termMonthsText.toIntOrNull()?.takeIf { it in 1..DebtTerms.MAX_TERM_MONTHS }
+        val rate = (DebtMath.parseRate(draft.interestText) as? DebtMath.RateResult.Valid)?.bps
+        val suggested = if (owed != null && months != null) DebtMath.monthlyInstallment(owed, months, rate) else null
+        when {
+            error == DraftError.TermInvalid -> HintText("Enter how many months, from 1 to ${DebtTerms.MAX_TERM_MONTHS}.", isError = true)
+            error == DraftError.InstallmentInvalid -> HintText("Enter what you pay each month.", isError = true)
+            suggested != null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                HintText(
+                    "${MoneyFormatter.format(suggested)} a month repays ${MoneyFormatter.format(owed!!)} in $months months" +
+                        (rate?.let { " at ${DebtMath.formatRate(it)}" } ?: "") + ".",
+                    modifier = Modifier.weight(1f),
+                )
+                val applied = (MoneyParser.parse(draft.installmentText, draft.currencyCode, decimalSeparator) as? MoneyParser.Result.Success)?.money == suggested
+                if (!applied) {
+                    LucentoTextButton(text = "Use", onClick = { onChange(draft.copy(installmentText = MoneyFormatter.formatPlain(suggested))) })
+                }
+            }
+            else -> HintText("Enter what you owe, the months and the rate to get a suggested amortization.")
+        }
+    }
+    if (showReminder) {
+        Spacer(Modifier.height(Spacing.sm))
+        DateField(
+            label = if (draft.repayment == DebtRepayment.MONTHLY) "Payment reminder · first due date (optional)" else "Payment reminder · due date (optional)",
+            date = draft.reminderDate,
+            onDate = { onChange(draft.copy(reminderDate = it)) },
+            emptyText = "No reminder",
+        )
+        if (draft.reminderDate != null) {
+            HintText("After saving, a recurring payment opens with this filled in, so you can split it into principal and interest.")
+        }
+    }
+}
+
+@Composable
+private fun HintText(text: String, modifier: Modifier = Modifier, isError: Boolean = false) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(start = Spacing.lg, top = Spacing.xs),
+    )
 }
 
 /** Wallet kinds as recognisable tiles, four per row (seven kinds: two balanced rows). */

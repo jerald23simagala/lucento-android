@@ -102,6 +102,10 @@ recurring-schedule sync, syncing preferences.
   right), Assets and Liabilities as separate tinted sections of carded rows (Debts & loans beside Liabilities), each
   wallet page opening on a bank-card style face per type (`walletCard` tokens), balance flags with tooltips and a reconcile note (Scan shortcut), and Adjust balance from
   Edit wallet (ADJUSTMENT_IN/OUT rows; no schema change — `type` is TEXT).
+- Debts & loans: optional interest rate, one-time / monthly repayment (months + amortization with a suggestion) and a
+  payment reminder that opens a prefilled recurring debt payment; payments split (user input) into principal (transfer)
+  and interest (expense under the auto-created "Debt interest"); Recurring payments redesigned (brand hero, carded rows,
+  Bill / Income / Debt payment). DB v8 (`debt_terms`, `recurring.to_wallet_id` / `interest_minor`), not synced yet.
 - Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull. Older installs also read balance adjustments as expenses after a sync pull.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)

@@ -31,7 +31,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
   assets and liabilities in separate cards (Debts & loans linked from Liabilities), each wallet shown as a bank-style card, warnings for balances that can't be right, and
   **Adjust balance** (the gap is recorded as a visible Balance adjustment, never income or spending); account detail with history.
-- **Savings goals**, **Debts & loans**, **Recurring payments** (mark paid / skip / pause — never auto-posted).
+- **Savings goals**, **Debts & loans** (optional interest rate, one-time or monthly amortization, payment reminders),
+  **Recurring payments** (bills, income and debt payments split into principal and interest; mark paid / skip /
+  pause — never auto-posted).
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,

@@ -4,6 +4,8 @@ import com.lucento.app.data.local.BudgetDao
 import com.lucento.app.data.local.BudgetEntity
 import com.lucento.app.data.local.CategoryDao
 import com.lucento.app.data.local.CategoryEntity
+import com.lucento.app.data.local.DebtTermsDao
+import com.lucento.app.data.local.DebtTermsEntity
 import com.lucento.app.data.local.GoalContributionEntity
 import com.lucento.app.data.local.GoalContributionRow
 import com.lucento.app.data.local.GoalDao
@@ -319,7 +321,7 @@ class FakeRecurringDao : RecurringDao {
 
     override suspend fun getById(id: Long) = rows.value.firstOrNull { it.id == id }
 
-    override suspend fun countForWallet(walletId: Long) = rows.value.count { it.walletId == walletId }
+    override suspend fun countForWallet(walletId: Long) = rows.value.count { it.walletId == walletId || it.toWalletId == walletId }
 
     override suspend fun insert(schedule: RecurringEntity): Long {
         val id = nextId++
@@ -333,6 +335,20 @@ class FakeRecurringDao : RecurringDao {
 
     override suspend fun deleteById(id: Long) {
         rows.value = rows.value.filterNot { it.id == id }
+    }
+}
+
+class FakeDebtTermsDao : DebtTermsDao {
+    val rows = MutableStateFlow<List<DebtTermsEntity>>(emptyList())
+
+    override fun observeAll(): Flow<List<DebtTermsEntity>> = rows
+
+    override suspend fun upsert(terms: DebtTermsEntity) {
+        rows.value = rows.value.filterNot { it.walletId == terms.walletId } + terms
+    }
+
+    override suspend fun delete(walletId: Long) {
+        rows.value = rows.value.filterNot { it.walletId == walletId }
     }
 }
 

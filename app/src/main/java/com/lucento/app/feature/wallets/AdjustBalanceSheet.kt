@@ -167,7 +167,7 @@ fun AdjustBalanceSheet(
                                 else "${wallet.currencyCode} allows up to ${e.digits} decimal places."
                             AdjustError.AmountTooLarge -> "That amount is larger than Lucento supports."
                             AdjustError.Failed -> "Couldn’t save the adjustment. Nothing was changed."
-                            else -> "From your bank app, statement or a count of your cash."
+                            else -> if (liability) "From your latest statement or lender’s app." else "From your bank app, statement or a count of your cash."
                         }
                     )
                 },
