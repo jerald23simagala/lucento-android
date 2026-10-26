@@ -12,6 +12,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -239,6 +241,22 @@ class ScreenshotTourTest {
         tab("Transactions")
         waitForText("Transactions")
         shot("11-transactions")
+        // A left swipe reveals Edit and Delete; a tap opens the read-only View page, whose Edit pill opens the editor.
+        compose.onNodeWithText("Weekly shop").performScrollTo().performTouchInput { swipeLeft() }
+        waitForText("Delete")
+        shot("11a-transaction-actions")
+        compose.onNodeWithText("Weekly shop").performClick() // closes the open row
+        compose.waitForIdle()
+        click("Weekly shop")
+        waitForDescription("Edit")
+        shot("11b-transaction-view")
+        compose.onNodeWithContentDescription("Edit").performClick()
+        waitForText("Edit transaction")
+        shot("11c-transaction-edit")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
         tab("Home")
         // Wallets open from Quick links (or the Net worth card); the dock is Home · Transactions · + · Insights · Budgets.
         compose.onNodeWithContentDescription("Wallets").performScrollTo().performClick()
@@ -272,9 +290,8 @@ class ScreenshotTourTest {
         compose.waitForIdle()
         tab("Home")
         waitForText("Monthly budget")
-        // Home keeps its scroll position from the earlier "lower cards" screenshot: bring the profile button back
-        // into view first (a tap on an off-screen node does nothing).
-        compose.onNodeWithContentDescription("Profile and settings").performScrollTo().performClick()
+        // The Home header is pinned, so the profile button is always on screen.
+        compose.onNodeWithContentDescription("Profile and settings").performClick()
         compose.waitForIdle()
         waitForText("Account and app")
         shot("19-profile-menu")

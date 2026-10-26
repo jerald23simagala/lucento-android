@@ -3,7 +3,7 @@
 Lucento has one way to add transactions: **describe what happened**. Type, speak or scan a receipt, and every
 transaction in the message appears at once as an editable row. Fix anything that looks wrong in place and save the
 batch with one tap. The old Add sheet (Manual · Scan · Speak · Type it), `VoiceEntryScreen` and `ReceiptScanScreen`
-are gone. The editor sheet still opens for **editing** existing transactions and the transfer sheet for wallet
+are gone. The full-page editor still opens for **editing** existing transactions and the transfer sheet for wallet
 transfers.
 
 ```

@@ -277,7 +277,7 @@ private fun GoalCard(p: GoalProgress, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         containerColor = surface,
         contentColor = colors.onSurface,
-        border = BorderStroke(1.dp, colors.outlineVariant),
+        border = BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault),
         overlay = overlay,
         artworkAlignment = Alignment.TopCenter,
         contentPadding = PaddingValues(start = Spacing.lg, end = Spacing.lg, top = window, bottom = Spacing.lg),

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.lucento.app.core.designsystem.component.icon
+import com.lucento.app.core.designsystem.component.WalletPill
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -558,56 +559,6 @@ private fun WalletBar(
                 description = "New transfer between your accounts",
                 onClick = { if (enabled) onTransfer() },
             )
-        }
-    }
-}
-
-/**
- * A compact wallet pill: type icon and name, 32dp tall (48dp touch target). The active wallet is navy-filled — never
- * the brand blue of the user's own message bubbles — and the default carries a small sun star.
- */
-@Composable
-private fun WalletPill(
-    label: String,
-    icon: ImageVector,
-    iconTint: Color?,
-    selected: Boolean,
-    isDefault: Boolean,
-    role: Role,
-    description: String,
-    onClick: () -> Unit,
-) {
-    val colors = MaterialTheme.colorScheme
-    val ext = LucentoTheme.extendedColors
-    val shape = RoundedCornerShape(50)
-    Box(
-        Modifier
-            .minimumInteractiveComponentSize()
-            .selectable(selected = selected, role = role, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(
-            Modifier
-                .height(32.dp)
-                .background(if (selected) colors.inverseSurface else colors.surfaceContainerLowest, shape)
-                .border(1.dp, if (selected) colors.inverseSurface else colors.outlineVariant, shape)
-                .padding(start = 10.dp, end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val content = if (selected) colors.inverseOnSurface else colors.onSurface
-            Icon(icon, contentDescription = null, tint = iconTint ?: content, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge, color = content, maxLines = 1)
-            if (isDefault) {
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Icons.Filled.Star,
-                    contentDescription = null,
-                    tint = if (selected) ext.accent else ext.accentText,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
         }
     }
 }

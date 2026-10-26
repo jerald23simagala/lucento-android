@@ -92,7 +92,8 @@ import com.lucento.app.feature.profile.ProfileSheet
 import com.lucento.app.feature.settings.EnabledFeaturesScreen
 import com.lucento.app.feature.settings.SettingsScreen
 import com.lucento.app.feature.transactions.TransactionDraft
-import com.lucento.app.feature.transactions.TransactionEditorSheet
+import com.lucento.app.feature.transactions.TransactionDetailScreen
+import com.lucento.app.feature.transactions.TransactionEditorScreen
 import com.lucento.app.feature.transactions.TransactionEditorViewModel
 import com.lucento.app.feature.transactions.TransactionsScreen
 import com.lucento.app.feature.transactions.TransferDraft
@@ -122,6 +123,10 @@ import kotlin.reflect.KClass
 @Serializable data object CategorySetupRoute
 @Serializable data object SettingsRoute
 @Serializable data object FeaturesRoute
+/** Full-page editor for the transaction held in LucentoRoot's editor draft (opened from Edit on a row). */
+@Serializable data object TransactionEditRoute
+/** Read-only View Transaction page; Edit there opens [TransactionEditRoute] (or the transfer sheet). */
+@Serializable data class TransactionViewRoute(val transactionId: Long)
 /** The transaction composer: [start] is a [ComposerStart] name; [typeHint] a TransactionType name or empty. */
 @Serializable data class ComposerRoute(val start: String = "TYPE", val walletId: Long = NO_WALLET, val typeHint: String = "")
 
@@ -155,6 +160,8 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     SettingsRoute::class,
     FeaturesRoute::class,
     ComposerRoute::class,
+    TransactionEditRoute::class,
+    TransactionViewRoute::class,
 )
 
 private fun NavDestination?.primaryKey(): String? =
@@ -191,7 +198,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     val editorViewModel: TransactionEditorViewModel = viewModel(factory = TransactionEditorViewModel.Factory)
     val editorState by editorViewModel.state.collectAsStateWithLifecycle()
     var editorDraft by remember { mutableStateOf<TransactionDraft?>(null) }
-    var editorNote by remember { mutableStateOf<String?>(null) }
     var transferDraft by remember { mutableStateOf<TransferDraft?>(null) }
     var transferNote by remember { mutableStateOf<String?>(null) }
     // Set only from a save callback that reported success, i.e. after the database write committed.
@@ -260,10 +266,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             transferNote = null
             transferDraft = transfer.toDraft()
         } else {
-            editorNote = null
             editorDraft = transaction.toDraft()
+            push(TransactionEditRoute)
         }
     }
+
+    fun view(transaction: Transaction) = push(TransactionViewRoute(transaction.id))
 
     /** The one way to add transactions: the composer (typed, spoken or scanned, reviewed as a batch). */
     fun openComposer(start: ComposerStart = ComposerStart.TYPE, walletId: Long? = null, typeHint: TransactionType? = null) {
@@ -336,7 +344,11 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     composable<TransactionsRoute> {
                         TransactionsScreen(
                             onAddTransaction = { openComposer() },
+                            onViewTransaction = { view(it) },
                             onEditTransaction = { edit(it) },
+                            onDeleteTransaction = { t ->
+                                editorViewModel.delete(t.id) { notify(if (t.isTransfer) "Transfer deleted" else "Transaction deleted") }
+                            },
                             onAddWallet = { push(WalletsRoute) },
                             onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
                             onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ openComposer(ComposerStart.SPEAK) }) else null,
@@ -368,7 +380,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onBack = back,
                             onAddTransaction = { type, walletId -> openComposer(walletId = walletId, typeHint = type) },
                             onTransfer = { from, to -> openTransfer(from, to) },
-                            onEditTransaction = { edit(it) },
+                            onEditTransaction = { view(it) },
                             transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
                         )
                     }
@@ -392,6 +404,58 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     pushed<CategorySetupRoute>(reducedMotion) { CategorySetupScreen(onDone = back) }
                     pushed<SettingsRoute>(reducedMotion) { SettingsScreen(onBack = back) }
                     pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
+                    pushed<TransactionViewRoute>(reducedMotion) { entry ->
+                        val route = entry.toRoute<TransactionViewRoute>()
+                        TransactionDetailScreen(
+                            transactionId = route.transactionId,
+                            onBack = {
+                                // Guarded: the page also steps back by itself once its transaction is deleted.
+                                if (navController.currentBackStackEntry?.id == entry.id) navController.popBackStack()
+                            },
+                            onEdit = { edit(it) },
+                        )
+                    }
+                    pushed<TransactionEditRoute>(reducedMotion) {
+                        val draft = editorDraft
+                        // The draft lives only in memory: after process death there is nothing to edit, so step back.
+                        if (draft == null) {
+                            LaunchedEffect(Unit) { navController.popBackStack() }
+                        } else {
+                            // The draft is left in place (the next Edit replaces it) so the exit transition still has content.
+                            fun close() {
+                                if (navController.currentDestination?.hasRoute(TransactionEditRoute::class) == true) navController.popBackStack()
+                            }
+                            TransactionEditorScreen(
+                                initial = draft,
+                                wallets = editorState.wallets,
+                                categories = editorState.categories,
+                                onSave = { toSave, decimal, onResult ->
+                                    editorViewModel.save(toSave, decimal) { error ->
+                                        onResult(error)
+                                        if (error == null) {
+                                            confirmation = Confirmation(
+                                                when {
+                                                    toSave.id != null -> "Changes saved"
+                                                    toSave.type == TransactionType.INCOME -> "Income added"
+                                                    else -> "Expense added"
+                                                }
+                                            )
+                                        }
+                                    }
+                                },
+                                onDelete = { id ->
+                                    editorViewModel.delete(id) { notify("Transaction deleted") }
+                                    // Leave both the editor and the View page of the transaction that no longer exists.
+                                    navController.popBackStack<TransactionEditRoute>(inclusive = true)
+                                    if (navController.currentDestination?.hasRoute(TransactionViewRoute::class) == true) {
+                                        navController.popBackStack()
+                                    }
+                                },
+                                onClose = ::close,
+                                showWalletPicker = features.isEnabled(Feature.MULTIPLE_WALLETS),
+                            )
+                        }
+                    }
                     pushed<ComposerRoute>(reducedMotion) { entry ->
                         val route = entry.toRoute<ComposerRoute>()
                         TransactionComposerScreen(
@@ -429,43 +493,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 }
             },
             onDismiss = { showProfile = false },
-        )
-    }
-
-    editorDraft?.let { draft ->
-        TransactionEditorSheet(
-            initial = draft,
-            wallets = editorState.wallets,
-            categories = editorState.categories,
-            onSave = { toSave, decimal, onResult ->
-                editorViewModel.save(toSave, decimal) { error ->
-                    onResult(error)
-                    if (error == null) {
-                        confirmation = Confirmation(
-                            when {
-                                toSave.id != null -> "Changes saved"
-                                toSave.type == TransactionType.INCOME -> "Income added"
-                                else -> "Expense added"
-                            }
-                        )
-                    }
-                }
-            },
-            onDelete = { id -> editorViewModel.delete(id) { notify("Transaction deleted") } },
-            onDismiss = {
-                editorDraft = null
-                editorNote = null
-            },
-            onSwitchToTransfer = if (features.isEnabled(Feature.MULTIPLE_WALLETS) && editorState.wallets.size > 1) {
-                {
-                    editorDraft = null
-                    openTransfer(draft.walletId)
-                }
-            } else {
-                null
-            },
-            showWalletPicker = features.isEnabled(Feature.MULTIPLE_WALLETS),
-            sourceNote = editorNote,
         )
     }
 

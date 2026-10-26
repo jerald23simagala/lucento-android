@@ -56,7 +56,8 @@ fun LucentoCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = MaterialTheme.shapes.large
-    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    // Cards use the stronger border-default tone so their edges read clearly on the ivory / navy canvas.
+    val border = BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault)
     // Cards lift off the canvas: white on ivory by day, a lighter navy by night.
     val dark = LucentoTheme.isDark
     val color = if (dark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest
@@ -65,8 +66,8 @@ fun LucentoCard(
         elevation = Elevation.xs,
         shape = shape,
         clip = false,
-        ambientColor = tint.copy(alpha = 0.04f),
-        spotColor = tint.copy(alpha = 0.08f),
+        ambientColor = tint.copy(alpha = 0.06f),
+        spotColor = tint.copy(alpha = 0.12f),
     )
     if (onClick != null) {
         Surface(onClick = onClick, modifier = cardModifier, shape = shape, color = color, border = border) {
@@ -194,13 +195,16 @@ fun CardHeader(
     }
 }
 
-/** Hairline separator between list rows. [inset] aligns it with row text rather than the icon. */
+/**
+ * Hairline separator between list rows. [inset] aligns it with row text rather than the icon; [strong] uses a more
+ * visible tone for rows packed tightly inside a card.
+ */
 @Composable
-fun Hairline(modifier: Modifier = Modifier, inset: Dp = 0.dp) {
+fun Hairline(modifier: Modifier = Modifier, inset: Dp = 0.dp, strong: Boolean = false) {
     HorizontalDivider(
         modifier = modifier.padding(start = inset),
         thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant,
+        color = if (strong) MaterialTheme.colorScheme.outline.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outlineVariant,
     )
 }
 

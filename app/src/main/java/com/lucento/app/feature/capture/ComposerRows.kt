@@ -122,7 +122,7 @@ internal fun ReviewRowItem(
         shape = shape,
         // By day a soft navy shadow lifts each card off the canvas; by night (where shadows don't read) a lighter tone.
         color = if (dark) colors.surfaceContainerHigh else colors.surfaceContainerLowest,
-        border = if (incomplete) BorderStroke(1.5.dp, StatusTones.negative.content) else BorderStroke(1.dp, colors.outlineVariant),
+        border = if (incomplete) BorderStroke(1.5.dp, StatusTones.negative.content) else BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault),
         modifier = modifier
             .fillMaxWidth()
             .then(

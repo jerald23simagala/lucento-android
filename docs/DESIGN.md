@@ -126,7 +126,8 @@ logos or UI in the art.
 28dp between sections.
 Radii (`Radii` / `LucentoShapes`): xs 6 badges · sm 10 inputs, icon tiles · md 14 buttons, dropdowns, chips, dock ·
 lg 20 cards, panels · xl 28 sheets, feature cards; `CircleShape` only for circular controls and thin tracks.
-Borders: `outlineVariant` `#E8EAF0` (subtle: cards, separators), `borderDefault` `#D8DDE7` (stronger, decorative),
+Borders: `borderDefault` `#D8DDE7` / night `#2D3D63` for card, panel and dock edges (`outlineVariant` `#E8EAF0` read
+too faint on ivory), `outlineVariant` for separators and unselected pills,
 `outline` `#7A869F` for input/control boundaries (the brief's `#D8DDE7` is 1.4:1, below the 3:1 a control needs),
 focus = 2dp primary. Elevation (`Elevation` xs 1 · sm 2 · md 4 · lg 8 · xl 16dp, navy-tinted `shadow`): day cards
 xs with their hairline, FAB sm→md, toast md, dialogs lg; the night theme uses tonal surfaces instead.

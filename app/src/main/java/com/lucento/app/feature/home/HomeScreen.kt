@@ -158,14 +158,23 @@ fun HomeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.gutter),
-    ) {
-        HomeHeader(status = state.cloudStatus, onOpenSyncSettings = actions.onOpenSettings)
+    val scroll = rememberScrollState()
+    Column(Modifier.fillMaxSize()) {
+        // Pinned: the brand, sync status, notifications and profile stay put while the dashboard scrolls beneath.
+        HomeHeader(
+            status = state.cloudStatus,
+            onOpenSyncSettings = actions.onOpenSettings,
+            modifier = Modifier.padding(horizontal = Spacing.gutter),
+        )
+        if (scroll.value > 0) Hairline()
 
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(scroll)
+                .padding(horizontal = Spacing.gutter),
+        ) {
         AnimatedContent(
             targetState = when {
                 state.loading -> HomeContent.Loading
@@ -189,6 +198,7 @@ fun HomeScreen(
         }
         // Breathing room above the dock and its raised + button.
         Spacer(Modifier.height(Spacing.xl))
+        }
     }
 
     editingWallet?.let { draft ->
@@ -207,9 +217,9 @@ private enum class HomeContent { Loading, Welcome, Overview }
 
 /** Brand on the left; sync status, notifications (not yet available) and the profile entry on the right. */
 @Composable
-private fun HomeHeader(status: CloudStatus, onOpenSyncSettings: () -> Unit) {
+private fun HomeHeader(status: CloudStatus, onOpenSyncSettings: () -> Unit, modifier: Modifier = Modifier) {
     // On narrow phones the symbol alone carries the brand, leaving room for the status chip and actions.
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
         val showWordmark = maxWidth >= 360.dp
         Row(
             Modifier
@@ -287,7 +297,7 @@ private fun MonthPill(state: HomeUiState, onSelect: (YearMonth) -> Unit) {
             Modifier
                 .heightIn(min = Sizes.minTouch)
                 .clip(MaterialTheme.shapes.medium)
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), MaterialTheme.shapes.medium)
+                .border(BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault), MaterialTheme.shapes.medium)
                 .background(if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest)
                 .clickable(role = Role.Button, onClickLabel = "Choose month") { open = true }
                 .padding(horizontal = Spacing.md),
@@ -552,7 +562,7 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
 @Composable
 private fun SpeechBubble(text: String, modifier: Modifier = Modifier) {
     val surface = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLowest
-    val outline = MaterialTheme.colorScheme.outlineVariant
+    val outline = LucentoTheme.extendedColors.borderDefault
     Row(modifier.clearAndSetSemantics { }, verticalAlignment = Alignment.Top) {
         Canvas(Modifier.padding(top = 18.dp).size(width = 7.dp, height = 12.dp)) {
             val path = Path().apply {
@@ -884,7 +894,7 @@ private fun QuickLinkTile(link: QuickLink, modifier: Modifier = Modifier) {
         modifier
             .heightIn(min = 72.dp)
             .clip(MaterialTheme.shapes.medium)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), MaterialTheme.shapes.medium)
+            .border(BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault), MaterialTheme.shapes.medium)
             .clickable(role = Role.Button, onClickLabel = "Open ${link.accessibilityLabel}", onClick = link.onClick)
             .padding(horizontal = 2.dp, vertical = Spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,

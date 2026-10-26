@@ -90,7 +90,7 @@ fun NavigationDock(
                 ),
             shape = shape,
             color = container,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault),
         ) {
             Row(
                 Modifier

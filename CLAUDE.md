@@ -43,8 +43,8 @@ app/src/main/java/com/lucento/app/
   the same `BudgetPlan`.
 - Guard against duplicate submissions (in-flight flags, idempotency keys for imports).
 - New transactions are added only through the composer (`feature/capture`): `TransactionInterpreter` → `BatchReview`
-  → `TransactionRepository.saveBatch` (atomic, one idempotency key per row). The editor sheet is for editing existing
-  transactions. Never present local parsing as AI; a remote interpreter needs the opt-in described in docs/CAPTURE.md.
+  → `TransactionRepository.saveBatch` (atomic, one idempotency key per row). The full-page editor (`TransactionEditorScreen`, opened from
+  Edit on a history row) is for editing existing transactions. Never present local parsing as AI; a remote interpreter needs the opt-in described in docs/CAPTURE.md.
 
 ## Database
 - `exportSchema = true`; schemas land in `app/schemas/` and **are committed** (1–3 recovered from CI artifacts).
