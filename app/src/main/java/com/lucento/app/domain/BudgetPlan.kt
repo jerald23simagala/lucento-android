@@ -109,6 +109,9 @@ data class BudgetPlan(
     val allSpending: Money get() = spent + unbudgetedSpending
 }
 
+/** Spending compared with the month's progress: faster than the calendar, broadly in step, or slower. */
+enum class PacePosition { AHEAD, ALIGNED, BEHIND }
+
 /**
  * How fast the month's budget is being used. [elapsedPercent] is how far through the month [today] is (100 for a
  * finished month), so the bar can show consumption against time. Uses the same [BudgetPlan] as the hero card.
@@ -135,6 +138,20 @@ data class BudgetBurn(
 ) {
     /** Spending is running ahead of the calendar by more than [BudgetPlanner.PACE_MARGIN_PERCENT] points. */
     val aheadOfPace: Boolean get() = consumedPercent != null && consumedPercent > elapsedPercent + BudgetPlanner.PACE_MARGIN_PERCENT
+
+    /**
+     * Where spending stands against the calendar: budget used vs month elapsed, with the same
+     * [BudgetPlanner.PACE_MARGIN_PERCENT] tolerance either side. Null without a budget.
+     */
+    val pace: PacePosition?
+        get() {
+            val consumed = consumedPercent ?: return null
+            return when {
+                consumed > elapsedPercent + BudgetPlanner.PACE_MARGIN_PERCENT -> PacePosition.AHEAD
+                consumed < elapsedPercent - BudgetPlanner.PACE_MARGIN_PERCENT -> PacePosition.BEHIND
+                else -> PacePosition.ALIGNED
+            }
+        }
 }
 
 object BudgetPlanner {

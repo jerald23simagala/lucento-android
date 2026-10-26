@@ -150,6 +150,11 @@ data class GoalsOverview(
     val closest: GoalProgress?,
     /** Goals kept in other currencies (not added in; never converted). */
     val otherCurrencyGoals: Int,
+    /**
+     * The goal to feature: the in-progress goal with the highest completion (same order as [closest]); when every
+     * goal is reached, the most recently created one. Null only when there are no goals in this currency.
+     */
+    val top: GoalProgress? = null,
 )
 
 object GoalsSummary {
@@ -187,6 +192,7 @@ object GoalsSummary {
             fraction = Insights.fraction(saved, target),
             closest = closest,
             otherCurrencyGoals = goals.size - inCurrency.size,
+            top = closest ?: progress.maxByOrNull { it.goal.createdAtEpochMillis },
         )
     }
 }

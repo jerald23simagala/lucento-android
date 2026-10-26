@@ -56,7 +56,29 @@ val LucentoTypography = Typography(
     labelSmall = style(11, 16, FontWeight.Medium, tracking = 0.02),
 )
 
-/** Editorial overline used for section labels ("THIS MONTH", "RECENT"). Uppercased by the caller. */
+/**
+ * The hierarchy every screen shares, so a section's purpose, its main figure, the supporting detail and its action
+ * read in the same order everywhere:
+ *
+ *   section title   [Hierarchy.sectionTitle] 18 SemiBold, on-surface — a block of a screen (SectionHeader)
+ *   card title      [Hierarchy.cardTitle] 15 SemiBold, on-surface — what a card is about (CardHeader)
+ *   context         [Hierarchy.context] 12 Medium, on-surface-variant — period, currency, scope ("October · USD")
+ *   primary value   [AmountStyles.hero] / [AmountStyles.large] — the one figure the block exists for
+ *   secondary value [AmountStyles.medium] / [AmountStyles.row] — figures that explain the primary one
+ *   description     bodySmall, on-surface-variant — one or two lines of meaning, never a third heading
+ *   action          LucentoTextButton (labelLarge, primary) — trailing the title it acts on
+ *   field label     [Hierarchy.fieldLabel] 14 SemiBold, on-surface — inside forms and sheets (FieldHeader)
+ *
+ * Titles are sentence case; uppercase overlines are kept only for tiny chart/legend labels.
+ */
+object Hierarchy {
+    val sectionTitle = style(18, 24, FontWeight.SemiBold, tracking = -0.005)
+    val cardTitle = style(15, 20, FontWeight.SemiBold)
+    val context = style(12, 16, FontWeight.Medium, tracking = 0.005)
+    val fieldLabel = style(14, 20, FontWeight.SemiBold)
+}
+
+/** Editorial overline for tiny labels (chart legends, figure captions). Uppercased by the caller. */
 val OverlineStyle = style(11, 16, FontWeight.SemiBold, tracking = 0.08)
 
 /** Amount styles. Always tabular. Prominent but never crowding the layout. */

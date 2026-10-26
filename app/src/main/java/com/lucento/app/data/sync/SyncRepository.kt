@@ -13,6 +13,7 @@ import com.lucento.app.data.local.TransactionEntity
 import com.lucento.app.data.local.WalletDao
 import com.lucento.app.data.local.WalletEntity
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -52,6 +53,9 @@ class SyncRepository(
     private val clock: () -> Long = System::currentTimeMillis,
     private val pageSize: Long = PULL_PAGE_SIZE,
 ) {
+    /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
+    fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
+
     suspend fun sync(): SyncResult {
         val r = remote ?: return SyncResult.NotConfigured
         val userId = try {

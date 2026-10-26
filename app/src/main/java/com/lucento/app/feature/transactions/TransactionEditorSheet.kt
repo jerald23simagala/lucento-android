@@ -72,7 +72,7 @@ import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
-import com.lucento.app.core.designsystem.component.SectionHeader
+import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.icon
 import com.lucento.app.core.designsystem.component.rememberHaptics
@@ -214,7 +214,7 @@ fun TransactionEditorSheet(
 
             Spacer(Modifier.height(Spacing.lg))
             if (showWalletPicker || wallets.size > 1) {
-                SectionHeader(if (draft.type == TransactionType.INCOME) "Into wallet" else "From wallet")
+                FieldHeader(if (draft.type == TransactionType.INCOME) "Into wallet" else "From wallet")
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -238,7 +238,7 @@ fun TransactionEditorSheet(
             }
 
             Spacer(Modifier.height(Spacing.md))
-            SectionHeader("Category") {
+            FieldHeader("Category") {
                 Text(
                     "Optional",
                     style = MaterialTheme.typography.bodySmall,
@@ -256,7 +256,7 @@ fun TransactionEditorSheet(
             )
 
             Spacer(Modifier.height(Spacing.md))
-            SectionHeader("Date")
+            FieldHeader("Date")
             DateChoices(
                 date = draft.date,
                 onDate = { draft = draft.copy(date = it) },

@@ -24,8 +24,9 @@ app/src/main/java/com/lucento/app/
   data/repository/     Repositories mapping entities <-> domain, enforcing validation
   domain/              Pure Kotlin models and calculators (unit-tested, no Android deps)
   feature/<name>/      Screen + ViewModel per feature
-  navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · Wallets · Insights · Budget + More menu),
-                       app-wide + opens the transaction composer (feature/capture), profile menu (Settings lives there)
+  navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · (+) · Insights · Budgets; the centre +
+                       opens the transaction composer in feature/capture; Wallets, goals, scheduled and debts open from
+                       Home's Quick links, categories from Budgets), profile menu (Settings lives there)
 ```
 - Dependency wiring: `AppContainer` in `LucentoApplication` (manual DI). ViewModels use `containerFactory`.
 - Keep financial logic in `domain/` or `core/money/` as pure functions so it is testable on the JVM.

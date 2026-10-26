@@ -10,6 +10,7 @@ import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.data.repository.saveBatchOrNull
+import com.lucento.app.domain.transactable
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
@@ -107,7 +108,8 @@ class ComposerViewModel(
         categories.observeCategories(),
         transactions.observeTransactions(),
         session,
-    ) { walletList, categoryList, history, s ->
+    ) { allWallets, categoryList, history, s ->
+        val walletList = allWallets.transactable()
         val transfersAllowed = s.transfersEnabled && walletList.size > 1
         val setup = ReviewSetup(walletList, categoryList, separator, transfersAllowed, history)
         val statuses = s.rows.associate { it.key to BatchReview.check(it, setup) }

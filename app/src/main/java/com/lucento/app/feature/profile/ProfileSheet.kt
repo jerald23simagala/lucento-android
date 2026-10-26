@@ -44,7 +44,7 @@ import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.NavRow
 import com.lucento.app.core.designsystem.component.ProfileAvatar
-import com.lucento.app.core.designsystem.component.SectionHeader
+import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
@@ -141,14 +141,14 @@ fun ProfileSheet(
                 }
             }
 
-            SectionHeader("Appearance", Modifier.padding(top = Spacing.lg))
+            FieldHeader("Appearance", Modifier.padding(top = Spacing.lg))
             SegmentedToggle(
                 options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"),
                 selected = preferences.themeMode,
                 onSelect = onTheme,
             )
 
-            SectionHeader("Account and app", Modifier.padding(top = Spacing.lg))
+            FieldHeader("Account and app", Modifier.padding(top = Spacing.lg))
             NavRow(
                 icon = Icons.Outlined.Settings,
                 title = "Settings",

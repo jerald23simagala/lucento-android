@@ -112,7 +112,12 @@ logos or UI in the art.
 - Scale (sp): display 36 Bold · screen title 28 Bold (`headlineMedium`) · section 20 SemiBold (`titleLarge`) ·
   card heading / buttons 16 SemiBold (`titleMedium`) · body 14–16 · form labels 14 Medium (`labelLarge`) ·
   supporting 12 (`bodySmall`) · financial metadata 12 Medium (`labelMedium`). Hero amounts top out at 40sp.
-- Overline labels (`OverlineStyle`, 11sp, tracked, uppercase) name every card ("SAFE TO SPEND", "NET FLOW").
+- **Hierarchy** (`Hierarchy` in `Type.kt`, used the same way on every screen), sentence case throughout:
+  section title 18 SemiBold (`SectionHeader`, optional supporting line) · card title 15 SemiBold with a 12 Medium
+  context line such as "October · USD" (`CardHeader`) · primary value (`AmountStyles.hero` / `large`) · secondary
+  values (`AmountStyles.medium` / `row`) · description (`bodySmall`, muted) · action (`LucentoTextButton`, trailing
+  the title it acts on) · form labels inside sheets 14 SemiBold (`FieldHeader`).
+- Overline labels (`OverlineStyle`, 11sp, tracked, uppercase) are only for tiny legend/figure captions, never titles.
 - Amounts always use tabular figures (`AmountStyles`, `tnum`; Plus Jakarta's figures are lining, `−` matches `+`). `MoneyText` sets minor units smaller, shrinks to fit
   narrow screens instead of wrapping, and rolls value changes.
 
@@ -134,7 +139,7 @@ Hairlines separate rows inside cards.
 | `MoneyText` / `AmountText` | Prominent animated figure / compact tabular figure; both signed. |
 | `ProgressRing`, `DonutChart`, `ShareBar`, `MonthlyBarChart` | Data visuals; each has a spoken description and the exact figures beside it. |
 | `ActionTile` | Round quick action with label (Home, account screens). |
-| `NavRow` | Menu row: icon tile, title, real status line, chevron (More, Profile, Add sheet). |
+| `NavRow` | Menu row: icon tile, title, real status line, chevron (Profile, Add sheet). |
 | `ConsumptionBar`, `IncomeExpenseChart`, `CompositionBar`, `LegendKey`, `NetFlowIndicator` | v0.5 visuals: budget/goal consumption with a today marker; income vs expenses by month; stacked net-worth composition; net-flow Lottie glyph. |
 | `ProfileButton`, `ProfileAvatar` | Top-bar avatar (initials or a person glyph) that opens the profile menu. |
 | `SwitchRow` | Whole-row toggle with description and dependency note (Enabled features). |
@@ -181,13 +186,16 @@ Visual parity has **not** been verified on a device: no emulator or Android buil
 environment (see `docs/QUALITY.md`).
 
 ## Navigation (v0.5)
-- **Dock** (`navigation/NavigationDock.kt`, persistent): **Home · Transactions · Wallets · Insights · Budget**, then a
-  **More** button. The selected tab shows its label under a tinted indicator; the others are icon-only (each keeps its
+- **Dock** (`navigation/NavigationDock.kt`, persistent): **Home · Transactions · (+) · Insights · Budgets** on a floating
+  surface (24dp corners, 12dp side inset, hairline border; a soft shadow by day). The **+** is a raised 60dp brand-blue
+  circle in the centre, breaking the dock's top edge, with a brand-tinted shadow: the one transaction-entry action.
+  Wallets, savings goals, scheduled transactions and debts open from Home's **Quick links**; categories from the
+  Budgets tab. The selected tab shows its label under a tinted indicator; the others are icon-only (each keeps its
   label as the accessibility name). Insights/Budget leave the dock when switched off. The dock stays on secondary
   screens (goals, recurring, debts, account detail, categories — the tab they were opened from stays highlighted)
   and steps aside for focused workflows: the transaction composer, category setup, Settings, Enabled features.
   Tabs keep their state (save/restore on switch).
-- **+ Add transaction** (floating, every primary screen) opens the **transaction composer**: a compact top bar, the
+- **+ Add transaction** (the dock's centre button) opens the **transaction composer**: a compact top bar, the
   conversation (the user's message on a pale-sky bubble, Lucento's one-line reply, then the rows on the background
   separated by hairlines), a summary with one primary "Save N transactions" button, and the input with scan and
   microphone actions (each shown only when its module is on). Rows: category tile, description and signed amount (both
@@ -195,25 +203,33 @@ environment (see `docs/QUALITY.md`).
   attention are amber-tinted and explained in words underneath. Lucento's reply never exceeds one line ("Found 4
   transactions. Review anything that looks wrong."). The mascot appears once, 72dp, in the empty intro. Spec:
   docs/CAPTURE.md.
-- **More** (sheet): Savings goals, Recurring payments, Debts & loans, Categories — each with a real status line.
 - **Profile** (avatar in every primary screen's top bar): optional name (device-only), appearance, **Settings**,
   Enabled features, version. Lucento has no account; nothing here signs in.
 - One app-wide transaction editor and one transfer sheet. Opening a switched-off module explains and offers "Turn on".
 
-## Home dashboard (v0.5)
-Top to bottom, nothing duplicated from the dock or the + button:
-1. **Budget hero** — solid brand panel (the most prominent element, ≈30 % shorter than v0.4's card): budget left
-   (or over) this month, "of total · spent", one supportive sentence, and the **mascot** — happy while
-   comfortably within budget, *supportively concerned* when ≤ 10 % is left or the budget is used up, curious before a
-   budget exists. Taps through to Budget (or category setup when none is chosen).
-2. **Net flow** — one compact row: Lottie trend glyph (green up / red down / neutral level line at exactly zero), the
-   signed net, income and expenses in small type.
-3. **Burn rate** — consumption bar with a "today" marker (share of the month gone), level colours normal / approaching
-   / exhausted from the same thresholds as the hero, day N of M, daily average and the daily allowance that keeps the
-   month on budget. No percentage when there is no budget.
-4. **Savings goals** — overall % saved across goals (capped per goal), progress bar, closest goal and what's left.
-5. **Upcoming payments** — next recurring items within 30 days in date order (overdue flagged in red with words),
-   wallet and amount; tapping opens that payment's review sheet where it can be marked paid. Never auto-recorded.
+## Home dashboard (v0.6)
+No greeting: the header is working space. Top to bottom, as cards with a title and chevron (the card opens its page):
+1. **Header** — Lucento symbol + wordmark (symbol only under 360dp); a **sync status chip** (icon + word: On device ·
+   Synced · Sync needed · Offline · Sync issue; opens Settings › Cloud sync; "On device" is the normal local-only
+   state); a **notifications** bell, visibly disabled and announced "coming soon" until reminders exist; the profile
+   button. Below it, the **month pill** (calendar icon, "October 2026", ▾) listing this month back to the first month
+   with data (≤ 24).
+2. **Monthly budget** — budget health and burn rate in one card, tinted by the verdict (red-tinted ahead, green in
+   step, blue slower). Primary figure **% of budget used** and "of <total> used"; Lucento (72dp) with a **speech
+   bubble** ("You're ahead of the month. Let's slow down!" / "You're on track! Keep it up!" / "You're below the month
+   pace. All good!"); two thick bars with their % printed at the fill's end — **Budget used** and **Month elapsed**
+   (real calendar days) — and a legend; three figures: Spent · Remaining (or Over budget) · "16 of 31 days / 52% of
+   month"; an **advice banner** with a matching glyph (up / check / info) and the daily allowance. With Budgets off, a
+   plain Net flow card takes its place.
+3. **Net worth** and **Quick links** — two cards side by side (compact type; stacked under ~300dp). Net worth: Wallets
+   & assets, Liabilities, then **Net worth = assets − liabilities** with this month's change from recorded income and
+   spending (arrow + signed amount); the card opens **Wallets**. Quick links: a 2×2 grid of tiles — Savings goals,
+   Scheduled, Debts & loans (each only when its module is on) and **Wallets**. Categories are managed from the Budgets
+   tab ("Manage categories").
+4. **Top savings goal** — the in-progress goal closest to done (ties: earlier target date; all reached: the newest):
+   its picture, name, %, bar, saved of target, target (or projected) month; "View all".
+5. **Scheduled transactions** — the next recurring items within 30 days: name, category or "Recurring expense",
+   relative and calendar date, signed amount; overdue flagged in words; "See all". Never auto-recorded.
 
 ## Budget tab (v0.5)
 The total is always the **sum of category amounts**. Month switcher, currency pills (never summed across currencies),

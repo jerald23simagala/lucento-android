@@ -90,6 +90,15 @@ last-write-wins, WorkManager scheduling, Settings → Cloud sync, Supabase schem
 Remaining: Google OAuth clients + Supabase Google provider (blocks real sign-in), an end-to-end two-device test,
 recurring-schedule sync, syncing preferences.
 
+## In progress — dashboard refresh (`feature/dashboard-refresh`)
+- Home: working header (brand, sync status, disabled notifications placeholder, profile, month selector); Budget pace
+  card (budget used vs month elapsed, verdict in words, mascot); Net worth card (assets − liabilities with shortcuts);
+  featured savings goal; Scheduled transactions.
+- Manually valued assets (`OTHER_ASSET`): valuation only, counted in net worth, refused by every money write path.
+- App-wide hierarchy (`Hierarchy`, `SectionHeader`, `CardHeader`, `FieldHeader`); rounded floating dock
+  Home · Transactions · (+) · Insights · Budgets; Wallets, goals, scheduled transactions and debts open from Home's Quick links; categories from Budgets.
+- Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull.
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).

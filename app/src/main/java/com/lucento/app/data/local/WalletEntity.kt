@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.lucento.app.domain.WalletType
 
 @Entity(
     tableName = "wallets",
@@ -35,3 +36,7 @@ data class WalletEntity(
     /** Server `revision` this row was last synced at; a push based on it is a causal successor (v7, docs/SYNC.md). */
     @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
 )
+
+/** Money can be posted to this wallet: it is active and not a manually valued asset (see WalletType.isValuedManually). */
+val WalletEntity.acceptsTransactions: Boolean
+    get() = !archived && type != WalletType.OTHER_ASSET.name

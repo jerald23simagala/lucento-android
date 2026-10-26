@@ -1,5 +1,6 @@
 package com.lucento.app.feature.wallets
 
+import com.lucento.app.core.designsystem.component.CardHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -46,7 +47,6 @@ import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.component.label
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
-import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
@@ -102,16 +102,19 @@ fun WalletDetailScreen(
         }
         if (wallet == null) return@LazyColumn
         val liability = wallet.type.isLiability
+        val valued = wallet.type.isValuedManually
 
         item(key = "balance") {
             LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.xl) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     WalletTypeTile(wallet.type, size = Sizes.iconTileLarge)
                     Spacer(Modifier.width(Spacing.md))
-                    Text(
-                        if (liability) "AMOUNT OWED" else "CURRENT BALANCE",
-                        style = OverlineStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    CardHeader(
+                        title = when {
+                            liability -> "Amount owed"
+                            valued -> "Estimated value"
+                            else -> "Current balance"
+                        },
                     )
                 }
                 Spacer(Modifier.height(Spacing.md))
@@ -120,6 +123,14 @@ fun WalletDetailScreen(
                     style = AmountStyles.display,
                     color = if (liability && !wallet.balance.isZero) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
                 )
+                if (valued) {
+                    Spacer(Modifier.height(Spacing.md))
+                    InfoNote(
+                        "A value you enter yourself — no money moves through it. Use the edit button when it changes. " +
+                            "It counts towards your net worth as an asset.",
+                    )
+                    return@LucentoCard
+                }
                 Spacer(Modifier.height(Spacing.md))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     Figure(if (liability) "Owed at start" else "Opening balance", Modifier.weight(1f)) {
@@ -135,6 +146,9 @@ fun WalletDetailScreen(
                 }
             }
         }
+
+        // A manually valued asset has no movements: no actions, history or balance formula.
+        if (valued) return@LazyColumn
 
         item(key = "actions") {
             Row(Modifier.fillMaxWidth().padding(top = Spacing.md), horizontalArrangement = Arrangement.SpaceBetween) {

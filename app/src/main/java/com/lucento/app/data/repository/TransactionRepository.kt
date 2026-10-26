@@ -5,6 +5,7 @@ import com.lucento.app.data.local.CategoryDao
 import com.lucento.app.data.local.TransactionDao
 import com.lucento.app.data.local.TransactionEntity
 import com.lucento.app.data.local.WalletDao
+import com.lucento.app.data.local.acceptsTransactions
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
 import kotlinx.coroutines.flow.Flow
@@ -71,7 +72,7 @@ class TransactionRepository(
         if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
 
         val wallet = wallets.getById(input.walletId)
-        if (wallet == null || wallet.archived) return SaveResult.WalletNotFound
+        if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
         if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
 
         if (input.categoryId != null) {
@@ -136,7 +137,7 @@ class TransactionRepository(
         if (input.fromWalletId == input.toWalletId) return TransferResult.SameWallet
         val from = wallets.getById(input.fromWalletId)
         val to = wallets.getById(input.toWalletId)
-        if (from == null || from.archived || to == null || to.archived) return TransferResult.WalletNotFound
+        if (from == null || !from.acceptsTransactions || to == null || !to.acceptsTransactions) return TransferResult.WalletNotFound
         if (from.currencyCode != input.amount.currencyCode || to.currencyCode != input.amount.currencyCode) {
             return TransferResult.CurrencyMismatch
         }
@@ -279,7 +280,7 @@ class TransactionRepository(
         if (input.id != null || input.type.isTransfer) return SaveResult.InvalidType
         if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
         val wallet = wallets.getById(input.walletId)
-        if (wallet == null || wallet.archived) return SaveResult.WalletNotFound
+        if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
         if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
         if (input.categoryId != null) {
             val category = categories.getById(input.categoryId) ?: return SaveResult.CategoryMismatch
@@ -294,7 +295,7 @@ class TransactionRepository(
         if (input.fromWalletId == input.toWalletId) return TransferResult.SameWallet
         val from = wallets.getById(input.fromWalletId)
         val to = wallets.getById(input.toWalletId)
-        if (from == null || from.archived || to == null || to.archived) return TransferResult.WalletNotFound
+        if (from == null || !from.acceptsTransactions || to == null || !to.acceptsTransactions) return TransferResult.WalletNotFound
         if (from.currencyCode != input.amount.currencyCode || to.currencyCode != input.amount.currencyCode) return TransferResult.CurrencyMismatch
         return null
     }

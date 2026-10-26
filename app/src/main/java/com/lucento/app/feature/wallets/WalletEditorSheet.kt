@@ -56,7 +56,7 @@ import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.CurrencyPickerSheet
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
-import com.lucento.app.core.designsystem.component.SectionHeader
+import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.component.label
 import com.lucento.app.core.designsystem.component.rememberHaptics
@@ -129,7 +129,7 @@ fun WalletEditorSheet(
             }
 
             Spacer(Modifier.height(Spacing.sm))
-            SectionHeader("Type")
+            FieldHeader("Type")
             TypeGrid(
                 selected = draft.type,
                 onSelect = {
@@ -172,6 +172,7 @@ fun WalletEditorSheet(
                             WalletType.SAVINGS -> "e.g. Emergency fund"
                             WalletType.CREDIT_CARD -> "e.g. Travel card"
                             WalletType.LOAN -> "e.g. Car loan"
+                            WalletType.OTHER_ASSET -> "e.g. Home, car, investments"
                         }
                     )
                 },
@@ -239,6 +240,7 @@ fun WalletEditorSheet(
                 label = {
                     Text(
                         when {
+                            draft.type.isValuedManually -> "Estimated value"
                             initial.id != null && draft.type.isLiability -> "Opening amount owed"
                             initial.id != null -> "Opening balance"
                             draft.type.isLiability -> "Amount owed now"
@@ -260,6 +262,7 @@ fun WalletEditorSheet(
                                 else "${draft.currencyCode} allows up to ${e.digits} decimal places."
                             DraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
                             else -> when {
+                                draft.type.isValuedManually -> "What it’s worth today. Update it whenever the value changes — no transactions needed."
                                 initial.id != null -> "Where this wallet started, before the transactions you record."
                                 draft.type == WalletType.LOAN -> "What you still owe on this loan. It counts against your net worth."
                                 draft.type.isLiability -> "What you currently owe on this card. It counts against your net worth."
@@ -339,12 +342,12 @@ fun WalletEditorSheet(
     }
 }
 
-/** Wallet kinds as recognisable tiles: three per row on narrow phones, five on wider screens. */
+/** Wallet kinds as recognisable tiles, four per row (seven kinds: two balanced rows). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TypeGrid(selected: WalletType, onSelect: (WalletType) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = if (maxWidth >= 420.dp) 6 else 3
+        val columns = 4
         val gap = Spacing.sm
         val tileWidth = (maxWidth - gap * (columns - 1)) / columns
         FlowRow(

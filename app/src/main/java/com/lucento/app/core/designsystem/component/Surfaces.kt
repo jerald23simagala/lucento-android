@@ -39,11 +39,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.Elevation
+import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
-import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
-import java.util.Locale
 
 /**
  * Card: hairline border plus, by day only, the faint navy shadow-xs (night uses tonal separation). Use sparingly —
@@ -113,25 +112,83 @@ fun StatementPanel(
     Surface(modifier = modifier.then(clickable), shape = shape, color = colors.hero, contentColor = colors.onHero) { body() }
 }
 
-/** Editorial overline section label with an optional trailing action. */
+/**
+ * A section of a screen: a sentence-case title in [Hierarchy.sectionTitle], optional [supporting] context beneath
+ * it, and an optional trailing action. See [Hierarchy] for the full scale.
+ */
 @Composable
 fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    supporting: String? = null,
+    trailing: @Composable (RowScope.() -> Unit)? = null,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().heightIn(min = Sizes.minTouch).padding(top = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(Modifier.weight(1f, fill = false)) {
+            Text(
+                text = title,
+                style = Hierarchy.sectionTitle,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() },
+            )
+            if (supporting != null) {
+                Text(supporting, style = Hierarchy.context, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (trailing != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+        }
+    }
+}
+
+/** A label for a group of fields inside a form or sheet ("Category", "Date"): quieter than a [SectionHeader]. */
+@Composable
+fun FieldHeader(
     title: String,
     modifier: Modifier = Modifier,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().heightIn(min = Sizes.minTouch),
+        modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            text = title.uppercase(Locale.getDefault()),
-            style = OverlineStyle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = title,
+            style = Hierarchy.fieldLabel,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f, fill = false).semantics { heading() },
         )
         if (trailing != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+        }
+    }
+}
+
+/**
+ * The top of a card: what the card is about ([title], [Hierarchy.cardTitle]), its scope ([context], e.g.
+ * "October · USD") and an optional trailing element (a status, an action or a chevron). Primary figures follow it.
+ */
+@Composable
+fun CardHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    context: String? = null,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    contextColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    trailing: @Composable (RowScope.() -> Unit)? = null,
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = Hierarchy.cardTitle, color = titleColor, modifier = Modifier.semantics { heading() })
+            if (context != null) Text(context, style = Hierarchy.context, color = contextColor)
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(Spacing.sm))
             Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
         }
     }

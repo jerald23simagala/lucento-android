@@ -62,7 +62,7 @@ import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
-import com.lucento.app.core.designsystem.component.SectionHeader
+import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.ShareBar
 import com.lucento.app.core.designsystem.component.StatusPill
@@ -406,7 +406,7 @@ private fun GoalDetailSheet(
 
             if (history.isNotEmpty()) {
                 Spacer(Modifier.height(Spacing.lg))
-                SectionHeader("History")
+                FieldHeader("History")
                 history.forEachIndexed { index, c ->
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(formatDate(c.date), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -504,7 +504,7 @@ private fun GoalEditorSheet(
             )
             if (initial.id == null) {
                 // Optional starting points: a tap fills in the name and picture only; the user still sets the amount.
-                SectionHeader("Suggestions (optional)")
+                FieldHeader("Suggestions (optional)")
                 PillRow(
                     options = GoalPresets.all.map { it to it.name },
                     selected = GoalPresets.all.firstOrNull { it.name == draft.name },
@@ -536,14 +536,14 @@ private fun GoalEditorSheet(
             DateField(label = "Target date (optional)", date = draft.targetDate, onDate = { draft = draft.copy(targetDate = it) })
             val savingsWallets = state.wallets.filter { !it.type.isLiability && it.currencyCode == draft.currencyCode }
             if (savingsWallets.isNotEmpty()) {
-                SectionHeader("Kept in (optional)")
+                FieldHeader("Kept in (optional)")
                 PillRow(
                     options = listOf<Pair<Long?, String>>(null to "Not linked") + savingsWallets.map { it.id to it.name },
                     selected = draft.walletId,
                     onSelect = { draft = draft.copy(walletId = it) },
                 )
             }
-            SectionHeader("Card picture")
+            FieldHeader("Card picture")
             ScenePicker(
                 name = draft.name,
                 selectedKey = draft.sceneKey,
@@ -589,7 +589,7 @@ private fun GoalEditorSheet(
     }
 }
 
-private fun GoalScene.illustration(): LucentoIllustration? = when (this) {
+internal fun GoalScene.illustration(): LucentoIllustration? = when (this) {
     GoalScene.JAPAN -> LucentoIllustration.JapanFuji
     GoalScene.TRAVEL -> LucentoIllustration.SunriseLandscape
     GoalScene.MOUNTAINS -> LucentoIllustration.SoftMountains
@@ -714,7 +714,7 @@ private fun ScenePicker(
 
 /** The user's own goal photo, decoded off the main thread; null while loading or when the file is gone. */
 @Composable
-private fun rememberGoalPhoto(path: String?): ImageBitmap? {
+internal fun rememberGoalPhoto(path: String?): ImageBitmap? {
     var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(path) {
         bitmap = if (path == null) null else withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path)?.asImageBitmap() }

@@ -338,6 +338,9 @@ class FakeSyncDao : SyncDao {
 
     override suspend fun unpushedTombstones() = rows.value.filterNot { it.pushed }
 
+    /** Only the tombstone part: the fake has no other tables to count dirty rows in. */
+    override fun observePendingChanges(): Flow<Int> = rows.map { list -> list.count { !it.pushed } }
+
     override suspend fun markPushed(ids: List<Long>) {
         rows.value = rows.value.map { if (it.id in ids) it.copy(pushed = true) else it }
     }

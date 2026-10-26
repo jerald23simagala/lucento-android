@@ -7,6 +7,7 @@ import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 /**
  * One row per deletion of a row that had been given a [client_uuid]. Added automatically by an `AFTER DELETE`
@@ -31,6 +32,18 @@ data class SyncTombstoneEntity(
 
 @Dao
 interface SyncDao {
+    /**
+     * Local changes cloud sync has not confirmed yet: dirty rows in every synced table plus unpushed deletions.
+     * Observed by the Home header's sync status; recurring schedules are not synced, so they are not counted.
+     */
+    @Query(
+        "SELECT (SELECT COUNT(*) FROM wallets WHERE dirty = 1) + (SELECT COUNT(*) FROM categories WHERE dirty = 1) + " +
+            "(SELECT COUNT(*) FROM transactions WHERE dirty = 1) + (SELECT COUNT(*) FROM budgets WHERE dirty = 1) + " +
+            "(SELECT COUNT(*) FROM goals WHERE dirty = 1) + (SELECT COUNT(*) FROM goal_contributions WHERE dirty = 1) + " +
+            "(SELECT COUNT(*) FROM sync_tombstones WHERE pushed = 0)",
+    )
+    fun observePendingChanges(): Flow<Int>
+
     @Query("SELECT * FROM sync_tombstones WHERE pushed = 0 ORDER BY id ASC")
     suspend fun unpushedTombstones(): List<SyncTombstoneEntity>
 

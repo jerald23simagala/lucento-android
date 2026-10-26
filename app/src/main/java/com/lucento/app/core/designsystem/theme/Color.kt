@@ -202,6 +202,7 @@ data class LucentoExtendedColors(
         WalletType.SAVINGS -> savings
         WalletType.CREDIT_CARD -> credit
         WalletType.LOAN -> loan
+        WalletType.OTHER_ASSET -> savings
     }
 }
 

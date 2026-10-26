@@ -1,5 +1,6 @@
 package com.lucento.app.feature.budget
 
+import com.lucento.app.core.designsystem.component.CardHeader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,7 +70,6 @@ import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
-import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.Money
@@ -290,15 +290,15 @@ private fun MonthSwitcher(month: YearMonth, canGoForward: Boolean, onPrevious: (
 private fun BudgetSummaryCard(plan: BudgetPlan, today: java.time.LocalDate, isCurrentMonth: Boolean) {
     val burn = remember(plan, today) { BudgetPlanner.burn(plan, today) }
     LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.xl) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "MONTHLY BUDGET · ${plan.currencyCode}",
-                style = OverlineStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            if (plan.hasBudget) StatusPill(healthLabel(plan.health, plan.remaining), healthTone(plan.health))
-        }
+        CardHeader(
+            title = "Monthly budget",
+            context = "${monthLabel(plan.month)} · ${plan.currencyCode}",
+            trailing = if (plan.hasBudget) {
+                { StatusPill(healthLabel(plan.health, plan.remaining), healthTone(plan.health)) }
+            } else {
+                null
+            },
+        )
         Spacer(Modifier.height(Spacing.sm))
         if (!plan.hasBudget) {
             MoneyText(money = plan.total, style = AmountStyles.hero, color = MaterialTheme.colorScheme.onSurfaceVariant)

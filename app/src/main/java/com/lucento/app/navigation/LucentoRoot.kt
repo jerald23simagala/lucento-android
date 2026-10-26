@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -17,25 +16,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.PieChart
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.PieChart
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -77,7 +68,6 @@ import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.ProfileChrome
 import com.lucento.app.core.designsystem.component.rememberHaptics
-import com.lucento.app.core.designsystem.theme.Elevation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.data.preferences.UserPreferences
@@ -93,8 +83,6 @@ import com.lucento.app.feature.capture.TransactionComposerScreen
 import com.lucento.app.feature.home.HomeActions
 import com.lucento.app.feature.home.HomeScreen
 import com.lucento.app.feature.insights.InsightsScreen
-import com.lucento.app.feature.more.MoreDestination
-import com.lucento.app.feature.more.MoreSheet
 import com.lucento.app.feature.onboarding.OnboardingScreen
 import com.lucento.app.feature.plan.DebtsScreen
 import com.lucento.app.feature.plan.GoalsScreen
@@ -143,21 +131,20 @@ const val NO_WALLET = -1L
 private data class Tab(val item: DockItem, val route: Any)
 
 /**
- * The navigation dock: Home · Transactions · Wallets · Insights · Budget, then a "More" menu. Insights and Budget leave
- * the dock when the user switches those modules off (their data is kept).
+ * The navigation dock: Home · Transactions · (+) · Insights · Budgets, with the transaction-entry button in the centre.
+ * Insights and Budgets leave the dock when the user switches those modules off (their data is kept). Wallets, goals,
+ * scheduled transactions, debts and categories open from Home's Net worth card.
  */
 private fun tabs(features: FeatureSet): List<Tab> = listOfNotNull(
     Tab(DockItem("home", "Home", Icons.Outlined.Home, Icons.Filled.Home), HomeRoute),
     Tab(DockItem("transactions", "Transactions", Icons.AutoMirrored.Outlined.ReceiptLong, Icons.AutoMirrored.Filled.ReceiptLong), TransactionsRoute),
-    Tab(DockItem("wallets", "Wallets", Icons.Outlined.AccountBalanceWallet, Icons.Filled.AccountBalanceWallet), WalletsRoute),
     if (features.isEnabled(Feature.INSIGHTS)) Tab(DockItem("insights", "Insights", Icons.Outlined.Insights, Icons.Filled.Insights), InsightsRoute) else null,
-    if (features.isEnabled(Feature.BUDGETS)) Tab(DockItem("budget", "Budget", Icons.Outlined.PieChart, Icons.Filled.PieChart), BudgetRoute) else null,
+    if (features.isEnabled(Feature.BUDGETS)) Tab(DockItem("budget", "Budgets", Icons.Outlined.PieChart, Icons.Filled.PieChart), BudgetRoute) else null,
 )
 
 private val PrimaryRoutes: List<Pair<String, KClass<out Any>>> = listOf(
     "home" to HomeRoute::class,
     "transactions" to TransactionsRoute::class,
-    "wallets" to WalletsRoute::class,
     "insights" to InsightsRoute::class,
     "budget" to BudgetRoute::class,
 )
@@ -210,7 +197,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     // Set only from a save callback that reported success, i.e. after the database write committed.
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
-    var showMore by rememberSaveable { mutableStateOf(false) }
     var showProfile by rememberSaveable { mutableStateOf(false) }
     // The tab a pushed screen belongs to, so the dock keeps it highlighted (e.g. Goals opened from Home).
     var selectedTab by rememberSaveable { mutableStateOf("home") }
@@ -248,7 +234,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
 
     fun requireWallets(): Boolean {
         if (editorState.loaded && editorState.wallets.isEmpty()) {
-            navigateTo(WalletsRoute)
+            push(WalletsRoute)
             notify("Add a wallet first — every transaction belongs to one.")
             return false
         }
@@ -258,7 +244,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     fun openTransfer(from: Long? = null, to: Long? = null) {
         if (!requireWallets()) return
         if (editorState.loaded && editorState.wallets.size < 2) {
-            navigateTo(WalletsRoute)
+            push(WalletsRoute)
             notify("Add a second account to move money between them.")
             return
         }
@@ -287,7 +273,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     val enableFeature: (Feature) -> Unit = { appViewModel.setFeatureEnabled(it, true) }
     val back: () -> Unit = { navController.popBackStack() }
     val focused = currentDestination.isFocused()
-    val onPrimary = currentDestination == null || currentDestination.primaryKey() != null
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -299,27 +284,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     containerColor = MaterialTheme.colorScheme.inverseSurface,
                     contentColor = MaterialTheme.colorScheme.inverseOnSurface,
                 )
-            }
-        },
-        floatingActionButton = {
-            // The app-wide "+ Add transaction", on every primary screen.
-            AnimatedVisibility(
-                visible = onPrimary && !focused,
-                enter = scaleIn(tween(if (reducedMotion) 0 else 180)) + fadeIn(),
-                exit = scaleOut(tween(if (reducedMotion) 0 else 120)) + fadeOut(),
-            ) {
-                FloatingActionButton(
-                    onClick = {
-                        haptics.tick()
-                        openComposer()
-                    },
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = Elevation.sm, pressedElevation = Elevation.md),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add transaction", modifier = Modifier.size(28.dp))
-                }
             }
         },
         bottomBar = {
@@ -336,7 +300,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         selectedTab = item.key
                         navigateTo(tab.route)
                     },
-                    onMore = { showMore = true },
+                    onAdd = {
+                        haptics.tick()
+                        openComposer()
+                    },
                 )
             }
         },
@@ -359,6 +326,9 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 onOpenInsights = { navigateTo(InsightsRoute) },
                                 onOpenGoals = { push(GoalsRoute) },
                                 onOpenRecurring = { id -> push(RecurringRoute(id ?: NO_SCHEDULE)) },
+                                onOpenWallets = { push(WalletsRoute) },
+                                onOpenDebts = { push(DebtsRoute) },
+                                onOpenSettings = { push(SettingsRoute) },
                             ),
                         )
                     }
@@ -366,14 +336,14 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         TransactionsScreen(
                             onAddTransaction = { openComposer() },
                             onEditTransaction = { edit(it) },
-                            onAddWallet = { navigateTo(WalletsRoute) },
+                            onAddWallet = { push(WalletsRoute) },
                             onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
                             onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ openComposer(ComposerStart.SPEAK) }) else null,
                         )
                     }
-                    composable<WalletsRoute> {
+                    pushed<WalletsRoute>(reducedMotion) {
                         WalletsScreen(
-                            onBack = null,
+                            onBack = back,
                             onOpenWallet = { push(WalletDetailRoute(it)) },
                             allowAdding = features.isEnabled(Feature.MULTIPLE_WALLETS),
                         )
@@ -426,7 +396,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         TransactionComposerScreen(
                             onBack = back,
                             onSaved = { message -> confirmation = Confirmation(message) },
-                            onAddWallet = { navigateTo(WalletsRoute) },
+                            onAddWallet = { push(WalletsRoute) },
                             voiceEnabled = features.isEnabled(Feature.VOICE_ENTRY),
                             scanEnabled = features.isEnabled(Feature.RECEIPT_SCANNING),
                             transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
@@ -439,20 +409,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
             }
         }
-    }
-
-    if (showMore) {
-        MoreSheet(
-            onOpen = { destination ->
-                when (destination) {
-                    MoreDestination.GOALS -> push(GoalsRoute)
-                    MoreDestination.RECURRING -> push(RecurringRoute())
-                    MoreDestination.DEBTS -> push(DebtsRoute)
-                    MoreDestination.CATEGORIES -> push(CategoriesRoute)
-                }
-            },
-            onDismiss = { showMore = false },
-        )
     }
 
     if (showProfile) {

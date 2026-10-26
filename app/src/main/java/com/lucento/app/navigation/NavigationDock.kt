@@ -2,11 +2,13 @@ package com.lucento.app.navigation
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,9 +19,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,13 +32,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 
@@ -48,66 +51,91 @@ data class DockItem(
 )
 
 /**
- * Lucento's persistent navigation dock: the five primary destinations and a "More" menu button.
+ * Lucento's persistent navigation dock: the primary destinations either side of the central **+ Add transaction**
+ * button (Home · Transactions · + · Insights · Budgets).
  *
- * The selected destination shows its label under a tinted indicator; the others are icon-only (each still has its
- * label as the accessibility name), which keeps the dock calm and legible on narrow phones. Every item is a
- * selectable tab with a 48dp+ touch target. "More" opens a menu rather than a destination, so it is never selected.
+ * The dock floats with rounded corners; the + is a raised brand-blue circle that breaks its top edge, so transaction
+ * entry reads as the one central action rather than another destination. Every tab shows its label (the selected one
+ * in brand blue under a tinted indicator), is a selectable tab, and has a 48dp+ touch target.
  */
 @Composable
 fun NavigationDock(
     items: List<DockItem>,
     selectedKey: String?,
     onSelect: (DockItem) -> Unit,
-    onMore: () -> Unit,
+    onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
     val container = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLowest
-    Surface(modifier = modifier.fillMaxWidth(), color = container) {
-        Column(Modifier.navigationBarsPadding()) {
-            Hairline()
+    val shape = RoundedCornerShape(24.dp)
+    // Destinations split evenly around the + (the first half on the left).
+    val leading = items.take((items.size + 1) / 2)
+    val trailing = items.drop(leading.size)
+    Box(
+        modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AddRise)
+                .shadow(
+                    elevation = if (LucentoTheme.isDark) 0.dp else 6.dp,
+                    shape = shape,
+                    ambientColor = LucentoTheme.extendedColors.shadow.copy(alpha = 0.10f),
+                    spotColor = LucentoTheme.extendedColors.shadow.copy(alpha = 0.16f),
+                ),
+            shape = shape,
+            color = container,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(68.dp)
+                    .height(64.dp)
                     .padding(horizontal = 4.dp)
                     .selectableGroup(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                items.forEach { item ->
-                    DockTab(
-                        item = item,
-                        selected = item.key == selectedKey,
-                        onClick = {
-                            if (item.key != selectedKey) haptics.tick()
-                            onSelect(item)
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
+                fun select(item: DockItem) {
+                    if (item.key != selectedKey) haptics.tick()
+                    onSelect(item)
                 }
-                Box(
-                    Modifier
-                        .width(1.dp)
-                        .height(24.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant),
-                )
-                Box(
-                    Modifier
-                        .width(56.dp)
-                        .fillMaxHeight()
-                        .clip(MaterialTheme.shapes.medium)
-                        .selectable(selected = false, role = Role.Button, onClick = {
-                            haptics.tick()
-                            onMore()
-                        })
-                        .semantics { contentDescription = "More: goals, recurring payments, debts" },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.MoreHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                leading.forEach { item ->
+                    DockTab(item, selected = item.key == selectedKey, onClick = { select(item) }, modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.width(AddSize + 16.dp))
+                trailing.forEach { item ->
+                    DockTab(item, selected = item.key == selectedKey, onClick = { select(item) }, modifier = Modifier.weight(1f))
                 }
             }
         }
+        AddButton(onClick = onAdd, modifier = Modifier.align(Alignment.TopCenter))
+    }
+}
+
+private val AddSize = 60.dp
+/** How far the + rises above the dock's top edge. */
+private val AddRise = 14.dp
+
+/** The raised central + with a soft brand-tinted shadow. */
+@Composable
+private fun AddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val primary = MaterialTheme.colorScheme.primary
+    Box(
+        modifier
+            .size(AddSize)
+            .shadow(elevation = 10.dp, shape = CircleShape, ambientColor = primary.copy(alpha = 0.35f), spotColor = primary.copy(alpha = 0.6f))
+            .clip(CircleShape)
+            .background(primary)
+            .selectable(selected = false, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "Add transaction" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(30.dp))
     }
 }
 
@@ -124,7 +152,6 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
         tween(180),
         label = "dock-tint",
     )
-    // Not clipped, so a long selected label ("Transactions") can use a little of its neighbours' empty label space.
     Column(
         modifier
             .fillMaxHeight()
@@ -135,9 +162,9 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
     ) {
         Box(
             Modifier
-                .width(52.dp)
-                .height(30.dp)
-                .clip(RoundedCornerShape(15.dp))
+                .width(48.dp)
+                .height(28.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .background(indicator),
             contentAlignment = Alignment.Center,
         ) {
@@ -148,17 +175,15 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
                 modifier = Modifier.size(22.dp),
             )
         }
-        if (selected) {
-            Text(
-                item.label,
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.primary,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Visible,
-                // Measured at its natural width and centred, so it may extend slightly past a narrow tab.
-                modifier = Modifier.padding(top = 4.dp).wrapContentWidth(unbounded = true),
-            )
-        }
+        Text(
+            item.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Visible,
+            // Measured at its natural width and centred, so "Transactions" may use a little of its neighbours' space.
+            modifier = Modifier.padding(top = 2.dp).wrapContentWidth(unbounded = true),
+        )
     }
 }

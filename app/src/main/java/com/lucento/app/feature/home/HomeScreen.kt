@@ -5,26 +5,60 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material.icons.outlined.SyncProblem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,56 +67,63 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.AmountText
+import com.lucento.app.core.designsystem.component.CardHeader
 import com.lucento.app.core.designsystem.component.CategoryTile
-import com.lucento.app.core.designsystem.component.ConsumptionBar
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.LucentoCard
+import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.LucentoTextButton
+import com.lucento.app.core.designsystem.component.LucentoWordmark
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.MoneyText
-import com.lucento.app.core.designsystem.component.NetFlowIndicator
 import com.lucento.app.core.designsystem.component.ProfileButton
-import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.component.StatementPanel
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.theme.AmountStyles
+import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
-import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.designsystem.theme.TonePair
+import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.BudgetBurn
-import com.lucento.app.domain.BudgetHealth
 import com.lucento.app.domain.BudgetPlan
-import com.lucento.app.domain.BurnLevel
 import com.lucento.app.domain.Feature
+import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalsOverview
+import com.lucento.app.domain.NetWorthComposition
+import com.lucento.app.domain.PacePosition
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.UpcomingPayment
 import com.lucento.app.domain.WellnessTier
-import androidx.compose.ui.platform.LocalDensity
-import com.lucento.app.core.designsystem.component.IllustratedSurface
-import com.lucento.app.core.designsystem.component.IllustrationScrims
-import com.lucento.app.core.designsystem.component.LucentoIllustration
-import com.lucento.app.feature.budget.burnColor
-import com.lucento.app.feature.budget.encouragement
-import com.lucento.app.feature.transactions.shortDayLabel
+import com.lucento.app.feature.plan.illustration
+import com.lucento.app.feature.plan.rememberGoalPhoto
 import com.lucento.app.feature.wallets.WalletDraft
 import com.lucento.app.feature.wallets.WalletEditorSheet
 import com.lucento.app.feature.wallets.WalletsViewModel
-import java.time.LocalDate
-import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -90,7 +131,7 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-/** Callbacks Home needs from the app shell. Adding transactions happens through the app-wide + button. */
+/** Callbacks Home needs from the app shell. Adding transactions happens through the dock's central + button. */
 data class HomeActions(
     val onOpenBudget: () -> Unit,
     val onChooseCategories: () -> Unit,
@@ -98,11 +139,16 @@ data class HomeActions(
     val onOpenGoals: () -> Unit,
     /** Opens Recurring payments; with a schedule id, straight to that payment's review / mark-paid sheet. */
     val onOpenRecurring: (Long?) -> Unit,
+    val onOpenWallets: () -> Unit = {},
+    val onOpenDebts: () -> Unit = {},
+    /** Where the sync status leads: Settings, which explains and controls cloud sync. */
+    val onOpenSettings: () -> Unit = {},
 )
 
 /**
- * The dashboard, top to bottom: the budget hero (with the Sun), net flow, the burn-rate bar, the savings level and
- * upcoming recurring payments. No duplicated action buttons — navigation lives in the dock, adding behind the + button.
+ * The dashboard, top to bottom: the header (brand, sync status, notifications, profile) with the month pill; the
+ * monthly budget card (budget used against month elapsed, with Lucento the mascot); net worth with quick access; the
+ * top savings goal; and scheduled transactions. Every figure comes from [HomeUiState].
  */
 @Composable
 fun HomeScreen(
@@ -119,7 +165,7 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.gutter),
     ) {
-        Greeting(today = state.today, name = state.displayName)
+        HomeHeader(status = state.cloudStatus, onOpenSyncSettings = actions.onOpenSettings)
 
         AnimatedContent(
             targetState = when {
@@ -135,11 +181,15 @@ fun HomeScreen(
                 HomeContent.Welcome -> WelcomePanel(
                     onAddWallet = { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) },
                 )
-                HomeContent.Overview -> Overview(state = state, actions = actions)
+                HomeContent.Overview -> Overview(
+                    state = state,
+                    actions = actions,
+                    onSelectMonth = viewModel::selectMonth,
+                )
             }
         }
-        // Clears the + button that floats above the dock.
-        Spacer(Modifier.height(Spacing.fabClearance))
+        // Breathing room above the dock and its raised + button.
+        Spacer(Modifier.height(Spacing.xl))
     }
 
     editingWallet?.let { draft ->
@@ -154,43 +204,118 @@ fun HomeScreen(
 
 private enum class HomeContent { Loading, Welcome, Overview }
 
-/** Time-of-day greeting (with the name, when the user gave one) and the profile button. */
+// ------------------------------------------------------------------ Header
+
+/** Brand on the left; sync status, notifications (not yet available) and the profile entry on the right. */
 @Composable
-private fun Greeting(today: LocalDate, name: String?) {
-    val greeting = remember {
-        when (LocalTime.now().hour) {
-            in 5..11 -> "Good morning"
-            in 12..17 -> "Good afternoon"
-            else -> "Good evening"
+private fun HomeHeader(status: CloudStatus, onOpenSyncSettings: () -> Unit) {
+    // On narrow phones the symbol alone carries the brand, leaving room for the status chip and actions.
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val showWordmark = maxWidth >= 360.dp
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Sizes.topBar)
+                .padding(top = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                Modifier
+                    .weight(1f)
+                    .semantics(mergeDescendants = true) { heading() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LucentoMark(size = 28.dp, animate = false)
+                if (showWordmark) {
+                    Spacer(Modifier.width(Spacing.sm))
+                    LucentoWordmark(height = 20.dp)
+                }
+            }
+            SyncStatusChip(status, onClick = onOpenSyncSettings)
+            // A placeholder until reminders exist: visibly disabled and announced as such, so it never pretends to work.
+            IconButton(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.semantics { contentDescription = "Notifications, coming soon" },
+            ) {
+                Icon(Icons.Outlined.Notifications, contentDescription = null)
+            }
+            ProfileButton()
         }
     }
-    val dateLabel = remember(today) {
-        today.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(Locale.getDefault()))
+}
+
+/** A compact chip: icon plus a one-word state, so the meaning never relies on colour. Opens Settings › Cloud sync. */
+@Composable
+private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
+    val tone: TonePair
+    val icon: ImageVector
+    when (status) {
+        CloudStatus.LOCAL -> { tone = StatusTones.neutral; icon = Icons.Outlined.PhoneAndroid }
+        CloudStatus.SYNCED -> { tone = StatusTones.positive; icon = Icons.Outlined.CloudDone }
+        CloudStatus.PENDING -> { tone = StatusTones.warning; icon = Icons.Outlined.CloudUpload }
+        CloudStatus.OFFLINE -> { tone = StatusTones.neutral; icon = Icons.Outlined.CloudOff }
+        CloudStatus.ERROR -> { tone = StatusTones.negative; icon = Icons.Outlined.SyncProblem }
     }
-    Row(
+    Box(
         Modifier
-            .fillMaxWidth()
-            .heightIn(min = 72.dp)
-            .padding(top = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
+            .heightIn(min = Sizes.minTouch)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(role = Role.Button, onClickLabel = "Open cloud sync settings", onClick = onClick)
+            .clearAndSetSemantics { contentDescription = "Sync status: ${status.label}. Opens cloud sync settings." },
+        contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                if (name != null) "$greeting, ${name.substringBefore(' ')}" else greeting,
-                style = MaterialTheme.typography.headlineMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
-            )
-            Text(
-                dateLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Row(
+            Modifier
+                .clip(CircleShape)
+                .background(tone.container)
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(Spacing.xs))
+            Text(status.label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
         }
-        ProfileButton()
+    }
+}
+
+/** The month pill: which month the budget card describes, with a menu of the months that have data. */
+@Composable
+private fun MonthPill(state: HomeUiState, onSelect: (YearMonth) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            Modifier
+                .heightIn(min = Sizes.minTouch)
+                .clip(MaterialTheme.shapes.medium)
+                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), MaterialTheme.shapes.medium)
+                .background(if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest)
+                .clickable(role = Role.Button, onClickLabel = "Choose month") { open = true }
+                .padding(horizontal = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            Text(monthYearLabel(state.month), style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.width(Spacing.xs))
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            state.availableMonths.forEach { month ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (month == YearMonth.from(state.today)) "${monthYearLabel(month)} · this month" else monthYearLabel(month),
+                            fontWeight = if (month == state.month) FontWeight.SemiBold else null,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        onSelect(month)
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -229,292 +354,559 @@ private fun WelcomePanel(onAddWallet: () -> Unit) {
 }
 
 @Composable
-private fun Overview(state: HomeUiState, actions: HomeActions) {
+private fun Overview(
+    state: HomeUiState,
+    actions: HomeActions,
+    onSelectMonth: (YearMonth) -> Unit,
+) {
     val f = state.features
     Column {
-        Spacer(Modifier.height(Spacing.xs))
+        MonthPill(state, onSelectMonth)
+        Spacer(Modifier.height(Spacing.md))
         val plan = state.budget
-        if (plan != null) {
-            BudgetHero(state, plan, actions)
-            Spacer(Modifier.height(Spacing.md))
+        val burn = state.burn
+        if (plan != null && burn != null) {
+            MonthlyBudgetCard(state, plan, burn, actions)
+        } else {
+            CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
         }
 
-        NetFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
-
-        val burn = state.burn
-        if (plan != null && burn != null && state.expenseCategoryCount > 0) {
+        state.netWorthComposition?.let { composition ->
             Spacer(Modifier.height(Spacing.md))
-            BurnRateCard(plan, burn, onOpen = actions.onOpenBudget)
+            NetWorthAndQuickLinks(state, composition, actions)
         }
 
         if (f.isEnabled(Feature.SAVINGS_GOALS)) {
             Spacer(Modifier.height(Spacing.md))
-            SavingsLevelCard(state.goals, hasAnyGoals = state.hasAnyGoals, onOpen = actions.onOpenGoals)
+            TopGoalCard(state.goals, hasAnyGoals = state.hasAnyGoals, onOpen = actions.onOpenGoals)
         }
 
         if (f.isEnabled(Feature.RECURRING)) {
-            Spacer(Modifier.height(Spacing.section))
-            UpcomingSection(state, onOpen = actions.onOpenRecurring)
+            Spacer(Modifier.height(Spacing.md))
+            ScheduledCard(state, onOpen = actions.onOpenRecurring)
         }
     }
 }
 
-// ------------------------------------------------------------------ A. Budget hero
+/** A card's title with a chevron, saying the whole card opens its page, and an optional trailing action. */
+@Composable
+private fun LinkedTitle(
+    title: String,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    trailing: @Composable (RowScope.() -> Unit)? = null,
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = if (compact) Hierarchy.cardTitle else Hierarchy.sectionTitle, modifier = Modifier.semantics { heading() })
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
+        Spacer(Modifier.weight(1f))
+        if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+    }
+}
+
+// ------------------------------------------------------------------ Monthly budget (budget + burn rate)
+
+/** Colours for a pace verdict: the card tint, the budget bar and the advice banner. Words carry the meaning too. */
+private data class PaceTones(val card: Color, val bar: Color, val banner: TonePair, val icon: ImageVector)
+
+@Composable
+private fun paceTones(position: PacePosition?): PaceTones {
+    val ext = LucentoTheme.extendedColors
+    val tintAlpha = if (LucentoTheme.isDark) 0.22f else 0.45f
+    return when (position) {
+        PacePosition.AHEAD -> PaceTones(
+            card = ext.negativeContainer.copy(alpha = tintAlpha),
+            bar = ext.negativeIndicator,
+            banner = TonePair(ext.negativeContainer, ext.negative),
+            icon = Icons.AutoMirrored.Filled.TrendingUp,
+        )
+        PacePosition.BEHIND -> PaceTones(
+            card = ext.infoContainer.copy(alpha = tintAlpha),
+            bar = ext.success,
+            banner = TonePair(ext.infoContainer, ext.info),
+            icon = Icons.Outlined.Info,
+        )
+        PacePosition.ALIGNED -> PaceTones(
+            card = ext.positiveContainer.copy(alpha = tintAlpha),
+            bar = ext.success,
+            banner = TonePair(ext.positiveContainer, ext.positive),
+            icon = Icons.Filled.Check,
+        )
+        null -> PaceTones(
+            card = MaterialTheme.colorScheme.primaryContainer.copy(alpha = tintAlpha),
+            bar = MaterialTheme.colorScheme.primary,
+            banner = TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
+            icon = Icons.Outlined.Info,
+        )
+    }
+}
 
 /**
- * The most prominent card: what's left of this month's budget (the sum of category amounts), with the total and
- * the amount spent beneath it, and Lucento (the mascot) whose torch light and look follow the month's
- * [WellnessTier] — bright and tidy while within budget at pace, dimmer and more worn as the budget runs out, with a
- * supportive (never judging) pose when 10% or less is left or the budget is used up.
+ * Budget health and burn rate in one card. The primary figure is the share of the month's budget used; two bars
+ * compare it with the share of the month elapsed; the figures beneath give spent, remaining and the calendar; the
+ * banner says in words whether spending runs faster than, with, or slower than the month. Lucento (the mascot)
+ * mirrors the verdict in a speech bubble.
  */
 @Composable
-private fun BudgetHero(state: HomeUiState, plan: BudgetPlan, actions: HomeActions) {
-    val ext = LucentoTheme.extendedColors
+private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: BudgetBurn, actions: HomeActions) {
     val monthName = monthLabel(plan.month)
+    val setupNeeded = state.expenseCategoryCount == 0
+    val insight = remember(plan, burn, state.isCurrentMonth) { PaceCopy.describe(plan, burn, monthName, state.isCurrentMonth) }
+    val tones = paceTones(insight.position)
+    val ahead = insight.position == PacePosition.AHEAD
     val mood = when {
-        !plan.hasBudget -> MascotMood.Curious
-        plan.health.isConcerning -> MascotMood.Concerned
+        setupNeeded || !plan.hasBudget -> MascotMood.Curious
+        ahead || plan.health.isConcerning -> MascotMood.Concerned
         else -> MascotMood.Happy
     }
-    val tier = if (plan.hasBudget) {
-        WellnessTier.of(plan.health, aheadOfPace = state.burn?.aheadOfPace == true, overspent = plan.remaining.isNegative)
-    } else {
-        WellnessTier.STEADY
-    }
-    val mascotLabel = when {
-        !plan.hasBudget -> "Lucento, ready when your budget is"
-        plan.health.isConcerning -> "Lucento, torch dimmed, gently concerned: little or none of this month’s budget is left"
-        tier == WellnessTier.GETTING_TIGHT -> "Lucento, torch a little dimmer: most of this month’s budget is used"
-        else -> "Lucento, torch bright: you’re within budget"
-    }
-    // The hero stays solid brand blue (navy at night) under every figure; the soft-mountain landscape shows only in
-    // the trailing band behind Lucento, so the character stands in its little world without touching the numbers.
-    val density = LocalDensity.current
-    val dark = LucentoTheme.isDark
-    val heroScrim = remember(ext.hero, dark, density) {
-        with(density) { IllustrationScrims.trailingWindow(ext.hero, fadeWidthPx = 120.dp.toPx(), endAlpha = if (dark) 0.45f else 0.15f) }
-    }
-    IllustratedSurface(
-        illustration = LucentoIllustration.SoftMountains,
-        onClick = if (state.expenseCategoryCount == 0) actions.onChooseCategories else actions.onOpenBudget,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        containerColor = ext.hero,
-        contentColor = ext.onHero,
-        overlay = heroScrim,
-        artworkAlignment = Alignment.BottomEnd,
-        contentPadding = PaddingValues(0.dp),
-    ) {
-        Row(Modifier.padding(start = Spacing.xl, end = Spacing.lg, top = Spacing.lg, bottom = Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    (if (plan.hasBudget && plan.remaining.isNegative) "OVER BUDGET · " else "BUDGET LEFT · ") +
-                        monthName.uppercase(Locale.getDefault()),
-                    style = OverlineStyle,
-                    color = ext.onHeroMuted,
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                when {
-                    state.expenseCategoryCount == 0 -> {
-                        Text("Finish your budget setup", style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            "Choose the categories you spend on.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.onHeroMuted,
-                        )
+    val tier = if (plan.hasBudget) WellnessTier.of(plan.health, aheadOfPace = ahead, overspent = plan.remaining.isNegative) else WellnessTier.STEADY
+    val open = if (setupNeeded) actions.onChooseCategories else actions.onOpenBudget
+    val bubble = if (setupNeeded) "Pick your spending categories first." else insight.bubble
+    val elapsedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+
+    LucentoCard(Modifier.fillMaxWidth(), onClick = open, contentPadding = 0.dp) {
+        Column(Modifier.background(tones.card).padding(Spacing.lg)) {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val showBubble = maxWidth >= 300.dp
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f)) {
+                        LinkedTitle("Monthly budget")
+                        Spacer(Modifier.height(Spacing.xs))
+                        when {
+                            setupNeeded -> Text("Finish your budget setup", style = MaterialTheme.typography.headlineSmall)
+                            !plan.hasBudget -> Text("No budget yet", style = MaterialTheme.typography.headlineSmall)
+                            else -> {
+                                Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.display)
+                                Text(
+                                    "of ${MoneyFormatter.format(plan.total)} used",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
-                    !plan.hasBudget -> {
-                        Text("No budget yet", style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            "Give your categories an amount — the total is their sum.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.onHeroMuted,
-                        )
-                    }
-                    else -> {
-                        MoneyText(
-                            money = if (plan.remaining.isNegative) -plan.remaining else plan.remaining,
-                            style = AmountStyles.hero,
-                            color = ext.onHero,
-                        )
-                        Text(
-                            "of ${MoneyFormatter.format(plan.total)} · ${MoneyFormatter.format(plan.spent)} spent",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.onHeroMuted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(Spacing.sm))
-                        Text(
-                            encouragement(plan),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.onHero,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                if (state.otherBudgetCurrencies.isNotEmpty()) {
-                    Text(
-                        "Budgets in ${state.otherBudgetCurrencies.joinToString()} are on the Budget tab.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ext.onHeroMuted,
-                        modifier = Modifier.padding(top = Spacing.xs),
+                    LucentoMascot(
+                        size = 72.dp,
+                        mood = mood,
+                        tier = tier,
+                        contentDescription = "Lucento says: $bubble",
+                        modifier = Modifier.padding(top = Spacing.lg),
                     )
+                    if (showBubble) SpeechBubble(bubble, Modifier.widthIn(max = 118.dp))
                 }
             }
-            Spacer(Modifier.width(Spacing.sm))
-            LucentoMascot(size = 84.dp, mood = mood, tier = tier, contentDescription = mascotLabel)
+
+            if (!setupNeeded) {
+                Spacer(Modifier.height(Spacing.md))
+                if (plan.hasBudget) {
+                    PercentBar(burn.consumedFraction, "${burn.consumedPercent ?: 0}%", tones.bar, "Budget used: ${burn.consumedPercent ?: 0} percent")
+                    Spacer(Modifier.height(Spacing.sm))
+                }
+                PercentBar(burn.elapsedPercent / 100f, "${burn.elapsedPercent}%", elapsedColor, "Month elapsed: ${burn.elapsedPercent} percent")
+                Spacer(Modifier.height(Spacing.sm))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (plan.hasBudget) {
+                        LegendDot(tones.bar, "Budget used")
+                        Spacer(Modifier.width(Spacing.lg))
+                    }
+                    LegendDot(elapsedColor, "Month elapsed")
+                }
+
+                Spacer(Modifier.height(Spacing.md))
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                    if (plan.hasBudget) {
+                        MoneyStat(plan.spent, "Spent", Modifier.weight(1f))
+                        StatDivider()
+                        MoneyStat(
+                            if (plan.remaining.isNegative) -plan.remaining else plan.remaining,
+                            if (plan.remaining.isNegative) "Over budget" else "Remaining",
+                            Modifier.weight(1f),
+                            valueColor = if (plan.remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
+                        )
+                        StatDivider()
+                    }
+                    BudgetStat("${burn.daysElapsed} of ${burn.daysInMonth} days", "${burn.elapsedPercent}% of month", Modifier.weight(1.15f), valueLines = 2)
+                }
+            }
+
+            Spacer(Modifier.height(Spacing.md))
+            AdviceBanner(
+                text = if (setupNeeded) "Choose the categories you spend on — your budget is built from them." else insight.message,
+                tones = tones,
+                onClick = open,
+            )
+
+            if (state.otherBudgetCurrencies.isNotEmpty()) {
+                Text(
+                    "Budgets in ${state.otherBudgetCurrencies.joinToString()} are on the Budgets tab.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.sm),
+                )
+            }
         }
     }
 }
 
-// ------------------------------------------------------------------ C. Net flow
+/** Lucento's speech bubble, pointing at the mascot on its left. Read out through the mascot's own label. */
+@Composable
+private fun SpeechBubble(text: String, modifier: Modifier = Modifier) {
+    val surface = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLowest
+    val outline = MaterialTheme.colorScheme.outlineVariant
+    Row(modifier.clearAndSetSemantics { }, verticalAlignment = Alignment.Top) {
+        Canvas(Modifier.padding(top = 18.dp).size(width = 7.dp, height = 12.dp)) {
+            val path = Path().apply {
+                moveTo(size.width, 0f)
+                lineTo(0f, size.height / 2)
+                lineTo(size.width, size.height)
+                close()
+            }
+            drawPath(path, surface)
+            drawLine(outline, Offset(size.width, 0f), Offset(0f, size.height / 2))
+            drawLine(outline, Offset(0f, size.height / 2), Offset(size.width, size.height))
+        }
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(surface)
+                .border(BorderStroke(1.dp, outline), RoundedCornerShape(12.dp))
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+        )
+    }
+}
+
+/** A thick bar with its percentage printed at the end of the fill (inside it when there is room). */
+@Composable
+private fun PercentBar(fraction: Float, label: String, color: Color, description: String) {
+    val clamped = fraction.coerceIn(0f, 1f)
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .height(18.dp)
+            .clip(CircleShape)
+            .background(LucentoTheme.extendedColors.track)
+            .clearAndSetSemantics { contentDescription = description },
+    ) {
+        val fill = maxWidth * clamped
+        val inside = fill >= 44.dp
+        Box(
+            Modifier
+                .width(fill)
+                .fillMaxHeight()
+                .clip(CircleShape)
+                .background(color),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            if (inside) {
+                Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(end = 6.dp))
+            }
+        }
+        if (!inside) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = fill + 6.dp),
+            )
+        }
+    }
+}
 
 @Composable
-private fun NetFlowCard(state: HomeUiState, onOpenInsights: (() -> Unit)?, modifier: Modifier = Modifier) {
+private fun LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(Spacing.xs))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun BudgetStat(value: String, label: String, modifier: Modifier = Modifier, valueLines: Int = 1) {
+    Column(modifier.semantics(mergeDescendants = true) {}.padding(horizontal = Spacing.xs)) {
+        Text(value, style = AmountStyles.medium, maxLines = valueLines, overflow = TextOverflow.Ellipsis)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    }
+}
+
+/** A money figure that shrinks to fit a narrow column instead of being cut off. */
+@Composable
+private fun MoneyStat(money: Money, label: String, modifier: Modifier = Modifier, valueColor: Color = MaterialTheme.colorScheme.onSurface) {
+    Column(modifier.semantics(mergeDescendants = true) {}.padding(horizontal = Spacing.xs)) {
+        MoneyText(money = money, style = AmountStyles.medium, color = valueColor, fractionScale = 1f, minScale = 0.7f)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    }
+}
+
+@Composable
+private fun StatDivider() {
+    Box(
+        Modifier
+            .padding(horizontal = Spacing.xs)
+            .width(1.dp)
+            .fillMaxHeight()
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
+}
+
+/** The verdict as advice, with a glyph that matches it (up / check / info) and a way into the Budgets tab. */
+@Composable
+private fun AdviceBanner(text: String, tones: PaceTones, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = Sizes.minTouch)
+            .clip(MaterialTheme.shapes.medium)
+            .background(tones.banner.container)
+            .clickable(role = Role.Button, onClickLabel = "Open budget", onClick = onClick)
+            .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(32.dp).clip(CircleShape).background(if (LucentoTheme.isDark) Color.Black.copy(alpha = 0.2f) else Color.White),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(tones.icon, contentDescription = null, tint = tones.banner.content, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(Spacing.md))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Shown in place of the budget card when Budgets is switched off: the month's money in and out. */
+@Composable
+private fun CashFlowCard(state: HomeUiState, onOpenInsights: (() -> Unit)?) {
     val flow = state.netFlow ?: return
     val ext = LucentoTheme.extendedColors
-    val direction = state.flowDirection
-    val color = when (direction) {
-        FlowDirection.POSITIVE -> ext.positive
-        FlowDirection.NEGATIVE -> ext.negative
-        FlowDirection.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    LucentoCard(modifier.fillMaxWidth(), onClick = onOpenInsights, contentPadding = Spacing.lg) {
+    LucentoCard(Modifier.fillMaxWidth(), onClick = onOpenInsights, contentPadding = Spacing.lg) {
+        CardHeader(title = "Net flow", context = "${monthLabel(flow.month)} · ${state.focusCurrency}")
+        Spacer(Modifier.height(Spacing.sm))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            NetFlowIndicator(
-                marker = when (direction) {
-                    FlowDirection.POSITIVE -> "up"
-                    FlowDirection.NEGATIVE -> "down"
-                    FlowDirection.NEUTRAL -> "flat"
+            MoneyText(
+                money = flow.net,
+                style = AmountStyles.large,
+                showPlus = true,
+                color = when (state.flowDirection) {
+                    FlowDirection.POSITIVE -> ext.positive
+                    FlowDirection.NEGATIVE -> ext.negative
+                    FlowDirection.NEUTRAL -> MaterialTheme.colorScheme.onSurface
                 },
-                size = 40.dp,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "NET FLOW · ${monthLabel(flow.month).uppercase(Locale.getDefault())}",
-                    style = OverlineStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                MoneyText(money = flow.net, style = AmountStyles.large, showPlus = true, color = color, fractionScale = 0.75f)
-            }
             Column(horizontalAlignment = Alignment.End) {
                 AmountText(flow.income, style = AmountStyles.small, showPlus = true, color = ext.positive)
                 AmountText(-flow.expense, style = AmountStyles.small, color = ext.negative)
             }
-            if (onOpenInsights != null) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+// ------------------------------------------------------------------ Net worth and quick links
+
+/**
+ * Two cards side by side: **Net worth** (opens Wallets) and **Quick links**. Compact type keeps both readable at half
+ * width; on very narrow screens (under ~300dp) they stack.
+ */
+@Composable
+private fun NetWorthAndQuickLinks(state: HomeUiState, composition: NetWorthComposition, actions: HomeActions) {
+    val f = state.features
+    val links = buildList {
+        if (f.isEnabled(Feature.SAVINGS_GOALS)) add(QuickLink("Savings goals", "Savings goals", Icons.Outlined.Savings, actions.onOpenGoals))
+        if (f.isEnabled(Feature.RECURRING)) add(QuickLink("Scheduled", "Scheduled transactions", Icons.Outlined.EventRepeat) { actions.onOpenRecurring(null) })
+        if (f.isEnabled(Feature.DEBTS_LOANS)) add(QuickLink("Debts & loans", "Debts and loans", Icons.Outlined.CreditCard, actions.onOpenDebts))
+        add(QuickLink("Wallets", "Wallets", Icons.Outlined.AccountBalanceWallet, actions.onOpenWallets))
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth >= 300.dp) {
+            // The links card's share of the row (1 of 2.1 weights) minus its padding: too narrow for two tiles across
+            // on small phones, where the links become a list. Worked out here because the row below measures its
+            // children's intrinsic height, which a nested BoxWithConstraints cannot provide.
+            val linksContentWidth = (maxWidth - Spacing.sm) / 2.1f - Spacing.md * 2
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                NetWorthCard(state, composition, actions.onOpenWallets, Modifier.weight(1.1f).fillMaxHeight())
+                QuickLinksCard(links, asList = linksContentWidth < 140.dp, modifier = Modifier.weight(1f).fillMaxHeight())
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                NetWorthCard(state, composition, actions.onOpenWallets, Modifier.fillMaxWidth())
+                QuickLinksCard(links, asList = false, modifier = Modifier.fillMaxWidth())
             }
         }
-        state.otherMonthTotals.forEach { t ->
+    }
+}
+
+/** Wallets & assets, then liabilities, then net worth = assets − liabilities as the result. Opens Wallets. */
+@Composable
+private fun NetWorthCard(state: HomeUiState, composition: NetWorthComposition, onOpenWallets: () -> Unit, modifier: Modifier) {
+    val ext = LucentoTheme.extendedColors
+    LucentoCard(modifier, onClick = onOpenWallets, contentPadding = Spacing.md) {
+        LinkedTitle("Net worth", compact = true)
+        Spacer(Modifier.height(Spacing.xs))
+        PositionRow(
+            icon = Icons.Outlined.AccountBalanceWallet,
+            tone = TonePair(ext.positiveContainer, ext.positive),
+            money = composition.totalAssets,
+            label = "Wallets & assets",
+        )
+        PositionRow(
+            icon = Icons.Outlined.AccountBalance,
+            tone = TonePair(ext.negativeContainer, ext.negative),
+            money = -composition.totalLiabilities,
+            label = "Liabilities",
+            color = if (composition.totalLiabilities.isZero) MaterialTheme.colorScheme.onSurface else ext.negative,
+        )
+        Hairline(Modifier.padding(vertical = Spacing.xs))
+        Column(
+            Modifier.semantics(mergeDescendants = true) {
+                contentDescription = "Net worth ${MoneyFormatter.format(composition.netWorth)}: assets ${MoneyFormatter.format(composition.totalAssets)} " +
+                    "minus liabilities ${MoneyFormatter.format(composition.totalLiabilities)}"
+            },
+        ) {
+            MoneyText(money = composition.netWorth, style = AmountStyles.large, fractionScale = 0.75f, minScale = 0.55f, color = MaterialTheme.colorScheme.primary)
+            Text("Net worth", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            state.netWorthMonthChange?.let { ChangeChip(it, Modifier.padding(top = Spacing.xs)) }
+        }
+        state.otherNetWorth.forEach { other ->
             Text(
-                "${t.currencyCode}: ${MoneyFormatter.formatSigned(t.income - t.expense, showPlus = true)} this month (kept separate, never converted)",
-                style = MaterialTheme.typography.bodySmall,
+                "${other.currencyCode} ${MoneyFormatter.formatSigned(other)} (separate)",
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.sm),
             )
         }
     }
 }
 
-// ------------------------------------------------------------------ D. Burn rate
+/** This month's movement from recorded income and spending: an arrow and a signed amount, never colour alone. */
+@Composable
+private fun ChangeChip(change: Money, modifier: Modifier = Modifier) {
+    val up = !change.isNegative
+    val tone = if (up) StatusTones.positive else StatusTones.negative
+    Column(
+        modifier
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(tone.container)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .clearAndSetSemantics {
+                contentDescription = "${MoneyFormatter.formatSigned(change, showPlus = true)} this month from recorded income and spending"
+            },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (up) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward, contentDescription = null, tint = tone.content, modifier = Modifier.size(12.dp))
+            Text(MoneyFormatter.formatSigned(change, showPlus = true), style = MaterialTheme.typography.labelSmall, color = tone.content, maxLines = 1)
+        }
+        Text("this month", style = MaterialTheme.typography.labelSmall, color = tone.content, maxLines = 1)
+    }
+}
 
 @Composable
-private fun BurnRateCard(plan: BudgetPlan, burn: BudgetBurn, onOpen: () -> Unit) {
-    val ext = LucentoTheme.extendedColors
-    val monthName = monthLabel(burn.month)
-    LucentoCard(Modifier.fillMaxWidth(), onClick = onOpen, contentPadding = Spacing.lg) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "BURN RATE · ${monthName.uppercase(Locale.getDefault())}",
-                style = OverlineStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            val consumed = burn.consumedPercent
-            if (consumed != null) {
-                Text(
-                    "$consumed% used",
-                    style = AmountStyles.small,
-                    color = when (burn.level) {
-                        BurnLevel.EXHAUSTED -> ext.negative
-                        BurnLevel.APPROACHING -> ext.warning
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
-                )
+private fun PositionRow(icon: ImageVector, tone: TonePair, money: Money, label: String, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Row(Modifier.padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+        IconTile(icon = icon, size = 28.dp, container = tone.container, content = tone.content)
+        Spacer(Modifier.width(Spacing.sm))
+        Column {
+            MoneyText(money = money, style = AmountStyles.row, color = color, fractionScale = 1f, minScale = 0.7f)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+    }
+}
+
+private data class QuickLink(val label: String, val accessibilityLabel: String, val icon: ImageVector, val onClick: () -> Unit)
+
+/**
+ * Quick access to the pages around your money: a two-by-two grid of compact tiles, or — when the card is too narrow
+ * for two tiles across (small phones) — a list of icon-and-label rows, so labels never break mid-word.
+ */
+@Composable
+private fun QuickLinksCard(links: List<QuickLink>, asList: Boolean, modifier: Modifier) {
+    LucentoCard(modifier, contentPadding = Spacing.md) {
+        Text("Quick links", style = Hierarchy.cardTitle, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(Spacing.sm))
+        if (asList) {
+            Column { links.forEach { QuickLinkRow(it) } }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                links.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        pair.forEach { QuickLinkTile(it, Modifier.weight(1f).fillMaxHeight()) }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
             }
         }
-        Spacer(Modifier.height(Spacing.sm))
-        if (burn.level == BurnLevel.NO_BUDGET) {
-            ConsumptionBar(
-                fraction = 0f,
-                color = burnColor(burn.level),
-                markerFraction = burn.elapsedPercent / 100f,
-                description = "No budget set for $monthName",
-            )
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                "Set category amounts to see how fast this month’s budget is used. So far: ${MoneyFormatter.format(burn.dailyAverage)} a day in budgeted categories.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return@LucentoCard
-        }
-        ConsumptionBar(
-            fraction = burn.consumedFraction,
-            color = burnColor(burn.level),
-            markerFraction = burn.elapsedPercent / 100f,
-            description = "${burn.consumedPercent ?: 0}% of this month’s budget used, ${burn.elapsedPercent}% of the month gone",
+    }
+}
+
+@Composable
+private fun QuickLinkRow(link: QuickLink) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = Sizes.minTouch)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(role = Role.Button, onClickLabel = "Open ${link.accessibilityLabel}", onClick = link.onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconTile(
+            icon = link.icon,
+            size = 28.dp,
+            container = MaterialTheme.colorScheme.primaryContainer,
+            content = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            link.label,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 2,
+            modifier = Modifier.weight(1f).semantics { contentDescription = link.accessibilityLabel },
+        )
+    }
+}
+
+@Composable
+private fun QuickLinkTile(link: QuickLink, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .heightIn(min = 72.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), MaterialTheme.shapes.medium)
+            .clickable(role = Role.Button, onClickLabel = "Open ${link.accessibilityLabel}", onClick = link.onClick)
+            .padding(horizontal = 2.dp, vertical = Spacing.sm),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        IconTile(
+            icon = link.icon,
+            size = 28.dp,
+            container = MaterialTheme.colorScheme.primaryContainer,
+            content = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(Spacing.xs))
-        Row(Modifier.fillMaxWidth()) {
-            Text(
-                when (burn.level) {
-                    BurnLevel.EXHAUSTED -> "Budget used up"
-                    BurnLevel.APPROACHING -> "Approaching the limit"
-                    else -> if (burn.aheadOfPace) "A little ahead of the calendar" else "On pace"
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                "Day ${burn.daysElapsed} of ${burn.daysInMonth}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         Text(
-            buildString {
-                append("${MoneyFormatter.format(burn.dailyAverage)} a day so far")
-                val allowance = burn.dailyAllowance
-                if (allowance != null) {
-                    append(" · ${MoneyFormatter.format(allowance)} a day keeps you on budget")
-                } else if (plan.health == BudgetHealth.EXCEEDED) {
-                    append(" · ${MoneyFormatter.format(-plan.remaining)} over")
-                }
-                append(".")
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Spacing.xxs),
+            link.label,
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.semantics { contentDescription = link.accessibilityLabel },
         )
     }
 }
 
-// ------------------------------------------------------------------ E. Savings level
+// ------------------------------------------------------------------ Top savings goal
 
+/** The goal closest to done (highest completion among goals still in progress): picture, name, %, bar, money, date. */
 @Composable
-private fun SavingsLevelCard(goals: GoalsOverview?, hasAnyGoals: Boolean, onOpen: () -> Unit) {
+private fun TopGoalCard(goals: GoalsOverview?, hasAnyGoals: Boolean, onOpen: () -> Unit) {
     val ext = LucentoTheme.extendedColors
+    val top = goals?.top
     LucentoCard(Modifier.fillMaxWidth(), onClick = onOpen, contentPadding = Spacing.lg) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("SAVINGS GOALS", style = OverlineStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        LinkedTitle("Top savings goal") {
+            if (top != null) LucentoTextButton(text = "View all", onClick = onOpen)
         }
-        if (goals == null) {
+        if (top == null) {
             Text(
                 if (hasAnyGoals) "Your goals are in other currencies — open Savings goals to see them."
                 else "Set a target — a trip, a cushion, a new laptop — and watch it fill up.",
@@ -524,116 +916,148 @@ private fun SavingsLevelCard(goals: GoalsOverview?, hasAnyGoals: Boolean, onOpen
             if (!hasAnyGoals) LucentoTextButton(text = "Start a savings goal", onClick = onOpen)
             return@LucentoCard
         }
-        Spacer(Modifier.height(Spacing.xs))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("${goals.percent}%", style = AmountStyles.large)
-            Text(
-                " saved across ${goals.goalCount} ${if (goals.goalCount == 1) "goal" else "goals"}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 3.dp),
-            )
-        }
         Spacer(Modifier.height(Spacing.sm))
-        ConsumptionBar(
-            fraction = goals.fraction,
-            color = ext.success,
-            description = "${goals.percent}% of your savings targets reached",
-            height = 8.dp,
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        val closest = goals.closest
-        Text(
-            when {
-                closest != null -> "Closest: ${closest.goal.name} · ${closest.percent}% · ${MoneyFormatter.format(closest.remaining)} to go"
-                goals.reachedCount == goals.goalCount -> "Every goal reached — wonderful."
-                else -> "${MoneyFormatter.format(goals.saved)} of ${MoneyFormatter.format(goals.target)}"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-// ------------------------------------------------------------------ F. Upcoming recurring payments
-
-@Composable
-private fun UpcomingSection(state: HomeUiState, onOpen: (Long?) -> Unit) {
-    SectionHeader("Upcoming payments") {
-        if (state.hasAnySchedules) LucentoTextButton(text = "See all", onClick = { onOpen(null) })
-    }
-    if (state.upcoming.isEmpty()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconTile(icon = Icons.Outlined.EventRepeat)
+            GoalThumbnail(top.goal.name, top.goal.sceneKey, top.goal.photoPath)
             Spacer(Modifier.width(Spacing.md))
             Column(Modifier.weight(1f)) {
-                Text(
-                    if (state.hasAnySchedules) "Nothing due in the next 30 days" else "No recurring payments scheduled",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    if (state.hasAnySchedules) "You’re all caught up." else "Add rent, bills or subscriptions and Lucento reminds you here.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(top.goal.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text("${top.percent}%", style = AmountStyles.medium, color = ext.success)
+                }
+                Spacer(Modifier.height(Spacing.xs))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(CircleShape)
+                        .background(ext.track)
+                        .clearAndSetSemantics { contentDescription = "${top.goal.name}: ${top.percent}% saved" },
+                ) {
+                    Box(Modifier.fillMaxWidth(top.fraction.coerceIn(0f, 1f)).fillMaxHeight().clip(CircleShape).background(ext.success))
+                }
+                Spacer(Modifier.height(Spacing.xs))
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        "${MoneyFormatter.format(top.saved)} of ${MoneyFormatter.format(top.goal.target)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    val formatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault()) }
+                    val date = top.goal.targetDate
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            when {
+                                top.reached -> "Reached"
+                                date != null -> "Target"
+                                top.projectedCompletion != null -> "At your pace"
+                                else -> "No target date"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        (date ?: top.projectedCompletion)?.takeIf { !top.reached }?.let {
+                            Text(it.format(formatter), style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
             }
         }
-        if (!state.hasAnySchedules) {
-            LucentoTextButton(text = "Add a recurring payment", onClick = { onOpen(null) })
+    }
+}
+
+/** The goal's own photo or card picture, small; a savings glyph when it has neither. Decorative. */
+@Composable
+private fun GoalThumbnail(name: String, sceneKey: String?, photoPath: String?) {
+    val photo = rememberGoalPhoto(photoPath)
+    val art = remember(name, sceneKey) { GoalScene.forGoal(name, sceneKey).illustration() }
+    val modifier = Modifier.size(width = 64.dp, height = 56.dp).clip(MaterialTheme.shapes.small)
+    when {
+        photo != null -> Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
+        art != null -> Image(painterResource(art.res), contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
+        else -> IconTile(icon = Icons.Outlined.Savings, size = 56.dp, container = MaterialTheme.colorScheme.primaryContainer, content = MaterialTheme.colorScheme.primary)
+    }
+}
+
+// ------------------------------------------------------------------ Scheduled transactions
+
+@Composable
+private fun ScheduledCard(state: HomeUiState, onOpen: (Long?) -> Unit) {
+    LucentoCard(Modifier.fillMaxWidth(), onClick = { onOpen(null) }, contentPadding = Spacing.lg) {
+        LinkedTitle("Scheduled transactions") {
+            if (state.hasAnySchedules) LucentoTextButton(text = "See all", onClick = { onOpen(null) })
         }
-        return
+        if (state.upcoming.isEmpty()) {
+            Spacer(Modifier.height(Spacing.xs))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(icon = Icons.Outlined.EventRepeat)
+                Spacer(Modifier.width(Spacing.md))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (state.hasAnySchedules) "Nothing due in the next 30 days" else "Nothing scheduled",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        if (state.hasAnySchedules) "You’re all caught up." else "Add rent, bills, subscriptions or salary and they show up here before they’re due.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (!state.hasAnySchedules) LucentoTextButton(text = "Schedule a transaction", onClick = { onOpen(null) })
+            return@LucentoCard
+        }
+        state.upcoming.forEachIndexed { index, item ->
+            ScheduledRow(item, state, onClick = { onOpen(item.schedule.id) })
+            if (index < state.upcoming.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
+        }
+        Text(
+            "Nothing is recorded until you mark it as paid or received.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xs),
+        )
     }
-    state.upcoming.forEachIndexed { index, item ->
-        UpcomingRow(item, state, onClick = { onOpen(item.schedule.id) })
-        if (index < state.upcoming.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
-    }
-    Text(
-        "Nothing is recorded until you mark a payment as paid.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = Spacing.sm),
-    )
 }
 
 @Composable
-private fun UpcomingRow(item: UpcomingPayment, state: HomeUiState, onClick: () -> Unit) {
+private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () -> Unit) {
     val schedule = item.schedule
-    val wallet = state.walletsById[schedule.walletId]
+    val category = schedule.categoryId?.let { state.categoriesById[it] }
     val days = ChronoUnit.DAYS.between(state.today, item.dueDate)
-    val whenLabel = when {
-        item.overdue -> "Overdue since ${shortDayLabel(item.dueDate, state.today)}"
-        days == 0L -> "Due today"
-        days == 1L -> "Due tomorrow"
-        days < 7L -> "Due in $days days"
-        else -> "Due ${shortDayLabel(item.dueDate, state.today)}"
+    val relative = when {
+        days == 0L -> "Today"
+        days == 1L -> "Tomorrow"
+        days in 2L..6L -> "In $days days"
+        else -> null
     }
+    val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()) }
     val income = schedule.type == TransactionType.INCOME
+    val kind = category?.name ?: if (income) "Recurring income" else "Recurring expense"
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
+            .heightIn(min = 60.dp)
             .clickable(role = Role.Button, onClickLabel = "Review ${schedule.name}", onClick = onClick)
             .padding(vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryTile(category = schedule.categoryId?.let { state.categoriesById[it] }, type = schedule.type)
+        CategoryTile(category = category, type = schedule.type)
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
-            Text(schedule.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                listOfNotNull(whenLabel.takeIf { !item.overdue }, wallet?.name).joinToString(" · ").ifEmpty { wallet?.name.orEmpty() },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (item.overdue) {
-                StatusPill(whenLabel, StatusTones.negative, Modifier.padding(top = 2.dp))
-            }
+            Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(kind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(Spacing.sm))
+        Column(horizontalAlignment = Alignment.End) {
+            when {
+                item.overdue -> StatusPill("Overdue", StatusTones.negative)
+                relative != null -> Text(relative, style = MaterialTheme.typography.labelMedium)
+            }
+            Text(item.dueDate.format(dateFormat), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(Spacing.md))
         AmountText(
             money = if (income) schedule.amount else -schedule.amount,
             showPlus = true,
@@ -644,3 +1068,5 @@ private fun UpcomingRow(item: UpcomingPayment, state: HomeUiState, onClick: () -
 
 internal fun monthLabel(month: YearMonth, locale: Locale = Locale.getDefault()): String =
     month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale).replaceFirstChar { it.titlecase(locale) }
+
+private fun monthYearLabel(month: YearMonth, locale: Locale = Locale.getDefault()): String = "${monthLabel(month, locale)} ${month.year}"

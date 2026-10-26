@@ -1,5 +1,6 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.domain.transactable
 import com.lucento.app.domain.GoalCalculator
 import com.lucento.app.domain.GoalMilestone
 import com.lucento.app.domain.GoalMilestones
@@ -116,7 +117,7 @@ class PlanViewModel(
             today = LocalDate.now(),
             primaryCurrency = prefs.primaryCurrency,
             features = prefs.features,
-            wallets = base.wallets,
+            wallets = base.wallets.transactable(),
             categories = base.categories,
             transactions = base.transactions,
             budgets = base.budgets,

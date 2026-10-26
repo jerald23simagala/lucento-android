@@ -60,7 +60,7 @@ import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
-import com.lucento.app.core.designsystem.component.SectionHeader
+import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.StatusTones
@@ -332,7 +332,7 @@ private fun ScheduleActionsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (due != null && !schedule.paused) {
-                SectionHeader(if (schedule.type == TransactionType.INCOME) "Record as received" else "Record as paid")
+                FieldHeader(if (schedule.type == TransactionType.INCOME) "Record as received" else "Record as paid")
                 MoneyField(
                     value = amountText,
                     onValueChange = { amountText = it; message = null },
@@ -447,17 +447,17 @@ private fun ScheduleEditorSheet(
                 label = "Amount",
                 currencyCode = wallet?.currencyCode ?: state.primaryCurrency,
             )
-            SectionHeader(if (draft.type == TransactionType.INCOME) "Into" else "Paid from")
+            FieldHeader(if (draft.type == TransactionType.INCOME) "Into" else "Paid from")
             PillRow(state.wallets.map { it.id to "${it.name} · ${it.currencyCode}" }, draft.walletId, onSelect = { draft = draft.copy(walletId = it) })
             if (categories.isNotEmpty()) {
-                SectionHeader("Category")
+                FieldHeader("Category")
                 PillRow(
                     options = listOf<Pair<Long?, String>>(null to "None") + categories.map { it.id to it.name },
                     selected = draft.categoryId,
                     onSelect = { draft = draft.copy(categoryId = it) },
                 )
             }
-            SectionHeader("Repeats")
+            FieldHeader("Repeats")
             PillRow(Frequency.entries.map { it to frequencyLabel(it, 1) }, draft.frequency, onSelect = { draft = draft.copy(frequency = it) })
             PillRow(
                 options = listOf(1, 2, 3, 6).map { n -> n to frequencyLabel(draft.frequency, n) },

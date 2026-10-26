@@ -38,7 +38,7 @@ import java.util.UUID
 
 /**
  * End-to-end tour of the 0.5 experience on a real emulator: mandatory category onboarding, the dock and its five
- * destinations, the + Add Transaction sheet, More and Profile menus, the dashboard in its different budget states,
+ * destinations, the + Add Transaction sheet, Quick links and the Profile menu, the dashboard in its different budget states,
  * Budget, Insights, light and dark. It asserts the key behaviours and saves a screenshot of every screen for design
  * review (CI pulls them from /data/local/tmp/lucento-shots and uploads them as an artifact).
  *
@@ -209,8 +209,9 @@ class ScreenshotTourTest {
 
         // ---------------------------------------------------------------- dashboard: within budget (happy sun)
         val total = MoneyFormatter.format(money(2_590))
-        waitForText("BUDGET LEFT")
-        waitForText("of $total") // the hero total is the sum of the category amounts
+        waitForText("Monthly budget")
+        waitForText(total) // the pace card's budget figure is the sum of the category amounts
+        waitForText("Month elapsed")
         shot("06-home-within-budget")
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
@@ -236,15 +237,19 @@ class ScreenshotTourTest {
         tab("Transactions")
         waitForText("Transactions")
         shot("11-transactions")
-        tab("Wallets")
+        tab("Home")
+        // Wallets open from Quick links (or the Net worth card); the dock is Home · Transactions · + · Insights · Budgets.
+        compose.onNodeWithContentDescription("Wallets").performScrollTo().performClick()
         waitForText("Assets")
         shot("12-wallets")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
         tab("Insights")
         waitForText("Income and expenses")
         shot("13-insights-trends")
         runCatching { compose.onNodeWithText("Savings goals aren’t added here", substring = true).performScrollTo() }
         shot("14-insights-net-worth")
-        tab("Budget")
+        tab("Budgets")
         waitForText("left of $total")
         shot("15-budget")
         compose.onNodeWithContentDescription("Manage categories").performClick()
@@ -254,17 +259,17 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
 
-        // ---------------------------------------------------------------- More and Profile menus
-        compose.onNodeWithContentDescription("More: goals, recurring payments, debts").performClick()
-        waitForText("Debts & loans")
-        shot("17-more-menu")
-        click("Recurring payments")
+        // ---------------------------------------------------------------- Quick links and Profile menu
+        tab("Home")
+        compose.onNodeWithContentDescription("Debts and loans").performScrollTo()
+        shot("17-quick-links")
+        compose.onNodeWithContentDescription("Scheduled transactions").performClick()
         waitForText("Gym membership")
         shot("18-recurring")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         tab("Home")
-        waitForText("BUDGET LEFT")
+        waitForText("Monthly budget")
         // Home keeps its scroll position from the earlier "lower cards" screenshot: bring the profile button back
         // into view first (a tap on an off-screen node does nothing).
         compose.onNodeWithContentDescription("Profile and settings").performScrollTo().performClick()
@@ -275,14 +280,14 @@ class ScreenshotTourTest {
         // ---------------------------------------------------------------- dark theme
         click("Dark")
         backUntilGone("Account and app")
-        waitForText("BUDGET LEFT")
+        waitForText("Monthly budget")
         runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
         shot("20-home-dark")
-        tab("Budget")
+        tab("Budgets")
         shot("21-budget-dark")
         tab("Home")
 
-        // ---------------------------------------------------------------- almost used: the sun turns supportively concerned
+        // ---------------------------------------------------------------- almost used: Lucento turns supportively concerned
         runBlocking {
             val categories = container.categories.observeCategories().first()
             val restaurants = categories.first { it.name == "Restaurants" }.id
@@ -291,7 +296,7 @@ class ScreenshotTourTest {
                 TransactionRepository.Input(null, UUID.randomUUID().toString(), TransactionType.EXPENSE, money(260), bank, restaurants, today, "Celebration dinner"),
             )
         }
-        waitForText("left this month", substring = true)
+        waitForText("Monthly budget")
         compose.waitUntilAtLeastOneExists(hasContentDescription("gently concerned", substring = true), 10_000)
         runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
         shot("22-home-budget-almost-used-dark")

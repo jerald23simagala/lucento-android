@@ -5,6 +5,7 @@ import com.lucento.app.data.local.CategoryDao
 import com.lucento.app.data.local.RecurringDao
 import com.lucento.app.data.local.RecurringEntity
 import com.lucento.app.data.local.WalletDao
+import com.lucento.app.data.local.acceptsTransactions
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
@@ -71,7 +72,7 @@ class RecurringRepository(
         if (input.interval !in 1..MAX_INTERVAL) return SaveResult.InvalidInterval
         if (input.endDate != null && input.endDate.isBefore(input.startDate)) return SaveResult.EndBeforeStart
         val wallet = wallets.getById(input.walletId)
-        if (wallet == null || wallet.archived) return SaveResult.WalletNotFound
+        if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
         if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
         if (input.categoryId != null) {
             val category = categories.getById(input.categoryId) ?: return SaveResult.CategoryMismatch

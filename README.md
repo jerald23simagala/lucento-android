@@ -11,14 +11,17 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 > [docs/DESIGN.md](docs/DESIGN.md), [docs/CALCULATIONS.md](docs/CALCULATIONS.md), [CHANGELOG.md](CHANGELOG.md).
 
 ## What works today (0.5.0)
-- **Navigation**: a persistent dock — **Home · Transactions · Wallets · Insights · Budget** — plus a **More** menu
-  (Savings goals, Recurring payments, Debts & loans, Categories) and a **profile** button (optional name,
-  appearance, Settings, Enabled features). An app-wide **+** opens the **transaction composer**.
+- **Navigation**: a persistent dock — **Home · Transactions · (+) · Insights · Budgets** — whose central **+** opens the
+  **transaction composer**; Wallets, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
+  links, Categories from the Budgets tab; a **profile** button (optional name, appearance, Settings, Enabled features).
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation.
-- **Home**: budget hero with Lucento, the mascot, whose torch light and look follow the month's budget (five wellness tiers),
-  compact net flow with an animated trend glyph, burn-rate bar against the calendar, savings goals level, upcoming
-  recurring payments (tap to review and mark paid).
+- **Home**: a working header (sync status, month selector, profile); the **Budget pace** card — % of budget used,
+  budget used vs month elapsed, a verdict in words and Lucento, the mascot, whose look follows it; **net worth** as
+  assets − liabilities with shortcuts to goals, scheduled transactions, debts and categories; the savings goal closest
+  to done; **scheduled transactions** (tap to review and mark paid).
+- **Wallets** include manually valued assets (home, car, investments): a valuation you update, counted in net worth,
+  never used for transactions.
 - **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
   the budget shown transparently; amounts per month and currency; manage categories (add, rename, reorder,
   deactivate, restore). Existing users keep their categories and can personalise them from presets.
