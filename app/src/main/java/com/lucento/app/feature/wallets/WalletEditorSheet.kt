@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -56,6 +57,8 @@ import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.CurrencyPickerSheet
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
+import com.lucento.app.core.designsystem.component.NavRow
+import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.component.SwitchRow
 import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.WalletTypeTile
@@ -87,6 +90,8 @@ fun WalletEditorSheet(
     /** Deletes the wallet; the callback says whether it was deleted or what still uses it. */
     onDelete: ((Long, (WalletRepository.DeleteResult) -> Unit) -> Unit)?,
     onDismiss: () -> Unit,
+    /** Opens Adjust balance for an existing money wallet; null hides the option (new or manually valued wallets). */
+    onAdjustBalance: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -104,8 +109,8 @@ fun WalletEditorSheet(
         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
     )
 
-    fun close() {
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    fun close(then: () -> Unit = onDismiss) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { then() }
     }
 
     LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -278,6 +283,17 @@ fun WalletEditorSheet(
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            if (onAdjustBalance != null && initial.id != null && !initial.type.isValuedManually) {
+                Spacer(Modifier.height(Spacing.xs))
+                NavRow(
+                    icon = Icons.Filled.Tune,
+                    title = "Adjust balance",
+                    summary = "Can’t reconcile? Set today’s real balance; the difference is recorded as a Balance adjustment.",
+                    tone = StatusTones.warning,
+                    onClick = { close(onAdjustBalance) },
+                )
+            }
 
             if (draft.type.isSpendable) {
                 Spacer(Modifier.height(Spacing.sm))

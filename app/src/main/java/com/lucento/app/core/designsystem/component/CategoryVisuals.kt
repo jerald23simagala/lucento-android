@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Weekend
 import androidx.compose.material.icons.filled.Whatshot
@@ -183,6 +184,17 @@ fun CategoryTile(
             modifier = modifier,
             container = MaterialTheme.colorScheme.primaryContainer,
             content = MaterialTheme.colorScheme.onPrimaryContainer,
+            size = size,
+        )
+        return
+    }
+    if (type.isAdjustment) {
+        // Warning-toned: a balance override is where tracking and reality parted, worth noticing in history.
+        IconTile(
+            icon = Icons.Filled.Tune,
+            modifier = modifier,
+            container = LucentoTheme.extendedColors.warningContainer,
+            content = LucentoTheme.extendedColors.warning,
             size = size,
         )
         return

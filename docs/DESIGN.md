@@ -22,7 +22,8 @@ Soft Ivory `#FFFDF5` · Midnight Navy `#17233F` · Pale Sky `#EAF1FF`.
 | Muted ink | `#5E687D` | `#B8C5DC` | Labels, captions (5.5:1, 4.9:1 on pale sky / 8.9:1). Derived from the brief's `#667085` (4.4:1 on pale sky). |
 | Primary — Electric Blue | `#3563F5`, white label 4.9:1 | `#7C9AFF`, navy label 6.7:1 | Primary actions, selection, the Add tab, links. |
 | On primary container | `#2447C7` on `#EAF1FF` | `#E4EBFF` on `#26397A` | Tonal actions (ActionTile, IconBadge), selected text. |
-| Statement panel (hero) | `#2F56E8` Electric Blue, white text, `#DCE5FF` muted | `#202E4D` elevated navy, `#F8FAFF` / `#B8C5DC` text | Budget hero. At night blue stays for interaction only. |
+| Statement panel (hero) | `#2F56E8` Electric Blue, white text, `#DCE5FF` muted | `#202E4D` elevated navy, `#F8FAFF` / `#B8C5DC` text | Budget hero, Wallets net-worth hero. At night blue stays for interaction only. |
+| Wallet card faces (`walletCard`) | Cash sunlight · Bank blue hero · E-wallet tangerine · Savings green · Credit card navy · Loan deep blue · Other asset pale sky; navy or white ink | Same (physical-card faces don't change at night) | Wallet page balance card. Decoration: two faint ink circles and a chip block only. |
 | Accent — sunlight | `#FFC928` (decorative only), `#9A5806` (text) | `#FFC928` (text-safe 11.5:1) | The leaf, the mascot, hero rule, milestones. Sparingly. |
 | Warm accent — tangerine | `#FF8A24` (decorative only) | `#FF8A24` | Logo warmth, secondary chart series. Never a status. |
 

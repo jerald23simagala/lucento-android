@@ -138,6 +138,8 @@ internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null): Wallet {
             expenseMinor = flow?.expenseMinor ?: 0L,
             transferInMinor = flow?.transferInMinor ?: 0L,
             transferOutMinor = flow?.transferOutMinor ?: 0L,
+            adjustmentInMinor = flow?.adjustmentInMinor ?: 0L,
+            adjustmentOutMinor = flow?.adjustmentOutMinor ?: 0L,
         ),
         createdAtEpochMillis = createdAt,
         openingBalance = opening,

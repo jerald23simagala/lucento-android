@@ -6,10 +6,11 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 
 | Figure | Definition | Code |
 |---|---|---|
-| Wallet balance (asset) | opening + income + transfers in − expenses − transfers out | `WalletBalanceCalculator` |
-| Wallet balance (credit card, loan) | amount owed = opening + expenses + transfers out − income − transfers in | `WalletBalanceCalculator` |
+| Wallet balance (asset) | opening + income + transfers in + adjustments in − expenses − transfers out − adjustments out | `WalletBalanceCalculator` |
+| Wallet balance (credit card, loan) | amount owed = opening + expenses + transfers out + adjustments out − income − transfers in − adjustments in | `WalletBalanceCalculator` |
+| Balance flag | cash / e-wallet / savings below zero, a bank account below zero (overdrawn?), or a card / loan below zero (owed to you). Shown as a warning with a reconcile note; never changes a figure | `Wallet.balanceFlag` |
 | Net worth | assets − liabilities, per currency | `NetWorthCalculator` |
-| Income / Expenses | sum of INCOME / EXPENSE in the period. **Transfers never count.** | `TransactionQueries.totalsByCurrency` |
+| Income / Expenses | sum of INCOME / EXPENSE in the period. **Transfers and balance adjustments never count.** | `TransactionQueries.totalsByCurrency` |
 | Net flow | income − expenses for the month; compared with last month when last month has records | `CashflowCalculator.netFlow` |
 | Burn rate | actual: expenses this month ÷ days elapsed (incl. today), half-up. Projection (labelled): expenses × days in month ÷ days elapsed. Comparison: last month's expenses ÷ its length | `CashflowCalculator.burnRate` |
 | **Monthly budget (v0.5)** | **Σ category allocations** of active expense categories in one currency for the calendar month. Never stored or edited on its own, so it cannot disagree with the categories. Archived categories, income categories, zero amounts and legacy "everything" rows (≤ v0.4) never count. Currencies are never summed together | `BudgetPlanner.plan` |
@@ -56,6 +57,17 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 - Loan proceeds: TRANSFER out of the loan into a bank account (raises owed; not income).
 - Principal repayment: TRANSFER into the loan. Interest and fees: EXPENSE on the loan.
 - Lucento does not split a single payment into principal and interest automatically.
+
+## Balance adjustments
+Lucento never syncs with a bank, so a balance only changes when something is recorded. When the user can't find what
+is missing, Edit wallet › Adjust balance sets the real balance (amount owed for a card or loan) at the end of a day,
+today or earlier. The tracked balance that day (opening ± that wallet's movements dated on or before it) is compared
+with the actual figure and the gap is written as **one** row: ADJUSTMENT_IN when it raises the money in the wallet
+(lowers what a card owes), ADJUSTMENT_OUT otherwise. Nothing already recorded is rewritten, and later transactions
+still apply on top. Adjustments have no category, appear in Transactions as "Balance adjustment" (warning tone), are
+never income, spending, budgeted spending or net flow, can be deleted but not edited as income/expense, and are
+idempotent on the sheet's client key. Equal balances write nothing. Manually valued assets are revalued in their
+editor instead. Code: `BalanceAdjustment.plan`, `WalletBalanceCalculator.balanceOn`, `TransactionRepository.adjustBalance`.
 
 ## Transfers
 Two legs (TRANSFER_OUT on the source, TRANSFER_IN on the destination) sharing `transfer_group`, written in one Room

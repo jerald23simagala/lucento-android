@@ -14,6 +14,8 @@ data class WalletFlowRow(
     @ColumnInfo(name = "expense_minor") val expenseMinor: Long,
     @ColumnInfo(name = "transfer_in_minor") val transferInMinor: Long = 0,
     @ColumnInfo(name = "transfer_out_minor") val transferOutMinor: Long = 0,
+    @ColumnInfo(name = "adjustment_in_minor") val adjustmentInMinor: Long = 0,
+    @ColumnInfo(name = "adjustment_out_minor") val adjustmentOutMinor: Long = 0,
 )
 
 @Dao
@@ -27,7 +29,9 @@ interface TransactionDao {
             "COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount_minor ELSE 0 END), 0) AS income_minor, " +
             "COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount_minor ELSE 0 END), 0) AS expense_minor, " +
             "COALESCE(SUM(CASE WHEN type = 'TRANSFER_IN' THEN amount_minor ELSE 0 END), 0) AS transfer_in_minor, " +
-            "COALESCE(SUM(CASE WHEN type = 'TRANSFER_OUT' THEN amount_minor ELSE 0 END), 0) AS transfer_out_minor " +
+            "COALESCE(SUM(CASE WHEN type = 'TRANSFER_OUT' THEN amount_minor ELSE 0 END), 0) AS transfer_out_minor, " +
+            "COALESCE(SUM(CASE WHEN type = 'ADJUSTMENT_IN' THEN amount_minor ELSE 0 END), 0) AS adjustment_in_minor, " +
+            "COALESCE(SUM(CASE WHEN type = 'ADJUSTMENT_OUT' THEN amount_minor ELSE 0 END), 0) AS adjustment_out_minor " +
             "FROM transactions GROUP BY wallet_id"
     )
     fun observeWalletFlows(): Flow<List<WalletFlowRow>>
@@ -40,6 +44,9 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE transfer_group = :group")
     suspend fun getByTransferGroup(group: String): List<TransactionEntity>
+
+    @Query("SELECT * FROM transactions WHERE wallet_id = :walletId")
+    suspend fun getForWallet(walletId: Long): List<TransactionEntity>
 
     @Query("SELECT COUNT(*) FROM transactions WHERE wallet_id = :walletId")
     suspend fun countForWallet(walletId: Long): Int

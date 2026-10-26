@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -147,18 +149,55 @@ fun InfoNote(
     icon: ImageVector = Icons.Outlined.Info,
     container: Color = MaterialTheme.colorScheme.surfaceContainer,
     content: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    /** An optional follow-up ("Adjust balance") shown inside the note, under the text. */
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
     Row(
         modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .background(container)
-            .padding(Spacing.md),
+            .padding(start = Spacing.md, end = Spacing.md, top = Spacing.md, bottom = if (actionLabel != null) Spacing.xs else Spacing.md),
         verticalAlignment = Alignment.Top,
     ) {
         Icon(icon, contentDescription = null, tint = content, modifier = Modifier.padding(top = 1.dp).width(18.dp))
         Spacer(Modifier.width(Spacing.sm))
-        Text(text, style = MaterialTheme.typography.bodySmall, color = content, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(text, style = MaterialTheme.typography.bodySmall, color = content)
+            if (actionLabel != null && onAction != null) {
+                Text(
+                    actionLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .heightIn(min = 40.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(role = Role.Button, onClick = onAction)
+                        .padding(vertical = Spacing.sm),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A tinted, rounded title for a figure on a summary card ("In", "Net worth", "Assets"): reads as the card's label at a
+ * glance instead of a faint caption. The [label] carries the meaning; [tone] and [icon] only reinforce it.
+ */
+@Composable
+fun ToneChip(label: String, tone: TonePair, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    Row(
+        modifier
+            .background(tone.container, RoundedCornerShape(50))
+            .padding(start = if (icon != null) 6.dp else Spacing.sm, end = Spacing.sm, top = Spacing.xxs, bottom = Spacing.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(Spacing.xs))
+        }
+        Text(label, style = MaterialTheme.typography.labelLarge, color = tone.content, maxLines = 1)
     }
 }
 

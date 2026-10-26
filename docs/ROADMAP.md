@@ -98,7 +98,11 @@ recurring-schedule sync, syncing preferences.
 - Manually valued assets (`OTHER_ASSET`): valuation only, counted in net worth, refused by every money write path.
 - App-wide hierarchy (`Hierarchy`, `SectionHeader`, `CardHeader`, `FieldHeader`); rounded floating dock
   Home · Transactions · (+) · Insights · Budgets; Wallets, goals, scheduled transactions and debts open from Home's Quick links; categories from Budgets.
-- Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull.
+- Wallets redesign: brand-blue Net worth hero (net worth left; Assets on sunlight / Liabilities on tangerine pills
+  right), Assets and Liabilities as separate tinted sections of carded rows (Debts & loans beside Liabilities), each
+  wallet page opening on a bank-card style face per type (`walletCard` tokens), balance flags with tooltips and a reconcile note (Scan shortcut), and Adjust balance from
+  Edit wallet (ADJUSTMENT_IN/OUT rows; no schema change — `type` is TEXT).
+- Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull. Older installs also read balance adjustments as expenses after a sync pull.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.

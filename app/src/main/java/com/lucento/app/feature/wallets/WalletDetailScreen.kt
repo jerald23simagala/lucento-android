@@ -1,16 +1,12 @@
 package com.lucento.app.feature.wallets
 
-import com.lucento.app.core.designsystem.component.CardHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -20,6 +16,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Percent
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,15 +33,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.ActionTile
 import com.lucento.app.core.designsystem.component.EmptyState
-import com.lucento.app.core.designsystem.component.Figure
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
-import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.SectionHeader
-import com.lucento.app.core.designsystem.component.WalletTypeTile
-import com.lucento.app.core.designsystem.component.label
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
@@ -53,6 +46,7 @@ import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.WalletType
+import com.lucento.app.domain.balanceFlag
 import com.lucento.app.feature.transactions.TransactionRow
 import com.lucento.app.feature.transactions.shortDayLabel
 
@@ -70,12 +64,15 @@ fun WalletDetailScreen(
     onTransfer: (Long?, Long?) -> Unit,
     onEditTransaction: (Transaction) -> Unit,
     transfersEnabled: Boolean,
+    /** After a balance adjustment is recorded (e.g. to confirm it in a snackbar). */
+    onAdjusted: () -> Unit = {},
     viewModel: WalletDetailViewModel = viewModel(key = "wallet-$walletId", factory = WalletDetailViewModel.factory(walletId)),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val walletsState by walletsViewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
+    var adjusting by remember { mutableStateOf(false) }
     val wallet = state.wallet
 
     // The account was deleted (from its editor): leave the screen.
@@ -89,8 +86,8 @@ fun WalletDetailScreen(
     ) {
         item(key = "bar") {
             LucentoTopBar(
-                title = wallet?.name ?: "Account",
-                subtitle = wallet?.let { "${it.type.label} · ${it.currencyCode}" },
+                // The wallet's name and type live on the card itself.
+                title = if (wallet == null) "Account" else "",
                 onBack = onBack,
                 actions = {
                     if (wallet != null) {
@@ -106,45 +103,28 @@ fun WalletDetailScreen(
         val valued = wallet.type.isValuedManually
 
         item(key = "balance") {
-            LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.xl) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    WalletTypeTile(wallet.type, size = Sizes.iconTileLarge)
-                    Spacer(Modifier.width(Spacing.md))
-                    CardHeader(
-                        title = when {
-                            liability -> "Amount owed"
-                            valued -> "Estimated value"
-                            else -> "Current balance"
-                        },
-                    )
-                }
-                Spacer(Modifier.height(Spacing.md))
-                MoneyText(
-                    money = wallet.balance,
-                    style = AmountStyles.display,
-                    color = if (liability && !wallet.balance.isZero) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
+            WalletCard(wallet = wallet, movements = state.history.size, modifier = Modifier.padding(top = Spacing.xs))
+            val ext = LucentoTheme.extendedColors
+            val notes = Modifier.padding(top = Spacing.sm)
+            when {
+                valued -> InfoNote(
+                    "A value you enter yourself — no money moves through it. Use the edit button when it changes. " +
+                        "It counts towards your net worth as an asset.",
+                    modifier = notes,
                 )
-                if (valued) {
-                    Spacer(Modifier.height(Spacing.md))
-                    InfoNote(
-                        "A value you enter yourself — no money moves through it. Use the edit button when it changes. " +
-                            "It counts towards your net worth as an asset.",
-                    )
-                    return@LucentoCard
-                }
-                Spacer(Modifier.height(Spacing.md))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    Figure(if (liability) "Owed at start" else "Opening balance", Modifier.weight(1f)) {
-                        MoneyText(money = wallet.openingBalance, style = AmountStyles.medium, fractionScale = 1f)
-                    }
-                    Figure("Recorded movements", Modifier.weight(1f)) {
-                        Text("${state.history.size}", style = AmountStyles.medium)
-                    }
-                }
-                if (wallet.type == WalletType.SAVINGS) {
-                    Spacer(Modifier.height(Spacing.md))
-                    InfoNote("Savings aren’t counted in Safe to spend, so money you set aside stays set aside.")
-                }
+                wallet.balanceFlag != null -> InfoNote(
+                    wallet.balanceFlag!!.explanation() + " Compare it with the real account and add what’s missing, or adjust the balance.",
+                    modifier = notes,
+                    icon = Icons.Outlined.WarningAmber,
+                    container = ext.warningContainer,
+                    content = ext.warning,
+                    actionLabel = "Adjust balance",
+                    onAction = { adjusting = true },
+                )
+                wallet.type == WalletType.SAVINGS -> InfoNote(
+                    "Savings aren’t counted in Safe to spend, so money you set aside stays set aside.",
+                    modifier = notes,
+                )
             }
         }
 
@@ -222,6 +202,23 @@ fun WalletDetailScreen(
             onSave = walletsViewModel::save,
             onDelete = walletsViewModel::delete,
             onDismiss = { editing = null },
+            onAdjustBalance = {
+                editing = null
+                adjusting = true
+            },
+        )
+    }
+
+    if (adjusting && wallet != null && !wallet.type.isValuedManually) {
+        AdjustBalanceSheet(
+            wallet = wallet,
+            history = state.history,
+            onAdjust = viewModel::adjust,
+            onAdjusted = {
+                adjusting = false
+                onAdjusted()
+            },
+            onDismiss = { adjusting = false },
         )
     }
 }

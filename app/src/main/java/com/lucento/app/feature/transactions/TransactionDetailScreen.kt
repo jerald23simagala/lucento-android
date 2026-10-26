@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.CategoryTile
 import com.lucento.app.core.designsystem.component.Hairline
+import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.theme.AmountStyles
@@ -71,11 +73,16 @@ fun TransactionDetailScreen(
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LucentoTopBar(
-            title = if (transaction?.isTransfer == true) "Transfer" else "Transaction",
+            title = when {
+                transaction?.isTransfer == true -> "Transfer"
+                transaction?.isAdjustment == true -> "Balance adjustment"
+                else -> "Transaction"
+            },
             onBack = onBack,
             modifier = Modifier.padding(horizontal = Spacing.gutter),
             actions = {
-                if (transaction != null) EditPill(onClick = { onEdit(transaction) })
+                // An adjustment isn't income or spending, so it has no editor: delete it from the list and adjust again.
+                if (transaction != null && !transaction.isAdjustment) EditPill(onClick = { onEdit(transaction) })
             },
         )
         if (transaction == null) return@Column
@@ -83,8 +90,10 @@ fun TransactionDetailScreen(
         val ext = LucentoTheme.extendedColors
         val isTransfer = transaction.isTransfer
         val isIncome = transaction.type == TransactionType.INCOME
+        val isAdjustment = transaction.isAdjustment
         val tone = when {
             isTransfer -> TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
+            isAdjustment -> TonePair(ext.warningContainer, ext.warning)
             isIncome -> TonePair(ext.positiveContainer, ext.positive)
             else -> TonePair(ext.negativeContainer, ext.negative)
         }
@@ -95,6 +104,7 @@ fun TransactionDetailScreen(
         val title = when {
             transaction.note.isNotBlank() -> transaction.note
             isTransfer -> "Transfer"
+            isAdjustment -> "Balance adjustment"
             else -> categoryName
         }
 
@@ -131,6 +141,7 @@ fun TransactionDetailScreen(
                     Text(
                         when {
                             isTransfer -> "Transfer"
+                            isAdjustment -> "Balance adjustment"
                             isIncome -> "Income"
                             else -> "Expense"
                         },
@@ -149,6 +160,8 @@ fun TransactionDetailScreen(
                     DetailRow("From", from)
                     Hairline(modifier = Modifier.padding(vertical = Spacing.sm))
                     DetailRow("To", to)
+                } else if (isAdjustment) {
+                    DetailRow("Wallet", state.wallet?.name ?: "—")
                 } else {
                     DetailRow("Category", categoryName)
                     Hairline(modifier = Modifier.padding(vertical = Spacing.sm))
@@ -160,6 +173,16 @@ fun TransactionDetailScreen(
                 DetailRow("Currency", transaction.currencyCode)
                 Hairline(modifier = Modifier.padding(vertical = Spacing.sm))
                 DetailRow("Note", transaction.note.ifBlank { "No note" }, muted = transaction.note.isBlank())
+            }
+            if (isAdjustment) {
+                InfoNote(
+                    "Recorded when this wallet's balance was set by hand: the gap between what Lucento tracked and the " +
+                        "actual balance. It isn't counted as income or spending. A large one usually means transactions " +
+                        "weren't recorded — delete it and add them instead if you find them.",
+                    icon = Icons.Outlined.WarningAmber,
+                    container = ext.warningContainer,
+                    content = ext.warning,
+                )
             }
         }
     }

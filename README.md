@@ -28,7 +28,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Insights**: income and expenses over 3/6/12 months (transfers excluded) and net-worth composition by account type.
 - **Transactions**: search, filters (date, type incl. transfers, wallet, category), day groups, edit/delete.
 - **Transfers** between your own accounts (two linked legs, atomic, never income or spending).
-- **Wallets**: cash, bank, e-wallet, savings, credit card and loan; account detail with history.
+- **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
+  assets and liabilities in separate cards (Debts & loans linked from Liabilities), each wallet shown as a bank-style card, warnings for balances that can't be right, and
+  **Adjust balance** (the gap is recorded as a visible Balance adjustment, never income or spending); account detail with history.
 - **Savings goals**, **Debts & loans**, **Recurring payments** (mark paid / skip / pause — never auto-posted).
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three

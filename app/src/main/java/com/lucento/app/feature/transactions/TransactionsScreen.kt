@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
@@ -95,6 +94,7 @@ import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.ProfileButton
 import com.lucento.app.core.designsystem.component.SearchField
 import com.lucento.app.core.designsystem.component.SegmentedToggle
+import com.lucento.app.core.designsystem.component.ToneChip
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
@@ -270,9 +270,12 @@ fun TransactionsScreen(
                                     revealed = revealedId == transaction.id,
                                     onRevealChange = { open -> revealedId = if (open) transaction.id else null },
                                     onOpen = { onViewTransaction(transaction) },
-                                    onEdit = {
-                                        revealedId = null
-                                        onEditTransaction(transaction)
+                                    // A balance adjustment is never edited as income or spending: delete it and adjust again.
+                                    onEdit = if (transaction.isAdjustment) null else {
+                                        {
+                                            revealedId = null
+                                            onEditTransaction(transaction)
+                                        }
                                     },
                                     onDelete = { confirmingDelete = transaction },
                                 ) { rowModifier, toggle ->
@@ -288,6 +291,7 @@ fun TransactionsScreen(
                                         onClickLabel = when {
                                             revealedId == transaction.id -> "Hide actions"
                                             transaction.isTransfer -> "View transfer"
+                                            transaction.isAdjustment -> "View balance adjustment"
                                             else -> "View transaction"
                                         },
                                         modifier = rowModifier,
@@ -346,14 +350,14 @@ private fun RevealableRow(
     revealed: Boolean,
     onRevealChange: (Boolean) -> Unit,
     onOpen: () -> Unit,
-    onEdit: () -> Unit,
+    onEdit: (() -> Unit)?,
     onDelete: () -> Unit,
     content: @Composable (Modifier, () -> Unit) -> Unit,
 ) {
     val density = LocalDensity.current
     val haptics = rememberHaptics()
     val reducedMotion = LucentoTheme.reducedMotion
-    val maxPx = with(density) { (RowActionWidth * 2).toPx() }
+    val maxPx = with(density) { (RowActionWidth * (if (onEdit != null) 2 else 1)).toPx() }
     val offset = remember { Animatable(if (revealed) -maxPx else 0f) }
     val scope = rememberCoroutineScope()
     val target = if (revealed) -maxPx else 0f
@@ -362,28 +366,34 @@ private fun RevealableRow(
         if (reducedMotion) offset.snapTo(target) else offset.animateTo(target, tween(220))
     }
 
-    val noun = if (transaction.isTransfer) "transfer" else "transaction"
+    val noun = when {
+        transaction.isTransfer -> "transfer"
+        transaction.isAdjustment -> "balance adjustment"
+        else -> "transaction"
+    }
     val surface = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest
     Box(
         Modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
             .semantics {
-                customActions = listOf(
-                    CustomAccessibilityAction("Edit $noun") { onEdit(); true },
+                customActions = listOfNotNull(
+                    onEdit?.let { edit -> CustomAccessibilityAction("Edit $noun") { edit(); true } },
                     CustomAccessibilityAction("Delete $noun") { onDelete(); true },
                 )
             },
     ) {
         if (revealed || offset.value != 0f) {
             Row(Modifier.align(Alignment.CenterEnd).fillMaxHeight()) {
-                RowAction(
-                    label = "Edit",
-                    icon = Icons.Outlined.Edit,
-                    container = MaterialTheme.colorScheme.primaryContainer,
-                    content = MaterialTheme.colorScheme.primary,
-                    onClick = onEdit,
-                )
+                if (onEdit != null) {
+                    RowAction(
+                        label = "Edit",
+                        icon = Icons.Outlined.Edit,
+                        container = MaterialTheme.colorScheme.primaryContainer,
+                        content = MaterialTheme.colorScheme.primary,
+                        onClick = onEdit,
+                    )
+                }
                 RowAction(
                     label = "Delete",
                     icon = Icons.Outlined.Delete,
@@ -537,16 +547,7 @@ private fun SummaryFigure(
 ) {
     Column(modifier) {
         // A tinted label chip, so In / Out / Net read at a glance rather than as faint captions.
-        Row(
-            Modifier
-                .background(tone.container, RoundedCornerShape(50))
-                .padding(start = 6.dp, end = Spacing.sm, top = Spacing.xxs, bottom = Spacing.xxs),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(Spacing.xs))
-            Text(label, style = MaterialTheme.typography.labelLarge, color = tone.content, maxLines = 1)
-        }
+        ToneChip(label, tone, icon = icon)
         Spacer(Modifier.height(Spacing.xs + Spacing.xxs))
         MoneyText(money = money, style = AmountStyles.medium, showPlus = showPlus, color = tone.content, fractionScale = 1f)
     }

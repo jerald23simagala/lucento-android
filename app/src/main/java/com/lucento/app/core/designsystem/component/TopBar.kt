@@ -64,13 +64,16 @@ fun LucentoTopBar(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
-            )
+            // A blank title leaves the heading to the screen's content (e.g. the wallet card).
+            if (title.isNotEmpty()) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() },
+                )
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically, content = actions)
     }

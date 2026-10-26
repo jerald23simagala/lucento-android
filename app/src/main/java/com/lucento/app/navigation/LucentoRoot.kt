@@ -359,6 +359,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onBack = back,
                             onOpenWallet = { push(WalletDetailRoute(it)) },
                             allowAdding = features.isEnabled(Feature.MULTIPLE_WALLETS),
+                            onOpenDebts = if (features.isEnabled(Feature.DEBTS_LOANS)) ({ push(DebtsRoute) }) else null,
+                            onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
                         )
                     }
                     composable<InsightsRoute> {
@@ -382,6 +384,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onTransfer = { from, to -> openTransfer(from, to) },
                             onEditTransaction = { view(it) },
                             transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
+                            onAdjusted = { notify("Balance adjusted") },
                         )
                     }
                     pushed<GoalsRoute>(reducedMotion) {

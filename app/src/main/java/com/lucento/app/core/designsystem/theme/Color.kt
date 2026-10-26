@@ -158,6 +158,8 @@ data class LucentoExtendedColors(
     val accentText: Color,
     /** Bright tangerine: warm brand accent, never a status colour. */
     val warmAccent: Color,
+    /** Ink on a sunlight or tangerine fill (navy in both themes: the fills don't change at night). */
+    val onAccent: Color,
     /** border-default: stronger card/section boundaries (decorative; control boundaries use colorScheme.outline). */
     val borderDefault: Color,
     /** Shadow tint for elevated surfaces (navy by day, black at night where shadows are rarely used). */
@@ -194,6 +196,20 @@ data class LucentoExtendedColors(
     val categoryFallback: TonePair = TonePair(Color(0xFFECEFF4), Color(0xFF56637D)),
 ) {
     fun categoryTone(iconKey: String?): TonePair = iconKey?.let { categoryTones[it] } ?: categoryFallback
+
+    /**
+     * The face of a wallet's bank-card style balance card: a solid brand fill and its ink, the same in both themes
+     * (like a physical card). Text contrast: white on blue/navy/green ≥ 5:1, navy on sunlight/tangerine/sky ≥ 6:1.
+     */
+    fun walletCard(type: WalletType): TonePair = when (type) {
+        WalletType.CASH -> TonePair(Palette.SunlightYellow, Palette.MidnightNavy)
+        WalletType.BANK -> TonePair(Palette.BlueHero, Color.White)
+        WalletType.E_WALLET -> TonePair(Palette.BrightTangerine, Palette.MidnightNavy)
+        WalletType.SAVINGS -> TonePair(Palette.PositiveText, Color.White)
+        WalletType.CREDIT_CARD -> TonePair(Palette.MidnightNavy, Color.White)
+        WalletType.LOAN -> TonePair(Palette.BlueDeep, Color.White)
+        WalletType.OTHER_ASSET -> TonePair(Palette.PaleSky, Palette.MidnightNavy)
+    }
 
     fun tone(type: WalletType): TonePair = when (type) {
         WalletType.CASH -> cash
@@ -255,6 +271,7 @@ internal val LightExtended = LucentoExtendedColors(
     accent = Palette.SunlightYellow,
     accentText = Palette.AmberText,
     warmAccent = Palette.BrightTangerine,
+    onAccent = Palette.MidnightNavy,
     borderDefault = Color(0xFFD8DDE7),
     shadow = Palette.MidnightNavy,
     highlight = Palette.SunlightPale,
@@ -303,6 +320,7 @@ internal val DarkExtended = LucentoExtendedColors(
     accent = Palette.SunlightYellow,
     accentText = Palette.SunlightYellow,
     warmAccent = Palette.BrightTangerine,
+    onAccent = Palette.MidnightNavy,
     borderDefault = Color(0xFF2D3D63),
     shadow = Color.Black,
     highlight = Color(0xFF3D3214),

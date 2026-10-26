@@ -6,8 +6,11 @@ import com.lucento.app.data.local.TransactionDao
 import com.lucento.app.data.local.TransactionEntity
 import com.lucento.app.data.local.WalletDao
 import com.lucento.app.data.local.acceptsTransactions
+import com.lucento.app.domain.BalanceAdjustment
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.WalletBalanceCalculator
+import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -64,11 +67,21 @@ class TransactionRepository(
         data object TransferNotFound : TransferResult
     }
 
+    sealed interface AdjustResult {
+        data class Adjusted(val id: Long) : AdjustResult
+        /** The tracked balance on that date already equals the actual one: nothing was written. */
+        data object Unchanged : AdjustResult
+        data object WalletNotFound : AdjustResult
+        data object CurrencyMismatch : AdjustResult
+        /** A balance can be overridden for today or an earlier day, never the future. */
+        data object FutureDate : AdjustResult
+    }
+
     fun observeTransactions(): Flow<List<Transaction>> =
         transactions.observeAll().map { list -> list.map { it.toDomain() } }
 
     suspend fun save(input: Input): SaveResult {
-        if (input.type.isTransfer) return SaveResult.InvalidType
+        if (!input.type.isCashFlow) return SaveResult.InvalidType
         if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
 
         val wallet = wallets.getById(input.walletId)
@@ -104,7 +117,7 @@ class TransactionRepository(
         }
 
         val existing = transactions.getById(input.id) ?: return SaveResult.TransactionNotFound
-        if (existing.transferGroup != null) return SaveResult.InvalidType
+        if (existing.transferGroup != null || existing.type !in CASH_FLOW_TYPES) return SaveResult.InvalidType
         transactions.update(
             existing.copy(
                 type = input.type.name,
@@ -198,6 +211,49 @@ class TransactionRepository(
         return TransferResult.Saved(input.group)
     }
 
+    /**
+     * Overrides wallet [walletId]'s balance at the end of [date] with [actual] (the amount owed for a card or loan).
+     * The gap from the tracked balance on that date is written as one ADJUSTMENT_IN / ADJUSTMENT_OUT row, so later
+     * transactions still apply on top and nothing already recorded is rewritten. Reading the balance and inserting
+     * happen in one database transaction; creation is idempotent on [clientUuid].
+     */
+    suspend fun adjustBalance(walletId: Long, actual: Money, date: LocalDate, clientUuid: String, today: LocalDate = LocalDate.now()): AdjustResult {
+        if (date.isAfter(today)) return AdjustResult.FutureDate
+        val wallet = wallets.getById(walletId)
+        if (wallet == null || !wallet.acceptsTransactions) return AdjustResult.WalletNotFound
+        if (wallet.currencyCode != actual.currencyCode) return AdjustResult.CurrencyMismatch
+        val type = runCatching { WalletType.valueOf(wallet.type) }.getOrDefault(WalletType.CASH)
+        transactions.findByClientUuid(clientUuid)?.let { return AdjustResult.Adjusted(it.id) }
+        val now = clock()
+        var result: AdjustResult = AdjustResult.Unchanged
+        runner.run {
+            val tracked = WalletBalanceCalculator.balanceOn(
+                opening = Money(wallet.openingBalanceMinor, wallet.currencyCode),
+                type = type,
+                walletId = walletId,
+                transactions = transactions.getForWallet(walletId).map { it.toDomain() },
+                date = date,
+            )
+            val plan = BalanceAdjustment.plan(type, tracked, actual) ?: return@run
+            val id = transactions.insert(
+                TransactionEntity(
+                    type = plan.type.name,
+                    amountMinor = plan.amount.amountMinor,
+                    currencyCode = plan.amount.currencyCode,
+                    walletId = walletId,
+                    categoryId = null,
+                    occurredOn = date.toEpochDay(),
+                    note = "",
+                    clientUuid = clientUuid,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+            result = AdjustResult.Adjusted(id)
+        }
+        return result
+    }
+
     /** One new transaction or transfer in a batch written by [saveBatch]. */
     sealed interface BatchEntry {
         data class Single(val input: Input) : BatchEntry
@@ -277,7 +333,7 @@ class TransactionRepository(
     }
 
     private suspend fun validateNew(input: Input): SaveResult? {
-        if (input.id != null || input.type.isTransfer) return SaveResult.InvalidType
+        if (input.id != null || !input.type.isCashFlow) return SaveResult.InvalidType
         if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
         val wallet = wallets.getById(input.walletId)
         if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
@@ -314,6 +370,7 @@ class TransactionRepository(
 
     companion object {
         const val MAX_NOTE = 200
+        private val CASH_FLOW_TYPES = setOf(TransactionType.INCOME.name, TransactionType.EXPENSE.name)
         private const val OUT_SUFFIX = "-out"
         private const val IN_SUFFIX = "-in"
     }
@@ -347,6 +404,15 @@ suspend fun TransactionRepository.saveOrNull(input: TransactionRepository.Input)
 suspend fun TransactionRepository.saveBatchOrNull(entries: List<TransactionRepository.BatchEntry>): TransactionRepository.BatchResult? =
     try {
         saveBatch(entries)
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        null
+    }
+
+/** [TransactionRepository.adjustBalance] that returns null instead of throwing (constraint failure, disk full, overflow). */
+suspend fun TransactionRepository.adjustBalanceOrNull(walletId: Long, actual: Money, date: LocalDate, clientUuid: String): TransactionRepository.AdjustResult? =
+    try {
+        adjustBalance(walletId, actual, date, clientUuid)
     } catch (e: Exception) {
         if (e is kotlinx.coroutines.CancellationException) throw e
         null

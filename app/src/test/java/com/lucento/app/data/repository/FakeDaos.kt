@@ -149,6 +149,8 @@ class FakeTransactionDao : TransactionDao {
                 expenseMinor = items.filter { it.type == "EXPENSE" }.sumOf { it.amountMinor },
                 transferInMinor = items.filter { it.type == "TRANSFER_IN" }.sumOf { it.amountMinor },
                 transferOutMinor = items.filter { it.type == "TRANSFER_OUT" }.sumOf { it.amountMinor },
+                adjustmentInMinor = items.filter { it.type == "ADJUSTMENT_IN" }.sumOf { it.amountMinor },
+                adjustmentOutMinor = items.filter { it.type == "ADJUSTMENT_OUT" }.sumOf { it.amountMinor },
             )
         }
     }
@@ -158,6 +160,8 @@ class FakeTransactionDao : TransactionDao {
     override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
 
     override suspend fun getByTransferGroup(group: String) = rows.value.filter { it.transferGroup == group }
+
+    override suspend fun getForWallet(walletId: Long) = rows.value.filter { it.walletId == walletId }
 
     override suspend fun countForWallet(walletId: Long) = rows.value.count { it.walletId == walletId }
 

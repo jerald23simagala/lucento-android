@@ -29,6 +29,8 @@ object CsvExporter {
                         TransactionType.INCOME -> "income"
                         TransactionType.TRANSFER_OUT -> "transfer_out"
                         TransactionType.TRANSFER_IN -> "transfer_in"
+                        TransactionType.ADJUSTMENT_IN -> "adjustment_in"
+                        TransactionType.ADJUSTMENT_OUT -> "adjustment_out"
                     },
                     t.signedAmount.toBigDecimal().toPlainString(),
                     t.currencyCode,

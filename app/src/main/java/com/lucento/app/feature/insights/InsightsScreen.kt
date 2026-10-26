@@ -78,7 +78,7 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel(factory = InsightsVi
     val currencies = remember(data.wallets, data.transactions, data.focusCurrency) {
         (listOf(data.focusCurrency) +
             NetWorthComposer.currencies(data.wallets, data.focusCurrency) +
-            data.transactions.filterNot { it.isTransfer }.map { it.currencyCode }.distinct().sorted()).distinct()
+            data.transactions.filter { it.type.isCashFlow }.map { it.currencyCode }.distinct().sorted()).distinct()
     }
     val currency = currencyChoice?.takeIf { it in currencies } ?: data.focusCurrency
 

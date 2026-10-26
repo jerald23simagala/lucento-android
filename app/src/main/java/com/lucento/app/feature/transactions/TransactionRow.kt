@@ -63,7 +63,10 @@ fun TransactionRow(
     val categoryName = category?.name ?: "Uncategorized"
     val title: String
     val subtitle: String
-    if (isTransfer) {
+    if (transaction.isAdjustment) {
+        title = transaction.note.ifBlank { "Balance adjustment" }
+        subtitle = listOfNotNull("Balance adjustment".takeIf { transaction.note.isNotBlank() }, wallet?.name).joinToString(" · ")
+    } else if (isTransfer) {
         val from = transfer?.let { walletNames[it.fromWalletId] } ?: "Account"
         val to = transfer?.let { walletNames[it.toWalletId] } ?: "Account"
         title = transaction.note.ifBlank { "Transfer" }
@@ -82,7 +85,11 @@ fun TransactionRow(
             .heightIn(min = if (dense) 56.dp else 64.dp)
             .clickable(
                 role = Role.Button,
-                onClickLabel = onClickLabel ?: if (isTransfer) "Edit transfer" else "Edit transaction",
+                onClickLabel = onClickLabel ?: when {
+                    isTransfer -> "Edit transfer"
+                    transaction.isAdjustment -> "View balance adjustment"
+                    else -> "Edit transaction"
+                },
                 onClick = onClick,
             )
             .padding(

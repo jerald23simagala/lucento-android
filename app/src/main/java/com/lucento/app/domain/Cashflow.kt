@@ -155,7 +155,7 @@ object CashflowCalculator {
         val expense = totalIn(transactions, currencyCode, month, TransactionType.EXPENSE)
         val previous = month.minusMonths(1)
         val hasPrevious = transactions.any {
-            !it.isTransfer && it.currencyCode == currencyCode && YearMonth.from(it.date) == previous
+            it.type.isCashFlow && it.currencyCode == currencyCode && YearMonth.from(it.date) == previous
         }
         val previousNet = if (hasPrevious) {
             totalIn(transactions, currencyCode, previous, TransactionType.INCOME) -
