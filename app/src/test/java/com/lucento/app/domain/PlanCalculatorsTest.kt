@@ -26,14 +26,16 @@ class PlanCalculatorsTest {
             tx(TransactionType.INCOME, 16_000, "2026-10-10", category = 7), // income never offsets
             tx(TransactionType.TRANSFER_OUT, 32_000, "2026-10-10"), // transfers never count
         )
-        val overall = Budget(1, null, Money(10_000, "USD"))
+        val legacyOverall = Budget(1, null, Money(10_000, "USD"))
         val food = Budget(2, 7, Money(1_000, "USD"))
-        assertEquals(Money(3_000, "USD"), BudgetCalculator.spent(overall, txs, october))
+        // A pre-0.5 "everything" row covers nothing any more.
+        assertEquals(Money.zero("USD"), BudgetCalculator.spent(legacyOverall, txs, october))
         assertEquals(Money(1_000, "USD"), BudgetCalculator.spent(food, txs, october))
+        assertEquals(listOf(2L), BudgetCalculator.progressAll(listOf(legacyOverall, food), txs, october).map { it.budget.id })
     }
 
     @Test fun budgetStatusThresholds() {
-        val b = Budget(1, null, Money(10_000, "USD"))
+        val b = Budget(1, 3, Money(10_000, "USD"))
         val m = YearMonth.of(2026, 10)
         assertEquals(BudgetStatus.ON_TRACK, BudgetProgress(b, m, Money(7_999, "USD")).status)
         assertEquals(BudgetStatus.NEAR_LIMIT, BudgetProgress(b, m, Money(8_000, "USD")).status)

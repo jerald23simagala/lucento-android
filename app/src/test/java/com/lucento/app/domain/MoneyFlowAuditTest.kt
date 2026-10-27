@@ -91,18 +91,20 @@ class MoneyFlowAuditTest {
 
     @Test fun budgetMonthBoundariesUseCalendarDates() {
         val txs = listOf(
-            tx(TransactionType.EXPENSE, 100, bank, "2026-09-30"),
-            tx(TransactionType.EXPENSE, 200, bank, "2026-10-01"),
-            tx(TransactionType.EXPENSE, 300, bank, "2026-10-31"),
-            tx(TransactionType.EXPENSE, 400, bank, "2026-11-01"),
-            tx(TransactionType.TRANSFER_OUT, 999, bank, "2026-10-15", group = "g"),
+            tx(TransactionType.EXPENSE, 100, bank, "2026-09-30", category = 7),
+            tx(TransactionType.EXPENSE, 200, bank, "2026-10-01", category = 7),
+            tx(TransactionType.EXPENSE, 300, bank, "2026-10-31", category = 7),
+            tx(TransactionType.EXPENSE, 400, bank, "2026-11-01", category = 7),
+            tx(TransactionType.TRANSFER_OUT, 999, bank, "2026-10-15", category = 7, group = "g"),
         )
-        val overall = Budget(1, null, Money(1_000, "PHP"))
-        assertEquals(Money(500, "PHP"), BudgetCalculator.spent(overall, txs, month))
-        assertEquals(Money(400, "PHP"), BudgetCalculator.spent(overall, txs, YearMonth.of(2026, 11)))
+        val food = Budget(1, 7, Money(1_000, "PHP"))
+        val categories = listOf(Category(7, "Food", CategoryKind.EXPENSE, "groceries"))
+        assertEquals(Money(500, "PHP"), BudgetCalculator.spent(food, txs, month))
+        assertEquals(Money(400, "PHP"), BudgetCalculator.spent(food, txs, YearMonth.of(2026, 11)))
+        assertEquals(Money(500, "PHP"), BudgetPlanner.plan(categories, listOf(food), txs, "PHP", month).spent)
         // February in a leap year ends on the 29th.
-        val feb = listOf(tx(TransactionType.EXPENSE, 50, bank, "2028-02-29"))
-        assertEquals(Money(50, "PHP"), BudgetCalculator.spent(overall, feb, YearMonth.of(2028, 2)))
+        val feb = listOf(tx(TransactionType.EXPENSE, 50, bank, "2028-02-29", category = 7))
+        assertEquals(Money(50, "PHP"), BudgetCalculator.spent(food, feb, YearMonth.of(2028, 2)))
     }
 
     @Test fun otherCurrenciesNeverLeakIntoTotals() {

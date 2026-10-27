@@ -1,5 +1,6 @@
 package com.lucento.app
 
+import kotlinx.coroutines.flow.first
 import android.app.Application
 import androidx.room.withTransaction
 import com.lucento.app.data.local.LucentoDatabase
@@ -11,6 +12,16 @@ import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.TransactionRunner
 import com.lucento.app.data.repository.WalletRepository
+import com.lucento.app.data.sync.AuthRepository
+import com.lucento.app.data.sync.SupabaseModule
+import com.lucento.app.data.sync.SupabaseSyncRemote
+import com.lucento.app.data.sync.SyncPreferences
+import com.lucento.app.data.sync.SyncRepository
+import com.lucento.app.data.sync.SyncScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class LucentoApplication : Application() {
     lateinit var container: AppContainer
@@ -19,6 +30,11 @@ class LucentoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
+        // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            if (container.syncPreferences.isEnabled()) SyncScheduler.ensurePeriodic(this@LucentoApplication)
+        }
     }
 }
 
@@ -39,9 +55,11 @@ class AppContainer(application: Application) {
             dao = database.walletDao(),
             transactionDao = database.transactionDao(),
             scheduleCount = { id -> database.recurringDao().countForWallet(id) },
+            debtTerms = database.debtTermsDao(),
+            runner = runner,
         )
     }
-    val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao()) }
+    val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao(), runner = runner) }
     val transactions: TransactionRepository by lazy {
         TransactionRepository(database.transactionDao(), database.walletDao(), database.categoryDao(), runner = runner)
     }
@@ -49,5 +67,35 @@ class AppContainer(application: Application) {
     val goals: GoalRepository by lazy { GoalRepository(database.goalDao()) }
     val recurring: RecurringRepository by lazy {
         RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner)
+    }
+
+    // --- optional cloud sync (see docs/SYNC.md); every value here is safe to hold even when unconfigured ---
+
+    private val supabaseClient by lazy { SupabaseModule.create() }
+    val syncPreferences: SyncPreferences by lazy { SyncPreferences(application) }
+    val auth: AuthRepository by lazy { AuthRepository(supabaseClient) }
+
+    /** The composer's reader: Gemini when Smarter reading is on (see docs/CAPTURE.md), else this phone. */
+    val interpreter: com.lucento.app.domain.capture.TransactionInterpreter by lazy {
+        com.lucento.app.data.ai.HybridTransactionInterpreter(
+            local = com.lucento.app.domain.capture.LocalTransactionInterpreter(),
+            remote = com.lucento.app.data.ai.RemoteTransactionInterpreter(accessToken = auth::accessToken),
+            enabled = { preferences.preferences.first().smartReading },
+            currency = { preferences.preferences.first().primaryCurrency },
+        )
+    }
+    val syncRepository: SyncRepository by lazy {
+        SyncRepository(
+            remote = supabaseClient?.let(::SupabaseSyncRemote),
+            wallets = database.walletDao(),
+            categories = database.categoryDao(),
+            transactions = database.transactionDao(),
+            budgets = database.budgetDao(),
+            goals = database.goalDao(),
+            syncMeta = database.syncDao(),
+            preferences = syncPreferences,
+            recurring = database.recurringDao(),
+            debtTerms = database.debtTermsDao(),
+        )
     }
 }

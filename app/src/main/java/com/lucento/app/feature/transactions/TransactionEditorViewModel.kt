@@ -10,6 +10,7 @@ import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.data.repository.saveOrNull
 import com.lucento.app.data.repository.saveTransferOrNull
+import com.lucento.app.domain.transactable
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
@@ -111,7 +112,7 @@ class TransactionEditorViewModel(
 
     val state: StateFlow<TransactionEditorState> =
         combine(wallets.observeWallets(), categories.observeCategories(), transactions.observeTransactions()) { walletList, categoryList, all ->
-            TransactionEditorState(loaded = true, wallets = walletList, categories = categoryList, transfers = Transfer.pair(all))
+            TransactionEditorState(loaded = true, wallets = walletList.transactable(), categories = categoryList, transfers = Transfer.pair(all))
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionEditorState())
 
     /** The wallet used for the most recent successful save in this session; pre-selected next time. */

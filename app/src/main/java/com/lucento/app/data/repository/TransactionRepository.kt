@@ -5,8 +5,12 @@ import com.lucento.app.data.local.CategoryDao
 import com.lucento.app.data.local.TransactionDao
 import com.lucento.app.data.local.TransactionEntity
 import com.lucento.app.data.local.WalletDao
+import com.lucento.app.data.local.acceptsTransactions
+import com.lucento.app.domain.BalanceAdjustment
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.WalletBalanceCalculator
+import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -63,15 +67,25 @@ class TransactionRepository(
         data object TransferNotFound : TransferResult
     }
 
+    sealed interface AdjustResult {
+        data class Adjusted(val id: Long) : AdjustResult
+        /** The tracked balance on that date already equals the actual one: nothing was written. */
+        data object Unchanged : AdjustResult
+        data object WalletNotFound : AdjustResult
+        data object CurrencyMismatch : AdjustResult
+        /** A balance can be overridden for today or an earlier day, never the future. */
+        data object FutureDate : AdjustResult
+    }
+
     fun observeTransactions(): Flow<List<Transaction>> =
         transactions.observeAll().map { list -> list.map { it.toDomain() } }
 
     suspend fun save(input: Input): SaveResult {
-        if (input.type.isTransfer) return SaveResult.InvalidType
+        if (!input.type.isCashFlow) return SaveResult.InvalidType
         if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
 
         val wallet = wallets.getById(input.walletId)
-        if (wallet == null || wallet.archived) return SaveResult.WalletNotFound
+        if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
         if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
 
         if (input.categoryId != null) {
@@ -103,7 +117,7 @@ class TransactionRepository(
         }
 
         val existing = transactions.getById(input.id) ?: return SaveResult.TransactionNotFound
-        if (existing.transferGroup != null) return SaveResult.InvalidType
+        if (existing.transferGroup != null || existing.type !in CASH_FLOW_TYPES) return SaveResult.InvalidType
         transactions.update(
             existing.copy(
                 type = input.type.name,
@@ -136,7 +150,7 @@ class TransactionRepository(
         if (input.fromWalletId == input.toWalletId) return TransferResult.SameWallet
         val from = wallets.getById(input.fromWalletId)
         val to = wallets.getById(input.toWalletId)
-        if (from == null || from.archived || to == null || to.archived) return TransferResult.WalletNotFound
+        if (from == null || !from.acceptsTransactions || to == null || !to.acceptsTransactions) return TransferResult.WalletNotFound
         if (from.currencyCode != input.amount.currencyCode || to.currencyCode != input.amount.currencyCode) {
             return TransferResult.CurrencyMismatch
         }
@@ -198,6 +212,151 @@ class TransactionRepository(
     }
 
     /**
+     * Overrides wallet [walletId]'s balance at the end of [date] with [actual] (the amount owed for a card or loan).
+     * The gap from the tracked balance on that date is written as one ADJUSTMENT_IN / ADJUSTMENT_OUT row, so later
+     * transactions still apply on top and nothing already recorded is rewritten. Reading the balance and inserting
+     * happen in one database transaction; creation is idempotent on [clientUuid].
+     */
+    suspend fun adjustBalance(walletId: Long, actual: Money, date: LocalDate, clientUuid: String, today: LocalDate = LocalDate.now()): AdjustResult {
+        if (date.isAfter(today)) return AdjustResult.FutureDate
+        val wallet = wallets.getById(walletId)
+        if (wallet == null || !wallet.acceptsTransactions) return AdjustResult.WalletNotFound
+        if (wallet.currencyCode != actual.currencyCode) return AdjustResult.CurrencyMismatch
+        val type = runCatching { WalletType.valueOf(wallet.type) }.getOrDefault(WalletType.CASH)
+        transactions.findByClientUuid(clientUuid)?.let { return AdjustResult.Adjusted(it.id) }
+        val now = clock()
+        var result: AdjustResult = AdjustResult.Unchanged
+        runner.run {
+            val tracked = WalletBalanceCalculator.balanceOn(
+                opening = Money(wallet.openingBalanceMinor, wallet.currencyCode),
+                type = type,
+                walletId = walletId,
+                transactions = transactions.getForWallet(walletId).map { it.toDomain() },
+                date = date,
+            )
+            val plan = BalanceAdjustment.plan(type, tracked, actual) ?: return@run
+            val id = transactions.insert(
+                TransactionEntity(
+                    type = plan.type.name,
+                    amountMinor = plan.amount.amountMinor,
+                    currencyCode = plan.amount.currencyCode,
+                    walletId = walletId,
+                    categoryId = null,
+                    occurredOn = date.toEpochDay(),
+                    note = "",
+                    clientUuid = clientUuid,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+            result = AdjustResult.Adjusted(id)
+        }
+        return result
+    }
+
+    /** One new transaction or transfer in a batch written by [saveBatch]. */
+    sealed interface BatchEntry {
+        data class Single(val input: Input) : BatchEntry
+        data class Move(val input: TransferInput) : BatchEntry
+    }
+
+    sealed interface BatchResult {
+        /** Every entry is in the database (entries already saved under the same key count once, not twice). */
+        data class Saved(val count: Int) : BatchResult
+        /** Nothing was written: entry [index] broke a rule. */
+        data class Rejected(val index: Int, val reason: Any) : BatchResult
+    }
+
+    /**
+     * Saves several new transactions and transfers as one unit: every entry is validated first with the same rules as
+     * [save] and [saveTransfer], then all rows are written in a single database transaction, so a failure part-way
+     * leaves nothing behind. Each entry keeps its own idempotency key, so retrying a batch after an error, or a second
+     * tap, never creates duplicates. Only creation is supported here (ids and groups must be null).
+     */
+    suspend fun saveBatch(entries: List<BatchEntry>): BatchResult {
+        if (entries.isEmpty()) return BatchResult.Saved(0)
+        entries.forEachIndexed { index, entry ->
+            val problem: Any? = when (entry) {
+                is BatchEntry.Single -> validateNew(entry.input)
+                is BatchEntry.Move -> validateNewTransfer(entry.input)
+            }
+            if (problem != null) return BatchResult.Rejected(index, problem)
+        }
+        val now = clock()
+        runner.run {
+            entries.forEach { entry ->
+                when (entry) {
+                    is BatchEntry.Single -> {
+                        val input = entry.input
+                        if (transactions.findByClientUuid(input.clientUuid) == null) {
+                            transactions.insert(
+                                TransactionEntity(
+                                    type = input.type.name,
+                                    amountMinor = input.amount.amountMinor,
+                                    currencyCode = input.amount.currencyCode,
+                                    walletId = input.walletId,
+                                    categoryId = input.categoryId,
+                                    occurredOn = input.date.toEpochDay(),
+                                    note = input.note.trim().take(MAX_NOTE),
+                                    clientUuid = input.clientUuid,
+                                    createdAt = now,
+                                    updatedAt = now,
+                                )
+                            )
+                        }
+                    }
+                    is BatchEntry.Move -> {
+                        val input = entry.input
+                        val outKey = input.clientUuid + OUT_SUFFIX
+                        if (transactions.findByClientUuid(outKey) == null) {
+                            fun leg(type: TransactionType, walletId: Long, key: String) = TransactionEntity(
+                                type = type.name,
+                                amountMinor = input.amount.amountMinor,
+                                currencyCode = input.amount.currencyCode,
+                                walletId = walletId,
+                                categoryId = null,
+                                occurredOn = input.date.toEpochDay(),
+                                note = input.note.trim().take(MAX_NOTE),
+                                clientUuid = key,
+                                createdAt = now,
+                                updatedAt = now,
+                                transferGroup = input.clientUuid,
+                            )
+                            transactions.insert(leg(TransactionType.TRANSFER_OUT, input.fromWalletId, outKey))
+                            transactions.insert(leg(TransactionType.TRANSFER_IN, input.toWalletId, input.clientUuid + IN_SUFFIX))
+                        }
+                    }
+                }
+            }
+        }
+        return BatchResult.Saved(entries.size)
+    }
+
+    private suspend fun validateNew(input: Input): SaveResult? {
+        if (input.id != null || !input.type.isCashFlow) return SaveResult.InvalidType
+        if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
+        val wallet = wallets.getById(input.walletId)
+        if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
+        if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
+        if (input.categoryId != null) {
+            val category = categories.getById(input.categoryId) ?: return SaveResult.CategoryMismatch
+            if (category.kind != input.type.name || category.archived) return SaveResult.CategoryMismatch
+        }
+        return null
+    }
+
+    private suspend fun validateNewTransfer(input: TransferInput): TransferResult? {
+        if (input.group != null) return TransferResult.TransferNotFound
+        if (input.amount.amountMinor <= 0L) return TransferResult.AmountNotPositive
+        if (input.fromWalletId == input.toWalletId) return TransferResult.SameWallet
+        val from = wallets.getById(input.fromWalletId)
+        val to = wallets.getById(input.toWalletId)
+        if (from == null || !from.acceptsTransactions || to == null || !to.acceptsTransactions) return TransferResult.WalletNotFound
+        if (from.currencyCode != input.amount.currencyCode || to.currencyCode != input.amount.currencyCode) return TransferResult.CurrencyMismatch
+        return null
+    }
+
+    /**
      * Inserts a row keyed by [clientUuid]. If the unique index rejects it because a concurrent submit with the
      * same key got there first, returns that row's id instead of failing; any other error is rethrown.
      */
@@ -211,6 +370,7 @@ class TransactionRepository(
 
     companion object {
         const val MAX_NOTE = 200
+        private val CASH_FLOW_TYPES = setOf(TransactionType.INCOME.name, TransactionType.EXPENSE.name)
         private const val OUT_SUFFIX = "-out"
         private const val IN_SUFFIX = "-in"
     }
@@ -226,6 +386,7 @@ internal fun TransactionEntity.toDomain(): Transaction = Transaction(
     note = note,
     createdAtEpochMillis = createdAt,
     transferGroup = transferGroup,
+    clientUuid = clientUuid,
 )
 
 /**
@@ -235,6 +396,24 @@ internal fun TransactionEntity.toDomain(): Transaction = Transaction(
 suspend fun TransactionRepository.saveOrNull(input: TransactionRepository.Input): TransactionRepository.SaveResult? =
     try {
         save(input)
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        null
+    }
+
+/** [TransactionRepository.saveBatch] that returns null instead of throwing; the whole batch is rolled back together. */
+suspend fun TransactionRepository.saveBatchOrNull(entries: List<TransactionRepository.BatchEntry>): TransactionRepository.BatchResult? =
+    try {
+        saveBatch(entries)
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        null
+    }
+
+/** [TransactionRepository.adjustBalance] that returns null instead of throwing (constraint failure, disk full, overflow). */
+suspend fun TransactionRepository.adjustBalanceOrNull(walletId: Long, actual: Money, date: LocalDate, clientUuid: String): TransactionRepository.AdjustResult? =
+    try {
+        adjustBalance(walletId, actual, date, clientUuid)
     } catch (e: Exception) {
         if (e is kotlinx.coroutines.CancellationException) throw e
         null

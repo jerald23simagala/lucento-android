@@ -45,7 +45,7 @@ import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
-import com.lucento.app.core.designsystem.component.SectionHeader
+import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.icon
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.Spacing
@@ -148,7 +148,7 @@ fun TransferEditorSheet(
             )
 
             Spacer(Modifier.height(Spacing.lg))
-            SectionHeader("From")
+            FieldHeader("From")
             WalletPills(wallets, draft.fromWalletId) { id ->
                 haptics.tick()
                 val newFrom = wallets.firstOrNull { it.id == id }
@@ -160,7 +160,7 @@ fun TransferEditorSheet(
             if (error is TransferDraftError.FromRequired) ErrorText("Choose where the money comes from.")
 
             Spacer(Modifier.height(Spacing.md))
-            SectionHeader("To")
+            FieldHeader("To")
             if (destinations.isEmpty()) {
                 Text(
                     if (from == null) "Choose the source account first." else "No other ${from.currencyCode} account. Add one in Wallets to transfer.",
@@ -182,7 +182,7 @@ fun TransferEditorSheet(
             }
 
             Spacer(Modifier.height(Spacing.md))
-            SectionHeader("Date")
+            FieldHeader("Date")
             DateChoices(date = draft.date, onDate = { draft = draft.copy(date = it) }, onPick = { pickingDate = true })
 
             Spacer(Modifier.height(Spacing.lg))
@@ -193,7 +193,7 @@ fun TransferEditorSheet(
                 placeholder = { Text("e.g. Card payment, ATM withdrawal") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-                shape = MaterialTheme.shapes.medium,
+                shape = MaterialTheme.shapes.small,
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,

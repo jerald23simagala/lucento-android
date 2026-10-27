@@ -1,5 +1,105 @@
 # Changelog
 
+## Unreleased — Optional cloud sync (Supabase + Google Sign-In)
+
+- **Settings → Cloud sync**: connect a Google account to back up and sync wallets, categories, transactions, budgets,
+  goals and goal contributions. Off by default; Lucento remains fully usable offline with no account; signing out
+  never deletes local data. Shows the connected account, last sync time / error, "Sync now" and "Disconnect". When the
+  build has no Supabase or Google OAuth configuration the section says so instead of showing a button that fails.
+- Offline-first engine (`data/sync`): Room stays the source of truth. Pushes dirty rows and deletion tombstones, pulls
+  changes since the last cursor, merges by last-write-wins on `updated_at` (a newer unsynced local edit is never
+  discarded), retries via WorkManager (periodic every 30 min on a network connection, plus "Sync now").
+- **Database v6** (`MIGRATION_5_6` + 2 instrumented tests, run on an API 28 emulator): `client_uuid` for wallets,
+  categories, budgets and goals (backfilled); `dirty`/`synced_at` on every synced table; `categories.updated_at`;
+  `sync_tombstones` filled by `AFTER DELETE` triggers; an `AFTER UPDATE` trigger re-marks edited rows dirty. No
+  repository's delete path changed. Categories now maintain `updated_at` on every edit.
+- Supabase (`supabase/migrations/`, applied to project `lucento`): six tables, RLS owner-only policies, composite
+  user-scoped foreign keys, server-side last-write-wins trigger, grants to `authenticated` only. Verified with a
+  rolled-back cross-account test at the SQL level; Supabase security advisor clean.
+- Manifest: INTERNET + ACCESS_NETWORK_STATE now present for sync only; HTTPS-only network security config; CI checks
+  release permissions against an allow-list instead of forbidding network access. Privacy copy in Settings updated.
+- Config via `local.properties` / CI env (`LUCENTO_SUPABASE_URL`, `LUCENTO_SUPABASE_ANON_KEY`,
+  `LUCENTO_GOOGLE_WEB_CLIENT_ID`; see `local.properties.example`). Only the publishable key reaches the APK.
+- Not yet: Google OAuth client setup (so real sign-in is untested), recurring-schedule sync. See docs/SYNC.md.
+
+## Unreleased — Sunrise Energy brand refresh (not compiled locally; awaiting CI)
+
+- **Transaction composer replaces the Add sheet.** The + button, the Transactions empty state and a wallet's
+  Expense/Income tiles open one screen: type, speak or scan, and every transaction in the message appears as an
+  editable row (type, category, date and account inferred; inline correction; competing amounts offered as choices;
+  receipts produce one expense for the total). One tap saves the batch atomically with per-row idempotency keys
+  (`TransactionRepository.saveBatch`). Removed `AddTransactionSheet`, `VoiceEntryScreen`, `ReceiptScanScreen` and their
+  routes. On-device only — no AI service and no network (see docs/CAPTURE.md).
+- Parser: month-name dates ("October 12", "12 Oct 2026"), spoken number words, specific-first category keywords for the
+  onboarding presets, receipt items-vs-total check. "Voice & text entry" module renamed "Voice entry" (typing is core).
+- 55 new JVM tests (batch parsing, review rules, receipts, atomic batch save with rollback, number words).
+
+- Goals: optional suggestions (Japan trip, holiday, emergency fund, laptop) and a card picture picker.
+- Goals: a chosen photo can be the card picture (private copy in app storage, database v5 `photo_path`).
+  Photos are not in any backup because the app has no backup or restore yet.
+- Palette: Sunlight Yellow `#FFC928`, Bright Tangerine `#FF8A24`, Electric Blue `#3563F5`, Soft Ivory `#FFFDF5`,
+  Midnight Navy `#17233F`, Pale Sky `#EAF1FF`; new night theme on `#10182B` / `#17233F` / `#202E4D`.
+- Separate semantic status tokens (positive, warning, negative, info) with text-safe variants; new `info`,
+  `warmAccent` and `highlight` extended colours. Sunrise chart order for categorical series.
+- UI Lottie illustrations (empty states, feedback, loading, net flow, receipt scan) recoloured to the palette. The
+  logo (mark, launcher, splash, onboarding animation) and the mascot keep their original artwork and colours.
+- Typography: Plus Jakarta Sans (bundled static 400/500/600/700, OFL) replaces Inter; Sunrise type scale.
+- Radii 6/10/14/20/28 (`Radii`), `Elevation` scale with navy-tinted card shadow by day, border tokens
+  (`outlineVariant` `#E8EAF0`, `borderDefault`), muted ink `#5E687D`, blue active dock icon, inputs on radius-sm.
+- **Mascot:** the approved Lucento character replaces the interim vector/Lottie Sun and Moon. 35 WebP sprites
+  (5 wellness tiers × 7 poses, ~1.7 MB) in `drawable-nodpi`, a code-drawn torch glow, gentle float and cross-fades.
+  The Budget hero picks the tier from budget health via `WellnessTier` (unit-tested). Removed
+  `lucento_mascot_sun/moon.json`, their generator and the vector drawing; mascot colour tokens dropped.
+- Mascot motion made visible on a phone: arrival hop with a soft spring, greeting rocks, float 4.5 % of height.
+- "A Brighter Little World" illustrations (crops of one painterly sunrise/Fuji panorama) with `IllustratedSurface` +
+  scrims; on the Home budget hero, travel savings goals (`GoalScene`, unit-tested) and the onboarding welcome.
+- Savings goals: optional suggestions in the new-goal form (Trip to Japan, Holiday, Emergency fund, New laptop) and a
+  card-picture picker (Automatic / Mount Fuji / Sunrise / Mountains / No picture). **Database v4**: nullable
+  `goals.scene_key` (MIGRATION_3_4 + MigrationTest); 4.json must be committed from the CI `room-schemas` artifact.
+- `ThemeContrastTest` checks AA contrast for every text/background pair in both themes.
+- Palette use aligned with the reference board: tonal category tiles (pale tint + saturated glyph; deep tint +
+  light glyph at night), pale-sky secondary buttons, solid-blue selected chips, an elevated-navy night budget hero,
+  and indicator colours (not text colours) for approaching/over budget bars.
+- No behaviour, layout or dependency changes.
+
+## 0.5.0 — 2026-10-22 (UI/UX refinement; JVM-tested locally, awaiting CI compile)
+
+### Navigation
+- Persistent dock: Home · Transactions · Wallets · Insights · Budget + More menu (goals, recurring, debts, categories).
+  Hidden only for focused workflows (scan, speak/type, category setup, settings). Tab state preserved.
+- Profile button on every primary screen → profile menu (optional device-only name, appearance, Settings, Enabled
+  features). Settings is no longer a primary destination.
+- App-wide + opens Add Transaction: Manual, Scan, Speak (listens on arrival), Type it (focuses the sentence field).
+  Removed: Add tab, Quick Add screen, Plan hub, More screen.
+
+### Home
+- Budget hero (brand panel, ~30 % shorter) with remaining/total/spent and the Sun mascot: happy within budget,
+  supportively concerned at ≤ 10 % left or exceeded (new `concerned` Lottie marker + vector still).
+- Compact net-flow card with an animated trend glyph (green / red / neutral at zero — new `net_flow_indicator` Lottie).
+- Burn-rate consumption bar with a today marker; same thresholds as the hero; no percentage without a budget.
+- Savings goals level; Upcoming recurring payments replace Recent transactions (tap → review / mark paid).
+- Action-button row removed.
+
+### Budget
+- The overall budget is derived: the sum of category allocations per currency and month (`BudgetPlanner`). No
+  separate "budget for everything"; legacy rows are ignored, explained once and removable.
+- New Budget tab: summary, budgeted / not-budgeted categories, spending outside the budget, amount sheet with a
+  live new-total preview, category management (add, rename, reorder, deactivate, restore).
+- Mandatory onboarding step: choose spending categories from a grouped preset library (≈90 presets, 10 groups,
+  search, recommended defaults, custom names) and review before confirming. Fresh installs seed income categories
+  only. Existing users are never sent back through onboarding: a one-time card offers the same picker or keeping
+  their categories; users with no categories get "Finish setting up your budget".
+- Budgets module on by default.
+
+### Insights
+- Focused on income/expense trends (3/6/12 months, transfers excluded) and net-worth composition (assets and
+  liabilities by account type on a shared scale). Category donut and budget performance removed from Insights.
+
+### Quality
+- 38 new JVM tests (253 total, passing in `tools/jvm-harness/run.sh`, now committed).
+- `ScreenshotTourTest` (emulator) + CI upload of screenshots; CI also runs on `feature/**` and `release/**` pushes.
+- No Room schema change (database stays v3).
+
 ## 0.4.0 — 2026-10-22 (local, not yet built by CI)
 
 ### Financial integrity

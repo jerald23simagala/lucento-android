@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -29,6 +30,26 @@ data class UserPreferences(
     val features: FeatureSet = FeatureSet.ALL,
     /** Last month whose kept budget was acknowledged ("2026-09"), so the moment is shown only once. */
     val acknowledgedBudgetMonth: java.time.YearMonth? = null,
+    /** Optional name shown on the profile button and menu. Stored only on this device; never required. */
+    val displayName: String? = null,
+    /**
+     * True once the user has chosen their budget categories (in onboarding since 0.5, or later from the Budget
+     * screen). Installs that completed onboarding before 0.5 start false: they keep their categories and are offered
+     * the category setup on the Budget screen, never forced back through onboarding.
+     */
+    val categorySetupDone: Boolean = false,
+    /**
+     * The wallet new transactions go to unless the user picks another (cash, bank or e-wallet only). Null when none is
+     * chosen; the composer then asks. May point at a wallet that no longer exists — readers check it against the list.
+     */
+    val defaultWalletId: Long? = null,
+    /**
+     * Smarter reading: typed messages are read by Gemini through Lucento's proxy. Off by default, turned on only by the
+     * user after the consent dialog in Settings; nothing is sent to a model while it is off.
+     */
+    val smartReading: Boolean = false,
+    /** Where the guided setup after onboarding stands; null when finished or never started (older installs). */
+    val guideStep: com.lucento.app.domain.GuideStep? = null,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
@@ -41,6 +62,11 @@ class UserPreferencesRepository(private val context: Context) {
         val primaryCurrency = stringPreferencesKey("primary_currency")
         val enabledFeatures = stringSetPreferencesKey("enabled_features")
         val acknowledgedBudgetMonth = stringPreferencesKey("acknowledged_budget_month")
+        val displayName = stringPreferencesKey("display_name")
+        val categorySetupDone = booleanPreferencesKey("category_setup_done")
+        val defaultWalletId = longPreferencesKey("default_wallet_id")
+        val guideStep = stringPreferencesKey("guide_step")
+        val smartReading = booleanPreferencesKey("smart_reading")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -59,16 +85,53 @@ class UserPreferencesRepository(private val context: Context) {
                     ?: FeatureSet.ALL,
                 acknowledgedBudgetMonth = p[Keys.acknowledgedBudgetMonth]
                     ?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
+                displayName = p[Keys.displayName]?.trim()?.takeIf { it.isNotEmpty() },
+                categorySetupDone = p[Keys.categorySetupDone] ?: false,
+                defaultWalletId = p[Keys.defaultWalletId],
+                guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
+                smartReading = p[Keys.smartReading] ?: false,
             )
         }
 
-    /** Saves the onboarding choices in one atomic edit, then marks onboarding complete. */
+    /**
+     * Saves the onboarding choices in one atomic edit, then marks onboarding complete. Called only after the chosen
+     * categories were written to the database, so a completed onboarding always has the user's categories.
+     */
     suspend fun completeOnboarding(primaryCurrency: String, themeMode: ThemeMode, features: Set<Feature>) {
         context.dataStore.edit {
             it[Keys.primaryCurrency] = primaryCurrency
             it[Keys.themeMode] = themeMode.name
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
+            it[Keys.categorySetupDone] = true
             it[Keys.onboardingComplete] = true
+            // A new user continues into the guided setup (wallets, budget, goal, first transactions).
+            it[Keys.guideStep] = com.lucento.app.domain.GuideStep.WALLETS.key
+        }
+    }
+
+    suspend fun setSmartReading(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.smartReading] = enabled }
+    }
+
+    /** Saves the guided setup's progress; null when it is finished (or was never started, as for older installs). */
+    suspend fun setGuideStep(step: com.lucento.app.domain.GuideStep?) {
+        context.dataStore.edit { if (step == null) it.remove(Keys.guideStep) else it[Keys.guideStep] = step.key }
+    }
+
+    suspend fun setCategorySetupDone(done: Boolean) {
+        context.dataStore.edit { it[Keys.categorySetupDone] = done }
+    }
+
+    /** Blank clears the name. */
+    suspend fun setDisplayName(name: String) {
+        val cleaned = name.trim().replace(Regex("\\s+"), " ").take(MAX_DISPLAY_NAME)
+        context.dataStore.edit { prefs ->
+            if (cleaned.isEmpty()) {
+                prefs.remove(Keys.displayName)
+            } else {
+                prefs[Keys.displayName] = cleaned
+            }
+            Unit
         }
     }
 
@@ -77,6 +140,14 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { prefs ->
             val current = prefs[Keys.enabledFeatures]?.toSet() ?: Feature.entries.map(Feature::key).toSet()
             prefs[Keys.enabledFeatures] = if (enabled) current + feature.key else current - feature.key
+        }
+    }
+
+    /** Null clears the default. */
+    suspend fun setDefaultWallet(walletId: Long?) {
+        context.dataStore.edit { prefs ->
+            if (walletId == null) prefs.remove(Keys.defaultWalletId) else prefs[Keys.defaultWalletId] = walletId
+            Unit
         }
     }
 
@@ -94,6 +165,8 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     companion object {
+        const val MAX_DISPLAY_NAME = 40
+
         fun defaultCurrency(locale: Locale = Locale.getDefault()): String =
             runCatching { Currency.getInstance(locale).currencyCode }.getOrNull()
                 ?.takeIf { it != "XXX" }

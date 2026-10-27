@@ -206,6 +206,55 @@ object ReceiptParser {
         return best?.let { it.third to TotalConfidence.LABELLED }
     }
 
+    // ------------------------------------------------------------- items vs total
+
+    enum class ItemsCheck { ADDS_UP, DOES_NOT_ADD_UP, UNKNOWN }
+
+    private val subtotalLabel = Regex("sub\\s*-?\\s*total")
+    private val taxLine = Regex("\\b(vat|tax|service\\s*charge)\\b")
+    private val notAddedTax = Regex("vatable|vat[-\\s]*exempt|zero[-\\s]*rated|incl|inclusive|reg|tin")
+    private val discountLine = Regex("discount|\\bless\\b|promo|voucher")
+
+    /**
+     * Whether the receipt's own numbers support [total]: a printed subtotal (plus added tax, less discounts), or else the
+     * priced item lines above the total. Deliberately cautious: [ItemsCheck.DOES_NOT_ADD_UP] is reported only with two or
+     * more priced items and a mismatch, and [ItemsCheck.UNKNOWN] whenever the layout can't be read with confidence.
+     */
+    fun checkItems(lines: List<String>, total: BigDecimal?, fractionDigits: Int = 2): ItemsCheck {
+        if (total == null) return ItemsCheck.UNKNOWN
+        val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
+        val totalIndex = clean.indexOfFirst { line ->
+            val lower = line.lowercase(Locale.ROOT)
+            !notTotal.containsMatchIn(lower) && totalLabels.any { (re, _) -> re.containsMatchIn(lower) }
+        }
+        if (totalIndex <= 0) return ItemsCheck.UNKNOWN
+        val above = clean.subList(0, totalIndex)
+        fun last(line: String) = amountsIn(line, fractionDigits, allowIntegers = false).lastOrNull()
+        var tax = BigDecimal.ZERO
+        var discount = BigDecimal.ZERO
+        var subtotal: BigDecimal? = null
+        var items = BigDecimal.ZERO
+        var itemCount = 0
+        above.forEach { line ->
+            val lower = line.lowercase(Locale.ROOT)
+            val amount = last(line) ?: return@forEach
+            when {
+                subtotalLabel.containsMatchIn(lower) -> subtotal = amount
+                taxLine.containsMatchIn(lower) && !notAddedTax.containsMatchIn(lower) -> tax += amount
+                discountLine.containsMatchIn(lower) -> discount += amount
+                notTotal.containsMatchIn(lower) || notAddedTax.containsMatchIn(lower) -> Unit
+                else -> {
+                    items += amount
+                    itemCount++
+                }
+            }
+        }
+        fun matches(base: BigDecimal) = listOf(base, base + tax, base - discount, base + tax - discount).any { it.compareTo(total) == 0 }
+        subtotal?.let { return if (matches(it)) ItemsCheck.ADDS_UP else ItemsCheck.DOES_NOT_ADD_UP }
+        if (itemCount < 2) return ItemsCheck.UNKNOWN
+        return if (matches(items)) ItemsCheck.ADDS_UP else ItemsCheck.DOES_NOT_ADD_UP
+    }
+
     // ------------------------------------------------------------- date
 
     private val ISO = Regex("(20\\d{2})[-/.](\\d{1,2})[-/.](\\d{1,2})")

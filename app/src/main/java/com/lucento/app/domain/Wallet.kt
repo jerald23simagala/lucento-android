@@ -8,14 +8,23 @@ import com.lucento.app.core.money.Money
  * [isLiability] accounts (credit cards, loans) track the amount owed as a positive balance; they reduce
  * net worth. [isSpendable] accounts hold money available for everyday spending (used by Safe to Spend);
  * savings are deliberately excluded so money set aside is not presented as spendable.
+ *
+ * [isValuedManually] assets (a home, a car, investments) have no money movements: their balance is a valuation the
+ * user enters and updates. They count towards net worth but never appear where a transaction, transfer or
+ * recurring payment picks an account, and the repositories refuse to post movements to them.
  */
-enum class WalletType(val isLiability: Boolean, val isSpendable: Boolean) {
+enum class WalletType(val isLiability: Boolean, val isSpendable: Boolean, val isValuedManually: Boolean = false) {
     CASH(isLiability = false, isSpendable = true),
     BANK(isLiability = false, isSpendable = true),
     E_WALLET(isLiability = false, isSpendable = true),
     SAVINGS(isLiability = false, isSpendable = false),
     CREDIT_CARD(isLiability = true, isSpendable = false),
     LOAN(isLiability = true, isSpendable = false),
+    OTHER_ASSET(isLiability = false, isSpendable = false, isValuedManually = true),
+    ;
+
+    /** True for accounts that money moves through: everything except manually valued assets. */
+    val acceptsTransactions: Boolean get() = !isValuedManually
 }
 
 /**
@@ -30,12 +39,17 @@ data class Wallet(
     val balance: Money,
     val createdAtEpochMillis: Long,
     val openingBalance: Money = balance,
+    /** Interest rate and repayment plan of a card or loan, when the user entered them. Always null for assets. */
+    val debt: DebtTerms? = null,
 ) {
     val currencyCode: String get() = balance.currencyCode
 
     /** Signed effect of this wallet on net worth. */
     val netWorthContribution: Money get() = if (type.isLiability) -balance else balance
 }
+
+/** Wallets that can be picked for a transaction, transfer, recurring payment or goal (manually valued assets excluded). */
+fun List<Wallet>.transactable(): List<Wallet> = filter { it.type.acceptsTransactions }
 
 /** What still depends on a wallet: posted transactions (including transfer legs) and recurring schedules. */
 data class WalletUsage(val transactionCount: Int, val scheduleCount: Int) {
@@ -74,7 +88,12 @@ sealed interface WalletChangeViolation {
  */
 object WalletChangePolicy {
 
-    fun crossesBalanceSide(from: WalletType, to: WalletType): Boolean = from.isLiability != to.isLiability
+    /**
+     * True when [from] → [to] changes how the balance is formed: asset ↔ liability, or a money account ↔ a manually
+     * valued asset (whose balance is a valuation, not the sum of movements).
+     */
+    fun crossesBalanceSide(from: WalletType, to: WalletType): Boolean =
+        from.isLiability != to.isLiability || from.isValuedManually != to.isValuedManually
 
     fun check(
         currentType: WalletType,

@@ -40,6 +40,8 @@ class CsvAndFeaturesTest {
         assertTrue(Feature.BUDGETS in features)
         assertFalse(Feature.SAVINGS_GOALS in features)
         assertEquals(Feature.BUDGETS, Feature.fromKey("budgets"))
+        // Budget is a primary tab built from the categories chosen in onboarding, so it starts on for everyone.
+        assertTrue(Feature.BUDGETS in FinancialFocus.initialFeatures(emptySet()))
     }
 
     @Test fun transfersPairAndQueriesTreatThemTogether() {

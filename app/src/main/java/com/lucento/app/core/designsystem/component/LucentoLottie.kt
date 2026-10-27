@@ -29,7 +29,6 @@ import com.lucento.app.core.designsystem.theme.LucentoTheme
  * outlines and paper stay legible on the midnight theme.
  */
 enum class LucentoAnimation(@RawRes val day: Int, @RawRes val night: Int, val loops: Boolean) {
-    Welcome(R.raw.onboarding_welcome, R.raw.onboarding_welcome_night, loops = false),
     EmptyTransactions(R.raw.empty_transactions, R.raw.empty_transactions_night, loops = false),
     EmptyBudgets(R.raw.empty_budgets, R.raw.empty_budgets_night, loops = false),
     EmptyGoals(R.raw.empty_goals, R.raw.empty_goals_night, loops = false),
@@ -38,7 +37,8 @@ enum class LucentoAnimation(@RawRes val day: Int, @RawRes val night: Int, val lo
     Saved(R.raw.feedback_saved, R.raw.feedback_saved, loops = false),
     Milestone(R.raw.feedback_milestone, R.raw.feedback_milestone, loops = false),
     Loading(R.raw.loading_dots, R.raw.loading_dots, loops = true),
-    Mascot(R.raw.lucento_mascot_sun, R.raw.lucento_mascot_moon, loops = false),
+    /** Home net-flow indicator; markers `up`, `down`, `flat` (one-shot each). */
+    NetFlow(R.raw.net_flow_indicator, R.raw.net_flow_indicator_night, loops = false),
 }
 
 /**

@@ -1,0 +1,2192 @@
+{
+  "schema_version": 3,
+  "generated": "2026-10-23",
+  "root": "docs/mascot",
+  "statuses": [
+    "source",
+    "prototype",
+    "needs_cleanup",
+    "approved",
+    "missing"
+  ],
+  "note": "No asset is 'approved': approval requires human art-direction sign-off after MASCOT_ASSET_QA.md. v1 masters in assets/backup_v1/, v2 masters/processed/previews in assets/backup_v2/ (moved, not deleted).",
+  "assets": [
+    {
+      "id": "01M5MZKDTJ1NM8NA87K8DHBTQ7",
+      "filename": "assets/source/01M5MZKDTJ1NM8NA87K8DHBTQ7.png",
+      "category": "source_reference",
+      "tier": null,
+      "pose": null,
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "color_mode": "RGB",
+      "alpha_status": "none",
+      "canvas": [
+        1536,
+        1024
+      ],
+      "pivot": null,
+      "source": "user-created concept sheet (original filename)",
+      "provenance": "user-created: the user states they created this concept sheet themselves (their own original concept). Not legally cleared.",
+      "production_status": "source",
+      "validation_status": "inspected: RGB no alpha, checkerboard score 0.030 (not baked), has labels/background",
+      "limitations": [
+        "concept sheet with text and gradient background; reference only"
+      ]
+    },
+    {
+      "id": "lucento_concept_sheet_reference",
+      "filename": "assets/source/lucento_concept_sheet_reference.png",
+      "category": "source_reference",
+      "tier": null,
+      "pose": null,
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "color_mode": "RGB",
+      "alpha_status": "none",
+      "canvas": [
+        1536,
+        1024
+      ],
+      "pivot": null,
+      "source": "copy of user-created concept sheet",
+      "provenance": "user-created: the user states they created this concept sheet themselves (their own original concept). Not legally cleared.",
+      "production_status": "source",
+      "validation_status": "inspected: RGB no alpha, checkerboard score 0.030 (not baked), has labels/background",
+      "limitations": [
+        "concept sheet with text and gradient background; reference only"
+      ]
+    },
+    {
+      "id": "lucento_thriving_hero_neutral_v3",
+      "filename": "assets/wellness_tiers/lucento_thriving_hero_neutral_v3.png",
+      "category": "character_full",
+      "tier": "thriving",
+      "pose": "hero_neutral",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.08,
+        "opaque_pct": 25.8,
+        "partial_pct": 1.11
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        404,
+        315,
+        1728,
+        1647
+      ],
+      "min_padding_px": 315,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/thriving_hero_neutral_v2_chroma.jpg",
+      "native_processed": "assets/processed/thriving_hero_neutral_v3_native1024.png",
+      "crystal_level": 1.0,
+      "crystal_luma_before": 224.0,
+      "crystal_luma_after": 224.0,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/wellness_tiers/lucento_thriving_hero_neutral_v2.png"
+    },
+    {
+      "id": "lucento_thriving_greeting_happy_v3",
+      "filename": "assets/expressions/lucento_thriving_greeting_happy_v3.png",
+      "category": "character_full",
+      "tier": "thriving",
+      "pose": "greeting_happy",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.11,
+        "opaque_pct": 25.76,
+        "partial_pct": 1.13
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        398,
+        317,
+        1724,
+        1651
+      ],
+      "min_padding_px": 317,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_greeting_happy_chroma.jpg",
+      "native_processed": "assets/processed/thriving_greeting_happy_v3_native1024.png",
+      "crystal_level": 1.0,
+      "crystal_luma_before": 226.9,
+      "crystal_luma_after": 226.9,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_thriving_greeting_happy_v2.png"
+    },
+    {
+      "id": "lucento_thriving_thinking_v3",
+      "filename": "assets/expressions/lucento_thriving_thinking_v3.png",
+      "category": "character_full",
+      "tier": "thriving",
+      "pose": "thinking",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.8,
+        "opaque_pct": 25.1,
+        "partial_pct": 1.1
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        423,
+        323,
+        1722,
+        1659
+      ],
+      "min_padding_px": 323,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_thinking_chroma.jpg",
+      "native_processed": "assets/processed/thriving_thinking_v3_native1024.png",
+      "crystal_level": 1.0,
+      "crystal_luma_before": 225.3,
+      "crystal_luma_after": 225.3,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_thriving_thinking_v2.png"
+    },
+    {
+      "id": "lucento_thriving_pointing_v3",
+      "filename": "assets/expressions/lucento_thriving_pointing_v3.png",
+      "category": "character_full",
+      "tier": "thriving",
+      "pose": "pointing",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.01,
+        "opaque_pct": 25.85,
+        "partial_pct": 1.14
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        371,
+        315,
+        1726,
+        1649
+      ],
+      "min_padding_px": 315,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_pointing_chroma.jpg",
+      "native_processed": "assets/processed/thriving_pointing_v3_native1024.png",
+      "crystal_level": 1.0,
+      "crystal_luma_before": 226.7,
+      "crystal_luma_after": 226.7,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_thriving_pointing_v2.png"
+    },
+    {
+      "id": "lucento_thriving_success_v3",
+      "filename": "assets/expressions/lucento_thriving_success_v3.png",
+      "category": "character_full",
+      "tier": "thriving",
+      "pose": "success",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.0,
+        "opaque_pct": 25.86,
+        "partial_pct": 1.14
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        376,
+        317,
+        1726,
+        1655
+      ],
+      "min_padding_px": 317,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/thriving_success_v2_chroma.jpg",
+      "native_processed": "assets/processed/thriving_success_v3_native1024.png",
+      "crystal_level": 1.0,
+      "crystal_luma_before": 223.9,
+      "crystal_luma_after": 223.9,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_thriving_success_v2.png"
+    },
+    {
+      "id": "lucento_thriving_caution_v3",
+      "filename": "assets/expressions/lucento_thriving_caution_v3.png",
+      "category": "character_full",
+      "tier": "thriving",
+      "pose": "caution",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.36,
+        "opaque_pct": 25.53,
+        "partial_pct": 1.11
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        411,
+        317,
+        1721,
+        1649
+      ],
+      "min_padding_px": 317,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_caution_chroma.jpg",
+      "native_processed": "assets/processed/thriving_caution_v3_native1024.png",
+      "crystal_level": 1.0,
+      "crystal_luma_before": 225.3,
+      "crystal_luma_after": 225.3,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_thriving_caution_v2.png"
+    },
+    {
+      "id": "lucento_thriving_sleeping_v3",
+      "filename": "assets/expressions/lucento_thriving_sleeping_v3.png",
+      "category": "character_full",
+      "tier": "thriving",
+      "pose": "sleeping",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.2,
+        "opaque_pct": 25.75,
+        "partial_pct": 1.06
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        443,
+        363,
+        1638,
+        1697
+      ],
+      "min_padding_px": 351,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/thriving_sleeping_v2_chroma.jpg",
+      "native_processed": "assets/processed/thriving_sleeping_v3_native1024.png",
+      "crystal_level": 1.0,
+      "crystal_luma_before": 221.9,
+      "crystal_luma_after": 221.9,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_thriving_sleeping_v2.png"
+    },
+    {
+      "id": "lucento_steady_hero_neutral_v3",
+      "filename": "assets/wellness_tiers/lucento_steady_hero_neutral_v3.png",
+      "category": "character_full",
+      "tier": "steady",
+      "pose": "hero_neutral",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 74.38,
+        "opaque_pct": 24.72,
+        "partial_pct": 0.9
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        482,
+        395,
+        1729,
+        1656
+      ],
+      "min_padding_px": 319,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_hero_neutral_v2_chroma.jpg",
+      "native_processed": "assets/processed/steady_hero_neutral_v3_native1024.png",
+      "crystal_level": 0.8,
+      "crystal_luma_before": 221.7,
+      "crystal_luma_after": 194.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/wellness_tiers/lucento_steady_hero_neutral_v2.png"
+    },
+    {
+      "id": "lucento_steady_greeting_happy_v3",
+      "filename": "assets/expressions/lucento_steady_greeting_happy_v3.png",
+      "category": "character_full",
+      "tier": "steady",
+      "pose": "greeting_happy",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.92,
+        "opaque_pct": 25.14,
+        "partial_pct": 0.94
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        367,
+        391,
+        1730,
+        1663
+      ],
+      "min_padding_px": 318,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_greeting_happy_v2_chroma.jpg",
+      "native_processed": "assets/processed/steady_greeting_happy_v3_native1024.png",
+      "crystal_level": 0.8,
+      "crystal_luma_before": 219.9,
+      "crystal_luma_after": 194.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_steady_greeting_happy_v2.png"
+    },
+    {
+      "id": "lucento_steady_thinking_v3",
+      "filename": "assets/expressions/lucento_steady_thinking_v3.png",
+      "category": "character_full",
+      "tier": "steady",
+      "pose": "thinking",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 74.1,
+        "opaque_pct": 24.99,
+        "partial_pct": 0.91
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        496,
+        395,
+        1726,
+        1686
+      ],
+      "min_padding_px": 322,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_thinking_v2_chroma.jpg",
+      "native_processed": "assets/processed/steady_thinking_v3_native1024.png",
+      "crystal_level": 0.8,
+      "crystal_luma_before": 217.6,
+      "crystal_luma_after": 194.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_steady_thinking_v2.png"
+    },
+    {
+      "id": "lucento_steady_pointing_v3",
+      "filename": "assets/expressions/lucento_steady_pointing_v3.png",
+      "category": "character_full",
+      "tier": "steady",
+      "pose": "pointing",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.6,
+        "opaque_pct": 25.44,
+        "partial_pct": 0.96
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        359,
+        373,
+        1732,
+        1669
+      ],
+      "min_padding_px": 316,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_pointing_v2_chroma.jpg",
+      "native_processed": "assets/processed/steady_pointing_v3_native1024.png",
+      "crystal_level": 0.8,
+      "crystal_luma_before": 221.4,
+      "crystal_luma_after": 194.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_steady_pointing_v2.png"
+    },
+    {
+      "id": "lucento_steady_success_v3",
+      "filename": "assets/expressions/lucento_steady_success_v3.png",
+      "category": "character_full",
+      "tier": "steady",
+      "pose": "success",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.83,
+        "opaque_pct": 25.24,
+        "partial_pct": 0.93
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        336,
+        393,
+        1730,
+        1663
+      ],
+      "min_padding_px": 318,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_success_v2_chroma.jpg",
+      "native_processed": "assets/processed/steady_success_v3_native1024.png",
+      "crystal_level": 0.8,
+      "crystal_luma_before": 219.8,
+      "crystal_luma_after": 194.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_steady_success_v2.png"
+    },
+    {
+      "id": "lucento_steady_caution_v3",
+      "filename": "assets/expressions/lucento_steady_caution_v3.png",
+      "category": "character_full",
+      "tier": "steady",
+      "pose": "caution",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 74.48,
+        "opaque_pct": 24.61,
+        "partial_pct": 0.9
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        485,
+        397,
+        1728,
+        1659
+      ],
+      "min_padding_px": 320,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_caution_v2_chroma.jpg",
+      "native_processed": "assets/processed/steady_caution_v3_native1024.png",
+      "crystal_level": 0.8,
+      "crystal_luma_before": 219.9,
+      "crystal_luma_after": 194.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_steady_caution_v2.png"
+    },
+    {
+      "id": "lucento_steady_sleeping_v3",
+      "filename": "assets/expressions/lucento_steady_sleeping_v3.png",
+      "category": "character_full",
+      "tier": "steady",
+      "pose": "sleeping",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.7,
+        "opaque_pct": 25.38,
+        "partial_pct": 0.91
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        448,
+        417,
+        1630,
+        1705
+      ],
+      "min_padding_px": 343,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/steady_sleeping_v2_chroma.jpg",
+      "native_processed": "assets/processed/steady_sleeping_v3_native1024.png",
+      "crystal_level": 0.8,
+      "crystal_luma_before": 220.9,
+      "crystal_luma_after": 194.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_steady_sleeping_v2.png"
+    },
+    {
+      "id": "lucento_getting_tight_hero_neutral_v3",
+      "filename": "assets/wellness_tiers/lucento_getting_tight_hero_neutral_v3.png",
+      "category": "character_full",
+      "tier": "getting_tight",
+      "pose": "hero_neutral",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.49,
+        "opaque_pct": 25.37,
+        "partial_pct": 1.14
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        427,
+        333,
+        1727,
+        1649
+      ],
+      "min_padding_px": 321,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/getting_tight_hero_neutral_chroma.jpg",
+      "native_processed": "assets/processed/getting_tight_hero_neutral_v3_native1024.png",
+      "crystal_level": 0.6,
+      "crystal_luma_before": 220.6,
+      "crystal_luma_after": 161.1,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/wellness_tiers/lucento_getting_tight_hero_neutral_v2.png"
+    },
+    {
+      "id": "lucento_getting_tight_greeting_happy_v3",
+      "filename": "assets/expressions/lucento_getting_tight_greeting_happy_v3.png",
+      "category": "character_full",
+      "tier": "getting_tight",
+      "pose": "greeting_happy",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.59,
+        "opaque_pct": 26.21,
+        "partial_pct": 1.2
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        351,
+        328,
+        1740,
+        1665
+      ],
+      "min_padding_px": 308,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/getting_tight_greeting_happy_chroma.jpg",
+      "native_processed": "assets/processed/getting_tight_greeting_happy_v3_native1024.png",
+      "crystal_level": 0.6,
+      "crystal_luma_before": 218.1,
+      "crystal_luma_after": 161.2,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_getting_tight_greeting_happy_v2.png"
+    },
+    {
+      "id": "lucento_getting_tight_thinking_v3",
+      "filename": "assets/expressions/lucento_getting_tight_thinking_v3.png",
+      "category": "character_full",
+      "tier": "getting_tight",
+      "pose": "thinking",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.13,
+        "opaque_pct": 25.73,
+        "partial_pct": 1.14
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        424,
+        331,
+        1728,
+        1673
+      ],
+      "min_padding_px": 320,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/getting_tight_thinking_chroma.jpg",
+      "native_processed": "assets/processed/getting_tight_thinking_v3_native1024.png",
+      "crystal_level": 0.6,
+      "crystal_luma_before": 218.6,
+      "crystal_luma_after": 161.2,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_getting_tight_thinking_v2.png"
+    },
+    {
+      "id": "lucento_getting_tight_pointing_v3",
+      "filename": "assets/expressions/lucento_getting_tight_pointing_v3.png",
+      "category": "character_full",
+      "tier": "getting_tight",
+      "pose": "pointing",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.97,
+        "opaque_pct": 25.85,
+        "partial_pct": 1.18
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        396,
+        332,
+        1728,
+        1661
+      ],
+      "min_padding_px": 320,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/getting_tight_pointing_chroma.jpg",
+      "native_processed": "assets/processed/getting_tight_pointing_v3_native1024.png",
+      "crystal_level": 0.6,
+      "crystal_luma_before": 218.5,
+      "crystal_luma_after": 161.2,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_getting_tight_pointing_v2.png"
+    },
+    {
+      "id": "lucento_getting_tight_success_v3",
+      "filename": "assets/expressions/lucento_getting_tight_success_v3.png",
+      "category": "character_full",
+      "tier": "getting_tight",
+      "pose": "success",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.81,
+        "opaque_pct": 26.03,
+        "partial_pct": 1.16
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        351,
+        331,
+        1729,
+        1657
+      ],
+      "min_padding_px": 319,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/getting_tight_success_v3_chroma.jpg",
+      "native_processed": "assets/processed/getting_tight_success_v3_native1024.png",
+      "crystal_level": 0.6,
+      "crystal_luma_before": 217.2,
+      "crystal_luma_after": 161.2,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_getting_tight_success_v2.png"
+    },
+    {
+      "id": "lucento_getting_tight_caution_v3",
+      "filename": "assets/expressions/lucento_getting_tight_caution_v3.png",
+      "category": "character_full",
+      "tier": "getting_tight",
+      "pose": "caution",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.24,
+        "opaque_pct": 25.61,
+        "partial_pct": 1.15
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        424,
+        331,
+        1730,
+        1657
+      ],
+      "min_padding_px": 318,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/getting_tight_caution_chroma.jpg",
+      "native_processed": "assets/processed/getting_tight_caution_v3_native1024.png",
+      "crystal_level": 0.6,
+      "crystal_luma_before": 218.7,
+      "crystal_luma_after": 161.2,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [raw unchanged since v2; reprocessed]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_getting_tight_caution_v2.png"
+    },
+    {
+      "id": "lucento_getting_tight_sleeping_v3",
+      "filename": "assets/expressions/lucento_getting_tight_sleeping_v3.png",
+      "category": "character_full",
+      "tier": "getting_tight",
+      "pose": "sleeping",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.31,
+        "opaque_pct": 25.62,
+        "partial_pct": 1.07
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        460,
+        389,
+        1658,
+        1713
+      ],
+      "min_padding_px": 335,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/getting_tight_sleeping_v3_chroma.jpg",
+      "native_processed": "assets/processed/getting_tight_sleeping_v3_native1024.png",
+      "crystal_level": 0.6,
+      "crystal_luma_before": 214.0,
+      "crystal_luma_after": 161.2,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": null,
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_getting_tight_sleeping_v2.png"
+    },
+    {
+      "id": "lucento_concerned_hero_neutral_v3",
+      "filename": "assets/wellness_tiers/lucento_concerned_hero_neutral_v3.png",
+      "category": "character_full",
+      "tier": "concerned",
+      "pose": "hero_neutral",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.97,
+        "opaque_pct": 25.86,
+        "partial_pct": 1.18
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        405,
+        339,
+        1728,
+        1657
+      ],
+      "min_padding_px": 320,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/concerned_hero_neutral_v3_chroma.jpg",
+      "native_processed": "assets/processed/concerned_hero_neutral_v3_native1024.png",
+      "crystal_level": 0.42,
+      "crystal_luma_before": 212.4,
+      "crystal_luma_after": 132.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): light scruffy stubble + teary eyes / single tear; sleeping shows tear track",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/wellness_tiers/lucento_concerned_hero_neutral_v2.png"
+    },
+    {
+      "id": "lucento_concerned_greeting_happy_v3",
+      "filename": "assets/expressions/lucento_concerned_greeting_happy_v3.png",
+      "category": "character_full",
+      "tier": "concerned",
+      "pose": "greeting_happy",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.49,
+        "opaque_pct": 26.3,
+        "partial_pct": 1.21
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        391,
+        339,
+        1732,
+        1669
+      ],
+      "min_padding_px": 316,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/concerned_greeting_happy_v3_chroma.jpg",
+      "native_processed": "assets/processed/concerned_greeting_happy_v3_native1024.png",
+      "crystal_level": 0.42,
+      "crystal_luma_before": 209.4,
+      "crystal_luma_after": 132.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): light scruffy stubble + teary eyes / single tear; sleeping shows tear track",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_concerned_greeting_happy_v2.png"
+    },
+    {
+      "id": "lucento_concerned_thinking_v3",
+      "filename": "assets/expressions/lucento_concerned_thinking_v3.png",
+      "category": "character_full",
+      "tier": "concerned",
+      "pose": "thinking",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.26,
+        "opaque_pct": 25.62,
+        "partial_pct": 1.12
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        423,
+        345,
+        1726,
+        1673
+      ],
+      "min_padding_px": 322,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/concerned_thinking_v3_chroma.jpg",
+      "native_processed": "assets/processed/concerned_thinking_v3_native1024.png",
+      "crystal_level": 0.42,
+      "crystal_luma_before": 208.6,
+      "crystal_luma_after": 132.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): light scruffy stubble + teary eyes / single tear; sleeping shows tear track",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_concerned_thinking_v2.png"
+    },
+    {
+      "id": "lucento_concerned_pointing_v3",
+      "filename": "assets/expressions/lucento_concerned_pointing_v3.png",
+      "category": "character_full",
+      "tier": "concerned",
+      "pose": "pointing",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.41,
+        "opaque_pct": 26.37,
+        "partial_pct": 1.22
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        372,
+        339,
+        1730,
+        1672
+      ],
+      "min_padding_px": 318,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/concerned_pointing_v3_chroma.jpg",
+      "native_processed": "assets/processed/concerned_pointing_v3_native1024.png",
+      "crystal_level": 0.42,
+      "crystal_luma_before": 210.1,
+      "crystal_luma_after": 132.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): light scruffy stubble + teary eyes / single tear; sleeping shows tear track",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_concerned_pointing_v2.png"
+    },
+    {
+      "id": "lucento_concerned_success_v3",
+      "filename": "assets/expressions/lucento_concerned_success_v3.png",
+      "category": "character_full",
+      "tier": "concerned",
+      "pose": "success",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.66,
+        "opaque_pct": 26.14,
+        "partial_pct": 1.2
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        406,
+        339,
+        1732,
+        1665
+      ],
+      "min_padding_px": 316,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/concerned_success_v3_chroma.jpg",
+      "native_processed": "assets/processed/concerned_success_v3_native1024.png",
+      "crystal_level": 0.42,
+      "crystal_luma_before": 209.8,
+      "crystal_luma_after": 132.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): light scruffy stubble + teary eyes / single tear; sleeping shows tear track",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_concerned_success_v2.png"
+    },
+    {
+      "id": "lucento_concerned_caution_v3",
+      "filename": "assets/expressions/lucento_concerned_caution_v3.png",
+      "category": "character_full",
+      "tier": "concerned",
+      "pose": "caution",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.96,
+        "opaque_pct": 25.85,
+        "partial_pct": 1.19
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        405,
+        339,
+        1728,
+        1665
+      ],
+      "min_padding_px": 320,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/concerned_caution_v3_chroma.jpg",
+      "native_processed": "assets/processed/concerned_caution_v3_native1024.png",
+      "crystal_level": 0.42,
+      "crystal_luma_before": 211.5,
+      "crystal_luma_after": 132.6,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): light scruffy stubble + teary eyes / single tear; sleeping shows tear track",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_concerned_caution_v2.png"
+    },
+    {
+      "id": "lucento_concerned_sleeping_v3",
+      "filename": "assets/expressions/lucento_concerned_sleeping_v3.png",
+      "category": "character_full",
+      "tier": "concerned",
+      "pose": "sleeping",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 71.29,
+        "opaque_pct": 27.62,
+        "partial_pct": 1.09
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        433,
+        357,
+        1672,
+        1723
+      ],
+      "min_padding_px": 325,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/concerned_sleeping_v3_chroma.jpg",
+      "native_processed": "assets/processed/concerned_sleeping_v3_native1024.png",
+      "crystal_level": 0.42,
+      "crystal_luma_before": 212.6,
+      "crystal_luma_after": 132.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): light scruffy stubble + teary eyes / single tear; sleeping shows tear track",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_concerned_sleeping_v2.png"
+    },
+    {
+      "id": "lucento_over_plan_hero_neutral_v3",
+      "filename": "assets/wellness_tiers/lucento_over_plan_hero_neutral_v3.png",
+      "category": "character_full",
+      "tier": "over_plan",
+      "pose": "hero_neutral",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.49,
+        "opaque_pct": 26.3,
+        "partial_pct": 1.21
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        403,
+        324,
+        1729,
+        1667
+      ],
+      "min_padding_px": 319,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/over_plan_hero_neutral_v3_chroma.jpg",
+      "native_processed": "assets/processed/over_plan_hero_neutral_v3_native1024.png",
+      "crystal_level": 0.28,
+      "crystal_luma_before": 199.2,
+      "crystal_luma_after": 110.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): fuller ragged beard + visible tears on cheeks; sleeping shows tear tracks",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/wellness_tiers/lucento_over_plan_hero_neutral_v2.png"
+    },
+    {
+      "id": "lucento_over_plan_greeting_happy_v3",
+      "filename": "assets/expressions/lucento_over_plan_greeting_happy_v3.png",
+      "category": "character_full",
+      "tier": "over_plan",
+      "pose": "greeting_happy",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 71.69,
+        "opaque_pct": 27.1,
+        "partial_pct": 1.21
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        394,
+        301,
+        1731,
+        1689
+      ],
+      "min_padding_px": 301,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/over_plan_greeting_happy_v3_chroma.jpg",
+      "native_processed": "assets/processed/over_plan_greeting_happy_v3_native1024.png",
+      "crystal_level": 0.28,
+      "crystal_luma_before": 197.9,
+      "crystal_luma_after": 110.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "needs_cleanup",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): fuller ragged beard + visible tears on cheeks; sleeping shows tear tracks",
+      "limitations": [
+        "scarf ends more frayed than over_plan hero_neutral; minor inconsistency",
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_over_plan_greeting_happy_v2.png"
+    },
+    {
+      "id": "lucento_over_plan_thinking_v3",
+      "filename": "assets/expressions/lucento_over_plan_thinking_v3.png",
+      "category": "character_full",
+      "tier": "over_plan",
+      "pose": "thinking",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 70.98,
+        "opaque_pct": 27.74,
+        "partial_pct": 1.28
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        387,
+        309,
+        1734,
+        1731
+      ],
+      "min_padding_px": 309,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/over_plan_thinking_v3_chroma.jpg",
+      "native_processed": "assets/processed/over_plan_thinking_v3_native1024.png",
+      "crystal_level": 0.28,
+      "crystal_luma_before": 197.8,
+      "crystal_luma_after": 110.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "needs_cleanup",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): fuller ragged beard + visible tears on cheeks; sleeping shows tear tracks",
+      "limitations": [
+        "sleeve/hem fraying still heavier than over_plan hero_neutral (v3 regeneration improved scarf only partially); review for dignified tone",
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_over_plan_thinking_v2.png"
+    },
+    {
+      "id": "lucento_over_plan_pointing_v3",
+      "filename": "assets/expressions/lucento_over_plan_pointing_v3.png",
+      "category": "character_full",
+      "tier": "over_plan",
+      "pose": "pointing",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 71.45,
+        "opaque_pct": 27.27,
+        "partial_pct": 1.28
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        344,
+        292,
+        1733,
+        1689
+      ],
+      "min_padding_px": 292,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/over_plan_pointing_v3_chroma.jpg",
+      "native_processed": "assets/processed/over_plan_pointing_v3_native1024.png",
+      "crystal_level": 0.28,
+      "crystal_luma_before": 198.1,
+      "crystal_luma_after": 110.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): fuller ragged beard + visible tears on cheeks; sleeping shows tear tracks",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_over_plan_pointing_v2.png"
+    },
+    {
+      "id": "lucento_over_plan_success_v3",
+      "filename": "assets/expressions/lucento_over_plan_success_v3.png",
+      "category": "character_full",
+      "tier": "over_plan",
+      "pose": "success",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 71.72,
+        "opaque_pct": 27.03,
+        "partial_pct": 1.25
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        387,
+        308,
+        1729,
+        1681
+      ],
+      "min_padding_px": 308,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/over_plan_success_v3_chroma.jpg",
+      "native_processed": "assets/processed/over_plan_success_v3_native1024.png",
+      "crystal_level": 0.28,
+      "crystal_luma_before": 199.1,
+      "crystal_luma_after": 110.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): fuller ragged beard + visible tears on cheeks; sleeping shows tear tracks",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_over_plan_success_v2.png"
+    },
+    {
+      "id": "lucento_over_plan_caution_v3",
+      "filename": "assets/expressions/lucento_over_plan_caution_v3.png",
+      "category": "character_full",
+      "tier": "over_plan",
+      "pose": "caution",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 72.11,
+        "opaque_pct": 26.69,
+        "partial_pct": 1.2
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        405,
+        318,
+        1731,
+        1699
+      ],
+      "min_padding_px": 317,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/over_plan_caution_v3_chroma.jpg",
+      "native_processed": "assets/processed/over_plan_caution_v3_native1024.png",
+      "crystal_level": 0.28,
+      "crystal_luma_before": 199.5,
+      "crystal_luma_after": 110.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): fuller ragged beard + visible tears on cheeks; sleeping shows tear tracks",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_over_plan_caution_v2.png"
+    },
+    {
+      "id": "lucento_over_plan_sleeping_v3",
+      "filename": "assets/expressions/lucento_over_plan_sleeping_v3.png",
+      "category": "character_full",
+      "tier": "over_plan",
+      "pose": "sleeping",
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine",
+      "alpha_stats": {
+        "min": 0,
+        "max": 255,
+        "transparent_pct": 73.87,
+        "opaque_pct": 25.03,
+        "partial_pct": 1.09
+      },
+      "canvas": [
+        2048,
+        2048
+      ],
+      "content_bbox": [
+        451,
+        377,
+        1624,
+        1701
+      ],
+      "min_padding_px": 347,
+      "pivot": {
+        "x": 1024,
+        "y": 1024,
+        "note": "canvas centre; standing feet baseline ~y=1650-1715"
+      },
+      "source": "assets/source/generated_chroma/over_plan_sleeping_v3_chroma.jpg",
+      "native_processed": "assets/processed/over_plan_sleeping_v3_native1024.png",
+      "crystal_level": 0.28,
+      "crystal_luma_before": 201.9,
+      "crystal_luma_after": 110.5,
+      "provenance": "AI-generated 2026-10-23 (Grok Bot image tool) using the user-created concept sheet and earlier generations as reference; processed by scripts/build_v3.py [regenerated in round 3]",
+      "production_status": "prototype",
+      "validation_status": "automated: pass; visual: light/dark previews + dark hair-edge zoom reviewed 2026-10-23",
+      "design_notes": "v3 (user request): fuller ragged beard + visible tears on cheeks; sleeping shows tear tracks",
+      "limitations": [
+        "AI-regenerated from the user-created concept sheet; not an exact recovery of any original layer",
+        "generator-native 1024x1024 JPEG on chroma green; keyed, edge-decontaminated, crystal-levelled, then 2x LANCZOS upscaled (premultiplied) to 2048 - resampled, not native 2048",
+        "flattened single layer; crystal brightness edited in-pixel (scripts/build_v3.py, same pipeline as build_v2.py) and glow is a separate layer",
+        "placement consistent from generator (feet baseline varies by up to ~60px for standing poses); sleeping poses sit lower by design"
+      ],
+      "supersedes": "assets/backup_v2/expressions/lucento_over_plan_sleeping_v2.png"
+    },
+    {
+      "id": "torch_glow_thriving",
+      "filename": "assets/layers/torch_glow/torch_glow_thriving.png",
+      "category": "layer_glow",
+      "tier": "thriving",
+      "pose": null,
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine (procedural radial)",
+      "canvas": [
+        1024,
+        1024
+      ],
+      "pivot": {
+        "x": 512,
+        "y": 512
+      },
+      "source": "procedural: mascot_assets.py glow",
+      "provenance": "procedurally generated by original code",
+      "peak_alpha_fraction": 1.0,
+      "production_status": "prototype",
+      "validation_status": "automated pass; composite reviewed in assets/previews/torch_glow_levels_v2_preview.png (moved to assets/backup_v2/previews/; glow layers unchanged in v3)",
+      "limitations": [
+        "placement on 2048 standing-pose canvas: centre (1620,660), ~700px; sleeping poses: crystal ~ (1535,830)"
+      ]
+    },
+    {
+      "id": "torch_glow_steady",
+      "filename": "assets/layers/torch_glow/torch_glow_steady.png",
+      "category": "layer_glow",
+      "tier": "steady",
+      "pose": null,
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine (procedural radial)",
+      "canvas": [
+        1024,
+        1024
+      ],
+      "pivot": {
+        "x": 512,
+        "y": 512
+      },
+      "source": "procedural: mascot_assets.py glow",
+      "provenance": "procedurally generated by original code",
+      "peak_alpha_fraction": 0.8,
+      "production_status": "prototype",
+      "validation_status": "automated pass; composite reviewed in assets/previews/torch_glow_levels_v2_preview.png (moved to assets/backup_v2/previews/; glow layers unchanged in v3)",
+      "limitations": [
+        "placement on 2048 standing-pose canvas: centre (1620,660), ~700px; sleeping poses: crystal ~ (1535,830)"
+      ]
+    },
+    {
+      "id": "torch_glow_getting_tight",
+      "filename": "assets/layers/torch_glow/torch_glow_getting_tight.png",
+      "category": "layer_glow",
+      "tier": "getting_tight",
+      "pose": null,
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine (procedural radial)",
+      "canvas": [
+        1024,
+        1024
+      ],
+      "pivot": {
+        "x": 512,
+        "y": 512
+      },
+      "source": "procedural: mascot_assets.py glow",
+      "provenance": "procedurally generated by original code",
+      "peak_alpha_fraction": 0.6,
+      "production_status": "prototype",
+      "validation_status": "automated pass; composite reviewed in assets/previews/torch_glow_levels_v2_preview.png (moved to assets/backup_v2/previews/; glow layers unchanged in v3)",
+      "limitations": [
+        "placement on 2048 standing-pose canvas: centre (1620,660), ~700px; sleeping poses: crystal ~ (1535,830)"
+      ]
+    },
+    {
+      "id": "torch_glow_concerned",
+      "filename": "assets/layers/torch_glow/torch_glow_concerned.png",
+      "category": "layer_glow",
+      "tier": "concerned",
+      "pose": null,
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine (procedural radial)",
+      "canvas": [
+        1024,
+        1024
+      ],
+      "pivot": {
+        "x": 512,
+        "y": 512
+      },
+      "source": "procedural: mascot_assets.py glow",
+      "provenance": "procedurally generated by original code",
+      "peak_alpha_fraction": 0.42,
+      "production_status": "prototype",
+      "validation_status": "automated pass; composite reviewed in assets/previews/torch_glow_levels_v2_preview.png (moved to assets/backup_v2/previews/; glow layers unchanged in v3)",
+      "limitations": [
+        "placement on 2048 standing-pose canvas: centre (1620,660), ~700px; sleeping poses: crystal ~ (1535,830)"
+      ]
+    },
+    {
+      "id": "torch_glow_over_plan",
+      "filename": "assets/layers/torch_glow/torch_glow_over_plan.png",
+      "category": "layer_glow",
+      "tier": "over_plan",
+      "pose": null,
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "color_mode": "RGBA",
+      "alpha_status": "genuine (procedural radial)",
+      "canvas": [
+        1024,
+        1024
+      ],
+      "pivot": {
+        "x": 512,
+        "y": 512
+      },
+      "source": "procedural: mascot_assets.py glow",
+      "provenance": "procedurally generated by original code",
+      "peak_alpha_fraction": 0.28,
+      "production_status": "prototype",
+      "validation_status": "automated pass; composite reviewed in assets/previews/torch_glow_levels_v2_preview.png (moved to assets/backup_v2/previews/; glow layers unchanged in v3)",
+      "limitations": [
+        "placement on 2048 standing-pose canvas: centre (1620,660), ~700px; sleeping poses: crystal ~ (1535,830)"
+      ]
+    },
+    {
+      "id": "layer_body",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_back_hair",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_front_hair",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_eyes_open",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_eyes_closed",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_eyebrows",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_mouths",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_clothing",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_scarf",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_satchel_strap",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_arm_left",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_arm_right",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_torch_handle",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_torch_crystal",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_ambient_sparkles",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    },
+    {
+      "id": "layer_ground_shadow",
+      "filename": null,
+      "category": "layer",
+      "production_status": "missing",
+      "validation_status": "n/a",
+      "limitations": [
+        "flattened generator output only; separation requires manual illustration/rigging"
+      ]
+    }
+  ]
+}

@@ -74,6 +74,51 @@ Presentation-layer only: no schema, entity, DAO or repository changes. See `docs
   states; Lottie: mascot expressions, onboarding, empty states, scan, saved, milestones (goal halfway/reached, month
   kept within budget — once).
 
+## Done — v0.5.0 UI/UX refinement (JVM-tested; compile pending CI)
+Dock navigation + More + profile menu, + Add sheet (Manual/Scan/Speak/Type it), budget hero with Sun moods, net flow
+glyph, burn bar, savings level, upcoming payments, category-derived budget, preset category onboarding, Budget tab
+with category management, focused Insights, screenshot tour in CI.
+
+## Done — conversational transaction composer (JVM-tested; compile pending CI)
+One composer replaces the Add sheet and the Scan / Speak / Type it screens: several transactions per message,
+inferred type/category/date/account, inline correction, receipts and speech through the same review, atomic batch
+save. Chat layout with a pinned wallet bar (default wallet, picker, one-tap transfers) and all-or-nothing saving.
+Next: on-device learning from corrections (M5), optional opt-in remote interpreter (docs/CAPTURE.md).
+
+## In progress — optional cloud sync (Supabase + Google Sign-In; built and tested locally, see docs/SYNC.md)
+Done: Room v6 sync bookkeeping (emulator-tested migration), push/pull/merge engine with tombstones and
+last-write-wins, WorkManager scheduling, Settings → Cloud sync, Supabase schema + RLS applied and verified.
+Remaining: Google OAuth clients + Supabase Google provider (blocks real sign-in), an end-to-end two-device test,
+recurring-schedule sync, syncing preferences.
+
+## In progress — dashboard refresh (`feature/dashboard-refresh`)
+- Home: working header (brand, sync status, disabled notifications placeholder, profile, month selector); Budget pace
+  card (budget used vs month elapsed, verdict in words, mascot); Net worth card (assets − liabilities with shortcuts);
+  featured savings goal; Scheduled transactions.
+- Manually valued assets (`OTHER_ASSET`): valuation only, counted in net worth, refused by every money write path.
+- App-wide hierarchy (`Hierarchy`, `SectionHeader`, `CardHeader`, `FieldHeader`); rounded floating dock
+  Home · Transactions · (+) · Insights · Budgets; Wallets, goals, scheduled transactions and debts open from Home's Quick links; categories from Budgets.
+- Wallets redesign: brand-blue Net worth hero (net worth left; Assets on sunlight / Liabilities on tangerine pills
+  right), Assets and Liabilities as separate tinted sections of carded rows (Debts & loans beside Liabilities), each
+  wallet page opening on a bank-card style face per type (`walletCard` tokens), balance flags with tooltips and a reconcile note (Scan shortcut), and Adjust balance from
+  Edit wallet (ADJUSTMENT_IN/OUT rows; no schema change — `type` is TEXT).
+- Debts & loans: optional interest rate, one-time / monthly repayment (months + amortization with a suggestion) and a
+  payment reminder that opens a prefilled recurring debt payment; payments split (user input) into principal (transfer)
+  and interest (expense under the auto-created "Debt interest"); Recurring payments redesigned (brand hero, carded rows,
+  Bill / Income / Debt payment). DB v8 (`debt_terms`, `recurring.to_wallet_id` / `interest_minor`), not synced yet.
+- Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
+  email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
+  Insights adopt the brand hero and carded sections.
+- Polish: rising-logo launch animation (the approved symbol's own paths, staged) and the same mark as the sign-in
+  indicator; 30 s sync request timeout with one retry; loan history shows each payment's principal and its interest
+  apart (`DebtPaymentLink`); New wallet live card preview; type icons on every wallet pill; compact goal cards;
+  smaller dashboard hero and raised Quick links; themed onboarding text in dark mode.
+- Guided setup after onboarding (accounts → cards & loans → two budget amounts → a goal → first transactions →
+  welcome); Wallets in the dock, Budgets in Quick links; Add actions in the top bar (sunlight at night); duplicate
+  categories from two setups on one sync account merge automatically; opt-in Smarter reading with Gemini through the
+  website proxy, with a per-user daily limit (docs/CAPTURE.md).
+- Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull. Older installs also read balance adjustments as expenses after a sync pull.
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).

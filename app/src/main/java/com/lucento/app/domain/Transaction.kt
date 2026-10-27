@@ -9,17 +9,28 @@ import java.time.LocalDate
  * Income and expense change what the user has. Transfers move money between the user's own wallets and
  * are stored as two linked legs ([TRANSFER_OUT] on the source, [TRANSFER_IN] on the destination) sharing a
  * transfer group. Transfers are never counted as income or spending.
+ *
+ * Balance adjustments ([ADJUSTMENT_IN] raises the money in a wallet, [ADJUSTMENT_OUT] lowers it) are written only by
+ * [com.lucento.app.data.repository.TransactionRepository.adjustBalance] when the user overrides a wallet's balance.
+ * They move the wallet balance but are never income or spending (see docs/CALCULATIONS.md).
  */
 enum class TransactionType {
     EXPENSE,
     INCOME,
     TRANSFER_OUT,
-    TRANSFER_IN;
+    TRANSFER_IN,
+    ADJUSTMENT_IN,
+    ADJUSTMENT_OUT;
 
     val isTransfer: Boolean get() = this == TRANSFER_OUT || this == TRANSFER_IN
 
+    val isAdjustment: Boolean get() = this == ADJUSTMENT_IN || this == ADJUSTMENT_OUT
+
+    /** Income or spending: what budgets, net flow and insights count. */
+    val isCashFlow: Boolean get() = this == INCOME || this == EXPENSE
+
     /** True when this movement adds money to the wallet it belongs to. */
-    val isInflow: Boolean get() = this == INCOME || this == TRANSFER_IN
+    val isInflow: Boolean get() = this == INCOME || this == TRANSFER_IN || this == ADJUSTMENT_IN
 }
 
 /**
@@ -37,10 +48,14 @@ data class Transaction(
     val note: String,
     val createdAtEpochMillis: Long,
     val transferGroup: String? = null,
+    /** The row's stable idempotency key; links a debt payment's interest row to its transfer ([DebtPaymentLink]). */
+    val clientUuid: String? = null,
 ) {
     val currencyCode: String get() = amount.currencyCode
 
     val isTransfer: Boolean get() = type.isTransfer
+
+    val isAdjustment: Boolean get() = type.isAdjustment
 
     /** Positive for money arriving in the wallet, negative for money leaving it. */
     val signedAmount: Money get() = if (type.isInflow) amount else -amount

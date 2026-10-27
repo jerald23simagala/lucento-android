@@ -1,0 +1,317 @@
+[
+  {
+    "tier": "thriving",
+    "pose": "hero_neutral",
+    "source": "assets/source/generated_chroma/thriving_hero_neutral_v2_chroma.jpg",
+    "out": "assets/wellness_tiers/lucento_thriving_hero_neutral_v2.png",
+    "crystal_px": 9923,
+    "crystal_luma_before": 224.0,
+    "crystal_luma_after": 224.0
+  },
+  {
+    "tier": "thriving",
+    "pose": "greeting_happy",
+    "source": "assets/source/generated_chroma/steady_greeting_happy_chroma.jpg",
+    "out": "assets/expressions/lucento_thriving_greeting_happy_v2.png",
+    "crystal_px": 9792,
+    "crystal_luma_before": 226.9,
+    "crystal_luma_after": 226.9
+  },
+  {
+    "tier": "thriving",
+    "pose": "thinking",
+    "source": "assets/source/generated_chroma/steady_thinking_chroma.jpg",
+    "out": "assets/expressions/lucento_thriving_thinking_v2.png",
+    "crystal_px": 9760,
+    "crystal_luma_before": 225.3,
+    "crystal_luma_after": 225.3
+  },
+  {
+    "tier": "thriving",
+    "pose": "pointing",
+    "source": "assets/source/generated_chroma/steady_pointing_chroma.jpg",
+    "out": "assets/expressions/lucento_thriving_pointing_v2.png",
+    "crystal_px": 9808,
+    "crystal_luma_before": 226.7,
+    "crystal_luma_after": 226.7
+  },
+  {
+    "tier": "thriving",
+    "pose": "caution",
+    "source": "assets/source/generated_chroma/steady_caution_chroma.jpg",
+    "out": "assets/expressions/lucento_thriving_caution_v2.png",
+    "crystal_px": 9793,
+    "crystal_luma_before": 225.3,
+    "crystal_luma_after": 225.3
+  },
+  {
+    "tier": "thriving",
+    "pose": "success",
+    "source": "assets/source/generated_chroma/thriving_success_v2_chroma.jpg",
+    "out": "assets/expressions/lucento_thriving_success_v2.png",
+    "crystal_px": 9741,
+    "crystal_luma_before": 223.9,
+    "crystal_luma_after": 223.9
+  },
+  {
+    "tier": "thriving",
+    "pose": "sleeping",
+    "source": "assets/source/generated_chroma/thriving_sleeping_v2_chroma.jpg",
+    "out": "assets/expressions/lucento_thriving_sleeping_v2.png",
+    "crystal_px": 8683,
+    "crystal_luma_before": 221.9,
+    "crystal_luma_after": 221.9
+  },
+  {
+    "tier": "steady",
+    "pose": "hero_neutral",
+    "source": "assets/source/generated_chroma/steady_hero_neutral_v2_chroma.jpg",
+    "out": "assets/wellness_tiers/lucento_steady_hero_neutral_v2.png",
+    "crystal_px": 9560,
+    "crystal_luma_before": 221.7,
+    "crystal_luma_after": 194.5
+  },
+  {
+    "tier": "steady",
+    "pose": "greeting_happy",
+    "source": "assets/source/generated_chroma/steady_greeting_happy_v2_chroma.jpg",
+    "out": "assets/expressions/lucento_steady_greeting_happy_v2.png",
+    "crystal_px": 9619,
+    "crystal_luma_before": 219.9,
+    "crystal_luma_after": 194.6
+  },
+  {
+    "tier": "steady",
+    "pose": "thinking",
+    "source": "assets/source/generated_chroma/steady_thinking_v2_chroma.jpg",
+    "out": "assets/expressions/lucento_steady_thinking_v2.png",
+    "crystal_px": 9548,
+    "crystal_luma_before": 217.6,
+    "crystal_luma_after": 194.6
+  },
+  {
+    "tier": "steady",
+    "pose": "pointing",
+    "source": "assets/source/generated_chroma/steady_pointing_v2_chroma.jpg",
+    "out": "assets/expressions/lucento_steady_pointing_v2.png",
+    "crystal_px": 9685,
+    "crystal_luma_before": 221.4,
+    "crystal_luma_after": 194.5
+  },
+  {
+    "tier": "steady",
+    "pose": "caution",
+    "source": "assets/source/generated_chroma/steady_caution_v2_chroma.jpg",
+    "out": "assets/expressions/lucento_steady_caution_v2.png",
+    "crystal_px": 9572,
+    "crystal_luma_before": 219.9,
+    "crystal_luma_after": 194.6
+  },
+  {
+    "tier": "steady",
+    "pose": "success",
+    "source": "assets/source/generated_chroma/steady_success_v2_chroma.jpg",
+    "out": "assets/expressions/lucento_steady_success_v2.png",
+    "crystal_px": 9604,
+    "crystal_luma_before": 219.8,
+    "crystal_luma_after": 194.6
+  },
+  {
+    "tier": "steady",
+    "pose": "sleeping",
+    "source": "assets/source/generated_chroma/steady_sleeping_v2_chroma.jpg",
+    "out": "assets/expressions/lucento_steady_sleeping_v2.png",
+    "crystal_px": 8601,
+    "crystal_luma_before": 220.9,
+    "crystal_luma_after": 194.5
+  },
+  {
+    "tier": "getting_tight",
+    "pose": "hero_neutral",
+    "source": "assets/source/generated_chroma/getting_tight_hero_neutral_chroma.jpg",
+    "out": "assets/wellness_tiers/lucento_getting_tight_hero_neutral_v2.png",
+    "crystal_px": 9719,
+    "crystal_luma_before": 220.6,
+    "crystal_luma_after": 161.1
+  },
+  {
+    "tier": "concerned",
+    "pose": "hero_neutral",
+    "source": "assets/source/generated_chroma/concerned_hero_neutral_v2_chroma.jpg",
+    "out": "assets/wellness_tiers/lucento_concerned_hero_neutral_v2.png",
+    "crystal_px": 5838,
+    "crystal_luma_before": 210.6,
+    "crystal_luma_after": 132.6
+  },
+  {
+    "tier": "over_plan",
+    "pose": "hero_neutral",
+    "source": "assets/source/generated_chroma/over_plan_hero_neutral_v2_chroma.jpg",
+    "out": "assets/wellness_tiers/lucento_over_plan_hero_neutral_v2.png",
+    "crystal_px": 6542,
+    "crystal_luma_before": 197.7,
+    "crystal_luma_after": 110.5
+  },
+  {
+    "tier": "getting_tight",
+    "pose": "greeting_happy",
+    "source": "assets/source/generated_chroma/getting_tight_greeting_happy_chroma.jpg",
+    "out": "assets/expressions/lucento_getting_tight_greeting_happy_v2.png",
+    "crystal_px": 9723,
+    "crystal_luma_before": 218.1,
+    "crystal_luma_after": 161.2
+  },
+  {
+    "tier": "getting_tight",
+    "pose": "thinking",
+    "source": "assets/source/generated_chroma/getting_tight_thinking_chroma.jpg",
+    "out": "assets/expressions/lucento_getting_tight_thinking_v2.png",
+    "crystal_px": 9801,
+    "crystal_luma_before": 218.6,
+    "crystal_luma_after": 161.2
+  },
+  {
+    "tier": "getting_tight",
+    "pose": "pointing",
+    "source": "assets/source/generated_chroma/getting_tight_pointing_chroma.jpg",
+    "out": "assets/expressions/lucento_getting_tight_pointing_v2.png",
+    "crystal_px": 9763,
+    "crystal_luma_before": 218.5,
+    "crystal_luma_after": 161.2
+  },
+  {
+    "tier": "getting_tight",
+    "pose": "caution",
+    "source": "assets/source/generated_chroma/getting_tight_caution_chroma.jpg",
+    "out": "assets/expressions/lucento_getting_tight_caution_v2.png",
+    "crystal_px": 9784,
+    "crystal_luma_before": 218.7,
+    "crystal_luma_after": 161.2
+  },
+  {
+    "tier": "getting_tight",
+    "pose": "success",
+    "source": "assets/source/generated_chroma/getting_tight_success_chroma.jpg",
+    "out": "assets/expressions/lucento_getting_tight_success_v2.png",
+    "crystal_px": 9753,
+    "crystal_luma_before": 218.7,
+    "crystal_luma_after": 161.2
+  },
+  {
+    "tier": "getting_tight",
+    "pose": "sleeping",
+    "source": "assets/source/generated_chroma/getting_tight_sleeping_chroma.jpg",
+    "out": "assets/expressions/lucento_getting_tight_sleeping_v2.png",
+    "crystal_px": 8596,
+    "crystal_luma_before": 219.4,
+    "crystal_luma_after": 161.1
+  },
+  {
+    "tier": "concerned",
+    "pose": "greeting_happy",
+    "source": "assets/source/generated_chroma/concerned_greeting_happy_chroma.jpg",
+    "out": "assets/expressions/lucento_concerned_greeting_happy_v2.png",
+    "crystal_px": 5663,
+    "crystal_luma_before": 210.0,
+    "crystal_luma_after": 132.6
+  },
+  {
+    "tier": "concerned",
+    "pose": "thinking",
+    "source": "assets/source/generated_chroma/concerned_thinking_chroma.jpg",
+    "out": "assets/expressions/lucento_concerned_thinking_v2.png",
+    "crystal_px": 5487,
+    "crystal_luma_before": 210.8,
+    "crystal_luma_after": 132.6
+  },
+  {
+    "tier": "concerned",
+    "pose": "pointing",
+    "source": "assets/source/generated_chroma/concerned_pointing_chroma.jpg",
+    "out": "assets/expressions/lucento_concerned_pointing_v2.png",
+    "crystal_px": 5510,
+    "crystal_luma_before": 210.3,
+    "crystal_luma_after": 132.6
+  },
+  {
+    "tier": "concerned",
+    "pose": "caution",
+    "source": "assets/source/generated_chroma/concerned_caution_chroma.jpg",
+    "out": "assets/expressions/lucento_concerned_caution_v2.png",
+    "crystal_px": 5118,
+    "crystal_luma_before": 211.5,
+    "crystal_luma_after": 132.6
+  },
+  {
+    "tier": "concerned",
+    "pose": "success",
+    "source": "assets/source/generated_chroma/concerned_success_chroma.jpg",
+    "out": "assets/expressions/lucento_concerned_success_v2.png",
+    "crystal_px": 5869,
+    "crystal_luma_before": 209.7,
+    "crystal_luma_after": 132.7
+  },
+  {
+    "tier": "concerned",
+    "pose": "sleeping",
+    "source": "assets/source/generated_chroma/concerned_sleeping_chroma.jpg",
+    "out": "assets/expressions/lucento_concerned_sleeping_v2.png",
+    "crystal_px": 8597,
+    "crystal_luma_before": 218.7,
+    "crystal_luma_after": 132.3
+  },
+  {
+    "tier": "over_plan",
+    "pose": "greeting_happy",
+    "source": "assets/source/generated_chroma/over_plan_greeting_happy_chroma.jpg",
+    "out": "assets/expressions/lucento_over_plan_greeting_happy_v2.png",
+    "crystal_px": 6324,
+    "crystal_luma_before": 197.5,
+    "crystal_luma_after": 110.5
+  },
+  {
+    "tier": "over_plan",
+    "pose": "thinking",
+    "source": "assets/source/generated_chroma/over_plan_thinking_chroma.jpg",
+    "out": "assets/expressions/lucento_over_plan_thinking_v2.png",
+    "crystal_px": 6151,
+    "crystal_luma_before": 198.1,
+    "crystal_luma_after": 110.5
+  },
+  {
+    "tier": "over_plan",
+    "pose": "pointing",
+    "source": "assets/source/generated_chroma/over_plan_pointing_chroma.jpg",
+    "out": "assets/expressions/lucento_over_plan_pointing_v2.png",
+    "crystal_px": 6394,
+    "crystal_luma_before": 198.0,
+    "crystal_luma_after": 110.5
+  },
+  {
+    "tier": "over_plan",
+    "pose": "caution",
+    "source": "assets/source/generated_chroma/over_plan_caution_chroma.jpg",
+    "out": "assets/expressions/lucento_over_plan_caution_v2.png",
+    "crystal_px": 6159,
+    "crystal_luma_before": 198.5,
+    "crystal_luma_after": 110.5
+  },
+  {
+    "tier": "over_plan",
+    "pose": "success",
+    "source": "assets/source/generated_chroma/over_plan_success_chroma.jpg",
+    "out": "assets/expressions/lucento_over_plan_success_v2.png",
+    "crystal_px": 6376,
+    "crystal_luma_before": 198.9,
+    "crystal_luma_after": 110.5
+  },
+  {
+    "tier": "over_plan",
+    "pose": "sleeping",
+    "source": "assets/source/generated_chroma/over_plan_sleeping_chroma.jpg",
+    "out": "assets/expressions/lucento_over_plan_sleeping_v2.png",
+    "crystal_px": 5223,
+    "crystal_luma_before": 201.3,
+    "crystal_luma_after": 110.5
+  }
+]

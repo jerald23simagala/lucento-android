@@ -81,7 +81,7 @@ internal fun MoneyField(
             null
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.small,
         colors = fieldColors(),
         modifier = modifier.fillMaxWidth(),
     )
@@ -114,21 +114,26 @@ internal fun TextInput(
             null
         },
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.small,
         colors = fieldColors(),
         modifier = modifier.fillMaxWidth(),
     )
 }
 
-/** Horizontal pills for a small set of choices. */
+/** Horizontal pills for a small set of choices; [icon] gives a pill its leading glyph (wallet pills carry their type's). */
 @Composable
-internal fun <T> PillRow(options: List<Pair<T, String>>, selected: T?, onSelect: (T) -> Unit) {
+internal fun <T> PillRow(
+    options: List<Pair<T, String>>,
+    selected: T?,
+    onSelect: (T) -> Unit,
+    icon: (T) -> androidx.compose.ui.graphics.vector.ImageVector? = { null },
+) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         options.forEach { (value, label) ->
-            ChoicePill(label = label, selected = value == selected, onClick = { onSelect(value) })
+            ChoicePill(label = label, selected = value == selected, leadingIcon = icon(value), onClick = { onSelect(value) })
         }
     }
 }

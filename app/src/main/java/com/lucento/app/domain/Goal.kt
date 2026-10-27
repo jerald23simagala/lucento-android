@@ -18,6 +18,10 @@ data class Goal(
     val targetDate: LocalDate?,
     val linkedWalletId: Long?,
     val createdAtEpochMillis: Long,
+    /** The card picture the user chose ([GoalScene.key]); null = automatic from the name. Presentation only. */
+    val sceneKey: String? = null,
+    /** The user's own photo for the card (a private copy in app storage). Takes precedence over [sceneKey]. */
+    val photoPath: String? = null,
 ) {
     val currencyCode: String get() = target.currencyCode
 }
@@ -122,5 +126,73 @@ object GoalMilestones {
             java.math.BigInteger.valueOf(saved.amountMinor).multiply(java.math.BigInteger.valueOf(100)) >=
                 java.math.BigInteger.valueOf(target.amountMinor).multiply(java.math.BigInteger.valueOf(m.percent.toLong()))
         return GoalMilestone.entries.reversed().firstOrNull { reached(after, it) && !reached(before, it) }
+    }
+}
+
+/**
+ * The dashboard's savings level for one currency: how far all active goals in [currencyCode] are toward their
+ * targets together, and the goal closest to completion.
+ *
+ * Goal contributions only *earmark* money already counted in wallet balances, so this is a view of progress, never
+ * an extra asset: nothing here feeds net worth, budgets or cash flow. Overall progress caps each goal at its target
+ * and ignores negative balances (a goal saved past its target cannot hide another goal's shortfall).
+ */
+data class GoalsOverview(
+    val currencyCode: String,
+    val goalCount: Int,
+    val reachedCount: Int,
+    /** Sum over goals of min(max(saved, 0), target). */
+    val saved: Money,
+    val target: Money,
+    val percent: Int,
+    val fraction: Float,
+    /** The unreached goal with the highest progress (ties: earliest target date, then oldest). */
+    val closest: GoalProgress?,
+    /** Goals kept in other currencies (not added in; never converted). */
+    val otherCurrencyGoals: Int,
+    /**
+     * The goal to feature: the in-progress goal with the highest completion (same order as [closest]); when every
+     * goal is reached, the most recently created one. Null only when there are no goals in this currency.
+     */
+    val top: GoalProgress? = null,
+)
+
+object GoalsSummary {
+
+    fun overview(goals: List<Goal>, contributions: List<GoalContribution>, currencyCode: String, today: LocalDate): GoalsOverview? {
+        val inCurrency = goals.filter { it.currencyCode == currencyCode }
+        if (inCurrency.isEmpty()) return null
+        val progress = inCurrency.map { GoalCalculator.progress(it, contributions, today) }
+        val zero = Money.zero(currencyCode)
+        val saved = Money.sum(
+            currencyCode,
+            progress.map { p ->
+                when {
+                    p.saved.isNegative -> zero
+                    p.saved > p.goal.target -> p.goal.target
+                    else -> p.saved
+                }
+            },
+        )
+        val target = Money.sum(currencyCode, inCurrency.map { it.target })
+        val closest = progress.filterNot { it.reached }
+            .sortedWith(
+                compareByDescending<GoalProgress> { it.percent }
+                    .thenBy { it.goal.targetDate ?: LocalDate.MAX }
+                    .thenBy { it.goal.createdAtEpochMillis },
+            )
+            .firstOrNull()
+        return GoalsOverview(
+            currencyCode = currencyCode,
+            goalCount = inCurrency.size,
+            reachedCount = progress.count { it.reached },
+            saved = saved,
+            target = target,
+            percent = (Insights.percentOf(saved, target) ?: 0).coerceIn(0, 100),
+            fraction = Insights.fraction(saved, target),
+            closest = closest,
+            otherCurrencyGoals = goals.size - inCurrency.size,
+            top = closest ?: progress.maxByOrNull { it.goal.createdAtEpochMillis },
+        )
     }
 }

@@ -1,5 +1,6 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.domain.transactable
 import com.lucento.app.domain.GoalCalculator
 import com.lucento.app.domain.GoalMilestone
 import com.lucento.app.domain.GoalMilestones
@@ -17,6 +18,8 @@ import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.Budget
 import com.lucento.app.domain.Category
+import com.lucento.app.domain.CategoryKind
+import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.FeatureSet
 import com.lucento.app.domain.Goal
 import com.lucento.app.domain.GoalContribution
@@ -31,7 +34,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.UUID
 
-/** Everything the Plan hub and its four screens read. Calculations happen in the domain layer. */
+/** Everything the goals, debts and recurring screens (and the More menu) read. Calculations happen in the domain layer. */
 data class PlanUiState(
     val loading: Boolean = true,
     val today: LocalDate = LocalDate.now(),
@@ -81,7 +84,7 @@ fun AmountError.message(currencyCode: String, separator: Char): String = when (t
 class PlanViewModel(
     transactions: TransactionRepository,
     wallets: WalletRepository,
-    categories: CategoryRepository,
+    private val categories: CategoryRepository,
     private val budgets: BudgetRepository,
     private val goals: GoalRepository,
     private val recurring: RecurringRepository,
@@ -116,7 +119,7 @@ class PlanViewModel(
             today = LocalDate.now(),
             primaryCurrency = prefs.primaryCurrency,
             features = prefs.features,
-            wallets = base.wallets,
+            wallets = base.wallets.transactable(),
             categories = base.categories,
             transactions = base.transactions,
             budgets = base.budgets,
@@ -152,17 +155,7 @@ class PlanViewModel(
         }
     }
 
-    // ---------------------------------------------------------------- budgets
-
-    fun saveBudget(id: Long?, categoryId: Long?, limit: Money, onResult: (BudgetRepository.SaveResult) -> Unit) =
-        write({ budgets.save(id, categoryId, limit) }, onResult)
-
-    fun deleteBudget(id: Long) = write({ budgets.delete(id) }) {}
-
-    /** Records that [month]'s kept budget was acknowledged, so it is never shown again. */
-    fun acknowledgeBudgetMonth(month: java.time.YearMonth) {
-        viewModelScope.launch { runCatching { preferences.setAcknowledgedBudgetMonth(month) } }
-    }
+    // Budgets moved to the Budget tab (feature/budget/BudgetViewModel) in 0.5.
 
     // ---------------------------------------------------------------- goals
 
@@ -172,8 +165,10 @@ class PlanViewModel(
         target: Money,
         targetDate: LocalDate?,
         walletId: Long?,
+        sceneKey: String?,
+        photoPath: String?,
         onResult: (GoalRepository.SaveResult) -> Unit,
-    ) = write({ goals.save(id, name, target, targetDate, walletId) }, onResult)
+    ) = write({ goals.save(id, name, target, targetDate, walletId, sceneKey, photoPath) }, onResult)
 
     /**
      * Saves a contribution. [onMilestone] is called once, after the write succeeded, if this contribution moved
@@ -206,11 +201,19 @@ class PlanViewModel(
 
     // ---------------------------------------------------------------- recurring
 
+    /** A debt payment without a category gets the shared interest category, created or restored as needed. */
     fun saveSchedule(input: RecurringRepository.Input, onResult: (RecurringRepository.SaveResult) -> Unit) =
-        write({ recurring.save(input) }, onResult)
+        write({
+            val withCategory = if (input.toWalletId != null && input.categoryId == null) {
+                input.copy(categoryId = categories.ensure(DebtMath.INTEREST_CATEGORY, CategoryKind.EXPENSE, DebtMath.INTEREST_ICON))
+            } else {
+                input
+            }
+            recurring.save(withCategory)
+        }, onResult)
 
-    fun markPaid(id: Long, amount: Money?, date: LocalDate?, onResult: (RecurringRepository.PayResult) -> Unit) =
-        write({ recurring.markPaid(id, amount, date) }, onResult)
+    fun markPaid(id: Long, amount: Money?, date: LocalDate?, interest: Money? = null, onResult: (RecurringRepository.PayResult) -> Unit) =
+        write({ recurring.markPaid(id, amount, date, interest) }, onResult)
 
     fun skip(id: Long) = write({ recurring.skip(id) }) {}
 

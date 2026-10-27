@@ -5,7 +5,7 @@ name: Android CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "release/**", "feature/**"]
   pull_request:
   workflow_dispatch:
 
@@ -129,8 +129,12 @@ jobs:
           cat permissions.txt
           grep -q "package: name='com.lucento.app'" badging.txt || { echo "::error::release application id is not com.lucento.app"; exit 1; }
           if grep -q "application-debuggable" badging.txt; then echo "::error::release APK is debuggable"; exit 1; fi
-          if grep -qE "android.permission.(INTERNET|ACCESS_NETWORK_STATE)" permissions.txt; then
-            echo "::error::release APK requests network access"; exit 1
+          # Allow-list (see docs/SYNC.md): network access exists only for opt-in cloud sync; WAKE_LOCK and
+          # RECEIVE_BOOT_COMPLETED come from WorkManager. Any other permission fails the build until reviewed.
+          ALLOWED="android.permission.INTERNET|android.permission.ACCESS_NETWORK_STATE|android.permission.WAKE_LOCK|android.permission.RECEIVE_BOOT_COMPLETED|com.lucento.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+          UNEXPECTED=$(grep "uses-permission" permissions.txt | sed -E "s/.*name='([^']+)'.*/\1/" | grep -vxE "$ALLOWED" || true)
+          if [ -n "$UNEXPECTED" ]; then
+            echo "::error::release APK requests unreviewed permissions: $UNEXPECTED"; exit 1
           fi
           "$AAPT2" dump badging "$DEBUG_APK" | grep -q "package: name='com.lucento.app.debug'" || { echo "::error::debug application id is not com.lucento.app.debug"; exit 1; }
           {
@@ -197,7 +201,7 @@ jobs:
           retention-days: 14
 
   migrations:
-    name: Room migration tests (emulator)
+    name: Room migration tests + UI screenshot tour (emulator)
     runs-on: ubuntu-latest
     needs: build
     timeout-minutes: 45
@@ -211,7 +215,7 @@ jobs:
         run: |
           DIR=app/schemas/com.lucento.app.data.local.LucentoDatabase
           missing=""
-          for v in 1 2 3; do [ -f "$DIR/$v.json" ] || missing="$missing $v.json"; done
+          for v in 1 2 3 4 5; do [ -f "$DIR/$v.json" ] || missing="$missing $v.json"; done
           if [ -n "$missing" ]; then
             echo "::error::Missing Room schema history:$missing. Migration tests NOT RUN. See docs/QUALITY.md › Room schemas."
             echo "### Migration tests NOT RUN — missing schema history:$missing" >> "$GITHUB_STEP_SUMMARY"
@@ -233,15 +237,55 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run instrumented migration tests on an API 30 emulator
+      - name: Run instrumented migration tests and the UI screenshot tour on an API 30 emulator
+        # MigrationTest validates every Room migration against the exported schemas. ScreenshotTourTest walks a fresh
+        # install through onboarding, every dock destination, the + / More / Profile sheets and both themes, asserting
+        # key behaviour and saving a screenshot of each screen (pulled below). Animations are disabled on the emulator,
+        # so the app shows its reduced-motion (still) frames — deterministic screenshots.
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
           arch: x86_64
           target: default
+          profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.data.local.MigrationTest
+          script: |
+            ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.data.local.MigrationTest
+            ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ScreenshotTourTest || echo "SCREENSHOT_TOUR_FAILED=true" >> "$GITHUB_ENV"
+            mkdir -p app/build/screenshots && adb pull /data/local/tmp/lucento-shots/. app/build/screenshots/ || true
+
+      - name: Screenshot tour result
+        if: always()
+        run: |
+          # Failure messages become annotations, which are readable without signing in (logs and artifacts are not).
+          python3 - <<'PY' || true
+          import glob, xml.etree.ElementTree as ET
+          for f in glob.glob("app/build/outputs/androidTest-results/connected/**/*.xml", recursive=True):
+              for case in ET.parse(f).getroot().iter("testcase"):
+                  for fail in list(case.iter("failure")) + list(case.iter("error")):
+                      text = (fail.get("message") or "") + "\n" + (fail.text or "")
+                      text = text.strip().replace("%", "%25").replace("\r", "").replace("\n", "%0A")[:3500]
+                      print(f"::error title={case.get('classname')}.{case.get('name')}::{text}")
+          PY
+          COUNT=$(find app/build/screenshots -name '*.png' 2>/dev/null | wc -l)
+          find app/build/screenshots -name '*.png' -printf '%f\n' 2>/dev/null | sort | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=Screenshots::$COUNT taken: $(find app/build/screenshots -name '*.png' -printf '%f ' 2>/dev/null)"
+          echo "### UI screenshot tour: $COUNT screenshots" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${SCREENSHOT_TOUR_FAILED:-false}" = "true" ]; then
+            echo "ScreenshotTourTest **failed** — see migration-test-reports. Screenshots taken before the failure are attached." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::ScreenshotTourTest failed"
+            exit 1
+          fi
+
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: app/build/screenshots/
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Upload instrumented test reports
         if: always()

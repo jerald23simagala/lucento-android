@@ -1,5 +1,13 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.icon
+import com.lucento.app.core.designsystem.component.MoneyText
+import com.lucento.app.core.designsystem.component.HeroTones
+import com.lucento.app.core.designsystem.component.HeroPill
+import com.lucento.app.core.designsystem.component.HeroFigure
+import com.lucento.app.core.designsystem.component.HeroCard
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.IntrinsicSize
 import com.lucento.app.core.designsystem.component.Confirmation
 import com.lucento.app.core.designsystem.component.ConfirmationHost
 import com.lucento.app.domain.GoalMilestone
@@ -7,6 +15,7 @@ import com.lucento.app.core.designsystem.component.LucentoAnimation
 import com.lucento.app.core.designsystem.component.EmptyIllustration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,6 +37,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -62,7 +72,7 @@ import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
-import com.lucento.app.core.designsystem.component.SectionHeader
+import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.ShareBar
 import com.lucento.app.core.designsystem.component.StatusPill
@@ -75,6 +85,35 @@ import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.data.repository.GoalRepository
 import com.lucento.app.domain.GoalCalculator
 import com.lucento.app.domain.GoalProgress
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import com.lucento.app.core.designsystem.component.IllustratedSurface
+import com.lucento.app.core.designsystem.component.IllustrationScrims
+import com.lucento.app.core.designsystem.component.LucentoIllustration
+import com.lucento.app.domain.GoalScene
+import com.lucento.app.domain.GoalPresets
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import android.graphics.BitmapFactory
+import com.lucento.app.data.media.GoalPhotos
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -85,7 +124,26 @@ private data class GoalDraft(
     val amountText: String = "",
     val targetDate: LocalDate? = null,
     val walletId: Long? = null,
+    /** Chosen card picture ([GoalScene.key]); null = automatic from the name. */
+    val sceneKey: String? = null,
+    /** The user's own card photo (private copy); when set it is the picture shown. */
+    val photoPath: String? = null,
 )
+
+/** The new-goal sheet on its own, for the guided setup; [onDismiss] runs when it closes, saved or not. */
+@Composable
+internal fun NewGoalSheet(currencyCode: String, onDismiss: () -> Unit, viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory)) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current.applicationContext
+    val photos = remember(context) { GoalPhotos(context) }
+    GoalEditorSheet(
+        initial = GoalDraft(currencyCode = currencyCode),
+        state = state,
+        photos = photos,
+        onSave = { d, money, done -> viewModel.saveGoal(d.id, d.name, money, d.targetDate, d.walletId, d.sceneKey, d.photoPath, done) },
+        onDismiss = onDismiss,
+    )
+}
 
 /** Savings goals with progress from earmarked contributions (wallet balances are never changed). */
 @Composable
@@ -93,6 +151,8 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<GoalDraft?>(null) }
     var openGoalId by remember { mutableStateOf<Long?>(null) }
+    val context = LocalContext.current.applicationContext
+    val photos = remember(context) { GoalPhotos(context) }
     var celebration by remember { mutableStateOf<Confirmation?>(null) }
     val progress = remember(state.goals, state.contributions, state.today) {
         state.goals.map { GoalCalculator.progress(it, state.contributions, state.today) }
@@ -103,7 +163,17 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
         ) {
-            item(key = "bar") { LucentoTopBar(title = "Savings goals", onBack = onBack) }
+            item(key = "bar") {
+                LucentoTopBar(title = "Goals", onBack = onBack, actions = {
+                    if (state.goals.isNotEmpty()) {
+                        com.lucento.app.core.designsystem.component.AddPillButton(
+                            "Add",
+                            onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
+                            contentDescription = "Add goal",
+                        )
+                    }
+                })
+            }
             if (!state.loading && state.goals.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
@@ -112,6 +182,12 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                         illustration = { EmptyIllustration(LucentoAnimation.EmptyGoals) },
                         action = { LucentoPrimaryButton(text = "Create a goal", onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) }) },
                     )
+                }
+            }
+            if (progress.isNotEmpty()) {
+                item(key = "hero") {
+                    GoalsHero(progress, state.primaryCurrency)
+                    Spacer(Modifier.height(Spacing.md))
                 }
             }
             items(progress, key = { "goal-${it.goal.id}" }) { p ->
@@ -123,17 +199,6 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                     InfoNote("Adding money to a goal sets it aside on paper — your wallet balances and net worth don’t change, so savings are never counted twice.")
                 }
             }
-        }
-        if (state.goals.isNotEmpty()) {
-            ExtendedFloatingActionButton(
-                onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Add goal") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.gutter),
-            )
         }
         ConfirmationHost(confirmation = celebration, onDismissed = { celebration = null })
     }
@@ -167,9 +232,12 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                     amountText = MoneyFormatter.formatPlain(open.goal.target),
                     targetDate = open.goal.targetDate,
                     walletId = open.goal.linkedWalletId,
+                    sceneKey = open.goal.sceneKey,
+                    photoPath = open.goal.photoPath,
                 )
             },
             onDelete = {
+                photos.delete(open.goal.photoPath)
                 viewModel.deleteGoal(open.goal.id)
                 openGoalId = null
             },
@@ -182,33 +250,129 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
         GoalEditorSheet(
             initial = draft,
             state = state,
-            onSave = { d, money, done -> viewModel.saveGoal(d.id, d.name, money, d.targetDate, d.walletId, done) },
+            photos = photos,
+            onSave = { d, money, done -> viewModel.saveGoal(d.id, d.name, money, d.targetDate, d.walletId, d.sceneKey, d.photoPath, done) },
             onDismiss = { editing = null },
         )
     }
 }
 
+/**
+ * The page's statement, on brand blue: what is saved toward goals in the main currency (other currencies are never
+ * added in) on the left; still to save and how many goals are reached stacked on the right.
+ */
 @Composable
-private fun GoalCard(p: GoalProgress, onClick: () -> Unit) {
+private fun GoalsHero(progress: List<GoalProgress>, primaryCurrency: String) {
     val ext = LucentoTheme.extendedColors
-    LucentoCard(Modifier.fillMaxWidth(), onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconTile(icon = Icons.Outlined.Flag, container = ext.savings.container, content = ext.savings.content)
-            Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f)) {
-                Text(p.goal.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    val code = progress.firstOrNull { it.goal.currencyCode == primaryCurrency }?.goal?.currencyCode ?: progress.first().goal.currencyCode
+    val mine = progress.filter { it.goal.currencyCode == code }
+    // Saved counts up to each target: money beyond a reached goal isn't "toward goals" any more.
+    val saved = Money.sum(code, mine.map { p -> if (p.saved.amountMinor > p.goal.target.amountMinor) p.goal.target else p.saved.coerceNonNegative() })
+    val target = Money.sum(code, mine.map { it.goal.target })
+    val left = (target - saved).coerceNonNegative()
+    val reached = mine.count { it.reached }
+    HeroCard {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1.15f)) {
+                HeroPill("Saved for goals · $code", HeroTones.main, Modifier.semantics { heading() })
+                Spacer(Modifier.height(Spacing.xs))
+                MoneyText(money = saved, style = AmountStyles.hero, color = ext.onHero)
                 Text(
-                    "${MoneyFormatter.format(p.saved)} of ${MoneyFormatter.format(p.goal.target)}",
+                    "of ${MoneyFormatter.format(target)} · ${mine.size} ${if (mine.size == 1) "goal" else "goals"}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = ext.onHeroMuted,
+                    maxLines = 1,
                 )
             }
-            if (p.reached) StatusPill("Reached", StatusTones.positive) else Text("${p.percent}%", style = AmountStyles.medium)
+            VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                HeroFigure("Still to save", HeroTones.tangerine) {
+                    MoneyText(money = left, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f)
+                }
+                HeroFigure("Reached", HeroTones.sunlight) {
+                    Text("$reached of ${mine.size}", style = AmountStyles.row, color = ext.onHero)
+                }
+            }
         }
-        Spacer(Modifier.height(Spacing.md))
+        if (mine.size < progress.size) {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                "Goals in other currencies are listed below and never added in.",
+                style = MaterialTheme.typography.bodySmall,
+                color = ext.onHeroMuted,
+            )
+        }
+    }
+}
+
+private fun Money.coerceNonNegative(): Money = if (isNegative) Money.zero(currencyCode) else this
+
+/**
+ * A goal's card, compact: its picture on the side — the user's photo, else the scene recognised from the name (Mount
+ * Fuji for Japan, the sunrise for other trips), else the goal flag — and the name, figures, progress bar and outlook
+ * beside it. Content, order and actions are identical whichever thumbnail shows.
+ */
+@Composable
+private fun GoalCard(p: GoalProgress, onClick: () -> Unit) {
+    LucentoCard(Modifier.fillMaxWidth(), onClick = onClick, contentPadding = Spacing.md) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            GoalThumbnail(p)
+            Spacer(Modifier.width(Spacing.md))
+            GoalCardContent(p, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun GoalThumbnail(p: GoalProgress) {
+    val photo = rememberGoalPhoto(p.goal.photoPath)
+    val scene = remember(p.goal.name, p.goal.sceneKey) { GoalScene.forGoal(p.goal.name, p.goal.sceneKey) }
+    val illustration = scene.illustration()
+    val ext = LucentoTheme.extendedColors
+    val shape = MaterialTheme.shapes.medium
+    val box = Modifier.size(64.dp).clip(shape)
+    when {
+        photo != null -> Image(bitmap = photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = box)
+        illustration != null -> Image(
+            painter = androidx.compose.ui.res.painterResource(illustration.res),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            // At night the artwork is dimmed slightly so it sits calmly on the navy card.
+            alpha = if (LucentoTheme.isDark) 0.85f else 1f,
+            modifier = box,
+        )
+        else -> Box(box.background(ext.savings.container), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.Flag, contentDescription = null, tint = ext.savings.content, modifier = Modifier.size(28.dp))
+        }
+    }
+}
+
+@Composable
+private fun GoalCardContent(p: GoalProgress, modifier: Modifier = Modifier) {
+    val ext = LucentoTheme.extendedColors
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(p.goal.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(Spacing.sm))
+            if (p.reached) StatusPill("Reached", StatusTones.positive) else Text("${p.percent}%", style = AmountStyles.row)
+        }
+        Text(
+            "${MoneyFormatter.format(p.saved)} of ${MoneyFormatter.format(p.goal.target)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(Spacing.xs))
         ShareBar(fraction = p.fraction, color = ext.success)
-        Spacer(Modifier.height(Spacing.sm))
-        Text(goalOutlook(p), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            goalOutlook(p),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -309,7 +473,7 @@ private fun GoalDetailSheet(
 
             if (history.isNotEmpty()) {
                 Spacer(Modifier.height(Spacing.lg))
-                SectionHeader("History")
+                FieldHeader("History")
                 history.forEachIndexed { index, c ->
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(formatDate(c.date), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -349,6 +513,7 @@ private fun GoalDetailSheet(
 private fun GoalEditorSheet(
     initial: GoalDraft,
     state: PlanUiState,
+    photos: GoalPhotos,
     onSave: (GoalDraft, Money, (GoalRepository.SaveResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -358,12 +523,38 @@ private fun GoalEditorSheet(
     var draft by remember { mutableStateOf(initial) }
     var nameError by remember { mutableStateOf<String?>(null) }
     var amountError by remember { mutableStateOf<String?>(null) }
-
-    fun close() {
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    var photoError by remember { mutableStateOf<String?>(null) }
+    var saved by remember { mutableStateOf(false) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val path = withContext(Dispatchers.IO) { photos.import(uri) }
+                if (path != null) {
+                    draft = draft.copy(photoPath = path)
+                    photoError = null
+                } else {
+                    photoError = "That picture couldn’t be opened. Try another one."
+                }
+            }
+        }
     }
 
-    LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    fun dismiss() {
+        // A photo copied during this edit but never saved is removed; the goal's own photo is left alone.
+        if (!saved && draft.photoPath != initial.photoPath) photos.delete(draft.photoPath)
+        onDismiss()
+    }
+
+    fun close() {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { dismiss() }
+    }
+
+    fun chooseBuiltIn(key: String?) {
+        if (draft.photoPath != initial.photoPath) photos.delete(draft.photoPath)
+        draft = draft.copy(sceneKey = key, photoPath = null)
+    }
+
+    LucentoBottomSheet(onDismissRequest = { dismiss() }, sheetState = sheetState) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -378,6 +569,19 @@ private fun GoalEditorSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.semantics { heading() },
             )
+            if (initial.id == null) {
+                // Optional starting points: a tap fills in the name and picture only; the user still sets the amount.
+                FieldHeader("Suggestions (optional)")
+                PillRow(
+                    options = GoalPresets.all.map { it to it.name },
+                    selected = GoalPresets.all.firstOrNull { it.name == draft.name },
+                    onSelect = { preset ->
+                        chooseBuiltIn(preset.scene.key)
+                        draft = draft.copy(name = preset.name)
+                        nameError = null
+                    },
+                )
+            }
             TextInput(
                 value = draft.name,
                 onValueChange = { draft = draft.copy(name = it); nameError = null },
@@ -399,12 +603,24 @@ private fun GoalEditorSheet(
             DateField(label = "Target date (optional)", date = draft.targetDate, onDate = { draft = draft.copy(targetDate = it) })
             val savingsWallets = state.wallets.filter { !it.type.isLiability && it.currencyCode == draft.currencyCode }
             if (savingsWallets.isNotEmpty()) {
-                SectionHeader("Kept in (optional)")
+                FieldHeader("Kept in (optional)")
                 PillRow(
                     options = listOf<Pair<Long?, String>>(null to "Not linked") + savingsWallets.map { it.id to it.name },
                     selected = draft.walletId,
                     onSelect = { draft = draft.copy(walletId = it) },
+                    icon = { id -> savingsWallets.firstOrNull { it.id == id }?.type?.icon ?: Icons.Outlined.LinkOff },
                 )
+            }
+            FieldHeader("Card picture")
+            ScenePicker(
+                name = draft.name,
+                selectedKey = draft.sceneKey,
+                photoPath = draft.photoPath,
+                onSelect = { chooseBuiltIn(it) },
+                onAddPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            )
+            photoError?.let {
+                Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
             }
             LucentoPrimaryButton(
                 text = if (initial.id == null) "Create goal" else "Save changes",
@@ -420,7 +636,11 @@ private fun GoalEditorSheet(
                     }
                     onSave(draft, money) { result ->
                         when (result) {
-                            is GoalRepository.SaveResult.Saved -> close()
+                            is GoalRepository.SaveResult.Saved -> {
+                                saved = true
+                                if (initial.photoPath != null && initial.photoPath != draft.photoPath) photos.delete(initial.photoPath)
+                                close()
+                            }
                             GoalRepository.SaveResult.BlankName -> nameError = "Give this goal a name."
                             GoalRepository.SaveResult.TargetNotPositive -> amountError = "The target must be greater than zero."
                             GoalRepository.SaveResult.CurrencyLocked -> amountError = "A goal’s currency can’t change."
@@ -435,4 +655,137 @@ private fun GoalEditorSheet(
             Spacer(Modifier.height(Spacing.sm))
         }
     }
+}
+
+internal fun GoalScene.illustration(): LucentoIllustration? = when (this) {
+    GoalScene.JAPAN -> LucentoIllustration.JapanFuji
+    GoalScene.TRAVEL -> LucentoIllustration.SunriseLandscape
+    GoalScene.MOUNTAINS -> LucentoIllustration.SoftMountains
+    GoalScene.NONE -> null
+}
+
+private fun GoalScene.label(): String = when (this) {
+    GoalScene.JAPAN -> "Mount Fuji"
+    GoalScene.TRAVEL -> "Sunrise"
+    GoalScene.MOUNTAINS -> "Mountains"
+    GoalScene.NONE -> "No picture"
+}
+
+/**
+ * Chooses the goal card's picture from Lucento's built-in scenes. "Automatic" (null) follows the goal's name, previewing
+ * what it currently resolves to. Pictures are decorative; each option is a radio button with a text label.
+ */
+@Composable
+private fun ScenePicker(
+    name: String,
+    selectedKey: String?,
+    photoPath: String?,
+    onSelect: (String?) -> Unit,
+    onAddPhoto: () -> Unit,
+) {
+    val automatic = GoalScene.of(name)
+    val options: List<Pair<String?, Pair<String, LucentoIllustration?>>> =
+        listOf<Pair<String?, Pair<String, LucentoIllustration?>>>(null to ("Automatic" to automatic.illustration())) +
+            GoalScene.entries.map { it.key to (it.label() to it.illustration()) }
+    val colors = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        options.forEach { (key, labelAndArt) ->
+            val (label, art) = labelAndArt
+            val selected = key == selectedKey && photoPath == null
+            Column(
+                Modifier
+                    .width(88.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .selectable(selected = selected, role = Role.RadioButton, onClick = { onSelect(key) })
+                    .padding(vertical = Spacing.xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(colors.surfaceContainer)
+                        .border(
+                            BorderStroke(if (selected) 2.dp else 1.dp, if (selected) colors.primary else colors.outlineVariant),
+                            MaterialTheme.shapes.small,
+                        ),
+                ) {
+                    if (art != null) {
+                        Image(
+                            painter = painterResource(art.res),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.matchParentSize(),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) colors.primary else colors.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+        val photo = rememberGoalPhoto(photoPath)
+        val photoSelected = photoPath != null
+        Column(
+            Modifier
+                .width(88.dp)
+                .clip(MaterialTheme.shapes.small)
+                .selectable(selected = photoSelected, role = Role.RadioButton, onClick = onAddPhoto)
+                .padding(vertical = Spacing.xs),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(colors.surfaceContainer)
+                    .border(
+                        BorderStroke(if (photoSelected) 2.dp else 1.dp, if (photoSelected) colors.primary else colors.outlineVariant),
+                        MaterialTheme.shapes.small,
+                    ),
+            ) {
+                if (photo != null) {
+                    Image(
+                        bitmap = photo,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = null,
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                if (photoSelected) "Your photo" else "Add photo",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (photoSelected) colors.primary else colors.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** The user's own goal photo, decoded off the main thread; null while loading or when the file is gone. */
+@Composable
+internal fun rememberGoalPhoto(path: String?): ImageBitmap? {
+    var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(path) {
+        bitmap = if (path == null) null else withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path)?.asImageBitmap() }
+    }
+    return bitmap
 }

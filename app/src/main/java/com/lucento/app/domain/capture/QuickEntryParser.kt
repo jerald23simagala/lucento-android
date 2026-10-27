@@ -54,15 +54,20 @@ object QuickEntryParser {
         val amount = extractAmount(withoutDate)
         if (amount == null) warnings += "No amount found — enter it below."
 
-        val type = detectType(withoutDate)
         val active = wallets
+        val type = detectType(withoutDate).let { t ->
+            if (t != TransactionType.TRANSFER_OUT && sendsToOwnWallet(withoutDate, active)) TransactionType.TRANSFER_OUT else t
+        }
         val mentions = findWalletMentions(withoutDate, active)
 
         var walletId: Long? = null
         var toWalletId: Long? = null
         if (type == TransactionType.TRANSFER_OUT) {
-            val from = mentions.firstOrNull { it.afterFrom } ?: mentions.firstOrNull { !it.afterTo }
-            val to = mentions.firstOrNull { it.afterTo && it.wallet.id != from?.wallet?.id }
+            // "paid my credit card 3000", "topped up GCash 500": the one account named is where the money goes.
+            val into = mentions.singleOrNull()?.takeIf { !it.afterFrom && INTO_VERBS.containsMatchIn(withoutDate) }
+            val from = if (into != null) null else mentions.firstOrNull { it.afterFrom } ?: mentions.firstOrNull { !it.afterTo }
+            val to = into
+                ?: mentions.firstOrNull { it.afterTo && it.wallet.id != from?.wallet?.id }
                 ?: mentions.firstOrNull { it.wallet.id != from?.wallet?.id }
             walletId = from?.wallet?.id
             toWalletId = to?.wallet?.id
@@ -111,12 +116,32 @@ object QuickEntryParser {
         " top up ", " topped up ", " top-up ", " cash in ", " paid off my ", " pay off my ",
     )
 
-    internal fun detectType(lower: String): TransactionType = when {
+    /** Verbs whose one named account is the destination of the transfer. */
+    private val INTO_VERBS = Regex(" (top up|topped up|top-up|topup|cash in|cashed in|(paid|pay) (my )?(credit )?card|(paid|pay) off my) ")
+    private val SEND_WORDS = Regex(" (sent|send|sending) ")
+
+    /** "sent 5000 to savings": sending money to one of the user's own accounts is a transfer, not spending. */
+    internal fun sendsToOwnWallet(lower: String, wallets: List<Wallet>): Boolean =
+        SEND_WORDS.containsMatchIn(lower) && findWalletMentions(lower, wallets).any { it.afterTo }
+
+    private val expenseWords = listOf(
+        " spent ", " spend ", " spending ", " paid ", " pay ", " paying ", " bought ", " buy ", " purchased ",
+        " purchase ", " cost ", " costs ", " expense ", " charged ", " ordered ", " tipped ",
+    )
+
+    internal fun detectType(lower: String): TransactionType = explicitType(lower) ?: TransactionType.EXPENSE
+
+    /**
+     * The type the words themselves state, or null when nothing in the text says it ("lunch 250"). Batch entry uses the
+     * null to let a clause follow its neighbours ("received 5000 from a client and 2000 from a friend").
+     */
+    internal fun explicitType(lower: String): TransactionType? = when {
         transferWords.any { lower.contains(it) } -> TransactionType.TRANSFER_OUT
         // "paid my credit card" is a transfer into the card, not new spending.
         Regex(" (paid|pay) (my )?(credit )?card ").containsMatchIn(lower) -> TransactionType.TRANSFER_OUT
         incomeWords.any { lower.contains(it) } -> TransactionType.INCOME
-        else -> TransactionType.EXPENSE
+        expenseWords.any { lower.contains(it) } -> TransactionType.EXPENSE
+        else -> null
     }
 
     // ---------------------------------------------------------------- date
@@ -142,6 +167,7 @@ object QuickEntryParser {
             }
             return today.minusDays(n.coerceAtMost(366)) to lower.replaceRange(m.range, " ")
         }
+        monthNameDate(lower, today)?.let { return it }
         Regex(" (last |on |this )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday) ").find(lower)?.let { m ->
             val day = weekdays.getValue(m.groupValues[2])
             var date = today
@@ -155,6 +181,40 @@ object QuickEntryParser {
         }
         return today to lower
     }
+
+    private val months = mapOf(
+        "january" to 1, "jan" to 1, "february" to 2, "feb" to 2, "march" to 3, "mar" to 3, "april" to 4, "apr" to 4,
+        "may" to 5, "june" to 6, "jun" to 6, "july" to 7, "jul" to 7, "august" to 8, "aug" to 8, "september" to 9,
+        "sept" to 9, "sep" to 9, "october" to 10, "oct" to 10, "november" to 11, "nov" to 11, "december" to 12, "dec" to 12,
+    )
+    private const val MONTH = "(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\\.?"
+
+    /**
+     * "October 12", "Oct 12, 2026", "12 October", "the 12th of October". Without a year it is the most recent such
+     * date (a date later this year is read as last year's): money is recorded after it moves. An impossible date
+     * ("February 30") is not a date.
+     */
+    private fun monthNameDate(lower: String, today: LocalDate): Pair<LocalDate, String>? {
+        val monthFirst = Regex(" (?:on )?$MONTH (\\d{1,2})(?:st|nd|rd|th)?(?:,? (\\d{4}))?(?=[\\s,.;!?])")
+        val dayFirst = Regex(" (?:on )?(?:the )?(\\d{1,2})(?:st|nd|rd|th)? (?:of )?$MONTH(?:,? (\\d{4}))?(?=[\\s,.;!?])")
+        val (match, month, day, year) = monthFirst.find(lower)?.let { m ->
+            Quad(m, months.getValue(m.groupValues[1]), m.groupValues[2].toInt(), m.groupValues[3].toIntOrNull())
+        } ?: dayFirst.find(lower)?.let { m ->
+            Quad(m, months.getValue(m.groupValues[2]), m.groupValues[1].toInt(), m.groupValues[3].toIntOrNull())
+        } ?: return null
+        // "may" is also a verb; only read it as a month when a day number sits right next to it.
+        val date = runCatching {
+            if (year != null) {
+                LocalDate.of(year, month, day)
+            } else {
+                val thisYear = LocalDate.of(today.year, month, day)
+                if (thisYear.isAfter(today)) LocalDate.of(today.year - 1, month, day) else thisYear
+            }
+        }.getOrNull() ?: return null
+        return date to lower.replaceRange(match.range, " ")
+    }
+
+    private data class Quad(val match: MatchResult, val month: Int, val day: Int, val year: Int?)
 
     // ---------------------------------------------------------------- currency & amount
 
@@ -188,7 +248,33 @@ object QuickEntryParser {
         return if (scaled.signum() > 0) scaled.stripTrailingZeros().let { if (it.scale() < 0) it.setScale(0) else it } else null
     }
 
-    private val AMOUNT = Regex("(?<![\\w.,])(\\d[\\d.,]*)(k|m)?(?![\\w])")
+    internal val AMOUNT = Regex("(?<![\\w.,])(\\d[\\d.,]*)(k|m)?(?![\\w])")
+
+    /** A number written in the text, with what is around it, so batch entry can tell a price from a quantity. */
+    internal data class AmountToken(
+        val value: BigDecimal,
+        val start: Int,
+        val end: Int,
+        /** A currency sign or word sits right next to it ("₱250", "250 pesos"). */
+        val hasCurrency: Boolean,
+        /** Looks like a price: two or more digits, a decimal part, a k/m suffix or a currency next to it. */
+        val priceLike: Boolean,
+    )
+
+    internal val currencyBefore = Regex("(₱|€|£|¥|₹|\\$|\\bphp|\\busd|\\beur|\\bgbp|\\bjpy|\\binr|\\bidr)\\s?$")
+    internal val currencyAfter = Regex("^\\s?(₱|€|£|¥|₹|\\$|php\\b|usd\\b|eur\\b|gbp\\b|jpy\\b|inr\\b|idr\\b|pesos?\\b|dollars?\\b|euros?\\b|pounds?\\b|yen\\b|rupees?\\b|rupiah\\b|bucks\\b)")
+
+    /** Every positive number in [lower] (already lower-cased, dates removed), in order. */
+    internal fun amountTokens(lower: String): List<AmountToken> = AMOUNT.findAll(lower).mapNotNull { m ->
+        val raw = m.groupValues[1]
+        val value = extractAmount(" " + m.value + " ") ?: return@mapNotNull null
+        val before = lower.substring(0, m.range.first)
+        val after = lower.substring(m.range.last + 1)
+        val currency = currencyBefore.containsMatchIn(before) || currencyAfter.containsMatchIn(after)
+        val digits = raw.count { it.isDigit() }
+        val priceLike = currency || digits >= 2 || m.groupValues[2].isNotEmpty() || raw.trimEnd('.', ',').any { it == '.' || it == ',' }
+        AmountToken(value, m.range.first, m.range.last + 1, currency, priceLike)
+    }.toList()
 
     internal fun normalizeNumber(raw: String): String? {
         val s = raw.trimEnd('.', ',')
@@ -263,23 +349,55 @@ object QuickEntryParser {
 
     // ---------------------------------------------------------------- categories
 
-    /** Keywords per default category icon key. Custom category names are matched directly first. */
-    private val categoryKeywords: Map<String, List<String>> = mapOf(
-        "dining" to listOf("lunch", "dinner", "breakfast", "brunch", "coffee", "cafe", "restaurant", "food", "meal", "snack", "pizza", "burger", "drinks", "takeout", "merienda"),
-        "groceries" to listOf("grocery", "groceries", "supermarket", "market", "palengke", "produce"),
-        "transport" to listOf("grab", "taxi", "uber", "bus", "jeep", "jeepney", "train", "mrt", "lrt", "fuel", "gas", "petrol", "diesel", "parking", "toll", "fare", "ride", "tricycle"),
+    /**
+     * Keywords per category icon key (the defaults and the onboarding presets). Custom category names are matched
+     * directly first. Order matters: more specific keys come first, so "coffee" goes to a "Cafes and coffee" category
+     * when the user has one and to "Restaurants"/"Dining" otherwise.
+     */
+    private val categoryKeywords: List<Pair<String, List<String>>> = listOf(
+        "cafe" to listOf("coffee", "cafe", "café", "latte", "cappuccino", "espresso", "starbucks", "milk tea", "tea"),
+        "takeout" to listOf("takeout", "take-out", "delivery", "grabfood", "foodpanda", "food delivery"),
+        "work_meals" to listOf("work lunch", "office lunch"),
+        "convenience" to listOf("7-eleven", "7 eleven", "convenience store", "snacks", "snack"),
+        "dining" to listOf("lunch", "dinner", "breakfast", "brunch", "coffee", "cafe", "restaurant", "food", "meal", "snack", "pizza", "burger", "drinks", "takeout", "merienda", "jollibee", "mcdonalds", "mcdonald's"),
+        "groceries" to listOf("grocery", "groceries", "supermarket", "market", "palengke", "produce", "puregold", "savemore"),
+        "fuel" to listOf("fuel", "gas", "petrol", "diesel", "gasoline"),
+        "taxi" to listOf("grab", "taxi", "uber", "angkas", "joyride", "lyft"),
+        "parking" to listOf("parking", "toll", "tolls", "rfid"),
+        "transport" to listOf("grab", "taxi", "uber", "bus", "jeep", "jeepney", "train", "mrt", "lrt", "fuel", "gas", "petrol", "diesel", "parking", "toll", "fare", "ride", "tricycle", "commute", "beep"),
+        "water" to listOf("water bill", "maynilad", "manila water"),
+        "internet" to listOf("internet", "wifi", "wi-fi", "fiber", "fibre", "broadband", "pldt", "converge"),
+        "phone" to listOf("phone bill", "load", "postpaid", "mobile plan", "phone plan"),
+        "heating" to listOf("lpg", "gas tank", "heating"),
+        "utilities" to listOf("electricity", "electric", "power bill", "meralco", "water bill", "internet", "wifi", "phone bill", "utility", "utilities", "load"),
+        "mortgage" to listOf("mortgage", "amortization", "amortisation"),
         "housing" to listOf("rent", "mortgage", "condo dues", "association dues"),
-        "utilities" to listOf("electricity", "electric", "power bill", "water bill", "internet", "wifi", "phone bill", "utility", "utilities", "load"),
-        "health" to listOf("medicine", "pharmacy", "doctor", "hospital", "clinic", "dentist", "vitamins", "checkup"),
-        "education" to listOf("tuition", "school", "books", "course", "class", "training"),
-        "entertainment" to listOf("movie", "movies", "cinema", "concert", "game", "games", "bowling", "karaoke"),
-        "shopping" to listOf("clothes", "shoes", "shopping", "lazada", "shopee", "amazon", "mall", "gadget"),
-        "travel" to listOf("hotel", "flight", "airbnb", "trip", "travel", "vacation"),
-        "personal" to listOf("haircut", "salon", "spa", "barber", "skincare"),
-        "gift" to listOf("gift", "donation", "donate", "charity", "present"),
-        "subscriptions" to listOf("netflix", "spotify", "subscription", "youtube premium", "icloud", "disney+", "membership"),
-        "work" to listOf("salary", "payroll", "paycheck", "wage", "wages"),
-        "business" to listOf("client", "sales", "invoice", "freelance", "commission", "sold"),
+        "pharmacy" to listOf("medicine", "medicines", "pharmacy", "drugstore", "mercury drug", "prescription", "vitamins"),
+        "dental" to listOf("dentist", "dental"),
+        "vision" to listOf("optometrist", "eyeglasses", "glasses", "contact lenses"),
+        "fitness" to listOf("gym", "fitness", "yoga", "pilates"),
+        "health" to listOf("medicine", "pharmacy", "doctor", "hospital", "clinic", "dentist", "vitamins", "checkup", "check-up", "consultation"),
+        "grooming" to listOf("haircut", "barber", "salon"),
+        "personal" to listOf("haircut", "salon", "spa", "barber", "skincare", "toiletries"),
+        "pets" to listOf("pet food", "dog food", "cat food", "vet", "veterinary"),
+        "baby" to listOf("diapers", "baby"),
+        "tuition" to listOf("tuition", "course", "class", "training"),
+        "education" to listOf("tuition", "school", "books", "course", "class", "training", "school supplies"),
+        "books" to listOf("book", "books", "kindle"),
+        "streaming" to listOf("netflix", "spotify", "youtube premium", "disney+", "hbo", "prime video", "apple music"),
+        "subscriptions" to listOf("netflix", "spotify", "subscription", "youtube premium", "icloud", "disney+", "membership", "software"),
+        "games" to listOf("game", "games", "steam", "playstation", "xbox", "nintendo"),
+        "entertainment" to listOf("movie", "movies", "cinema", "concert", "game", "games", "bowling", "karaoke", "tickets"),
+        "hotel" to listOf("hotel", "airbnb", "hostel", "resort"),
+        "travel" to listOf("hotel", "flight", "airbnb", "trip", "travel", "vacation", "airfare"),
+        "shopping" to listOf("clothes", "shoes", "shirt", "shirts", "shopping", "lazada", "shopee", "amazon", "mall", "gadget"),
+        "home_supplies" to listOf("household", "cleaning supplies", "detergent"),
+        "gift" to listOf("gift", "gifts", "birthday gift", "present"),
+        "donation" to listOf("donation", "donate", "charity"),
+        "bank_fees" to listOf("bank fee", "atm fee", "service charge"),
+        "tax" to listOf("tax", "taxes"),
+        "work" to listOf("salary", "payroll", "paycheck", "wage", "wages", "sweldo"),
+        "business" to listOf("client", "sales", "invoice", "freelance", "commission", "sold", "project"),
         "investments" to listOf("dividend", "dividends", "interest", "stocks"),
         "refund" to listOf("refund", "refunded", "reimbursement", "cashback"),
     )
@@ -290,12 +408,15 @@ object QuickEntryParser {
         pool.sortedByDescending { it.name.length }.firstOrNull { c ->
             Regex("(?<![\\w])" + Regex.escape(c.name.lowercase(Locale.ROOT)) + "(?![\\w])").containsMatchIn(lower)
         }?.let { return it.id }
-        var best: Pair<Category, Int>? = null
+        // Earliest keyword in the text wins; on a tie (the same word), the more specific key wins.
+        var best: Triple<Category, Int, Int>? = null
         pool.forEach { c ->
-            val words = categoryKeywords[c.iconKey] ?: return@forEach
-            words.forEach { word ->
-                val idx = Regex("(?<![\\w])" + Regex.escape(word) + "(?![\\w])").find(lower)?.range?.first
-                if (idx != null && (best == null || idx < best!!.second)) best = c to idx
+            val rank = categoryKeywords.indexOfFirst { it.first == c.iconKey }
+            if (rank < 0) return@forEach
+            categoryKeywords[rank].second.forEach { word ->
+                val idx = Regex("(?<![\\w])" + Regex.escape(word) + "(?![\\w])").find(lower)?.range?.first ?: return@forEach
+                val current = best
+                if (current == null || idx < current.second || (idx == current.second && rank < current.third)) best = Triple(c, idx, rank)
             }
         }
         return best?.first?.id

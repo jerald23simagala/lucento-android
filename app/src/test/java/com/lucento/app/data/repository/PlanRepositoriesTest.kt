@@ -40,22 +40,25 @@ class PlanRepositoriesTest {
 
     // ---- budgets
 
-    @Test fun oneOverallBudgetPerCurrency() = runTest {
-        assertTrue(budgets.save(null, null, Money(50_000, "USD")) is BudgetRepository.SaveResult.Saved)
-        assertEquals(BudgetRepository.SaveResult.Duplicate, budgets.save(null, null, Money(60_000, "USD")))
-        assertTrue(budgets.save(null, null, Money(60_000, "EUR")) is BudgetRepository.SaveResult.Saved)
+    @Test fun oneAllocationPerCategoryAndCurrency() = runTest {
         assertTrue(budgets.save(null, rent, Money(20_000, "USD")) is BudgetRepository.SaveResult.Saved)
         assertEquals(BudgetRepository.SaveResult.Duplicate, budgets.save(null, rent, Money(1, "USD")))
+        assertTrue(budgets.save(null, rent, Money(60_000, "EUR")) is BudgetRepository.SaveResult.Saved)
     }
 
-    @Test fun budgetsRejectIncomeCategoriesAndNonPositiveLimits() = runTest {
+    @Test fun budgetsRejectIncomeArchivedOrMissingCategoriesAndNonPositiveLimits() = runTest {
         assertEquals(BudgetRepository.SaveResult.InvalidCategory, budgets.save(null, salary, Money(1_000, "USD")))
-        assertEquals(BudgetRepository.SaveResult.LimitNotPositive, budgets.save(null, null, Money(0, "USD")))
+        assertEquals(BudgetRepository.SaveResult.InvalidCategory, budgets.save(null, 999, Money(1_000, "USD")))
+        assertEquals(BudgetRepository.SaveResult.LimitNotPositive, budgets.save(null, rent, Money(0, "USD")))
+        val old = (categories.create("Old", CategoryKind.EXPENSE) as CategoryRepository.SaveResult.Saved).id
+        transactions.save(TransactionRepository.Input(null, "old-1", TransactionType.EXPENSE, Money(1, "USD"), bank, old, start, ""))
+        categories.remove(old) // used, so archived
+        assertEquals(BudgetRepository.SaveResult.InvalidCategory, budgets.save(null, old, Money(1_000, "USD")))
     }
 
     @Test fun editingABudgetKeepsItsSlot() = runTest {
-        val id = (budgets.save(null, null, Money(50_000, "USD")) as BudgetRepository.SaveResult.Saved).id
-        assertTrue(budgets.save(id, null, Money(70_000, "USD")) is BudgetRepository.SaveResult.Saved)
+        val id = (budgets.save(null, rent, Money(50_000, "USD")) as BudgetRepository.SaveResult.Saved).id
+        assertTrue(budgets.save(id, rent, Money(70_000, "USD")) is BudgetRepository.SaveResult.Saved)
         assertEquals(Money(70_000, "USD"), budgets.observeBudgets().first().single().limit)
     }
 
@@ -145,5 +148,16 @@ class PlanRepositoriesTest {
         assertEquals(RecurringRepository.SaveResult.InvalidInterval, recurring.save(input(interval = 0)))
         assertEquals(RecurringRepository.SaveResult.EndBeforeStart, recurring.save(input(end = start.minusDays(1))))
         assertEquals(RecurringRepository.SaveResult.CategoryMismatch, recurring.save(input(type = TransactionType.INCOME)))
+    }
+
+    @Test fun goalPictureChoiceIsStoredAndEditable() = runTest {
+        val id = (goals.save(null, "Trip to Japan", Money(300_000, "USD"), null, null, "japan_fuji") as GoalRepository.SaveResult.Saved).id
+        assertEquals("japan_fuji", goals.observeGoals().first().single { it.id == id }.sceneKey)
+        goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "none")
+        assertEquals("none", goals.observeGoals().first().single { it.id == id }.sceneKey)
+        goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "not-a-scene")
+        assertEquals(null, goals.observeGoals().first().single { it.id == id }.sceneKey)
+        val plain = (goals.save(null, "Laptop", Money(100_000, "USD"), null, null) as GoalRepository.SaveResult.Saved).id
+        assertEquals(null, goals.observeGoals().first().single { it.id == plain }.sceneKey)
     }
 }

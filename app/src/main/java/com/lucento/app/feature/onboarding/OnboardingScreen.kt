@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,10 +51,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.CurrencyList
 import com.lucento.app.core.designsystem.component.Hairline
-import com.lucento.app.core.designsystem.component.LucentoMark
+import com.lucento.app.core.designsystem.component.InfoNote
+import com.lucento.app.core.designsystem.component.LucentoStackedLockup
 import com.lucento.app.core.designsystem.component.LucentoMascot
-import com.lucento.app.core.designsystem.component.LucentoAnimation
-import com.lucento.app.core.designsystem.component.LucentoLottieAnimation
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
@@ -64,7 +64,15 @@ import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.domain.Feature
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.graphics.SolidColor
+import com.lucento.app.core.designsystem.component.IllustratedSurface
+import com.lucento.app.core.designsystem.component.LucentoIllustration
+import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.domain.FinancialFocus
+import com.lucento.app.feature.budget.CategoryPicks
+import com.lucento.app.feature.budget.CategoryPresetPicker
+import com.lucento.app.feature.budget.CategoryReview
 
 @Composable
 fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModel.Factory)) {
@@ -73,6 +81,12 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     val focuses by viewModel.focuses.collectAsStateWithLifecycle()
     val features by viewModel.features.collectAsStateWithLifecycle()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val picks by viewModel.picks.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val signedInEmail by viewModel.signedInEmail.collectAsStateWithLifecycle()
+    val connecting by viewModel.connecting.collectAsStateWithLifecycle()
+    val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     BackHandler(enabled = step > 0) { viewModel.back() }
 
@@ -85,7 +99,8 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             StepIndicator(current = step, count = OnboardingViewModel.LAST_STEP + 1, modifier = Modifier.weight(1f))
-            if (step in OnboardingViewModel.STEP_FOCUS until OnboardingViewModel.LAST_STEP) {
+            // Focus and features are optional; spending categories are not, so Skip leads to them.
+            if (step in OnboardingViewModel.STEP_FOCUS until OnboardingViewModel.STEP_CATEGORIES) {
                 LucentoTextButton(text = "Skip", onClick = viewModel::skip)
             }
         }
@@ -104,6 +119,13 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
                 OnboardingViewModel.STEP_WELCOME -> WelcomeStep(onContinue = viewModel::next)
                 OnboardingViewModel.STEP_FOCUS -> FocusStep(focuses, viewModel::toggleFocus, viewModel::next)
                 OnboardingViewModel.STEP_FEATURES -> FeaturesStep(features, viewModel::setFeature, viewModel::next)
+                OnboardingViewModel.STEP_CATEGORIES -> CategoriesStep(picks, viewModel::setPicks, viewModel::next)
+                OnboardingViewModel.STEP_REVIEW -> CategoryReviewStep(
+                    picks = picks,
+                    onChange = viewModel::setPicks,
+                    onEdit = { viewModel.goTo(OnboardingViewModel.STEP_CATEGORIES) },
+                    onContinue = viewModel::next,
+                )
                 OnboardingViewModel.STEP_ESSENTIALS -> EssentialsStep(
                     currency = currency,
                     onCurrency = viewModel::selectCurrency,
@@ -111,7 +133,18 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
                     onTheme = viewModel::selectTheme,
                     onContinue = viewModel::next,
                 )
-                else -> ConfirmStep(currency, theme, features, onFinish = viewModel::finish)
+                OnboardingViewModel.STEP_SYNC -> SyncStep(
+                    available = viewModel.syncAvailable,
+                    googleAvailable = viewModel.googleAvailable,
+                    signedInEmail = signedInEmail,
+                    connecting = connecting,
+                    message = syncMessage,
+                    onGoogle = { viewModel.connectGoogle(context) },
+                    onEmail = viewModel::connectEmail,
+                    onPrepareEmail = viewModel::prepareConnection,
+                    onContinue = viewModel::next,
+                )
+                else -> ConfirmStep(currency, theme, features, picks.count, error, signedInEmail, onFinish = viewModel::finish)
             }
         }
     }
@@ -156,15 +189,8 @@ private fun WelcomeStep(onContinue: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // The mark assembles once (≈2.5 s, never blocks the button); reduced motion shows it complete.
-            LucentoLottieAnimation(
-                animation = LucentoAnimation.Welcome,
-                modifier = Modifier.size(width = 132.dp, height = 110.dp),
-                contentDescription = "Lucento",
-                fallback = { LucentoMark(size = 96.dp, animate = false) },
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            Text("Lucento", style = MaterialTheme.typography.displayMedium, modifier = Modifier.semantics { heading() })
+            // The Rising Crest symbol settles in once (never blocks the button); reduced motion shows it complete.
+            LucentoStackedLockup(symbolSize = 96.dp, animate = true, wordmarkModifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(Spacing.sm))
             Text(
                 "Financial clarity without the complexity.",
@@ -173,7 +199,19 @@ private fun WelcomeStep(onContinue: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Spacing.xl))
-            LucentoMascot(size = 140.dp, contentDescription = "Lucento’s sun, smiling")
+            // Lucento greets the user standing in its sunrise landscape (decorative artwork; the mascot keeps its label).
+            IllustratedSurface(
+                illustration = LucentoIllustration.SunriseLandscape,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = MaterialTheme.colorScheme.background,
+                overlay = if (LucentoTheme.isDark) SolidColor(MaterialTheme.colorScheme.background.copy(alpha = 0.45f)) else null,
+                artworkAlignment = Alignment.BottomCenter,
+                contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.sm),
+            ) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    LucentoMascot(size = 140.dp, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
+                }
+            }
             Spacer(Modifier.height(Spacing.lg))
             Text(
                 "Track what you spend, plan what’s next — privately, on this phone. No account, no bank login.",
@@ -253,6 +291,52 @@ private fun FeaturesStep(enabled: Set<Feature>, onSet: (Feature, Boolean) -> Uni
 }
 
 @Composable
+private fun CategoriesStep(picks: CategoryPicks, onChange: (CategoryPicks) -> Unit, onContinue: () -> Unit) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle(
+                "What do you spend on?",
+                "Pick the categories that fit your life — your budget is built from them. We’ve started you with " +
+                    "everyday essentials; add or remove anything. You’ll set amounts later, on the Budget tab.",
+            )
+            CategoryPresetPicker(picks = picks, onChange = onChange)
+            Spacer(Modifier.height(Spacing.lg))
+        }
+        Spacer(Modifier.height(Spacing.md))
+        LucentoPrimaryButton(
+            text = if (picks.count == 0) "Choose at least one category" else "Review ${picks.count} ${if (picks.count == 1) "category" else "categories"}",
+            onClick = onContinue,
+            enabled = picks.count > 0,
+        )
+    }
+}
+
+@Composable
+private fun CategoryReviewStep(
+    picks: CategoryPicks,
+    onChange: (CategoryPicks) -> Unit,
+    onEdit: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle(
+                "Your spending categories",
+                "Tap one to remove it. You can rename, reorder or add categories any time on the Budget tab.",
+            )
+            CategoryReview(picks = picks, onChange = onChange, onEdit = onEdit)
+            Spacer(Modifier.height(Spacing.lg))
+        }
+        Spacer(Modifier.height(Spacing.md))
+        LucentoPrimaryButton(
+            text = if (picks.count == 0) "Choose at least one category" else "Confirm ${picks.count} ${if (picks.count == 1) "category" else "categories"}",
+            onClick = onContinue,
+            enabled = picks.count > 0,
+        )
+    }
+}
+
+@Composable
 private fun EssentialsStep(
     currency: String,
     onCurrency: (String) -> Unit,
@@ -274,8 +358,75 @@ private fun EssentialsStep(
     }
 }
 
+/**
+ * Optional cloud sync: back up and sync across devices by connecting Google or an email account. Turning it on needs
+ * an account; "Not now" keeps everything on this phone (sync can be turned on later in Settings).
+ */
 @Composable
-private fun ConfirmStep(currency: String, theme: ThemeMode, features: Set<Feature>, onFinish: () -> Unit) {
+private fun SyncStep(
+    available: Boolean,
+    googleAvailable: Boolean,
+    signedInEmail: String?,
+    connecting: Boolean,
+    message: String?,
+    onGoogle: () -> Unit,
+    onEmail: (String, String, com.lucento.app.feature.settings.EmailMode) -> Unit,
+    onPrepareEmail: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle(
+                "Back up and sync?",
+                "Keep your wallets, transactions, budgets, goals and recurring payments safe and the same on every device.",
+            )
+            when {
+                !available -> InfoNote("Cloud sync isn’t available in this version of Lucento. Everything works fully offline.")
+                signedInEmail != null -> InfoNote(
+                    "Connected as ${signedInEmail.ifEmpty { "your account" }}. Sync starts when you finish setting up.",
+                    icon = Icons.Filled.CloudDone,
+                    container = MaterialTheme.colorScheme.primaryContainer,
+                    content = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                else -> {
+                    InfoNote(
+                        "Optional. Nothing leaves this phone unless you connect an account and keep sync on. Signing out " +
+                            "later never deletes what’s on this device.",
+                    )
+                    Spacer(Modifier.height(Spacing.md))
+                    com.lucento.app.feature.settings.ConnectAccountPanel(
+                        busy = connecting,
+                        googleAvailable = googleAvailable,
+                        onGoogle = onGoogle,
+                        onEmail = onEmail,
+                        onPrepareEmail = onPrepareEmail,
+                    )
+                }
+            }
+            if (message != null) {
+                Spacer(Modifier.height(Spacing.sm))
+                Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        if (signedInEmail != null || !available) {
+            LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+        } else {
+            LucentoTextButton(text = "Not now — keep it on this phone", onClick = onContinue, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun ConfirmStep(
+    currency: String,
+    theme: ThemeMode,
+    features: Set<Feature>,
+    categoryCount: Int,
+    error: String?,
+    signedInEmail: String?,
+    onFinish: () -> Unit,
+) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -299,15 +450,22 @@ private fun ConfirmStep(currency: String, theme: ThemeMode, features: Set<Featur
                     ThemeMode.DARK -> "Dark"
                 },
             )
+            SummaryRow("Spending categories", "$categoryCount chosen · set amounts on the Budget tab")
             SummaryRow("Turned on", Feature.entries.filter { it in features }.joinToString { it.title }.ifEmpty { "Just the essentials" })
             val off = Feature.entries.filterNot { it in features }
             if (off.isNotEmpty()) SummaryRow("Turned off", off.joinToString { it.title })
+            SummaryRow("Cloud sync", signedInEmail?.let { "On · ${it.ifEmpty { "connected" }}" } ?: "Off · everything stays on this phone")
             Spacer(Modifier.height(Spacing.md))
             Text(
-                "Next: add your first wallet on Home. Everything stays on this device.",
+                if (signedInEmail != null) "Next: add your first wallet on Home. It syncs to your account automatically."
+                else "Next: add your first wallet on Home. Everything stays on this device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (error != null) {
+                Spacer(Modifier.height(Spacing.md))
+                InfoNote(error, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
+            }
         }
         LucentoPrimaryButton(text = "Start using Lucento", onClick = onFinish)
     }

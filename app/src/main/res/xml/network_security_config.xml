@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Explicit, belt-and-suspenders network policy for the optional cloud sync feature (see docs/SYNC.md).
+    cleartextTrafficPermitted is already false by default once minSdk >= 24 and no base-config override is
+    present, but stating it here means a future change to this file has to deliberately weaken it rather
+    than silently losing a default. No domain is pinned/allow-listed: Supabase's own project subdomain is
+    configurable per deployment (local.properties), so this only guarantees HTTPS, not a specific host.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

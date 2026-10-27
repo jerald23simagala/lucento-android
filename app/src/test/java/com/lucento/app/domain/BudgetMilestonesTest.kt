@@ -9,33 +9,41 @@ import java.time.YearMonth
 
 class BudgetMilestonesTest {
     private val today = LocalDate.parse("2026-10-03")
-    private val budget = Budget(1, null, Money(10_000, "PHP"), createdOn = LocalDate.parse("2026-08-15"))
-    private fun spend(minor: Long, date: String) =
-        Transaction(minor, TransactionType.EXPENSE, Money(minor, "PHP"), 1, null, LocalDate.parse(date), "", 0)
+    private val food = Category(4, "Food", CategoryKind.EXPENSE, "groceries")
+    private val fun_ = Category(5, "Fun", CategoryKind.EXPENSE, "entertainment")
+    private val categories = listOf(food, fun_)
+    private val created = LocalDate.parse("2026-08-15")
+    // Total = 6,000 + 4,000 = 10,000.
+    private val budgets = listOf(
+        Budget(1, 4, Money(6_000, "PHP"), createdOn = created),
+        Budget(2, 5, Money(4_000, "PHP"), createdOn = created),
+    )
+    private fun spend(minor: Long, date: String, category: Long? = 4) =
+        Transaction(minor, TransactionType.EXPENSE, Money(minor, "PHP"), 1, category, LocalDate.parse(date), "", 0)
 
-    @Test fun keptLastMonthIsAcknowledged() {
-        val p = BudgetMilestones.monthToAcknowledge(listOf(budget), listOf(spend(9_000, "2026-09-10")), "PHP", today, null)
-        assertEquals(YearMonth.of(2026, 9), p?.month)
+    private fun ack(budgets: List<Budget>, txs: List<Transaction>, currency: String = "PHP", last: YearMonth? = null) =
+        BudgetMilestones.monthToAcknowledge(categories, budgets, txs, currency, today, last)
+
+    @Test fun keptLastMonthIsAcknowledged() =
+        assertEquals(YearMonth.of(2026, 9), ack(budgets, listOf(spend(9_000, "2026-09-10")))?.month)
+
+    @Test fun overspendingTheCategoryTotalIsNeverCelebrated() =
+        assertNull(ack(budgets, listOf(spend(6_001, "2026-09-10"), spend(4_000, "2026-09-11", category = 5))))
+
+    @Test fun exactlyAtTheTotalCounts() =
+        assertEquals(YearMonth.of(2026, 9), ack(budgets, listOf(spend(10_000, "2026-09-10")))?.month)
+
+    @Test fun shownOnlyOnce() = assertNull(ack(budgets, listOf(spend(1, "2026-09-10")), last = YearMonth.of(2026, 9)))
+
+    @Test fun emptyMonthsAndAllocationsCreatedMidMonthDoNotCount() {
+        assertNull(ack(budgets, emptyList()))
+        val late = budgets.map { it.copy(createdOn = LocalDate.parse("2026-09-02")) }
+        assertNull(ack(late, listOf(spend(1, "2026-09-10"))))
+        assertNull(ack(budgets.map { it.copy(createdOn = null) }, listOf(spend(1, "2026-09-10"))))
     }
 
-    @Test fun overspendingIsNeverCelebrated() =
-        assertNull(BudgetMilestones.monthToAcknowledge(listOf(budget), listOf(spend(10_001, "2026-09-10")), "PHP", today, null))
-
-    @Test fun exactlyAtTheLimitCounts() =
-        assertEquals(YearMonth.of(2026, 9), BudgetMilestones.monthToAcknowledge(listOf(budget), listOf(spend(10_000, "2026-09-10")), "PHP", today, null)?.month)
-
-    @Test fun shownOnlyOnce() =
-        assertNull(BudgetMilestones.monthToAcknowledge(listOf(budget), listOf(spend(1, "2026-09-10")), "PHP", today, YearMonth.of(2026, 9)))
-
-    @Test fun emptyMonthsAndPartialMonthsDoNotCount() {
-        assertNull(BudgetMilestones.monthToAcknowledge(listOf(budget), emptyList(), "PHP", today, null))
-        val late = budget.copy(createdOn = LocalDate.parse("2026-09-02"))
-        assertNull(BudgetMilestones.monthToAcknowledge(listOf(late), listOf(spend(1, "2026-09-10")), "PHP", today, null))
-        assertNull(BudgetMilestones.monthToAcknowledge(listOf(budget.copy(createdOn = null)), listOf(spend(1, "2026-09-10")), "PHP", today, null))
-    }
-
-    @Test fun onlyTheMatchingCurrencyAndOverallBudget() {
-        assertNull(BudgetMilestones.monthToAcknowledge(listOf(budget), listOf(spend(1, "2026-09-10")), "USD", today, null))
-        assertNull(BudgetMilestones.monthToAcknowledge(listOf(budget.copy(categoryId = 4)), listOf(spend(1, "2026-09-10")), "PHP", today, null))
+    @Test fun onlyTheMatchingCurrencyAndNeverALegacyOverallRow() {
+        assertNull(ack(budgets, listOf(spend(1, "2026-09-10")), currency = "USD"))
+        assertNull(ack(listOf(Budget(9, null, Money(10_000, "PHP"), createdOn = created)), listOf(spend(1, "2026-09-10"))))
     }
 }

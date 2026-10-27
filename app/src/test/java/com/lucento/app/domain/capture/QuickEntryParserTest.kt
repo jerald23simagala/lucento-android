@@ -80,6 +80,12 @@ class QuickEntryParserTest {
         assertEquals(TransactionType.TRANSFER_OUT, pay.type)
         assertEquals(4L, pay.walletId)
         assertEquals(5L, pay.toWalletId)
+
+        // With only the card named, the card is where the money goes; the source is left to choose.
+        val cardOnly = parse("paid my credit card 3000")
+        assertEquals(TransactionType.TRANSFER_OUT, cardOnly.type)
+        assertEquals(5L, cardOnly.toWalletId)
+        assertNull(cardOnly.walletId)
     }
 
     @Test fun relativeDates() {

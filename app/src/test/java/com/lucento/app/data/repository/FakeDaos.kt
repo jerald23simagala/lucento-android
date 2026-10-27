@@ -4,12 +4,16 @@ import com.lucento.app.data.local.BudgetDao
 import com.lucento.app.data.local.BudgetEntity
 import com.lucento.app.data.local.CategoryDao
 import com.lucento.app.data.local.CategoryEntity
+import com.lucento.app.data.local.DebtTermsDao
+import com.lucento.app.data.local.DebtTermsEntity
 import com.lucento.app.data.local.GoalContributionEntity
 import com.lucento.app.data.local.GoalContributionRow
 import com.lucento.app.data.local.GoalDao
 import com.lucento.app.data.local.GoalEntity
 import com.lucento.app.data.local.RecurringDao
 import com.lucento.app.data.local.RecurringEntity
+import com.lucento.app.data.local.SyncDao
+import com.lucento.app.data.local.SyncTombstoneEntity
 import com.lucento.app.data.local.TransactionDao
 import com.lucento.app.data.local.TransactionEntity
 import com.lucento.app.data.local.WalletDao
@@ -24,6 +28,9 @@ import kotlinx.coroutines.flow.map
 class FakeWalletDao : WalletDao {
     val rows = MutableStateFlow<List<WalletEntity>>(emptyList())
     private var nextId = 1L
+
+    /** Optional link so deleteById mirrors the real ON DELETE RESTRICT from transactions. */
+    var transactions: FakeTransactionDao? = null
 
     override fun observeActive(): Flow<List<WalletEntity>> =
         rows.map { list -> list.filter { !it.archived }.sortedBy { it.sortOrder } }
@@ -46,7 +53,20 @@ class FakeWalletDao : WalletDao {
     }
 
     override suspend fun deleteById(id: Long) {
+        check(transactions?.rows?.value?.none { it.walletId == id } ?: true) { "FOREIGN KEY constraint failed" }
         rows.value = rows.value.filterNot { it.id == id }
+    }
+
+    override suspend fun getDirty() = rows.value.filter { it.dirty }
+
+    override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
+
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
+        return 1
     }
 }
 
@@ -55,9 +75,13 @@ class FakeCategoryDao : CategoryDao {
     var transactionCounts = mutableMapOf<Long, Int>()
     private var nextId = 1L
 
-    override fun observeAll(): Flow<List<CategoryEntity>> = rows
+    /** Same order as the real query: kind, sort order, id. */
+    override fun observeAll(): Flow<List<CategoryEntity>> =
+        rows.map { list -> list.sortedWith(compareBy<CategoryEntity> { it.kind }.thenBy { it.sortOrder }.thenBy { it.id }) }
 
     override suspend fun getById(id: Long) = rows.value.firstOrNull { it.id == id }
+
+    override suspend fun getAll() = rows.value.sortedWith(compareBy<CategoryEntity> { it.kind }.thenBy { it.sortOrder }.thenBy { it.id })
 
     override suspend fun countActiveWithName(kind: String, name: String, excludeId: Long) =
         rows.value.count { !it.archived && it.kind == kind && it.name.equals(name, ignoreCase = true) && it.id != excludeId }
@@ -73,6 +97,14 @@ class FakeCategoryDao : CategoryDao {
     var recurring: FakeRecurringDao? = null
 
     override suspend fun budgetCount(id: Long) = budgets?.rows?.value?.count { it.categoryId == id } ?: 0
+
+    override suspend fun moveTransactions(from: Long, to: Long, now: Long) {
+        transactions?.rows?.let { r -> r.value = r.value.map { if (it.categoryId == from) it.copy(categoryId = to, updatedAt = now, dirty = true) else it } }
+    }
+
+    override suspend fun moveRecurring(from: Long, to: Long, now: Long) {
+        recurring?.rows?.let { r -> r.value = r.value.map { if (it.categoryId == from) it.copy(categoryId = to, updatedAt = now, dirty = true) else it } }
+    }
 
     override suspend fun recurringCount(id: Long) = recurring?.rows?.value?.count { it.categoryId == id } ?: 0
 
@@ -92,6 +124,24 @@ class FakeCategoryDao : CategoryDao {
         recurring?.let { r -> r.rows.value = r.rows.value.map { if (it.categoryId == id) it.copy(categoryId = null) else it } }
         transactions?.let { t -> t.rows.value = t.rows.value.map { if (it.categoryId == id) it.copy(categoryId = null) else it } }
     }
+
+    override suspend fun getDirty() = rows.value.filter { it.dirty }
+
+    override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
+
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
+        return 1
+    }
+
+    override suspend fun getWithoutClientUuid() = rows.value.filter { it.clientUuid == null }
+
+    override suspend fun assignClientUuid(id: Long, clientUuid: String) {
+        rows.value = rows.value.map { if (it.id == id && it.clientUuid == null) it.copy(clientUuid = clientUuid) else it }
+    }
 }
 
 class FakeTransactionDao : TransactionDao {
@@ -109,6 +159,8 @@ class FakeTransactionDao : TransactionDao {
                 expenseMinor = items.filter { it.type == "EXPENSE" }.sumOf { it.amountMinor },
                 transferInMinor = items.filter { it.type == "TRANSFER_IN" }.sumOf { it.amountMinor },
                 transferOutMinor = items.filter { it.type == "TRANSFER_OUT" }.sumOf { it.amountMinor },
+                adjustmentInMinor = items.filter { it.type == "ADJUSTMENT_IN" }.sumOf { it.amountMinor },
+                adjustmentOutMinor = items.filter { it.type == "ADJUSTMENT_OUT" }.sumOf { it.amountMinor },
             )
         }
     }
@@ -118,6 +170,8 @@ class FakeTransactionDao : TransactionDao {
     override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
 
     override suspend fun getByTransferGroup(group: String) = rows.value.filter { it.transferGroup == group }
+
+    override suspend fun getForWallet(walletId: Long) = rows.value.filter { it.walletId == walletId }
 
     override suspend fun countForWallet(walletId: Long) = rows.value.count { it.walletId == walletId }
 
@@ -139,6 +193,16 @@ class FakeTransactionDao : TransactionDao {
 
     override suspend fun deleteByTransferGroup(group: String) {
         rows.value = rows.value.filterNot { it.transferGroup == group }
+    }
+
+    override suspend fun getDirty() = rows.value.filter { it.dirty }
+
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
+        return 1
     }
 }
 
@@ -165,6 +229,29 @@ class FakeBudgetDao : BudgetDao {
 
     override suspend fun deleteById(id: Long) {
         rows.value = rows.value.filterNot { it.id == id }
+    }
+
+    override suspend fun findAllocation(categoryId: Long, currencyCode: String) =
+        rows.value.filter { it.categoryId == categoryId && it.currencyCode == currencyCode }.minByOrNull { it.id }
+
+    override suspend fun deleteLegacyOverall(): Int {
+        val before = rows.value.size
+        rows.value = rows.value.filterNot { it.categoryId == null }
+        return before - rows.value.size
+    }
+
+    override suspend fun getForCategory(categoryId: Long) = rows.value.filter { it.categoryId == categoryId }.sortedBy { it.id }
+
+    override suspend fun getDirty() = rows.value.filter { it.dirty }
+
+    override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
+
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
+        return 1
     }
 }
 
@@ -214,6 +301,26 @@ class FakeGoalDao : GoalDao {
     override suspend fun deleteContribution(id: Long) {
         contributions.value = contributions.value.filterNot { it.id == id }
     }
+
+    override suspend fun getDirtyGoals() = goals.value.filter { it.dirty }
+
+    override suspend fun findGoalByClientUuid(clientUuid: String) = goals.value.firstOrNull { it.clientUuid == clientUuid }
+
+    override suspend fun markGoalPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = goals.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        goals.value = goals.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
+        return 1
+    }
+
+    override suspend fun getDirtyContributions() = contributions.value.filter { it.dirty }
+
+    override suspend fun markContributionPushed(clientUuid: String, revision: Long, syncedAt: Long) {
+        contributions.value = contributions.value.map {
+            if (it.clientUuid == clientUuid) it.copy(dirty = false, baseRevision = revision, syncedAt = syncedAt) else it
+        }
+    }
 }
 
 class FakeRecurringDao : RecurringDao {
@@ -224,7 +331,7 @@ class FakeRecurringDao : RecurringDao {
 
     override suspend fun getById(id: Long) = rows.value.firstOrNull { it.id == id }
 
-    override suspend fun countForWallet(walletId: Long) = rows.value.count { it.walletId == walletId }
+    override suspend fun countForWallet(walletId: Long) = rows.value.count { it.walletId == walletId || it.toWalletId == walletId }
 
     override suspend fun insert(schedule: RecurringEntity): Long {
         val id = nextId++
@@ -238,5 +345,57 @@ class FakeRecurringDao : RecurringDao {
 
     override suspend fun deleteById(id: Long) {
         rows.value = rows.value.filterNot { it.id == id }
+    }
+
+    override suspend fun getDirty() = rows.value.filter { it.dirty }
+
+    override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
+
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
+        return 1
+    }
+}
+
+class FakeDebtTermsDao : DebtTermsDao {
+    val rows = MutableStateFlow<List<DebtTermsEntity>>(emptyList())
+
+    override fun observeAll(): Flow<List<DebtTermsEntity>> = rows
+
+    override suspend fun upsert(terms: DebtTermsEntity) {
+        rows.value = rows.value.filterNot { it.walletId == terms.walletId } + terms
+    }
+
+    override suspend fun delete(walletId: Long) {
+        rows.value = rows.value.filterNot { it.walletId == walletId }
+    }
+
+    override suspend fun get(walletId: Long) = rows.value.firstOrNull { it.walletId == walletId }
+}
+
+class FakeSyncDao : SyncDao {
+    val rows = MutableStateFlow<List<SyncTombstoneEntity>>(emptyList())
+    private var nextId = 1L
+
+    override suspend fun unpushedTombstones() = rows.value.filterNot { it.pushed }
+
+    /** Only the tombstone part: the fake has no other tables to count dirty rows in. */
+    override fun observePendingChanges(): Flow<Int> = rows.map { list -> list.count { !it.pushed } }
+
+    override suspend fun markPushed(ids: List<Long>) {
+        rows.value = rows.value.map { if (it.id in ids) it.copy(pushed = true) else it }
+    }
+
+    override suspend fun pruneOldPushed(olderThan: Long) {
+        rows.value = rows.value.filterNot { it.pushed && it.deletedAt < olderThan }
+    }
+
+    override suspend fun insert(tombstone: SyncTombstoneEntity): Long {
+        val id = nextId++
+        rows.value = rows.value + tombstone.copy(id = id)
+        return id
     }
 }

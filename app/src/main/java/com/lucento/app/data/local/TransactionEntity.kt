@@ -52,4 +52,9 @@ data class TransactionEntity(
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     /** Shared by the two legs of a transfer (TRANSFER_OUT + TRANSFER_IN); null for income and expense. Added in v3. */
     @ColumnInfo(name = "transfer_group") val transferGroup: String? = null,
+    /** Cloud sync bookkeeping, added in v6 (see MIGRATION_5_6 and docs/SYNC.md). */
+    @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
+    @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
+    /** Server `revision` this row was last synced at; a push based on it is a causal successor (v7, docs/SYNC.md). */
+    @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
 )

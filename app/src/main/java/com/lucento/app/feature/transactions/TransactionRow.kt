@@ -21,6 +21,7 @@ import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.CategoryTile
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.Transaction
@@ -52,13 +53,25 @@ fun TransactionRow(
     transfer: Transfer? = null,
     walletNames: Map<Long, String> = emptyMap(),
     perspectiveOfWallet: Boolean = false,
+    /** Tighter height, a smaller tile and inner padding for rows that sit inside a day card. */
+    dense: Boolean = false,
+    /** What a tap does, for TalkBack; defaults to opening the editor. */
+    onClickLabel: String? = null,
+    /**
+     * On a card's or loan's own history: show each amount as its change in what is owed (a payment "−", interest "+").
+     * Display only; the stored sign is unchanged.
+     */
+    owedPerspective: Boolean = false,
 ) {
     val isIncome = transaction.type == TransactionType.INCOME
     val isTransfer = transaction.isTransfer
     val categoryName = category?.name ?: "Uncategorized"
     val title: String
     val subtitle: String
-    if (isTransfer) {
+    if (transaction.isAdjustment) {
+        title = transaction.note.ifBlank { "Balance adjustment" }
+        subtitle = listOfNotNull("Balance adjustment".takeIf { transaction.note.isNotBlank() }, wallet?.name).joinToString(" · ")
+    } else if (isTransfer) {
         val from = transfer?.let { walletNames[it.fromWalletId] } ?: "Account"
         val to = transfer?.let { walletNames[it.toWalletId] } ?: "Account"
         title = transaction.note.ifBlank { "Transfer" }
@@ -74,15 +87,31 @@ fun TransactionRow(
     Row(
         modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
-            .clickable(role = Role.Button, onClickLabel = if (isTransfer) "Edit transfer" else "Edit transaction", onClick = onClick)
-            .padding(vertical = Spacing.sm),
+            .heightIn(min = if (dense) 56.dp else 64.dp)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = onClickLabel ?: when {
+                    isTransfer -> "Edit transfer"
+                    transaction.isAdjustment -> "View balance adjustment"
+                    else -> "Edit transaction"
+                },
+                onClick = onClick,
+            )
+            .padding(
+                horizontal = if (dense) Spacing.md else 0.dp,
+                vertical = if (dense) Spacing.xs + Spacing.xxs else Spacing.sm,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryTile(category = category, type = transaction.type)
-        Spacer(Modifier.width(Spacing.md))
+        CategoryTile(category = category, type = transaction.type, size = if (dense) 36.dp else Sizes.iconTile)
+        Spacer(Modifier.width(if (dense) Spacing.md - Spacing.xxs else Spacing.md))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                title,
+                style = if (dense) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (subtitle.isNotEmpty()) {
                 Text(
                     subtitle,
@@ -103,10 +132,11 @@ fun TransactionRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 else -> AmountText(
-                    money = transaction.signedAmount,
+                    money = if (owedPerspective) -transaction.signedAmount else transaction.signedAmount,
                     style = AmountStyles.row,
                     showPlus = true,
                     color = when {
+                        owedPerspective -> MaterialTheme.colorScheme.onSurface
                         isIncome -> LucentoTheme.extendedColors.positive
                         isTransfer -> MaterialTheme.colorScheme.onSurfaceVariant
                         else -> MaterialTheme.colorScheme.onSurface

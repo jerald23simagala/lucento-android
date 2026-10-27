@@ -24,7 +24,10 @@ app/src/main/java/com/lucento/app/
   data/repository/     Repositories mapping entities <-> domain, enforcing validation
   domain/              Pure Kotlin models and calculators (unit-tested, no Android deps)
   feature/<name>/      Screen + ViewModel per feature
-  navigation/          LucentoRoot, routes, bottom navigation (Home · Transactions · Add · Insights · More; the rest pushed)
+  navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · (+) · Budget · Wallets; the centre +
+                       opens the transaction composer in feature/capture; Insights, goals, scheduled and debts open from
+                       Home's Quick links, categories from Budget), profile menu (Settings lives there); a new user's
+                       guided setup (feature/guide) follows onboarding
 ```
 - Dependency wiring: `AppContainer` in `LucentoApplication` (manual DI). ViewModels use `containerFactory`.
 - Keep financial logic in `domain/` or `core/money/` as pure functions so it is testable on the JVM.
@@ -35,31 +38,44 @@ app/src/main/java/com/lucento/app/
 - Use `Math.addExact`-style arithmetic; overflow must throw, not wrap.
 - Parse user input only through `MoneyParser`.
 - Transfers are a single atomic DB transaction producing two linked legs (`transfer_group`); never double-count.
-- Financial definitions (Safe to spend, burn rate, net flow, budgets, goals, debts) live in `docs/CALCULATIONS.md`.
+- Financial definitions (budget, burn rate, net flow, goals, net worth, debts) live in `docs/CALCULATIONS.md`.
+- **The overall budget is always the sum of category allocations** (`BudgetPlanner`), per currency and calendar month.
+  Never add a separately editable overall amount; legacy "everything" rows are ignored. Home, Budget and Insights read
+  the same `BudgetPlan`.
 - Guard against duplicate submissions (in-flight flags, idempotency keys for imports).
+- New transactions are added only through the composer (`feature/capture`): `TransactionInterpreter` → `BatchReview`
+  → `TransactionRepository.saveBatch` (atomic, one idempotency key per row). The full-page editor (`TransactionEditorScreen`, opened from
+  Edit on a history row) is for editing existing transactions. Never present local parsing as AI; a remote interpreter needs the opt-in described in docs/CAPTURE.md.
 
 ## Database
 - `exportSchema = true`; schemas land in `app/schemas/` and **are committed** (1–3 recovered from CI artifacts).
   CI fails if the exported schema differs from the committed one. Never hand-write a schema JSON.
 - Wallet type/currency edits go through `WalletChangePolicy`; categories in use are archived, never deleted.
+- Fresh installs seed income categories only; expense categories come from the mandatory onboarding step
+  (`CategoryPresets` + `CategorySelection`). `DefaultCategories.all` is frozen (MIGRATION_1_2 depends on it).
 - Every version bump needs an explicit `Migration` plus a migration test. Never enable destructive fallback.
 
 ## Privacy & cost
 - Core features work fully offline. No mandatory paid APIs, accounts, cloud, or bank integrations.
-- The app has **no INTERNET permission**; the manifest strips network permissions merged by libraries (ML Kit).
-  Adding network access requires an explicit, opt-in feature (e.g. optional remote AI) with clear user consent
-  before any financial data leaves the device. OCR uses ML Kit's bundled on-device model.
+- INTERNET exists **only** for optional cloud sync (docs/SYNC.md): nothing leaves the device until the user signs in
+  (Google, or an email account) and keeps sync on. Room stays the source of truth; signing out never deletes local data. Any other
+  network use needs its own explicit opt-in with clear consent. CI allow-lists release permissions. OCR uses ML Kit's
+  bundled on-device model.
+- Supabase: schema changes ship as new files in `supabase/migrations/` (never edit applied DDL); every user-owned
+  table has RLS (`auth.uid() = user_id`) and grants to `authenticated` only. Only the publishable key may reach the
+  APK, via `local.properties`/CI env — never a service-role key or OAuth client secret.
 - Never hardcode API keys or secrets. Never commit keystores. Android auto-backup is disabled; Lucento
   provides its own explicit backup/restore.
 
 ## Design standards
-- Palette: brand blue `#2563EB` primary, sun-yellow accent (sparingly), warm cream / deep navy neutrals, midnight-navy
+- Palette: Sunrise Energy — Electric Blue `#3563F5` for interaction, sunlight `#FFC928` / tangerine `#FF8A24` accents (sparingly), soft ivory / midnight navy neutrals, navy
   dark theme. No dynamic colour. Tokens, components and rules are in `docs/DESIGN.md`; never hardcode colours.
-- Brand: blue L + yellow leaf mark; original Sun (light) / Moon (dark) mascot (`LucentoMascot`), small on dashboards.
+- Brand: Rising Crest logo (three leaf-cut bars + dot, "lucento" wordmark; source `lucento-website/brand/logo/`, see docs/DESIGN.md); Lucento mascot (`LucentoMascot`, golden orb with a crystal torch; spec in `docs/mascot/`), small on dashboards.
 - Optional modules are switched through the typed `FeatureSet` (DataStore). Disabling a module hides it and never
   deletes data; core transactions/accounts are never optional.
 - Amounts are always signed via `MoneyFormatter.formatSigned` so meaning never depends on colour alone.
-- Typography: Inter (body) + Inter Display (headings), bundled under OFL. Amounts use tabular figures (`AmountStyles`).
+- Typography: Plus Jakarta Sans (static 400–700), bundled under OFL. Amounts use tabular figures (`AmountStyles`).
+- The logo and mascot are approved artwork: never redraw, regenerate or re-tint them to match the UI palette.
 - Flat surfaces with hairline borders; no heavy gradients, glassmorphism, or decorative charts.
 - Every screen has one clear purpose. **No buttons that do nothing. No fake financial data.**
 - Haptics through `rememberHaptics()`; structural motion via Compose animation APIs, short and purposeful.
@@ -71,7 +87,9 @@ app/src/main/java/com/lucento/app/
 
 ## Quality
 - Write JVM unit tests for every financial calculation and critical workflow (`app/src/test`).
-- Run `./gradlew testDebugUnitTest assembleDebug` before pushing.
+- Run `./gradlew testDebugUnitTest assembleDebug` before pushing. Without the Android SDK, `tools/jvm-harness/run.sh`
+  compiles and runs the Android-free code and all JVM tests (a fallback, not a replacement for CI).
+- `ScreenshotTourTest` (androidTest, run by CI on an emulator) walks the main flows and saves screenshots for review.
 - Never claim a build or test passed without seeing it pass (locally or in GitHub Actions).
 - Fix defects instead of hiding them. Keep `docs/ROADMAP.md` and `README.md` current.
 

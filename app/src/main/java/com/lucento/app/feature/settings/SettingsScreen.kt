@@ -28,13 +28,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,10 +63,12 @@ import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.NavRow
 import com.lucento.app.core.designsystem.component.SwitchRow
+import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.component.rememberHaptics
+import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
@@ -99,11 +106,17 @@ fun SettingsScreen(
                 },
                 onPickCurrency = { pickingCurrency = true },
                 onFeature = viewModel::setFeatureEnabled,
+                onSmartReading = viewModel::setSmartReading,
                 onExport = {
                     exportMessage = null
                     exporter.launch("lucento-transactions-${LocalDate.now()}.csv")
                 },
                 exportMessage = exportMessage,
+                // LocalContext here is MainActivity, which Credential Manager needs to show the account picker.
+                onConnectGoogle = { viewModel.connectGoogleAccount(context) },
+                onConnectEmail = viewModel::connectEmailAccount,
+                onDisconnect = viewModel::disconnectAccount,
+                onSyncNow = viewModel::syncNow,
             )
         }
         Spacer(Modifier.height(Spacing.xxl))
@@ -192,8 +205,13 @@ private fun SettingsContent(
     onThemeMode: (ThemeMode) -> Unit,
     onPickCurrency: () -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
+    onSmartReading: (Boolean) -> Unit,
     onExport: () -> Unit,
     exportMessage: String?,
+    onConnectGoogle: () -> Unit,
+    onConnectEmail: (String, String, EmailMode) -> Unit,
+    onDisconnect: () -> Unit,
+    onSyncNow: () -> Unit,
 ) {
     val prefs = current.preferences
     Column {
@@ -255,6 +273,14 @@ private fun SettingsContent(
 
         EnabledFeaturesSection(current, onFeature)
 
+        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail)
+
+        SmartReadingSection(
+            on = prefs.smartReading,
+            signedIn = current.cloudSync.signedInEmail != null,
+            onChange = onSmartReading,
+        )
+
         SectionHeader("Your data", Modifier.padding(top = Spacing.section))
         NavRow(
             icon = Icons.Outlined.FileDownload,
@@ -272,9 +298,23 @@ private fun SettingsContent(
         )
 
         SectionHeader("Privacy", Modifier.padding(top = Spacing.section))
-        Fact(Icons.Outlined.PhoneAndroid, "Stored only on this device", "Wallets, transactions, budgets and goals live in Lucento’s private storage.")
+        Fact(
+            Icons.Outlined.PhoneAndroid,
+            if (current.cloudSync.status.enabled) "Kept on this device, copied to your account" else "Stored only on this device",
+            if (current.cloudSync.status.enabled)
+                "Wallets, transactions, budgets and goals stay in Lucento’s private storage; cloud sync keeps a copy in your account, readable only by you."
+            else
+                "Wallets, transactions, budgets and goals live in Lucento’s private storage.",
+        )
         Hairline(inset = Sizes.iconTile + Spacing.md)
-        Fact(Icons.Outlined.WifiOff, "No internet access", "Lucento doesn’t have the internet permission, so nothing can be sent anywhere. Receipt reading runs on the phone.")
+        Fact(
+            Icons.Outlined.WifiOff,
+            "Offline unless you turn sync on",
+            if (current.cloudSync.status.enabled)
+                "Cloud sync is on for this account; everything else still works offline. Receipt reading runs on the phone either way."
+            else
+                "Lucento makes no network connection until you connect an account above. Receipt reading runs on the phone.",
+        )
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.KeyboardVoice, "Voice uses your phone’s recogniser", "Speech is converted to text by your device’s speech service; Lucento interprets it offline.")
         Hairline(inset = Sizes.iconTile + Spacing.md)
@@ -295,7 +335,7 @@ private fun SettingsContent(
         }
         Spacer(Modifier.height(Spacing.md))
         Text(
-            "Set in Inter, licensed under the SIL Open Font License 1.1. Text recognition by Google ML Kit (on-device). " +
+            "Set in Plus Jakarta Sans, licensed under the SIL Open Font License 1.1. Text recognition by Google ML Kit (on-device). " +
                 "Animations play with Airbnb Lottie (Apache License 2.0); the Sun and Moon, illustrations and motion are original to Lucento.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -309,8 +349,8 @@ private fun ThemeOption(mode: ThemeMode, selected: Boolean, onSelect: () -> Unit
     val colors = MaterialTheme.colorScheme
     val border by animateColorAsState(if (selected) colors.primary else colors.outlineVariant, tween(160), label = "theme-border")
     // Literal previews of each theme (not tokens), so they look the same whichever theme is active.
-    val light = Color(0xFFFFFDF8) to Color(0xFF2563EB)
-    val dark = Color(0xFF0B1226) to Color(0xFF8AB0FF)
+    val light = Color(0xFFFFFDF5) to Color(0xFF3563F5)
+    val dark = Color(0xFF10182B) to Color(0xFF7C9AFF)
     Column(
         modifier
             .clip(MaterialTheme.shapes.medium)
@@ -366,6 +406,95 @@ private fun Swatch(colors: Pair<Color, Color>, modifier: Modifier) {
     }
 }
 
+/**
+ * Optional Google Sign-In + cloud sync (see docs/SYNC.md). Every core feature works without this section
+ * ever being touched — it only explains and controls something extra, never something required.
+ */
+@Composable
+internal fun CloudSyncSection(
+    state: CloudSyncUiState,
+    onConnectGoogle: () -> Unit,
+    onDisconnect: () -> Unit,
+    onSyncNow: () -> Unit,
+    onConnectEmail: (String, String, EmailMode) -> Unit = { _, _, _ -> },
+) {
+    Column {
+        SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
+        when {
+            !state.configured -> {
+                InfoNote("Cloud sync isn’t available in this version of Lucento yet. Everything else works fully offline.")
+            }
+            state.signedInEmail == null -> {
+                Text(
+                    "Back up your wallets, transactions, budgets and goals and keep them in sync across your " +
+                        "devices. Lucento stays fully usable without this — nothing is sent anywhere until you " +
+                        "connect an account.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                // Without GOOGLE_WEB_CLIENT_ID (see docs/SYNC.md "Setup required") only the email option is offered.
+                ConnectAccountPanel(
+                    busy = state.syncing,
+                    googleAvailable = state.googleSignInConfigured,
+                    onGoogle = onConnectGoogle,
+                    onEmail = onConnectEmail,
+                )
+            }
+            else -> {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(
+                        // A check mark beside "Last sync failed" would contradict the text: failures get the warning look.
+                        icon = if (state.status.lastError != null) Icons.Outlined.CloudOff else Icons.Filled.CloudDone,
+                        container = if (state.status.lastError != null) LucentoTheme.extendedColors.warningContainer else MaterialTheme.colorScheme.primaryContainer,
+                        content = if (state.status.lastError != null) LucentoTheme.extendedColors.warning else MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(Modifier.width(Spacing.md))
+                    Column(Modifier.weight(1f)) {
+                        Text(state.signedInEmail, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            syncStatusLine(state),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(Spacing.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    OutlinedButton(onClick = onSyncNow, enabled = !state.syncing) {
+                        if (state.syncing) {
+                            CircularProgressIndicator(Modifier.size(Sizes.iconTile / 2), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text("Sync now")
+                        }
+                    }
+                    OutlinedButton(onClick = onDisconnect, enabled = !state.syncing) { Text("Disconnect") }
+                }
+            }
+        }
+        // The status line already shows the stored error; don't print the same sentence twice (account mismatch).
+        state.lastMessage?.takeIf { state.signedInEmail == null || it != state.status.lastError }?.let {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun syncStatusLine(state: CloudSyncUiState): String {
+    val error = state.status.lastError
+    if (error != null) return "Last sync failed: $error"
+    val last = state.status.lastSyncedAtMillis ?: return "Not synced yet"
+    val minutesAgo = (System.currentTimeMillis() - last) / 60_000
+    return when {
+        minutesAgo < 1 -> "Synced just now"
+        minutesAgo < 60 -> "Synced $minutesAgo min ago"
+        minutesAgo < 24 * 60 -> "Synced ${minutesAgo / 60} h ago"
+        else -> "Synced ${minutesAgo / (24 * 60)} d ago"
+    }
+}
+
 /** A statement of how Lucento behaves — informational, not a toggle. */
 @Composable
 private fun Fact(icon: ImageVector, title: String, body: String) {
@@ -381,5 +510,40 @@ private fun Fact(icon: ImageVector, title: String, body: String) {
             Spacer(Modifier.height(Spacing.xxs))
             Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+/**
+ * Smarter reading (opt-in, off by default): typed and spoken messages are read by Gemini through Lucento's server.
+ * Turning it on always goes through a dialog that says what is sent and where; it needs a sync account, which carries
+ * the daily allowance. Receipts are always read on this phone, and so is everything when this is off or unreachable.
+ */
+@Composable
+private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boolean) -> Unit) {
+    var asking by remember { mutableStateOf(false) }
+    SectionHeader("Smarter reading", Modifier.padding(top = Spacing.section))
+    SwitchRow(
+        title = "Read messages with Gemini",
+        checked = on,
+        onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
+        enabled = signedIn || on,
+        description = "Better at messy, multi-item messages. Off or offline, Lucento reads them on this phone as before.",
+        note = if (!signedIn) "Connect a sync account above first — it keeps your daily allowance." else null,
+    )
+    if (asking) {
+        ConfirmDialog(
+            title = "Send messages to Gemini?",
+            text = "When you type or speak in the composer, Lucento sends that message, today’s date, your main currency " +
+                "and the names of your categories and accounts to Lucento’s server, which asks Google’s Gemini to read it. " +
+                "Balances and your history are not sent. Google processes the text under the Gemini API terms. Each " +
+                "account has a daily allowance; after it, reading happens on this phone. You review every row before " +
+                "anything is saved, receipts are still read on this phone, and you can turn this off at any time.",
+            confirmLabel = "Turn on",
+            onConfirm = {
+                asking = false
+                onChange(true)
+            },
+            onDismiss = { asking = false },
+        )
     }
 }

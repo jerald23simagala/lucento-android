@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="lucento_blue">#2563EB</color>
-    <color name="lucento_cream">#FFFDF8</color>
-    <color name="lucento_midnight">#0B1226</color>
-    <color name="lucento_sun">#FBBF24</color>
+    <color name="lucento_blue">#3563F5</color>
+    <color name="lucento_cream">#FFFDF5</color>
+    <color name="lucento_midnight">#10182B</color>
+    <color name="lucento_sun">#FFC928</color>
     <color name="splash_background">@color/lucento_cream</color>
 </resources>

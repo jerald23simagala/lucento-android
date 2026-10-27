@@ -19,7 +19,7 @@ enum class Feature(
         "Multiple wallets",
         "Track several accounts and move money between them with transfers.",
     ),
-    BUDGETS("budgets", "Budgets", "Monthly limits overall and per category, with progress."),
+    BUDGETS("budgets", "Budgets", "Monthly amounts per category; your total budget is their sum."),
     SAVINGS_GOALS("savings_goals", "Savings goals", "Targets, contributions and projected completion dates."),
     DEBTS_LOANS(
         "debts_loans",
@@ -30,7 +30,7 @@ enum class Feature(
     RECURRING("recurring", "Recurring payments", "Bills, subscriptions and salary you confirm when they happen."),
     INSIGHTS("insights", "Insights & reports", "Spending breakdowns, monthly comparisons and net flow."),
     RECEIPT_SCANNING("receipt_scanning", "Receipt scanning", "Read totals from receipt photos on this device."),
-    VOICE_ENTRY("voice_entry", "Voice & text entry", "Say or type “spent 250 on lunch” and review before saving.");
+    VOICE_ENTRY("voice_entry", "Voice entry", "Speak transactions; your phone’s speech service turns them into text for you to review.");
 
     companion object {
         fun fromKey(key: String): Feature? = entries.firstOrNull { it.key == key }
@@ -68,11 +68,12 @@ enum class FinancialFocus(val title: String, val description: String, val featur
 
     companion object {
         /**
-         * Initial modules for the chosen focuses. Multiple wallets, quick capture and insights are on by
-         * default because they make everyday tracking easier; the user can still turn them off.
+         * Initial modules for the chosen focuses. Budgets, multiple wallets, quick capture and insights are on by
+         * default because they make everyday tracking easier (Budget is a primary tab, built from the categories
+         * chosen in onboarding); the user can still turn them off.
          */
         fun initialFeatures(focuses: Set<FinancialFocus>): Set<Feature> =
-            setOf(Feature.MULTIPLE_WALLETS, Feature.INSIGHTS, Feature.RECEIPT_SCANNING, Feature.VOICE_ENTRY) +
+            setOf(Feature.BUDGETS, Feature.MULTIPLE_WALLETS, Feature.INSIGHTS, Feature.RECEIPT_SCANNING, Feature.VOICE_ENTRY) +
                 focuses.flatMap { it.features }
     }
 }

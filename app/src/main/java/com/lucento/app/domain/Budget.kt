@@ -4,8 +4,9 @@ import com.lucento.app.core.money.Money
 import java.time.YearMonth
 
 /**
- * A monthly spending limit in one currency. [categoryId] null means an overall budget covering every
- * expense in that currency; otherwise it covers one expense category.
+ * A monthly allocation for one expense category in one currency. The overall budget is never stored: it is the sum
+ * of the allocations (see [BudgetPlanner]). [categoryId] null only appears for an "everything" limit saved by
+ * Lucento 0.4 or earlier ([isLegacyOverall]); such a row is ignored by every calculation and can be removed by the user.
  *
  * Period rules: budgets apply to calendar months (1st to last day, by the transaction's calendar date).
  * There is no rollover — every month starts again from the full limit. Only EXPENSE transactions count:
@@ -20,7 +21,8 @@ data class Budget(
     val createdOn: java.time.LocalDate? = null,
 ) {
     val currencyCode: String get() = limit.currencyCode
-    val isOverall: Boolean get() = categoryId == null
+    /** A pre-0.5 "budget for everything". Ignored by all calculations; shown once so the user can remove it. */
+    val isLegacyOverall: Boolean get() = categoryId == null
 }
 
 enum class BudgetStatus { ON_TRACK, NEAR_LIMIT, OVER_LIMIT }
@@ -64,7 +66,7 @@ object BudgetCalculator {
             transactions
                 .asSequence()
                 .filter { it.type == TransactionType.EXPENSE && it.currencyCode == budget.currencyCode && it.date in range }
-                .filter { budget.isOverall || it.categoryId == budget.categoryId }
+                .filter { it.categoryId != null && it.categoryId == budget.categoryId }
                 .map { it.amount }
                 .asIterable(),
         )
@@ -73,20 +75,11 @@ object BudgetCalculator {
     fun progress(budget: Budget, transactions: List<Transaction>, month: YearMonth): BudgetProgress =
         BudgetProgress(budget, month, spent(budget, transactions, month))
 
-    /**
-     * Progress for every budget, overall budgets first, then category budgets by most used.
-     */
+    /** Progress for every category allocation (legacy "everything" rows are skipped), most used first. */
     fun progressAll(budgets: List<Budget>, transactions: List<Transaction>, month: YearMonth): List<BudgetProgress> =
-        budgets.map { progress(it, transactions, month) }
-            .sortedWith(
-                compareBy<BudgetProgress> { !it.budget.isOverall }
-                    .thenByDescending { it.percentUsed ?: 0 }
-                    .thenBy { it.budget.id },
-            )
-
-    /** The overall budget for [currencyCode], if the user set one. */
-    fun overallFor(budgets: List<Budget>, currencyCode: String): Budget? =
-        budgets.firstOrNull { it.isOverall && it.currencyCode == currencyCode }
+        budgets.filterNot { it.isLegacyOverall }
+            .map { progress(it, transactions, month) }
+            .sortedWith(compareByDescending<BudgetProgress> { it.percentUsed ?: 0 }.thenBy { it.budget.id })
 }
 
 /**
@@ -96,25 +89,25 @@ object BudgetCalculator {
 object BudgetMilestones {
 
     /**
-     * The most recent *finished* month (before [today]'s month) worth acknowledging, or null. It qualifies when an
-     * overall budget in [currencyCode] existed for that whole month, there was real spending, and spending stayed
-     * at or under the limit. Overspending is never celebrated, nor is an empty month, nor a month already
-     * acknowledged ([lastAcknowledged] on or after it).
+     * The most recent *finished* month (before [today]'s month) worth acknowledging, or null. Only allocations that
+     * existed for that whole month (created on or before its first day) count, so a budget set up mid-month is never
+     * judged on a partial month. The month qualifies when those allocations add up to a positive total in
+     * [currencyCode], there was real budgeted spending, and it stayed at or under the total. Overspending is never
+     * celebrated, nor is an empty month, nor a month already acknowledged ([lastAcknowledged] on or after it).
      */
     fun monthToAcknowledge(
+        categories: List<Category>,
         budgets: List<Budget>,
         transactions: List<Transaction>,
         currencyCode: String,
         today: java.time.LocalDate,
         lastAcknowledged: YearMonth?,
-    ): BudgetProgress? {
+    ): BudgetPlan? {
         val month = YearMonth.from(today).minusMonths(1)
         if (lastAcknowledged != null && !lastAcknowledged.isBefore(month)) return null
-        val budget = BudgetCalculator.overallFor(budgets, currencyCode) ?: return null
-        val created = budget.createdOn ?: return null
-        if (created.isAfter(month.atDay(1))) return null
-        val progress = BudgetCalculator.progress(budget, transactions, month)
-        if (progress.spent.isZero || progress.status == BudgetStatus.OVER_LIMIT) return null
-        return progress
+        val wholeMonth = budgets.filter { b -> b.createdOn != null && !b.createdOn.isAfter(month.atDay(1)) }
+        val plan = BudgetPlanner.plan(categories, wholeMonth, transactions, currencyCode, month)
+        if (!plan.hasBudget || plan.spent.isZero || plan.spent > plan.total) return null
+        return plan
     }
 }

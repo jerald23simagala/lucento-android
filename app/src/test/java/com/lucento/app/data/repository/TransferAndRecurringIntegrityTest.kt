@@ -156,8 +156,10 @@ class TransferAndRecurringIntegrityTest {
     @Test fun occurrenceKeysAreDistinctPerDueDate() = runTest {
         val id = schedule(LocalDate.parse("2026-01-31"))
         val s = recurring.observeSchedules().first().single { it.id == id }
-        assertEquals("recurring-$id-on-${LocalDate.parse("2026-01-31").toEpochDay()}", s.occurrenceKey(0))
-        assertEquals("recurring-$id-on-${LocalDate.parse("2026-02-28").toEpochDay()}", s.occurrenceKey(1))
+        // Keyed by the schedule's stable cross-device id (v9), so two synced devices can't each record the same payment.
+        val key = s.clientUuid!!
+        assertEquals("recurring-$key-on-${LocalDate.parse("2026-01-31").toEpochDay()}", s.occurrenceKey(0))
+        assertEquals("recurring-$key-on-${LocalDate.parse("2026-02-28").toEpochDay()}", s.occurrenceKey(1))
     }
 }
 

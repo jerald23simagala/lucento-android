@@ -1,5 +1,8 @@
 package com.lucento.app.core.designsystem.component
 
+import com.lucento.app.core.designsystem.theme.TonePair
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.border
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -104,6 +107,10 @@ fun SearchField(
 /**
  * Two-to-four option switch with a sliding-feel selected tile. Used for Expense / Income and theme.
  * Each option is a radio-like selectable so TalkBack announces state.
+ *
+ * [selectedTone] fills the selected tile with a stronger colour pair (e.g. brand blue for history filters, the
+ * income / expense tone in the editor) where the choice deserves emphasis; [compact] trims the row to 40dp for
+ * dense, pinned headers (the tiles span the full width, so they stay easy to hit).
  */
 @Composable
 fun <T> SegmentedToggle(
@@ -111,33 +118,46 @@ fun <T> SegmentedToggle(
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    selectedTone: ((T) -> TonePair)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val haptics = rememberHaptics()
+    val track = colors.surfaceContainerHigh
     Row(
         modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(colors.surfaceContainerHigh)
-            .padding(4.dp)
+            .background(track)
+            .then(if (selectedTone != null) Modifier.border(1.dp, colors.outlineVariant, MaterialTheme.shapes.medium) else Modifier)
+            .padding(if (compact) 3.dp else 4.dp)
             .selectableGroup(),
     ) {
         options.forEach { (value, label) ->
             val isSelected = value == selected
+            val tone = if (isSelected) selectedTone?.invoke(value) else null
             val container by animateColorAsState(
-                if (isSelected) colors.surfaceContainerLowest else colors.surfaceContainerHigh,
+                when {
+                    tone != null -> tone.container
+                    isSelected -> colors.surfaceContainerLowest
+                    else -> track
+                },
                 animationSpec = tween(180),
                 label = "segment",
             )
             val content by animateColorAsState(
-                if (isSelected) colors.onSurface else colors.onSurfaceVariant,
+                when {
+                    tone != null -> tone.content
+                    isSelected -> colors.onSurface
+                    else -> colors.onSurfaceVariant
+                },
                 animationSpec = tween(180),
                 label = "segment-text",
             )
             Box(
                 Modifier
                     .weight(1f)
-                    .heightIn(min = 44.dp)
+                    .heightIn(min = if (compact) 34.dp else 44.dp)
                     .clip(MaterialTheme.shapes.small)
                     .background(container)
                     .selectable(selected = isSelected, role = Role.RadioButton) {
@@ -148,7 +168,13 @@ fun <T> SegmentedToggle(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = MaterialTheme.typography.labelLarge, color = content, maxLines = 1)
+                Text(
+                    label,
+                    style = if (isSelected && tone != null) MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    else MaterialTheme.typography.labelLarge,
+                    color = content,
+                    maxLines = 1,
+                )
             }
         }
     }
@@ -167,10 +193,11 @@ fun ChoicePill(
 ) {
     val colors = MaterialTheme.colorScheme
     val container by animateColorAsState(
-        if (selected) colors.primaryContainer else colors.surfaceContainerLowest,
+        if (selected) colors.primary else colors.surfaceContainerLowest,
         tween(160),
         label = "pill",
     )
+    // Selected: solid primary with its label colour; unselected: a neutral pill with a hairline.
     val border = if (selected) colors.primary else colors.outlineVariant
     Surface(
         modifier = modifier
@@ -180,7 +207,7 @@ fun ChoicePill(
             .selectable(selected = selected, role = role, onClick = onClick),
         shape = MaterialTheme.shapes.small,
         color = container,
-        contentColor = if (selected) colors.onPrimaryContainer else colors.onSurface,
+        contentColor = if (selected) colors.onPrimary else colors.onSurface,
         border = BorderStroke(1.dp, border),
     ) {
         Row(
