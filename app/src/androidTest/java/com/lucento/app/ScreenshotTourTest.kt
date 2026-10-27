@@ -143,7 +143,13 @@ class ScreenshotTourTest {
         click("Continue")
         waitForText("Back up and sync?")
         shot("04a-onboarding-sync")
-        click("Not now", substring = true) // the tour stays offline: no account is connected
+        // The tour stays offline: no account is connected. A build without a sync key (CI) shows only Continue here;
+        // one with sync offers "Not now — keep it on this phone".
+        if (compose.onAllNodes(hasText("Not now", substring = true)).fetchSemanticsNodes().isNotEmpty()) {
+            click("Not now", substring = true)
+        } else {
+            click("Continue")
+        }
         waitForText("You’re all set")
         shot("04-onboarding-confirm")
         click("Start using Lucento")
