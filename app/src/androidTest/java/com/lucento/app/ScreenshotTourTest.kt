@@ -226,7 +226,7 @@ class ScreenshotTourTest {
         val total = MoneyFormatter.format(money(2_590))
         waitForText("Monthly budget")
         waitForText(total) // the pace card's budget figure is the sum of the category amounts
-        waitForText("Month elapsed")
+        waitForText("days left") // the compact pace card: bars are self-labelled, the stats end with days left
         shot("06-home-within-budget")
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
