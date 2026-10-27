@@ -15,7 +15,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   **transaction composer**; Insights, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
   links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name, appearance, Settings, Enabled features).
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
-  search, custom categories; required) → review → currency & appearance → confirmation.
+  search, custom categories; required) → review → currency & appearance → confirmation. On a new phone,
+  **I already have an account** (when sync is available) reminds you to sync the old phone first, signs in, downloads
+  the account and goes straight to Home — no story, no guided setup; an empty account continues with the normal setup.
 - **Home**: a working header (sync status, month selector, profile); the **Budget pace** card — % of budget used,
   budget used vs month elapsed, a verdict in words and Lucento, the mascot, whose look follows it; **net worth** as
   assets − liabilities with shortcuts to goals, scheduled transactions, debts and categories; the savings goal closest

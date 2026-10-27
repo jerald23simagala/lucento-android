@@ -30,6 +30,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.Circle
@@ -52,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.CurrencyList
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
+import com.lucento.app.core.designsystem.component.LucentoWorkingIndicator
 import com.lucento.app.core.designsystem.component.LucentoStackedLockup
 import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.MascotMood
@@ -86,9 +88,31 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     val signedInEmail by viewModel.signedInEmail.collectAsStateWithLifecycle()
     val connecting by viewModel.connecting.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
+    val restoreStage by viewModel.restoreStage.collectAsStateWithLifecycle()
+    val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    BackHandler(enabled = step > 0) { viewModel.back() }
+    BackHandler(enabled = step > 0 && restoreStage == RestoreStage.NONE) { viewModel.back() }
+    BackHandler(enabled = restoreStage != RestoreStage.NONE && restoreStage != RestoreStage.RESTORING) { viewModel.cancelRestore() }
+
+    // Restoring an account on a new phone replaces the story with its own short flow.
+    if (restoreStage != RestoreStage.NONE) {
+        RestoreFlow(
+            stage = restoreStage,
+            signedInEmail = signedInEmail,
+            googleAvailable = viewModel.googleAvailable,
+            connecting = connecting,
+            message = restoreMessage ?: syncMessage,
+            onContinue = viewModel::continueRestore,
+            onGoogle = { viewModel.connectGoogle(context) },
+            onEmail = viewModel::connectEmail,
+            onPrepareEmail = viewModel::prepareConnection,
+            onRetry = viewModel::runRestore,
+            onSetUpAsNew = viewModel::setUpAsNew,
+            onBack = viewModel::cancelRestore,
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -116,7 +140,10 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
             label = "onboarding-step",
         ) { target ->
             when (target) {
-                OnboardingViewModel.STEP_WELCOME -> WelcomeStep(onContinue = viewModel::next)
+                OnboardingViewModel.STEP_WELCOME -> WelcomeStep(
+                    onContinue = viewModel::next,
+                    onRestore = if (viewModel.syncAvailable) viewModel::startRestore else null,
+                )
                 OnboardingViewModel.STEP_FOCUS -> FocusStep(focuses, viewModel::toggleFocus, viewModel::next)
                 OnboardingViewModel.STEP_FEATURES -> FeaturesStep(features, viewModel::setFeature, viewModel::next)
                 OnboardingViewModel.STEP_CATEGORIES -> CategoriesStep(picks, viewModel::setPicks, viewModel::next)
@@ -182,7 +209,7 @@ private fun StepTitle(title: String, body: String) {
 }
 
 @Composable
-private fun WelcomeStep(onContinue: () -> Unit) {
+private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
     Column(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -221,6 +248,115 @@ private fun WelcomeStep(onContinue: () -> Unit) {
             )
         }
         LucentoPrimaryButton(text = "Get started", onClick = onContinue)
+        // Moving to a new phone: sign in and bring the account across instead of setting up from scratch.
+        if (onRestore != null) {
+            Spacer(Modifier.height(Spacing.xs))
+            LucentoTextButton(text = "I already have an account", onClick = onRestore, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/**
+ * "I already have an account": a reminder to sync the old phone first, sign-in, then the download. A restored account
+ * goes straight to Home (no story, no guided setup); an empty one continues with the normal setup, still connected.
+ */
+@Composable
+internal fun RestoreFlow(
+    stage: RestoreStage,
+    signedInEmail: String?,
+    googleAvailable: Boolean,
+    connecting: Boolean,
+    message: String?,
+    onContinue: () -> Unit,
+    onGoogle: () -> Unit,
+    onEmail: (String, String, com.lucento.app.feature.settings.EmailMode) -> Unit,
+    onPrepareEmail: () -> Unit,
+    onRetry: () -> Unit,
+    onSetUpAsNew: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val ext = LucentoTheme.extendedColors
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding()
+            .imePadding()
+            .padding(horizontal = Spacing.gutter, vertical = Spacing.lg),
+    ) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Spacer(Modifier.height(Spacing.lg))
+            when (stage) {
+                RestoreStage.WARN -> {
+                    LucentoMascot(size = 88.dp, mood = MascotMood.Curious, contentDescription = "Lucento, ready to help you move")
+                    Spacer(Modifier.height(Spacing.md))
+                    StepTitle(
+                        "Moving to a new phone?",
+                        "Sign in with your Lucento account and everything it has synced comes across: wallets, " +
+                            "transactions, budgets, goals and scheduled payments.",
+                    )
+                    Spacer(Modifier.height(Spacing.md))
+                    InfoNote(
+                        "Sync your old phone first (recommended). Anything added there since its last sync stays on that " +
+                            "phone and won’t show up here. On the old phone, open Lucento › Settings › Cloud sync › Sync now.",
+                        icon = Icons.Outlined.WarningAmber,
+                        container = ext.warningContainer,
+                        content = ext.warning,
+                    )
+                }
+                RestoreStage.SIGN_IN -> {
+                    StepTitle("Sign in to your account", "Use the same Google or email account as on your old phone.")
+                    Spacer(Modifier.height(Spacing.md))
+                    com.lucento.app.feature.settings.ConnectAccountPanel(
+                        busy = connecting,
+                        googleAvailable = googleAvailable,
+                        onGoogle = onGoogle,
+                        onEmail = onEmail,
+                        onPrepareEmail = onPrepareEmail,
+                    )
+                }
+                RestoreStage.RESTORING -> {
+                    StepTitle(
+                        "Bringing your money across",
+                        "Downloading ${signedInEmail?.takeIf { it.isNotEmpty() } ?: "your account"}. Keep Lucento open — " +
+                            "this can take a moment on a slow connection.",
+                    )
+                    Spacer(Modifier.height(Spacing.xl))
+                    LucentoWorkingIndicator(label = "Restoring your account")
+                }
+                RestoreStage.EMPTY -> {
+                    LucentoMascot(size = 88.dp, mood = MascotMood.Curious, contentDescription = "Lucento")
+                    Spacer(Modifier.height(Spacing.md))
+                    StepTitle(
+                        "Nothing to restore yet",
+                        "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "This account"} has no wallets or categories saved. " +
+                            "Set Lucento up as new — you stay connected, and it syncs when you finish.",
+                    )
+                }
+                RestoreStage.FAILED -> {
+                    StepTitle("Couldn’t bring your data across", "Nothing was changed on this phone.")
+                }
+                RestoreStage.NONE -> Unit
+            }
+            if (message != null && stage != RestoreStage.RESTORING) {
+                Spacer(Modifier.height(Spacing.sm))
+                Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        when (stage) {
+            RestoreStage.WARN -> {
+                LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+                LucentoTextButton(text = "Back", onClick = onBack, modifier = Modifier.fillMaxWidth())
+            }
+            RestoreStage.SIGN_IN -> LucentoTextButton(text = "Back", onClick = onBack, modifier = Modifier.fillMaxWidth(), enabled = !connecting)
+            RestoreStage.EMPTY -> LucentoPrimaryButton(text = "Set up as new", onClick = onSetUpAsNew)
+            RestoreStage.FAILED -> {
+                LucentoPrimaryButton(text = "Try again", onClick = onRetry)
+                LucentoTextButton(text = "Set up as new instead", onClick = onSetUpAsNew, modifier = Modifier.fillMaxWidth())
+            }
+            RestoreStage.RESTORING, RestoreStage.NONE -> Unit
+        }
     }
 }
 

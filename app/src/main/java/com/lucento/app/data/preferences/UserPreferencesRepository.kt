@@ -109,6 +109,22 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Finishes onboarding for an account restored on a new phone (its data already pulled by the first sync): the
+     * device-only preferences are set in one edit and the guided setup is skipped, since the account is set up.
+     * [categoriesChosen] is false when the account has no spending categories yet, so the category setup still asks.
+     */
+    suspend fun completeRestore(primaryCurrency: String, themeMode: ThemeMode, features: Set<Feature>, categoriesChosen: Boolean) {
+        context.dataStore.edit {
+            it[Keys.primaryCurrency] = primaryCurrency
+            it[Keys.themeMode] = themeMode.name
+            it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
+            it[Keys.categorySetupDone] = categoriesChosen
+            it[Keys.onboardingComplete] = true
+            it.remove(Keys.guideStep)
+        }
+    }
+
     suspend fun setSmartReading(enabled: Boolean) {
         context.dataStore.edit { it[Keys.smartReading] = enabled }
     }
