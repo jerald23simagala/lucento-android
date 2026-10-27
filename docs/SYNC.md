@@ -155,6 +155,22 @@ Linking an account never assumes either side is empty and never replaces local d
   **Duplicates by meaning are possible**: two devices that each created a wallet named "Cash" before ever syncing give
   the account two "Cash" wallets. Nothing is merged by name, except fresh-install seed categories (step 3 above).
 
+## Restoring on a new phone
+
+Onboarding's welcome screen offers **I already have an account** (only in builds with sync configured):
+
+1. A reminder: changes made on the old phone since its last sync stay there, so sync it first (recommended).
+2. Sign in (Google or email), which turns sync on.
+3. One full `SyncRepository.sync()` on this still-empty phone: it pushes only the fresh-install income seeds (their
+   deterministic ids merge with the account's) and pulls everything.
+4. If the account brought back a wallet or a spending category (`RestorePlan.hasData`), onboarding completes with
+   `UserPreferencesRepository.completeRestore`: main currency = the one most restored wallets use, every module on,
+   the current theme, and **no guided setup**. Periodic sync is scheduled.
+5. An empty account continues with the normal setup from its first question, still connected. A failed download
+   changes nothing and offers Try again or Set up as new. A restore interrupted by the app closing resumes on reopen.
+
+Main currency, theme and enabled modules are device preferences (DataStore), never synced.
+
 ## Sign-out
 
 "Disconnect" cancels background sync, turns sync off and clears the Supabase session. Local wallets, transactions,
