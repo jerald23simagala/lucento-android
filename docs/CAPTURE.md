@@ -113,6 +113,7 @@ A sync account is required: it identifies the user for the daily allowance.
 3. **Vercel.** In the `lucento-website` project → Settings → Environment Variables (Production), add
    `GEMINI_API_KEY` (mark *Sensitive*), `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and optionally `AI_DAILY_LIMIT`
    and `GEMINI_MODEL` (see `lucento-website/.env.example`). Redeploy so the function picks them up.
-4. **Check.** `curl -i -X POST https://www.lucentoapp.com/api/interpret` answers `401 sign_in_required` once deployed
-   (`503 not_configured` means a variable is missing).
+4. **Check.** `curl -i -X POST -H "Content-Type: application/json" -d "{}" https://www.lucentoapp.com/api/interpret`
+   (in PowerShell: `curl.exe`) answers `401 sign_in_required` once deployed; `503 not_configured` means a variable is
+   missing. Without the JSON content type Astro's form protection answers `403` instead.
 5. **App.** Sign in to a sync account, then Settings › Smarter reading › on. The composer's replies say who read them.
