@@ -112,6 +112,7 @@ fun SettingsScreen(
                 exportMessage = exportMessage,
                 // LocalContext here is MainActivity, which Credential Manager needs to show the account picker.
                 onConnectGoogle = { viewModel.connectGoogleAccount(context) },
+                onConnectEmail = viewModel::connectEmailAccount,
                 onDisconnect = viewModel::disconnectAccount,
                 onSyncNow = viewModel::syncNow,
             )
@@ -205,6 +206,7 @@ private fun SettingsContent(
     onExport: () -> Unit,
     exportMessage: String?,
     onConnectGoogle: () -> Unit,
+    onConnectEmail: (String, String, EmailMode) -> Unit,
     onDisconnect: () -> Unit,
     onSyncNow: () -> Unit,
 ) {
@@ -268,7 +270,7 @@ private fun SettingsContent(
 
         EnabledFeaturesSection(current, onFeature)
 
-        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow)
+        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail)
 
         SectionHeader("Your data", Modifier.padding(top = Spacing.section))
         NavRow(
@@ -405,6 +407,7 @@ internal fun CloudSyncSection(
     onConnectGoogle: () -> Unit,
     onDisconnect: () -> Unit,
     onSyncNow: () -> Unit,
+    onConnectEmail: (String, String, EmailMode) -> Unit = { _, _, _ -> },
 ) {
     Column {
         SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
@@ -421,19 +424,13 @@ internal fun CloudSyncSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(Spacing.sm))
-                if (!state.googleSignInConfigured) {
-                    // Missing GOOGLE_WEB_CLIENT_ID (see docs/SYNC.md "Setup required"); users can't fix that, so
-                    // the note says only what they can rely on.
-                    InfoNote("Connecting an account isn’t available in this version of Lucento yet. Everything else works fully offline.")
-                } else {
-                    Button(onClick = onConnectGoogle, enabled = !state.syncing) {
-                        if (state.syncing) {
-                            CircularProgressIndicator(Modifier.size(Sizes.iconTile / 2), strokeWidth = 2.dp)
-                        } else {
-                            Text("Connect with Google")
-                        }
-                    }
-                }
+                // Without GOOGLE_WEB_CLIENT_ID (see docs/SYNC.md "Setup required") only the email option is offered.
+                ConnectAccountPanel(
+                    busy = state.syncing,
+                    googleAvailable = state.googleSignInConfigured,
+                    onGoogle = onConnectGoogle,
+                    onEmail = onConnectEmail,
+                )
             }
             else -> {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

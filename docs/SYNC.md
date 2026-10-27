@@ -1,4 +1,4 @@
-# Optional cloud sync (Supabase + Google Sign-In)
+# Optional cloud sync (Supabase + Google Sign-In or email)
 
 Lucento stays local-first. Room is the source of truth for every read and write, every core feature works offline
 with no account, and nothing leaves the device until the user signs in with Google **and** keeps cloud sync on in
@@ -19,7 +19,7 @@ UI (Settings → Cloud sync) ──► SettingsViewModel ──► AuthRepositor
 | Piece | File |
 |---|---|
 | Client factory (null when unconfigured) | `data/sync/SupabaseModule.kt` |
-| Google Sign-In → Supabase session | `data/sync/AuthRepository.kt` |
+| Google Sign-In or email + password → Supabase session | `data/sync/AuthRepository.kt` (UI: `feature/settings/ConnectAccount.kt`, onboarding's sync step, Settings › Cloud sync) |
 | Push / pull / merge engine | `data/sync/SyncRepository.kt` |
 | Wire DTOs, conflict rule, results | `data/sync/SyncModels.kt` |
 | Background runs | `data/sync/SyncWorker.kt` (`SyncWorker`, `SyncScheduler`) |
@@ -38,9 +38,26 @@ UI (Settings → Cloud sync) ──► SettingsViewModel ──► AuthRepositor
 | `budgets` | `public.budgets` | |
 | `goals` | `public.goals` | `photo_path` is **never** synced (a local file path); `scene_key` is |
 | `goal_contributions` | `public.goal_contributions` | append/delete-only |
+| `recurring` | `public.recurring` | v9: `client_uuid`, `dirty`, `synced_at`, `base_revision` + triggers (MIGRATION_8_9); debt payments carry `to_wallet_id`, `interest_minor` |
+| `debt_terms` | columns of `public.wallets` | v9: `interest_rate_bps`, `repayment`, `term_months`, `installment_minor`, sent with the wallet (a terms edit bumps the wallet's `updated_at`); pre-v9 builds never send them, so the server keeps them |
 
-Not synced yet: **recurring schedules** (`recurring`, including debt payments), **debt terms** (`debt_terms`), DataStore preferences (theme, currency, enabled modules,
-display name), goal photos. See "Known limitations".
+Not synced: DataStore preferences (theme, currency, enabled modules, display name) and goal photos. See "Known
+limitations".
+
+A recurring occurrence's idempotency key uses the schedule's `client_uuid` (`recurring-<uuid>-on-<day>`), so marking the
+same payment paid on two devices records it once. Server schema: `supabase/migrations/20261026120000_recurring_and_debt_terms_sync.sql`
+(**must be applied before a v9 build syncs**: until then the extra wallet columns and the `recurring` table are unknown
+to the server and every sync fails safely, keeping all local data and dirty flags).
+
+### Accounts
+
+- **Google** (native, Credential Manager → ID token → `signInWith(IDToken)`), or **email + password** (`signUpWith(Email)` /
+  `signInWith(Email)`; at least 8 characters).
+- With "Confirm email" on (the project default), a new email account has no session until the user opens the link;
+  the app says so and the user signs in afterwards.
+- Onboarding asks once (after currency and look): connect Google or an email account, or "Not now". Connecting turns
+  sync on, but the **first sync runs only when onboarding finishes**, so an existing account's data is never merged
+  with categories the user hasn't confirmed yet.
 
 Amounts stay `bigint` minor units with their ISO 4217 code — no conversion, no floating point. `occurred_on` and
 `target_date` stay epoch days. Only `created_at` / `updated_at` / `deleted_at` become `timestamptz`.
@@ -244,7 +261,7 @@ server under account 2.
   (an edge case after concurrent parent deletes), it waits for a later cycle like any deferred row.
 - One Google account per device install. Switching accounts on a device that already synced requires clearing the
   app's data (which erases local records) or signing back in with the original account.
-- Recurring schedules, debt terms (interest rate, repayment plan), preferences and goal photos are not synced.
+- Preferences and goal photos are not synced.
 - Rows with identical meaning created separately before their first sync are not de-duplicated (seed categories are
   the exception). Categories seeded by older versions (before v6) carry random ids, so two upgraded devices can show
   duplicate default income categories.

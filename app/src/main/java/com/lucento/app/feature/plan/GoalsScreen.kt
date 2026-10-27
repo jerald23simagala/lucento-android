@@ -1,5 +1,12 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.MoneyText
+import com.lucento.app.core.designsystem.component.HeroTones
+import com.lucento.app.core.designsystem.component.HeroPill
+import com.lucento.app.core.designsystem.component.HeroFigure
+import com.lucento.app.core.designsystem.component.HeroCard
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.IntrinsicSize
 import com.lucento.app.core.designsystem.component.Confirmation
 import com.lucento.app.core.designsystem.component.ConfirmationHost
 import com.lucento.app.domain.GoalMilestone
@@ -149,6 +156,12 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                     )
                 }
             }
+            if (progress.isNotEmpty()) {
+                item(key = "hero") {
+                    GoalsHero(progress, state.primaryCurrency)
+                    Spacer(Modifier.height(Spacing.md))
+                }
+            }
             items(progress, key = { "goal-${it.goal.id}" }) { p ->
                 GoalCard(p, onClick = { openGoalId = p.goal.id })
                 Spacer(Modifier.height(Spacing.md))
@@ -226,6 +239,56 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
         )
     }
 }
+
+/**
+ * The page's statement, on brand blue: what is saved toward goals in the main currency (other currencies are never
+ * added in) on the left; still to save and how many goals are reached stacked on the right.
+ */
+@Composable
+private fun GoalsHero(progress: List<GoalProgress>, primaryCurrency: String) {
+    val ext = LucentoTheme.extendedColors
+    val code = progress.firstOrNull { it.goal.currencyCode == primaryCurrency }?.goal?.currencyCode ?: progress.first().goal.currencyCode
+    val mine = progress.filter { it.goal.currencyCode == code }
+    // Saved counts up to each target: money beyond a reached goal isn't "toward goals" any more.
+    val saved = Money.sum(code, mine.map { p -> if (p.saved.amountMinor > p.goal.target.amountMinor) p.goal.target else p.saved.coerceNonNegative() })
+    val target = Money.sum(code, mine.map { it.goal.target })
+    val left = (target - saved).coerceNonNegative()
+    val reached = mine.count { it.reached }
+    HeroCard {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1.15f)) {
+                HeroPill("Saved for goals · $code", HeroTones.main, Modifier.semantics { heading() })
+                Spacer(Modifier.height(Spacing.xs))
+                MoneyText(money = saved, style = AmountStyles.hero, color = ext.onHero)
+                Text(
+                    "of ${MoneyFormatter.format(target)} · ${mine.size} ${if (mine.size == 1) "goal" else "goals"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ext.onHeroMuted,
+                    maxLines = 1,
+                )
+            }
+            VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                HeroFigure("Still to save", HeroTones.tangerine) {
+                    MoneyText(money = left, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f)
+                }
+                HeroFigure("Reached", HeroTones.sunlight) {
+                    Text("$reached of ${mine.size}", style = AmountStyles.row, color = ext.onHero)
+                }
+            }
+        }
+        if (mine.size < progress.size) {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                "Goals in other currencies are listed below and never added in.",
+                style = MaterialTheme.typography.bodySmall,
+                color = ext.onHeroMuted,
+            )
+        }
+    }
+}
+
+private fun Money.coerceNonNegative(): Money = if (isNegative) Money.zero(currencyCode) else this
 
 /**
  * A goal's card. A goal with a picture ([GoalScene]: the user's choice, else recognised from the name — Mount Fuji for

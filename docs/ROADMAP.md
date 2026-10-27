@@ -106,6 +106,9 @@ recurring-schedule sync, syncing preferences.
   payment reminder that opens a prefilled recurring debt payment; payments split (user input) into principal (transfer)
   and interest (expense under the auto-created "Debt interest"); Recurring payments redesigned (brand hero, carded rows,
   Bill / Income / Debt payment). DB v8 (`debt_terms`, `recurring.to_wallet_id` / `interest_minor`), not synced yet.
+- Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
+  email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
+  Insights adopt the brand hero and carded sections.
 - Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull. Older installs also read balance adjustments as expenses after a sync pull.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)

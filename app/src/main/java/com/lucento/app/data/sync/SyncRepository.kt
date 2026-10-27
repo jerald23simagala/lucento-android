@@ -4,9 +4,13 @@ import com.lucento.app.data.local.BudgetDao
 import com.lucento.app.data.local.BudgetEntity
 import com.lucento.app.data.local.CategoryDao
 import com.lucento.app.data.local.CategoryEntity
+import com.lucento.app.data.local.DebtTermsDao
+import com.lucento.app.data.local.DebtTermsEntity
 import com.lucento.app.data.local.GoalContributionEntity
 import com.lucento.app.data.local.GoalDao
 import com.lucento.app.data.local.GoalEntity
+import com.lucento.app.data.local.RecurringDao
+import com.lucento.app.data.local.RecurringEntity
 import com.lucento.app.data.local.SyncDao
 import com.lucento.app.data.local.TransactionDao
 import com.lucento.app.data.local.TransactionEntity
@@ -50,6 +54,10 @@ class SyncRepository(
     private val goals: GoalDao,
     private val syncMeta: SyncDao,
     private val preferences: SyncPreferencesStore,
+    /** Recurring schedules (v9); null in tests that don't exercise them. */
+    private val recurring: RecurringDao? = null,
+    /** Debt terms, carried on their wallet's row (v9); null in tests that don't exercise them. */
+    private val debtTerms: DebtTermsDao? = null,
     private val clock: () -> Long = System::currentTimeMillis,
     private val pageSize: Long = PULL_PAGE_SIZE,
 ) {
@@ -83,6 +91,7 @@ class SyncRepository(
             report += pushCategories(r, userId, rejected)
             report += pushBudgets(r, userId, rejected)
             report += pushTransactions(r, userId, rejected)
+            report += pushRecurring(r, userId, rejected)
             report += pushGoals(r, userId, rejected)
             report += pushGoalContributions(r, userId, rejected)
 
@@ -181,12 +190,17 @@ class SyncRepository(
 
     private suspend fun pushWallets(r: SyncRemote, userId: String, rejected: Rejected): SyncReport {
         val dirty = wallets.getDirty().filter { it.clientUuid != null }
+        // A debt's terms ride on its wallet row; WalletRepository bumps the wallet's updated_at whenever they change.
+        val terms = dirty.associate { it.id to debtTerms?.get(it.id) }
         return pushRows(r, "wallets", dirty, { it.clientUuid!! }, {
+            val t = terms[it.id]
             encode(WalletRow.serializer(), WalletRow(
                 id = it.clientUuid!!, userId = userId, name = it.name, type = it.type,
                 currencyCode = it.currencyCode, openingBalanceMinor = it.openingBalanceMinor,
                 sortOrder = it.sortOrder, archived = it.archived,
                 createdAt = SyncTime.toIso(it.createdAt), updatedAt = SyncTime.toIso(it.updatedAt), baseRevision = it.baseRevision,
+                interestRateBps = t?.interestRateBps, repayment = t?.repayment, termMonths = t?.termMonths,
+                installmentMinor = t?.installmentMinor,
             ))
         }, { row, rev -> wallets.markPushed(row.clientUuid!!, row.updatedAt, rev, clock()) }, rejected)
     }
@@ -232,6 +246,29 @@ class SyncRepository(
                 createdAt = SyncTime.toIso(it.createdAt), updatedAt = SyncTime.toIso(it.updatedAt), baseRevision = it.baseRevision,
             ))
         }, { row, rev -> transactions.markPushed(row.clientUuid, row.updatedAt, rev, clock()) }, rejected)
+    }
+
+    private suspend fun pushRecurring(r: SyncRemote, userId: String, rejected: Rejected): SyncReport {
+        val dao = recurring ?: return SyncReport()
+        val dirty = dao.getDirty().filter { it.clientUuid != null }
+        val walletIds = dirty.flatMap { listOfNotNull(it.walletId, it.toWalletId) }.toSet()
+        val walletUuid = walletIds.associateWith { wallets.getById(it)?.clientUuid }
+        val categoryUuid = dirty.mapNotNull { it.categoryId }.toSet().associateWith { categories.getById(it)?.clientUuid }
+        // Like a transaction, a schedule waits until every wallet and category it points to has a stable id.
+        val eligible = dirty.filter {
+            walletUuid[it.walletId] != null && (it.toWalletId == null || walletUuid[it.toWalletId] != null) &&
+                (it.categoryId == null || categoryUuid[it.categoryId] != null)
+        }
+        return pushRows(r, "recurring", eligible, { it.clientUuid!! }, {
+            encode(RecurringRow.serializer(), RecurringRow(
+                id = it.clientUuid!!, userId = userId, name = it.name, type = it.type, amountMinor = it.amountMinor,
+                currencyCode = it.currencyCode, walletId = walletUuid[it.walletId]!!,
+                categoryId = it.categoryId?.let(categoryUuid::get), frequency = it.frequency, intervalCount = it.intervalCount,
+                startOn = it.startOn, endOn = it.endOn, nextIndex = it.nextIndex, paused = it.paused,
+                toWalletId = it.toWalletId?.let(walletUuid::get), interestMinor = it.interestMinor,
+                createdAt = SyncTime.toIso(it.createdAt), updatedAt = SyncTime.toIso(it.updatedAt), baseRevision = it.baseRevision,
+            ))
+        }, { row, rev -> dao.markPushed(row.clientUuid!!, row.updatedAt, rev, clock()) }, rejected)
     }
 
     private suspend fun pushGoals(r: SyncRemote, userId: String, rejected: Rejected): SyncReport {
@@ -345,11 +382,12 @@ class SyncRepository(
                 val row = decode(WalletRow.serializer(), json)
                 val local = wallets.findByClientUuid(row.id)
                 if (row.deletedAt != null) return queueDelete(s, table, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { wallets.deleteById(local!!.id) }
-                when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
+                val walletId = when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> wallets.insert(row.toEntity(syncedAt = clock()))
-                    PullDecision.UPDATE -> wallets.update(row.toEntity(syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    PullDecision.UPDATE -> local!!.id.also { wallets.update(row.toEntity(syncedAt = freshSyncedAt(local.syncedAt), id = it)) }
                     PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
                 }
+                applyDebtTerms(walletId, row)
                 s.pulled++
             }
             "categories" -> {
@@ -386,6 +424,23 @@ class SyncRepository(
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> transactions.insert(row.toEntity(walletId, categoryId, syncedAt = clock()))
                     PullDecision.UPDATE -> transactions.update(row.toEntity(walletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                }
+                s.pulled++
+            }
+            "recurring" -> {
+                val dao = recurring ?: return
+                val row = decode(RecurringRow.serializer(), json)
+                val local = dao.findByClientUuid(row.id)
+                if (row.deletedAt != null) return queueDelete(s, table, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { dao.deleteById(local!!.id) }
+                val walletId = wallets.findByClientUuid(row.walletId)?.id ?: return s.defer(json)
+                val toWalletId = row.toWalletId?.let { wallets.findByClientUuid(it)?.id }
+                if (row.toWalletId != null && toWalletId == null) return s.defer(json)
+                val categoryId = row.categoryId?.let { categories.findByClientUuid(it)?.id }
+                if (row.categoryId != null && categoryId == null) return s.defer(json)
+                when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
+                    PullDecision.INSERT -> dao.insert(row.toEntity(walletId, toWalletId, categoryId, syncedAt = clock()))
+                    PullDecision.UPDATE -> dao.update(row.toEntity(walletId, toWalletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
                     PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
@@ -428,6 +483,23 @@ class SyncRepository(
         }
     }
 
+    /** A pulled wallet's debt terms replace the local ones; a row without them (or not a card or loan) has none. */
+    private suspend fun applyDebtTerms(walletId: Long, row: WalletRow) {
+        val dao = debtTerms ?: return
+        val liability = row.type == "CREDIT_CARD" || row.type == "LOAN"
+        val repayment = row.repayment
+        if (!liability || repayment == null) {
+            dao.delete(walletId)
+            return
+        }
+        dao.upsert(
+            DebtTermsEntity(
+                walletId = walletId, interestRateBps = row.interestRateBps, repayment = repayment,
+                termMonths = row.termMonths, installmentMinor = row.installmentMinor, updatedAt = SyncTime.fromIso(row.updatedAt),
+            )
+        )
+    }
+
     private fun queueDelete(
         s: PullState,
         table: String,
@@ -464,8 +536,8 @@ class SyncRepository(
         const val TOMBSTONE_RETENTION_MS = 30L * 24 * 60 * 60 * 1000
         const val ACCOUNT_MISMATCH_MESSAGE =
             "This device's data is already synced with a different Google account. Sign in with that account to keep syncing."
-        private val PARENT_FIRST = listOf("wallets", "categories", "budgets", "transactions", "goals", "goal_contributions")
-        private val CHILD_FIRST = listOf("goal_contributions", "transactions", "budgets", "goals", "categories", "wallets")
+        private val PARENT_FIRST = listOf("wallets", "categories", "budgets", "transactions", "recurring", "goals", "goal_contributions")
+        private val CHILD_FIRST = listOf("goal_contributions", "recurring", "transactions", "budgets", "goals", "categories", "wallets")
     }
 }
 
@@ -501,6 +573,20 @@ private fun TransactionRow.toEntity(localWalletId: Long, localCategoryId: Long?,
         createdAt = SyncTime.fromIso(createdAt), updatedAt = SyncTime.fromIso(updatedAt), transferGroup = transferGroup,
         dirty = false, syncedAt = syncedAt, baseRevision = revision,
     )
+
+private fun RecurringRow.toEntity(
+    localWalletId: Long,
+    localToWalletId: Long?,
+    localCategoryId: Long?,
+    syncedAt: Long,
+    id: Long = 0,
+): RecurringEntity = RecurringEntity(
+    id = id, name = name, type = type, amountMinor = amountMinor, currencyCode = currencyCode, walletId = localWalletId,
+    categoryId = localCategoryId, frequency = frequency, intervalCount = intervalCount, startOn = startOn, endOn = endOn,
+    nextIndex = nextIndex, paused = paused, createdAt = SyncTime.fromIso(createdAt), updatedAt = SyncTime.fromIso(updatedAt),
+    toWalletId = localToWalletId, interestMinor = interestMinor, clientUuid = this.id, dirty = false, syncedAt = syncedAt,
+    baseRevision = revision,
+)
 
 private fun GoalRow.toEntity(localWalletId: Long?, photoPath: String?, syncedAt: Long, id: Long = 0): GoalEntity = GoalEntity(
     id = id, name = name, targetMinor = targetMinor, currencyCode = currencyCode, targetDate = targetDate,

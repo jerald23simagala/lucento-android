@@ -252,12 +252,12 @@ class MigrationTest {
     }
 
     @Test
-    fun migrate1To8_runsTheFullChainAndRoomOpensTheResult() {
+    fun migrate1To9_runsTheFullChainAndRoomOpensTheResult() {
         helper.createDatabase(TEST_DB, 1).apply {
             seedV1Wallets()
             close()
         }
-        val db = helper.runMigrationsAndValidate(TEST_DB, 8, true, *Migrations.ALL)
+        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, *Migrations.ALL)
         assertEquals(12345L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 1"))
         assertEquals(50000L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 2"))
         assertEquals(DefaultCategories.all.size.toLong(), db.long("SELECT COUNT(*) FROM categories"))
@@ -327,6 +327,39 @@ class MigrationTest {
         assertEquals(1L, db.long("SELECT COUNT(*) FROM debt_terms"))
         db.execSQL("DELETE FROM wallets WHERE id = 2")
         assertEquals(0L, db.long("SELECT COUNT(*) FROM debt_terms"))
+        db.assertNoForeignKeyViolations()
+    }
+
+    @Test
+    fun migrate8To9_givesSchedulesAStableIdAndSyncsTheirEditsAndDeletes() {
+        helper.createDatabase(TEST_DB, 8).apply {
+            execSQL(
+                "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, dirty) " +
+                    "VALUES (1, 'Bank', 'BANK', 'USD', 100000, 0, 0, 1, 1, 'w-1', 0)"
+            )
+            execSQL(
+                "INSERT INTO recurring (id, name, type, amount_minor, currency_code, wallet_id, category_id, frequency, interval_count, start_on, end_on, next_index, paused, created_at, updated_at, to_wallet_id, interest_minor) " +
+                    "VALUES (1, 'Rent', 'EXPENSE', 120000, 'USD', 1, NULL, 'MONTHLY', 1, 20000, NULL, 3, 0, 1, 1, NULL, 0), " +
+                    "(2, 'Gym', 'EXPENSE', 4000, 'USD', 1, NULL, 'MONTHLY', 1, 20000, NULL, 0, 0, 1, 1, NULL, 0)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 9, true, Migrations.MIGRATION_8_9)
+
+        db.query("SELECT client_uuid, dirty, next_index FROM recurring ORDER BY id").use { c ->
+            val ids = mutableSetOf<String>()
+            while (c.moveToNext()) {
+                assertTrue(c.getString(0).matches(Regex("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")))
+                ids += c.getString(0)
+                assertEquals("existing schedules upload on the first sync", 1, c.getInt(1))
+            }
+            assertEquals(2, ids.size)
+        }
+        db.execSQL("UPDATE recurring SET dirty = 0, synced_at = 5 WHERE id = 1")
+        db.execSQL("UPDATE recurring SET next_index = 4, updated_at = 2 WHERE id = 1") // an ordinary edit
+        assertEquals(1L, db.long("SELECT dirty FROM recurring WHERE id = 1"))
+        db.execSQL("DELETE FROM recurring WHERE id = 2")
+        assertEquals(1L, db.long("SELECT COUNT(*) FROM sync_tombstones WHERE table_name = 'recurring'"))
         db.assertNoForeignKeyViolations()
     }
 

@@ -26,7 +26,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.SET_NULL,
         ),
     ],
-    indices = [Index(value = ["wallet_id"]), Index(value = ["category_id"])],
+    indices = [Index(value = ["wallet_id"]), Index(value = ["category_id"]), Index(value = ["client_uuid"], unique = true)],
 )
 data class RecurringEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -50,4 +50,9 @@ data class RecurringEntity(
     @ColumnInfo(name = "to_wallet_id") val toWalletId: Long? = null,
     /** v8: the interest part of a debt payment; [amountMinor] is then the part against the debt. */
     @ColumnInfo(name = "interest_minor", defaultValue = "0") val interestMinor: Long = 0,
+    /** Cloud sync bookkeeping, added in v9 (see MIGRATION_8_9 and docs/SYNC.md): one stable id across devices. */
+    @ColumnInfo(name = "client_uuid") val clientUuid: String? = null,
+    @ColumnInfo(name = "dirty", defaultValue = "1") val dirty: Boolean = true,
+    @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
+    @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
 )

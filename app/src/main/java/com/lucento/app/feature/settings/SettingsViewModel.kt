@@ -103,18 +103,37 @@ class SettingsViewModel(
         viewModelScope.launch {
             syncing.value = true
             syncMessage.value = null
-            when (val result = auth.signInWithGoogle(activity)) {
-                AuthRepository.SignInResult.Success -> {
-                    syncPreferences.setEnabled(true)
-                    SyncScheduler.ensurePeriodic(application)
-                    runSyncNow()
-                }
-                AuthRepository.SignInResult.Cancelled -> Unit
-                AuthRepository.SignInResult.NotConfigured ->
-                    syncMessage.value = "Cloud sync isn’t available in this version of Lucento yet."
-                is AuthRepository.SignInResult.Failed -> syncMessage.value = result.message
-            }
+            handleSignIn(auth.signInWithGoogle(activity))
             syncing.value = false
+        }
+    }
+
+    /** An email account: [mode] creates one or signs in to an existing one; then sync turns on as for Google. */
+    fun connectEmailAccount(email: String, password: String, mode: EmailMode) {
+        if (syncing.value) return
+        viewModelScope.launch {
+            syncing.value = true
+            syncMessage.value = null
+            handleSignIn(
+                if (mode == EmailMode.CREATE) auth.signUpWithEmail(email, password) else auth.signInWithEmail(email, password)
+            )
+            syncing.value = false
+        }
+    }
+
+    private suspend fun handleSignIn(result: AuthRepository.SignInResult) {
+        when (result) {
+            AuthRepository.SignInResult.Success -> {
+                syncPreferences.setEnabled(true)
+                SyncScheduler.ensurePeriodic(application)
+                runSyncNow()
+            }
+            AuthRepository.SignInResult.Cancelled -> Unit
+            AuthRepository.SignInResult.NotConfigured ->
+                syncMessage.value = "Cloud sync isn’t available in this version of Lucento yet."
+            is AuthRepository.SignInResult.ConfirmEmail ->
+                syncMessage.value = "Almost there: open the link we sent to ${result.email}, then come back and sign in."
+            is AuthRepository.SignInResult.Failed -> syncMessage.value = result.message
         }
     }
 

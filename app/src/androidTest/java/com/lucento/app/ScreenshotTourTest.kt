@@ -141,6 +141,9 @@ class ScreenshotTourTest {
         click("Confirm", substring = true)
         waitForText("Currency and look")
         click("Continue")
+        waitForText("Back up and sync?")
+        shot("04a-onboarding-sync")
+        click("Not now", substring = true) // the tour stays offline: no account is connected
         waitForText("You’re all set")
         shot("04-onboarding-confirm")
         click("Start using Lucento")

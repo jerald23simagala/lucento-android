@@ -123,6 +123,7 @@ class RecurringRepository(
                     updatedAt = now,
                     toWalletId = input.toWalletId,
                     interestMinor = interest.amountMinor,
+                    clientUuid = java.util.UUID.randomUUID().toString(),
                 )
             )
             return SaveResult.Saved(id)
@@ -280,6 +281,7 @@ internal fun RecurringEntity.toDomainOrNull(): RecurringSchedule? = runCatching 
         paused = paused,
         toWalletId = toWalletId,
         interest = Money(interestMinor, currencyCode),
+        clientUuid = clientUuid,
     )
 }.getOrNull()
 

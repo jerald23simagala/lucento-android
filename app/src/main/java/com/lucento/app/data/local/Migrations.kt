@@ -369,7 +369,41 @@ object Migrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+    /**
+     * v9 — recurring schedules join cloud sync (docs/SYNC.md): `recurring` gains the same bookkeeping as every synced
+     * table — a stable random `client_uuid` (backfilled for existing schedules), `dirty` (existing rows start dirty so
+     * the first sync uploads them), `synced_at` and `base_revision` — plus the tombstone and dirty-on-edit triggers.
+     * Debt terms need no local change: they travel as columns of their wallet's cloud row.
+     * Literal statements only: tools/check_migrations.py replays them in CI.
+     */
+    val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `recurring` ADD COLUMN `client_uuid` TEXT")
+            db.execSQL(
+                "UPDATE `recurring` SET client_uuid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || " +
+                    "substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE client_uuid IS NULL"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_recurring_client_uuid` ON `recurring` (`client_uuid`)")
+            db.execSQL("ALTER TABLE `recurring` ADD COLUMN `dirty` INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE `recurring` ADD COLUMN `synced_at` INTEGER")
+            db.execSQL("ALTER TABLE `recurring` ADD COLUMN `base_revision` INTEGER")
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_recurring_tombstone` AFTER DELETE ON `recurring` WHEN OLD.client_uuid IS NOT NULL " +
+                    "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('recurring', OLD.client_uuid, " +
+                    "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `trg_recurring_dirty` AFTER UPDATE ON `recurring` " +
+                    "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                    "BEGIN UPDATE `recurring` SET dirty = 1 WHERE id = NEW.id; END"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(
+        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+    )
 }
 
 /**
@@ -408,6 +442,16 @@ object SyncTriggers {
             "CREATE TRIGGER IF NOT EXISTS `trg_goal_contributions_tombstone` AFTER DELETE ON `goal_contributions` WHEN OLD.client_uuid IS NOT NULL " +
                 "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('goal_contributions', OLD.client_uuid, " +
                 "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_recurring_tombstone` AFTER DELETE ON `recurring` WHEN OLD.client_uuid IS NOT NULL " +
+                "BEGIN INSERT INTO `sync_tombstones` (table_name, client_uuid, deleted_at, base_revision) VALUES ('recurring', OLD.client_uuid, " +
+                "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), OLD.base_revision); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER IF NOT EXISTS `trg_recurring_dirty` AFTER UPDATE ON `recurring` " +
+                "WHEN NEW.updated_at != OLD.updated_at AND NEW.synced_at IS OLD.synced_at " +
+                "BEGIN UPDATE `recurring` SET dirty = 1 WHERE id = NEW.id; END"
         )
         db.execSQL(
             "CREATE TRIGGER IF NOT EXISTS `trg_wallets_dirty` AFTER UPDATE ON `wallets` " +

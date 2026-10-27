@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Optional terms of a liability wallet, one row per card or loan (added in v8, see MIGRATION_7_8). Removed with its
- * wallet (CASCADE; only empty wallets are ever deleted). Local only for now, like recurring schedules: not synced.
+ * wallet (CASCADE; only empty wallets are ever deleted). Synced as columns of the cloud `wallets` row (v9): a terms
+ * change always bumps its wallet's `updated_at` (WalletRepository), so the wallet goes out again with them.
  */
 @Entity(
     tableName = "debt_terms",
@@ -46,4 +47,8 @@ interface DebtTermsDao {
 
     @Query("DELETE FROM debt_terms WHERE wallet_id = :walletId")
     suspend fun delete(walletId: Long)
+
+    /** Read by cloud sync, which carries a debt's terms on its wallet row (see docs/SYNC.md). */
+    @Query("SELECT * FROM debt_terms WHERE wallet_id = :walletId")
+    suspend fun get(walletId: Long): DebtTermsEntity?
 }

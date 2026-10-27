@@ -33,6 +33,12 @@ internal data class WalletRow(
     val revision: Long? = null,
     /** The revision this push was based on. Always sent, null included, so the server never reuses a stored value. */
     @EncodeDefault @SerialName("base_revision") val baseRevision: Long? = null,
+    // A card's or loan's optional terms (local `debt_terms`, synced from v9). Always sent, nulls included, so clearing
+    // them syncs too. A build older than v9 never sends them, and the server then keeps what it has.
+    @EncodeDefault @SerialName("interest_rate_bps") val interestRateBps: Int? = null,
+    @EncodeDefault val repayment: String? = null,
+    @EncodeDefault @SerialName("term_months") val termMonths: Int? = null,
+    @EncodeDefault @SerialName("installment_minor") val installmentMinor: Long? = null,
 )
 
 @Serializable
@@ -67,6 +73,36 @@ internal data class TransactionRow(
     @SerialName("occurred_on") val occurredOn: Long,
     val note: String,
     @SerialName("transfer_group") val transferGroup: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String,
+    @EncodeDefault @SerialName("deleted_at") val deletedAt: String? = null,
+    /** Assigned by the server on every write (see SupabaseSyncRemote); read-only for clients, never pushed. */
+    @SerialName("server_updated_at") val serverUpdatedAt: String? = null,
+    /** Server revision: +1 on every accepted write. Read-only for clients (never encoded: always null when pushing). */
+    val revision: Long? = null,
+    /** The revision this push was based on. Always sent, null included, so the server never reuses a stored value. */
+    @EncodeDefault @SerialName("base_revision") val baseRevision: Long? = null,
+)
+
+/** A recurring schedule (v9). Wallet and category ids are the parents' client uuids, like every other row. */
+@Serializable
+internal data class RecurringRow(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val name: String,
+    val type: String,
+    @SerialName("amount_minor") val amountMinor: Long,
+    @SerialName("currency_code") val currencyCode: String,
+    @SerialName("wallet_id") val walletId: String,
+    @EncodeDefault @SerialName("category_id") val categoryId: String? = null,
+    val frequency: String,
+    @SerialName("interval_count") val intervalCount: Int,
+    @SerialName("start_on") val startOn: Long,
+    @EncodeDefault @SerialName("end_on") val endOn: Long? = null,
+    @SerialName("next_index") val nextIndex: Int,
+    val paused: Boolean,
+    @EncodeDefault @SerialName("to_wallet_id") val toWalletId: String? = null,
+    @EncodeDefault @SerialName("interest_minor") val interestMinor: Long = 0,
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,
     @EncodeDefault @SerialName("deleted_at") val deletedAt: String? = null,

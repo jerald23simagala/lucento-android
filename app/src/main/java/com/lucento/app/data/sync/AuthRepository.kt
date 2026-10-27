@@ -17,7 +17,10 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.lucento.app.BuildConfig
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.exception.AuthErrorCode
+import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.providers.Google
+import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.CancellationException
@@ -29,7 +32,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 
 /**
- * Google Sign-In through Supabase Auth (see docs/SYNC.md "Authentication"). Entirely optional: Lucento is fully
+ * Google Sign-In, or an email + password account, through Supabase Auth (see docs/SYNC.md "Authentication"). Entirely optional: Lucento is fully
  * usable before, during and after a failed sign-in, and no financial data is read or sent here — this only
  * establishes or clears a session. The session itself is persisted and refreshed by supabase-kt's Auth plugin
  * (stored on the device, refreshed automatically before it expires); a session that can no longer be refreshed
@@ -43,6 +46,8 @@ class AuthRepository(private val client: SupabaseClient?) {
         data object Cancelled : SignInResult
         /** Missing Supabase or Google OAuth configuration — see docs/SYNC.md "Setup required". */
         data object NotConfigured : SignInResult
+        /** An email account was created but must be confirmed from the link Supabase emailed before signing in. */
+        data class ConfirmEmail(val email: String) : SignInResult
         data class Failed(val message: String) : SignInResult
     }
 
@@ -103,6 +108,42 @@ class AuthRepository(private val client: SupabaseClient?) {
         }
     }
 
+    /**
+     * Creates an email + password account. When the project requires email confirmation (Supabase's default) no
+     * session exists yet and [SignInResult.ConfirmEmail] asks the user to open the link, then sign in.
+     */
+    suspend fun signUpWithEmail(email: String, password: String): SignInResult {
+        val auth = client?.auth ?: return SignInResult.NotConfigured
+        return emailCall {
+            auth.signUpWith(Email) {
+                this.email = email.trim()
+                this.password = password
+            }
+            if (auth.currentSessionOrNull() != null) SignInResult.Success else SignInResult.ConfirmEmail(email.trim())
+        }
+    }
+
+    suspend fun signInWithEmail(email: String, password: String): SignInResult {
+        val auth = client?.auth ?: return SignInResult.NotConfigured
+        return emailCall {
+            auth.signInWith(Email) {
+                this.email = email.trim()
+                this.password = password
+            }
+            SignInResult.Success
+        }
+    }
+
+    private suspend fun emailCall(block: suspend () -> SignInResult): SignInResult = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: AuthRestException) {
+        SignInResult.Failed(emailFailureMessage(e.errorCode, BuildConfig.DEBUG, safeFailureDescription(e)))
+    } catch (e: Exception) {
+        SignInResult.Failed(signInFailureMessage(e, BuildConfig.DEBUG))
+    }
+
     /** Clears the Supabase session only. Local financial data is never touched by signing out. */
     suspend fun signOut() {
         runCatching { client?.auth?.signOut() }
@@ -135,4 +176,22 @@ internal fun signInFailureMessage(e: Throwable, debug: Boolean): String {
         else -> safeFailureDescription(e)
     }
     return "$message (debug: $detail)"
+}
+
+/** At least this many characters; Supabase's own minimum (6) is too weak for an account that holds financial data. */
+const val MIN_PASSWORD_LENGTH = 8
+
+/** What the user is told when an email sign-up or sign-in is refused: one honest sentence per cause. */
+internal fun emailFailureMessage(code: AuthErrorCode?, debug: Boolean, detail: String): String {
+    val message = when (code) {
+        AuthErrorCode.InvalidCredentials -> "That email and password don’t match an account. Check them, or create an account."
+        AuthErrorCode.EmailNotConfirmed -> "Confirm your email first — open the link we sent you, then sign in."
+        AuthErrorCode.UserAlreadyExists, AuthErrorCode.EmailExists -> "An account with this email already exists. Sign in instead."
+        AuthErrorCode.WeakPassword -> "Choose a stronger password: at least $MIN_PASSWORD_LENGTH characters, mixing letters and numbers."
+        AuthErrorCode.OverEmailSendRateLimit -> "Too many emails were sent just now. Wait a few minutes and try again."
+        AuthErrorCode.SignupDisabled, AuthErrorCode.EmailProviderDisabled -> "Email accounts aren’t turned on for Lucento’s sync yet. Use Google instead."
+        AuthErrorCode.ValidationFailed -> "Check the email address and password, then try again."
+        else -> "Couldn’t connect your account. Try again."
+    }
+    return if (debug) "$message (debug: $detail)" else message
 }

@@ -83,6 +83,8 @@ class AppContainer(application: Application) {
             goals = database.goalDao(),
             syncMeta = database.syncDao(),
             preferences = syncPreferences,
+            recurring = database.recurringDao(),
+            debtTerms = database.debtTermsDao(),
         )
     }
 }

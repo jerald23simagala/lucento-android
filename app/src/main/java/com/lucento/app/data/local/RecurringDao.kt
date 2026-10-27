@@ -26,4 +26,19 @@ interface RecurringDao {
 
     @Query("DELETE FROM recurring WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    // --- cloud sync (see docs/SYNC.md); unused unless the user has opted in ---
+
+    @Query("SELECT * FROM recurring WHERE dirty = 1")
+    suspend fun getDirty(): List<RecurringEntity>
+
+    @Query("SELECT * FROM recurring WHERE client_uuid = :clientUuid LIMIT 1")
+    suspend fun findByClientUuid(clientUuid: String): RecurringEntity?
+
+    /** As BudgetDao.markPushed: records the accepted revision; clears dirty only if not edited again meanwhile. */
+    @Query(
+        "UPDATE recurring SET base_revision = :revision, synced_at = :syncedAt, " +
+            "dirty = CASE WHEN updated_at = :expectedUpdatedAt THEN 0 ELSE dirty END WHERE client_uuid = :clientUuid"
+    )
+    suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
 }

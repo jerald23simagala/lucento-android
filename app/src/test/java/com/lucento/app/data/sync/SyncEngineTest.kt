@@ -1,6 +1,8 @@
 package com.lucento.app.data.sync
 
 import com.lucento.app.data.local.CategoryEntity
+import com.lucento.app.data.local.DebtTermsEntity
+import com.lucento.app.data.local.RecurringEntity
 import com.lucento.app.data.local.GoalContributionEntity
 import com.lucento.app.data.local.GoalEntity
 import com.lucento.app.data.local.SyncTombstoneEntity
@@ -8,6 +10,8 @@ import com.lucento.app.data.local.TransactionEntity
 import com.lucento.app.data.local.WalletEntity
 import com.lucento.app.data.repository.FakeBudgetDao
 import com.lucento.app.data.repository.FakeCategoryDao
+import com.lucento.app.data.repository.FakeDebtTermsDao
+import com.lucento.app.data.repository.FakeRecurringDao
 import com.lucento.app.data.repository.FakeGoalDao
 import com.lucento.app.data.repository.FakeSyncDao
 import com.lucento.app.data.repository.FakeTransactionDao
@@ -38,6 +42,8 @@ class SyncEngineTest {
         val transactions = FakeTransactionDao()
         val budgets = FakeBudgetDao()
         val goals = FakeGoalDao()
+        val recurring = FakeRecurringDao()
+        val debtTerms = FakeDebtTermsDao()
         val tombstones = FakeSyncDao()
         val prefs = FakeSyncPreferences(enabled = true)
 
@@ -65,7 +71,7 @@ class SyncEngineTest {
             }
             return SyncRepository(
                 remote, wallets, categories, transactions, budgets, goals, tombstones, prefs,
-                clock = { now }, pageSize = pageSize,
+                recurring = recurring, debtTerms = debtTerms, clock = { now }, pageSize = pageSize,
             ).sync()
         }
 
@@ -515,5 +521,98 @@ class SyncEngineTest {
         assertEquals("only once", local.note)
         assertTrue(!local.dirty)
         assertEquals(server.live("transactions", user).single().str("revision").toLong(), local.baseRevision)
+    }
+
+    // --- v9: recurring schedules and debt terms ---
+
+    @Test
+    fun `a debt payment schedule and the loan's terms reach a second device intact`() = runTest {
+        val a = Device()
+        val bank = a.addWallet("Bank")
+        val loanId = a.wallets.insert(
+            WalletEntity(name = "Car loan", type = "LOAN", currencyCode = "USD", openingBalanceMinor = 500_000, createdAt = a.now, updatedAt = a.now, clientUuid = UUID.randomUUID().toString())
+        )
+        a.debtTerms.upsert(DebtTermsEntity(loanId, interestRateBps = 1250, repayment = "MONTHLY", termMonths = 24, installmentMinor = 23_654, updatedAt = a.now))
+        val interest = a.addCategory("Debt interest")
+        a.recurring.insert(
+            RecurringEntity(
+                name = "Monthly Payment - Car loan", type = "EXPENSE", amountMinor = 23_654, currencyCode = "USD", walletId = bank.id,
+                categoryId = interest.id, frequency = "MONTHLY", intervalCount = 1, startOn = 20_000, endOn = 20_700, nextIndex = 2,
+                paused = false, createdAt = a.now, updatedAt = a.now, toWalletId = loanId, clientUuid = "sched-1",
+            )
+        )
+        assertTrue(a.sync() is SyncResult.Success)
+        assertTrue(a.recurring.rows.value.none { it.dirty })
+
+        val b = Device(now = a.now + 1_000)
+        assertTrue(b.sync() is SyncResult.Success)
+        val schedule = b.recurring.rows.value.single()
+        val bLoan = b.wallets.findByClientUuid(a.wallets.getById(loanId)!!.clientUuid!!)!!
+        assertEquals("sched-1", schedule.clientUuid)
+        assertEquals(b.wallets.findByClientUuid(bank.clientUuid!!)!!.id, schedule.walletId)
+        assertEquals(bLoan.id, schedule.toWalletId)
+        assertEquals(b.categories.findByClientUuid(interest.clientUuid!!)!!.id, schedule.categoryId)
+        assertEquals(2, schedule.nextIndex)
+        assertEquals(false, schedule.dirty)
+        val terms = b.debtTerms.get(bLoan.id)!!
+        assertEquals(1250, terms.interestRateBps)
+        assertEquals("MONTHLY", terms.repayment)
+        assertEquals(24, terms.termMonths)
+        assertEquals(23_654L, terms.installmentMinor)
+    }
+
+    @Test
+    fun `marking a payment paid on one device advances the schedule on the other, and deletes travel`() = runTest {
+        val a = Device()
+        val bank = a.addWallet("Bank")
+        val id = a.recurring.insert(
+            RecurringEntity(
+                name = "Rent", type = "EXPENSE", amountMinor = 120_000, currencyCode = "USD", walletId = bank.id, categoryId = null,
+                frequency = "MONTHLY", intervalCount = 1, startOn = 20_000, endOn = null, nextIndex = 0, paused = false,
+                createdAt = a.now, updatedAt = a.now, clientUuid = "rent",
+            )
+        )
+        a.sync()
+        val b = Device(now = a.now + 1_000)
+        b.sync()
+
+        // A marks it paid: next_index moves on and updated_at changes, so the trigger marks it dirty.
+        a.now += 5_000
+        a.recurring.update(a.recurring.getById(id)!!.copy(nextIndex = 1, updatedAt = a.now, dirty = true))
+        a.sync()
+        b.now += 10_000
+        b.sync()
+        assertEquals(1, b.recurring.rows.value.single().nextIndex)
+
+        // B deletes it; A drops it on the next sync.
+        val onB = b.recurring.rows.value.single()
+        b.recurring.deleteById(onB.id)
+        b.tombstones.insert(SyncTombstoneEntity(tableName = "recurring", clientUuid = "rent", deletedAt = b.now, baseRevision = onB.baseRevision))
+        b.sync()
+        a.now += 20_000
+        a.sync()
+        assertTrue(a.recurring.rows.value.isEmpty())
+    }
+
+    @Test
+    fun `clearing a loan's terms syncs as no terms`() = runTest {
+        val a = Device()
+        val loanId = a.wallets.insert(
+            WalletEntity(name = "Loan", type = "LOAN", currencyCode = "USD", openingBalanceMinor = 100_000, createdAt = a.now, updatedAt = a.now, clientUuid = "loan")
+        )
+        a.debtTerms.upsert(DebtTermsEntity(loanId, interestRateBps = 900, repayment = "ONE_TIME", termMonths = null, installmentMinor = null, updatedAt = a.now))
+        a.sync()
+        val b = Device(now = a.now + 1_000)
+        b.sync()
+        assertEquals(900, b.debtTerms.get(b.wallets.findByClientUuid("loan")!!.id)!!.interestRateBps)
+
+        // The terms are removed on A; WalletRepository bumps the wallet, which goes out without them.
+        a.now += 5_000
+        a.debtTerms.delete(loanId)
+        a.wallets.update(a.wallets.getById(loanId)!!.copy(updatedAt = a.now, dirty = true))
+        a.sync()
+        b.now += 10_000
+        b.sync()
+        assertNull(b.debtTerms.get(b.wallets.findByClientUuid("loan")!!.id))
     }
 }

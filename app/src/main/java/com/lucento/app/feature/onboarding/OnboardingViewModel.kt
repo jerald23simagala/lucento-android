@@ -23,7 +23,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * Setup: welcome → focus → features → spending categories → review → currency & appearance → confirmation.
+ * Setup: welcome → focus → features → spending categories → review → currency & appearance → cloud sync (optional)
+ * → confirmation.
  *
  * Focus and features can be skipped (safe defaults). Choosing spending categories cannot: the budget is built from
  * them, so at least one must be chosen and reviewed before onboarding completes. Categories are written to the
@@ -34,7 +35,59 @@ class OnboardingViewModel(
     private val savedState: SavedStateHandle,
     private val preferences: UserPreferencesRepository,
     private val categories: CategoryRepository,
+    /** Optional cloud sync; null in tests. Nothing is sent unless the user connects an account on the sync step. */
+    private val auth: com.lucento.app.data.sync.AuthRepository? = null,
+    private val syncPreferences: com.lucento.app.data.sync.SyncPreferences? = null,
+    private val appContext: android.content.Context? = null,
 ) : ViewModel() {
+
+    /** The connected account's email, or null while signed out. */
+    val signedInEmail: StateFlow<String?> = (auth?.observeSignedInEmail() ?: kotlinx.coroutines.flow.flowOf(null))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val _connecting = MutableStateFlow(false)
+    val connecting: StateFlow<Boolean> = _connecting
+
+    private val _syncMessage = MutableStateFlow<String?>(null)
+    val syncMessage: StateFlow<String?> = _syncMessage
+
+    val syncAvailable: Boolean get() = auth != null && com.lucento.app.data.sync.SupabaseModule.isConfigured
+    val googleAvailable: Boolean get() = com.lucento.app.data.sync.SupabaseModule.isGoogleSignInConfigured
+
+    /** Google's account picker runs from [activity]; it is used for this call only and not retained. */
+    fun connectGoogle(activity: android.content.Context) = connect { auth?.signInWithGoogle(activity) }
+
+    fun connectEmail(email: String, password: String, mode: com.lucento.app.feature.settings.EmailMode) = connect {
+        if (mode == com.lucento.app.feature.settings.EmailMode.CREATE) auth?.signUpWithEmail(email, password) else auth?.signInWithEmail(email, password)
+    }
+
+    /**
+     * Signing in turns sync on, but the first sync waits until onboarding finishes (see [finish]): pulling an existing
+     * account's data in the middle of setup would mix it with categories the user hasn't confirmed yet.
+     */
+    private fun connect(signIn: suspend () -> com.lucento.app.data.sync.AuthRepository.SignInResult?) {
+        if (_connecting.value) return
+        _connecting.value = true
+        _syncMessage.value = null
+        viewModelScope.launch {
+            try {
+                _syncMessage.value = when (val result = signIn()) {
+                    com.lucento.app.data.sync.AuthRepository.SignInResult.Success -> {
+                        syncPreferences?.setEnabled(true)
+                        null
+                    }
+                    com.lucento.app.data.sync.AuthRepository.SignInResult.Cancelled, null -> null
+                    com.lucento.app.data.sync.AuthRepository.SignInResult.NotConfigured ->
+                        "Cloud sync isn’t available in this version of Lucento yet. You can keep going — everything works offline."
+                    is com.lucento.app.data.sync.AuthRepository.SignInResult.ConfirmEmail ->
+                        "Almost there: open the link we sent to ${result.email}, then sign in here (or later in Settings)."
+                    is com.lucento.app.data.sync.AuthRepository.SignInResult.Failed -> result.message
+                }
+            } finally {
+                _connecting.value = false
+            }
+        }
+    }
 
     val step: StateFlow<Int> = savedState.getStateFlow(KEY_STEP, 0)
     val currency: StateFlow<String> =
@@ -118,6 +171,12 @@ class OnboardingViewModel(
                 // Existing rows (only income categories on a fresh install) are matched by name, never duplicated.
                 categories.applySelection(picks.value.choices(emptyList()))
                 preferences.completeOnboarding(currency.value, theme.value, features.value)
+                // Connected on the sync step: start syncing now that the user's own setup is saved.
+                val context = appContext
+                if (context != null && syncPreferences?.isEnabled() == true && signedInEmail.value != null) {
+                    com.lucento.app.data.sync.SyncScheduler.ensurePeriodic(context)
+                    com.lucento.app.data.sync.SyncScheduler.syncNow(context)
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -145,7 +204,8 @@ class OnboardingViewModel(
         const val STEP_CATEGORIES = 3
         const val STEP_REVIEW = 4
         const val STEP_ESSENTIALS = 5
-        const val STEP_CONFIRM = 6
+        const val STEP_SYNC = 6
+        const val STEP_CONFIRM = 7
         const val LAST_STEP = STEP_CONFIRM
         private const val KEY_STEP = "step"
         private const val KEY_CURRENCY = "currency"
@@ -158,7 +218,11 @@ class OnboardingViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val container = appContainer()
-                OnboardingViewModel(createSavedStateHandle(), container.preferences, container.categories)
+                val app = this[androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
+                OnboardingViewModel(
+                    createSavedStateHandle(), container.preferences, container.categories,
+                    auth = container.auth, syncPreferences = container.syncPreferences, appContext = app?.applicationContext,
+                )
             }
         }
     }

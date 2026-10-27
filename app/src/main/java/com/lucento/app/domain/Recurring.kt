@@ -33,6 +33,8 @@ data class RecurringSchedule(
      */
     val toWalletId: Long? = null,
     val interest: Money = Money.zero(amount.currencyCode),
+    /** The schedule's stable id across devices (v9); null only for a row that predates it in a test. */
+    val clientUuid: String? = null,
 ) {
     init {
         require(type == TransactionType.EXPENSE || type == TransactionType.INCOME) { "Schedules are income or expense" }
@@ -62,8 +64,10 @@ data class RecurringSchedule(
      * can never collide with this format.
      */
     fun occurrenceKey(index: Int): String {
-        val due = RecurringMath.occurrence(this, index) ?: return "recurring-$id-$index"
-        return "recurring-$id-on-${due.toEpochDay()}"
+        // With cloud sync the stable id is what both devices share; a local row id would let each record it once.
+        val key = clientUuid ?: id.toString()
+        val due = RecurringMath.occurrence(this, index) ?: return "recurring-$key-$index"
+        return "recurring-$key-on-${due.toEpochDay()}"
     }
 }
 

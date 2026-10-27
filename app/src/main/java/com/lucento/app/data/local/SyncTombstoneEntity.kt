@@ -34,12 +34,13 @@ data class SyncTombstoneEntity(
 interface SyncDao {
     /**
      * Local changes cloud sync has not confirmed yet: dirty rows in every synced table plus unpushed deletions.
-     * Observed by the Home header's sync status; recurring schedules are not synced, so they are not counted.
+     * Observed by the Home header's sync status. Debt terms travel on their wallet row, so they aren't counted apart.
      */
     @Query(
         "SELECT (SELECT COUNT(*) FROM wallets WHERE dirty = 1) + (SELECT COUNT(*) FROM categories WHERE dirty = 1) + " +
             "(SELECT COUNT(*) FROM transactions WHERE dirty = 1) + (SELECT COUNT(*) FROM budgets WHERE dirty = 1) + " +
             "(SELECT COUNT(*) FROM goals WHERE dirty = 1) + (SELECT COUNT(*) FROM goal_contributions WHERE dirty = 1) + " +
+            "(SELECT COUNT(*) FROM recurring WHERE dirty = 1) + " +
             "(SELECT COUNT(*) FROM sync_tombstones WHERE pushed = 0)",
     )
     fun observePendingChanges(): Flow<Int>

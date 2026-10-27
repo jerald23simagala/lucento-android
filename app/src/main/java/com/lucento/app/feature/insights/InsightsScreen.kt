@@ -1,5 +1,11 @@
 package com.lucento.app.feature.insights
 
+import com.lucento.app.core.designsystem.component.HeroTones
+import com.lucento.app.core.designsystem.component.HeroPill
+import com.lucento.app.core.designsystem.component.HeroFigure
+import com.lucento.app.core.designsystem.component.HeroCard
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -110,7 +116,14 @@ private fun TrendSection(data: InsightsData, currency: String, period: TrendPeri
         Insights.incomeExpenseTrend(data.transactions, currency, endMonth, period.months)
     }
     SectionHeader("Income and expenses", Modifier.semantics { heading() })
-    SegmentedToggle(options = TrendPeriod.entries.map { it to it.label }, selected = period, onSelect = onPeriod)
+    val colors = MaterialTheme.colorScheme
+    SegmentedToggle(
+        options = TrendPeriod.entries.map { it to it.label },
+        selected = period,
+        onSelect = onPeriod,
+        compact = true,
+        selectedTone = { com.lucento.app.core.designsystem.theme.TonePair(colors.primary, colors.onPrimary) },
+    )
     Spacer(Modifier.height(Spacing.md))
     val hasData = months.any { !it.income.isZero || !it.expense.isZero }
     if (!hasData) {
@@ -125,25 +138,33 @@ private fun TrendSection(data: InsightsData, currency: String, period: TrendPeri
     val income = Money.sum(currency, months.map { it.income })
     val expense = Money.sum(currency, months.map { it.expense })
     val net = income - expense
-    LucentoCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Figure("Income", Modifier.weight(1f)) {
-                MoneyText(money = income, style = AmountStyles.medium, showPlus = true, color = ext.positive, fractionScale = 1f)
-            }
-            Figure("Expenses", Modifier.weight(1f)) {
-                MoneyText(money = -expense, style = AmountStyles.medium, color = ext.negative, fractionScale = 1f)
-            }
-            Figure("Net", Modifier.weight(1f)) {
-                MoneyText(
-                    money = net,
-                    style = AmountStyles.medium,
-                    showPlus = true,
-                    color = if (net.isNegative) ext.negative else MaterialTheme.colorScheme.onSurface,
-                    fractionScale = 1f,
+    // The period's statement, on brand blue (the Wallets / Recurring hero): net on the left, its two halves stacked.
+    HeroCard {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1.15f)) {
+                HeroPill("Net · last ${period.months} months", if (net.isNegative) HeroTones.tangerine else HeroTones.main)
+                Spacer(Modifier.height(Spacing.xs))
+                MoneyText(money = net, style = AmountStyles.hero, showPlus = true, color = ext.onHero)
+                Text(
+                    if (net.isNegative) "More went out than came in" else "Money in minus money out",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ext.onHeroMuted,
+                    maxLines = 1,
                 )
             }
+            VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                HeroFigure("Income", HeroTones.sunlight) {
+                    MoneyText(money = income, style = AmountStyles.row, showPlus = true, color = ext.onHero, fractionScale = 1f)
+                }
+                HeroFigure("Expenses", HeroTones.tangerine) {
+                    MoneyText(money = -expense, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f)
+                }
+            }
         }
-        Spacer(Modifier.height(Spacing.lg))
+    }
+    Spacer(Modifier.height(Spacing.md))
+    LucentoCard(Modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
             LegendKey("Income", ext.positive)
             LegendKey("Expenses", ext.negative)

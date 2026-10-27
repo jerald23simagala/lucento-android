@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,6 +83,10 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val picks by viewModel.picks.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val signedInEmail by viewModel.signedInEmail.collectAsStateWithLifecycle()
+    val connecting by viewModel.connecting.collectAsStateWithLifecycle()
+    val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     BackHandler(enabled = step > 0) { viewModel.back() }
 
@@ -128,7 +133,17 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
                     onTheme = viewModel::selectTheme,
                     onContinue = viewModel::next,
                 )
-                else -> ConfirmStep(currency, theme, features, picks.count, error, onFinish = viewModel::finish)
+                OnboardingViewModel.STEP_SYNC -> SyncStep(
+                    available = viewModel.syncAvailable,
+                    googleAvailable = viewModel.googleAvailable,
+                    signedInEmail = signedInEmail,
+                    connecting = connecting,
+                    message = syncMessage,
+                    onGoogle = { viewModel.connectGoogle(context) },
+                    onEmail = viewModel::connectEmail,
+                    onContinue = viewModel::next,
+                )
+                else -> ConfirmStep(currency, theme, features, picks.count, error, signedInEmail, onFinish = viewModel::finish)
             }
         }
     }
@@ -342,6 +357,63 @@ private fun EssentialsStep(
     }
 }
 
+/**
+ * Optional cloud sync: back up and sync across devices by connecting Google or an email account. Turning it on needs
+ * an account; "Not now" keeps everything on this phone (sync can be turned on later in Settings).
+ */
+@Composable
+private fun SyncStep(
+    available: Boolean,
+    googleAvailable: Boolean,
+    signedInEmail: String?,
+    connecting: Boolean,
+    message: String?,
+    onGoogle: () -> Unit,
+    onEmail: (String, String, com.lucento.app.feature.settings.EmailMode) -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle(
+                "Back up and sync?",
+                "Keep your wallets, transactions, budgets, goals and recurring payments safe and the same on every device.",
+            )
+            when {
+                !available -> InfoNote("Cloud sync isn’t available in this version of Lucento. Everything works fully offline.")
+                signedInEmail != null -> InfoNote(
+                    "Connected as ${signedInEmail.ifEmpty { "your account" }}. Sync starts when you finish setting up.",
+                    icon = Icons.Filled.CloudDone,
+                    container = MaterialTheme.colorScheme.primaryContainer,
+                    content = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                else -> {
+                    InfoNote(
+                        "Optional. Nothing leaves this phone unless you connect an account and keep sync on. Signing out " +
+                            "later never deletes what’s on this device.",
+                    )
+                    Spacer(Modifier.height(Spacing.md))
+                    com.lucento.app.feature.settings.ConnectAccountPanel(
+                        busy = connecting,
+                        googleAvailable = googleAvailable,
+                        onGoogle = onGoogle,
+                        onEmail = onEmail,
+                    )
+                }
+            }
+            if (message != null) {
+                Spacer(Modifier.height(Spacing.sm))
+                Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        if (signedInEmail != null || !available) {
+            LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+        } else {
+            LucentoTextButton(text = "Not now — keep it on this phone", onClick = onContinue, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
 @Composable
 private fun ConfirmStep(
     currency: String,
@@ -349,6 +421,7 @@ private fun ConfirmStep(
     features: Set<Feature>,
     categoryCount: Int,
     error: String?,
+    signedInEmail: String?,
     onFinish: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -378,9 +451,11 @@ private fun ConfirmStep(
             SummaryRow("Turned on", Feature.entries.filter { it in features }.joinToString { it.title }.ifEmpty { "Just the essentials" })
             val off = Feature.entries.filterNot { it in features }
             if (off.isNotEmpty()) SummaryRow("Turned off", off.joinToString { it.title })
+            SummaryRow("Cloud sync", signedInEmail?.let { "On · ${it.ifEmpty { "connected" }}" } ?: "Off · everything stays on this phone")
             Spacer(Modifier.height(Spacing.md))
             Text(
-                "Next: add your first wallet on Home. Everything stays on this device.",
+                if (signedInEmail != null) "Next: add your first wallet on Home. It syncs to your account automatically."
+                else "Next: add your first wallet on Home. Everything stays on this device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

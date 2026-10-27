@@ -336,6 +336,18 @@ class FakeRecurringDao : RecurringDao {
     override suspend fun deleteById(id: Long) {
         rows.value = rows.value.filterNot { it.id == id }
     }
+
+    override suspend fun getDirty() = rows.value.filter { it.dirty }
+
+    override suspend fun findByClientUuid(clientUuid: String) = rows.value.firstOrNull { it.clientUuid == clientUuid }
+
+    override suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int {
+        val match = rows.value.firstOrNull { it.clientUuid == clientUuid } ?: return 0
+        rows.value = rows.value.map {
+            if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
+        }
+        return 1
+    }
 }
 
 class FakeDebtTermsDao : DebtTermsDao {
@@ -350,6 +362,8 @@ class FakeDebtTermsDao : DebtTermsDao {
     override suspend fun delete(walletId: Long) {
         rows.value = rows.value.filterNot { it.walletId == walletId }
     }
+
+    override suspend fun get(walletId: Long) = rows.value.firstOrNull { it.walletId == walletId }
 }
 
 class FakeSyncDao : SyncDao {
