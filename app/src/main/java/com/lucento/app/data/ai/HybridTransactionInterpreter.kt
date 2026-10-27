@@ -35,7 +35,10 @@ class HybridTransactionInterpreter(
                 if (result.items.isNotEmpty()) return Interpretation.Candidates(result.items, GEMINI) else "Gemini found nothing"
             RemoteTransactionInterpreter.Result.LimitReached -> "today’s Gemini limit is used up"
             RemoteTransactionInterpreter.Result.NotSignedIn -> "Gemini needs your sync account"
-            is RemoteTransactionInterpreter.Result.Failed, null -> "Gemini couldn’t be reached"
+            // A slow answer and an unreachable server need different fixes, so they read differently.
+            null -> "Gemini took too long to answer"
+            is RemoteTransactionInterpreter.Result.Failed ->
+                if (result.reason == "SocketTimeoutException") "Gemini took too long to answer" else "Gemini couldn’t be reached"
         }
         return when (val fallback = local.interpretText(text, context)) {
             is Interpretation.Candidates -> fallback.copy(engine = local.engine.copy(label = "${local.engine.label} · $fallbackReason"))
