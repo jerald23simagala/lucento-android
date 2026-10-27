@@ -82,11 +82,9 @@ class ScreenshotTourTest {
         compose.waitForIdle()
     }
 
-    /** Budgets lives in Home's Quick links. */
+    /** Budget is a dock tab. */
     private fun openBudgets() {
-        tab("Home")
-        compose.onNodeWithContentDescription("Budgets").performScrollTo().performClick()
-        compose.waitForIdle()
+        tab("Budget")
     }
 
     private fun tab(label: String) {
@@ -241,6 +239,11 @@ class ScreenshotTourTest {
         waitForText(total) // the pace card's budget figure is the sum of the category amounts
         waitForText("days left") // the compact pace card: bars are self-labelled, the stats end with days left
         shot("06-home-within-budget")
+        // The bell lists scheduled payments due this week (the seeded gym membership is overdue).
+        compose.onNode(hasContentDescription("Upcoming payments", substring = true)).performClick()
+        waitForText("See all scheduled")
+        shot("06b-home-bell")
+        back()
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
 
@@ -284,15 +287,18 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         tab("Home")
-        // The dock is Home · Transactions · + · Insights · Wallets; Budgets opens from Home's Quick links.
+        // The dock is Home · Transactions · + · Budget · Wallets; Insights opens from Home's Quick links.
         tab("Wallets")
         waitForText("Assets")
         shot("12-wallets")
-        tab("Insights")
+        tab("Home")
+        compose.onNodeWithContentDescription("Insights").performScrollTo().performClick()
         waitForText("Income and expenses")
         shot("13-insights-trends")
         runCatching { compose.onNodeWithText("Savings goals aren’t added here", substring = true).performScrollTo() }
         shot("14-insights-net-worth")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
         openBudgets()
         waitForText("left of $total")
         shot("15-budget")
@@ -302,14 +308,13 @@ class ScreenshotTourTest {
         shot("16-manage-categories")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.waitForIdle()
 
         // ---------------------------------------------------------------- Quick links and Profile menu
         tab("Home")
         compose.onNodeWithContentDescription("Debts and loans").performScrollTo()
         shot("17-quick-links")
-        compose.onNodeWithContentDescription("Scheduled transactions").performClick()
+        // Scroll to the tile itself: after scrolling to Debts, the row above can sit under the pinned header.
+        compose.onNodeWithContentDescription("Scheduled transactions").performScrollTo().performClick()
         waitForText("Gym membership")
         shot("18-recurring")
         compose.onNodeWithContentDescription("Back").performClick()
@@ -330,8 +335,6 @@ class ScreenshotTourTest {
         shot("20-home-dark")
         openBudgets()
         shot("21-budget-dark")
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.waitForIdle()
         tab("Home")
 
         // ---------------------------------------------------------------- almost used: Lucento turns supportively concerned

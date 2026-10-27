@@ -162,6 +162,12 @@ object RecurringMath {
 
     const val DASHBOARD_HORIZON_DAYS = 30L
     const val DASHBOARD_LIMIT = 4
+
+    /** What the Home bell flags: every overdue item plus everything due within [DUE_SOON_DAYS], soonest first. */
+    fun dueSoon(schedules: List<RecurringSchedule>, today: LocalDate): List<UpcomingPayment> =
+        upcomingPayments(schedules, today, horizonDays = DUE_SOON_DAYS, limit = Int.MAX_VALUE)
+
+    const val DUE_SOON_DAYS = 7L
 }
 
 /** A scheduled payment (or expected income) waiting for the user's confirmation. */

@@ -1,13 +1,16 @@
 package com.lucento.app.feature.home
 
-import androidx.compose.material.icons.outlined.PieChart
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,10 +31,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -49,12 +52,15 @@ import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.SyncProblem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,10 +74,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -119,6 +126,8 @@ import com.lucento.app.domain.NetWorthComposition
 import com.lucento.app.domain.PacePosition
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.UpcomingPayment
+import com.lucento.app.domain.RecurringMath
+import java.time.LocalDate
 import com.lucento.app.domain.WellnessTier
 import com.lucento.app.feature.plan.illustration
 import com.lucento.app.feature.plan.rememberGoalPhoto
@@ -166,6 +175,7 @@ fun HomeScreen(
         HomeHeader(
             status = state.cloudStatus,
             onOpenSyncSettings = actions.onOpenSettings,
+            bell = if (state.features.isEnabled(Feature.RECURRING)) ({ PaymentsBell(state, actions.onOpenRecurring) }) else null,
             modifier = Modifier.padding(horizontal = Spacing.gutter),
         )
         if (scroll.value > 0) Hairline()
@@ -217,9 +227,14 @@ private enum class HomeContent { Loading, Welcome, Overview }
 
 // ------------------------------------------------------------------ Header
 
-/** Brand on the left; sync status, notifications (not yet available) and the profile entry on the right. */
+/** Brand on the left; sync status, the payments bell (when Scheduled is on) and the profile entry on the right. */
 @Composable
-private fun HomeHeader(status: CloudStatus, onOpenSyncSettings: () -> Unit, modifier: Modifier = Modifier) {
+private fun HomeHeader(
+    status: CloudStatus,
+    onOpenSyncSettings: () -> Unit,
+    bell: (@Composable () -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
     // On narrow phones the symbol alone carries the brand, leaving room for the status chip and actions.
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val showWordmark = maxWidth >= 360.dp
@@ -243,16 +258,107 @@ private fun HomeHeader(status: CloudStatus, onOpenSyncSettings: () -> Unit, modi
                 }
             }
             SyncStatusChip(status, onClick = onOpenSyncSettings)
-            // A placeholder until reminders exist: visibly disabled and announced as such, so it never pretends to work.
-            IconButton(
-                onClick = {},
-                enabled = false,
-                modifier = Modifier.semantics { contentDescription = "Notifications, coming soon" },
-            ) {
-                Icon(Icons.Outlined.Notifications, contentDescription = null)
-            }
+            bell?.invoke()
             ProfileButton()
         }
+    }
+}
+
+/**
+ * The bell: scheduled payments that need attention (overdue, or due within a week) with a count badge, so they're
+ * noticed without scrolling to the Scheduled card. Opens a short list; each item opens its review / mark-paid sheet.
+ */
+@Composable
+private fun PaymentsBell(state: HomeUiState, onOpenRecurring: (Long?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val due = state.dueSoon
+    val overdue = due.count { it.overdue }
+    Box {
+        IconButton(
+            onClick = { open = true },
+            modifier = Modifier.semantics {
+                contentDescription = when {
+                    due.isEmpty() -> "Upcoming payments: nothing due this week"
+                    overdue > 0 -> "Upcoming payments: ${due.size} due, $overdue overdue"
+                    else -> "Upcoming payments: ${due.size} due this week"
+                }
+            },
+        ) {
+            BadgedBox(
+                badge = {
+                    if (due.isNotEmpty()) {
+                        Badge(
+                            containerColor = if (overdue > 0) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.primary,
+                            contentColor = if (overdue > 0) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onPrimary,
+                        ) { Text(if (due.size > 9) "9+" else "${due.size}") }
+                    }
+                },
+            ) {
+                Icon(if (due.isEmpty()) Icons.Outlined.Notifications else Icons.Filled.Notifications, contentDescription = null)
+            }
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(min = 260.dp, max = 320.dp)) {
+            Text(
+                "Upcoming payments",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm).semantics { heading() },
+            )
+            if (due.isEmpty()) {
+                Text(
+                    "Nothing due in the next ${RecurringMath.DUE_SOON_DAYS} days.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.md).padding(bottom = Spacing.sm),
+                )
+            }
+            due.forEach { item ->
+                val income = item.schedule.type == TransactionType.INCOME
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(item.schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                dueLabel(item, state.today),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (item.overdue) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    trailingIcon = {
+                        AmountText(
+                            money = if (income) item.schedule.amount else -item.schedule.total,
+                            showPlus = true,
+                            style = AmountStyles.small,
+                            color = if (income) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        onOpenRecurring(item.schedule.id)
+                    },
+                )
+            }
+            Hairline()
+            DropdownMenuItem(
+                text = { Text("See all scheduled", color = MaterialTheme.colorScheme.primary) },
+                onClick = {
+                    open = false
+                    onOpenRecurring(null)
+                },
+            )
+        }
+    }
+}
+
+/** "Overdue · Oct 1", "Due today", "Due tomorrow", "Due in 3 days". */
+private fun dueLabel(item: UpcomingPayment, today: LocalDate): String {
+    val days = ChronoUnit.DAYS.between(today, item.dueDate)
+    val date = item.dueDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()))
+    return when {
+        item.overdue -> "Overdue · $date"
+        days == 0L -> "Due today"
+        days == 1L -> "Due tomorrow"
+        else -> "Due in $days days · $date"
     }
 }
 
@@ -374,28 +480,31 @@ private fun Overview(
     Column {
         val plan = state.budget
         val burn = state.burn
-        // The month pill, with Lucento beside it as a mood indicator for the month's budget pace.
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val roomForBubble = maxWidth >= 320.dp
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                MonthPill(state, onSelectMonth)
-                Spacer(Modifier.weight(1f))
-                if (plan != null && burn != null) {
-                    val mood = remember(plan, burn, state.isCurrentMonth, state.expenseCategoryCount) { budgetMood(state, plan, burn) }
-                    if (roomForBubble) SpeechBubble(mood.bubble, Modifier.widthIn(max = 168.dp), pointRight = true)
-                    LucentoMascot(
-                        size = 48.dp,
-                        mood = mood.mood,
-                        tier = mood.tier,
-                        contentDescription = if (mood.mood == MascotMood.Concerned) "Lucento, gently concerned, says: ${mood.bubble}" else "Lucento says: ${mood.bubble}",
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(Spacing.sm))
         if (plan != null && burn != null) {
-            MonthlyBudgetCard(state, plan, burn, actions)
+            // Lucento stands beside the month pill and leans over the budget card's corner, its torch lighting the card.
+            // Its mood follows the month's pace; the words are read out through its label rather than a bubble.
+            val mood = remember(plan, burn, state.isCurrentMonth, state.expenseCategoryCount) { budgetMood(state, plan, burn) }
+            Box(Modifier.fillMaxWidth()) {
+                Column {
+                    MonthPill(state, onSelectMonth)
+                    Spacer(Modifier.height(Spacing.sm))
+                    MonthlyBudgetCard(state, plan, burn, actions)
+                }
+                LucentoMascot(
+                    size = MascotSize,
+                    mood = mood.mood,
+                    tier = mood.tier,
+                    contentDescription = if (mood.mood == MascotMood.Concerned) "Lucento, gently concerned, says: ${mood.bubble}" else "Lucento says: ${mood.bubble}",
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        // Bottom of the mascot sinks [MascotOverlap] into the card, below the month pill's row.
+                        .offset(y = Sizes.minTouch + Spacing.sm + MascotOverlap - MascotSize)
+                        .padding(end = Spacing.xs),
+                )
+            }
         } else {
+            MonthPill(state, onSelectMonth)
+            Spacer(Modifier.height(Spacing.sm))
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
         }
 
@@ -441,7 +550,8 @@ private data class PaceTones(val card: Color, val bar: Color, val banner: TonePa
 @Composable
 private fun paceTones(position: PacePosition?): PaceTones {
     val ext = LucentoTheme.extendedColors
-    val tintAlpha = if (LucentoTheme.isDark) 0.22f else 0.45f
+    // By day the tint is deep enough for the mascot's torch light to show against it; by night the navy already does.
+    val tintAlpha = if (LucentoTheme.isDark) 0.22f else 0.95f
     return when (position) {
         PacePosition.AHEAD -> PaceTones(
             card = ext.negativeContainer.copy(alpha = tintAlpha),
@@ -473,8 +583,8 @@ private fun paceTones(position: PacePosition?): PaceTones {
 /**
  * Budget health and burn rate in one card. The primary figure is the share of the month's budget used; two bars
  * compare it with the share of the month elapsed; the figures beneath give spent, remaining and the calendar; the
- * banner says in words whether spending runs faster than, with, or slower than the month. Lucento (the mascot)
- * mirrors the verdict in a speech bubble.
+ * banner says in words whether spending runs faster than, with, or slower than the month. Lucento (the mascot) leans
+ * over the top-right corner (see Overview) and its torch lights the card from there.
  */
 @Composable
 private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: BudgetBurn, actions: HomeActions) {
@@ -496,11 +606,13 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
             alpha = if (LucentoTheme.isDark) 0.10f else 0.14f,
             modifier = Modifier.matchParentSize(),
         )
+        TorchLight(Modifier.matchParentSize())
         // Compact by design: the dashboard should show everything at a glance with little scrolling.
         Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
             run {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
+                    // Leaves the top-right corner to the mascot leaning over it.
+                    Column(Modifier.weight(1f).padding(end = MascotClearance)) {
                         LinkedTitle("Monthly budget")
                         Spacer(Modifier.height(Spacing.xxs))
                         when {
@@ -587,40 +699,50 @@ private fun budgetMood(state: HomeUiState, plan: BudgetPlan, burn: BudgetBurn): 
     return BudgetMood(mood, tier, if (setupNeeded) "Pick your spending categories first." else insight.bubble)
 }
 
-/** Lucento's speech bubble, pointing at the mascot on its left. Read out through the mascot's own label. */
+/** The mascot beside the budget card: its size and how far it leans down over the card's top edge. */
+private val MascotSize = 96.dp
+private val MascotOverlap = 44.dp
+
+/** Room the card's title keeps free at its end, so the mascot never covers the figures. */
+private val MascotClearance = 72.dp
+
+/**
+ * The mascot's torch lighting the budget card: a warm sunlight glow from the top-right corner (where Lucento leans
+ * in), fading across the card. It breathes slowly; with reduced motion it holds still. Purely decorative.
+ */
 @Composable
-private fun SpeechBubble(text: String, modifier: Modifier = Modifier, pointRight: Boolean = false) {
-    val surface = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLowest
-    val outline = LucentoTheme.extendedColors.borderDefault
-    val tail: @Composable () -> Unit = {
-        Canvas(Modifier.size(width = 7.dp, height = 12.dp)) {
-            // The tail points at the mascot: from the bubble's edge to a tip on the mascot's side.
-            val base = if (pointRight) 0f else size.width
-            val tip = size.width - base
-            val path = Path().apply {
-                moveTo(base, 0f)
-                lineTo(tip, size.height / 2)
-                lineTo(base, size.height)
-                close()
-            }
-            drawPath(path, surface)
-            drawLine(outline, Offset(base, 0f), Offset(tip, size.height / 2))
-            drawLine(outline, Offset(tip, size.height / 2), Offset(base, size.height))
-        }
-    }
-    Row(modifier.clearAndSetSemantics { }, verticalAlignment = Alignment.CenterVertically) {
-        if (!pointRight) tail()
-        Text(
-            text,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(surface)
-                .border(BorderStroke(1.dp, outline), RoundedCornerShape(12.dp))
-                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+private fun TorchLight(modifier: Modifier = Modifier) {
+    val ext = LucentoTheme.extendedColors
+    val strength = if (LucentoTheme.isDark) 0.38f else 0.62f
+    val pulse = if (LucentoTheme.reducedMotion) {
+        1f
+    } else {
+        val transition = rememberInfiniteTransition(label = "torch")
+        val value by transition.animateFloat(
+            initialValue = 0.82f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(2400), RepeatMode.Reverse),
+            label = "torch-pulse",
         )
-        if (pointRight) tail()
+        value
     }
+    Box(
+        modifier.drawBehind {
+            // The torch sits just inside the corner, a little left of the edge where the mascot holds it.
+            val center = Offset(size.width - 34.dp.toPx(), 6.dp.toPx())
+            val radius = size.width * 0.78f
+            drawRect(
+                Brush.radialGradient(
+                    0f to ext.accent.copy(alpha = strength * pulse),
+                    0.18f to ext.warmAccent.copy(alpha = strength * 0.55f * pulse),
+                    0.55f to ext.accent.copy(alpha = strength * 0.16f * pulse),
+                    1f to Color.Transparent,
+                    center = center,
+                    radius = radius,
+                ),
+            )
+        },
+    )
 }
 
 /** A thick bar with its percentage printed at the end of the fill (inside it when there is room). */
@@ -705,13 +827,14 @@ private fun AdviceBanner(text: String, detail: String?, tones: PaceTones, onClic
             .fillMaxWidth()
             .heightIn(min = Sizes.minTouch)
             .clip(MaterialTheme.shapes.medium)
-            .background(tones.banner.container)
+            // By day the card's tint is deep, so the banner sits on a frosted light panel rather than the same tint.
+            .background(if (LucentoTheme.isDark) tones.banner.container else MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.82f))
             .clickable(role = Role.Button, onClickLabel = "Open budget", onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(28.dp).clip(CircleShape).background(if (LucentoTheme.isDark) Color.Black.copy(alpha = 0.2f) else Color.White),
+            Modifier.size(28.dp).clip(CircleShape).background(if (LucentoTheme.isDark) Color.Black.copy(alpha = 0.2f) else tones.banner.container),
             contentAlignment = Alignment.Center,
         ) {
             Icon(tones.icon, contentDescription = null, tint = tones.banner.content, modifier = Modifier.size(18.dp))
@@ -768,8 +891,8 @@ private fun NetWorthAndQuickLinks(state: HomeUiState, composition: NetWorthCompo
         if (f.isEnabled(Feature.SAVINGS_GOALS)) add(QuickLink("Goals", "Savings goals", Icons.Outlined.Savings, actions.onOpenGoals))
         if (f.isEnabled(Feature.RECURRING)) add(QuickLink("Scheduled", "Scheduled transactions", Icons.Outlined.EventRepeat) { actions.onOpenRecurring(null) })
         if (f.isEnabled(Feature.DEBTS_LOANS)) add(QuickLink("Debts", "Debts and loans", Icons.Outlined.CreditCard, actions.onOpenDebts))
-        // Wallets has its own place in the dock; Budgets opens from here.
-        if (f.isEnabled(Feature.BUDGETS)) add(QuickLink("Budgets", "Budgets", Icons.Outlined.PieChart, actions.onOpenBudget))
+        // Budget and Wallets have their own places in the dock; Insights opens from here.
+        if (f.isEnabled(Feature.INSIGHTS)) add(QuickLink("Insights", "Insights", Icons.Outlined.Insights, actions.onOpenInsights))
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         if (maxWidth >= 300.dp) {

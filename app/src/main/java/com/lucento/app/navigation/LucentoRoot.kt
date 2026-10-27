@@ -25,10 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -152,21 +150,21 @@ const val NO_WALLET = -1L
 private data class Tab(val item: DockItem, val route: Any)
 
 /**
- * The navigation dock: Home · Transactions · (+) · Insights · Wallets, with the transaction-entry button in the centre.
- * Insights leaves the dock when the user switches it off (its data is kept). Budgets, goals, scheduled transactions
- * and debts open from Home's Quick links; categories from Budgets.
+ * The navigation dock: Home · Transactions · (+) · Budget · Wallets, with the transaction-entry button in the centre.
+ * Budget leaves the dock when the user switches it off (its data is kept). Insights, goals, scheduled transactions
+ * and debts open from Home's Quick links; categories from Budget.
  */
 private fun tabs(features: FeatureSet): List<Tab> = listOfNotNull(
     Tab(DockItem("home", "Home", Icons.Outlined.Home, Icons.Filled.Home), HomeRoute),
     Tab(DockItem("transactions", "Transactions", Icons.AutoMirrored.Outlined.ReceiptLong, Icons.AutoMirrored.Filled.ReceiptLong), TransactionsRoute),
-    if (features.isEnabled(Feature.INSIGHTS)) Tab(DockItem("insights", "Insights", Icons.Outlined.Insights, Icons.Filled.Insights), InsightsRoute) else null,
+    if (features.isEnabled(Feature.BUDGETS)) Tab(DockItem("budget", "Budget", Icons.Outlined.PieChart, Icons.Filled.PieChart), BudgetRoute) else null,
     Tab(DockItem("wallets", "Wallets", Icons.Outlined.AccountBalanceWallet, Icons.Filled.AccountBalanceWallet), WalletsRoute),
 )
 
 private val PrimaryRoutes: List<Pair<String, KClass<out Any>>> = listOf(
     "home" to HomeRoute::class,
     "transactions" to TransactionsRoute::class,
-    "insights" to InsightsRoute::class,
+    "budget" to BudgetRoute::class,
     "wallets" to WalletsRoute::class,
 )
 
@@ -265,7 +263,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     // A tab whose module is switched off while it is showing returns to Home rather than show a hidden module.
     LaunchedEffect(features) {
         val key = navController.currentDestination.primaryKey()
-        if (key == "insights" && !features.isEnabled(Feature.INSIGHTS)) {
+        if (key == "budget" && !features.isEnabled(Feature.BUDGETS)) {
             navigateTo(HomeRoute)
         }
     }
@@ -381,9 +379,9 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     composable<HomeRoute> {
                         HomeScreen(
                             actions = HomeActions(
-                                onOpenBudget = { push(BudgetRoute) },
+                                onOpenBudget = { navigateTo(BudgetRoute) },
                                 onChooseCategories = { push(CategorySetupRoute) },
-                                onOpenInsights = { navigateTo(InsightsRoute) },
+                                onOpenInsights = { push(InsightsRoute) },
                                 onOpenGoals = { push(GoalsRoute) },
                                 onOpenRecurring = { id -> push(RecurringRoute(id ?: NO_SCHEDULE)) },
                                 onOpenWallets = { navigateTo(WalletsRoute) },
@@ -415,17 +413,17 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
                         )
                     }
-                    composable<InsightsRoute> {
-                        Gated(Feature.INSIGHTS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) { InsightsScreen() }
-                    }
-                    pushed<BudgetRoute>(reducedMotion) {
-                        Gated(Feature.BUDGETS, features, enableFeature, back) {
+                    composable<BudgetRoute> {
+                        Gated(Feature.BUDGETS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) {
                             BudgetScreen(
-                                onBack = back,
+                                onBack = null,
                                 onChooseCategories = { push(CategorySetupRoute) },
                                 onManageCategories = { push(CategoriesRoute) },
                             )
                         }
+                    }
+                    pushed<InsightsRoute>(reducedMotion) {
+                        Gated(Feature.INSIGHTS, features, enableFeature, back) { InsightsScreen(onBack = back) }
                     }
 
                     pushed<WalletDetailRoute>(reducedMotion) { entry ->

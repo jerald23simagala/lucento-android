@@ -127,6 +127,23 @@ class DashboardCalculationsTest {
         assertEquals(2, RecurringMath.upcomingPayments(list, today, limit = 2).size)
     }
 
+    /** The Home bell: overdue items and anything due within a week, with no dashboard limit. */
+    @Test fun dueSoonIsOverduePlusTheNextSevenDays() {
+        val list = listOf(
+            schedule(1, "2026-10-01"), // overdue
+            schedule(2, "2026-10-22"), // today
+            schedule(3, "2026-10-29"), // day 7: included
+            schedule(4, "2026-10-30"), // day 8: not yet
+            schedule(5, "2026-10-24", paused = true),
+            schedule(6, "2026-10-25"),
+            schedule(7, "2026-10-26"),
+        )
+        val due = RecurringMath.dueSoon(list, today)
+        assertEquals(listOf(1L, 2L, 6L, 7L, 3L), due.map { it.schedule.id }) // five, beyond the dashboard's four
+        assertEquals(listOf(true, false, false, false, false), due.map { it.overdue })
+        assertTrue(RecurringMath.dueSoon(listOf(schedule(8, "2026-11-20")), today).isEmpty())
+    }
+
     @Test fun markingPaidAdvancesTheScheduleSoTheNextDateAppears() {
         val s = schedule(1, "2026-10-20")
         assertEquals(LocalDate.parse("2026-10-20"), RecurringMath.upcomingPayments(listOf(s), today).single().dueDate)

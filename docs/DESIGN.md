@@ -189,12 +189,12 @@ Visual parity has **not** been verified on a device: no emulator or Android buil
 environment (see `docs/QUALITY.md`).
 
 ## Navigation (v0.5)
-- **Dock** (`navigation/NavigationDock.kt`, persistent): **Home · Transactions · (+) · Insights · Budgets** on a floating
+- **Dock** (`navigation/NavigationDock.kt`, persistent): **Home · Transactions · (+) · Budget · Wallets** on a floating
   surface (24dp corners, 12dp side inset, hairline border; a soft shadow by day). The **+** is a raised 60dp brand-blue
   circle in the centre, breaking the dock's top edge, with a brand-tinted shadow: the one transaction-entry action.
-  Wallets, savings goals, scheduled transactions and debts open from Home's **Quick links**; categories from the
-  Budgets tab. The selected tab shows its label under a tinted indicator; the others are icon-only (each keeps its
-  label as the accessibility name). Insights/Budget leave the dock when switched off. The dock stays on secondary
+  Insights, savings goals, scheduled transactions and debts open from Home's **Quick links**; categories from the
+  Budget tab. The selected tab shows its label under a tinted indicator; the others are icon-only (each keeps its
+  label as the accessibility name). Budget leaves the dock when switched off. The dock stays on secondary
   screens (goals, recurring, debts, account detail, categories — the tab they were opened from stays highlighted)
   and steps aside for focused workflows: the transaction composer, category setup, Settings, Enabled features.
   Tabs keep their state (save/restore on switch).
@@ -214,21 +214,23 @@ environment (see `docs/QUALITY.md`).
 No greeting: the header is working space. Top to bottom, as cards with a title and chevron (the card opens its page):
 1. **Header** — Lucento symbol + wordmark (symbol only under 360dp); a **sync status chip** (icon + word: On device ·
    Synced · Sync needed · Offline · Sync issue; opens Settings › Cloud sync; "On device" is the normal local-only
-   state); a **notifications** bell, visibly disabled and announced "coming soon" until reminders exist; the profile
-   button. Below it, the **month pill** (calendar icon, "October 2026", ▾) listing this month back to the first month
+   state); a **payments bell** (when Scheduled is on) whose badge counts scheduled
+   items overdue or due within 7 days (red when any is overdue) and whose menu lists them — each opens its review
+   sheet — with "See all scheduled"; the profile button. Below it, the **month pill** (calendar icon, "October 2026", ▾) listing this month back to the first month
    with data (≤ 24).
 2. **Monthly budget** — budget health and burn rate in one card, tinted by the verdict (red-tinted ahead, green in
-   step, blue slower). Primary figure **% of budget used** and "of <total> used"; Lucento (72dp) with a **speech
-   bubble** ("You're ahead of the month. Let's slow down!" / "You're on track! Keep it up!" / "You're below the month
-   pace. All good!"); two thick bars with their % printed at the fill's end — **Budget used** and **Month elapsed**
-   (real calendar days) — and a legend; three figures: Spent · Remaining (or Over budget) · "16 of 31 days / 52% of
+   step, blue slower). Primary figure **% of budget used** and "of <total> used". Lucento (96dp, no speech bubble; its
+   verdict is read out through its label) stands beside the month pill and leans over the card's top-right corner,
+   its torch casting a slowly breathing sunlight glow across the card (still under reduced motion); by day the card's
+   tint is deep enough for the glow to show, and the advice banner sits on a frosted light panel; two thick bars with their % printed at the fill's end — **Budget used** and **Month elapsed**
+   (real calendar days) — and a legend; three figures: Spent (every expense, budgeted or not) · Remaining (or Over budget) · "16 of 31 days / 52% of
    month"; an **advice banner** with a matching glyph (up / check / info) and the daily allowance. With Budgets off, a
    plain Net flow card takes its place.
 3. **Net flow / Net worth** and **Quick links** — two cards side by side (compact type; stacked under ~300dp). The left
    card has two tappable halves: **Net flow** for the shown month on top (signed, coloured by direction; opens
    Insights) and **Net worth** today below (assets − debts, with this month's change from recorded income and
    spending; opens Wallets). Quick links: a 2×2 grid — Savings goals, Scheduled, Debts & loans (each only when its
-   module is on) and **Wallets** (a list on small phones). Categories are managed from the Budgets tab.
+   module is on) and **Insights** (a list on small phones). Categories are managed from the Budget tab.
 4. **Top savings goal** — the in-progress goal closest to done (ties: earlier target date; all reached: the newest):
    its picture, name, %, bar, saved of target, target (or projected) month; "View all".
 5. **Scheduled transactions** — the next recurring items within 30 days: name, category or "Recurring expense",

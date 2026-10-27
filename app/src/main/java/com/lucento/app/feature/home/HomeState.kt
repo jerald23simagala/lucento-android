@@ -174,6 +174,8 @@ data class HomeUiState(
     val hasAnyGoals: Boolean = false,
     /** Next unpaid recurring items (overdue flagged), in date order; empty when Recurring is off. */
     val upcoming: List<UpcomingPayment> = emptyList(),
+    /** Overdue and due-within-a-week items, for the header bell; empty when Recurring is off. */
+    val dueSoon: List<UpcomingPayment> = emptyList(),
     val hasAnySchedules: Boolean = false,
     val categoriesById: Map<Long, Category> = emptyMap(),
     val cloudStatus: CloudStatus = CloudStatus.LOCAL,
@@ -264,6 +266,7 @@ object HomeStateBuilder {
             goals = if (goalsOn) GoalsSummary.overview(goals, contributions, focus, today) else null,
             hasAnyGoals = goalsOn && goals.isNotEmpty(),
             upcoming = RecurringMath.upcomingPayments(activeSchedules, today),
+            dueSoon = RecurringMath.dueSoon(activeSchedules, today),
             hasAnySchedules = activeSchedules.any { !it.isFinished },
             categoriesById = categories.associateBy { it.id },
             cloudStatus = cloudStatus,

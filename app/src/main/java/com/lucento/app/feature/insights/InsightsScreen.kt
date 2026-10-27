@@ -77,7 +77,11 @@ private enum class TrendPeriod(val label: String, val months: Int) { THREE("3 mo
  * wallet balances). Every chart has its exact figures beside it and a spoken summary.
  */
 @Composable
-fun InsightsScreen(viewModel: InsightsViewModel = viewModel(factory = InsightsViewModel.Factory)) {
+fun InsightsScreen(
+    /** Insights opens from Home's Quick links and net flow, on top of Home; back returns there. */
+    onBack: (() -> Unit)? = null,
+    viewModel: InsightsViewModel = viewModel(factory = InsightsViewModel.Factory),
+) {
     val data by viewModel.data.collectAsStateWithLifecycle()
     var period by rememberSaveable { mutableStateOf(TrendPeriod.SIX) }
     var currencyChoice by rememberSaveable { mutableStateOf<String?>(null) }
@@ -94,7 +98,7 @@ fun InsightsScreen(viewModel: InsightsViewModel = viewModel(factory = InsightsVi
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.gutter),
     ) {
-        LucentoTopBar(title = "Insights", subtitle = "From your own records · $currency", actions = { ProfileButton() })
+        LucentoTopBar(title = "Insights", subtitle = "From your own records · $currency", onBack = onBack, actions = { ProfileButton() })
         if (data.loading) return@Column
         if (currencies.size > 1) {
             PillRow(currencies.map { it to it }, currency, onSelect = { currencyChoice = it })

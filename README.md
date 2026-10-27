@@ -11,9 +11,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 > [docs/DESIGN.md](docs/DESIGN.md), [docs/CALCULATIONS.md](docs/CALCULATIONS.md), [CHANGELOG.md](CHANGELOG.md).
 
 ## What works today (0.5.0)
-- **Navigation**: a persistent dock — **Home · Transactions · (+) · Insights · Budgets** — whose central **+** opens the
-  **transaction composer**; Wallets, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
-  links, Categories from the Budgets tab; a **profile** button (optional name, appearance, Settings, Enabled features).
+- **Navigation**: a persistent dock — **Home · Transactions · (+) · Budget · Wallets** — whose central **+** opens the
+  **transaction composer**; Insights, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
+  links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name, appearance, Settings, Enabled features).
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation.
 - **Home**: a working header (sync status, month selector, profile); the **Budget pace** card — % of budget used,
