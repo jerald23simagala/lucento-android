@@ -51,7 +51,8 @@ class BudgetPlanTest {
         val archivedTransport = categories.map { if (it.id == 3L) it.copy(archived = true) else it }
         val p = plan(example, listOf(spend(500_00, 3)), cats = archivedTransport)
         assertEquals(Money(23_000_00, "PHP"), p.total)
-        assertEquals(Money.zero("PHP"), p.spent)
+        assertEquals(Money(500_00, "PHP"), p.spent) // still money out
+        assertEquals(Money.zero("PHP"), p.budgetedSpending)
         assertEquals(Money(500_00, "PHP"), p.unbudgetedSpending)
         assertTrue(p.lines.none { it.category.id == 3L })
     }
@@ -78,7 +79,8 @@ class BudgetPlanTest {
         assertEquals(Money(1_000, "PHP"), p.total)
     }
 
-    @Test fun spendingIsSplitIntoBudgetedAndTransparentlyUnbudgeted() {
+    /** Spent is the actual money out: every expense, so the budget measures all spending, not just planned spending. */
+    @Test fun spentIsAllExpensesSplitIntoBudgetedAndUnbudgeted() {
         val txs = listOf(
             spend(14_000_00, 1),
             spend(2_000_00, 2),
@@ -89,11 +91,12 @@ class BudgetPlanTest {
             spend(1_000_00, 1, date = "2026-09-30"), // previous month
         )
         val p = plan(example, txs)
-        assertEquals(Money(16_000_00, "PHP"), p.spent)
+        assertEquals(Money(17_000_00, "PHP"), p.spent) // 14,000 + 2,000 + 700 + 300; no income, transfer or September
+        assertEquals(Money(16_000_00, "PHP"), p.budgetedSpending)
         assertEquals(Money(1_000_00, "PHP"), p.unbudgetedSpending)
         assertEquals(Money(300_00, "PHP"), p.uncategorizedSpending)
-        assertEquals(Money(17_000_00, "PHP"), p.allSpending)
-        assertEquals(Money(10_000_00, "PHP"), p.remaining)
+        assertEquals(Money(9_000_00, "PHP"), p.remaining) // 26,000 − 17,000
+        assertEquals(65, p.percentUsed) // 17,000 of 26,000
         assertEquals(Money(700_00, "PHP"), p.lines.single { it.category.id == 4L }.spent)
         // Allocated first (most used first), then unallocated.
         assertEquals(listOf(1L, 2L, 3L, 4L), p.lines.map { it.category.id })
@@ -152,6 +155,35 @@ class BudgetPlanTest {
         assertEquals(Money(1_300_00, "PHP"), burn.dailyAverage)
         assertEquals(Money(40_300_00, "PHP"), burn.projected)
         assertEquals(Money(325_00, "PHP"), burn.dailyAllowance) // 5,200 over 16 days (16th..31st)
+    }
+
+    /** Audit UI-003: the "days left" shown and the daily allowance's divisor are one number, today included. */
+    @Test fun daysLeftIncludesTodayAndIsTheAllowanceDivisor() {
+        val p = plan(example, listOf(spend(10_000_00, 1))) // 26,000 budget, 16,000 remaining
+        fun burnOn(date: String) = BudgetPlanner.burn(p, LocalDate.parse(date))
+
+        val mid = burnOn("2026-10-16")
+        assertEquals(16, mid.daysLeft) // 16th..31st
+        assertEquals(Money(1_000_00, "PHP"), mid.dailyAllowance) // 16,000 / 16
+        assertEquals(31, burnOn("2026-10-01").daysLeft)
+
+        val last = burnOn("2026-10-31")
+        assertEquals(1, last.daysLeft) // the last day still counts: never "0 days left" beside a full-day allowance
+        assertEquals(Money(16_000_00, "PHP"), last.dailyAllowance)
+
+        val finished = burnOn("2026-11-05")
+        assertEquals(0, finished.daysLeft)
+        assertNull(finished.dailyAllowance)
+
+        val upcoming = burnOn("2026-09-20")
+        assertEquals(31, upcoming.daysLeft)
+        assertEquals(Money(516_12, "PHP"), upcoming.dailyAllowance) // 16,000 / 31, rounded down
+
+        listOf(mid, last, upcoming).forEach { burn ->
+            val allowance = burn.dailyAllowance!!
+            // Spending the allowance every remaining day never exceeds what is left.
+            assertTrue(allowance.amountMinor * burn.daysLeft <= p.remaining.amountMinor)
+        }
     }
 
     @Test fun burnLevelsMapFromHealth() {

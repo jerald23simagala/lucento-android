@@ -74,9 +74,10 @@ data class CategoryBudgetLine(
  * allocations of active expense categories in [currencyCode] — there is no separately editable overall amount
  * that could disagree with them.
  *
- * - [spent] counts expenses in allocated categories only, so `remaining = total − spent` compares like with like.
- * - [unbudgetedSpending] is every other expense in this currency and month (uncategorised, categories without an
- *   allocation, archived categories). It is reported, never hidden and never forced into a category.
+ * - [spent] is the month's actual money out: **every** expense in this currency and month, budgeted or not, so
+ *   `remaining = total − spent`, the percentage used, health and pace all measure real spending against the plan.
+ * - [budgetedSpending] is the part in allocated categories; [unbudgetedSpending] is the rest (uncategorised,
+ *   categories without an allocation, archived categories). Both are reported; nothing is forced into a category.
  * - Transfers, income and goal contributions are never spending. Other currencies are never converted.
  * - [legacyOverall] is an "everything" limit saved by Lucento 0.4 or earlier. It no longer counts anywhere; the
  *   Budget screen explains it once and lets the user remove it.
@@ -87,7 +88,9 @@ data class BudgetPlan(
     /** Allocated categories first (most used first), then unallocated ones by spending, then the user's order. */
     val lines: List<CategoryBudgetLine>,
     val total: Money,
+    /** Every expense this month in this currency: [budgetedSpending] plus [unbudgetedSpending]. */
     val spent: Money,
+    val budgetedSpending: Money,
     val unbudgetedSpending: Money,
     val uncategorizedSpending: Money,
     val legacyOverall: Budget? = null,
@@ -104,9 +107,6 @@ data class BudgetPlan(
 
     val allocatedLines: List<CategoryBudgetLine> get() = lines.filter { it.isAllocated }
     val unallocatedLines: List<CategoryBudgetLine> get() = lines.filterNot { it.isAllocated }
-
-    /** Every expense this month in this currency: budgeted plus unbudgeted. */
-    val allSpending: Money get() = spent + unbudgetedSpending
 }
 
 /** Spending compared with the month's progress: faster than the calendar, broadly in step, or slower. */
@@ -128,6 +128,11 @@ data class BudgetBurn(
     val consumedFraction: Float,
     val daysElapsed: Int,
     val daysInMonth: Int,
+    /**
+     * Days still to come, today included (0 for a finished month, the whole month for a future one). The single
+     * source for every "days left" label and the [dailyAllowance] divisor, so the two can never disagree.
+     */
+    val daysLeft: Int,
     val elapsedPercent: Int,
     /** Average budgeted spending per elapsed day (rounded half-up to the minor unit). */
     val dailyAverage: Money,
@@ -223,15 +228,16 @@ object BudgetPlanner {
                     .thenBy { order[it.category.id] ?: Int.MAX_VALUE },
             )
         val total = Money.sum(currencyCode, allocations.values.map { it.limit })
-        val spent = Money.sum(currencyCode, lines.filter { it.isAllocated }.map { it.spent })
+        val budgeted = Money.sum(currencyCode, lines.filter { it.isAllocated }.map { it.spent })
         val all = Money.sum(currencyCode, expenses.map { it.amount })
         return BudgetPlan(
             month = month,
             currencyCode = currencyCode,
             lines = lines,
             total = total,
-            spent = spent,
-            unbudgetedSpending = all - spent,
+            spent = all,
+            budgetedSpending = budgeted,
+            unbudgetedSpending = all - budgeted,
             uncategorizedSpending = spentByCategory[null] ?: zero,
             legacyOverall = budgets.firstOrNull { it.categoryId == null && it.currencyCode == currencyCode },
         )
@@ -275,6 +281,7 @@ object BudgetPlanner {
             consumedFraction = plan.fraction,
             daysElapsed = elapsed,
             daysInMonth = length,
+            daysLeft = daysLeft,
             elapsedPercent = (elapsed * 100) / length,
             dailyAverage = daily,
             dailyAllowance = allowance,

@@ -215,11 +215,11 @@ fun BudgetScreen(
                 item(key = "unbudgeted") {
                     InfoNote(
                         buildString {
-                            append("${MoneyFormatter.format(plan.unbudgetedSpending)} spent outside your budget this month")
+                            append("${MoneyFormatter.format(plan.unbudgetedSpending)} spent outside your budget categories this month")
                             if (!plan.uncategorizedSpending.isZero) {
                                 append(" (${MoneyFormatter.format(plan.uncategorizedSpending)} has no category)")
                             }
-                            append(". It isn’t hidden or moved — give those categories an amount, or categorise the expenses, to include it.")
+                            append(". It still counts in Spent — give those categories an amount, or categorise the expenses, to plan for it.")
                         },
                         modifier = Modifier.padding(top = Spacing.md),
                     )
@@ -235,7 +235,7 @@ fun BudgetScreen(
                         caption = "${lines.size} ${if (lines.size == 1) "category" else "categories"}",
                     ) {
                         Text(
-                            "${MoneyFormatter.format(plan.spent)} of ${MoneyFormatter.format(plan.total)}",
+                            "${MoneyFormatter.format(plan.budgetedSpending)} of ${MoneyFormatter.format(plan.total)}",
                             style = AmountStyles.small,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

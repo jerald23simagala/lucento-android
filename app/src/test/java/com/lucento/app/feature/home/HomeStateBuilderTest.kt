@@ -73,20 +73,21 @@ class HomeStateBuilderTest {
         val all = listOf(
             tx(14_000, "2025-03-02", category = 10),
             tx(7_500, "2025-03-15", category = 11),
-            tx(1_000, "2025-03-18", category = null), // uncategorised: reported, not budgeted
+            tx(1_000, "2025-03-18", category = null), // uncategorised: outside the budget, still counted as spent
             tx(9_000, "2025-02-27", category = 11), // last month
         )
         val state = HomeStateBuilder.build(all, listOf(wallet("USD")), categories, "USD", today, budgets)
         val plan = state.budget!!
         val burn = state.burn!!
         assertEquals(Money(26_000, "USD"), plan.total)
-        assertEquals(Money(21_500, "USD"), plan.spent)
-        assertEquals(Money(4_500, "USD"), plan.remaining)
+        assertEquals(Money(22_500, "USD"), plan.spent) // actual money out, budgeted or not
+        assertEquals(Money(21_500, "USD"), plan.budgetedSpending)
+        assertEquals(Money(3_500, "USD"), plan.remaining)
         assertEquals(Money(1_000, "USD"), plan.unbudgetedSpending)
         assertEquals(plan.spent, burn.spent)
         assertEquals(plan.total, burn.total)
         assertEquals(plan.percentUsed, burn.consumedPercent)
-        assertEquals(83, burn.consumedPercent)
+        assertEquals(87, burn.consumedPercent) // 22,500 / 26,000 = 86.5%, half-up
         assertEquals(BudgetHealth.APPROACHING, plan.health)
         assertEquals(BurnLevel.APPROACHING, burn.level)
         assertEquals(64, burn.elapsedPercent) // day 20 of 31
