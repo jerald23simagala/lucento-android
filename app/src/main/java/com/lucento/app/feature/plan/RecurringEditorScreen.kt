@@ -146,7 +146,7 @@ fun RecurringEditorScreen(
             .imePadding(),
     ) {
         LucentoTopBar(
-            title = if (scheduleId == null) "New payment" else "Edit payment",
+            title = if (scheduleId == null) "Scheduled transactions" else "Edit payment",
             subtitle = "Recurring payments",
             onBack = onBack,
             modifier = Modifier.padding(horizontal = Spacing.gutter),
@@ -220,12 +220,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                 options = kinds.map { it to it.label },
                 selected = draft.kind,
                 onSelect = { picked ->
-                    update(
-                        when (picked) {
-                            ScheduleKind.DEBT -> payTo(debt ?: debts.firstOrNull(), draft)
-                            else -> draft.copy(kind = picked, toWalletId = null, categoryId = null)
-                        }
-                    )
+                    if (picked == draft.kind) return@SegmentedToggle
+                    // Each kind starts clean: a name, amount, category or debt from another kind never carries over
+                    // (a debt payment then fills its name and amount from the chosen loan's terms).
+                    val fresh = draft.copy(kind = picked, name = "", amountText = "", toWalletId = null, categoryId = null)
+                    update(if (picked == ScheduleKind.DEBT) payTo(debts.firstOrNull(), fresh) else fresh)
                 },
                 compact = true,
             )
