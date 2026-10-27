@@ -120,15 +120,20 @@ internal fun TextInput(
     )
 }
 
-/** Horizontal pills for a small set of choices. */
+/** Horizontal pills for a small set of choices; [icon] gives a pill its leading glyph (wallet pills carry their type's). */
 @Composable
-internal fun <T> PillRow(options: List<Pair<T, String>>, selected: T?, onSelect: (T) -> Unit) {
+internal fun <T> PillRow(
+    options: List<Pair<T, String>>,
+    selected: T?,
+    onSelect: (T) -> Unit,
+    icon: (T) -> androidx.compose.ui.graphics.vector.ImageVector? = { null },
+) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         options.forEach { (value, label) ->
-            ChoicePill(label = label, selected = value == selected, onClick = { onSelect(value) })
+            ChoicePill(label = label, selected = value == selected, leadingIcon = icon(value), onClick = { onSelect(value) })
         }
     }
 }

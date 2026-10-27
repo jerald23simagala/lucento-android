@@ -3,9 +3,8 @@ package com.lucento.app.feature.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -19,7 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import com.lucento.app.core.designsystem.component.ConnectingIndicator
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
@@ -62,8 +64,16 @@ fun ConnectAccountPanel(
     )
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        if (busy) {
+            // Never a silent screen while the account connects: the rising mark and what is happening.
+            ConnectingIndicator(
+                "Connecting your account…",
+                Modifier.fillMaxWidth().padding(vertical = Spacing.lg).semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            return@Column
+        }
         if (googleAvailable) {
-            LucentoPrimaryButton(text = if (busy && !usingEmail) "Connecting…" else "Continue with Google", onClick = onGoogle, enabled = !busy)
+            LucentoPrimaryButton(text = "Continue with Google", onClick = onGoogle)
         }
         if (!usingEmail) {
             LucentoSecondaryButton(text = "Use email instead", onClick = { usingEmail = true })
@@ -105,17 +115,13 @@ fun ConnectAccountPanel(
             modifier = Modifier.fillMaxWidth(),
         )
         problem?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-        if (busy) {
-            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-        } else {
-            LucentoSecondaryButton(
-                text = if (mode == EmailMode.CREATE) "Create account" else "Sign in",
-                onClick = {
-                    problem = emailFormProblem(email, password, mode)
-                    if (problem == null) onEmail(email.trim(), password, mode)
-                },
-            )
-        }
+        LucentoSecondaryButton(
+            text = if (mode == EmailMode.CREATE) "Create account" else "Sign in",
+            onClick = {
+                problem = emailFormProblem(email, password, mode)
+                if (problem == null) onEmail(email.trim(), password, mode)
+            },
+        )
         if (googleAvailable) {
             LucentoTextButton(text = "Back to Google", onClick = { usingEmail = false })
         }

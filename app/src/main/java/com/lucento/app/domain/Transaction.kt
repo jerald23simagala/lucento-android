@@ -48,6 +48,8 @@ data class Transaction(
     val note: String,
     val createdAtEpochMillis: Long,
     val transferGroup: String? = null,
+    /** The row's stable idempotency key; links a debt payment's interest row to its transfer ([DebtPaymentLink]). */
+    val clientUuid: String? = null,
 ) {
     val currencyCode: String get() = amount.currencyCode
 

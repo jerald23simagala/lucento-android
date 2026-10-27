@@ -5,6 +5,7 @@ import androidx.credentials.exceptions.GetCredentialProviderConfigurationExcepti
 import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.exceptions.NoCredentialException
 import io.github.jan.supabase.exceptions.HttpRequestException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.http.takeFrom
 import org.junit.Assert.assertEquals
@@ -35,6 +36,15 @@ class AuthFailureMessagesTest {
         assertEquals("Google sign-in was interrupted. Try again.", signInFailureMessage(GetCredentialInterruptedException(), debug = false))
         assertEquals("Google sign-in didn't finish. Try again.", signInFailureMessage(GetCredentialUnknownException(), debug = false))
         assertTrue(signInFailureMessage(networkFailure(), debug = false).startsWith("Couldn't reach the sync server"))
+    }
+
+    @Test
+    fun `a timeout says the server was slow, not that the account failed`() {
+        val timeout = HttpRequestTimeoutException("https://example.invalid/auth/v1/token", 30_000)
+        assertTrue(isTimeout(timeout))
+        assertTrue(isTimeout(IllegalStateException("wrapped", timeout)))
+        assertTrue(signInFailureMessage(timeout, debug = false).startsWith("The sync server took too long to answer"))
+        assertFalse(isTimeout(networkFailure()))
     }
 
     @Test

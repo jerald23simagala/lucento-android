@@ -246,11 +246,11 @@ fun WalletDetailScreen(
 }
 
 /**
- * A card's or loan's history, in two sections and as changes in what is owed (a payment reads "−", interest "+"; display
- * only — stored amounts and signs are unchanged). A loan splits into Principal (payments, borrowing, adjustments) and
- * Interest (interest and fees, recorded as expenses); a card into Payments and Charges (purchases, interest, fees).
- * The note says how the balance comes from the start figure: by the principal repaid, with interest paid inside
- * each payment.
+ * A card's or loan's history, in sections and as changes in what is owed (a payment reads "−", interest "+"; display
+ * only — stored amounts and signs are unchanged). A loan splits into Principal (payments, borrowing, adjustments),
+ * Interest paid (the interest part of each recorded payment) and Interest & fees (charges that add to the debt); a card
+ * into Payments and Charges (purchases, interest, fees). A payment's row shows its principal only: the transfer from
+ * the paying wallet was principal + interest, and the interest part is listed under Interest paid ([DebtPaymentLink]).
  */
 private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
     wallet: com.lucento.app.domain.Wallet,
@@ -258,22 +258,37 @@ private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
     onOpen: (Transaction) -> Unit,
 ) {
     val loan = wallet.type == WalletType.LOAN
-    val (first, second) = if (loan) {
-        state.history.partition { it.type != TransactionType.EXPENSE }
-    } else {
-        state.history.partition { it.type.isInflow }
-    }
     val code = wallet.currencyCode
+    val interestByPayment = if (loan) com.lucento.app.domain.DebtPaymentLink.interestByPayment(state.history, wallet.id) else emptyMap()
+    val paidInterestKeys = interestByPayment.keys.mapTo(HashSet()) { com.lucento.app.domain.DebtPaymentLink.interestKey(it) }
+    // What each row shows: a payment leg as its principal; everything else as stored.
+    fun shown(t: Transaction): Transaction =
+        if (t.type == TransactionType.TRANSFER_IN && t.transferGroup in interestByPayment) {
+            t.copy(amount = com.lucento.app.domain.DebtPaymentLink.principalOf(t, interestByPayment))
+        } else {
+            t
+        }
+    val sections: List<Triple<String, List<Transaction>, Boolean>> = if (loan) {
+        val (charges, principal) = state.history.partition { it.type == TransactionType.EXPENSE }
+        val (paid, added) = charges.partition { it.clientUuid in paidInterestKeys }
+        listOf(
+            // Third value: rows read as changes in what is owed (true) or as money paid (false).
+            Triple("Principal", principal.map(::shown), true),
+            Triple("Interest paid", paid, false),
+            Triple("Interest & fees", added, true),
+        )
+    } else {
+        val (payments, charges) = state.history.partition { it.type.isInflow }
+        listOf(Triple("Payments", payments, true), Triple("Charges", charges, true))
+    }
     fun owedChange(list: List<Transaction>) = com.lucento.app.core.money.Money.sum(code, list.map { -it.signedAmount })
-    listOf(
-        (if (loan) "Principal" else "Payments") to first,
-        (if (loan) "Interest" else "Charges") to second,
-    ).forEach { (title, rows) ->
+    val originals = state.history.associateBy { it.id }
+    sections.forEach { (title, rows, owed) ->
         if (rows.isEmpty()) return@forEach
         item(key = "section-$title") {
             SectionHeader(title, Modifier.padding(top = Spacing.lg)) {
                 Text(
-                    MoneyFormatter.formatSigned(owedChange(rows)),
+                    MoneyFormatter.formatSigned(if (owed) owedChange(rows) else com.lucento.app.core.money.Money.sum(code, rows.map { it.signedAmount })),
                     style = AmountStyles.small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -287,12 +302,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
                         transaction = transaction,
                         category = transaction.categoryId?.let { state.categoriesById[it] },
                         wallet = wallet,
-                        onClick = { onOpen(transaction) },
+                        onClick = { onOpen(originals[transaction.id] ?: transaction) },
                         trailingCaption = shortDayLabel(transaction.date),
                         transfer = transaction.transferGroup?.let { state.transfers[it] },
                         walletNames = state.walletNames,
                         perspectiveOfWallet = true,
-                        owedPerspective = true,
+                        owedPerspective = owed,
                         dense = true,
                     )
                     if (index < rows.lastIndex) Hairline(strong = true)
@@ -300,23 +315,23 @@ private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
             }
         }
     }
+    val paidInterest = com.lucento.app.core.money.Money.sum(code, interestByPayment.values.toList())
     item(key = "note") {
         val start = MoneyFormatter.format(wallet.openingBalance)
         val now = MoneyFormatter.format(wallet.balance)
         val text = if (loan) {
             val repaid = wallet.openingBalance - wallet.balance
-            val interest = com.lucento.app.core.money.Money.sum(code, second.map { it.amount })
             buildString {
                 append("Owed = $start at start ")
                 append(if (repaid.isNegative) "+ ${MoneyFormatter.format(-repaid)} added" else "− ${MoneyFormatter.format(repaid)} principal repaid")
                 append(" = $now.")
-                if (!interest.isZero) {
-                    append(" ${MoneyFormatter.format(interest)} of interest was charged and paid within your payments, so it doesn’t change what you owe.")
+                if (!paidInterest.isZero) {
+                    append(" Your payments also covered ${MoneyFormatter.format(paidInterest)} of interest, paid on top of the principal, so it doesn’t change what you owe.")
                 }
             }
         } else {
-            "Owed = $start at start + charges ${MoneyFormatter.format(owedChange(second))} − payments " +
-                "${MoneyFormatter.format(-owedChange(first))} = $now."
+            "Owed = $start at start + charges ${MoneyFormatter.format(owedChange(sections[1].second))} − payments " +
+                "${MoneyFormatter.format(-owedChange(sections[0].second))} = $now."
         }
         Text(
             text,

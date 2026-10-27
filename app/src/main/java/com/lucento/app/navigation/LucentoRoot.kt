@@ -190,7 +190,13 @@ fun LucentoRoot(preferences: UserPreferences) {
         transitionSpec = { fadeIn(tween(400)) togetherWith fadeOut(tween(200)) },
         label = "root",
     ) { onboarded ->
-        if (onboarded) MainScaffold(preferences) else OnboardingScreen()
+        if (onboarded) {
+            MainScaffold(preferences)
+        } else {
+            // Onboarding has no Scaffold above it: this Surface sets the themed content colour, so text without an
+            // explicit colour follows the theme instead of falling back to black (invisible in dark mode).
+            androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background) { OnboardingScreen() }
+        }
     }
 }
 

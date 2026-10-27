@@ -109,6 +109,10 @@ recurring-schedule sync, syncing preferences.
 - Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
   email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
   Insights adopt the brand hero and carded sections.
+- Polish: rising-logo launch animation (the approved symbol's own paths, staged) and the same mark as the sign-in
+  indicator; 30 s sync request timeout with one retry; loan history shows each payment's principal and its interest
+  apart (`DebtPaymentLink`); New wallet live card preview; type icons on every wallet pill; compact goal cards;
+  smaller dashboard hero and raised Quick links; themed onboarding text in dark mode.
 - Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull. Older installs also read balance adjustments as expenses after a sync pull.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)

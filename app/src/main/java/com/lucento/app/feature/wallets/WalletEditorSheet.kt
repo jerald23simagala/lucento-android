@@ -3,6 +3,7 @@ package com.lucento.app.feature.wallets
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,12 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -152,9 +159,28 @@ fun WalletEditorSheet(
                 }
             }
 
-            Spacer(Modifier.height(Spacing.sm))
+            val amountLabel = when {
+                draft.type.isValuedManually -> "Estimated value"
+                initial.id != null && draft.type.isLiability -> "Opening amount owed"
+                initial.id != null -> "Opening balance"
+                draft.type.isLiability -> "Amount owed now"
+                else -> "Current balance"
+            }
+            if (initial.id == null) {
+                // A live card: the wallet as it will look on Wallets, following every choice below.
+                Spacer(Modifier.height(Spacing.sm))
+                WalletCardPreview(
+                    type = draft.type,
+                    name = draft.name,
+                    currencyCode = draft.currencyCode,
+                    amount = MoneyParser.parseOrNull(draft.amountText, draft.currencyCode, decimalSeparator),
+                    amountLabel = amountLabel,
+                )
+            }
+
+            Spacer(Modifier.height(Spacing.lg))
             FieldHeader("Type")
-            TypeGrid(
+            TypeDropdown(
                 selected = draft.type,
                 onSelect = {
                     haptics.tick()
@@ -174,6 +200,7 @@ fun WalletEditorSheet(
             }
 
             Spacer(Modifier.height(Spacing.lg))
+            FieldHeader("Details")
             val nameMessage = when (error) {
                 DraftError.NameRequired -> "Give this wallet a name."
                 DraftError.NameTaken -> "You already have a wallet with this name."
@@ -221,8 +248,9 @@ fun WalletEditorSheet(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 56.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), MaterialTheme.shapes.medium)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), MaterialTheme.shapes.small)
                     .clickable(role = Role.Button, onClickLabel = "Change currency") { pickingCurrency = true }
                     .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
@@ -261,17 +289,7 @@ fun WalletEditorSheet(
                     draft = draft.copy(amountText = it.take(20))
                     if (amountError) error = null
                 },
-                label = {
-                    Text(
-                        when {
-                            draft.type.isValuedManually -> "Estimated value"
-                            initial.id != null && draft.type.isLiability -> "Opening amount owed"
-                            initial.id != null -> "Opening balance"
-                            draft.type.isLiability -> "Amount owed now"
-                            else -> "Current balance"
-                        }
-                    )
-                },
+                label = { Text(amountLabel) },
                 prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
                 placeholder = { Text("0") },
                 singleLine = true,
@@ -522,44 +540,41 @@ private fun HintText(text: String, modifier: Modifier = Modifier, isError: Boole
 }
 
 /** Wallet kinds as recognisable tiles, four per row (seven kinds: two balanced rows). */
-@OptIn(ExperimentalLayoutApi::class)
+/** The wallet type as one dropdown field (its icon and name), so the sheet stays short; the menu lists every type with its icon. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TypeGrid(selected: WalletType, onSelect: (WalletType) -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = 4
-        val gap = Spacing.sm
-        val tileWidth = (maxWidth - gap * (columns - 1)) / columns
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(gap),
-            verticalArrangement = Arrangement.spacedBy(gap),
-            maxItemsInEachRow = columns,
+private fun TypeDropdown(selected: WalletType, onSelect: (WalletType) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .clip(MaterialTheme.shapes.small)
+                .background(colors.surfaceContainerLowest)
+                .border(BorderStroke(1.dp, if (expanded) colors.primary else colors.outline), MaterialTheme.shapes.small)
+                .semantics { contentDescription = "Wallet type: ${selected.label}" }
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            WalletTypeTile(selected, size = 32.dp)
+            Spacer(Modifier.width(Spacing.md))
+            Text(selected.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+        }
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             WalletType.entries.forEach { type ->
-                val isSelected = type == selected
-                val border by animateColorAsState(
-                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                    tween(160),
-                    label = "type-border",
+                DropdownMenuItem(
+                    text = { Text(type.label, fontWeight = if (type == selected) FontWeight.SemiBold else null) },
+                    leadingIcon = { WalletTypeTile(type, size = 28.dp) },
+                    onClick = {
+                        expanded = false
+                        onSelect(type)
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                 )
-                Column(
-                    Modifier
-                        .width(tileWidth)
-                        .clip(MaterialTheme.shapes.medium)
-                        .border(BorderStroke(if (isSelected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
-                        .selectable(selected = isSelected, role = Role.RadioButton) { onSelect(type) }
-                        .padding(vertical = Spacing.md, horizontal = Spacing.xs),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    WalletTypeTile(type, size = 36.dp)
-                    Spacer(Modifier.height(Spacing.xs))
-                    Text(
-                        type.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
     }

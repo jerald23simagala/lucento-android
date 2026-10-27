@@ -67,6 +67,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -475,54 +476,52 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
     val elapsedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
 
     LucentoCard(Modifier.fillMaxWidth(), onClick = open, contentPadding = 0.dp) {
-        Column(Modifier.background(tones.card).padding(Spacing.lg)) {
+        // Compact by design: the dashboard should show everything at a glance with little scrolling.
+        Column(Modifier.background(tones.card).padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val showBubble = maxWidth >= 300.dp
-                Row(verticalAlignment = Alignment.Top) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         LinkedTitle("Monthly budget")
-                        Spacer(Modifier.height(Spacing.xs))
+                        Spacer(Modifier.height(Spacing.xxs))
                         when {
-                            setupNeeded -> Text("Finish your budget setup", style = MaterialTheme.typography.headlineSmall)
-                            !plan.hasBudget -> Text("No budget yet", style = MaterialTheme.typography.headlineSmall)
-                            else -> {
-                                Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.display)
+                            setupNeeded -> Text("Finish your budget setup", style = MaterialTheme.typography.titleMedium)
+                            !plan.hasBudget -> Text("No budget yet", style = MaterialTheme.typography.titleMedium)
+                            else -> Row(verticalAlignment = Alignment.Bottom) {
+                                Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.large, maxLines = 1)
+                                Spacer(Modifier.width(Spacing.xs))
+                                // One line, in full ink: the budget this percentage is of.
                                 Text(
                                     "of ${MoneyFormatter.format(plan.total)} used",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = 2.dp),
                                 )
                             }
                         }
                     }
                     LucentoMascot(
-                        size = 72.dp,
+                        size = 52.dp,
                         mood = mood,
                         tier = tier,
                         contentDescription = if (mood == MascotMood.Concerned) "Lucento, gently concerned, says: $bubble" else "Lucento says: $bubble",
-                        modifier = Modifier.padding(top = Spacing.lg),
                     )
-                    if (showBubble) SpeechBubble(bubble, Modifier.widthIn(max = 118.dp))
+                    if (showBubble) SpeechBubble(bubble, Modifier.widthIn(max = 112.dp))
                 }
             }
 
             if (!setupNeeded) {
-                Spacer(Modifier.height(Spacing.md))
-                if (plan.hasBudget) {
-                    PercentBar(burn.consumedFraction, "${burn.consumedPercent ?: 0}%", tones.bar, "Budget used: ${burn.consumedPercent ?: 0} percent")
-                    Spacer(Modifier.height(Spacing.sm))
-                }
-                PercentBar(burn.elapsedPercent / 100f, "${burn.elapsedPercent}%", elapsedColor, "Month elapsed: ${burn.elapsedPercent} percent")
                 Spacer(Modifier.height(Spacing.sm))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (plan.hasBudget) {
-                        LegendDot(tones.bar, "Budget used")
-                        Spacer(Modifier.width(Spacing.lg))
-                    }
-                    LegendDot(elapsedColor, "Month elapsed")
+                // Each bar says what it is, so no legend row is needed.
+                if (plan.hasBudget) {
+                    PercentBar(burn.consumedFraction, "${burn.consumedPercent ?: 0}% used", tones.bar, "Budget used: ${burn.consumedPercent ?: 0} percent")
+                    Spacer(Modifier.height(Spacing.xs))
                 }
+                PercentBar(burn.elapsedPercent / 100f, "${burn.elapsedPercent}% of month", elapsedColor, "Month elapsed: ${burn.elapsedPercent} percent")
 
-                Spacer(Modifier.height(Spacing.md))
+                Spacer(Modifier.height(Spacing.sm))
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                     if (plan.hasBudget) {
                         MoneyStat(plan.spent, "Spent", Modifier.weight(1f))
@@ -535,11 +534,11 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                         )
                         StatDivider()
                     }
-                    BudgetStat("${burn.daysElapsed} of ${burn.daysInMonth} days", "${burn.elapsedPercent}% of month", Modifier.weight(1.15f), valueLines = 2)
+                    BudgetStat("${burn.daysInMonth - burn.daysElapsed}", "days left", Modifier.weight(0.8f))
                 }
             }
 
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.sm))
             AdviceBanner(
                 text = if (setupNeeded) "Choose the categories you spend on — your budget is built from them." else insight.message,
                 tones = tones,
@@ -594,13 +593,13 @@ private fun PercentBar(fraction: Float, label: String, color: Color, description
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .height(18.dp)
+            .height(16.dp)
             .clip(CircleShape)
             .background(LucentoTheme.extendedColors.track)
             .clearAndSetSemantics { contentDescription = description },
     ) {
         val fill = maxWidth * clamped
-        val inside = fill >= 44.dp
+        val inside = fill >= 96.dp
         Box(
             Modifier
                 .width(fill)
@@ -671,11 +670,11 @@ private fun AdviceBanner(text: String, tones: PaceTones, onClick: () -> Unit) {
             .clip(MaterialTheme.shapes.medium)
             .background(tones.banner.container)
             .clickable(role = Role.Button, onClickLabel = "Open budget", onClick = onClick)
-            .padding(Spacing.md),
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(32.dp).clip(CircleShape).background(if (LucentoTheme.isDark) Color.Black.copy(alpha = 0.2f) else Color.White),
+            Modifier.size(28.dp).clip(CircleShape).background(if (LucentoTheme.isDark) Color.Black.copy(alpha = 0.2f) else Color.White),
             contentAlignment = Alignment.Center,
         ) {
             Icon(tones.icon, contentDescription = null, tint = tones.banner.content, modifier = Modifier.size(18.dp))
@@ -862,22 +861,41 @@ private fun QuickLinksCard(links: List<QuickLink>, asList: Boolean, modifier: Mo
     }
 }
 
+/** The raised, brand-tinted face shared by quick-link tiles and rows, so they read as buttons at a glance. */
+@Composable
+private fun Modifier.quickLinkFace(link: QuickLink, shape: androidx.compose.ui.graphics.Shape): Modifier {
+    val colors = MaterialTheme.colorScheme
+    return this
+        .shadow(elevation = 2.dp, shape = shape, clip = false, ambientColor = LucentoTheme.extendedColors.shadow.copy(alpha = 0.08f), spotColor = LucentoTheme.extendedColors.shadow.copy(alpha = 0.16f))
+        .clip(shape)
+        .background(colors.primaryContainer)
+        .border(BorderStroke(1.dp, colors.primary.copy(alpha = 0.22f)), shape)
+        .clickable(role = Role.Button, onClickLabel = "Open ${link.accessibilityLabel}", onClick = link.onClick)
+}
+
+/** A solid brand-blue badge with a white glyph: the button's icon. */
+@Composable
+private fun QuickLinkBadge(link: QuickLink) {
+    IconTile(
+        icon = link.icon,
+        size = 30.dp,
+        container = MaterialTheme.colorScheme.primary,
+        content = MaterialTheme.colorScheme.onPrimary,
+    )
+}
+
 @Composable
 private fun QuickLinkRow(link: QuickLink) {
     Row(
         Modifier
             .fillMaxWidth()
+            .padding(vertical = 3.dp)
             .heightIn(min = Sizes.minTouch)
-            .clip(MaterialTheme.shapes.small)
-            .clickable(role = Role.Button, onClickLabel = "Open ${link.accessibilityLabel}", onClick = link.onClick),
+            .quickLinkFace(link, MaterialTheme.shapes.small)
+            .padding(horizontal = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconTile(
-            icon = link.icon,
-            size = 28.dp,
-            container = MaterialTheme.colorScheme.primaryContainer,
-            content = MaterialTheme.colorScheme.primary,
-        )
+        QuickLinkBadge(link)
         Spacer(Modifier.width(Spacing.sm))
         Text(
             link.label,
@@ -893,23 +911,18 @@ private fun QuickLinkTile(link: QuickLink, modifier: Modifier = Modifier) {
     Column(
         modifier
             .heightIn(min = 72.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .border(BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault), MaterialTheme.shapes.medium)
-            .clickable(role = Role.Button, onClickLabel = "Open ${link.accessibilityLabel}", onClick = link.onClick)
+            .quickLinkFace(link, MaterialTheme.shapes.medium)
             .padding(horizontal = 2.dp, vertical = Spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        IconTile(
-            icon = link.icon,
-            size = 28.dp,
-            container = MaterialTheme.colorScheme.primaryContainer,
-            content = MaterialTheme.colorScheme.primary,
-        )
+        QuickLinkBadge(link)
         Spacer(Modifier.height(Spacing.xs))
         Text(
             link.label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

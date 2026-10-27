@@ -5,6 +5,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Builds the optional Supabase client for cloud sync (see docs/SYNC.md). Lucento ships with no mandatory
@@ -26,6 +27,9 @@ object SupabaseModule {
             supabaseUrl = BuildConfig.SUPABASE_URL,
             supabaseKey = BuildConfig.SUPABASE_ANON_KEY,
         ) {
+            // The default 10 s is too short for the first request after a cold start (new DNS lookup, TLS and a
+            // waking server), which is exactly when onboarding connects an account.
+            requestTimeout = 30.seconds
             install(Auth)
             install(Postgrest)
         }

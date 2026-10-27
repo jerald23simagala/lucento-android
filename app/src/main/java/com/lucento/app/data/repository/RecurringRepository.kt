@@ -6,6 +6,7 @@ import com.lucento.app.data.local.RecurringDao
 import com.lucento.app.data.local.RecurringEntity
 import com.lucento.app.data.local.WalletDao
 import com.lucento.app.data.local.acceptsTransactions
+import com.lucento.app.domain.DebtPaymentLink
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
@@ -212,7 +213,7 @@ class RecurringRepository(
                     val saved = transactions.save(
                         TransactionRepository.Input(
                             id = null,
-                            clientUuid = "$key-interest",
+                            clientUuid = DebtPaymentLink.interestKey(key),
                             type = TransactionType.EXPENSE,
                             amount = interest,
                             walletId = debtId,

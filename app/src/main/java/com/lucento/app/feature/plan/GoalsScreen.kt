@@ -1,5 +1,6 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.icon
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.HeroTones
 import com.lucento.app.core.designsystem.component.HeroPill
@@ -14,6 +15,7 @@ import com.lucento.app.core.designsystem.component.LucentoAnimation
 import com.lucento.app.core.designsystem.component.EmptyIllustration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -291,84 +294,71 @@ private fun GoalsHero(progress: List<GoalProgress>, primaryCurrency: String) {
 private fun Money.coerceNonNegative(): Money = if (isNegative) Money.zero(currencyCode) else this
 
 /**
- * A goal's card. A goal with a picture ([GoalScene]: the user's choice, else recognised from the name — Mount Fuji for
- * Japan, the sunrise for other trips) shows it in a top window; the figures below sit on the solid card surface.
- * Goals without one keep the plain card. Content, order and actions are identical either way.
+ * A goal's card, compact: its picture on the side — the user's photo, else the scene recognised from the name (Mount
+ * Fuji for Japan, the sunrise for other trips), else the goal flag — and the name, figures, progress bar and outlook
+ * beside it. Content, order and actions are identical whichever thumbnail shows.
  */
 @Composable
 private fun GoalCard(p: GoalProgress, onClick: () -> Unit) {
-    val photo = rememberGoalPhoto(p.goal.photoPath)
-    if (photo != null) {
-        LucentoCard(Modifier.fillMaxWidth(), onClick = onClick) {
-            Column {
-                Image(
-                    bitmap = photo,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(104.dp).clip(MaterialTheme.shapes.medium),
-                )
-                Spacer(Modifier.height(Spacing.md))
-                GoalCardContent(p)
-            }
-        }
-        return
-    }
-    val scene = remember(p.goal.name, p.goal.sceneKey) { GoalScene.forGoal(p.goal.name, p.goal.sceneKey) }
-    val illustration = scene.illustration()
-    if (illustration == null) {
-        LucentoCard(Modifier.fillMaxWidth(), onClick = onClick) { GoalCardContent(p) }
-        return
-    }
-    val colors = MaterialTheme.colorScheme
-    val dark = LucentoTheme.isDark
-    val surface = if (dark) colors.surfaceContainer else colors.surfaceContainerLowest
-    val density = LocalDensity.current
-    val window = 104.dp
-    val overlay = remember(surface, dark, density) {
-        with(density) {
-            IllustrationScrims.topWindow(
-                color = surface,
-                windowPx = window.toPx(),
-                fadePx = 36.dp.toPx(),
-                // At night the artwork is dimmed slightly so it sits calmly on the navy card.
-                wash = if (dark) colors.surfaceContainerLowest.copy(alpha = 0.35f) else Color.Transparent,
-            )
+    LucentoCard(Modifier.fillMaxWidth(), onClick = onClick, contentPadding = Spacing.md) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            GoalThumbnail(p)
+            Spacer(Modifier.width(Spacing.md))
+            GoalCardContent(p, Modifier.weight(1f))
         }
     }
-    IllustratedSurface(
-        illustration = illustration,
-        modifier = Modifier.fillMaxWidth(),
-        containerColor = surface,
-        contentColor = colors.onSurface,
-        border = BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault),
-        overlay = overlay,
-        artworkAlignment = Alignment.TopCenter,
-        contentPadding = PaddingValues(start = Spacing.lg, end = Spacing.lg, top = window, bottom = Spacing.lg),
-        onClick = onClick,
-    ) { GoalCardContent(p) }
 }
 
 @Composable
-private fun GoalCardContent(p: GoalProgress) {
+private fun GoalThumbnail(p: GoalProgress) {
+    val photo = rememberGoalPhoto(p.goal.photoPath)
+    val scene = remember(p.goal.name, p.goal.sceneKey) { GoalScene.forGoal(p.goal.name, p.goal.sceneKey) }
+    val illustration = scene.illustration()
     val ext = LucentoTheme.extendedColors
-    run {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconTile(icon = Icons.Outlined.Flag, container = ext.savings.container, content = ext.savings.content)
-            Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f)) {
-                Text(p.goal.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    "${MoneyFormatter.format(p.saved)} of ${MoneyFormatter.format(p.goal.target)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (p.reached) StatusPill("Reached", StatusTones.positive) else Text("${p.percent}%", style = AmountStyles.medium)
+    val shape = MaterialTheme.shapes.medium
+    val box = Modifier.size(64.dp).clip(shape)
+    when {
+        photo != null -> Image(bitmap = photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = box)
+        illustration != null -> Image(
+            painter = androidx.compose.ui.res.painterResource(illustration.res),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            // At night the artwork is dimmed slightly so it sits calmly on the navy card.
+            alpha = if (LucentoTheme.isDark) 0.85f else 1f,
+            modifier = box,
+        )
+        else -> Box(box.background(ext.savings.container), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.Flag, contentDescription = null, tint = ext.savings.content, modifier = Modifier.size(28.dp))
         }
-        Spacer(Modifier.height(Spacing.md))
+    }
+}
+
+@Composable
+private fun GoalCardContent(p: GoalProgress, modifier: Modifier = Modifier) {
+    val ext = LucentoTheme.extendedColors
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(p.goal.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(Spacing.sm))
+            if (p.reached) StatusPill("Reached", StatusTones.positive) else Text("${p.percent}%", style = AmountStyles.row)
+        }
+        Text(
+            "${MoneyFormatter.format(p.saved)} of ${MoneyFormatter.format(p.goal.target)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(Spacing.xs))
         ShareBar(fraction = p.fraction, color = ext.success)
-        Spacer(Modifier.height(Spacing.sm))
-        Text(goalOutlook(p), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            goalOutlook(p),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -604,6 +594,7 @@ private fun GoalEditorSheet(
                     options = listOf<Pair<Long?, String>>(null to "Not linked") + savingsWallets.map { it.id to it.name },
                     selected = draft.walletId,
                     onSelect = { draft = draft.copy(walletId = it) },
+                    icon = { id -> savingsWallets.firstOrNull { it.id == id }?.type?.icon ?: Icons.Outlined.LinkOff },
                 )
             }
             FieldHeader("Card picture")

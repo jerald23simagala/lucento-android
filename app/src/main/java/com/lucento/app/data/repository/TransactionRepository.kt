@@ -386,6 +386,7 @@ internal fun TransactionEntity.toDomain(): Transaction = Transaction(
     note = note,
     createdAtEpochMillis = createdAt,
     transferGroup = transferGroup,
+    clientUuid = clientUuid,
 )
 
 /**

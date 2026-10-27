@@ -1,5 +1,6 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.icon
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -176,6 +177,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
     val haptics = rememberHaptics()
     var error by remember { mutableStateOf<String?>(null) }
     val debts = state.debts()
+    val walletIcon: (Long?) -> androidx.compose.ui.graphics.vector.ImageVector? = { id -> id?.let { state.walletsById[it]?.type?.icon } }
     val debt = draft.toWalletId?.let { state.walletsById[it] }
     val isDebt = draft.kind == ScheduleKind.DEBT
     val sources = if (isDebt) state.payingWallets(debt?.currencyCode) else state.wallets
@@ -254,7 +256,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                 FieldHeader("Pay to")
                 PillRow(debts.map { it.id to "${it.name} · ${it.currencyCode}" }, draft.toWalletId, onSelect = { id ->
                     update(payTo(state.walletsById[id], draft))
-                })
+                }, icon = walletIcon)
                 FieldHeader("Paid from")
                 if (sources.isEmpty()) {
                     Text(
@@ -263,7 +265,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                         color = MaterialTheme.colorScheme.error,
                     )
                 } else {
-                    PillRow(sources.map { it.id to "${it.name} · ${it.currencyCode}" }, draft.walletId, onSelect = { update(draft.copy(walletId = it)) })
+                    PillRow(sources.map { it.id to "${it.name} · ${it.currencyCode}" }, draft.walletId, onSelect = { update(draft.copy(walletId = it)) }, icon = walletIcon)
                 }
             }
             InfoNote(
@@ -280,7 +282,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
             )
             LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
                 FieldHeader(if (draft.kind == ScheduleKind.INCOME) "Into" else "Paid from")
-                PillRow(state.wallets.map { it.id to "${it.name} · ${it.currencyCode}" }, draft.walletId, onSelect = { update(draft.copy(walletId = it)) })
+                PillRow(state.wallets.map { it.id to "${it.name} · ${it.currencyCode}" }, draft.walletId, onSelect = { update(draft.copy(walletId = it)) }, icon = walletIcon)
                 if (categories.isNotEmpty()) {
                     FieldHeader("Category")
                     PillRow(

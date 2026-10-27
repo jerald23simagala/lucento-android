@@ -23,7 +23,11 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
@@ -93,10 +97,12 @@ class AuthRepository(private val client: SupabaseClient?) {
                 return SignInResult.Failed(signInFailureMessage(IllegalStateException("Unexpected credential type"), BuildConfig.DEBUG))
             }
             val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
-            auth.signInWith(IDToken) {
-                idToken = googleCredential.idToken
-                provider = Google
-                nonce = rawNonce
+            retryOnTimeout {
+                auth.signInWith(IDToken) {
+                    idToken = googleCredential.idToken
+                    provider = Google
+                    nonce = rawNonce
+                }
             }
             SignInResult.Success
         } catch (e: CancellationException) {
@@ -115,9 +121,11 @@ class AuthRepository(private val client: SupabaseClient?) {
     suspend fun signUpWithEmail(email: String, password: String): SignInResult {
         val auth = client?.auth ?: return SignInResult.NotConfigured
         return emailCall {
-            auth.signUpWith(Email) {
-                this.email = email.trim()
-                this.password = password
+            retryOnTimeout {
+                auth.signUpWith(Email) {
+                    this.email = email.trim()
+                    this.password = password
+                }
             }
             if (auth.currentSessionOrNull() != null) SignInResult.Success else SignInResult.ConfirmEmail(email.trim())
         }
@@ -126,9 +134,11 @@ class AuthRepository(private val client: SupabaseClient?) {
     suspend fun signInWithEmail(email: String, password: String): SignInResult {
         val auth = client?.auth ?: return SignInResult.NotConfigured
         return emailCall {
-            auth.signInWith(Email) {
-                this.email = email.trim()
-                this.password = password
+            retryOnTimeout {
+                auth.signInWith(Email) {
+                    this.email = email.trim()
+                    this.password = password
+                }
             }
             SignInResult.Success
         }
@@ -144,6 +154,17 @@ class AuthRepository(private val client: SupabaseClient?) {
         SignInResult.Failed(signInFailureMessage(e, BuildConfig.DEBUG))
     }
 
+    /** Tries a request once more after a timeout: the first call on a cold network often times out where the next succeeds. */
+    private suspend fun <T> retryOnTimeout(block: suspend () -> T): T = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        if (!isTimeout(e)) throw e
+        delay(1_000)
+        block()
+    }
+
     /** Clears the Supabase session only. Local financial data is never touched by signing out. */
     suspend fun signOut() {
         runCatching { client?.auth?.signOut() }
@@ -156,8 +177,15 @@ class AuthRepository(private val client: SupabaseClient?) {
  * server's own error description via [safeFailureDescription], never a token, header or raw exception message — so a
  * setup mistake (missing Android OAuth client, wrong Client ID in Supabase, provider disabled) is visible on screen.
  */
+internal fun isTimeout(e: Throwable): Boolean =
+    generateSequence(e) { it.cause }.take(5).any {
+        it is HttpRequestTimeoutException || it is ConnectTimeoutException || it is SocketTimeoutException
+    }
+
 internal fun signInFailureMessage(e: Throwable, debug: Boolean): String {
-    val message = when (e) {
+    val message = when {
+        isTimeout(e) -> "The sync server took too long to answer. Check your connection and try again — your data is safe on this phone."
+        else -> when (e) {
         is NoCredentialException ->
             "No Google account could be used. Add a Google account in Android Settings, then try again."
         is GetCredentialProviderConfigurationException ->
@@ -168,6 +196,7 @@ internal fun signInFailureMessage(e: Throwable, debug: Boolean): String {
         is HttpRequestException -> "Couldn't reach the sync server. Check your connection and try again."
         is RestException -> "The sync server didn't accept this Google sign-in. Try again later."
         else -> "Couldn't connect your account. Try again."
+        }
     }
     if (!debug) return message
     val detail = when (e) {

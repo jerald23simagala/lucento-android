@@ -7,10 +7,22 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lucento.app.core.designsystem.component.LaunchAnimation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.isDark
 import com.lucento.app.data.preferences.ThemeMode
@@ -50,9 +62,18 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
 
+            // The rising logo plays once per launch (not on rotation) while the app loads underneath.
+            var launching by rememberSaveable { mutableStateOf(true) }
             LucentoTheme(darkTheme = dark) {
-                if (ready != null) {
-                    LucentoRoot(preferences = ready.preferences)
+                Box(Modifier.fillMaxSize()) {
+                    if (ready != null) {
+                        LucentoRoot(preferences = ready.preferences)
+                    }
+                    AnimatedVisibility(visible = launching || ready == null, exit = fadeOut(tween(220))) {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                            LaunchAnimation(onFinished = { launching = false })
+                        }
+                    }
                 }
             }
         }

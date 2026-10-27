@@ -1,5 +1,6 @@
 package com.lucento.app.feature.transactions
 
+import com.lucento.app.core.designsystem.component.icon
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -571,6 +572,8 @@ private fun FilterRow(state: TransactionsUiState, viewModel: TransactionsViewMod
             active = f.walletId != null,
             options = listOf<Pair<String, () -> Unit>>("All wallets" to { viewModel.setWallet(null) }) +
                 state.wallets.map { w -> w.name to { viewModel.setWallet(w.id) } },
+            icon = f.walletId?.let { state.walletsById[it]?.type?.icon } ?: Icons.Outlined.AccountBalanceWallet,
+            optionIcons = listOf(Icons.Outlined.AccountBalanceWallet) + state.wallets.map { it.type.icon },
         )
         MenuPill(
             label = f.categoryId?.let { state.categoriesById[it]?.name } ?: "All categories",
@@ -585,12 +588,19 @@ private fun FilterRow(state: TransactionsUiState, viewModel: TransactionsViewMod
 }
 
 @Composable
-private fun MenuPill(label: String, active: Boolean, options: List<Pair<String, () -> Unit>>) {
+private fun MenuPill(
+    label: String,
+    active: Boolean,
+    options: List<Pair<String, () -> Unit>>,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    optionIcons: List<androidx.compose.ui.graphics.vector.ImageVector>? = null,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         ChoicePill(
             label = label,
             selected = active,
+            leadingIcon = icon,
             trailingIcon = Icons.Filled.ArrowDropDown,
             role = Role.DropdownList,
             onClick = { expanded = true },
@@ -599,9 +609,11 @@ private fun MenuPill(label: String, active: Boolean, options: List<Pair<String, 
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            options.forEach { (text, action) ->
+            options.forEachIndexed { index, (text, action) ->
+                val glyph = optionIcons?.getOrNull(index)
                 DropdownMenuItem(
                     text = { Text(text) },
+                    leadingIcon = glyph?.let { { Icon(it, contentDescription = null) } },
                     onClick = {
                         expanded = false
                         action()

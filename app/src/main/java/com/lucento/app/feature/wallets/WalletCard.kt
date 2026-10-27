@@ -143,6 +143,51 @@ fun WalletCard(wallet: Wallet, movements: Int, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The New wallet sheet's live preview: the same face, type mark and ink as [WalletCard], in a short strip that
+ * follows the type, name, currency and amount as they are typed. [amount] is null while the field is empty or invalid.
+ */
+@Composable
+fun WalletCardPreview(type: WalletType, name: String, currencyCode: String, amount: com.lucento.app.core.money.Money?, amountLabel: String, modifier: Modifier = Modifier) {
+    val face = LucentoTheme.extendedColors.walletCard(type)
+    val ink = face.content
+    val muted = ink.copy(alpha = 0.74f)
+    Surface(shape = RoundedCornerShape(20.dp), color = face.container, contentColor = ink, modifier = modifier.fillMaxWidth()) {
+        Box {
+            Canvas(Modifier.matchParentSize()) {
+                drawCircle(ink.copy(alpha = 0.07f), radius = size.height * 0.9f, center = Offset(size.width * 1.0f, size.height * 1.15f))
+            }
+            Row(Modifier.fillMaxWidth().padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        name.ifBlank { "Your ${type.label.lowercase()}" },
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = if (name.isBlank()) muted else ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        "$currencyCode · ${MoneyFormatter.currencyName(currencyCode)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.size(Spacing.sm))
+                    Text(amountLabel, style = MaterialTheme.typography.labelMedium, color = muted, maxLines = 1)
+                    MoneyText(
+                        money = amount ?: com.lucento.app.core.money.Money(0, currencyCode),
+                        style = AmountStyles.large,
+                        color = ink,
+                    )
+                }
+                Spacer(Modifier.width(Spacing.sm))
+                TypeMark(type, ink)
+            }
+        }
+    }
+}
+
 /** The card network's place: the wallet type's glyph above its name in small capitals. */
 @Composable
 private fun TypeMark(type: WalletType, ink: Color) {
