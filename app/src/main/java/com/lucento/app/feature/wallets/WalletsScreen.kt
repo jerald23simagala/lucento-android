@@ -105,9 +105,7 @@ fun WalletsScreen(
                 onBack = onBack,
                 actions = {
                     if (state.wallets.isNotEmpty() && canAdd) {
-                        IconButton(onClick = { editing = newDraft() }) {
-                            Icon(Icons.Filled.Add, contentDescription = "Add wallet")
-                        }
+                        com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = { editing = newDraft() }, contentDescription = "Add wallet")
                     }
                     if (onBack == null) ProfileButton()
                 },

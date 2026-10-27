@@ -52,7 +52,7 @@ data class DockItem(
 
 /**
  * Lucento's persistent navigation dock: the primary destinations either side of the central **+ Add transaction**
- * button (Home · Transactions · + · Insights · Budgets).
+ * button (Home · Transactions · + · Insights · Wallets).
  *
  * The dock floats with rounded corners; the + is a raised brand-blue circle that breaks its top edge, so transaction
  * entry reads as the one central action rather than another destination. Every tab shows its label (the selected one
@@ -124,7 +124,7 @@ private val AddRise = 14.dp
 /** The raised central + with a soft brand-tinted shadow. */
 @Composable
 private fun AddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val primary = MaterialTheme.colorScheme.primary
+    val (primary, onPrimary) = com.lucento.app.core.designsystem.component.addActionColors()
     Box(
         modifier
             .size(AddSize)
@@ -135,7 +135,7 @@ private fun AddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .semantics { contentDescription = "Add transaction" },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(30.dp))
+        Icon(Icons.Filled.Add, contentDescription = null, tint = onPrimary, modifier = Modifier.size(30.dp))
     }
 }
 

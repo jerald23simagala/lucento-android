@@ -732,7 +732,17 @@ private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAtten
                                 )
                             }
                         }
+                        androidx.compose.foundation.layout.Column {
                         Text(text, style = MaterialTheme.typography.bodyMedium, modifier = live)
+                        // Who read it, whenever it isn't plain on-device reading: Gemini, or this phone with the reason.
+                        s.engine?.takeIf { !it.onDevice || it.label.contains("·") }?.let { engine ->
+                            Text(
+                                if (engine.onDevice) "Read on this phone — ${engine.label.substringAfter("· ")}" else "Read by ${engine.label}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        }
                     }
                 }
             }

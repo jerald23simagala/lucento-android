@@ -63,6 +63,7 @@ import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.NavRow
 import com.lucento.app.core.designsystem.component.SwitchRow
+import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.SectionHeader
@@ -105,6 +106,7 @@ fun SettingsScreen(
                 },
                 onPickCurrency = { pickingCurrency = true },
                 onFeature = viewModel::setFeatureEnabled,
+                onSmartReading = viewModel::setSmartReading,
                 onExport = {
                     exportMessage = null
                     exporter.launch("lucento-transactions-${LocalDate.now()}.csv")
@@ -203,6 +205,7 @@ private fun SettingsContent(
     onThemeMode: (ThemeMode) -> Unit,
     onPickCurrency: () -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
+    onSmartReading: (Boolean) -> Unit,
     onExport: () -> Unit,
     exportMessage: String?,
     onConnectGoogle: () -> Unit,
@@ -271,6 +274,12 @@ private fun SettingsContent(
         EnabledFeaturesSection(current, onFeature)
 
         CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail)
+
+        SmartReadingSection(
+            on = prefs.smartReading,
+            signedIn = current.cloudSync.signedInEmail != null,
+            onChange = onSmartReading,
+        )
 
         SectionHeader("Your data", Modifier.padding(top = Spacing.section))
         NavRow(
@@ -501,5 +510,40 @@ private fun Fact(icon: ImageVector, title: String, body: String) {
             Spacer(Modifier.height(Spacing.xxs))
             Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+/**
+ * Smarter reading (opt-in, off by default): typed and spoken messages are read by Gemini through Lucento's server.
+ * Turning it on always goes through a dialog that says what is sent and where; it needs a sync account, which carries
+ * the daily allowance. Receipts are always read on this phone, and so is everything when this is off or unreachable.
+ */
+@Composable
+private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boolean) -> Unit) {
+    var asking by remember { mutableStateOf(false) }
+    SectionHeader("Smarter reading", Modifier.padding(top = Spacing.section))
+    SwitchRow(
+        title = "Read messages with Gemini",
+        checked = on,
+        onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
+        enabled = signedIn || on,
+        description = "Better at messy, multi-item messages. Off or offline, Lucento reads them on this phone as before.",
+        note = if (!signedIn) "Connect a sync account above first — it keeps your daily allowance." else null,
+    )
+    if (asking) {
+        ConfirmDialog(
+            title = "Send messages to Gemini?",
+            text = "When you type or speak in the composer, Lucento sends that message, today’s date, your main currency " +
+                "and the names of your categories and accounts to Lucento’s server, which asks Google’s Gemini to read it. " +
+                "Balances and your history are not sent. Google processes the text under the Gemini API terms. Each " +
+                "account has a daily allowance; after it, reading happens on this phone. You review every row before " +
+                "anything is saved, receipts are still read on this phone, and you can turn this off at any time.",
+            confirmLabel = "Turn on",
+            onConfirm = {
+                asking = false
+                onChange(true)
+            },
+            onDismiss = { asking = false },
+        )
     }
 }

@@ -1,5 +1,6 @@
 package com.lucento.app.feature.home
 
+import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -371,10 +372,27 @@ private fun Overview(
 ) {
     val f = state.features
     Column {
-        MonthPill(state, onSelectMonth)
-        Spacer(Modifier.height(Spacing.md))
         val plan = state.budget
         val burn = state.burn
+        // The month pill, with Lucento beside it as a mood indicator for the month's budget pace.
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val roomForBubble = maxWidth >= 320.dp
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MonthPill(state, onSelectMonth)
+                Spacer(Modifier.weight(1f))
+                if (plan != null && burn != null) {
+                    val mood = remember(plan, burn, state.isCurrentMonth, state.expenseCategoryCount) { budgetMood(state, plan, burn) }
+                    if (roomForBubble) SpeechBubble(mood.bubble, Modifier.widthIn(max = 168.dp), pointRight = true)
+                    LucentoMascot(
+                        size = 48.dp,
+                        mood = mood.mood,
+                        tier = mood.tier,
+                        contentDescription = if (mood.mood == MascotMood.Concerned) "Lucento, gently concerned, says: ${mood.bubble}" else "Lucento says: ${mood.bubble}",
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(Spacing.sm))
         if (plan != null && burn != null) {
             MonthlyBudgetCard(state, plan, burn, actions)
         } else {
@@ -464,22 +482,23 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
     val setupNeeded = state.expenseCategoryCount == 0
     val insight = remember(plan, burn, state.isCurrentMonth) { PaceCopy.describe(plan, burn, monthName, state.isCurrentMonth) }
     val tones = paceTones(insight.position)
-    val ahead = insight.position == PacePosition.AHEAD
-    val mood = when {
-        setupNeeded || !plan.hasBudget -> MascotMood.Curious
-        ahead || plan.health.isConcerning -> MascotMood.Concerned
-        else -> MascotMood.Happy
-    }
-    val tier = if (plan.hasBudget) WellnessTier.of(plan.health, aheadOfPace = ahead, overspent = plan.remaining.isNegative) else WellnessTier.STEADY
     val open = if (setupNeeded) actions.onChooseCategories else actions.onOpenBudget
-    val bubble = if (setupNeeded) "Pick your spending categories first." else insight.bubble
     val elapsedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
 
     LucentoCard(Modifier.fillMaxWidth(), onClick = open, contentPadding = 0.dp) {
+      Box(Modifier.background(tones.card)) {
+        // The sunrise, barely there: a warm hint behind the figures, never competing with them.
+        Image(
+            painter = painterResource(com.lucento.app.core.designsystem.component.LucentoIllustration.SunriseLandscape.res),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.BottomCenter,
+            alpha = if (LucentoTheme.isDark) 0.10f else 0.14f,
+            modifier = Modifier.matchParentSize(),
+        )
         // Compact by design: the dashboard should show everything at a glance with little scrolling.
-        Column(Modifier.background(tones.card).padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val showBubble = maxWidth >= 300.dp
+        Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
+            run {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         LinkedTitle("Monthly budget")
@@ -502,13 +521,6 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                             }
                         }
                     }
-                    LucentoMascot(
-                        size = 52.dp,
-                        mood = mood,
-                        tier = tier,
-                        contentDescription = if (mood == MascotMood.Concerned) "Lucento, gently concerned, says: $bubble" else "Lucento says: $bubble",
-                    )
-                    if (showBubble) SpeechBubble(bubble, Modifier.widthIn(max = 112.dp))
                 }
             }
 
@@ -540,7 +552,8 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
 
             Spacer(Modifier.height(Spacing.sm))
             AdviceBanner(
-                text = if (setupNeeded) "Choose the categories you spend on — your budget is built from them." else insight.message,
+                text = if (setupNeeded) "Choose the categories you spend on" else insight.message,
+                detail = if (setupNeeded) "Your budget is built from them" else insight.detail,
                 tones = tones,
                 onClick = open,
             )
@@ -554,26 +567,49 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                 )
             }
         }
+      }
     }
+}
+
+/** Lucento's mood for the month's budget: the mascot's expression, wellness tier and speech bubble. */
+private class BudgetMood(val mood: MascotMood, val tier: WellnessTier, val bubble: String)
+
+private fun budgetMood(state: HomeUiState, plan: BudgetPlan, burn: BudgetBurn): BudgetMood {
+    val setupNeeded = state.expenseCategoryCount == 0
+    val insight = PaceCopy.describe(plan, burn, monthLabel(plan.month), state.isCurrentMonth)
+    val ahead = insight.position == PacePosition.AHEAD
+    val mood = when {
+        setupNeeded || !plan.hasBudget -> MascotMood.Curious
+        ahead || plan.health.isConcerning -> MascotMood.Concerned
+        else -> MascotMood.Happy
+    }
+    val tier = if (plan.hasBudget) WellnessTier.of(plan.health, aheadOfPace = ahead, overspent = plan.remaining.isNegative) else WellnessTier.STEADY
+    return BudgetMood(mood, tier, if (setupNeeded) "Pick your spending categories first." else insight.bubble)
 }
 
 /** Lucento's speech bubble, pointing at the mascot on its left. Read out through the mascot's own label. */
 @Composable
-private fun SpeechBubble(text: String, modifier: Modifier = Modifier) {
+private fun SpeechBubble(text: String, modifier: Modifier = Modifier, pointRight: Boolean = false) {
     val surface = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLowest
     val outline = LucentoTheme.extendedColors.borderDefault
-    Row(modifier.clearAndSetSemantics { }, verticalAlignment = Alignment.Top) {
-        Canvas(Modifier.padding(top = 18.dp).size(width = 7.dp, height = 12.dp)) {
+    val tail: @Composable () -> Unit = {
+        Canvas(Modifier.size(width = 7.dp, height = 12.dp)) {
+            // The tail points at the mascot: from the bubble's edge to a tip on the mascot's side.
+            val base = if (pointRight) 0f else size.width
+            val tip = size.width - base
             val path = Path().apply {
-                moveTo(size.width, 0f)
-                lineTo(0f, size.height / 2)
-                lineTo(size.width, size.height)
+                moveTo(base, 0f)
+                lineTo(tip, size.height / 2)
+                lineTo(base, size.height)
                 close()
             }
             drawPath(path, surface)
-            drawLine(outline, Offset(size.width, 0f), Offset(0f, size.height / 2))
-            drawLine(outline, Offset(0f, size.height / 2), Offset(size.width, size.height))
+            drawLine(outline, Offset(base, 0f), Offset(tip, size.height / 2))
+            drawLine(outline, Offset(tip, size.height / 2), Offset(base, size.height))
         }
+    }
+    Row(modifier.clearAndSetSemantics { }, verticalAlignment = Alignment.CenterVertically) {
+        if (!pointRight) tail()
         Text(
             text,
             style = MaterialTheme.typography.labelMedium,
@@ -583,6 +619,7 @@ private fun SpeechBubble(text: String, modifier: Modifier = Modifier) {
                 .border(BorderStroke(1.dp, outline), RoundedCornerShape(12.dp))
                 .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
         )
+        if (pointRight) tail()
     }
 }
 
@@ -662,7 +699,7 @@ private fun StatDivider() {
 
 /** The verdict as advice, with a glyph that matches it (up / check / info) and a way into the Budgets tab. */
 @Composable
-private fun AdviceBanner(text: String, tones: PaceTones, onClick: () -> Unit) {
+private fun AdviceBanner(text: String, detail: String?, tones: PaceTones, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -679,9 +716,14 @@ private fun AdviceBanner(text: String, tones: PaceTones, onClick: () -> Unit) {
         ) {
             Icon(tones.icon, contentDescription = null, tint = tones.banner.content, modifier = Modifier.size(18.dp))
         }
-        Spacer(Modifier.width(Spacing.md))
-        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(Spacing.sm))
+        // Two one-liners: the verdict, then the daily allowance that keeps the month on budget.
+        Column(Modifier.weight(1f)) {
+            Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (detail != null) {
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 
@@ -723,10 +765,11 @@ private fun CashFlowCard(state: HomeUiState, onOpenInsights: (() -> Unit)?) {
 private fun NetWorthAndQuickLinks(state: HomeUiState, composition: NetWorthComposition, actions: HomeActions) {
     val f = state.features
     val links = buildList {
-        if (f.isEnabled(Feature.SAVINGS_GOALS)) add(QuickLink("Savings goals", "Savings goals", Icons.Outlined.Savings, actions.onOpenGoals))
+        if (f.isEnabled(Feature.SAVINGS_GOALS)) add(QuickLink("Goals", "Savings goals", Icons.Outlined.Savings, actions.onOpenGoals))
         if (f.isEnabled(Feature.RECURRING)) add(QuickLink("Scheduled", "Scheduled transactions", Icons.Outlined.EventRepeat) { actions.onOpenRecurring(null) })
-        if (f.isEnabled(Feature.DEBTS_LOANS)) add(QuickLink("Debts & loans", "Debts and loans", Icons.Outlined.CreditCard, actions.onOpenDebts))
-        add(QuickLink("Wallets", "Wallets", Icons.Outlined.AccountBalanceWallet, actions.onOpenWallets))
+        if (f.isEnabled(Feature.DEBTS_LOANS)) add(QuickLink("Debts", "Debts and loans", Icons.Outlined.CreditCard, actions.onOpenDebts))
+        // Wallets has its own place in the dock; Budgets opens from here.
+        if (f.isEnabled(Feature.BUDGETS)) add(QuickLink("Budgets", "Budgets", Icons.Outlined.PieChart, actions.onOpenBudget))
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         if (maxWidth >= 300.dp) {

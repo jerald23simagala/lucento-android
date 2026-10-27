@@ -39,6 +39,9 @@ interface BudgetDao {
 
     // --- cloud sync (see docs/SYNC.md); unused unless the user has opted in ---
 
+    @Query("SELECT * FROM budgets WHERE category_id = :categoryId ORDER BY id ASC")
+    suspend fun getForCategory(categoryId: Long): List<BudgetEntity>
+
     @Query("SELECT * FROM budgets WHERE dirty = 1")
     suspend fun getDirty(): List<BudgetEntity>
 

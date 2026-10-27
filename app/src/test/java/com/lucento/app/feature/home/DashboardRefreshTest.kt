@@ -77,11 +77,11 @@ class DashboardRefreshTest {
             .let { PaceCopy.describe(it, BudgetPlanner.burn(it, LocalDate.parse("2026-06-16")), "June", isCurrentMonth = true) }
         val ahead = insight(68_000)
         assertEquals(PacePosition.AHEAD, ahead.position)
-        assertEquals("You’re ahead of the month. Let’s slow down!", ahead.bubble)
-        assertTrue(ahead.message.startsWith("You’re spending faster than the month progression."))
-        assertTrue(ahead.message.contains("a day keeps you within budget")) // the daily allowance from the same plan
-        assertEquals("You’re on track! Keep it up!", insight(55_000).bubble)
-        assertTrue(insight(30_000).message.startsWith("You’re spending slower than the month progression."))
+        assertEquals("Ahead of the month. Let’s slow down!", ahead.bubble)
+        assertEquals("Spending faster than the month", ahead.message)
+        assertTrue(ahead.detail!!.endsWith("a day keeps you within budget")) // the daily allowance from the same plan
+        assertEquals("On track! Keep it up!", insight(55_000).bubble)
+        assertEquals("Spending slower than the month", insight(30_000).message)
         val over = insight(112_500)
         assertEquals("Over budget. Let’s regroup!", over.bubble)
         assertTrue(over.message, over.message.contains("$125.00 over your $1,000.00 budget with 14 days left"))

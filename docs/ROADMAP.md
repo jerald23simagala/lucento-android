@@ -113,6 +113,10 @@ recurring-schedule sync, syncing preferences.
   indicator; 30 s sync request timeout with one retry; loan history shows each payment's principal and its interest
   apart (`DebtPaymentLink`); New wallet live card preview; type icons on every wallet pill; compact goal cards;
   smaller dashboard hero and raised Quick links; themed onboarding text in dark mode.
+- Guided setup after onboarding (accounts → cards & loans → two budget amounts → a goal → first transactions →
+  welcome); Wallets in the dock, Budgets in Quick links; Add actions in the top bar (sunlight at night); duplicate
+  categories from two setups on one sync account merge automatically; opt-in Smarter reading with Gemini through the
+  website proxy, with a per-user daily limit (docs/CAPTURE.md).
 - Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull. Older installs also read balance adjustments as expenses after a sync pull.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)

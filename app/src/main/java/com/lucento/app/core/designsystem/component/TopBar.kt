@@ -1,5 +1,6 @@
 package com.lucento.app.core.designsystem.component
 
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -97,5 +98,40 @@ fun BackPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
         Box(Modifier.width(52.dp).heightIn(min = 40.dp), contentAlignment = Alignment.Center) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(22.dp))
         }
+    }
+}
+
+/**
+ * A page's add action, always in its top bar's trailing corner (Wallets, Goals, Debts, Recurring): a pill with a plus
+ * and a short label. Brand blue in the light theme; sunlight yellow at night, where it stands out on navy.
+ */
+@Composable
+fun AddPillButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, contentDescription: String = label) {
+    val (container, content) = addActionColors()
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = container,
+        contentColor = content,
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .semantics { this.contentDescription = contentDescription; role = Role.Button },
+    ) {
+        Row(Modifier.heightIn(min = 36.dp).padding(start = Spacing.sm, end = Spacing.md), verticalAlignment = Alignment.CenterVertically) {
+            Icon(androidx.compose.material.icons.Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(Spacing.xxs))
+            Text(label, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+/** The colours of add actions (the Add pill and the dock's + button): primary by day, sunlight by night. */
+@Composable
+fun addActionColors(): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> {
+    val ext = com.lucento.app.core.designsystem.theme.LucentoTheme.extendedColors
+    return if (com.lucento.app.core.designsystem.theme.LucentoTheme.isDark) {
+        ext.accent to ext.onAccent
+    } else {
+        MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
     }
 }

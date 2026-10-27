@@ -82,6 +82,13 @@ class ScreenshotTourTest {
         compose.waitForIdle()
     }
 
+    /** Budgets lives in Home's Quick links. */
+    private fun openBudgets() {
+        tab("Home")
+        compose.onNodeWithContentDescription("Budgets").performScrollTo().performClick()
+        compose.waitForIdle()
+    }
+
     private fun tab(label: String) {
         compose.onNodeWithContentDescription(label).performClick()
         compose.waitForIdle()
@@ -153,6 +160,12 @@ class ScreenshotTourTest {
         waitForText("You’re all set")
         shot("04-onboarding-confirm")
         click("Start using Lucento")
+
+        // ---------------------------------------------------------------- guided setup (first page), then Home
+        waitForText("Add your accounts")
+        shot("04b-guide-accounts")
+        // The tour seeds its own data below, so it ends the guide here the way "Go to Home" does.
+        runBlocking { container.preferences.setGuideStep(null) }
 
         // ---------------------------------------------------------------- empty dashboard
         waitForText("Let’s set up your money")
@@ -271,24 +284,24 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         tab("Home")
-        // Wallets open from Quick links (or the Net worth card); the dock is Home · Transactions · + · Insights · Budgets.
-        compose.onNodeWithContentDescription("Wallets").performScrollTo().performClick()
+        // The dock is Home · Transactions · + · Insights · Wallets; Budgets opens from Home's Quick links.
+        tab("Wallets")
         waitForText("Assets")
         shot("12-wallets")
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.waitForIdle()
         tab("Insights")
         waitForText("Income and expenses")
         shot("13-insights-trends")
         runCatching { compose.onNodeWithText("Savings goals aren’t added here", substring = true).performScrollTo() }
         shot("14-insights-net-worth")
-        tab("Budgets")
+        openBudgets()
         waitForText("left of $total")
         shot("15-budget")
         compose.onNodeWithContentDescription("Manage categories").performClick()
         compose.waitForIdle()
         waitForText("Active", substring = true)
         shot("16-manage-categories")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
 
@@ -315,8 +328,10 @@ class ScreenshotTourTest {
         waitForText("Monthly budget")
         runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
         shot("20-home-dark")
-        tab("Budgets")
+        openBudgets()
         shot("21-budget-dark")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
         tab("Home")
 
         // ---------------------------------------------------------------- almost used: Lucento turns supportively concerned

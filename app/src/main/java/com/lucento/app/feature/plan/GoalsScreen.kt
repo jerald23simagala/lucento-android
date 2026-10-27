@@ -130,6 +130,21 @@ private data class GoalDraft(
     val photoPath: String? = null,
 )
 
+/** The new-goal sheet on its own, for the guided setup; [onDismiss] runs when it closes, saved or not. */
+@Composable
+internal fun NewGoalSheet(currencyCode: String, onDismiss: () -> Unit, viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory)) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current.applicationContext
+    val photos = remember(context) { GoalPhotos(context) }
+    GoalEditorSheet(
+        initial = GoalDraft(currencyCode = currencyCode),
+        state = state,
+        photos = photos,
+        onSave = { d, money, done -> viewModel.saveGoal(d.id, d.name, money, d.targetDate, d.walletId, d.sceneKey, d.photoPath, done) },
+        onDismiss = onDismiss,
+    )
+}
+
 /** Savings goals with progress from earmarked contributions (wallet balances are never changed). */
 @Composable
 fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory)) {
@@ -148,7 +163,17 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
         ) {
-            item(key = "bar") { LucentoTopBar(title = "Savings goals", onBack = onBack) }
+            item(key = "bar") {
+                LucentoTopBar(title = "Goals", onBack = onBack, actions = {
+                    if (state.goals.isNotEmpty()) {
+                        com.lucento.app.core.designsystem.component.AddPillButton(
+                            "Add",
+                            onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
+                            contentDescription = "Add goal",
+                        )
+                    }
+                })
+            }
             if (!state.loading && state.goals.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
@@ -174,17 +199,6 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                     InfoNote("Adding money to a goal sets it aside on paper — your wallet balances and net worth don’t change, so savings are never counted twice.")
                 }
             }
-        }
-        if (state.goals.isNotEmpty()) {
-            ExtendedFloatingActionButton(
-                onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Add goal") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.gutter),
-            )
         }
         ConfirmationHost(confirmation = celebration, onDismissed = { celebration = null })
     }

@@ -98,6 +98,14 @@ class FakeCategoryDao : CategoryDao {
 
     override suspend fun budgetCount(id: Long) = budgets?.rows?.value?.count { it.categoryId == id } ?: 0
 
+    override suspend fun moveTransactions(from: Long, to: Long, now: Long) {
+        transactions?.rows?.let { r -> r.value = r.value.map { if (it.categoryId == from) it.copy(categoryId = to, updatedAt = now, dirty = true) else it } }
+    }
+
+    override suspend fun moveRecurring(from: Long, to: Long, now: Long) {
+        recurring?.rows?.let { r -> r.value = r.value.map { if (it.categoryId == from) it.copy(categoryId = to, updatedAt = now, dirty = true) else it } }
+    }
+
     override suspend fun recurringCount(id: Long) = recurring?.rows?.value?.count { it.categoryId == id } ?: 0
 
     override suspend fun insert(category: CategoryEntity): Long {
@@ -231,6 +239,8 @@ class FakeBudgetDao : BudgetDao {
         rows.value = rows.value.filterNot { it.categoryId == null }
         return before - rows.value.size
     }
+
+    override suspend fun getForCategory(categoryId: Long) = rows.value.filter { it.categoryId == categoryId }.sortedBy { it.id }
 
     override suspend fun getDirty() = rows.value.filter { it.dirty }
 

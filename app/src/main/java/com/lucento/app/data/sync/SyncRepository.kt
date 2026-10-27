@@ -2,6 +2,7 @@ package com.lucento.app.data.sync
 
 import com.lucento.app.data.local.BudgetDao
 import com.lucento.app.data.local.BudgetEntity
+import com.lucento.app.domain.CategoryDedup
 import com.lucento.app.data.local.CategoryDao
 import com.lucento.app.data.local.CategoryEntity
 import com.lucento.app.data.local.DebtTermsDao
@@ -96,6 +97,14 @@ class SyncRepository(
             report += pushGoalContributions(r, userId, rejected)
 
             report += pull(r, userId, rejected)
+            // Copies of one category from two setups on this account fold into one; the merge's edits go up now.
+            if (mergeDuplicateCategories() > 0) {
+                val again = Rejected()
+                report += pushTombstones(r, userId, again)
+                report += pushBudgets(r, userId, again)
+                report += pushTransactions(r, userId, again)
+                report += pushRecurring(r, userId, again)
+            }
             preferences.setLastSyncedAtMillis(clock())
             preferences.clearLastError()
             SyncResult.Success(report)
@@ -133,6 +142,32 @@ class SyncRepository(
             val id = if (categories.findByClientUuid(seedId) == null) seedId else UUID.randomUUID().toString()
             categories.assignClientUuid(category.id, id)
         }
+    }
+
+    /**
+     * Folds duplicate categories ([CategoryDedup]): each copy's transactions, recurring schedules and budget amount move
+     * to the keeper, then the copy is deleted — its tombstone tells the other devices. Returns how many copies merged.
+     */
+    private suspend fun mergeDuplicateCategories(): Int {
+        val plan = CategoryDedup.plan(categories.getAll().map { CategoryDedup.Candidate(it.id, it.kind, it.name, it.archived, it.clientUuid) })
+        if (plan.isEmpty()) return 0
+        val now = clock()
+        plan.forEach { (copy, keeper) ->
+            categories.moveTransactions(copy, keeper, now)
+            categories.moveRecurring(copy, keeper, now)
+            budgets.getForCategory(copy).forEach { moved ->
+                val existing = budgets.findAllocation(keeper, moved.currencyCode)
+                if (existing == null) {
+                    budgets.update(moved.copy(categoryId = keeper, updatedAt = now))
+                } else {
+                    val limit = CategoryDedup.mergedLimit(existing.limitMinor, moved.limitMinor)
+                    if (limit != existing.limitMinor) budgets.update(existing.copy(limitMinor = limit, updatedAt = now))
+                    budgets.deleteById(moved.id)
+                }
+            }
+            categories.deleteById(copy)
+        }
+        return plan.size
     }
 
     // --- push ---

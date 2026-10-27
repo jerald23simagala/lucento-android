@@ -51,6 +51,8 @@ fun ConnectAccountPanel(
     onGoogle: () -> Unit,
     onEmail: (email: String, password: String, mode: EmailMode) -> Unit,
     modifier: Modifier = Modifier,
+    /** The user chose email: a chance to open the server connection while they type (see AuthRepository.prewarm). */
+    onPrepareEmail: () -> Unit = {},
 ) {
     var usingEmail by rememberSaveable { mutableStateOf(!googleAvailable) }
     var mode by rememberSaveable { mutableStateOf(EmailMode.CREATE) }
@@ -76,7 +78,10 @@ fun ConnectAccountPanel(
             LucentoPrimaryButton(text = "Continue with Google", onClick = onGoogle)
         }
         if (!usingEmail) {
-            LucentoSecondaryButton(text = "Use email instead", onClick = { usingEmail = true })
+            LucentoSecondaryButton(text = "Use email instead", onClick = {
+                usingEmail = true
+                onPrepareEmail()
+            })
             return@Column
         }
         SegmentedToggle(

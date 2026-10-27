@@ -66,6 +66,13 @@ interface CategoryDao {
     suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
 
     /** Fresh-install seed categories (CategorySeed must stay valid at every schema version, so it can't set one). */
+    /** Re-points a merged category's transactions to its keeper ([com.lucento.app.domain.CategoryDedup]); they sync as edits. */
+    @Query("UPDATE transactions SET category_id = :to, updated_at = :now WHERE category_id = :from")
+    suspend fun moveTransactions(from: Long, to: Long, now: Long)
+
+    @Query("UPDATE recurring SET category_id = :to, updated_at = :now WHERE category_id = :from")
+    suspend fun moveRecurring(from: Long, to: Long, now: Long)
+
     @Query("SELECT * FROM categories WHERE client_uuid IS NULL")
     suspend fun getWithoutClientUuid(): List<CategoryEntity>
 

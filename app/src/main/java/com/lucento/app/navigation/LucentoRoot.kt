@@ -1,5 +1,8 @@
 package com.lucento.app.navigation
 
+import com.lucento.app.feature.guide.GuideScreen
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -112,6 +115,8 @@ import kotlin.reflect.KClass
 @Serializable data object WalletsRoute
 @Serializable data object InsightsRoute
 @Serializable data object BudgetRoute
+/** The guided setup after onboarding (wallets, debts, budget, goal, first transactions, welcome). */
+@Serializable data object GuideRoute
 
 // Secondary destinations, pushed on top of the current tab; the dock stays visible.
 @Serializable data class WalletDetailRoute(val walletId: Long)
@@ -147,26 +152,27 @@ const val NO_WALLET = -1L
 private data class Tab(val item: DockItem, val route: Any)
 
 /**
- * The navigation dock: Home · Transactions · (+) · Insights · Budgets, with the transaction-entry button in the centre.
- * Insights and Budgets leave the dock when the user switches those modules off (their data is kept). Wallets, goals,
- * scheduled transactions, debts and categories open from Home's Net worth card.
+ * The navigation dock: Home · Transactions · (+) · Insights · Wallets, with the transaction-entry button in the centre.
+ * Insights leaves the dock when the user switches it off (its data is kept). Budgets, goals, scheduled transactions
+ * and debts open from Home's Quick links; categories from Budgets.
  */
 private fun tabs(features: FeatureSet): List<Tab> = listOfNotNull(
     Tab(DockItem("home", "Home", Icons.Outlined.Home, Icons.Filled.Home), HomeRoute),
     Tab(DockItem("transactions", "Transactions", Icons.AutoMirrored.Outlined.ReceiptLong, Icons.AutoMirrored.Filled.ReceiptLong), TransactionsRoute),
     if (features.isEnabled(Feature.INSIGHTS)) Tab(DockItem("insights", "Insights", Icons.Outlined.Insights, Icons.Filled.Insights), InsightsRoute) else null,
-    if (features.isEnabled(Feature.BUDGETS)) Tab(DockItem("budget", "Budgets", Icons.Outlined.PieChart, Icons.Filled.PieChart), BudgetRoute) else null,
+    Tab(DockItem("wallets", "Wallets", Icons.Outlined.AccountBalanceWallet, Icons.Filled.AccountBalanceWallet), WalletsRoute),
 )
 
 private val PrimaryRoutes: List<Pair<String, KClass<out Any>>> = listOf(
     "home" to HomeRoute::class,
     "transactions" to TransactionsRoute::class,
     "insights" to InsightsRoute::class,
-    "budget" to BudgetRoute::class,
+    "wallets" to WalletsRoute::class,
 )
 
 /** Workflows that take the whole screen (capture, category setup, settings): the dock steps aside. */
 private val FocusedRoutes: List<KClass<out Any>> = listOf(
+    GuideRoute::class,
     CategorySetupRoute::class,
     SettingsRoute::class,
     FeaturesRoute::class,
@@ -259,14 +265,14 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     // A tab whose module is switched off while it is showing returns to Home rather than show a hidden module.
     LaunchedEffect(features) {
         val key = navController.currentDestination.primaryKey()
-        if ((key == "insights" && !features.isEnabled(Feature.INSIGHTS)) || (key == "budget" && !features.isEnabled(Feature.BUDGETS))) {
+        if (key == "insights" && !features.isEnabled(Feature.INSIGHTS)) {
             navigateTo(HomeRoute)
         }
     }
 
     fun requireWallets(): Boolean {
         if (editorState.loaded && editorState.wallets.isEmpty()) {
-            push(WalletsRoute)
+            navigateTo(WalletsRoute)
             notify("Add a wallet first — every transaction belongs to one.")
             return false
         }
@@ -276,7 +282,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     fun openTransfer(from: Long? = null, to: Long? = null) {
         if (!requireWallets()) return
         if (editorState.loaded && editorState.wallets.size < 2) {
-            push(WalletsRoute)
+            navigateTo(WalletsRoute)
             notify("Add a second account to move money between them.")
             return
         }
@@ -305,6 +311,17 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     }
 
     val enableFeature: (Feature) -> Unit = { appViewModel.setFeatureEnabled(it, true) }
+
+    // A new user's guided setup opens over Home and resumes there until it is finished.
+    val guidePending = preferences.guideStep != null
+    // Keyed on the destination too: when a step's work (the composer) ends on a tab, the guide comes back over it.
+    LaunchedEffect(guidePending, backStackEntry?.destination?.route) {
+        val onGuide = navController.currentDestination?.hasRoute(GuideRoute::class) == true
+        val onTab = navController.currentDestination.primaryKey() != null
+        if (guidePending && !onGuide && (onTab || navController.currentDestination == null)) push(GuideRoute)
+        // Finished elsewhere (or by a restore): the guide steps aside.
+        if (!guidePending && onGuide) navController.popBackStack(GuideRoute, inclusive = true)
+    }
     val back: () -> Unit = { navController.popBackStack() }
     val focused = currentDestination.isFocused()
 
@@ -352,15 +369,24 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     enterTransition = { if (reducedMotion) fadeIn(tween(0)) else fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.985f) },
                     exitTransition = { fadeOut(tween(if (reducedMotion) 0 else 120)) },
                 ) {
+                    composable<GuideRoute> {
+                        GuideScreen(
+                            onRecordTransactions = { openComposer() },
+                            onFinished = {
+                                navController.popBackStack(GuideRoute, inclusive = true)
+                                navigateTo(HomeRoute)
+                            },
+                        )
+                    }
                     composable<HomeRoute> {
                         HomeScreen(
                             actions = HomeActions(
-                                onOpenBudget = { navigateTo(BudgetRoute) },
+                                onOpenBudget = { push(BudgetRoute) },
                                 onChooseCategories = { push(CategorySetupRoute) },
                                 onOpenInsights = { navigateTo(InsightsRoute) },
                                 onOpenGoals = { push(GoalsRoute) },
                                 onOpenRecurring = { id -> push(RecurringRoute(id ?: NO_SCHEDULE)) },
-                                onOpenWallets = { push(WalletsRoute) },
+                                onOpenWallets = { navigateTo(WalletsRoute) },
                                 onOpenDebts = { push(DebtsRoute) },
                                 onOpenSettings = { push(SettingsRoute) },
                             ),
@@ -374,14 +400,14 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onDeleteTransaction = { t ->
                                 editorViewModel.delete(t.id) { notify(if (t.isTransfer) "Transfer deleted" else "Transaction deleted") }
                             },
-                            onAddWallet = { push(WalletsRoute) },
+                            onAddWallet = { navigateTo(WalletsRoute) },
                             onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
                             onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ openComposer(ComposerStart.SPEAK) }) else null,
                         )
                     }
-                    pushed<WalletsRoute>(reducedMotion) {
+                    composable<WalletsRoute> {
                         WalletsScreen(
-                            onBack = back,
+                            onBack = null,
                             onOpenWallet = { push(WalletDetailRoute(it)) },
                             allowAdding = features.isEnabled(Feature.MULTIPLE_WALLETS),
                             onPlanDebtPayment = planDebtPayment,
@@ -392,9 +418,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     composable<InsightsRoute> {
                         Gated(Feature.INSIGHTS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) { InsightsScreen() }
                     }
-                    composable<BudgetRoute> {
-                        Gated(Feature.BUDGETS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) {
+                    pushed<BudgetRoute>(reducedMotion) {
+                        Gated(Feature.BUDGETS, features, enableFeature, back) {
                             BudgetScreen(
+                                onBack = back,
                                 onChooseCategories = { push(CategorySetupRoute) },
                                 onManageCategories = { push(CategoriesRoute) },
                             )
@@ -516,7 +543,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 selectedTab = "transactions"
                                 navigateTo(TransactionsRoute)
                             },
-                            onAddWallet = { push(WalletsRoute) },
+                            onAddWallet = { navigateTo(WalletsRoute) },
                             voiceEnabled = features.isEnabled(Feature.VOICE_ENTRY),
                             scanEnabled = features.isEnabled(Feature.RECEIPT_SCANNING),
                             transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),

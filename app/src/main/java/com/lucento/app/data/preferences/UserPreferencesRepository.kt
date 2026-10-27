@@ -43,6 +43,13 @@ data class UserPreferences(
      * chosen; the composer then asks. May point at a wallet that no longer exists — readers check it against the list.
      */
     val defaultWalletId: Long? = null,
+    /**
+     * Smarter reading: typed messages are read by Gemini through Lucento's proxy. Off by default, turned on only by the
+     * user after the consent dialog in Settings; nothing is sent to a model while it is off.
+     */
+    val smartReading: Boolean = false,
+    /** Where the guided setup after onboarding stands; null when finished or never started (older installs). */
+    val guideStep: com.lucento.app.domain.GuideStep? = null,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
@@ -58,6 +65,8 @@ class UserPreferencesRepository(private val context: Context) {
         val displayName = stringPreferencesKey("display_name")
         val categorySetupDone = booleanPreferencesKey("category_setup_done")
         val defaultWalletId = longPreferencesKey("default_wallet_id")
+        val guideStep = stringPreferencesKey("guide_step")
+        val smartReading = booleanPreferencesKey("smart_reading")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -79,6 +88,8 @@ class UserPreferencesRepository(private val context: Context) {
                 displayName = p[Keys.displayName]?.trim()?.takeIf { it.isNotEmpty() },
                 categorySetupDone = p[Keys.categorySetupDone] ?: false,
                 defaultWalletId = p[Keys.defaultWalletId],
+                guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
+                smartReading = p[Keys.smartReading] ?: false,
             )
         }
 
@@ -93,7 +104,18 @@ class UserPreferencesRepository(private val context: Context) {
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
             it[Keys.categorySetupDone] = true
             it[Keys.onboardingComplete] = true
+            // A new user continues into the guided setup (wallets, budget, goal, first transactions).
+            it[Keys.guideStep] = com.lucento.app.domain.GuideStep.WALLETS.key
         }
+    }
+
+    suspend fun setSmartReading(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.smartReading] = enabled }
+    }
+
+    /** Saves the guided setup's progress; null when it is finished (or was never started, as for older installs). */
+    suspend fun setGuideStep(step: com.lucento.app.domain.GuideStep?) {
+        context.dataStore.edit { if (step == null) it.remove(Keys.guideStep) else it[Keys.guideStep] = step.key }
     }
 
     suspend fun setCategorySetupDone(done: Boolean) {

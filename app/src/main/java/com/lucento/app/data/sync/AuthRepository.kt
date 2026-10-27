@@ -28,6 +28,7 @@ import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
@@ -92,6 +93,8 @@ class AuthRepository(private val client: SupabaseClient?) {
                 .setNonce(hashedNonce)
                 .build()
             val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
+            // While the user picks an account, open the connection to the sync server so the token exchange is quick.
+            prewarm()
             val credential = CredentialManager.create(activity).getCredential(activity, request).credential
             if (credential !is CustomCredential || credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 return SignInResult.Failed(signInFailureMessage(IllegalStateException("Unexpected credential type"), BuildConfig.DEBUG))
@@ -154,6 +157,29 @@ class AuthRepository(private val client: SupabaseClient?) {
         SignInResult.Failed(signInFailureMessage(e, BuildConfig.DEBUG))
     }
 
+    private val warmScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    /**
+     * Opens the connection to the sync server ahead of sign-in (DNS, TLS), so the first real request isn't the slow
+     * one. Called only once the user has chosen to connect an account — never before. Sends no personal data: an
+     * unauthenticated health check carrying only the app's publishable key. Failures are ignored.
+     */
+    fun prewarm() {
+        if (client == null || !SupabaseModule.isConfigured) return
+        warmScope.launch {
+            runCatching {
+                val url = java.net.URL(BuildConfig.SUPABASE_URL.trimEnd('/') + "/auth/v1/health")
+                (url.openConnection() as java.net.HttpURLConnection).run {
+                    connectTimeout = 10_000
+                    readTimeout = 10_000
+                    setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    responseCode
+                    disconnect()
+                }
+            }
+        }
+    }
+
     /** Tries a request once more after a timeout: the first call on a cold network often times out where the next succeeds. */
     private suspend fun <T> retryOnTimeout(block: suspend () -> T): T = try {
         block()
@@ -164,6 +190,9 @@ class AuthRepository(private val client: SupabaseClient?) {
         delay(1_000)
         block()
     }
+
+    /** The signed-in session's access token, for Lucento's own proxy (Smarter reading); null when signed out. */
+    suspend fun accessToken(): String? = runCatching { client?.auth?.currentAccessTokenOrNull() }.getOrNull()
 
     /** Clears the Supabase session only. Local financial data is never touched by signing out. */
     suspend fun signOut() {

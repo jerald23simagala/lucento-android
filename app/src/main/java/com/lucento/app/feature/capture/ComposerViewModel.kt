@@ -56,7 +56,7 @@ data class ComposerMessage(
 sealed interface MessageState {
     data object Reading : MessageState
     /** Interpreted; [found] rows came from it, [saved] of them have been saved since. */
-    data class Read(val found: Int, val saved: Int = 0) : MessageState
+    data class Read(val found: Int, val saved: Int = 0, val engine: com.lucento.app.domain.capture.InterpreterEngine? = null) : MessageState
     data class NothingFound(val message: String) : MessageState
 }
 
@@ -287,7 +287,7 @@ class ComposerViewModel(
             val (messageState, newRows) = when (result) {
                 is Interpretation.Candidates -> {
                     val rows = result.items.map { ReviewRow.from(it, UUID.randomUUID().toString(), id, source, separator) }
-                    MessageState.Read(rows.size) to rows
+                    MessageState.Read(rows.size, engine = result.engine) to rows
                 }
                 is Interpretation.NothingFound -> MessageState.NothingFound(result.message) to emptyList()
             }
@@ -387,7 +387,7 @@ class ComposerViewModel(
 
     companion object {
         val Factory = containerFactory {
-            ComposerViewModel(it.transactions, it.wallets, it.categories, LocalTransactionInterpreter(), it.preferences)
+            ComposerViewModel(it.transactions, it.wallets, it.categories, it.interpreter, it.preferences)
         }
     }
 }

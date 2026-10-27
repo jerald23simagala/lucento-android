@@ -128,7 +128,13 @@ fun RecurringScreen(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
         ) {
-            item(key = "bar") { LucentoTopBar(title = "Recurring payments", onBack = onBack) }
+            item(key = "bar") {
+                LucentoTopBar(title = "Scheduled", onBack = onBack, actions = {
+                    if (state.schedules.isNotEmpty() && state.wallets.isNotEmpty()) {
+                        com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = onAddSchedule, contentDescription = "Add recurring payment")
+                    }
+                })
+            }
             if (!state.loading && state.schedules.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
@@ -190,17 +196,6 @@ fun RecurringScreen(
                     )
                 }
             }
-        }
-        if (state.schedules.isNotEmpty() && state.wallets.isNotEmpty()) {
-            ExtendedFloatingActionButton(
-                onClick = onAddSchedule,
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Add") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.gutter),
-            )
         }
         ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
     }

@@ -72,11 +72,11 @@ enum class CloudStatus(val label: String) {
 }
 
 /**
- * The words on the monthly budget card: Lucento's one-line [bubble] (the mascot's speech bubble) and the [message] in
- * the advice banner. The verdict is always spelled out, so meaning never depends on colour. Built from the same
+ * The words on the monthly budget card: Lucento's one-line [bubble] (the mascot's speech bubble beside the month pill),
+ * the one-line [message] in the advice banner, and its second line [detail] (the daily allowance) when there is one. The verdict is always spelled out, so meaning never depends on colour. Built from the same
  * [BudgetPlan] and [BudgetBurn] the card draws.
  */
-data class PaceInsight(val position: PacePosition?, val bubble: String, val message: String)
+data class PaceInsight(val position: PacePosition?, val bubble: String, val message: String, val detail: String? = null)
 
 object PaceCopy {
 
@@ -110,23 +110,11 @@ object PaceCopy {
                 "$monthName ended at $used% of budget, with ${MoneyFormatter.format(plan.remaining)} unused.",
             )
         }
-        val allowance = burn.dailyAllowance?.let { " About ${MoneyFormatter.format(it)} a day keeps you within budget." } ?: ""
+        val allowance = burn.dailyAllowance?.let { "About ${MoneyFormatter.format(it)} a day keeps you within budget" }
         return when (pace) {
-            PacePosition.AHEAD -> PaceInsight(
-                pace,
-                "You’re ahead of the month. Let’s slow down!",
-                "You’re spending faster than the month progression.$allowance",
-            )
-            PacePosition.BEHIND -> PaceInsight(
-                pace,
-                "You’re below the month pace. All good!",
-                "You’re spending slower than the month progression. You have room if needed.$allowance",
-            )
-            else -> PaceInsight(
-                PacePosition.ALIGNED,
-                "You’re on track! Keep it up!",
-                "You’re on track with your spending pace. Great job!$allowance",
-            )
+            PacePosition.AHEAD -> PaceInsight(pace, "Ahead of the month. Let’s slow down!", "Spending faster than the month", allowance)
+            PacePosition.BEHIND -> PaceInsight(pace, "Below the month pace. All good!", "Spending slower than the month", allowance)
+            else -> PaceInsight(PacePosition.ALIGNED, "On track! Keep it up!", "Spending in step with the month", allowance)
         }
     }
 

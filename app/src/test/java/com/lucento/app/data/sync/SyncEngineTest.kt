@@ -120,6 +120,32 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `two setups on one account fold their copies of a category into one, keeping set budgets`() = runTest {
+        // An offline install set up "Rent" and budgeted it; a second setup on the same account picked "Rent" too.
+        val phone = Device()
+        val rent = phone.addCategory("Rent", clientUuid = "b-rent")
+        phone.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = rent.id, currencyCode = "USD", limitMinor = 0, createdAt = phone.now, updatedAt = phone.now, clientUuid = UUID.randomUUID().toString()))
+        success(phone.sync())
+
+        val other = Device()
+        val otherRent = other.addCategory("rent ", clientUuid = "a-rent")
+        other.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = otherRent.id, currencyCode = "USD", limitMinor = 1_500_00, createdAt = other.now, updatedAt = other.now, clientUuid = UUID.randomUUID().toString()))
+        val cash = other.addWallet()
+        other.addTransaction(cash.id, 1_500_00, categoryId = otherRent.id)
+        success(other.sync())
+
+        // Both devices end with the copy every device picks ("a-rent"), its set amount, and the spending on it.
+        success(phone.sync())
+        listOf(phone, other).forEach { d ->
+            val live = d.categories.getAll().filter { it.name.trim().equals("rent", ignoreCase = true) }
+            assertEquals(listOf("a-rent"), live.map { it.clientUuid })
+            val budgets = d.budgets.rows.value.filter { it.categoryId == live.single().id }
+            assertEquals(listOf(1_500_00L), budgets.map { it.limitMinor })
+        }
+        assertTrue(phone.transactions.rows.value.all { it.categoryId == phone.categories.findByClientUuid("a-rent")!!.id })
+    }
+
+    @Test
     fun `first sign-in uploads existing local data, and retrying never duplicates it`() = runTest {
         val phone = Device()
         val cash = phone.addWallet()

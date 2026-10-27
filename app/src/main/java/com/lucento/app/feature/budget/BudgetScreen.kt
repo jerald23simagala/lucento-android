@@ -104,6 +104,8 @@ import java.time.YearMonth
 @Composable
 fun BudgetScreen(
     onChooseCategories: () -> Unit,
+    /** Budgets opens from Home's Quick links, so it has a way back. */
+    onBack: (() -> Unit)? = null,
     onManageCategories: () -> Unit,
     viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.Factory),
 ) {
@@ -147,6 +149,7 @@ fun BudgetScreen(
             item(key = "bar") {
                 LucentoTopBar(
                     title = "Budget",
+                    onBack = onBack,
                     actions = {
                         IconButton(onClick = onManageCategories) {
                             Icon(Icons.Outlined.Category, contentDescription = "Manage categories")

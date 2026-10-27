@@ -180,6 +180,11 @@ class SettingsViewModel(
     }
 
     /** Switching a module never touches its data; it only changes what is shown. */
+    /** Smarter reading; turned on only from the consent dialog in Settings. */
+    fun setSmartReading(enabled: Boolean) {
+        viewModelScope.launch { preferences.setSmartReading(enabled) }
+    }
+
     fun setFeatureEnabled(feature: Feature, enabled: Boolean) {
         viewModelScope.launch { preferences.setFeatureEnabled(feature, enabled) }
     }

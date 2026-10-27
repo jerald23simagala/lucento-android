@@ -1,5 +1,6 @@
 package com.lucento.app
 
+import kotlinx.coroutines.flow.first
 import android.app.Application
 import androidx.room.withTransaction
 import com.lucento.app.data.local.LucentoDatabase
@@ -73,6 +74,16 @@ class AppContainer(application: Application) {
     private val supabaseClient by lazy { SupabaseModule.create() }
     val syncPreferences: SyncPreferences by lazy { SyncPreferences(application) }
     val auth: AuthRepository by lazy { AuthRepository(supabaseClient) }
+
+    /** The composer's reader: Gemini when Smarter reading is on (see docs/CAPTURE.md), else this phone. */
+    val interpreter: com.lucento.app.domain.capture.TransactionInterpreter by lazy {
+        com.lucento.app.data.ai.HybridTransactionInterpreter(
+            local = com.lucento.app.domain.capture.LocalTransactionInterpreter(),
+            remote = com.lucento.app.data.ai.RemoteTransactionInterpreter(accessToken = auth::accessToken),
+            enabled = { preferences.preferences.first().smartReading },
+            currency = { preferences.preferences.first().primaryCurrency },
+        )
+    }
     val syncRepository: SyncRepository by lazy {
         SyncRepository(
             remote = supabaseClient?.let(::SupabaseSyncRemote),

@@ -54,6 +54,11 @@ class OnboardingViewModel(
     val syncAvailable: Boolean get() = auth != null && com.lucento.app.data.sync.SupabaseModule.isConfigured
     val googleAvailable: Boolean get() = com.lucento.app.data.sync.SupabaseModule.isGoogleSignInConfigured
 
+    /** The user chose to connect by email: open the server connection while they type. */
+    fun prepareConnection() {
+        auth?.prewarm()
+    }
+
     /** Google's account picker runs from [activity]; it is used for this call only and not retained. */
     fun connectGoogle(activity: android.content.Context) = connect { auth?.signInWithGoogle(activity) }
 

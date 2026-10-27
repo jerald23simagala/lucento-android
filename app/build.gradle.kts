@@ -38,6 +38,12 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"${lucentoConfig("LUCENTO_SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${lucentoConfig("LUCENTO_SUPABASE_ANON_KEY")}\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${lucentoConfig("LUCENTO_GOOGLE_WEB_CLIENT_ID")}\"")
+        // Smarter reading (opt-in): Lucento's own proxy, which holds the Gemini key. Never a model API key here.
+        buildConfigField(
+            "String",
+            "AI_INTERPRET_URL",
+            "\"${lucentoConfig("LUCENTO_AI_INTERPRET_URL").ifBlank { "https://www.lucentoapp.com/api/interpret" }}\"",
+        )
     }
 
     // Release signing comes only from the environment (CI secrets or a developer's shell); nothing is committed.

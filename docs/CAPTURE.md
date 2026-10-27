@@ -85,19 +85,34 @@ or camera permission: the recogniser and camera apps ask for their own. Cancel, 
 a one-line note and the keyboard. Photos are read with ML Kit's bundled on-device model and deleted afterwards. Speech
 is auto-sent; the user can fix the wording with "Edit message" or fix rows directly.
 
-## AI provider — what exists and what activation would need
+## Smarter reading (Gemini) — opt-in
 
-There is **no AI provider** in Lucento and nothing in the UI claims one. Capture never touches the network: the only
-network use is opt-in cloud sync (docs/SYNC.md), which never sends text to a model. `LocalTransactionInterpreter`
-is deterministic rule-based parsing.
+Off by default. When the user turns on **Settings › Smarter reading** (a dialog first says what is sent and where), typed
+and spoken messages go to Gemini through Lucento's own proxy; everything else — and everything while it is off — is
+read on this phone by `LocalTransactionInterpreter` (deterministic rules; never presented as AI).
 
-A remote model can be added later behind `TransactionInterpreter` without touching the composer, but only with:
+| Piece | Where |
+|---|---|
+| Opt-in flag | `UserPreferences.smartReading` (DataStore), set only from the consent dialog |
+| Composer reader | `data/ai/HybridTransactionInterpreter`: Gemini when on, else local; falls back to local per request (offline, signed out, daily limit used, error, nothing found) and labels the reply "Read by Gemini" / "Read on this phone — <reason>" |
+| Client | `data/ai/RemoteTransactionInterpreter` → `BuildConfig.AI_INTERPRET_URL` (default `https://www.lucentoapp.com/api/interpret`, override with `LUCENTO_AI_INTERPRET_URL`) with the user's Supabase access token |
+| Validation | `RemoteCandidates`: ids must be the user's own, amounts positive decimals, kinds must fit; doubts become review flags. Rows still go through `BatchReview` and the user's review |
+| Proxy | `lucento-website/api/interpret.ts` (Vercel). Holds `GEMINI_API_KEY`; checks the token with Supabase Auth; counts the request with `public.consume_ai_quota()`; returns structured rows |
+| Daily limit | `supabase/migrations/20261027090000_ai_usage_quota.sql` (`public.ai_usage`, RLS read-own, no write grants) + `AI_DAILY_LIMIT` on Vercel (default 50/user/UTC day) |
 
-1. A server you operate (a small proxy) that holds the model API key — never the APK, `BuildConfig` or resources.
-2. A new opt-in module in `FeatureSet` ("Smarter reading, sends text to …"), off by default, with a consent screen that
-   names what is sent (the message text or OCR text, plus category names) and where.
-3. Network calls only while that module is on (INTERNET now exists for cloud sync), and a per-request fallback to the
-   local interpreter when offline,
-   declined or failing.
-4. The model returning the `TransactionCandidate` shape (structured JSON), validated by the same `BatchReview` rules;
-   its rows labelled with `InterpreterEngine.label` so the user knows what read them.
+**Sent:** the message text, today's date, the main currency, category names/kinds and wallet names/types with their
+local ids. **Never sent:** balances, history, receipts (always read on this phone), the Gemini key (only on Vercel).
+A sync account is required: it identifies the user for the daily allowance.
+
+### Setting it up
+
+1. **Gemini key.** Open https://aistudio.google.com/apikey, sign in, *Create API key* (pick or create a Google Cloud
+   project). For real users, turn on billing for that project (paid tier): on the free tier Google may use prompts to
+   improve its products, and free-tier rate limits are low. Optionally set a budget alert in Google Cloud Billing.
+2. **Database.** Apply `supabase/migrations/20261027090000_ai_usage_quota.sql` to the Supabase project.
+3. **Vercel.** In the `lucento-website` project → Settings → Environment Variables (Production), add
+   `GEMINI_API_KEY` (mark *Sensitive*), `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and optionally `AI_DAILY_LIMIT`
+   and `GEMINI_MODEL` (see `lucento-website/.env.example`). Redeploy so the function picks them up.
+4. **Check.** `curl -i -X POST https://www.lucentoapp.com/api/interpret` answers `401 sign_in_required` once deployed
+   (`503 not_configured` means a variable is missing).
+5. **App.** Sign in to a sync account, then Settings › Smarter reading › on. The composer's replies say who read them.

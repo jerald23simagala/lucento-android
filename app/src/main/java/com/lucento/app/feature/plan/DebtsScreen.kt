@@ -73,7 +73,13 @@ fun DebtsScreen(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
         ) {
-            item(key = "bar") { LucentoTopBar(title = "Debts & loans", onBack = onBack) }
+            item(key = "bar") {
+                LucentoTopBar(title = "Debts", onBack = onBack, actions = {
+                    if (debts.isNotEmpty()) {
+                        com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = { adding = newDebt() }, contentDescription = "Add debt")
+                    }
+                })
+            }
             if (!state.loading && debts.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
@@ -123,17 +129,6 @@ fun DebtsScreen(
                     )
                 }
             }
-        }
-        if (debts.isNotEmpty()) {
-            ExtendedFloatingActionButton(
-                onClick = { adding = newDebt() },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Add debt") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.gutter),
-            )
         }
     }
 

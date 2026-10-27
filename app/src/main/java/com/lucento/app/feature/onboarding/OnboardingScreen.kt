@@ -141,6 +141,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
                     message = syncMessage,
                     onGoogle = { viewModel.connectGoogle(context) },
                     onEmail = viewModel::connectEmail,
+                    onPrepareEmail = viewModel::prepareConnection,
                     onContinue = viewModel::next,
                 )
                 else -> ConfirmStep(currency, theme, features, picks.count, error, signedInEmail, onFinish = viewModel::finish)
@@ -370,6 +371,7 @@ private fun SyncStep(
     message: String?,
     onGoogle: () -> Unit,
     onEmail: (String, String, com.lucento.app.feature.settings.EmailMode) -> Unit,
+    onPrepareEmail: () -> Unit,
     onContinue: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().imePadding()) {
@@ -397,6 +399,7 @@ private fun SyncStep(
                         googleAvailable = googleAvailable,
                         onGoogle = onGoogle,
                         onEmail = onEmail,
+                        onPrepareEmail = onPrepareEmail,
                     )
                 }
             }
