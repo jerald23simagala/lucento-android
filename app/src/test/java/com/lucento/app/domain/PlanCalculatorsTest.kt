@@ -3,6 +3,7 @@ package com.lucento.app.domain
 import com.lucento.app.core.money.Money
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
@@ -121,6 +122,21 @@ class PlanCalculatorsTest {
         assertEquals(listOf("2026-10-01", "2026-10-08", "2026-10-15"), due.map { it.second.toString() })
         assertEquals(emptyList<Pair<Int, LocalDate>>(), RecurringMath.dueThrough(s.copy(paused = true), LocalDate.parse("2026-10-31")))
         assertNull(s.copy(nextIndex = 3).nextDue)
+    }
+
+    @Test fun overdueOccurrencesAreNotCappedAt400() {
+        // Weekly from the start of 2018 through late 2026 is well past the old 400-occurrence cap.
+        val rent = schedule("2018-01-01", Frequency.WEEKLY, minor = 100)
+        val through = LocalDate.parse("2026-10-28")
+        val count = RecurringMath.countDueThrough(rent, through)
+        assertTrue(count > 400)
+        assertEquals(count, RecurringMath.dueThrough(rent, through).size)
+        assertEquals(Money(100L * count, "USD"), RecurringMath.committedExpenses(listOf(rent), "USD", through))
+        // First day, last day, and the month boundary are all included when they fall on an occurrence.
+        assertEquals(LocalDate.parse("2018-01-01"), RecurringMath.dueThrough(rent, through).first().second)
+        assertEquals(1, RecurringMath.countDueThrough(schedule("2026-01-31"), LocalDate.parse("2026-01-31")))
+        assertEquals(3, RecurringMath.countDueThrough(schedule("2026-01-31"), LocalDate.parse("2026-03-31")))
+        assertEquals(0, RecurringMath.countDueThrough(schedule("2026-02-01"), LocalDate.parse("2026-01-31")))
     }
 
     @Test fun committedExpensesOnlyCountUnpaidExpenseOccurrencesInCurrency() {

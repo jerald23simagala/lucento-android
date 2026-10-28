@@ -1,6 +1,7 @@
 package com.lucento.app.domain
 
 import com.lucento.app.core.money.Money
+import java.time.DateTimeException
 import java.time.LocalDate
 
 enum class Frequency { WEEKLY, MONTHLY, YEARLY }
@@ -79,31 +80,71 @@ object RecurringMath {
         occurrence(schedule.startDate, schedule.frequency, schedule.interval, index)
 
     fun occurrence(start: LocalDate, frequency: Frequency, interval: Int, index: Int): LocalDate? {
-        if (index < 0) return null
+        if (index < 0 || interval < 1) return null
         val steps = index.toLong() * interval
-        return when (frequency) {
-            Frequency.WEEKLY -> start.plusWeeks(steps)
-            Frequency.MONTHLY -> start.plusMonths(steps)
-            Frequency.YEARLY -> start.plusYears(steps)
+        return try {
+            when (frequency) {
+                Frequency.WEEKLY -> start.plusWeeks(steps)
+                Frequency.MONTHLY -> start.plusMonths(steps)
+                Frequency.YEARLY -> start.plusYears(steps)
+            }
+        } catch (_: DateTimeException) {
+            null
+        } catch (_: ArithmeticException) {
+            null
         }
     }
 
     /**
      * Unpaid occurrences of [schedule] due on or before [through] (including overdue ones), oldest first.
-     * Paused or finished schedules have none. Bounded by [limit] as a safety net.
+     * Paused schedules have none. There is no fixed cap: every real occurrence counts. The search stops when the
+     * date would pass [through], the schedule's end, or the calendar itself, so a long-overdue weekly plan cannot
+     * loop forever.
      */
-    fun dueThrough(schedule: RecurringSchedule, through: LocalDate, limit: Int = 400): List<Pair<Int, LocalDate>> {
-        if (schedule.paused) return emptyList()
-        val result = ArrayList<Pair<Int, LocalDate>>()
-        var index = schedule.nextIndex
-        while (result.size < limit) {
+    fun dueThrough(schedule: RecurringSchedule, through: LocalDate): List<Pair<Int, LocalDate>> {
+        val last = lastDueIndex(schedule, through) ?: return emptyList()
+        val result = ArrayList<Pair<Int, LocalDate>>(last - schedule.nextIndex + 1)
+        for (index in schedule.nextIndex..last) {
             val date = occurrence(schedule, index) ?: break
-            if (date.isAfter(through)) break
-            if (schedule.endDate != null && date.isAfter(schedule.endDate)) break
             result.add(index to date)
-            index++
         }
         return result
+    }
+
+    /** How many unpaid occurrences are due on or before [through]. Same rules as [dueThrough], without the list. */
+    fun countDueThrough(schedule: RecurringSchedule, through: LocalDate): Int {
+        val last = lastDueIndex(schedule, through) ?: return 0
+        return last - schedule.nextIndex + 1
+    }
+
+    /**
+     * Highest occurrence index whose date is still due. Null when none are. Binary search, so a schedule that is
+     * years overdue does not walk every week on the UI thread.
+     */
+    private fun lastDueIndex(schedule: RecurringSchedule, through: LocalDate): Int? {
+        if (schedule.paused || schedule.interval < 1) return null
+        val end = schedule.endDate?.takeIf { it.isBefore(through) } ?: through
+        val start = schedule.nextIndex
+        val first = occurrence(schedule, start) ?: return null
+        if (first.isAfter(end)) return null
+        var high = start
+        var step = 1
+        while (step > 0 && high <= Int.MAX_VALUE - step) {
+            val candidate = high + step
+            val date = occurrence(schedule, candidate)
+            if (date == null || date.isAfter(end)) break
+            high = candidate
+            if (step > Int.MAX_VALUE / 2) break
+            step *= 2
+        }
+        var low = high
+        var ceiling = (high.toLong() + step).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        while (low < ceiling) {
+            val mid = low + (ceiling - low + 1) / 2
+            val date = occurrence(schedule, mid)
+            if (date != null && !date.isAfter(end)) low = mid else ceiling = mid - 1
+        }
+        return low
     }
 
     /**
@@ -117,14 +158,18 @@ object RecurringMath {
         through: LocalDate,
         spendingOnly: Boolean = false,
     ): Money =
-        Money.sum(
-            currencyCode,
+        Money(
             schedules
                 .filter { it.type == TransactionType.EXPENSE && it.currencyCode == currencyCode }
-                .flatMap { s ->
-                    val each = if (spendingOnly && s.isDebtPayment) s.interest else s.total
-                    dueThrough(s, through).map { each }
+                .fold(0L) { sum, s ->
+                    val count = countDueThrough(s, through).toLong()
+                    if (count == 0L) sum
+                    else {
+                        val each = if (spendingOnly && s.isDebtPayment) s.interest.amountMinor else s.total.amountMinor
+                        Math.addExact(sum, Math.multiplyExact(each, count))
+                    }
                 },
+            currencyCode,
         )
 
     /** Next unpaid occurrence of each active schedule due on or before [through] (overdue included), soonest first. */
