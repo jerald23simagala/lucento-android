@@ -114,6 +114,12 @@ an upsert on `id`, retrying a push can never create a duplicate.
 Any exception aborts the cycle with `Retryable`; the cursor does not move, nothing local is deleted, and unpushed rows
 stay dirty, so the next cycle repeats the work. `SyncWorker` retries with WorkManager backoff (up to 5 attempts).
 
+"Sync now" and the 30-minute worker share one in-process lock (`SyncFlight`) and, on a device, one file lock under
+the app's files directory. A second cycle waits; it does not run beside the first. The file lock is released by the
+operating system if the process is killed, and the cursor moves only after a cycle finishes, so a killed cycle retries
+without a stuck lock or a half-applied cursor. The manual worker is unique work with `KEEP` (a second tap does not
+cancel the running one). The periodic worker has its own unique name; the lock is what keeps the two from overlapping.
+
 ## Clocks
 
 - **Which rows are new** is decided by `server_updated_at`, set by the database on every insert and update
