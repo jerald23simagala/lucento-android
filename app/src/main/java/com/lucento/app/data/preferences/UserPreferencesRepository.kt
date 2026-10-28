@@ -50,6 +50,11 @@ data class UserPreferences(
     val smartReading: Boolean = false,
     /** Crash reports. Off until the user turns them on in Settings. Nothing is sent while this is false. */
     val crashReports: Boolean = false,
+    /**
+     * The one-time Home note that data stays on this phone and uninstalling erases it. New setup marks this seen.
+     * Installs that finished onboarding before the note existed start unseen, so they are told once.
+     */
+    val localDataNoticeSeen: Boolean = false,
     /** Where the guided setup after onboarding stands; null when finished or never started (older installs). */
     val guideStep: com.lucento.app.domain.GuideStep? = null,
 )
@@ -70,6 +75,7 @@ class UserPreferencesRepository(private val context: Context) {
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
         val crashReports = booleanPreferencesKey("crash_reports")
+        val localDataNoticeSeen = booleanPreferencesKey("local_data_notice_seen")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -94,6 +100,7 @@ class UserPreferencesRepository(private val context: Context) {
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
                 smartReading = p[Keys.smartReading] ?: false,
                 crashReports = p[Keys.crashReports] ?: false,
+                localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
             )
         }
 
@@ -108,6 +115,7 @@ class UserPreferencesRepository(private val context: Context) {
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
             it[Keys.categorySetupDone] = true
             it[Keys.onboardingComplete] = true
+            it[Keys.localDataNoticeSeen] = true
             // A new user continues into the guided setup (wallets, budget, goal, first transactions).
             it[Keys.guideStep] = com.lucento.app.domain.GuideStep.WALLETS.key
         }
@@ -125,6 +133,7 @@ class UserPreferencesRepository(private val context: Context) {
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
             it[Keys.categorySetupDone] = categoriesChosen
             it[Keys.onboardingComplete] = true
+            it[Keys.localDataNoticeSeen] = true
             it.remove(Keys.guideStep)
         }
     }
@@ -135,6 +144,10 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setCrashReports(enabled: Boolean) {
         context.dataStore.edit { it[Keys.crashReports] = enabled }
+    }
+
+    suspend fun setLocalDataNoticeSeen() {
+        context.dataStore.edit { it[Keys.localDataNoticeSeen] = true }
     }
 
     /** Saves the guided setup's progress; null when it is finished (or was never started, as for older installs). */

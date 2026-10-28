@@ -132,8 +132,14 @@ internal fun daysLeftLabel(daysLeft: Int): String = if (daysLeft == 1) "1 day" e
  * closest to done and scheduled transactions. All figures are derived from stored data through the domain
  * calculators; nothing is invented, and the pace card and the Budget screen read the same [BudgetPlan].
  */
+/** Existing installs that finished setup before the local-only warning are shown it once on Home. */
+fun showLocalDataNotice(onboardingComplete: Boolean, noticeSeen: Boolean): Boolean =
+    onboardingComplete && !noticeSeen
+
 data class HomeUiState(
     val loading: Boolean = true,
+    /** One-time warning for people who finished setup before that copy existed. */
+    val showLocalDataNotice: Boolean = false,
     val today: LocalDate = LocalDate.now(),
     val primaryCurrency: String = "USD",
     val displayName: String? = null,
