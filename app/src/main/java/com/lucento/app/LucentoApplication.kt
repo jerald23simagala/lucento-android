@@ -16,6 +16,7 @@ import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.TransactionRunner
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.core.crash.CrashReporting
+import com.lucento.app.core.network.observeOnline
 import com.lucento.app.core.crash.CrashReportsFlag
 import com.lucento.app.data.local.LocalLedgerReset
 import com.lucento.app.data.media.GoalPhotos
@@ -52,6 +53,11 @@ class LucentoApplication : Application() {
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             container.usageCounts.retryPendingDeletion()
+            observeOnline().collect { online ->
+                if (online) container.usageCounts.retryPendingDeletion()
+            }
+        }
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             // A different account already signed in, with nothing unsynced, is wiped before the next sync
             // so this phone never uploads the previous ledger. Unsynced changes wait for a confirmation in Settings.
             when (container.accountBoundary.afterSignIn()) {
@@ -152,6 +158,8 @@ class AppContainer(application: Application) {
         LocalLedgerReset(database, syncPreferences, GoalPhotos(application), preferences)
     }
 
+    private val usageScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     val usageCounts: UsageCountsService by lazy {
         val remote = supabaseClient?.let(::SupabaseUsageRemote)
         UsageCountsService(
@@ -162,6 +170,7 @@ class AppContainer(application: Application) {
             newInstallId = { UUID.randomUUID().toString() },
             now = System::currentTimeMillis,
             appVersion = BuildConfig.VERSION_NAME,
+            launchInBackground = { block -> usageScope.launch { block() } },
         )
     }
 

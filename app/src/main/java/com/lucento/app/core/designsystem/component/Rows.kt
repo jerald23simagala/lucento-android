@@ -197,7 +197,7 @@ fun ToneChip(label: String, tone: TonePair, modifier: Modifier = Modifier, icon:
             Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(Spacing.xs))
         }
-        Text(label, style = MaterialTheme.typography.labelLarge, color = tone.content, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = tone.content, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -208,7 +208,8 @@ fun StatusPill(text: String, tone: TonePair, modifier: Modifier = Modifier) {
         text,
         style = MaterialTheme.typography.labelMedium,
         color = tone.content,
-        maxLines = 1,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .clip(MaterialTheme.shapes.extraSmall)
             .background(tone.container)

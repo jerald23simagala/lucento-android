@@ -25,40 +25,59 @@ class UsageCountsService(
     private val newInstallId: () -> String,
     private val now: () -> Long,
     private val appVersion: String,
+    /** Runs the server delete off the opt-out call, so a slow network cannot block saving "off". */
+    private val launchInBackground: (suspend () -> Unit) -> Unit,
 ) {
     private val gate = Mutex()
 
-    suspend fun setOptIn(enabled: Boolean) = gate.withLock {
-        if (enabled) {
-            retryPendingLocked()
-            val next = UsageLedgerLogic.optIn(load(), now(), newInstallId())
-            save(next)
-            upload(next)
-        } else {
-            optOutLocked()
-        }
-    }
-
-    /** Next launch: try again to delete rows for an install id whose opt-out did not finish. */
-    suspend fun retryPendingDeletion() = gate.withLock { retryPendingLocked() }
-
-    private suspend fun optOutLocked() {
-        val current = load()
-        val id = UsageLedgerLogic.idToDelete(current)
-        val deleted = if (id == null) {
-            true
-        } else {
-            try {
-                deleteRemote.delete(id)
-                true
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                false
+    suspend fun setOptIn(enabled: Boolean) {
+        val followUp = gate.withLock {
+            if (enabled) {
+                retryPendingLocked()
+                val next = UsageLedgerLogic.optIn(load(), now(), newInstallId())
+                save(next)
+                upload(next)
+                null
+            } else {
+                optOutLocally()
             }
         }
-        save(UsageLedgerLogic.afterOptOut(current, deleted))
+        if (followUp != null) launchInBackground(followUp)
     }
+
+    /**
+     * Persist opted-out and an empty queue before any network call. The install id moves to the pending
+     * slot so a kill during the background delete can be retried next launch or when the network returns.
+     * Returns the background delete, or null when there is nothing on the server to remove.
+     */
+    private suspend fun optOutLocally(): (suspend () -> Unit)? {
+        val current = load()
+        val id = UsageLedgerLogic.idToDelete(current)
+        save(UsageLedgerLogic.afterOptOut(current, deleted = false))
+        if (id == null) return null
+        return { finishDeletion(id) }
+    }
+
+    private suspend fun finishDeletion(id: String) {
+        val deleted = try {
+            deleteRemote.delete(id)
+            true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            false
+        }
+        if (!deleted) return
+        gate.withLock {
+            val latest = load()
+            if (latest.pendingDeletionInstallId == id) {
+                save(UsageLedgerLogic.afterDeletionRetry(latest, deleted = true))
+            }
+        }
+    }
+
+    /** Next launch, or the network coming back: delete rows for an install id whose opt-out did not finish. */
+    suspend fun retryPendingDeletion() = gate.withLock { retryPendingLocked() }
 
     private suspend fun retryPendingLocked() {
         val id = load().pendingDeletionInstallId ?: return
@@ -102,6 +121,8 @@ class UsageCountsService(
         var ledger = loaded
         if (ledger.installedAtMillis == null) ledger = ledger.copy(installedAtMillis = now())
         val installed = ledger.installedAtMillis ?: now()
+        // Milestones reached while counts are off are marked sent on purpose. A later opt-in must not
+        // upload d1, d7, or the first entry: those happened before the person agreed to share counts.
         for (event in UsageLedgerLogic.returnsDue(installed, now(), ledger.sent)) {
             ledger = UsageLedgerLogic.enqueue(ledger, event.name, event.props)
                 .copy(sent = ledger.sent + event.name)

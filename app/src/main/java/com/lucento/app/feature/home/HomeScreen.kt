@@ -93,6 +93,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -459,7 +460,13 @@ private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
         ) {
             Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(Spacing.xs))
-            Text(status.label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
+            Text(
+                status.label,
+                style = MaterialTheme.typography.labelMedium,
+                color = tone.content,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -481,7 +488,12 @@ private fun MonthPill(state: HomeUiState, onSelect: (YearMonth) -> Unit) {
         ) {
             Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(Spacing.sm))
-            Text(monthYearLabel(state.month), style = MaterialTheme.typography.titleSmall)
+            Text(
+                monthYearLabel(state.month),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             Spacer(Modifier.width(Spacing.xs))
             Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
         }
@@ -1270,9 +1282,21 @@ private fun ChangeChip(change: Money, modifier: Modifier = Modifier) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(if (up) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward, contentDescription = null, tint = tone.content, modifier = Modifier.size(12.dp))
-            Text(MoneyFormatter.formatSigned(change, showPlus = true), style = MaterialTheme.typography.labelSmall, color = tone.content, maxLines = 1)
+            Text(
+                MoneyFormatter.formatSigned(change, showPlus = true),
+                style = MaterialTheme.typography.labelSmall,
+                color = tone.content,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        Text("this month", style = MaterialTheme.typography.labelSmall, color = tone.content, maxLines = 1)
+        Text(
+            "this month",
+            style = MaterialTheme.typography.labelSmall,
+            color = tone.content,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -1578,6 +1602,10 @@ private fun HomeFontScalePreview() {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.gutter),
         ) {
+            SyncStatusChip(CloudStatus.PENDING) {}
+            ChangeChip(Money(-1_234_567_89, "USD"))
+            StatusPill("Overdue · October 28, 2026", StatusTones.negative)
+            AmountText(money = Money(-1_234_567_89, "USD"), showPlus = true)
             Overview(
                 state = state,
                 actions = HomeActions(

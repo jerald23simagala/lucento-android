@@ -1,5 +1,8 @@
 package com.lucento.app.domain
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -96,6 +99,7 @@ class UsageCountsTest {
             newInstallId = { "install" },
             now = { 10 },
             appVersion = "1.0",
+            launchInBackground = { block -> runBlocking { block() } },
         )
         service.noteWelcome()
         service.setOptIn(true)
@@ -127,6 +131,7 @@ class UsageCountsTest {
             newInstallId = { "new-id" },
             now = { 10 },
             appVersion = "1",
+            launchInBackground = { block -> runBlocking { block() } },
         )
         service.setOptIn(false)
         assertEquals("old-id", store.ledger.pendingDeletionInstallId)
@@ -137,6 +142,58 @@ class UsageCountsTest {
         assertEquals(listOf("old-id"), deleted)
         assertNull(store.ledger.pendingDeletionInstallId)
     }
+
+    @Test fun optOutIsSavedBeforeTheDeleteSoAKillKeepsThePendingId() = runBlocking {
+        val store = Store(UsageLedger(optedIn = true, installId = "old-id", queue = listOf(UsageEvent("d1_return"))))
+        val service = service(store, deleteRemote = { error("should not run") }, launchInBackground = { })
+        service.setOptIn(false)
+        assertFalse(store.ledger.optedIn)
+        assertTrue(store.ledger.queue.isEmpty())
+        assertNull(store.ledger.installId)
+        assertEquals("old-id", store.ledger.pendingDeletionInstallId)
+    }
+
+    @Test fun aSlowDeleteDoesNotBlockSavingTheOptOut() = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val store = Store(UsageLedger(optedIn = true, installId = "old-id", queue = listOf(UsageEvent("d1_return"))))
+        lateinit var background: suspend () -> Unit
+        val service = service(
+            store,
+            deleteRemote = {
+                started.complete(Unit)
+                release.await()
+            },
+            launchInBackground = { background = it },
+        )
+        service.setOptIn(false)
+        assertFalse(store.ledger.optedIn)
+        assertTrue(store.ledger.queue.isEmpty())
+        assertEquals("old-id", store.ledger.pendingDeletionInstallId)
+        coroutineScope {
+            val job = launch { background() }
+            started.await()
+            assertEquals("old-id", store.ledger.pendingDeletionInstallId)
+            release.complete(Unit)
+            job.join()
+        }
+        assertNull(store.ledger.pendingDeletionInstallId)
+    }
+
+    private fun service(
+        store: Store,
+        deleteRemote: suspend (String) -> Unit = {},
+        launchInBackground: (suspend () -> Unit) -> Unit = { block -> runBlocking { block() } },
+    ) = UsageCountsService(
+        load = { store.ledger },
+        save = { store.ledger = it },
+        send = UsageEventSender { _, _, _ -> },
+        deleteRemote = UsageEventDeleter { deleteRemote(it) },
+        newInstallId = { "new-id" },
+        now = { 10 },
+        appVersion = "1",
+        launchInBackground = launchInBackground,
+    )
 
     private class Store(var ledger: UsageLedger = UsageLedger())
 }
