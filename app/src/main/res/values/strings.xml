@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Lucento</string>
+    <string name="backup_goal_photos_not_included">Goal photos aren\'t included in backups yet.</string>
+    <string name="backup_file_not_encrypted">This file isn\'t encrypted. It contains your full financial history, so keep it somewhere private and don\'t share it.</string>
 </resources>

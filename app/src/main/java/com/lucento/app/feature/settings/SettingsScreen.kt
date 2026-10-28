@@ -55,11 +55,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.BuildConfig
+import com.lucento.app.R
 import com.lucento.app.core.designsystem.component.CurrencyPickerSheet
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.IconTile
@@ -375,6 +377,7 @@ private fun SettingsContent(
             summary = "${current.transactionCount} rows · opens in any spreadsheet app",
             onClick = onExport,
         )
+        BackupExportNotice()
         NavRow(
             icon = Icons.Outlined.FileDownload,
             title = "Export backup (JSON)",
@@ -660,6 +663,27 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
                 onChange(true)
             },
             onDismiss = { asking = false },
+        )
+    }
+}
+
+/**
+ * Shown before a backup is written. The lines wrap with the font size; the Settings screen scrolls,
+ * so nothing is clipped at a large font scale.
+ */
+@Composable
+private fun BackupExportNotice() {
+    Column(Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) {
+        Text(
+            stringResource(R.string.backup_goal_photos_not_included),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            stringResource(R.string.backup_file_not_encrypted),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
