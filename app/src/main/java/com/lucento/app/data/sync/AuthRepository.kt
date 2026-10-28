@@ -43,7 +43,10 @@ import java.security.SecureRandom
  * (stored on the device, refreshed automatically before it expires); a session that can no longer be refreshed
  * shows up as signed out, and sync stops until the user connects again.
  */
-class AuthRepository(private val client: SupabaseClient?) {
+class AuthRepository(
+    private val client: SupabaseClient?,
+    private val passwords: PasswordPolicy = PasswordPolicy(),
+) {
 
     sealed interface SignInResult {
         data object Success : SignInResult
@@ -123,6 +126,7 @@ class AuthRepository(private val client: SupabaseClient?) {
      */
     suspend fun signUpWithEmail(email: String, password: String): SignInResult {
         val auth = client?.auth ?: return SignInResult.NotConfigured
+        passwords.problem(password)?.let { return SignInResult.Failed(it) }
         return emailCall {
             retryOnTimeout {
                 auth.signUpWith(Email) {
@@ -131,6 +135,21 @@ class AuthRepository(private val client: SupabaseClient?) {
                 }
             }
             if (auth.currentSessionOrNull() != null) SignInResult.Success else SignInResult.ConfirmEmail(email.trim())
+        }
+    }
+
+    /**
+     * Replaces the signed-in email account's password. The same length and breach checks as sign-up run first.
+     * A breach lookup that cannot reach the network does not block the change.
+     */
+    suspend fun changePassword(password: String): SignInResult {
+        val auth = client?.auth ?: return SignInResult.NotConfigured
+        passwords.problem(password)?.let { return SignInResult.Failed(it) }
+        return emailCall {
+            auth.updateUser {
+                this.password = password
+            }
+            SignInResult.Success
         }
     }
 

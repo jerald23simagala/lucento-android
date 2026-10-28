@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -110,7 +111,7 @@ fun ConnectAccountPanel(
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             supportingText = if (mode == EmailMode.CREATE) {
-                { Text("At least $MIN_PASSWORD_LENGTH characters.") }
+                { Text("At least $MIN_PASSWORD_LENGTH characters. Known breached passwords are refused.") }
             } else {
                 null
             },
@@ -131,4 +132,53 @@ fun ConnectAccountPanel(
             LucentoTextButton(text = "Back to Google", onClick = { usingEmail = false })
         }
     }
+}
+
+/** A new password for the signed-in email account. Checked for length here; the breach check runs on submit. */
+@Composable
+fun ChangePasswordForm(busy: Boolean, onSubmit: (String) -> Unit) {
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var problem by remember { mutableStateOf<String?>(null) }
+    val colors = OutlinedTextFieldDefaults.colors()
+    OutlinedTextField(
+        value = password,
+        onValueChange = { password = it.take(128); problem = null },
+        label = { Text("New password") },
+        singleLine = true,
+        enabled = !busy,
+        visualTransformation = PasswordVisualTransformation(),
+        supportingText = { Text("At least $MIN_PASSWORD_LENGTH characters. Known breached passwords are refused.") },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+        shape = MaterialTheme.shapes.small,
+        colors = colors,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = confirm,
+        onValueChange = { confirm = it.take(128); problem = null },
+        label = { Text("Confirm password") },
+        singleLine = true,
+        enabled = !busy,
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+        shape = MaterialTheme.shapes.small,
+        colors = colors,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    problem?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
+    LucentoSecondaryButton(
+        text = "Update password",
+        enabled = !busy,
+        onClick = {
+            problem = when {
+                password.length < MIN_PASSWORD_LENGTH -> "Use at least $MIN_PASSWORD_LENGTH characters for the password."
+                password != confirm -> "Those passwords don’t match."
+                else -> null
+            }
+            if (problem == null) onSubmit(password)
+        },
+    )
 }

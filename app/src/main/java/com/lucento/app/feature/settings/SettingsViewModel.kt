@@ -210,6 +210,21 @@ class SettingsViewModel(
         runSyncNow()
     }
 
+    /** Email accounts only. Length and the breach check run before the password is sent. */
+    fun changePassword(password: String) {
+        if (syncing.value) return
+        viewModelScope.launch {
+            syncing.value = true
+            syncMessage.value = when (val result = auth.changePassword(password)) {
+                AuthRepository.SignInResult.Success -> "Password updated."
+                is AuthRepository.SignInResult.Failed -> result.message
+                AuthRepository.SignInResult.NotConfigured -> "Cloud sync isn’t available in this version of Lucento yet."
+                else -> "Couldn’t update the password. Try again."
+            }
+            syncing.value = false
+        }
+    }
+
     fun syncNow() {
         if (syncing.value) return
         viewModelScope.launch {

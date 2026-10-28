@@ -216,6 +216,10 @@ The device is no longer permanently tied to the first account. Signing back in t
 - The APK contains only the Supabase URL and the **publishable** key — no service-role key, database password or
   Google client secret exists in the repository or the app. Values come from `local.properties` / CI env.
 - Network: HTTPS only (`res/xml/network_security_config.xml`). No tokens, emails or financial values are logged.
+- **Passwords.** Email sign-up and password change require at least 8 characters on the device, then a Have I Been
+  Pwned range check: only the first 5 hex characters of the SHA-1 are sent to `api.pwnedpasswords.com`. The password
+  is not sent and is not logged. If that request fails, the password is accepted (fail open) so a network problem
+  cannot lock someone out of creating an account. Signing in to an existing password is not re-checked.
 - Sessions: supabase-kt stores the session on the device (`SettingsSessionManager`), restores it at startup and
   refreshes it before expiry. If a refresh fails offline the session is kept; if it can no longer be refreshed the user
   appears signed out and sync stops until they connect again.

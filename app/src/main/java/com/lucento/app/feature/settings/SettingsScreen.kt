@@ -117,6 +117,7 @@ fun SettingsScreen(
                 onConnectEmail = viewModel::connectEmailAccount,
                 onDisconnect = viewModel::disconnectAccount,
                 onSyncNow = viewModel::syncNow,
+                onChangePassword = viewModel::changePassword,
             )
             current.cloudSync.prompt?.let { prompt ->
                 ConfirmDialog(
@@ -230,6 +231,7 @@ private fun SettingsContent(
     onConnectEmail: (String, String, EmailMode) -> Unit,
     onDisconnect: () -> Unit,
     onSyncNow: () -> Unit,
+    onChangePassword: (String) -> Unit,
 ) {
     val prefs = current.preferences
     Column {
@@ -291,7 +293,7 @@ private fun SettingsContent(
 
         EnabledFeaturesSection(current, onFeature)
 
-        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail)
+        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword)
 
         SmartReadingSection(
             on = prefs.smartReading,
@@ -436,6 +438,7 @@ internal fun CloudSyncSection(
     onDisconnect: () -> Unit,
     onSyncNow: () -> Unit,
     onConnectEmail: (String, String, EmailMode) -> Unit = { _, _, _ -> },
+    onChangePassword: (String) -> Unit = {},
 ) {
     Column {
         SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
@@ -491,6 +494,8 @@ internal fun CloudSyncSection(
                     }
                     OutlinedButton(onClick = onDisconnect, enabled = !state.syncing) { Text("Disconnect") }
                 }
+                Spacer(Modifier.height(Spacing.sm))
+                ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
             }
         }
         // The status line already shows the stored error; don't print the same sentence twice (account mismatch).
