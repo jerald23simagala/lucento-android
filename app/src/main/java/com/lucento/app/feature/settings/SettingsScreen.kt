@@ -302,11 +302,13 @@ private fun SettingsContent(
 
         CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword)
 
-        SmartReadingSection(
-            on = prefs.smartReading,
-            signedIn = current.cloudSync.signedInEmail != null,
-            onChange = onSmartReading,
-        )
+        if (current.cloudSync.configured && current.cloudSync.signedInEmail != null) {
+            SmartReadingSection(
+                on = prefs.smartReading,
+                signedIn = true,
+                onChange = onSmartReading,
+            )
+        }
 
         SectionHeader("Your data", Modifier.padding(top = Spacing.section))
         NavRow(
