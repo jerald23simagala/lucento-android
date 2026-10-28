@@ -97,7 +97,7 @@ object PaceCopy {
                 PaceInsight(
                     PacePosition.AHEAD,
                     "Over budget. Let’s regroup!",
-                    "You’re $over over your $total budget with ${daysLeft(burn)} left. Pause non-essential spending where you can.",
+                    "You’re $over over your $total budget with ${daysLeftLabel(burn.daysLeft)} left. Pause non-essential spending where you can.",
                 )
             } else {
                 PaceInsight(PacePosition.AHEAD, "$monthName went over budget.", "$monthName ended $over over the $total budget.")
@@ -118,11 +118,13 @@ object PaceCopy {
         }
     }
 
-    private fun daysLeft(burn: BudgetBurn): String {
-        val left = burn.daysInMonth - burn.daysElapsed
-        return if (left == 1) "1 day" else "$left days"
-    }
 }
+
+/**
+ * Phrase for [BudgetBurn.daysLeft]: today counts, so the last day of the month is "1 day", never "0 days"
+ * beside a full day's allowance. The number is [BudgetBurn.daysLeft]; this only pluralises it.
+ */
+internal fun daysLeftLabel(daysLeft: Int): String = if (daysLeft == 1) "1 day" else "$daysLeft days"
 
 /**
  * Everything the Home dashboard shows, in the order it is shown: the header (brand, sync status, month), the

@@ -658,7 +658,7 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                         )
                         StatDivider()
                     }
-                    BudgetStat("${burn.daysInMonth - burn.daysElapsed}", "days left", Modifier.weight(0.8f))
+                    BudgetStat("${burn.daysLeft}", "days left", Modifier.weight(0.8f))
                 }
             }
 
