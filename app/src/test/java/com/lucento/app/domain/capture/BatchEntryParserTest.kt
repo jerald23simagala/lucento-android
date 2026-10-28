@@ -153,6 +153,15 @@ class BatchEntryParserTest {
         assertEquals(listOf(INCOME, INCOME), rows.map { it.type })
     }
 
+    @Test fun aClauseThatMatchesIncomeAndExpenseCategoriesDefaultsToExpense() {
+        val both = categories + listOf(
+            Category(30, "Gift", CategoryKind.INCOME, "gift"),
+            Category(31, "Gifts", CategoryKind.EXPENSE, "gift"),
+        )
+        val row = parse("gift 20", context.copy(categories = both)).single()
+        assertEquals(EXPENSE, row.type)
+    }
+
     @Test fun typeHintFromAWallet() {
         val row = parse("2000 from a friend", context.copy(typeHint = INCOME)).single()
         assertEquals(INCOME, row.type)

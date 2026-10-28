@@ -108,12 +108,17 @@ object QuickEntryParser {
     // ---------------------------------------------------------------- type
 
     private val incomeWords = listOf(
-        " received ", " receive ", " got paid", " earned ", " earn ", " salary", " income", " paid me",
+        " got paid", " earned ", " earn ", " salary", " income", " paid me",
         " refund", " bonus", " sold ", " payment from", " allowance", " dividend", " commission",
     )
 
-    /** "got 20 from mom" and "received 20 from a friend": money coming from someone, not a purchase. */
-    private val GOT_OR_RECEIVED_FROM = Regex("""\b(got|received|receive)\b.+\bfrom\b""")
+    /**
+     * Money that arrives: the amount is the very next thing after got/received ("got 20 from mom",
+     * "received 500 salary"). "got lunch from jollibee" is a purchase — words, not an amount, come next.
+     */
+    private val AMOUNT_RIGHT_AFTER_GOT_OR_RECEIVED = Regex(
+        """\b(?:got|received|receive)\s+(?:[₱€£$]|php|usd|eur)?\s*\d[\d,]*(?:\.\d+)?\s*k?\b""",
+    )
 
     /** "mom gave me 20". */
     private val GAVE_ME = Regex("""\b(gave|give|gives) me\b""")
@@ -146,7 +151,7 @@ object QuickEntryParser {
         // "paid my credit card" is a transfer into the card, not new spending.
         Regex(" (paid|pay) (my )?(credit )?card ").containsMatchIn(lower) -> TransactionType.TRANSFER_OUT
         incomeWords.any { lower.contains(it) } ||
-            GOT_OR_RECEIVED_FROM.containsMatchIn(lower) ||
+            AMOUNT_RIGHT_AFTER_GOT_OR_RECEIVED.containsMatchIn(lower) ||
             GAVE_ME.containsMatchIn(lower) -> TransactionType.INCOME
         expenseWords.any { lower.contains(it) } -> TransactionType.EXPENSE
         else -> null

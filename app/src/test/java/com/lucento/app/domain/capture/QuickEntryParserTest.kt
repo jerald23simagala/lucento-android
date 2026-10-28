@@ -64,6 +64,17 @@ class QuickEntryParserTest {
         assertEquals(BigDecimal("20"), parse("paid 20 to mom").amount)
     }
 
+    @Test fun purchasesThatMerelyUseGotOrReceivedStayExpenses() {
+        assertEquals(TransactionType.EXPENSE, parse("got lunch from jollibee 150").type)
+        assertEquals(BigDecimal("150"), parse("got lunch from jollibee 150").amount)
+        assertEquals(TransactionType.EXPENSE, parse("got coffee from starbucks 180").type)
+        assertEquals(BigDecimal("180"), parse("got coffee from starbucks 180").amount)
+        assertEquals(TransactionType.EXPENSE, parse("got groceries 500 from sm").type)
+        assertEquals(BigDecimal("500"), parse("got groceries 500 from sm").amount)
+        assertEquals(TransactionType.EXPENSE, parse("received a parcel from lazada 300 shipping fee").type)
+        assertEquals(BigDecimal("300"), parse("received a parcel from lazada 300 shipping fee").amount)
+    }
+
     @Test fun incomeWithGroupedThousandsAndYesterday() {
         val p = parse("got paid 52,000 salary yesterday into Main Account")
         assertEquals(TransactionType.INCOME, p.type)
