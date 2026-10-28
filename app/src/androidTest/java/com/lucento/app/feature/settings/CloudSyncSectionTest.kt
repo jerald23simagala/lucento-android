@@ -62,7 +62,7 @@ class CloudSyncSectionTest {
     @Test
     fun signedOut_explainsAndOffersGoogle() {
         show(base(email = null))
-        compose.onNodeWithText("nothing is sent anywhere until you connect an account", substring = true).assertExists()
+        compose.onNodeWithText("your data stays on this phone until you connect an account", substring = true).assertExists()
         compose.onNodeWithText("Connect with Google").performClick()
         assertEquals(1, connects)
         shot("cloud-01-signed-out")

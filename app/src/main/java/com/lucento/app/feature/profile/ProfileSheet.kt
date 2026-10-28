@@ -108,7 +108,7 @@ fun ProfileSheet(
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        "No account needed · everything stays on this phone",
+                        "No account needed · data stays on this phone unless you turn sync on",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

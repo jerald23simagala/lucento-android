@@ -111,7 +111,7 @@ fun ConnectAccountPanel(
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             supportingText = if (mode == EmailMode.CREATE) {
-                { Text("At least $MIN_PASSWORD_LENGTH characters. Known breached passwords are refused.") }
+                { Text("At least $MIN_PASSWORD_LENGTH characters. Checked against known breaches by sending only the first 5 characters of its hash.") }
             } else {
                 null
             },

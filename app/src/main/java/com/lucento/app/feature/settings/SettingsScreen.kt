@@ -336,18 +336,18 @@ private fun SettingsContent(
             Icons.Outlined.PhoneAndroid,
             if (current.cloudSync.status.enabled) "Kept on this device, copied to your account" else "Stored only on this device",
             if (current.cloudSync.status.enabled)
-                "Wallets, transactions, budgets and goals stay in Lucento’s private storage; cloud sync keeps a copy in your account, readable only by you."
+                "Wallets, transactions, budgets and goals stay in Lucento’s private storage; cloud sync keeps a copy in your account, readable only by you. Crash reports and Smarter reading are separate and stay off until you turn them on."
             else
-                "Wallets, transactions, budgets and goals live in Lucento’s private storage.",
+                "Wallets, transactions, budgets and goals stay on this phone unless you turn on cloud sync. Crash reports and Smarter reading stay off until you turn those on too.",
         )
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(
             Icons.Outlined.WifiOff,
             "Offline unless you turn sync on",
             if (current.cloudSync.status.enabled)
-                "Cloud sync is on for this account; everything else still works offline. Receipt reading runs on the phone either way."
+                "Cloud sync is on for this account. Crash reports and Smarter reading still wait for their own switches. Receipt reading runs on the phone either way."
             else
-                "Lucento makes no network connection until you connect an account above. Receipt reading runs on the phone.",
+                "Nothing is sent unless you turn on cloud sync, crash reports, or Smarter reading. Receipt reading runs on the phone.",
         )
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.KeyboardVoice, "Voice uses your phone’s recogniser", "Speech is converted to text by your device’s speech service; Lucento interprets it offline.")
@@ -462,8 +462,8 @@ internal fun CloudSyncSection(
             state.signedInEmail == null -> {
                 Text(
                     "Back up your wallets, transactions, budgets and goals and keep them in sync across your " +
-                        "devices. Lucento stays fully usable without this — nothing is sent anywhere until you " +
-                        "connect an account.",
+                        "devices. Lucento stays fully usable without this — your data stays on this phone until you " +
+                        "connect an account and keep sync on.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
