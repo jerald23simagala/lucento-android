@@ -79,4 +79,11 @@ interface CategoryDao {
     /** Leaves updated_at alone, so the dirty trigger does not fire; the row's sync state is unchanged. */
     @Query("UPDATE categories SET client_uuid = :clientUuid WHERE id = :id AND client_uuid IS NULL")
     suspend fun assignClientUuid(id: Long, clientUuid: String)
+
+    @Query("DELETE FROM categories")
+    suspend fun deleteAll()
+
+    /** Same as [assignClientUuid], and marks the row dirty so a backup id is uploaded on the next sync. */
+    @Query("UPDATE categories SET client_uuid = :clientUuid, dirty = 1 WHERE id = :id AND client_uuid IS NULL")
+    suspend fun assignClientUuidForBackup(id: Long, clientUuid: String)
 }

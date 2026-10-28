@@ -16,6 +16,7 @@ import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
 import com.lucento.app.domain.UsageLedger
 import com.lucento.app.domain.UsageLedgerCodec
+import com.lucento.app.domain.backup.BackupSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -268,6 +269,31 @@ class UserPreferencesRepository(
     suspend fun setPrimaryCurrency(code: String) {
         require(CurrencyRules.isSupported(code))
         context.dataStore.edit { it[Keys.primaryCurrency] = code }
+    }
+
+    /**
+     * Writes the preferences a backup is allowed to carry. Crash reports and the one-time local-data notice
+     * stay as they are on this device.
+     */
+    suspend fun applyBackupSettings(settings: BackupSettings, defaultWalletLocalId: Long?) {
+        val mode = runCatching { ThemeMode.valueOf(settings.themeMode) }.getOrDefault(ThemeMode.SYSTEM)
+        require(CurrencyRules.isSupported(settings.primaryCurrency))
+        context.dataStore.edit { prefs ->
+            prefs[Keys.onboardingComplete] = settings.onboardingComplete
+            prefs[Keys.themeMode] = mode.name
+            prefs[Keys.primaryCurrency] = settings.primaryCurrency
+            prefs[Keys.enabledFeatures] = settings.enabledFeatures.toSet()
+            if (settings.acknowledgedBudgetMonth == null) {
+                prefs.remove(Keys.acknowledgedBudgetMonth)
+            } else {
+                prefs[Keys.acknowledgedBudgetMonth] = settings.acknowledgedBudgetMonth
+            }
+            if (settings.displayName.isNullOrBlank()) prefs.remove(Keys.displayName) else prefs[Keys.displayName] = settings.displayName
+            prefs[Keys.categorySetupDone] = settings.categorySetupDone
+            if (defaultWalletLocalId == null) prefs.remove(Keys.defaultWalletId) else prefs[Keys.defaultWalletId] = defaultWalletLocalId
+            if (settings.guideStep == null) prefs.remove(Keys.guideStep) else prefs[Keys.guideStep] = settings.guideStep
+            prefs[Keys.smartReading] = settings.smartReading
+        }
     }
 
     companion object {

@@ -77,4 +77,10 @@ interface TransactionDao {
             "dirty = CASE WHEN updated_at = :expectedUpdatedAt THEN 0 ELSE dirty END WHERE client_uuid = :clientUuid"
     )
     suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
+
+    @Query("SELECT * FROM transactions ORDER BY occurred_on ASC, id ASC")
+    suspend fun getAll(): List<TransactionEntity>
+
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAll()
 }

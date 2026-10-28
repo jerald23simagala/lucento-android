@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import android.app.Application
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.withTransaction
+import com.lucento.app.data.backup.RoomBackupStore
 import com.lucento.app.data.local.LucentoDatabase
 import com.lucento.app.data.preferences.SharedPreferencesCrashReportsStore
 import com.lucento.app.data.preferences.UserPreferencesRepository
@@ -34,8 +35,9 @@ import com.lucento.app.data.usage.SupabaseUsageRemote
 import com.lucento.app.domain.UsageCountsService
 import com.lucento.app.domain.UsageEventDeleter
 import com.lucento.app.domain.UsageEventSender
-import java.util.UUID
+import com.lucento.app.domain.backup.BackupEngine
 import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -126,6 +128,9 @@ class AppContainer(application: Application) {
     }
 
     val preferences: UserPreferencesRepository by lazy { UserPreferencesRepository(application) }
+    val backup: BackupEngine by lazy {
+        BackupEngine(RoomBackupStore(database, runner, preferences, GoalPhotos(application)))
+    }
     val wallets: WalletRepository by lazy {
         WalletRepository(
             dao = database.walletDao(),

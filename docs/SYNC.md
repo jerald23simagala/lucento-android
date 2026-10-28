@@ -42,7 +42,8 @@ UI (Settings → Cloud sync) ──► SettingsViewModel ──► AuthRepositor
 | `recurring` | `public.recurring` | v9: `client_uuid`, `dirty`, `synced_at`, `base_revision` + triggers (MIGRATION_8_9); debt payments carry `to_wallet_id`, `interest_minor` |
 | `debt_terms` | columns of `public.wallets` | v9: `interest_rate_bps`, `repayment`, `term_months`, `installment_minor`, sent with the wallet (a terms edit bumps the wallet's `updated_at`); pre-v9 builds never send them, so the server keeps them |
 
-Not synced: DataStore preferences (theme, currency, enabled modules, display name) and goal photos. See "Known
+Not synced: DataStore preferences (theme, currency, enabled modules, display name) and goal photos. A JSON backup
+does include those preferences (not crash reports, and not the sync cursor or account id). See docs/BACKUP.md. See "Known
 limitations".
 
 A recurring occurrence's idempotency key uses the schedule's `client_uuid` (`recurring-<uuid>-on-<day>`), so marking the

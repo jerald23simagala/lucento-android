@@ -68,6 +68,20 @@ class FakeWalletDao : WalletDao {
         }
         return 1
     }
+
+    override suspend fun getAll() = rows.value.sortedWith(compareBy<WalletEntity> { it.sortOrder }.thenBy { it.id })
+
+    override suspend fun deleteAll() {
+        rows.value = emptyList()
+    }
+
+    override suspend fun getWithoutClientUuid() = rows.value.filter { it.clientUuid == null }
+
+    override suspend fun assignClientUuid(id: Long, clientUuid: String) {
+        rows.value = rows.value.map {
+            if (it.id == id && it.clientUuid == null) it.copy(clientUuid = clientUuid, dirty = true) else it
+        }
+    }
 }
 
 class FakeCategoryDao : CategoryDao {
@@ -142,6 +156,16 @@ class FakeCategoryDao : CategoryDao {
     override suspend fun assignClientUuid(id: Long, clientUuid: String) {
         rows.value = rows.value.map { if (it.id == id && it.clientUuid == null) it.copy(clientUuid = clientUuid) else it }
     }
+
+    override suspend fun deleteAll() {
+        rows.value = emptyList()
+    }
+
+    override suspend fun assignClientUuidForBackup(id: Long, clientUuid: String) {
+        rows.value = rows.value.map {
+            if (it.id == id && it.clientUuid == null) it.copy(clientUuid = clientUuid, dirty = true) else it
+        }
+    }
 }
 
 class FakeTransactionDao : TransactionDao {
@@ -204,6 +228,12 @@ class FakeTransactionDao : TransactionDao {
         }
         return 1
     }
+
+    override suspend fun getAll() = rows.value.sortedWith(compareBy<TransactionEntity> { it.occurredOn }.thenBy { it.id })
+
+    override suspend fun deleteAll() {
+        rows.value = emptyList()
+    }
 }
 
 class FakeBudgetDao : BudgetDao {
@@ -252,6 +282,20 @@ class FakeBudgetDao : BudgetDao {
             if (it.id == match.id) it.copy(baseRevision = revision, syncedAt = syncedAt, dirty = it.dirty && it.updatedAt != expectedUpdatedAt) else it
         }
         return 1
+    }
+
+    override suspend fun getAll() = rows.value.sortedBy { it.id }
+
+    override suspend fun deleteAll() {
+        rows.value = emptyList()
+    }
+
+    override suspend fun getWithoutClientUuid() = rows.value.filter { it.clientUuid == null }
+
+    override suspend fun assignClientUuid(id: Long, clientUuid: String) {
+        rows.value = rows.value.map {
+            if (it.id == id && it.clientUuid == null) it.copy(clientUuid = clientUuid, dirty = true) else it
+        }
     }
 }
 
@@ -321,6 +365,27 @@ class FakeGoalDao : GoalDao {
             if (it.clientUuid == clientUuid) it.copy(dirty = false, baseRevision = revision, syncedAt = syncedAt) else it
         }
     }
+
+    override suspend fun getAll() = goals.value.sortedBy { it.id }
+
+    override suspend fun getAllContributions() =
+        contributions.value.sortedWith(compareBy<GoalContributionEntity> { it.occurredOn }.thenBy { it.id })
+
+    override suspend fun deleteAll() {
+        goals.value = emptyList()
+    }
+
+    override suspend fun deleteAllContributions() {
+        contributions.value = emptyList()
+    }
+
+    override suspend fun getWithoutClientUuid() = goals.value.filter { it.clientUuid == null }
+
+    override suspend fun assignClientUuid(id: Long, clientUuid: String) {
+        goals.value = goals.value.map {
+            if (it.id == id && it.clientUuid == null) it.copy(clientUuid = clientUuid, dirty = true) else it
+        }
+    }
 }
 
 class FakeRecurringDao : RecurringDao {
@@ -358,6 +423,20 @@ class FakeRecurringDao : RecurringDao {
         }
         return 1
     }
+
+    override suspend fun getAll() = rows.value.sortedBy { it.id }
+
+    override suspend fun deleteAll() {
+        rows.value = emptyList()
+    }
+
+    override suspend fun getWithoutClientUuid() = rows.value.filter { it.clientUuid == null }
+
+    override suspend fun assignClientUuid(id: Long, clientUuid: String) {
+        rows.value = rows.value.map {
+            if (it.id == id && it.clientUuid == null) it.copy(clientUuid = clientUuid, dirty = true) else it
+        }
+    }
 }
 
 class FakeDebtTermsDao : DebtTermsDao {
@@ -374,6 +453,12 @@ class FakeDebtTermsDao : DebtTermsDao {
     }
 
     override suspend fun get(walletId: Long) = rows.value.firstOrNull { it.walletId == walletId }
+
+    override suspend fun getAll() = rows.value
+
+    override suspend fun deleteAll() {
+        rows.value = emptyList()
+    }
 }
 
 class FakeSyncDao : SyncDao {
@@ -397,5 +482,11 @@ class FakeSyncDao : SyncDao {
         val id = nextId++
         rows.value = rows.value + tombstone.copy(id = id)
         return id
+    }
+
+    override suspend fun getAll() = rows.value
+
+    override suspend fun deleteAll() {
+        rows.value = emptyList()
     }
 }

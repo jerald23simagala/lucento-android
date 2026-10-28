@@ -74,4 +74,22 @@ interface GoalDao {
 
     @Query("UPDATE goal_contributions SET dirty = 0, base_revision = :revision, synced_at = :syncedAt WHERE client_uuid = :clientUuid")
     suspend fun markContributionPushed(clientUuid: String, revision: Long, syncedAt: Long)
+
+    @Query("SELECT * FROM goals ORDER BY id ASC")
+    suspend fun getAll(): List<GoalEntity>
+
+    @Query("SELECT * FROM goal_contributions ORDER BY occurred_on ASC, id ASC")
+    suspend fun getAllContributions(): List<GoalContributionEntity>
+
+    @Query("DELETE FROM goals")
+    suspend fun deleteAll()
+
+    @Query("DELETE FROM goal_contributions")
+    suspend fun deleteAllContributions()
+
+    @Query("SELECT * FROM goals WHERE client_uuid IS NULL")
+    suspend fun getWithoutClientUuid(): List<GoalEntity>
+
+    @Query("UPDATE goals SET client_uuid = :clientUuid, dirty = 1 WHERE id = :id AND client_uuid IS NULL")
+    suspend fun assignClientUuid(id: Long, clientUuid: String)
 }

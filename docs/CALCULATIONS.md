@@ -115,6 +115,14 @@ transaction, idempotent on the client key. Same currency only. Deleting or editi
   unique-key race returns the row that won. Screens use `saveOrNull` / `saveTransferOrNull` and the Plan view model
   catches failures, so a refused write shows an error and never a success confirmation.
 
+## JSON backup
+A backup is one JSON document (`schemaVersion`, app version, export time) of the Room ledger plus the preferences
+listed in `docs/BACKUP.md`. Amounts are integer minor units with an ISO 4217 code — the same representation as the
+database, never floating point. Calendar dates are ISO-8601 (`YYYY-MM-DD`); instants are ISO-8601 UTC. Stable ids are
+each row's `client_uuid`. Restored rows are marked dirty with no base revision, so the next sync uploads them and a
+conflict with the server is decided by `updatedAt`, not by claiming to be based on a server revision the file does
+not know.
+
 ## CSV export
 RFC 4180 quoting (commas, quotes, CR/LF) for every field. User-entered text (account, category, note) whose first
 meaningful character — after leading whitespace, control characters or a BOM — is `=`, `+`, `-`, `@` (or the

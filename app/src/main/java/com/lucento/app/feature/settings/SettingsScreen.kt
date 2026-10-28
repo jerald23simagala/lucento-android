@@ -31,12 +31,15 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -74,6 +77,8 @@ import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.domain.Feature
+import com.lucento.app.domain.backup.BackupPreview
+import com.lucento.app.domain.backup.RestoreMode
 import java.time.LocalDate
 
 @Composable
@@ -84,10 +89,25 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var pickingCurrency by remember { mutableStateOf(false) }
     var exportMessage by remember { mutableStateOf<String?>(null) }
+    var backupPreview by remember { mutableStateOf<BackupPreview?>(null) }
+    var confirmReplace by remember { mutableStateOf(false) }
     val haptics = rememberHaptics()
     val context = LocalContext.current
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) viewModel.exportCsv(context.contentResolver, uri) { exportMessage = it }
+    }
+    val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) viewModel.exportBackup(context.contentResolver, uri) { exportMessage = it }
+    }
+    val backupImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            viewModel.inspectBackup(
+                context.contentResolver,
+                uri,
+                onPreview = { backupPreview = it },
+                onError = { exportMessage = it },
+            )
+        }
     }
 
     Column(
@@ -111,6 +131,14 @@ fun SettingsScreen(
                 onExport = {
                     exportMessage = null
                     exporter.launch("lucento-transactions-${LocalDate.now()}.csv")
+                },
+                onExportBackup = {
+                    exportMessage = null
+                    backupExporter.launch("lucento-backup-${LocalDate.now()}.json")
+                },
+                onRestoreBackup = {
+                    exportMessage = null
+                    backupImporter.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
                 },
                 exportMessage = exportMessage,
                 // LocalContext here is MainActivity, which Credential Manager needs to show the account picker.
@@ -146,6 +174,32 @@ fun SettingsScreen(
             }
         }
         Spacer(Modifier.height(Spacing.xxl))
+    }
+
+    backupPreview?.let { preview ->
+        RestorePreviewDialog(
+            preview = preview,
+            onMerge = {
+                backupPreview = null
+                viewModel.restoreBackup(RestoreMode.MERGE) { exportMessage = it }
+            },
+            onReplace = { confirmReplace = true },
+            onDismiss = { backupPreview = null },
+        )
+    }
+    if (confirmReplace) {
+        ConfirmDialog(
+            title = "Replace everything on this device?",
+            text = "This erases the wallets, transactions, budgets, goals and schedules on this phone, then imports the file. It can’t be undone.",
+            confirmLabel = "Replace",
+            destructive = true,
+            onConfirm = {
+                confirmReplace = false
+                backupPreview = null
+                viewModel.restoreBackup(RestoreMode.REPLACE) { exportMessage = it }
+            },
+            onDismiss = { confirmReplace = false },
+        )
     }
 
     val current = state
@@ -234,6 +288,8 @@ private fun SettingsContent(
     onSmartReading: (Boolean) -> Unit,
     onCrashReports: (Boolean) -> Unit,
     onExport: () -> Unit,
+    onExportBackup: () -> Unit,
+    onRestoreBackup: () -> Unit,
     exportMessage: String?,
     onConnectGoogle: () -> Unit,
     onConnectEmail: (String, String, EmailMode) -> Unit,
@@ -319,14 +375,27 @@ private fun SettingsContent(
             summary = "${current.transactionCount} rows · opens in any spreadsheet app",
             onClick = onExport,
         )
+        NavRow(
+            icon = Icons.Outlined.FileDownload,
+            title = "Export backup (JSON)",
+            summary = "Wallets, transactions, budgets, goals, debts and settings",
+            onClick = onExportBackup,
+        )
+        NavRow(
+            icon = Icons.Outlined.FileUpload,
+            title = "Restore backup",
+            summary = "Merge with this phone, or replace everything here",
+            onClick = onRestoreBackup,
+        )
         exportMessage?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Spacing.sm))
         InfoNote(
-            "Your wallets, transactions, budgets and goals stay only on this phone unless cloud sync is on. " +
-                "Full backup and restore isn’t available yet. Until it is, keep a CSV export somewhere safe: uninstalling " +
-                "Lucento or clearing its storage permanently erases your data.",
+            "A backup is one JSON file you choose where to save. Restore it to merge with this phone, or to replace " +
+                "everything here. CSV export is only a spreadsheet of transactions. Goal photos stay on this phone, and " +
+                "the file never includes sign-in or crash reports. Uninstalling Lucento or clearing its storage erases " +
+                "anything that isn’t in a backup or in cloud sync.",
         )
 
         SectionHeader("Privacy", Modifier.padding(top = Spacing.section))
@@ -593,4 +662,41 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
             onDismiss = { asking = false },
         )
     }
+}
+
+@Composable
+private fun RestorePreviewDialog(
+    preview: BackupPreview,
+    onMerge: () -> Unit,
+    onReplace: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        title = { Text("Restore this backup?", style = MaterialTheme.typography.headlineSmall) },
+        text = {
+            Column {
+                Text(preview.summary(), style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    "Merge keeps records already on this phone and updates one only when the file is newer. " +
+                        "Replace erases this phone’s records and uses the file. Theme and currency change only when you replace.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            Row {
+                TextButton(onClick = onMerge) { Text("Merge") }
+                TextButton(onClick = onReplace) {
+                    Text("Replace", color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }

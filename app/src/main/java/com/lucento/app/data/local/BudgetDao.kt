@@ -57,4 +57,16 @@ interface BudgetDao {
             "dirty = CASE WHEN updated_at = :expectedUpdatedAt THEN 0 ELSE dirty END WHERE client_uuid = :clientUuid"
     )
     suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
+
+    @Query("SELECT * FROM budgets ORDER BY id ASC")
+    suspend fun getAll(): List<BudgetEntity>
+
+    @Query("DELETE FROM budgets")
+    suspend fun deleteAll()
+
+    @Query("SELECT * FROM budgets WHERE client_uuid IS NULL")
+    suspend fun getWithoutClientUuid(): List<BudgetEntity>
+
+    @Query("UPDATE budgets SET client_uuid = :clientUuid, dirty = 1 WHERE id = :id AND client_uuid IS NULL")
+    suspend fun assignClientUuid(id: Long, clientUuid: String)
 }
