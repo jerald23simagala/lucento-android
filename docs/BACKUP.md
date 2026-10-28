@@ -34,11 +34,17 @@ reference, or a forbidden field fails and changes nothing.
 The preview shows how many of each record the file contains and the earliest and latest transaction date.
 
 - **Merge** upserts by stable id. When both sides have the id, the later `updatedAt` wins (goal contributions use
-  `createdAt`; a tie keeps the row already on the phone). Records only on this phone stay. Device preferences stay,
-  except a default wallet that the merge removed.
-- **Replace** makes the file the whole ledger inside one Room transaction. Ids that were only on this phone are
-  recorded as deletions so the next sync can remove them. Preferences in the file replace theme, currency and the
-  other settings listed above. Crash reports are left alone.
+  `createdAt`; a tie keeps the row already on the phone). A file category with a different id is folded into a local
+  category when the normalized name (trimmed, case-folded, internal spaces collapsed) and the kind both match, and
+  every transaction, budget and schedule that used the file id is pointed at the local one. The preview says how many
+  were matched. The same name with a different kind is a conflict: the preview says so and Merge keeps both.
+  Records only on this phone stay. Device preferences stay, except a default wallet that the merge removed.
+- **Replace** makes the file the whole ledger inside one Room transaction. Every restored row’s `updatedAt` (and a
+  goal contribution’s `createdAt`, which sync sends as `updated_at`) is set to the restore time. The push has no
+  base revision, so the server treats it as concurrent and skips it unless `updated_at` is strictly newer
+  (`lucento_reject_stale_update`). Ids that were only on this phone are recorded as unpushed deletions, and sync
+  uploads those tombstones with the current time. Preferences in the file replace theme, currency and the other
+  settings listed above. Crash reports are left alone.
 
 If the write fails, the transaction rolls back and the previous ledger remains.
 

@@ -362,7 +362,7 @@ class SettingsViewModel(
         exporting = true
         viewModelScope.launch {
             val message = try {
-                val json = backup.export(BuildConfig.VERSION_NAME)
+                val json = withContext(Dispatchers.IO) { backup.export(BuildConfig.VERSION_NAME) }
                 withContext(Dispatchers.IO) {
                     val stream = resolver.openOutputStream(uri) ?: error("Could not open the file")
                     stream.use { it.write(json.toByteArray(Charsets.UTF_8)) }
@@ -386,7 +386,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             try {
                 val text = withContext(Dispatchers.IO) { readBackup(resolver, uri) }
-                val preview = backup.preview(text)
+                val preview = withContext(Dispatchers.IO) { backup.preview(text) }
                 pendingRestore = text
                 onPreview(preview)
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -409,7 +409,7 @@ class SettingsViewModel(
         exporting = true
         viewModelScope.launch {
             val message = try {
-                backup.restore(json, mode)
+                withContext(Dispatchers.IO) { backup.restore(json, mode) }
                 pendingRestore = null
                 if (mode == RestoreMode.REPLACE) "Replaced this device’s data with the backup." else "Merged the backup into this device."
             } catch (e: kotlinx.coroutines.CancellationException) {

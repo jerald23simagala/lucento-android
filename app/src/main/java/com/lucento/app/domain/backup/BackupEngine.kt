@@ -14,10 +14,11 @@ class BackupEngine(
         return BackupCodec.encode(document(appVersion, snapshot))
     }
 
-    fun preview(json: String): BackupPreview {
+    suspend fun preview(json: String): BackupPreview {
         val document = BackupCodec.decode(json)
         val dates = document.snapshot.transactions.map { it.occurredOn }
         val snapshot = document.snapshot
+        val match = BackupMerge.categoryMatch(store.read(), snapshot)
         return BackupPreview(
             counts = BackupCounts(
                 wallets = snapshot.wallets.size,
@@ -34,6 +35,8 @@ class BackupEngine(
             appVersion = document.appVersion,
             exportedAt = document.exportedAt,
             schemaVersion = document.schemaVersion,
+            categoriesMatched = match.matched,
+            categoryConflicts = match.conflicts,
         )
     }
 

@@ -11,6 +11,12 @@
   **Replace** (wipe the local ledger and import it inside one Room transaction). A malformed file, an unknown
   schema version, or a tampered field changes nothing. Older files migrate forward (version 0 used `accounts` and
   epoch numbers).
+- Merge folds a category from another install into the local one when the normalized name and the kind both match,
+  and points transactions, budgets and schedules at that category. A matching name with a different kind is shown in
+  the preview and both categories are kept.
+- Replace stamps restored `updatedAt` (and a contribution’s `createdAt`, which sync sends as `updated_at`) with the
+  restore time, so the server’s concurrent last-write-wins rule does not skip the restore. Rows the replace removed
+  are unpushed deletion tombstones and are uploaded on the next sync.
 - Restored rows are marked dirty with no base revision, so they upload on the next sync and still restore when signed out.
   Sign-in, crash reports, sync cursors and goal photo files are not in the backup. CSV export is unchanged.
 - Goal photos stay on the device. A goal restored from a file keeps its scene and not a custom photo.

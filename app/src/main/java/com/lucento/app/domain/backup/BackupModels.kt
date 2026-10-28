@@ -172,6 +172,16 @@ data class BackupCounts(
     val debts: Int,
 )
 
+/**
+ * A file category whose name matches one on this phone, but not its kind. Merge keeps both.
+ * [name] is the name as written in the file.
+ */
+data class CategoryKindConflict(
+    val name: String,
+    val fileKind: CategoryKind,
+    val localKinds: List<CategoryKind>,
+)
+
 data class BackupPreview(
     val counts: BackupCounts,
     val earliestTransaction: LocalDate?,
@@ -179,8 +189,11 @@ data class BackupPreview(
     val appVersion: String,
     val exportedAt: Long,
     val schemaVersion: Int,
+    /** File categories Merge will fold into one already on this phone (same normalized name and kind, different id). */
+    val categoriesMatched: Int = 0,
+    val categoryConflicts: List<CategoryKindConflict> = emptyList(),
 ) {
-    /** Counts and the transaction date span, for the restore confirmation. */
+    /** Counts, category matches, and the transaction date span, for the restore confirmation. */
     fun summary(): String = buildString {
         appendLine("${counts.wallets} ${noun(counts.wallets, "wallet", "wallets")}")
         appendLine("${counts.categories} ${noun(counts.categories, "category", "categories")}")
@@ -190,6 +203,19 @@ data class BackupPreview(
         appendLine("${counts.goalContributions} ${noun(counts.goalContributions, "goal contribution", "goal contributions")}")
         appendLine("${counts.recurring} scheduled")
         appendLine("${counts.debts} ${noun(counts.debts, "debt", "debts")}")
+        if (categoriesMatched > 0) {
+            appendLine(
+                "$categoriesMatched ${noun(categoriesMatched, "category", "categories")} " +
+                    "matched one already on this phone and will be combined if you merge.",
+            )
+        }
+        categoryConflicts.forEach { conflict ->
+            val here = conflict.localKinds.joinToString(" and ") { it.name.lowercase() }
+            appendLine(
+                "“${conflict.name}” is ${conflict.fileKind.name.lowercase()} in the file and $here on this phone, " +
+                    "so Merge keeps both.",
+            )
+        }
         val from = earliestTransaction
         val to = latestTransaction
         if (from != null && to != null) {
@@ -216,8 +242,9 @@ object BackupTables {
 
 /**
  * How a restored row is marked so the next sync uploads it, including when the user is signed out
- * (the flag simply waits). [baseRevision] stays null so an old file is not treated as a causal
- * successor of whatever the server currently has; the later [updatedAt] wins that conflict.
+ * (the flag simply waits). [baseRevision] stays null, so the push is concurrent with the server.
+ * A Replace restore also sets [updatedAt] to the restore time: the server skips a concurrent update
+ * whose `updated_at` is not strictly newer (`lucento_reject_stale_update`).
  */
 object RestoredSync {
     const val DIRTY = true

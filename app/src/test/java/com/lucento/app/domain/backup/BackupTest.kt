@@ -1,5 +1,6 @@
 package com.lucento.app.domain.backup
 
+import com.lucento.app.data.sync.localEditWins
 import com.lucento.app.domain.CategoryKind
 import com.lucento.app.domain.DebtRepayment
 import com.lucento.app.domain.Feature
@@ -41,7 +42,10 @@ class BackupTest {
 
         store.snapshot = BackupSnapshot()
         engine.restore(json, RestoreMode.REPLACE)
-        val expected = original.copy(goals = original.goals.map { it.copy(photoPath = null) })
+        val expected = BackupMerge.stampForSync(
+            original.copy(goals = original.goals.map { it.copy(photoPath = null) }),
+            exportedAt,
+        )
         assertEquals(expected, store.snapshot)
         assertEquals(setOf("wal-bank", "wal-card", "cat-food", "cat-pay", "tx-1", "tx-2", "bud-1", "goal-1", "contrib-1", "rec-1"), store.pendingIds)
         assertTrue(RestoredSync.DIRTY)
@@ -49,7 +53,7 @@ class BackupTest {
         assertNull(RestoredSync.baseRevision)
     }
 
-    @Test fun previewReportsCountsAndDateRange() {
+    @Test fun previewReportsCountsAndDateRange() = runTest {
         val json = BackupCodec.encode(BackupDocument(1, "0.5.0", exportedAt, sample()))
         val preview = BackupEngine(MemoryBackupStore(BackupSnapshot())).preview(json)
         assertEquals(2, preview.counts.wallets)
@@ -88,6 +92,70 @@ class BackupTest {
         )
         assertEquals("On device", store.snapshot.wallets.single().name)
         assertEquals("DARK", store.snapshot.settings.themeMode)
+    }
+
+    @Test fun mergeCombinesSeededFoodFromAnotherInstall() = runTest {
+        val at = 5_000L
+        val localFood = category("local-food", "Food", CategoryKind.EXPENSE, at)
+        val fileFood = category("file-food", " food ", CategoryKind.EXPENSE, at)
+        val localTx = transaction("tx-home", updatedAt = at).copy(categoryId = "local-food")
+        val fileTx = transaction("tx-away", updatedAt = at).copy(categoryId = "file-food")
+        val local = snapshot(wallet("wal-bank", "Cash", at), transactions = listOf(localTx)).copy(categories = listOf(localFood))
+        val file = snapshot(wallet("wal-bank", "Cash", at), transactions = listOf(fileTx)).copy(categories = listOf(fileFood))
+        val store = MemoryBackupStore(local)
+        val engine = engine(store)
+        val preview = engine.preview(encode(file))
+        assertEquals(1, preview.categoriesMatched)
+        assertTrue(preview.categoryConflicts.isEmpty())
+        assertTrue(preview.summary().contains("1 category matched"))
+        engine.restore(encode(file), RestoreMode.MERGE)
+        assertEquals(listOf("local-food"), store.snapshot.categories.map { it.id })
+        assertEquals("Food", store.snapshot.categories.single().name)
+        assertEquals(setOf("tx-home", "tx-away"), store.snapshot.transactions.map { it.id }.toSet())
+        assertTrue(store.snapshot.transactions.all { it.categoryId == "local-food" })
+    }
+
+    @Test fun mergeKeepsBothCategoriesWhenOnlyTheKindDiffers() = runTest {
+        val at = 5_000L
+        val localFood = category("local-food", "Food", CategoryKind.EXPENSE, at)
+        val fileFood = category("file-food", "Food", CategoryKind.INCOME, at)
+        val fileTx = transaction("tx-away", updatedAt = at).copy(categoryId = "file-food", type = TransactionType.INCOME)
+        val local = snapshot(wallet("wal-bank", "Cash", at)).copy(categories = listOf(localFood))
+        val file = snapshot(wallet("wal-bank", "Cash", at), transactions = listOf(fileTx)).copy(categories = listOf(fileFood))
+        val store = MemoryBackupStore(local)
+        val engine = engine(store)
+        val preview = engine.preview(encode(file))
+        assertEquals(0, preview.categoriesMatched)
+        assertEquals("Food", preview.categoryConflicts.single().name)
+        assertEquals(CategoryKind.INCOME, preview.categoryConflicts.single().fileKind)
+        assertEquals(listOf(CategoryKind.EXPENSE), preview.categoryConflicts.single().localKinds)
+        assertTrue(preview.summary().contains("Merge keeps both"))
+        engine.restore(encode(file), RestoreMode.MERGE)
+        assertEquals(setOf("local-food", "file-food"), store.snapshot.categories.map { it.id }.toSet())
+        assertEquals("file-food", store.snapshot.transactions.single().categoryId)
+    }
+
+    @Test fun replaceStampsUpdatedAtSoTheNextSyncIsNotRejected() = runTest {
+        val old = 1_000L
+        val kept = wallet("from-file", "Kept", updatedAt = old)
+        val movement = transaction("tx-1", updatedAt = old).copy(walletId = "from-file")
+        val goal = BackupGoal("goal-1", "Trip", 100, "USD", null, "from-file", false, null, old, old)
+        val contribution = BackupGoalContribution("contrib-1", "goal-1", 50, LocalDate.parse("2026-01-10"), "", old)
+        val file = snapshot(kept, transactions = listOf(movement)).copy(goals = listOf(goal), goalContributions = listOf(contribution))
+        val store = MemoryBackupStore(snapshot(wallet("local-only", "Gone", updatedAt = old)))
+        engine(store).restore(encode(file), RestoreMode.REPLACE)
+        assertEquals(exportedAt, store.snapshot.wallets.single().updatedAt)
+        assertEquals(exportedAt, store.snapshot.transactions.single().updatedAt)
+        assertEquals(exportedAt, store.snapshot.goals.single().updatedAt)
+        assertEquals(old, store.snapshot.goals.single().createdAt)
+        assertEquals(exportedAt, store.snapshot.goalContributions.single().createdAt)
+        assertEquals(LocalDate.parse("2026-01-10"), store.snapshot.goalContributions.single().occurredOn)
+        assertEquals(listOf(BackupDeletion(BackupTables.WALLETS, "local-only", exportedAt)), store.snapshot.deletions)
+        assertTrue(store.pendingIds.contains("from-file"))
+        assertTrue(store.pendingIds.contains("local-only"))
+        // Unknown base revision is concurrent. The server keeps the stored row unless updated_at is strictly newer.
+        assertFalse(localEditWins(localBaseRevision = null, localUpdatedAt = old, remoteRevision = 4, remoteUpdatedAt = exportedAt))
+        assertTrue(localEditWins(localBaseRevision = null, localUpdatedAt = exportedAt, remoteRevision = 4, remoteUpdatedAt = old))
     }
 
     @Test fun mergeDropsARowWhenTheFileDeletionIsNewer() = runTest {
@@ -242,7 +310,7 @@ class BackupTest {
                 if (failOnWrite) error("disk full")
                 this.snapshot = snapshot
                 writes += 1
-                pendingIds = liveIds(snapshot)
+                pendingIds = liveIds(snapshot) + snapshot.deletions.map { it.id }
             } catch (error: Throwable) {
                 this.snapshot = checkpoint
                 pendingIds = checkpointPending
@@ -294,6 +362,17 @@ class BackupTest {
             ),
         )
     }
+
+    private fun category(id: String, name: String, kind: CategoryKind, at: Long) = BackupCategory(
+        id = id,
+        name = name,
+        kind = kind,
+        iconKey = "groceries",
+        sortOrder = 0,
+        archived = false,
+        createdAt = at,
+        updatedAt = at,
+    )
 
     private fun wallet(id: String, name: String, updatedAt: Long) = BackupWallet(
         id = id,

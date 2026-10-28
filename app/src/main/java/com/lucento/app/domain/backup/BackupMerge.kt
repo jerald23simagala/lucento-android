@@ -16,21 +16,47 @@ object BackupMerge {
         val contributions = drop(mergeRows(local.goalContributions, incoming.goalContributions, { it.id }, { it.createdAt }), deletions, BackupTables.GOAL_CONTRIBUTIONS, { it.id }, { it.createdAt })
         val recurring = drop(mergeRows(local.recurring, incoming.recurring, { it.id }, { it.updatedAt }), deletions, BackupTables.RECURRING, { it.id }, { it.updatedAt })
         val debts = mergeRows(local.debtTerms, incoming.debtTerms, { it.walletId }, { it.updatedAt })
+        val folded = foldCategories(
+            localIds = local.categories.map { it.id }.toSet(),
+            categories = categories.rows,
+            transactions = transactions.rows,
+            budgets = budgets.rows,
+            recurring = recurring.rows,
+        )
+        val foldedBudgetDeletions = folded.droppedBudgetIds.map { BackupDeletion(BackupTables.BUDGETS, it, now) }
         return normalize(
             BackupSnapshot(
                 wallets = wallets.rows,
-                categories = categories.rows,
-                transactions = transactions.rows,
-                budgets = budgets.rows,
+                categories = folded.categories,
+                transactions = folded.transactions,
+                budgets = folded.budgets,
                 goals = goals.rows,
                 goalContributions = contributions.rows,
-                recurring = recurring.rows,
+                recurring = folded.recurring,
                 debtTerms = debts,
                 deletions = wallets.deletions + categories.deletions + transactions.deletions +
-                    budgets.deletions + goals.deletions + contributions.deletions + recurring.deletions,
+                    budgets.deletions + goals.deletions + contributions.deletions + recurring.deletions +
+                    foldedBudgetDeletions,
                 settings = local.settings,
             ),
             now,
+        )
+    }
+
+    /** What Merge will do with categories that share a name but not an id. Used by the restore preview. */
+    internal fun categoryMatch(local: BackupSnapshot, incoming: BackupSnapshot): CategoryNameMatch.Plan {
+        val deletions = combine(local.deletions, incoming.deletions)
+        val categories = drop(
+            mergeRows(local.categories, incoming.categories, { it.id }, { it.updatedAt }),
+            deletions,
+            BackupTables.CATEGORIES,
+            { it.id },
+            { it.updatedAt },
+        ).rows
+        val localIds = local.categories.map { it.id }.toSet()
+        return CategoryNameMatch.plan(
+            local = categories.filter { it.id in localIds },
+            incomingOnly = categories.filter { it.id !in localIds },
         )
     }
 
@@ -66,14 +92,36 @@ object BackupMerge {
             }
             deletion.id !in live
         }
-        return normalize(
-            incoming.copy(
-                goals = incoming.goals.map { it.copy(photoPath = null) },
-                deletions = combine(incoming.deletions, removed + stillDeleted),
+        return stampForSync(
+            normalize(
+                incoming.copy(
+                    goals = incoming.goals.map { it.copy(photoPath = null) },
+                    deletions = combine(incoming.deletions, removed + stillDeleted),
+                ),
+                now,
             ),
             now,
         )
     }
+
+    /**
+     * A Replace restore is a new edit. The server skips a concurrent upsert whose `updated_at` is not
+     * strictly newer, and a restored row's base revision is unknown, so the stored edit time has to be
+     * the restore time. Goal contributions have no `updatedAt`; sync sends [BackupGoalContribution.createdAt]
+     * as that column, while [BackupGoalContribution.occurredOn] stays the date the person entered.
+     * Deletion times are the restore time as well; sync pushes every unpushed tombstone.
+     */
+    internal fun stampForSync(snapshot: BackupSnapshot, now: Long): BackupSnapshot = snapshot.copy(
+        wallets = snapshot.wallets.map { it.copy(updatedAt = now) },
+        categories = snapshot.categories.map { it.copy(updatedAt = now) },
+        transactions = snapshot.transactions.map { it.copy(updatedAt = now) },
+        budgets = snapshot.budgets.map { it.copy(updatedAt = now) },
+        goals = snapshot.goals.map { it.copy(updatedAt = now) },
+        goalContributions = snapshot.goalContributions.map { it.copy(createdAt = now) },
+        recurring = snapshot.recurring.map { it.copy(updatedAt = now) },
+        debtTerms = snapshot.debtTerms.map { it.copy(updatedAt = now) },
+        deletions = snapshot.deletions.map { it.copy(deletedAt = now) },
+    )
 
     /**
      * Drops rows whose parent was removed, matching the database's foreign keys, and records a
@@ -150,6 +198,50 @@ object BackupMerge {
             settings = settings,
         ).ordered()
     }
+}
+
+private data class FoldedCategories(
+    val categories: List<BackupCategory>,
+    val transactions: List<BackupTransaction>,
+    val budgets: List<BackupBudget>,
+    val recurring: List<BackupRecurring>,
+    val droppedBudgetIds: List<String> = emptyList(),
+)
+
+/** Drops file categories that are the same name and kind as a local one, and points every reference at the local id. */
+private fun foldCategories(
+    localIds: Set<String>,
+    categories: List<BackupCategory>,
+    transactions: List<BackupTransaction>,
+    budgets: List<BackupBudget>,
+    recurring: List<BackupRecurring>,
+): FoldedCategories {
+    val plan = CategoryNameMatch.plan(
+        local = categories.filter { it.id in localIds },
+        incomingOnly = categories.filter { it.id !in localIds },
+    )
+    if (plan.remap.isEmpty()) {
+        return FoldedCategories(categories, transactions, budgets, recurring)
+    }
+    fun remap(id: String?): String? = id?.let { plan.remap[it] ?: it }
+    val foldedBudgets = LinkedHashMap<Pair<String?, String>, BackupBudget>()
+    for (budget in budgets.map { it.copy(categoryId = remap(it.categoryId)) }) {
+        val key = budget.categoryId to budget.currency
+        val existing = foldedBudgets[key]
+        foldedBudgets[key] = when {
+            existing == null -> budget
+            budget.updatedAt > existing.updatedAt -> budget
+            else -> existing
+        }
+    }
+    val keptBudgetIds = foldedBudgets.values.map { it.id }.toSet()
+    return FoldedCategories(
+        categories = categories.filter { it.id !in plan.remap },
+        transactions = transactions.map { it.copy(categoryId = remap(it.categoryId)) },
+        budgets = foldedBudgets.values.toList(),
+        recurring = recurring.map { it.copy(categoryId = remap(it.categoryId)) },
+        droppedBudgetIds = budgets.map { it.id }.filter { it !in keptBudgetIds },
+    )
 }
 
 private data class Kept<T>(val rows: List<T>, val deletions: List<BackupDeletion>)
