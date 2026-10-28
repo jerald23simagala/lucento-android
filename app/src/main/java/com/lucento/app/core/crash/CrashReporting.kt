@@ -12,6 +12,10 @@ object CrashReporting {
     internal var collectionEnabled: Boolean? = null
         private set
 
+    /** How many times opt-out asked the SDK to drop reports still waiting to send. Visible for tests. */
+    internal var unsentReportsDeleted: Int = 0
+        private set
+
     /**
      * Installs the sanitising handler and leaves collection off. The Settings toggle calls
      * [setCollectionEnabled] after the stored preference is read. With no Crashlytics class this is a no-op.
@@ -30,14 +34,18 @@ object CrashReporting {
         }
     }
 
-    /** Turns collection on or off immediately. No-op when the SDK isn't in this build. */
+    /** Turns collection on or off immediately. Opting out also drops reports that have not been sent yet. */
     fun setCollectionEnabled(enabled: Boolean) {
         collectionEnabled = enabled
+        if (!enabled) unsentReportsDeleted++
         val crashlytics = crashlyticsClass() ?: return
         val instance = instance(crashlytics) ?: return
         runCatching {
             crashlytics.getMethod("setCrashlyticsCollectionEnabled", Boolean::class.javaPrimitiveType)
                 .invoke(instance, enabled)
+        }
+        if (!enabled) {
+            runCatching { crashlytics.getMethod("deleteUnsentReports").invoke(instance) }
         }
     }
 

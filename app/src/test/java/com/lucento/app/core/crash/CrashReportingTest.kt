@@ -34,7 +34,9 @@ class CrashReportingTest {
         assertEquals(false, CrashReporting.collectionEnabled)
         CrashReporting.setCollectionEnabled(true)
         assertEquals(true, CrashReporting.collectionEnabled)
+        val deletedBefore = CrashReporting.unsentReportsDeleted
         CrashReporting.setCollectionEnabled(false)
         assertEquals(false, CrashReporting.collectionEnabled)
+        assertEquals(deletedBefore + 1, CrashReporting.unsentReportsDeleted)
     }
 }

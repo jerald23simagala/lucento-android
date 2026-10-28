@@ -74,6 +74,13 @@ import com.lucento.app.domain.capture.RowStatus
 import com.lucento.app.feature.plan.formatDate
 import java.time.LocalDate
 
+/** One tap on a review row: expense and income trade places. A transfer becomes an expense. */
+internal fun flipIncomeExpense(type: TransactionType): TransactionType = when (type) {
+    TransactionType.EXPENSE -> TransactionType.INCOME
+    TransactionType.INCOME -> TransactionType.EXPENSE
+    else -> TransactionType.EXPENSE
+}
+
 internal fun typeLabel(type: TransactionType): String = when (type) {
     TransactionType.INCOME -> "Income"
     TransactionType.EXPENSE -> "Expense"
@@ -143,13 +150,15 @@ internal fun ReviewRowItem(
                 if (transfersAllowed || row.type.isTransfer) add(TransactionType.TRANSFER_OUT)
             }
             val typeChip: @Composable (Boolean) -> Unit = { small ->
-                MenuChip(
-                    label = typeLabel(row.type),
-                    description = "Type: ${typeLabel(row.type)}. Change type",
+                TypeChip(
+                    type = row.type,
+                    options = typeOptions,
                     attention = attention(RowField.TYPE),
                     enabled = enabled,
                     small = small,
-                    options = typeOptions.map { typeLabel(it) to { onEdit(RowEdit.Type(it)) } },
+                    offerMenu = transfersAllowed || row.type.isTransfer,
+                    onFlip = { onEdit(RowEdit.Type(flipIncomeExpense(row.type))) },
+                    onPick = { onEdit(RowEdit.Type(it)) },
                 )
             }
 
@@ -167,10 +176,7 @@ internal fun ReviewRowItem(
                         onClick = onPickDate,
                     )
                     val showAccount = wallets.size > 1 && row.walletId != activeWalletId
-                    if (row.type.isTransfer) {
-                        Spacer(Modifier.width(6.dp))
-                        typeChip(true)
-                    } else if (showAccount || attention(RowField.WALLET)) {
+                    if (!row.type.isTransfer && (showAccount || attention(RowField.WALLET))) {
                         Spacer(Modifier.width(6.dp))
                         AccountChip(
                             null, row.walletId, wallets, attention(RowField.WALLET), enabled,
@@ -256,6 +262,7 @@ internal fun ReviewRowItem(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                typeChip(false)
                 if (row.type.isTransfer) {
                     AccountChip("From", row.walletId, wallets, attention(RowField.WALLET), enabled, fill = true, modifier = Modifier.weight(1f)) {
                         onEdit(RowEdit.Account(it))
@@ -264,7 +271,6 @@ internal fun ReviewRowItem(
                         onEdit(RowEdit.ToAccount(it))
                     }
                 } else {
-                    typeChip(false)
                     val kind = if (row.type == TransactionType.INCOME) CategoryKind.INCOME else CategoryKind.EXPENSE
                     val pool = categories.filter { it.kind == kind && !it.archived }
                     MenuChip(
@@ -386,6 +392,8 @@ private fun FieldChip(
     attention: Boolean = false,
     softAttention: Boolean = false,
     trailing: Boolean = false,
+    /** When set, the arrow is its own control and [onClick] is only the label. */
+    onTrailingClick: (() -> Unit)? = null,
     /** The quieter size used for the date line. */
     small: Boolean = false,
     /** Stretch to the width given (the label ellipsizes, the arrow stays at the end). */
@@ -428,7 +436,50 @@ private fun FieldChip(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = fill),
             )
-            if (trailing) Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(if (small) 16.dp else 18.dp))
+            if (trailing) {
+                if (onTrailingClick != null) {
+                    IconButton(onClick = onTrailingClick, enabled = enabled, modifier = Modifier.size(if (small) 28.dp else 32.dp)) {
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "More types", modifier = Modifier.size(if (small) 16.dp else 18.dp))
+                    }
+                } else {
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(if (small) 16.dp else 18.dp))
+                }
+            }
+        }
+    }
+}
+
+/** Expense/Income in one tap on every review row. The arrow still lists Transfer when that is allowed. */
+@Composable
+private fun TypeChip(
+    type: TransactionType,
+    options: List<TransactionType>,
+    attention: Boolean,
+    enabled: Boolean,
+    small: Boolean,
+    offerMenu: Boolean,
+    onFlip: () -> Unit,
+    onPick: (TransactionType) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        FieldChip(
+            label = typeLabel(type),
+            description = "Type: ${typeLabel(type)}. Switch between expense and income",
+            attention = attention,
+            enabled = enabled,
+            small = small,
+            trailing = offerMenu,
+            onClick = onFlip,
+            onTrailingClick = if (offerMenu) ({ open = true }) else null,
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(text = { Text(typeLabel(option)) }, onClick = {
+                    open = false
+                    onPick(option)
+                })
+            }
         }
     }
 }

@@ -125,7 +125,7 @@ class AppContainer(application: Application) {
     }
 
     private val ledgerReset: LocalLedgerReset by lazy {
-        LocalLedgerReset(database, syncPreferences, GoalPhotos(application))
+        LocalLedgerReset(database, syncPreferences, GoalPhotos(application), preferences)
     }
 
     /** Sign-out and account switching. Wipes the local ledger before another account can sync. */
