@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -62,6 +61,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,7 +70,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,7 +83,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -89,7 +93,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -112,6 +115,7 @@ import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.Hierarchy
+import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
@@ -120,6 +124,8 @@ import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.BudgetBurn
 import com.lucento.app.domain.BudgetPlan
+import com.lucento.app.domain.BudgetSuggestion
+import com.lucento.app.domain.FirstWeek
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalsOverview
@@ -154,6 +160,8 @@ data class HomeActions(
     val onOpenDebts: () -> Unit = {},
     /** Where the sync status leads: Settings, which explains and controls cloud sync. */
     val onOpenSettings: () -> Unit = {},
+    /** Opens the composer to log another entry. */
+    val onAddEntry: () -> Unit = {},
 )
 
 /**
@@ -190,6 +198,7 @@ fun HomeScreen(
         ) {
         AnimatedContent(
             targetState = when {
+                state.loadError -> HomeContent.Error
                 state.loading -> HomeContent.Loading
                 !state.hasWallets -> HomeContent.Welcome
                 else -> HomeContent.Overview
@@ -198,20 +207,28 @@ fun HomeScreen(
             label = "home-content",
         ) { content ->
             when (content) {
-                HomeContent.Loading -> Spacer(Modifier.height(1.dp))
+                HomeContent.Loading -> HomeSkeleton()
+                HomeContent.Error -> LoadError(onRetry = viewModel::retry)
                 HomeContent.Welcome -> WelcomePanel(
                     onAddWallet = { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) },
                 )
                 HomeContent.Overview -> Overview(
                     state = state,
-                    actions = actions,
+                    actions = actions.copy(onOpenInsights = {
+                        viewModel.markInsightsChecked()
+                        actions.onOpenInsights()
+                    }),
                     onSelectMonth = viewModel::selectMonth,
                     onDismissLocalDataNotice = viewModel::dismissLocalDataNotice,
+                    onDismissFirstWeek = viewModel::dismissFirstWeek,
+                    onSnoozeSuggestion = viewModel::snoozeBudgetSuggestion,
+                    onUseSuggestion = viewModel::applyBudgetSuggestion,
+                    onCelebrateShown = viewModel::markFirstEntryCelebrated,
                 )
             }
         }
-        // Breathing room above the dock and its raised + button.
-        Spacer(Modifier.height(Spacing.xl))
+        // The dock's padding already clears the bar. This extra space keeps the last card off the raised +.
+        Spacer(Modifier.height(Spacing.fabClearance))
         }
     }
 
@@ -225,7 +242,7 @@ fun HomeScreen(
     }
 }
 
-private enum class HomeContent { Loading, Welcome, Overview }
+private enum class HomeContent { Loading, Error, Welcome, Overview }
 
 // ------------------------------------------------------------------ Header
 
@@ -318,7 +335,7 @@ private fun PaymentsBell(state: HomeUiState, onOpenRecurring: (Long?) -> Unit) {
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(item.schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(item.schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 2)
                             Text(
                                 dueLabel(item, state.today),
                                 style = MaterialTheme.typography.labelSmall,
@@ -473,13 +490,48 @@ private fun WelcomePanel(onAddWallet: () -> Unit) {
 }
 
 @Composable
+private fun HomeSkeleton() {
+    Column(Modifier.padding(top = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        repeat(3) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .clip(MaterialTheme.shapes.large)
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LoadError(onRetry: () -> Unit) {
+    Column(Modifier.padding(top = Spacing.xl)) {
+        Text("Couldn’t load your data. Try again", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(Spacing.md))
+        LucentoPrimaryButton(text = "Try again", onClick = onRetry)
+    }
+}
+
+@Composable
 private fun Overview(
     state: HomeUiState,
     actions: HomeActions,
     onSelectMonth: (YearMonth) -> Unit,
     onDismissLocalDataNotice: () -> Unit,
+    onDismissFirstWeek: () -> Unit,
+    onSnoozeSuggestion: () -> Unit,
+    onUseSuggestion: () -> Unit,
+    onCelebrateShown: () -> Unit,
 ) {
     val f = state.features
+    var showCelebration by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.celebrateFirstEntry) {
+        if (state.celebrateFirstEntry) {
+            showCelebration = true
+            onCelebrateShown()
+        }
+    }
     Column {
         if (state.showLocalDataNotice) {
             InfoNote(
@@ -490,9 +542,38 @@ private fun Overview(
             )
             Spacer(Modifier.height(Spacing.sm))
         }
+        if (showCelebration) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = Spacing.sm)) {
+                LucentoMascot(size = 56.dp, mood = MascotMood.Celebrate, contentDescription = null)
+                Spacer(Modifier.width(Spacing.md))
+                Text(FirstWeek.REACTION, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            }
+        }
+        BalanceAndRecent(state, onAdd = actions.onAddEntry)
+        if (state.showFirstWeekCard) {
+            Spacer(Modifier.height(Spacing.md))
+            FirstWeekCard(
+                state = state,
+                onDismiss = onDismissFirstWeek,
+                onLog = actions.onAddEntry,
+                onGoal = actions.onOpenGoals,
+                onBill = { actions.onOpenRecurring(null) },
+                onInsights = actions.onOpenInsights,
+            )
+        }
+        state.budgetSuggestion?.let { suggestion ->
+            Spacer(Modifier.height(Spacing.md))
+            BudgetSuggestionCard(
+                suggestion = suggestion,
+                onUse = onUseSuggestion,
+                onAdjust = actions.onOpenBudget,
+                onNotNow = onSnoozeSuggestion,
+            )
+        }
+        Spacer(Modifier.height(Spacing.md))
         val plan = state.budget
         val burn = state.burn
-        if (plan != null && burn != null) {
+        if (plan != null && burn != null && plan.hasBudget) {
             // Lucento stands beside the month pill and leans over the budget card's corner, its torch lighting the card.
             // Its mood follows the month's pace; the words are read out through its label rather than a bubble.
             val mood = remember(plan, burn, state.isCurrentMonth, state.expenseCategoryCount) { budgetMood(state, plan, burn) }
@@ -502,18 +583,24 @@ private fun Overview(
                     Spacer(Modifier.height(Spacing.sm))
                     MonthlyBudgetCard(state, plan, burn, actions)
                 }
-                LucentoMascot(
-                    size = MascotSize,
-                    mood = mood.mood,
-                    tier = mood.tier,
-                    contentDescription = if (mood.mood == MascotMood.Concerned) "Lucento, gently concerned, says: ${mood.bubble}" else "Lucento says: ${mood.bubble}",
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        // Bottom of the mascot sinks [MascotOverlap] into the card, below the month pill's row.
-                        .offset(y = Sizes.minTouch + Spacing.sm + MascotOverlap - MascotSize)
-                        .padding(end = Spacing.xs),
-                )
+                if (!showCelebration) {
+                    LucentoMascot(
+                        size = MascotSize,
+                        mood = mood.mood,
+                        tier = mood.tier,
+                        contentDescription = if (mood.mood == MascotMood.Concerned) "Lucento, gently concerned, says: ${mood.bubble}" else "Lucento says: ${mood.bubble}",
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            // Bottom of the mascot sinks [MascotOverlap] into the card, below the month pill's row.
+                            .offset(y = Sizes.minTouch + Spacing.sm + MascotOverlap - MascotSize)
+                            .padding(end = Spacing.xs),
+                    )
+                }
             }
+        } else if (plan != null && burn != null) {
+            MonthPill(state, onSelectMonth)
+            Spacer(Modifier.height(Spacing.sm))
+            SpendingThisMonthCard(spent = plan.spent, daysLeft = burn.daysLeft)
         } else {
             MonthPill(state, onSelectMonth)
             Spacer(Modifier.height(Spacing.sm))
@@ -537,6 +624,121 @@ private fun Overview(
     }
 }
 
+@Composable
+private fun BalanceAndRecent(state: HomeUiState, onAdd: () -> Unit) {
+    val balance = state.wallets.singleOrNull()?.balance ?: state.netWorthComposition?.netWorth
+    if (balance != null) {
+        Text("Balance", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        MoneyText(money = balance, style = AmountStyles.large, minScale = 0.6f)
+        Spacer(Modifier.height(Spacing.sm))
+    }
+    Text("Recent", style = Hierarchy.sectionTitle, modifier = Modifier.semantics { heading() })
+    Spacer(Modifier.height(Spacing.xs))
+    if (state.realEntryCount == 0) {
+        Text("Nothing logged yet", style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.height(Spacing.sm))
+        LucentoPrimaryButton(text = "Add your first", onClick = onAdd)
+    } else {
+        state.recentEntries.forEach { entry ->
+            val title = entry.note.ifBlank {
+                entry.categoryId?.let { state.categoriesById[it]?.name }
+                    ?: if (entry.type == com.lucento.app.domain.TransactionType.INCOME) "Income" else "Expense"
+            }
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch).padding(vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 3)
+                Spacer(Modifier.width(Spacing.sm))
+                AmountText(
+                    money = if (entry.type == com.lucento.app.domain.TransactionType.INCOME) entry.amount else -entry.amount,
+                    showPlus = true,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpendingThisMonthCard(spent: Money, daysLeft: Int) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+        Text("Spending this month", style = Hierarchy.sectionTitle, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(Spacing.sm))
+        MoneyText(money = spent, style = AmountStyles.large, minScale = 0.6f)
+        Text(
+            "${daysLeftLabel(daysLeft)} left",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun FirstWeekCard(
+    state: HomeUiState,
+    onDismiss: () -> Unit,
+    onLog: () -> Unit,
+    onGoal: () -> Unit,
+    onBill: () -> Unit,
+    onInsights: () -> Unit,
+) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("First week", style = Hierarchy.sectionTitle, modifier = Modifier.weight(1f).semantics { heading() })
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Outlined.Close, contentDescription = "Dismiss first week tips")
+            }
+        }
+        state.firstWeekSteps.forEach { step ->
+            val open = when (step.id) {
+                "log3" -> onLog
+                "goal" -> onGoal
+                "bill" -> onBill
+                else -> onInsights
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Sizes.minTouch)
+                    .clickable(role = Role.Button, onClickLabel = step.title, onClick = open)
+                    .padding(vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (step.done) "Done" else "To do",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (step.done) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.widthIn(min = 56.dp),
+                )
+                Text(step.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 3)
+                step.progress?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BudgetSuggestionCard(
+    suggestion: BudgetSuggestion,
+    onUse: () -> Unit,
+    onAdjust: () -> Unit,
+    onNotNow: () -> Unit,
+) {
+    val sentence = suggestion.lines.joinToString(", ") { "${MoneyFormatter.format(it.suggested)} for ${it.categoryName}" }
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+        Text(
+            "Based on your last ${suggestion.days} days, try $sentence.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Column {
+            LucentoTextButton(text = "Use these", onClick = onUse, modifier = Modifier.fillMaxWidth())
+            LucentoTextButton(text = "Adjust", onClick = onAdjust, modifier = Modifier.fillMaxWidth())
+            LucentoTextButton(text = "Not now", onClick = onNotNow, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
 /** A card's title with a chevron, saying the whole card opens its page, and an optional trailing action. */
 @Composable
 private fun LinkedTitle(
@@ -547,9 +749,13 @@ private fun LinkedTitle(
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = if (compact) Hierarchy.cardTitle else Hierarchy.sectionTitle, modifier = Modifier.semantics { heading() })
+        Text(
+            title,
+            style = if (compact) Hierarchy.cardTitle else Hierarchy.sectionTitle,
+            maxLines = 2,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
         if (showChevron) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
-        Spacer(Modifier.weight(1f))
         if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
     }
 }
@@ -630,17 +836,13 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                         when {
                             setupNeeded -> Text("Finish your budget setup", style = MaterialTheme.typography.titleMedium)
                             !plan.hasBudget -> Text("No budget yet", style = MaterialTheme.typography.titleMedium)
-                            else -> Row(verticalAlignment = Alignment.Bottom) {
-                                Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.large, maxLines = 1)
-                                Spacer(Modifier.width(Spacing.xs))
-                                // One line, in full ink: the budget this percentage is of.
+                            else -> Column {
+                                Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.large, maxLines = 2)
                                 Text(
                                     "of ${MoneyFormatter.format(plan.total)} used",
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(bottom = 2.dp),
+                                    maxLines = 2,
                                 )
                             }
                         }
@@ -658,20 +860,7 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                 PercentBar(burn.elapsedPercent / 100f, "${burn.elapsedPercent}% of month", elapsedColor, "Month elapsed: ${burn.elapsedPercent} percent")
 
                 Spacer(Modifier.height(Spacing.sm))
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                    if (plan.hasBudget) {
-                        MoneyStat(plan.spent, "Spent", Modifier.weight(1f))
-                        StatDivider()
-                        MoneyStat(
-                            if (plan.remaining.isNegative) -plan.remaining else plan.remaining,
-                            if (plan.remaining.isNegative) "Over budget" else "Remaining",
-                            Modifier.weight(1f),
-                            valueColor = if (plan.remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
-                        )
-                        StatDivider()
-                    }
-                    BudgetStat("${burn.daysLeft}", "days left", Modifier.weight(0.8f))
-                }
+                BudgetFigures(plan, burn)
             }
 
             Spacer(Modifier.height(Spacing.sm))
@@ -806,8 +995,43 @@ private fun LegendDot(color: Color, label: String) {
 @Composable
 private fun BudgetStat(value: String, label: String, modifier: Modifier = Modifier, valueLines: Int = 1) {
     Column(modifier.semantics(mergeDescendants = true) {}.padding(horizontal = Spacing.xs)) {
-        Text(value, style = AmountStyles.medium, maxLines = valueLines, overflow = TextOverflow.Ellipsis)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Text(value, style = AmountStyles.medium, maxLines = valueLines)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+    }
+}
+
+/** Spent, remaining and days left. Stacked when the card is narrow or type is large, so nothing is clipped. */
+@Composable
+private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stack = maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.3f
+        if (stack) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                if (plan.hasBudget) {
+                    MoneyStat(plan.spent, "Spent", Modifier.fillMaxWidth())
+                    MoneyStat(
+                        if (plan.remaining.isNegative) -plan.remaining else plan.remaining,
+                        if (plan.remaining.isNegative) "Over budget" else "Remaining",
+                        Modifier.fillMaxWidth(),
+                        valueColor = if (plan.remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                BudgetStat("${burn.daysLeft}", "days left", Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                if (plan.hasBudget) {
+                    MoneyStat(plan.spent, "Spent", Modifier.weight(1f))
+                    MoneyStat(
+                        if (plan.remaining.isNegative) -plan.remaining else plan.remaining,
+                        if (plan.remaining.isNegative) "Over budget" else "Remaining",
+                        Modifier.weight(1f),
+                        valueColor = if (plan.remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                BudgetStat("${burn.daysLeft}", "days left", Modifier.weight(0.8f))
+            }
+        }
     }
 }
 
@@ -815,20 +1039,9 @@ private fun BudgetStat(value: String, label: String, modifier: Modifier = Modifi
 @Composable
 private fun MoneyStat(money: Money, label: String, modifier: Modifier = Modifier, valueColor: Color = MaterialTheme.colorScheme.onSurface) {
     Column(modifier.semantics(mergeDescendants = true) {}.padding(horizontal = Spacing.xs)) {
-        MoneyText(money = money, style = AmountStyles.medium, color = valueColor, fractionScale = 1f, minScale = 0.7f)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        MoneyText(money = money, style = AmountStyles.medium, color = valueColor, fractionScale = 1f, minScale = 0.6f)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
     }
-}
-
-@Composable
-private fun StatDivider() {
-    Box(
-        Modifier
-            .padding(horizontal = Spacing.xs)
-            .width(1.dp)
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.outlineVariant),
-    )
 }
 
 /** The verdict as advice, with a glyph that matches it (up / check / info) and a way into the Budgets tab. */
@@ -843,7 +1056,7 @@ private fun AdviceBanner(text: String, detail: String?, tones: PaceTones, onClic
             .background(if (LucentoTheme.isDark) tones.banner.container else MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.82f))
             .clickable(role = Role.Button, onClickLabel = "Open budget", onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         Box(
             Modifier.size(28.dp).clip(CircleShape).background(if (LucentoTheme.isDark) Color.Black.copy(alpha = 0.2f) else tones.banner.container),
@@ -854,9 +1067,9 @@ private fun AdviceBanner(text: String, detail: String?, tones: PaceTones, onClic
         Spacer(Modifier.width(Spacing.sm))
         // Two one-liners: the verdict, then the daily allowance that keeps the month on budget.
         Column(Modifier.weight(1f)) {
-            Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 3)
             if (detail != null) {
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
             }
         }
     }
@@ -901,7 +1114,7 @@ private fun NetWorthAndQuickLinks(state: HomeUiState, composition: NetWorthCompo
     val f = state.features
     val links = buildList {
         if (f.isEnabled(Feature.SAVINGS_GOALS)) add(QuickLink("Goals", "Savings goals", Icons.Outlined.Savings, actions.onOpenGoals))
-        if (f.isEnabled(Feature.RECURRING)) add(QuickLink("Scheduled", "Scheduled transactions", Icons.Outlined.EventRepeat) { actions.onOpenRecurring(null) })
+        if (f.isEnabled(Feature.RECURRING)) add(QuickLink("Bills", "Bills and subscriptions", Icons.Outlined.EventRepeat) { actions.onOpenRecurring(null) })
         if (f.isEnabled(Feature.DEBTS_LOANS)) add(QuickLink("Debts", "Debts and loans", Icons.Outlined.CreditCard, actions.onOpenDebts))
         // Budget and Wallets have their own places in the dock; Insights opens from here.
         if (f.isEnabled(Feature.INSIGHTS)) add(QuickLink("Insights", "Insights", Icons.Outlined.Insights, actions.onOpenInsights))
@@ -912,9 +1125,9 @@ private fun NetWorthAndQuickLinks(state: HomeUiState, composition: NetWorthCompo
             // on small phones, where the links become a list. Worked out here because the row below measures its
             // children's intrinsic height, which a nested BoxWithConstraints cannot provide.
             val linksContentWidth = (maxWidth - Spacing.sm) / 2.1f - Spacing.md * 2
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                FlowAndWorthCard(state, composition, actions, Modifier.weight(1.1f).fillMaxHeight())
-                QuickLinksCard(links, asList = linksContentWidth < 140.dp, modifier = Modifier.weight(1f).fillMaxHeight())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.Top) {
+                FlowAndWorthCard(state, composition, actions, Modifier.weight(1.1f))
+                QuickLinksCard(links, asList = linksContentWidth < 140.dp || LocalDensity.current.fontScale >= 1.3f, modifier = Modifier.weight(1f))
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
@@ -1029,8 +1242,8 @@ private fun QuickLinksCard(links: List<QuickLink>, asList: Boolean, modifier: Mo
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 links.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        pair.forEach { QuickLinkTile(it, Modifier.weight(1f).fillMaxHeight()) }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.Top) {
+                        pair.forEach { QuickLinkTile(it, Modifier.weight(1f)) }
                         if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
@@ -1102,8 +1315,7 @@ private fun QuickLinkTile(link: QuickLink, modifier: Modifier = Modifier) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+            maxLines = 3,
             modifier = Modifier.semantics { contentDescription = link.accessibilityLabel },
         )
     }
@@ -1136,7 +1348,7 @@ private fun TopGoalCard(goals: GoalsOverview?, hasAnyGoals: Boolean, onOpen: () 
             Spacer(Modifier.width(Spacing.md))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(top.goal.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(top.goal.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, modifier = Modifier.weight(1f))
                     Text("${top.percent}%", style = AmountStyles.medium, color = ext.success)
                 }
                 Spacer(Modifier.height(Spacing.xs))
@@ -1186,7 +1398,12 @@ private fun TopGoalCard(goals: GoalsOverview?, hasAnyGoals: Boolean, onOpen: () 
 private fun GoalThumbnail(name: String, sceneKey: String?, photoPath: String?) {
     val photo = rememberGoalPhoto(photoPath)
     val art = remember(name, sceneKey) { GoalScene.forGoal(name, sceneKey).illustration() }
-    val modifier = Modifier.size(width = 64.dp, height = 56.dp).clip(MaterialTheme.shapes.small)
+    val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val modifier = Modifier
+        .widthIn(min = 64.dp)
+        .heightIn(min = 56.dp)
+        .size(width = 64.dp * scale, height = 56.dp * scale)
+        .clip(MaterialTheme.shapes.small)
     when {
         photo != null -> Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
         art != null -> Image(painterResource(art.res), contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
@@ -1260,8 +1477,8 @@ private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () 
         CategoryTile(category = category, type = schedule.type)
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
-            Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(kind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+            Text(kind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
         }
         Spacer(Modifier.width(Spacing.sm))
         Column(horizontalAlignment = Alignment.End) {
@@ -1284,3 +1501,49 @@ internal fun monthLabel(month: YearMonth, locale: Locale = Locale.getDefault()):
     month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale).replaceFirstChar { it.titlecase(locale) }
 
 private fun monthYearLabel(month: YearMonth, locale: Locale = Locale.getDefault()): String = "${monthLabel(month, locale)} ${month.year}"
+
+@Preview(name = "Home 1.3 × 360", fontScale = 1.3f, widthDp = 360, heightDp = 800)
+@Preview(name = "Home 2.0 × 360", fontScale = 2.0f, widthDp = 360, heightDp = 900)
+@Composable
+private fun HomeFontScalePreview() {
+    LucentoTheme {
+        val today = LocalDate.of(2026, 10, 28)
+        val wallet = com.lucento.app.domain.Wallet(1, "Cash", com.lucento.app.domain.WalletType.CASH, Money(120_00, "USD"), 0)
+        val groceries = com.lucento.app.domain.Category(1, "Groceries", com.lucento.app.domain.CategoryKind.EXPENSE, "groceries")
+        val entry = com.lucento.app.domain.Transaction(1, TransactionType.EXPENSE, Money(4_50, "USD"), 1, 1, today, "Coffee", 0)
+        val budget = com.lucento.app.domain.Budget(1, 1, Money(80_00, "USD"))
+        val goal = com.lucento.app.domain.Goal(1, "Emergency fund", Money(500_00, "USD"), null, 1, 0)
+        val state = HomeStateBuilder.build(
+            all = listOf(entry),
+            wallets = listOf(wallet),
+            categories = listOf(groceries),
+            primaryCurrency = "USD",
+            today = today,
+            budgets = listOf(budget),
+            goals = listOf(goal),
+        ).copy(dayOneHome = true, celebrateFirstEntry = true)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.gutter),
+        ) {
+            Overview(
+                state = state,
+                actions = HomeActions(
+                    onOpenBudget = {},
+                    onChooseCategories = {},
+                    onOpenInsights = {},
+                    onOpenGoals = {},
+                    onOpenRecurring = {},
+                ),
+                onSelectMonth = {},
+                onDismissLocalDataNotice = {},
+                onDismissFirstWeek = {},
+                onSnoozeSuggestion = {},
+                onUseSuggestion = {},
+                onCelebrateShown = {},
+            )
+        }
+    }
+}

@@ -38,10 +38,14 @@ class CsvAndFeaturesTest {
         assertTrue(Feature.DEBTS_LOANS in features)
         assertTrue(Feature.MULTIPLE_WALLETS in features)
         assertTrue(Feature.BUDGETS in features)
-        assertFalse(Feature.SAVINGS_GOALS in features)
+        assertTrue(Feature.SAVINGS_GOALS in features)
+        assertTrue(Feature.RECURRING in features)
         assertEquals(Feature.BUDGETS, Feature.fromKey("budgets"))
-        // Budget is a primary tab built from the categories chosen in onboarding, so it starts on for everyone.
-        assertTrue(Feature.BUDGETS in FinancialFocus.initialFeatures(emptySet()))
+        val defaults = FinancialFocus.initialFeatures(emptySet())
+        assertTrue(Feature.BUDGETS in defaults)
+        assertTrue(Feature.SAVINGS_GOALS in defaults)
+        assertTrue(Feature.RECURRING in defaults)
+        assertEquals(FirstRunDefaults.DEBTS_ON_BY_DEFAULT, Feature.DEBTS_LOANS in defaults)
     }
 
     @Test fun transfersPairAndQueriesTreatThemTogether() {

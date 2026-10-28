@@ -45,8 +45,9 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
   Budget tab explains this once and offers "Remove the old limit" (`BudgetRepository.removeLegacyOverall`).
 - Savings-goal contributions are earmarks, not expenses; transfers and debt principal repayments are transfers. None
   of them count as budget spending unless the user records an actual EXPENSE.
-- Categories: a fresh install seeds only income categories; onboarding requires choosing at least one expense
-  category from the preset library (`CategoryPresets`) or custom names. Applying a selection (`CategorySelection`)
+- Categories: a fresh install seeds only income categories. The short first run then applies the recommended
+  expense presets (`FirstRunDefaults.categoryPresetKeys`) without asking. The same picker stays in Settings and on
+  the Budget screen. Applying a selection (`CategorySelection`)
   reuses categories by normalised name (case, spacing, "&" = "and"), restores archived matches with their ids,
   creates the rest, and deactivates unchosen ones (archived when used, deleted only when unused). No schema change
   was needed, so the database stays at version 3.

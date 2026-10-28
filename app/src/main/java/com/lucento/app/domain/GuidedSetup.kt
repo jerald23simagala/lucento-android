@@ -7,9 +7,15 @@ package com.lucento.app.domain
 enum class GuideStep(val key: String) {
     /** Cash, bank, e-wallet and savings accounts. At least one is needed: every transaction belongs to a wallet. */
     WALLETS("wallets"),
-    /** Credit cards and loans; optional. */
+    /**
+     * Kept so an install that stopped here can resume. The step is no longer shown: cards and loans are added
+     * later from Wallets, and [GuidedSetup.steps] skips this key.
+     */
     DEBTS("debts"),
-    /** Amounts for spending categories: at least [GuidedSetup.MIN_BUDGETED] (or every category, when fewer). */
+    /**
+     * Kept so an install that stopped on the old budget gate can resume. The step is no longer shown and never
+     * blocks. Budgets are suggested later from real spending.
+     */
     BUDGETS("budgets"),
     /** One savings goal; optional. */
     GOAL("goal"),
@@ -24,13 +30,13 @@ enum class GuideStep(val key: String) {
 }
 
 object GuidedSetup {
-    const val MIN_BUDGETED = 2
-
-    /** The steps this user walks through, in order. */
+    /**
+     * The steps this user walks through, in order. Debts and the budget gate are not part of the story:
+     * a saved [GuideStep.DEBTS] or [GuideStep.BUDGETS] resumes at the next step that still applies.
+     */
     fun steps(features: FeatureSet): List<GuideStep> = GuideStep.entries.filter { step ->
         when (step) {
-            GuideStep.DEBTS -> features.isEnabled(Feature.DEBTS_LOANS)
-            GuideStep.BUDGETS -> features.isEnabled(Feature.BUDGETS)
+            GuideStep.DEBTS, GuideStep.BUDGETS -> false
             GuideStep.GOAL -> features.isEnabled(Feature.SAVINGS_GOALS)
             else -> true
         }
@@ -46,16 +52,12 @@ object GuidedSetup {
     fun resume(saved: GuideStep, features: FeatureSet): GuideStep =
         if (saved in steps(features)) saved else next(saved, features) ?: GuideStep.WELCOME
 
-    /** How many categories need an amount before the budget step can be left. */
-    fun budgetsRequired(expenseCategories: Int): Int = minOf(MIN_BUDGETED, expenseCategories)
-
     /**
-     * Whether [step] is complete enough to move on. Optional steps always are; wallets need one asset account and
-     * budgets [budgetsRequired] categories with an amount.
+     * Whether [step] is complete enough to move on. Wallets need one asset account. The old budget step never
+     * blocks, even if a saved install still names it.
      */
     fun canContinue(step: GuideStep, assetWallets: Int, budgetedCategories: Int, expenseCategories: Int): Boolean = when (step) {
         GuideStep.WALLETS -> assetWallets > 0
-        GuideStep.BUDGETS -> budgetedCategories >= budgetsRequired(expenseCategories)
         else -> true
     }
 

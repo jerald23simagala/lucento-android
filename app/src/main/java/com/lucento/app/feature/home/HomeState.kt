@@ -27,8 +27,12 @@ import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionQueries
+import com.lucento.app.domain.BudgetSuggestion
+import com.lucento.app.domain.FirstWeek
+import com.lucento.app.domain.FirstWeekStep
 import com.lucento.app.domain.UpcomingPayment
 import com.lucento.app.domain.Wallet
+import com.lucento.app.domain.realEntries
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -187,7 +191,25 @@ data class HomeUiState(
     val hasAnySchedules: Boolean = false,
     val categoriesById: Map<Long, Category> = emptyMap(),
     val cloudStatus: CloudStatus = CloudStatus.LOCAL,
+    /** Income and expenses, newest first. Transfers and balance adjustments are not entries. */
+    val recentEntries: List<Transaction> = emptyList(),
+    val realEntryCount: Int = 0,
+    /** Short first run only. Older finished installs stay false, so they are not shown day-one prompts. */
+    val dayOneHome: Boolean = false,
+    val firstWeekDismissed: Boolean = false,
+    val celebrateFirstEntry: Boolean = false,
+    val budgetSuggestion: BudgetSuggestion? = null,
+    val insightsChecked: Boolean = false,
+    val loadError: Boolean = false,
 ) {
+    val firstWeekSteps: List<FirstWeekStep>
+        get() = FirstWeek.steps(
+            realEntryCount = realEntryCount,
+            hasGoal = hasAnyGoals,
+            hasBill = hasAnySchedules,
+            checkedInsights = insightsChecked,
+        )
+    val showFirstWeekCard: Boolean get() = FirstWeek.show(dayOneHome, firstWeekDismissed)
     val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
     val hasWallets: Boolean get() = wallets.isNotEmpty()
     val isCurrentMonth: Boolean get() = month == YearMonth.from(today)
@@ -248,6 +270,7 @@ object HomeStateBuilder {
             .takeWhile { !it.isBefore(earliest) }
             .take(MAX_SELECTABLE_MONTHS)
             .toList()
+        val entries = realEntries(all).sortedWith(compareByDescending<Transaction> { it.date }.thenByDescending { it.id })
 
         return HomeUiState(
             loading = false,
@@ -278,6 +301,8 @@ object HomeStateBuilder {
             hasAnySchedules = activeSchedules.any { !it.isFinished },
             categoriesById = categories.associateBy { it.id },
             cloudStatus = cloudStatus,
+            recentEntries = entries.take(5),
+            realEntryCount = entries.size,
         )
     }
 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Short first run
+
+- First run is four screens: welcome (data stays on this phone; uninstalling erases it unless sync is on), main
+  currency, a starting balance, then the composer. Theme stays System, sync stays off, and the recommended spending
+  categories are applied without a picker. Goals and recurring payments start on. Debts stays off behind
+  `FirstRunDefaults.DEBTS_ON_BY_DEFAULT`. Categories, features and sync remain in Settings.
+- The guided setup no longer blocks until two categories have a budget. After 7–14 days of real expenses, Home can
+  suggest category amounts. Nothing sample is written. People who already finished onboarding are not sent through
+  it again; a saved debts or budget step resumes at the next step that still exists.
+- Day-one Home shows the real balance and recent entries, a dismissible first-week card, and one mascot reaction
+  to the first entry. Home layout wraps at font scale 1.3 and 2.0 and at 360dp.
+
 ## Unreleased — Optional cloud sync (Supabase + Google Sign-In)
 
 - **Settings → Cloud sync**: connect a Google account to back up and sync wallets, categories, transactions, budgets,

@@ -136,6 +136,11 @@ fun TransactionComposerScreen(
     start: ComposerStart = ComposerStart.TYPE,
     walletId: Long? = null,
     typeHint: TransactionType? = null,
+    /** The fourth first-run screen: a shorter header, two example chips, and Skip for now. */
+    firstRun: Boolean = false,
+    /** Smarter reading is on, so the entry is sent to Gemini. The privacy line says so. */
+    geminiEnabled: Boolean = false,
+    onSkip: (() -> Unit)? = null,
     viewModel: ComposerViewModel = viewModel(factory = ComposerViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -272,6 +277,7 @@ fun TransactionComposerScreen(
                 state.summary.total > 0 && state.summary.canSave -> MascotMood.Happy
                 else -> MascotMood.Curious
             },
+            firstRun = firstRun,
         )
         if (state.wallets.size > 1) {
             WalletBar(
@@ -309,7 +315,13 @@ fun TransactionComposerScreen(
             }
             if (state.messages.isEmpty()) {
                 item(key = "intro") {
-                    ComposerIntro(transfersAllowed = state.transfersAllowed, onExample = { input = it })
+                    ComposerIntro(
+                        transfersAllowed = state.transfersAllowed,
+                        firstRun = firstRun,
+                        geminiEnabled = geminiEnabled,
+                        onExample = { input = it },
+                        onSkip = onSkip,
+                    )
                 }
             }
             state.messages.forEach { message ->
@@ -606,43 +618,71 @@ private val ReplyIndent = AvatarSize + Spacing.sm
 
 /** The pinned header under the top bar: Lucento and the one instruction. Never scrolls away. */
 @Composable
-private fun ComposerBanner(mood: MascotMood) {
+private fun ComposerBanner(mood: MascotMood, firstRun: Boolean) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LucentoMascot(size = 48.dp, mood = mood)
+        LucentoMascot(size = 48.dp, mood = mood, contentDescription = null)
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
-            Text("Describe what happened", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+            Text(
+                if (firstRun) "Add something you spent today" else "Describe what happened",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 3,
+                modifier = Modifier.semantics { heading() },
+            )
+            if (firstRun) {
+                Text(
+                    com.lucento.app.domain.FirstRunStep.progressLabel(com.lucento.app.domain.FirstRunStep.FIRST_ENTRY),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             Text(
                 "Write several at once — each becomes a row to check before saving.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
             )
         }
     }
 }
 
 @Composable
-private fun ComposerIntro(transfersAllowed: Boolean, onExample: (String) -> Unit) {
+private fun ComposerIntro(
+    transfersAllowed: Boolean,
+    firstRun: Boolean,
+    geminiEnabled: Boolean,
+    onExample: (String) -> Unit,
+    onSkip: (() -> Unit)?,
+) {
     Column(Modifier.fillMaxWidth()) {
         Text("TRY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(Spacing.xs))
-        val examples = buildList {
-            add("Lunch 250, groceries 800, salary 35000")
-            add("Yesterday coffee 180 and dinner 650")
-            if (transfersAllowed) add("Transfer 5000 from bank to savings")
+        val examples = if (firstRun) {
+            listOf("coffee 4.50", "lunch 12 and taxi 8 yesterday")
+        } else {
+            buildList {
+                add("Lunch 250, groceries 800, salary 35000")
+                add("Yesterday coffee 180 and dinner 650")
+                if (transfersAllowed) add("Transfer 5000 from bank to savings")
+            }
         }
         examples.forEach { example ->
             LucentoTextButton(text = "“$example”", onClick = { onExample(example) })
         }
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            "Read on this phone. Nothing is sent unless you turn on cloud sync, crash reports, or Smarter reading.",
+            com.lucento.app.domain.ComposerPrivacy.line(geminiEnabled),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 4,
         )
+        if (firstRun && onSkip != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            LucentoTextButton(text = "Skip for now", onClick = onSkip, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -735,11 +775,12 @@ private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAtten
                         androidx.compose.foundation.layout.Column {
                         Text(text, style = MaterialTheme.typography.bodyMedium, modifier = live)
                         // Who read it, whenever it isn't plain on-device reading: Gemini, or this phone with the reason.
-                        s.engine?.takeIf { !it.onDevice || it.label.contains("·") }?.let { engine ->
+                        s.engine?.let { engine ->
                             Text(
-                                if (engine.onDevice) "Read on this phone — ${engine.label.substringAfter("· ")}" else "Read by ${engine.label}",
+                                com.lucento.app.domain.ComposerPrivacy.line(geminiEnabled = !engine.onDevice),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 4,
                             )
                         }
                         }

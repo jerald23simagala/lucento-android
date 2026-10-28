@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -79,6 +80,7 @@ import java.time.LocalDate
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenCategories: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -119,6 +121,7 @@ fun SettingsScreen(
                 onDisconnect = viewModel::disconnectAccount,
                 onSyncNow = viewModel::syncNow,
                 onChangePassword = viewModel::changePassword,
+                onOpenCategories = onOpenCategories,
             )
             current.cloudSync.prompt?.let { prompt ->
                 val unsynced = signOutUnsyncedMessage(prompt.unsyncedCount)
@@ -239,6 +242,7 @@ private fun SettingsContent(
     onDisconnect: () -> Unit,
     onSyncNow: () -> Unit,
     onChangePassword: (String) -> Unit,
+    onOpenCategories: () -> Unit,
 ) {
     val prefs = current.preferences
     Column {
@@ -296,6 +300,12 @@ private fun SettingsContent(
             "Used for Home and Insights. Each wallet keeps its own currency — Lucento never converts.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        NavRow(
+            icon = Icons.Outlined.Category,
+            title = "Spending categories",
+            summary = "Choose what you spend on. Your budget is the sum of the amounts you set later.",
+            onClick = onOpenCategories,
         )
 
         EnabledFeaturesSection(current, onFeature)

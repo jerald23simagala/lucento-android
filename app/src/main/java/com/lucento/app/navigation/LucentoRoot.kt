@@ -142,7 +142,12 @@ import kotlin.reflect.KClass
 /** Read-only View Transaction page; Edit there opens [TransactionEditRoute] (or the transfer sheet). */
 @Serializable data class TransactionViewRoute(val transactionId: Long)
 /** The transaction composer: [start] is a [ComposerStart] name; [typeHint] a TransactionType name or empty. */
-@Serializable data class ComposerRoute(val start: String = "TYPE", val walletId: Long = NO_WALLET, val typeHint: String = "")
+@Serializable data class ComposerRoute(
+    val start: String = "TYPE",
+    val walletId: Long = NO_WALLET,
+    val typeHint: String = "",
+    val firstRun: Boolean = false,
+)
 
 const val NO_SCHEDULE = -1L
 const val NO_WALLET = -1L
@@ -303,9 +308,18 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     fun view(transaction: Transaction) = push(TransactionViewRoute(transaction.id))
 
     /** The one way to add transactions: the composer (typed, spoken or scanned, reviewed as a batch). */
-    fun openComposer(start: ComposerStart = ComposerStart.TYPE, walletId: Long? = null, typeHint: TransactionType? = null) {
+    fun openComposer(start: ComposerStart = ComposerStart.TYPE, walletId: Long? = null, typeHint: TransactionType? = null, firstRun: Boolean = false) {
         if (!requireWallets()) return
-        push(ComposerRoute(start.name, walletId ?: NO_WALLET, typeHint?.name.orEmpty()))
+        push(ComposerRoute(start.name, walletId ?: NO_WALLET, typeHint?.name.orEmpty(), firstRun))
+    }
+
+    // The short first run ends in the composer. Older installs leave this flag false.
+    var openedFirstEntry by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(preferences.pendingFirstEntry) {
+        if (preferences.pendingFirstEntry && !openedFirstEntry) {
+            openedFirstEntry = true
+            openComposer(firstRun = true)
+        }
     }
 
     val enableFeature: (Feature) -> Unit = { appViewModel.setFeatureEnabled(it, true) }
@@ -387,6 +401,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 onOpenWallets = { navigateTo(WalletsRoute) },
                                 onOpenDebts = { push(DebtsRoute) },
                                 onOpenSettings = { push(SettingsRoute) },
+                                onAddEntry = { openComposer() },
                             ),
                         )
                     }
@@ -477,7 +492,9 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         ManageCategoriesScreen(onBack = back, onChooseFromPresets = { push(CategorySetupRoute) })
                     }
                     pushed<CategorySetupRoute>(reducedMotion) { CategorySetupScreen(onDone = back) }
-                    pushed<SettingsRoute>(reducedMotion) { SettingsScreen(onBack = back) }
+                    pushed<SettingsRoute>(reducedMotion) {
+                        SettingsScreen(onBack = back, onOpenCategories = { push(CategorySetupRoute) })
+                    }
                     pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
                     pushed<TransactionViewRoute>(reducedMotion) { entry ->
                         val route = entry.toRoute<TransactionViewRoute>()
@@ -537,9 +554,14 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onBack = back,
                             onSaved = { message ->
                                 confirmation = Confirmation(message)
-                                // Land on the history, where the batch that was just saved is now listed.
-                                selectedTab = "transactions"
-                                navigateTo(TransactionsRoute)
+                                if (route.firstRun) {
+                                    appViewModel.finishFirstEntry()
+                                    navigateTo(HomeRoute)
+                                } else {
+                                    // Land on the history, where the batch that was just saved is now listed.
+                                    selectedTab = "transactions"
+                                    navigateTo(TransactionsRoute)
+                                }
                             },
                             onAddWallet = { navigateTo(WalletsRoute) },
                             voiceEnabled = features.isEnabled(Feature.VOICE_ENTRY),
@@ -548,6 +570,16 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             start = runCatching { ComposerStart.valueOf(route.start) }.getOrDefault(ComposerStart.TYPE),
                             walletId = route.walletId.takeIf { it != NO_WALLET },
                             typeHint = route.typeHint.takeIf { it.isNotEmpty() }?.let { name -> runCatching { TransactionType.valueOf(name) }.getOrNull() },
+                            firstRun = route.firstRun,
+                            geminiEnabled = preferences.smartReading,
+                            onSkip = if (route.firstRun) {
+                                {
+                                    appViewModel.finishFirstEntry()
+                                    navigateTo(HomeRoute)
+                                }
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
