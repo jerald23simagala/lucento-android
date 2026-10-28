@@ -1,6 +1,8 @@
 *.iml
 .gradle/
 /local.properties
+# Firebase project file for optional crash reports. The build succeeds without it (see docs/QUALITY.md).
+/app/google-services.json
 /.idea/
 .DS_Store
 /build/

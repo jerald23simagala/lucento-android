@@ -7,6 +7,16 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.firebase.crashlytics) apply false
+}
+
+// Crash reports are optional. Without app/google-services.json the plugins and the SDK are left out, so a
+// checkout with no Firebase project still builds. See docs/QUALITY.md "Crash reporting".
+val crashlyticsConfigured = file("google-services.json").exists()
+if (crashlyticsConfigured) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 // Optional cloud sync config (see docs/SYNC.md). Never committed: read from local.properties (a developer's
@@ -166,6 +176,12 @@ dependencies {
 
     // Bundled vector animations (res/raw); no runtime downloads, no network permission.
     implementation(libs.lottie.compose)
+
+    // Present only when app/google-services.json exists. CrashReporting no-ops otherwise.
+    if (crashlyticsConfigured) {
+        implementation(platform(libs.firebase.bom))
+        implementation(libs.firebase.crashlytics)
+    }
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

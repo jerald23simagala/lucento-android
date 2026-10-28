@@ -60,8 +60,9 @@ app/src/main/java/com/lucento/app/
 - INTERNET exists **only** for optional cloud sync (docs/SYNC.md): nothing leaves the device until the user signs in
   (Google, or an email account) and keeps sync on. Room stays the source of truth. Signing out, and switching to a
   different account, wipes this phone’s ledger and sync binding so the next account starts clean and one user’s data
-  is never uploaded into another account; unsynced changes require confirmation before that wipe. Any other
-  network use needs its own explicit opt-in with clear consent. CI allow-lists release permissions. OCR uses ML Kit's
+  is never uploaded into another account; unsynced changes require confirmation before that wipe. Crash reports,
+  only when `app/google-services.json` is present at build time, send stacks without amounts or notes (docs/QUALITY.md).
+  Any other network use needs its own explicit opt-in with clear consent. CI allow-lists release permissions. OCR uses ML Kit's
   bundled on-device model.
 - Supabase: schema changes ship as new files in `supabase/migrations/` (never edit applied DDL); every user-owned
   table has RLS (`auth.uid() = user_id`) and grants to `authenticated` only. Only the publishable key may reach the

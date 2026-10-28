@@ -12,6 +12,7 @@ import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.TransactionRunner
 import com.lucento.app.data.repository.WalletRepository
+import com.lucento.app.core.crash.CrashReporting
 import com.lucento.app.data.local.LocalLedgerReset
 import com.lucento.app.data.media.GoalPhotos
 import com.lucento.app.data.sync.AccountBoundary
@@ -34,6 +35,8 @@ class LucentoApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // No-op unless app/google-services.json was present at build time. Messages are stripped; see CrashReporting.
+        CrashReporting.install()
         container = AppContainer(this)
         // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
