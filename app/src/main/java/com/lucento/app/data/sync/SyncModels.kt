@@ -184,6 +184,8 @@ data class SyncReport(
     val deletedLocally: Int = 0,
     /** Deleted wallets, categories or goals brought back locally so a child row could be kept. */
     val parentsRestored: Int = 0,
+    /** Pending local edits that tied with the server and were nudged one millisecond later so they can be pushed. */
+    val pendingKept: Int = 0,
 ) {
     operator fun plus(other: SyncReport) = SyncReport(
         pushed + other.pushed,
@@ -192,6 +194,7 @@ data class SyncReport(
         tombstonesPushed + other.tombstonesPushed,
         deletedLocally + other.deletedLocally,
         parentsRestored + other.parentsRestored,
+        pendingKept + other.pendingKept,
     )
 }
 
@@ -216,9 +219,36 @@ internal fun localWinsOverRemoteDelete(localUpdatedAtMillis: Long, localDirty: B
 internal enum class PullDecision { INSERT, UPDATE, KEEP_LOCAL, UNCHANGED }
 
 /**
+ * A pending (dirty) local edit survives a pull when it is a causal successor, or when it is not older than the
+ * incoming row. A tie keeps the pending edit: the server's own rule keeps the stored row on an equal timestamp, so
+ * [tieBreakUpdatedAt] moves the local edit one millisecond later and the next push is accepted.
+ */
+internal fun protectsPendingEdit(
+    localBaseRevision: Long?,
+    localUpdatedAt: Long,
+    remoteRevision: Long?,
+    remoteUpdatedAt: Long,
+): Boolean = localEditWins(localBaseRevision, localUpdatedAt, remoteRevision, remoteUpdatedAt) ||
+    localUpdatedAt == remoteUpdatedAt
+
+/** Non-null when a dirty tie should be pushed as one millisecond later than the server row. */
+internal fun tieBreakUpdatedAt(
+    dirty: Boolean,
+    localBaseRevision: Long?,
+    localUpdatedAt: Long,
+    remoteRevision: Long?,
+    remoteUpdatedAt: Long,
+): Long? {
+    if (!dirty) return null
+    val causal = remoteRevision != null && localBaseRevision == remoteRevision
+    if (!causal && localUpdatedAt == remoteUpdatedAt) return remoteUpdatedAt + 1
+    return null
+}
+
+/**
  * The pull rule. A clean local row has nothing to protect: the server's copy is the accepted state and is applied
- * even if its edit time is older (a fast-clock device must still take edits made elsewhere). A dirty row is kept only
- * when [localEditWins]; it is then pushed and the server, applying the same rule, accepts it.
+ * even if its edit time is older (a fast-clock device must still take edits made elsewhere). A dirty row is kept when
+ * [protectsPendingEdit] — including a same-timestamp edit — and is then pushed.
  */
 internal fun pullDecision(
     localExists: Boolean,
@@ -229,7 +259,7 @@ internal fun pullDecision(
     remoteUpdatedAt: Long,
 ): PullDecision = when {
     !localExists -> PullDecision.INSERT
-    localDirty && localEditWins(localBaseRevision, localUpdatedAt, remoteRevision, remoteUpdatedAt) -> PullDecision.KEEP_LOCAL
+    localDirty && protectsPendingEdit(localBaseRevision, localUpdatedAt, remoteRevision, remoteUpdatedAt) -> PullDecision.KEEP_LOCAL
     !localDirty && localBaseRevision == remoteRevision && localUpdatedAt == remoteUpdatedAt -> PullDecision.UNCHANGED
     else -> PullDecision.UPDATE
 }

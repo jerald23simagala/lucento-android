@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -640,6 +641,30 @@ class SyncEngineTest {
         b.now += 10_000
         b.sync()
         assertNull(b.debtTerms.get(b.wallets.findByClientUuid("loan")!!.id))
+    }
+
+    @Test
+    fun `a pending local edit made at the same moment is not overwritten`() = runTest {
+        val a = Device()
+        val cash = a.addWallet()
+        a.addTransaction(cash.id, 100, note = "base")
+        success(a.sync())
+        val b = Device()
+        success(b.sync())
+
+        val same = a.now + 5_000
+        a.now = same
+        b.now = same
+        a.editNote(a.transactions.rows.value.single(), "from a")
+        b.editNote(b.transactions.rows.value.single(), "from b")
+        success(b.sync())
+        success(a.sync())
+
+        assertEquals("from a", a.transactions.rows.value.single().note)
+        assertEquals("from a", server.live("transactions", user).single().str("note"))
+        assertFalse(a.transactions.rows.value.single().dirty)
+        success(b.sync())
+        assertEquals("from a", b.transactions.rows.value.single().note)
     }
 
     @Test
