@@ -16,6 +16,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -74,6 +76,7 @@ import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
+import com.lucento.app.domain.PreviewTour
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.feature.budget.BudgetScreen
@@ -231,6 +234,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
     var showProfile by rememberSaveable { mutableStateOf(false) }
+    // In-memory only. Not a preference, so the tour is not hidden behind a switch that starts off.
+    var previewing by rememberSaveable { mutableStateOf(false) }
     // The tab a pushed screen belongs to, so the dock keeps it highlighted (e.g. Goals opened from Home).
     var selectedTab by rememberSaveable { mutableStateOf("home") }
 
@@ -372,7 +377,11 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         },
     ) { innerPadding ->
         CompositionLocalProvider(LocalProfileChrome provides ProfileChrome(preferences.displayName) { showProfile = true }) {
-            Box(Modifier.fillMaxSize().padding(innerPadding)) {
+            Column(Modifier.fillMaxSize().padding(innerPadding)) {
+                if (previewing) {
+                    PreviewBanner(onExit = { previewing = false })
+                }
+                Box(Modifier.weight(1f).fillMaxWidth()) {
                 NavHost(
                     navController = navController,
                     startDestination = HomeRoute,
@@ -403,6 +412,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 onOpenSettings = { push(SettingsRoute) },
                                 onAddEntry = { openComposer() },
                             ),
+                            preview = if (previewing) PreviewTour.example(preferences.primaryCurrency) else null,
+                            onPreview = { previewing = it },
                         )
                     }
                     composable<TransactionsRoute> {
@@ -584,6 +595,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     }
                 }
                 ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
+                }
             }
         }
     }
@@ -686,5 +698,24 @@ private fun Gated(
                 }
             },
         )
+    }
+}
+
+/** Shown on every screen while the in-memory example is open. */
+@Composable
+private fun PreviewBanner(onExit: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.gutter, vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Preview",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        LucentoTextButton(text = "Back to my data", onClick = onExit)
     }
 }

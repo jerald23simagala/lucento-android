@@ -68,8 +68,8 @@ enum class FinancialFocus(val title: String, val description: String, val featur
 
     companion object {
         /**
-         * Modules a new install starts with. Goals and recurring payments are on. Debts follows
-         * [FirstRunDefaults.DEBTS_ON_BY_DEFAULT] only. A chosen focus can still add its modules (used when an
+         * Modules a new install starts with. Goals, recurring payments and debts are on
+         * ([FirstRunDefaults.DEBTS_ON_BY_DEFAULT] is true). A chosen focus can still add its modules (used when an
          * older in-progress setup is resumed). Everything remains switchable in Settings.
          */
         fun initialFeatures(focuses: Set<FinancialFocus>): Set<Feature> =

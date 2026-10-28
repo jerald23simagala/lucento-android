@@ -50,6 +50,7 @@ class OnboardingViewModel(
     private val sync: com.lucento.app.data.sync.SyncRepository? = null,
     private val wallets: com.lucento.app.data.repository.WalletRepository? = null,
     private val accounts: com.lucento.app.data.sync.AccountBoundary? = null,
+    private val usage: com.lucento.app.domain.UsageCountsService? = null,
 ) : ViewModel() {
 
     /** The connected account's email, or null while signed out. */
@@ -65,6 +66,23 @@ class OnboardingViewModel(
     private val _switchPrompt = MutableStateFlow(false)
     /** A different account signed in while this phone still has unsynced data. Nothing is wiped until confirmed. */
     val switchPrompt: StateFlow<Boolean> = _switchPrompt
+
+    val usageOptIn: StateFlow<Boolean> = preferences.preferences
+        .map { it.usageCounts }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setUsageOptIn(enabled: Boolean) {
+        val counts = usage ?: return
+        viewModelScope.launch { counts.setOptIn(enabled) }
+    }
+
+    fun onStepShown(step: com.lucento.app.domain.FirstRunStep) {
+        val counts = usage ?: return
+        viewModelScope.launch {
+            if (step == com.lucento.app.domain.FirstRunStep.WELCOME) counts.noteWelcome()
+            counts.stepViewed(step.number)
+        }
+    }
 
     val syncAvailable: Boolean get() = auth != null && com.lucento.app.data.sync.SupabaseModule.isConfigured
     val googleAvailable: Boolean get() = com.lucento.app.data.sync.SupabaseModule.isGoogleSignInConfigured
@@ -411,6 +429,7 @@ class OnboardingViewModel(
                     auth = container.auth, syncPreferences = container.syncPreferences, appContext = app?.applicationContext,
                     sync = container.syncRepository, wallets = container.wallets,
                     accounts = container.accountBoundary,
+                    usage = container.usageCounts,
                 )
             }
         }

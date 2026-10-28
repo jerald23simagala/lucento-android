@@ -127,6 +127,7 @@ import com.lucento.app.domain.BudgetPlan
 import com.lucento.app.domain.BudgetSuggestion
 import com.lucento.app.domain.FirstWeek
 import com.lucento.app.domain.Feature
+import com.lucento.app.domain.PreviewExample
 import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalsOverview
 import com.lucento.app.domain.NetWorthComposition
@@ -172,6 +173,9 @@ data class HomeActions(
 @Composable
 fun HomeScreen(
     actions: HomeActions,
+    /** In-memory example. Null means the person's own figures. Never stored. */
+    preview: PreviewExample? = null,
+    onPreview: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
@@ -196,6 +200,11 @@ fun HomeScreen(
                 .verticalScroll(scroll)
                 .padding(horizontal = Spacing.gutter),
         ) {
+        PreviewEntry(
+            preview = preview,
+            currency = state.primaryCurrency,
+            onPreview = onPreview,
+        )
         AnimatedContent(
             targetState = when {
                 state.loadError -> HomeContent.Error
@@ -222,9 +231,13 @@ fun HomeScreen(
                     onDismissLocalDataNotice = viewModel::dismissLocalDataNotice,
                     onDismissFirstWeek = viewModel::dismissFirstWeek,
                     onSnoozeSuggestion = viewModel::snoozeBudgetSuggestion,
-                    onUseSuggestion = viewModel::applyBudgetSuggestion,
-                    onCelebrateShown = viewModel::markFirstEntryCelebrated,
-                )
+                onUseSuggestion = viewModel::applyBudgetSuggestion,
+                onCelebrateShown = viewModel::markFirstEntryCelebrated,
+                onAdjustSuggestion = {
+                    viewModel.noteBudgetAdjust()
+                    actions.onOpenBudget()
+                },
+            )
             }
         }
         // The dock's padding already clears the bar. This extra space keeps the last card off the raised +.
@@ -243,6 +256,42 @@ fun HomeScreen(
 }
 
 private enum class HomeContent { Loading, Error, Welcome, Overview }
+
+@Composable
+private fun PreviewEntry(preview: PreviewExample?, currency: String, onPreview: (Boolean) -> Unit) {
+    if (preview == null) {
+        LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.lg) {
+            Text("Preview with example data", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                "A labelled sample, kept in memory. It is not saved with your accounts.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LucentoTextButton(text = "Preview", onClick = { onPreview(true) })
+        }
+        Spacer(Modifier.height(Spacing.md))
+    } else {
+        LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.lg) {
+            Text("Preview", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text("Example balance", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+            MoneyText(money = preview.balance, style = AmountStyles.large, minScale = 0.6f)
+            Spacer(Modifier.height(Spacing.sm))
+            Text("Example entry", style = MaterialTheme.typography.titleSmall)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(preview.entryNote, modifier = Modifier.weight(1f), maxLines = 2)
+                AmountText(money = -preview.entry, showPlus = true)
+            }
+            Text(
+                "These figures are not yours. ${preview.balance.currencyCode.ifEmpty { currency }} sample only.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LucentoTextButton(text = "Back to my data", onClick = { onPreview(false) })
+        }
+        Spacer(Modifier.height(Spacing.md))
+    }
+}
 
 // ------------------------------------------------------------------ Header
 
@@ -523,6 +572,7 @@ private fun Overview(
     onSnoozeSuggestion: () -> Unit,
     onUseSuggestion: () -> Unit,
     onCelebrateShown: () -> Unit,
+    onAdjustSuggestion: () -> Unit,
 ) {
     val f = state.features
     var showCelebration by rememberSaveable { mutableStateOf(false) }
@@ -566,7 +616,7 @@ private fun Overview(
             BudgetSuggestionCard(
                 suggestion = suggestion,
                 onUse = onUseSuggestion,
-                onAdjust = actions.onOpenBudget,
+                onAdjust = onAdjustSuggestion,
                 onNotNow = onSnoozeSuggestion,
             )
         }
@@ -1543,6 +1593,7 @@ private fun HomeFontScalePreview() {
                 onSnoozeSuggestion = {},
                 onUseSuggestion = {},
                 onCelebrateShown = {},
+                onAdjustSuggestion = {},
             )
         }
     }

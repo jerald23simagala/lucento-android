@@ -65,7 +65,7 @@ class OnboardingFlowTest {
         assertTrue(Feature.BUDGETS in features)
         assertTrue(Feature.MULTIPLE_WALLETS in features)
         assertEquals(FirstRunDefaults.DEBTS_ON_BY_DEFAULT, Feature.DEBTS_LOANS in features)
-        assertFalse(FirstRunDefaults.DEBTS_ON_BY_DEFAULT)
+        assertTrue(FirstRunDefaults.DEBTS_ON_BY_DEFAULT)
         assertEquals("Cash", FirstRunDefaults.DEFAULT_WALLET_NAME)
         assertTrue(FirstRunDefaults.categoryPresetKeys().isNotEmpty())
         assertTrue("groceries" in FirstRunDefaults.categoryPresetKeys())

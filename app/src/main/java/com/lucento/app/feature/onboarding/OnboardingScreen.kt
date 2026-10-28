@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -57,6 +58,7 @@ import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoStackedLockup
 import com.lucento.app.core.designsystem.component.LucentoTextButton
+import com.lucento.app.core.designsystem.component.SwitchRow
 import com.lucento.app.core.designsystem.component.LucentoWorkingIndicator
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.theme.LucentoTheme
@@ -76,7 +78,10 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     val restoreStage by viewModel.restoreStage.collectAsStateWithLifecycle()
     val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
     val switchPrompt by viewModel.switchPrompt.collectAsStateWithLifecycle()
+    val usageOptIn by viewModel.usageOptIn.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(step) { viewModel.onStepShown(step) }
 
     if (switchPrompt) {
         ConfirmDialog(
@@ -136,6 +141,8 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
                 FirstRunStep.WELCOME -> WelcomeStep(
                     onContinue = viewModel::next,
                     onRestore = if (viewModel.syncAvailable) viewModel::startRestore else null,
+                    usageOptIn = usageOptIn,
+                    onUsageOptIn = viewModel::setUsageOptIn,
                 )
                 FirstRunStep.CURRENCY -> CurrencyStep(
                     currency = currency,
@@ -175,7 +182,12 @@ private fun StepTitle(title: String, body: String) {
 }
 
 @Composable
-private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
+private fun WelcomeStep(
+    onContinue: () -> Unit,
+    onRestore: (() -> Unit)?,
+    usageOptIn: Boolean,
+    onUsageOptIn: (Boolean) -> Unit,
+) {
     val mascot = if (LocalDensity.current.fontScale >= 1.3f) 96.dp else 140.dp
     Column(Modifier.fillMaxSize()) {
         Column(
@@ -215,9 +227,13 @@ private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
             InfoNote(
                 "Your data stays on this phone. Uninstalling Lucento or clearing its storage erases it, unless cloud sync is on.",
             )
-            // TODO(usage-counts): Opt-in toggle, off by default, once the usage_events backend is approved.
-            // Copy: "Share anonymous usage counts to help improve Lucento. Never amounts or what you type. What we collect"
-            // Do not add the toggle, the events table, or an analytics client until that backend is approved.
+            Spacer(Modifier.height(Spacing.md))
+            SwitchRow(
+                title = "Share anonymous usage counts",
+                description = "Helps improve Lucento. Never amounts or what you type. Event names and timings only, with a random install id, kept 90 days.",
+                checked = usageOptIn,
+                onCheckedChange = onUsageOptIn,
+            )
             Spacer(Modifier.height(Spacing.md))
         }
         LucentoPrimaryButton(text = "Get started", onClick = onContinue)
@@ -390,7 +406,7 @@ private fun WelcomeFontScalePreview() {
     LucentoTheme {
         Column(Modifier.background(MaterialTheme.colorScheme.background).padding(Spacing.gutter)) {
             StepLabel(FirstRunStep.WELCOME)
-            WelcomeStep(onContinue = {}, onRestore = {})
+            WelcomeStep(onContinue = {}, onRestore = {}, usageOptIn = false, onUsageOptIn = {})
         }
     }
 }

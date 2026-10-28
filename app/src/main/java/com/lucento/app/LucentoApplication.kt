@@ -27,6 +27,11 @@ import com.lucento.app.data.sync.SyncFlight
 import com.lucento.app.data.sync.SyncPreferences
 import com.lucento.app.data.sync.SyncRepository
 import com.lucento.app.data.sync.SyncScheduler
+import com.lucento.app.data.usage.SupabaseUsageRemote
+import com.lucento.app.domain.UsageCountsService
+import com.lucento.app.domain.UsageEventDeleter
+import com.lucento.app.domain.UsageEventSender
+import java.util.UUID
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +51,7 @@ class LucentoApplication : Application() {
         // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            container.usageCounts.retryPendingDeletion()
             // A different account already signed in, with nothing unsynced, is wiped before the next sync
             // so this phone never uploads the previous ledger. Unsynced changes wait for a confirmation in Settings.
             when (container.accountBoundary.afterSignIn()) {
@@ -144,6 +150,19 @@ class AppContainer(application: Application) {
 
     private val ledgerReset: LocalLedgerReset by lazy {
         LocalLedgerReset(database, syncPreferences, GoalPhotos(application), preferences)
+    }
+
+    val usageCounts: UsageCountsService by lazy {
+        val remote = supabaseClient?.let(::SupabaseUsageRemote)
+        UsageCountsService(
+            load = { preferences.readUsageLedger() },
+            save = { preferences.writeUsageLedger(it) },
+            send = UsageEventSender { id, event, version -> if (remote != null) remote.insert(id, event, version) },
+            deleteRemote = UsageEventDeleter { id -> if (remote != null) remote.delete(id) },
+            newInstallId = { UUID.randomUUID().toString() },
+            now = System::currentTimeMillis,
+            appVersion = BuildConfig.VERSION_NAME,
+        )
     }
 
     /** Sign-out and account switching. Wipes the local ledger before another account can sync. */

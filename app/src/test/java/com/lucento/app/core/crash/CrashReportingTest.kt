@@ -30,13 +30,17 @@ class CrashReportingTest {
     }
 
     @Test fun collectionStartsDisabledAndTheToggleChangesItImmediately() {
+        val beforeInstall = CrashReporting.unsentReportsDeleted
         CrashReporting.install()
         assertEquals(false, CrashReporting.collectionEnabled)
+        assertEquals(beforeInstall + 1, CrashReporting.unsentReportsDeleted)
         CrashReporting.setCollectionEnabled(true)
         assertEquals(true, CrashReporting.collectionEnabled)
         val deletedBefore = CrashReporting.unsentReportsDeleted
         CrashReporting.setCollectionEnabled(false)
         assertEquals(false, CrashReporting.collectionEnabled)
+        assertEquals(deletedBefore, CrashReporting.unsentReportsDeleted)
+        CrashReporting.deleteUnsentReports()
         assertEquals(deletedBefore + 1, CrashReporting.unsentReportsDeleted)
     }
 

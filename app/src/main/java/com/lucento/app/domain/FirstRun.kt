@@ -62,11 +62,10 @@ object OnboardingFlow {
 /**
  * Defaults for everything the short first run no longer asks.
  * [DEBTS_ON_BY_DEFAULT] is the only switch for whether new installs start with Debts.
- * It stays off, which is what the previous focus defaults did. Flip the constant to turn Debts on.
- * People who already finished setup keep the feature set they saved.
+ * It is on. People who already finished setup keep the feature set they saved.
  */
 object FirstRunDefaults {
-    const val DEBTS_ON_BY_DEFAULT = false
+    const val DEBTS_ON_BY_DEFAULT = true
     const val DEFAULT_WALLET_NAME = "Cash"
     const val THEME_SYSTEM = "SYSTEM"
 

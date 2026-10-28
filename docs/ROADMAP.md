@@ -113,7 +113,8 @@ recurring-schedule sync, syncing preferences.
   indicator; 30 s sync request timeout with one retry; loan history shows each payment's principal and its interest
   apart (`DebtPaymentLink`); New wallet live card preview; type icons on every wallet pill; compact goal cards;
   smaller dashboard hero and raised Quick links; themed onboarding text in dark mode.
-- First run is welcome, currency, a starting balance and the composer. The older guided setup (including the
+- First run is welcome, currency, a starting balance and the composer. Debts, goals and recurring payments start on.
+  Home includes an in-memory example preview (labelled, not saved). The older guided setup (including the
   two-budget gate) is no longer started for new installs; someone already part-way through it resumes without that gate.
 - Guided setup after onboarding (accounts → cards & loans → two budget amounts → a goal → first transactions →
   welcome); Wallets in the dock, Budgets in Quick links; Add actions in the top bar (sunlight at night); duplicate

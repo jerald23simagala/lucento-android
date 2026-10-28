@@ -122,6 +122,7 @@ fun SettingsScreen(
                 onSyncNow = viewModel::syncNow,
                 onChangePassword = viewModel::changePassword,
                 onOpenCategories = onOpenCategories,
+                onUsageCounts = viewModel::setUsageCounts,
             )
             current.cloudSync.prompt?.let { prompt ->
                 val unsynced = signOutUnsyncedMessage(prompt.unsyncedCount)
@@ -243,6 +244,7 @@ private fun SettingsContent(
     onSyncNow: () -> Unit,
     onChangePassword: (String) -> Unit,
     onOpenCategories: () -> Unit,
+    onUsageCounts: (Boolean) -> Unit,
 ) {
     val prefs = current.preferences
     Column {
@@ -344,6 +346,12 @@ private fun SettingsContent(
             onCheckedChange = onCrashReports,
             description = "Off unless you turn this on. A report is the stack and the kind of error — never an amount, a note, or what you typed.",
         )
+        SwitchRow(
+            title = "Share anonymous usage counts",
+            checked = prefs.usageCounts,
+            onCheckedChange = onUsageCounts,
+            description = "Off unless you turn this on. Event names and timings only, with a random install id. Never amounts or what you type. Kept 90 days. Turning this off deletes the counts for this install.",
+        )
         Fact(
             Icons.Outlined.PhoneAndroid,
             if (current.cloudSync.status.enabled) "Kept on this device, copied to your account" else "Stored only on this device",
@@ -359,7 +367,7 @@ private fun SettingsContent(
             if (current.cloudSync.status.enabled)
                 "Cloud sync is on for this account. Crash reports and Smarter reading still wait for their own switches. Receipt reading runs on the phone either way."
             else
-                "Nothing is sent unless you turn on cloud sync, crash reports, or Smarter reading. Receipt reading runs on the phone.",
+                "Nothing is sent unless you turn on cloud sync, crash reports, Smarter reading, or anonymous usage counts. Receipt reading runs on the phone.",
         )
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.KeyboardVoice, "Voice uses your phone’s recogniser", "Speech is converted to text by your device’s speech service; Lucento interprets it offline.")

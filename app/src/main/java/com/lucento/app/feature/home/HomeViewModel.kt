@@ -17,6 +17,7 @@ import com.lucento.app.domain.Budget
 import com.lucento.app.domain.BudgetSuggestions
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.FirstWeek
+import com.lucento.app.domain.UsageCountsService
 import com.lucento.app.domain.Goal
 import com.lucento.app.domain.GoalContribution
 import com.lucento.app.domain.RecurringSchedule
@@ -52,6 +53,7 @@ class HomeViewModel(
     pendingChanges: Flow<Int>,
     online: Flow<Boolean>,
     private val syncConfigured: Boolean,
+    private val usage: UsageCountsService? = null,
 ) : ViewModel() {
 
     private data class Core(
@@ -161,15 +163,58 @@ class HomeViewModel(
     fun applyBudgetSuggestion() {
         val suggestion = uiState.value.budgetSuggestion ?: return
         val currency = uiState.value.focusCurrency
+        val count = suggestion.lines.size
         viewModelScope.launch {
             suggestion.lines.forEach { line ->
                 budgets.setAllocation(line.categoryId, currency, line.suggested)
             }
+            usage?.onHome(
+                realEntries = uiState.value.realEntryCount,
+                suggestionDays = suggestion.days,
+                doneSteps = emptySet(),
+                budgetedCategories = count,
+                acceptSuggestion = true,
+                markAdjust = false,
+            )
         }
     }
 
     fun retry() {
         reload.value += 1
+    }
+
+    fun noteBudgetAdjust() {
+        val log = usage ?: return
+        val state = uiState.value
+        viewModelScope.launch {
+            log.onHome(
+                realEntries = state.realEntryCount,
+                suggestionDays = state.budgetSuggestion?.days,
+                doneSteps = state.firstWeekSteps.filter { it.done }.map { it.id }.toSet(),
+                budgetedCategories = state.budgetSuggestion?.lines?.size ?: 0,
+                acceptSuggestion = false,
+                markAdjust = true,
+            )
+        }
+    }
+
+    init {
+        val log = usage ?: null
+        if (log != null) {
+            viewModelScope.launch {
+                uiState.collect { state ->
+                    if (state.loading || state.loadError) return@collect
+                    log.onHome(
+                        realEntries = state.realEntryCount,
+                        suggestionDays = state.budgetSuggestion?.days,
+                        doneSteps = state.firstWeekSteps.filter { it.done }.map { it.id }.toSet(),
+                        budgetedCategories = state.budgetSuggestion?.lines?.size ?: 0,
+                        acceptSuggestion = false,
+                        markAdjust = false,
+                    )
+                }
+            }
+        }
     }
 
     /** Shows [month] on the budget card; the current month follows the calendar (null). */
@@ -186,6 +231,7 @@ class HomeViewModel(
                 pendingChanges = c.syncRepository.observePendingChanges(),
                 online = application.observeOnline(),
                 syncConfigured = SupabaseModule.isConfigured,
+                usage = c.usageCounts,
             )
         }
     }

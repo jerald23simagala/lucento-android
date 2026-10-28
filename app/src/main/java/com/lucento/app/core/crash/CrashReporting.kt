@@ -24,6 +24,7 @@ object CrashReporting {
      */
     fun install(enabled: Boolean = false) {
         setCollectionEnabled(enabled)
+        if (!enabled) deleteUnsentReports()
         val crashlytics = crashlyticsClass() ?: return
         val instance = instance(crashlytics) ?: return
         if (handlerInstalled) return
@@ -35,19 +36,25 @@ object CrashReporting {
         }
     }
 
-    /** Turns collection on or off immediately. Opting out also drops reports that have not been sent yet. */
+    /** Turns collection on or off. Dropping unsent reports is [deleteUnsentReports], after the choice is saved. */
     fun setCollectionEnabled(enabled: Boolean) {
         collectionEnabled = enabled
-        if (!enabled) unsentReportsDeleted++
+        val crashlytics = crashlyticsClass()
+        val instance = crashlytics?.let { instance(it) }
+        if (crashlytics != null && instance != null) {
+            runCatching {
+                crashlytics.getMethod("setCrashlyticsCollectionEnabled", Boolean::class.javaPrimitiveType)
+                    .invoke(instance, enabled)
+            }
+        }
+    }
+
+    /** Drops reports still waiting on the device. Safe to call more than once. No-op without the SDK. */
+    fun deleteUnsentReports() {
+        unsentReportsDeleted++
         val crashlytics = crashlyticsClass() ?: return
         val instance = instance(crashlytics) ?: return
-        runCatching {
-            crashlytics.getMethod("setCrashlyticsCollectionEnabled", Boolean::class.javaPrimitiveType)
-                .invoke(instance, enabled)
-        }
-        if (!enabled) {
-            runCatching { crashlytics.getMethod("deleteUnsentReports").invoke(instance) }
-        }
+        runCatching { crashlytics.getMethod("deleteUnsentReports").invoke(instance) }
     }
 
     private var handlerInstalled = false
