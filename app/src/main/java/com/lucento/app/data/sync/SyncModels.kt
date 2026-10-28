@@ -182,6 +182,8 @@ data class SyncReport(
     val conflicts: Int = 0,
     val tombstonesPushed: Int = 0,
     val deletedLocally: Int = 0,
+    /** Deleted wallets, categories or goals brought back locally so a child row could be kept. */
+    val parentsRestored: Int = 0,
 ) {
     operator fun plus(other: SyncReport) = SyncReport(
         pushed + other.pushed,
@@ -189,6 +191,7 @@ data class SyncReport(
         conflicts + other.conflicts,
         tombstonesPushed + other.tombstonesPushed,
         deletedLocally + other.deletedLocally,
+        parentsRestored + other.parentsRestored,
     )
 }
 

@@ -641,4 +641,64 @@ class SyncEngineTest {
         b.sync()
         assertNull(b.debtTerms.get(b.wallets.findByClientUuid("loan")!!.id))
     }
+
+    @Test
+    fun `a transaction whose wallet or category was deleted is kept and does not stall the cursor`() = runTest {
+        val a = Device()
+        val cash = a.addWallet("Cash")
+        val food = a.addCategory("Food")
+        success(a.sync())
+        val b = Device()
+        success(b.sync())
+
+        a.now += 1_000
+        a.deleteWallet(cash)
+        val foodRow = a.categories.getById(food.id)!!
+        a.categories.deleteById(food.id)
+        a.tombstones.insert(
+            SyncTombstoneEntity(tableName = "categories", clientUuid = food.clientUuid!!, deletedAt = a.now, baseRevision = foodRow.baseRevision),
+        )
+        success(a.sync())
+
+        // The deletions are already behind the cursor, so this pull will not see the parent rows themselves.
+        val deletedThrough = maxOf(
+            SyncTime.fromIso(server.rows("wallets", user).single().str("server_updated_at")),
+            SyncTime.fromIso(server.rows("categories", user).single { it.str("name") == "Food" }.str("server_updated_at")),
+        )
+        a.prefs.pullCursor = SyncTime.toIso(deletedThrough + 1)
+
+        b.now += 2_000
+        b.addTransaction(
+            b.wallets.rows.value.single { it.name == "Cash" }.id,
+            4242,
+            b.categories.rows.value.single { it.name == "Food" }.id,
+            note = "offline lunch",
+        )
+        success(b.sync())
+        // A later row, far enough past the transaction that a deferred cursor would stay on the transaction.
+        server.serverNow += 120_000
+        b.now += 3_000
+        b.addWallet("Savings")
+        success(b.sync())
+
+        val report = success(a.sync())
+        assertEquals("offline lunch", a.transactions.rows.value.single().note)
+        assertEquals(4242L, a.transactions.rows.value.single().amountMinor)
+        assertEquals(SyncRepository.RESTORED_ACCOUNT_NAME, a.wallets.rows.value.single { it.clientUuid == cash.clientUuid }.name)
+        assertEquals(SyncRepository.UNCATEGORIZED_NAME, a.categories.getById(a.transactions.rows.value.single().categoryId!!)!!.name)
+        assertTrue(report.parentsRestored >= 2)
+        assertTrue(a.wallets.rows.value.any { it.name == "Savings" })
+        val cursor = SyncTime.fromIso(a.prefs.pullCursor!!)
+        val transactionAt = SyncTime.fromIso(server.live("transactions", user).single().str("server_updated_at"))
+        assertTrue("cursor $cursor stayed on the transaction at $transactionAt", cursor > transactionAt)
+
+        success(a.sync())
+        assertEquals(1, a.transactions.rows.value.size)
+
+        val fresh = Device()
+        success(fresh.sync())
+        assertEquals("offline lunch", fresh.transactions.rows.value.single().note)
+        assertEquals("Cash", fresh.wallets.rows.value.single { it.clientUuid == cash.clientUuid }.name)
+        assertEquals("Food", fresh.categories.getById(fresh.transactions.rows.value.single().categoryId!!)!!.name)
+    }
 }

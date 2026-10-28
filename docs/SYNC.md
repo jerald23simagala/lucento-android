@@ -106,8 +106,13 @@ an upsert on `id`, retrying a push can never create a duplicate.
    server-assigned `server_updated_at` is at or after the cursor is read in **keyset** pages of 500 —
    `(server_updated_at, id) > last seen` — so a row updated by another device mid-read moves to the end instead of
    shifting the next page and being skipped (which offset paging allowed). A row whose parent hasn't arrived is
-   deferred. Remote deletions are applied after all upserts, children first; one the local schema still refuses (this
-   device added a transaction to a wallet another device deleted) is kept and counted as a conflict, never fatal.
+   deferred only while a parent might still arrive in a later page. A wallet, category or goal that is already
+   deleted is restored locally so the child can be stored (a missing category with no row left to restore becomes
+   "Uncategorized"; a missing wallet becomes "Restored account", keeping the original id and the transaction's
+   currency). The restored parent is not pushed, so other devices that deleted it stay deleted until they too
+   receive the child. The cursor then moves. Remote deletions are applied after all upserts, children first; one the
+   local schema still refuses (this device added a transaction to a wallet another device deleted) is kept and counted
+   as a conflict, never fatal.
 7. Save the new cursor: the newest `server_updated_at` seen minus 60 s (catches writes stamped before but committed
    after the read; re-pulled rows are idempotent), never past a deferred row. Then clear the last error.
 
@@ -290,8 +295,8 @@ transaction arrive with the edited note. Sign in on B with a second test account
   log the user can restore from) is the next step if this proves to matter in practice.
 - A pull that applies a remote delete writes a local tombstone too; pushing it is harmless (the row is already
   deleted) but costs one extra request.
-- A rejected write is resolved from the server's copy in the same cycle; if that copy's parent row is missing locally
-  (an edge case after concurrent parent deletes), it waits for a later cycle like any deferred row.
+- A child row whose parent was deleted is kept by restoring that parent locally (see the pull step). The restored
+  parent is not uploaded, so it does not undelete the account on a device that already removed it.
 - Switching accounts wipes this phone's ledger first (see Sign-out). Unsynced changes are kept only if the user
   cancels the switch and signs back in to the original account.
 - Preferences and goal photos are not synced.

@@ -225,7 +225,8 @@ class SettingsViewModel(
             is SyncResult.Success -> {
                 val r = result.report
                 "Synced — ${r.pushed} sent, ${r.pulled} received" +
-                    if (r.conflicts > 0) ". ${r.conflicts} changed on two devices at once — the later edit was kept" else ""
+                    (if (r.conflicts > 0) ". ${r.conflicts} changed on two devices at once — the later edit was kept" else "") +
+                    (if (r.parentsRestored > 0) ". ${r.parentsRestored} deleted account or category restored so a transaction was kept" else "")
             }
             SyncResult.NotSignedIn -> "Not connected — sign in to sync."
             SyncResult.AccountMismatch -> {
