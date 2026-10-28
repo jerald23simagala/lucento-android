@@ -120,21 +120,26 @@ fun SettingsScreen(
                 onChangePassword = viewModel::changePassword,
             )
             current.cloudSync.prompt?.let { prompt ->
+                val unsynced = signOutUnsyncedMessage(prompt.unsyncedCount)
+                val signOutWithLoss = prompt.kind == AccountPrompt.Kind.SIGN_OUT && unsynced != null
                 ConfirmDialog(
                     title = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect this account?" else "Switch account?",
                     text = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) {
                         "This removes the account’s wallets, transactions, budgets and goals from this phone. " +
                             "Sign back in to download them again." +
-                            if (prompt.unsynced) " Changes that haven’t synced yet will be lost." else ""
+                            (unsynced?.let { " $it" } ?: "")
                     } else {
                         "This phone’s data belongs to another account. It will be removed so it is never uploaded " +
                             "to the account you just signed in to." +
-                            if (prompt.unsynced) " Changes that haven’t synced will be lost." else ""
+                            if (prompt.hasUnsynced) " Changes that haven’t synced will be lost." else ""
                     },
-                    confirmLabel = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect" else "Remove and switch",
-                    destructive = true,
-                    onConfirm = viewModel::confirmAccountPrompt,
+                    confirmLabel = if (signOutWithLoss) "Sync first" else if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect" else "Remove and switch",
+                    destructive = !signOutWithLoss,
+                    onConfirm = if (signOutWithLoss) viewModel::syncBeforeSignOut else viewModel::confirmAccountPrompt,
                     onDismiss = viewModel::dismissAccountPrompt,
+                    secondaryLabel = if (signOutWithLoss) "Sign out anyway" else null,
+                    onSecondary = if (signOutWithLoss) viewModel::confirmAccountPrompt else null,
+                    secondaryDestructive = true,
                 )
             }
         }

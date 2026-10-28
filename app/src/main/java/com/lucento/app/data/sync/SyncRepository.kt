@@ -68,8 +68,14 @@ class SyncRepository(
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
 
+    /**
+     * Dirty rows plus deletions not yet pushed. The same total the Home header watches.
+     * Sign-out uses it before wiping the phone.
+     */
+    suspend fun pendingChangeCount(): Int = observePendingChanges().first()
+
     /** True when a sign-out or account switch would drop changes that have not reached the server. */
-    suspend fun hasUnsyncedChanges(): Boolean = observePendingChanges().first() > 0
+    suspend fun hasUnsyncedChanges(): Boolean = pendingChangeCount() > 0
 
     suspend fun sync(): SyncResult = SyncFlight.exclusive { syncBody() }
 

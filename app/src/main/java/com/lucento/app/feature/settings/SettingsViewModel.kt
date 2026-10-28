@@ -43,8 +43,10 @@ data class SettingsUiState(
 
 /** Everything the "Cloud sync" section needs, kept separate so the rest of Settings never depends on it. */
 /** A wipe the user still has to confirm. [unsynced] means changes that have not reached the server would be lost. */
-data class AccountPrompt(val kind: Kind, val unsynced: Boolean) {
+data class AccountPrompt(val kind: Kind, val unsyncedCount: Int) {
     enum class Kind { SIGN_OUT, SWITCH }
+
+    val hasUnsynced: Boolean get() = unsyncedCount > 0
 }
 
 data class CloudSyncUiState(
@@ -81,7 +83,7 @@ class SettingsViewModel(
                 AccountBoundary.AfterSignIn.Ready -> Unit
                 AccountBoundary.AfterSignIn.Wiped -> enableSyncAndRun()
                 is AccountBoundary.AfterSignIn.ConfirmSwitch ->
-                    prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, check.unsynced)
+                    prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, syncRepository.pendingChangeCount())
             }
         }
     }
@@ -162,7 +164,18 @@ class SettingsViewModel(
     fun disconnectAccount() {
         if (syncing.value) return
         viewModelScope.launch {
-            prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.hasUnsyncedChanges())
+            prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.pendingChangeCount())
+        }
+    }
+
+    /** Uploads what it can, then counts again so the dialog shows what would still be lost. */
+    fun syncBeforeSignOut() {
+        if (syncing.value) return
+        viewModelScope.launch {
+            syncing.value = true
+            runSyncNow()
+            prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.pendingChangeCount())
+            syncing.value = false
         }
     }
 
@@ -200,7 +213,7 @@ class SettingsViewModel(
         when (check) {
             AccountBoundary.AfterSignIn.Ready, AccountBoundary.AfterSignIn.Wiped -> enableSyncAndRun()
             is AccountBoundary.AfterSignIn.ConfirmSwitch ->
-                prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, check.unsynced)
+                prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, syncRepository.pendingChangeCount())
         }
     }
 
@@ -245,7 +258,7 @@ class SettingsViewModel(
             }
             SyncResult.NotSignedIn -> "Not connected — sign in to sync."
             SyncResult.AccountMismatch -> {
-                prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, syncRepository.hasUnsyncedChanges())
+                prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, syncRepository.pendingChangeCount())
                 SyncRepository.ACCOUNT_MISMATCH_MESSAGE
             }
             SyncResult.NotConfigured -> "Cloud sync isn’t available in this version of Lucento yet."
