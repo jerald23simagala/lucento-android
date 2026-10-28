@@ -17,6 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -146,16 +147,16 @@ fun AdjustBalanceSheet(
             Spacer(Modifier.height(Spacing.sm))
             val amountError = error is AdjustError.AmountInvalid || error is AdjustError.AmountTooPrecise ||
                 error is AdjustError.AmountTooLarge
-            OutlinedTextField(
+            AmountTextField(
                 value = amountText,
                 onValueChange = {
-                    amountText = it.take(20)
+                    amountText = it
                     if (error != null && error != AdjustError.FutureDate) error = null
                 },
+                filter = { it.take(20) },
                 label = { Text(if (liability) "Actual amount owed" else "Actual balance") },
                 prefix = { Text(MoneyFormatter.currencySymbol(wallet.currencyCode) + " ") },
                 placeholder = { Text("0") },
-                singleLine = true,
                 isError = amountError,
                 textStyle = AmountStyles.medium,
                 supportingText = {

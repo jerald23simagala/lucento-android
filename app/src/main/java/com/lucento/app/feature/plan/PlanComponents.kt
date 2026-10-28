@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.component.AmountTextField
 import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.Spacing
@@ -66,13 +67,13 @@ internal fun MoneyField(
     error: String? = null,
     supporting: String? = null,
 ) {
-    OutlinedTextField(
+    AmountTextField(
         value = value,
-        onValueChange = { input -> onValueChange(input.filter { it.isDigit() || it == '.' || it == ',' }.take(20)) },
+        onValueChange = onValueChange,
+        filter = { input -> input.filter { it.isDigit() || it == '.' || it == ',' }.take(20) },
         label = { Text(label) },
         prefix = { Text(MoneyFormatter.currencySymbol(currencyCode) + " ") },
         placeholder = { Text("0") },
-        singleLine = true,
         isError = error != null,
         textStyle = AmountStyles.medium,
         supportingText = if (error != null || supporting != null) {

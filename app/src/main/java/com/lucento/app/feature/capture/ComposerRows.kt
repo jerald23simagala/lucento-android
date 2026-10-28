@@ -30,6 +30,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -336,24 +337,42 @@ private fun InlineField(
     var value by remember { mutableStateOf(initial) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    OutlinedTextField(
-        value = value,
-        onValueChange = { value = it.take(if (keyboardType == KeyboardType.Decimal) 24 else 200) },
-        label = { Text(label) },
-        singleLine = true,
-        shape = MaterialTheme.shapes.small,
-        textStyle = if (keyboardType == KeyboardType.Decimal) AmountStyles.row else MaterialTheme.typography.bodyLarge,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = keyboardType,
-            capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
-            imeAction = ImeAction.Done,
-        ),
-        keyboardActions = KeyboardActions(onDone = { onDone(value) }),
-        trailingIcon = {
-            IconButton(onClick = { onDone(value) }) { Icon(Icons.Filled.Check, contentDescription = "Done") }
-        },
-        modifier = modifier.fillMaxWidth().focusRequester(focus),
-    )
+    val done = { onDone(value) }
+    val fieldModifier = modifier.fillMaxWidth().focusRequester(focus)
+    if (keyboardType == KeyboardType.Decimal) {
+        AmountTextField(
+            value = value,
+            onValueChange = { value = it },
+            filter = { it.take(24) },
+            label = { Text(label) },
+            textStyle = AmountStyles.row,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { done() }),
+            trailingIcon = {
+                IconButton(onClick = done) { Icon(Icons.Filled.Check, contentDescription = "Done") }
+            },
+            modifier = fieldModifier,
+        )
+    } else {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { value = it.take(200) },
+            label = { Text(label) },
+            singleLine = true,
+            shape = MaterialTheme.shapes.small,
+            textStyle = MaterialTheme.typography.bodyLarge,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = keyboardType,
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(onDone = { done() }),
+            trailingIcon = {
+                IconButton(onClick = done) { Icon(Icons.Filled.Check, contentDescription = "Done") }
+            },
+            modifier = fieldModifier,
+        )
+    }
 }
 
 /** A compact, tappable field value. [attention] tints it; [softAttention] uses the quieter hint tone. */
