@@ -111,6 +111,12 @@ object QuickEntryParser {
         " received ", " receive ", " got paid", " earned ", " earn ", " salary", " income", " paid me",
         " refund", " bonus", " sold ", " payment from", " allowance", " dividend", " commission",
     )
+
+    /** "got 20 from mom" and "received 20 from a friend": money coming from someone, not a purchase. */
+    private val GOT_OR_RECEIVED_FROM = Regex("""\b(got|received|receive)\b.+\bfrom\b""")
+
+    /** "mom gave me 20". */
+    private val GAVE_ME = Regex("""\b(gave|give|gives) me\b""")
     private val transferWords = listOf(
         " transfer", " transferred ", " moved ", " move ", " withdrew ", " withdraw ", " deposited ", " deposit ",
         " top up ", " topped up ", " top-up ", " cash in ", " paid off my ", " pay off my ",
@@ -139,7 +145,9 @@ object QuickEntryParser {
         transferWords.any { lower.contains(it) } -> TransactionType.TRANSFER_OUT
         // "paid my credit card" is a transfer into the card, not new spending.
         Regex(" (paid|pay) (my )?(credit )?card ").containsMatchIn(lower) -> TransactionType.TRANSFER_OUT
-        incomeWords.any { lower.contains(it) } -> TransactionType.INCOME
+        incomeWords.any { lower.contains(it) } ||
+            GOT_OR_RECEIVED_FROM.containsMatchIn(lower) ||
+            GAVE_ME.containsMatchIn(lower) -> TransactionType.INCOME
         expenseWords.any { lower.contains(it) } -> TransactionType.EXPENSE
         else -> null
     }
