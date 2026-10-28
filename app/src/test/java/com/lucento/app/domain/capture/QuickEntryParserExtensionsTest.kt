@@ -25,6 +25,8 @@ class QuickEntryParserExtensionsTest {
         assertNull(QuickEntryParser.explicitType(" lunch 250 "))
         assertEquals(TransactionType.EXPENSE, QuickEntryParser.explicitType(" bought shoes 900 "))
         assertEquals(TransactionType.INCOME, QuickEntryParser.explicitType(" got paid 5000 "))
+        assertEquals(TransactionType.INCOME, QuickEntryParser.explicitType(" got 20 from mom "))
+        assertEquals(TransactionType.EXPENSE, QuickEntryParser.explicitType(" got 500 from jollibee "))
         assertEquals(TransactionType.TRANSFER_OUT, QuickEntryParser.explicitType(" paid my credit card 3000 "))
         // The single-entry default is unchanged: no cue still means expense.
         assertEquals(TransactionType.EXPENSE, QuickEntryParser.detectType(" lunch 250 "))

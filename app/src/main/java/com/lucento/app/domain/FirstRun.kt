@@ -133,4 +133,7 @@ object FirstWeek {
     /** The mascot reaction plays once, on the visit after the first real entry, for a day-one home. */
     fun celebrate(dayOneHome: Boolean, alreadyCelebrated: Boolean, realEntryCount: Int): Boolean =
         dayOneHome && !alreadyCelebrated && realEntryCount >= 1
+
+    /** Done steps and the size of the list, for the "1 of 4 done" label. */
+    fun progress(steps: List<FirstWeekStep>): Pair<Int, Int> = steps.count { it.done } to steps.size
 }

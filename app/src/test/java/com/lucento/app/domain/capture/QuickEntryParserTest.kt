@@ -65,6 +65,10 @@ class QuickEntryParserTest {
     }
 
     @Test fun purchasesThatMerelyUseGotOrReceivedStayExpenses() {
+        val jollibee = parse("got 500 from Jollibee")
+        assertEquals(TransactionType.EXPENSE, jollibee.type)
+        assertEquals(BigDecimal("500"), jollibee.amount)
+        assertEquals(10L, jollibee.categoryId)
         assertEquals(TransactionType.EXPENSE, parse("got lunch from jollibee 150").type)
         assertEquals(BigDecimal("150"), parse("got lunch from jollibee 150").amount)
         assertEquals(TransactionType.EXPENSE, parse("got coffee from starbucks 180").type)

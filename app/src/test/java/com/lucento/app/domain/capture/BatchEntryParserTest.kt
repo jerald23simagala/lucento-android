@@ -167,6 +167,14 @@ class BatchEntryParserTest {
         assertEquals(INCOME, row.type)
     }
 
+    @Test fun gotMoneyFromAMerchantIsAnExpenseEvenWhenIncomeIsTheDefault() {
+        val row = parse("got 500 from Jollibee", context.copy(typeHint = INCOME)).single()
+        assertEquals(EXPENSE, row.type)
+        assertEquals("500", row.amount?.toPlainString())
+        assertEquals(10L, row.categoryId)
+        assertEquals(INCOME, parse("got 20 from mom").single().type)
+    }
+
     @Test fun namedAccountAndCurrency() {
         val gcash = parse("Grab 180 from GCash").single()
         assertEquals(3L, gcash.walletId)

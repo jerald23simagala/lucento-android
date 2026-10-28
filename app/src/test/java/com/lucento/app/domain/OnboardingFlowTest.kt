@@ -113,6 +113,8 @@ class OnboardingFlowTest {
         assertTrue(FirstWeek.celebrate(dayOneHome = true, alreadyCelebrated = false, realEntryCount = 1))
         assertFalse(FirstWeek.celebrate(dayOneHome = true, alreadyCelebrated = true, realEntryCount = 3))
         assertFalse(FirstWeek.celebrate(dayOneHome = false, alreadyCelebrated = false, realEntryCount = 5))
+        val one = FirstWeek.steps(realEntryCount = 1, hasGoal = true, hasBill = false, checkedInsights = false)
+        assertEquals(1 to 4, FirstWeek.progress(one))
     }
 
     @Test
