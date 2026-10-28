@@ -45,9 +45,10 @@ create policy "usage_events: insert"
 create or replace function public.purge_usage_events()
 returns void
 language sql
+set search_path = ''
 as $$
   delete from public.usage_events
-  where created_at < now() - interval '90 days';
+  where created_at < pg_catalog.now() - interval '90 days';
 $$;
 
 revoke all on function public.purge_usage_events() from public, anon, authenticated;
