@@ -1,9 +1,12 @@
 package com.lucento.app
 
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import android.app.Application
+import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.withTransaction
 import com.lucento.app.data.local.LucentoDatabase
+import com.lucento.app.data.preferences.SharedPreferencesCrashReportsStore
 import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.BudgetRepository
 import com.lucento.app.data.repository.CategoryRepository
@@ -13,6 +16,7 @@ import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.TransactionRunner
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.core.crash.CrashReporting
+import com.lucento.app.core.crash.CrashReportsFlag
 import com.lucento.app.data.local.LocalLedgerReset
 import com.lucento.app.data.media.GoalPhotos
 import com.lucento.app.data.sync.AccountBoundary
@@ -35,12 +39,10 @@ class LucentoApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Collection stays off until the stored opt-in is read. No-op without google-services.json.
-        CrashReporting.install()
+        // The manifest keeps collection off until this call. The flag is synchronous, so an opted-in user is
+        // enabled before the rest of startup. DataStore is read only when the flag has never been written.
+        CrashReporting.install(storedCrashReports())
         container = AppContainer(this)
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            CrashReporting.setCollectionEnabled(container.preferences.preferences.first().crashReports)
-        }
         // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
@@ -53,6 +55,22 @@ class LucentoApplication : Application() {
                     container.syncRepository.sync()
                 }
                 else -> if (container.syncPreferences.isEnabled()) SyncScheduler.ensurePeriodic(this@LucentoApplication)
+            }
+        }
+    }
+
+    /**
+     * Opt-in for this process, read before any other startup work. Missing flag and no DataStore file means off,
+     * without opening DataStore. An older install that already chose is copied across once.
+     */
+    private fun storedCrashReports(): Boolean {
+        val store = SharedPreferencesCrashReportsStore(this)
+        return CrashReportsFlag.enabledForStartup(store) {
+            val file = preferencesDataStoreFile(UserPreferencesRepository.DATA_STORE_NAME)
+            if (!file.exists()) {
+                false
+            } else {
+                runBlocking { UserPreferencesRepository(this@LucentoApplication).preferences.first().crashReports }
             }
         }
     }

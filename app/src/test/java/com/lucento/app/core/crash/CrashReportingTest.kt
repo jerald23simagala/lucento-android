@@ -39,4 +39,11 @@ class CrashReportingTest {
         assertEquals(false, CrashReporting.collectionEnabled)
         assertEquals(deletedBefore + 1, CrashReporting.unsentReportsDeleted)
     }
+
+    @Test fun installUsesTheStoredOptInAndDoesNotDropReportsWhenOn() {
+        val deletedBefore = CrashReporting.unsentReportsDeleted
+        CrashReporting.install(enabled = true)
+        assertEquals(true, CrashReporting.collectionEnabled)
+        assertEquals(deletedBefore, CrashReporting.unsentReportsDeleted)
+    }
 }

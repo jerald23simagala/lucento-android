@@ -81,11 +81,16 @@ To turn reports on:
 4. Confirm in the Firebase console after a test crash from a build that included the file.
 
 Collection is **off** until the user turns on Settings › Privacy › Send crash reports. The manifest sets
-`firebase_crashlytics_collection_enabled` to false, and startup calls `setCrashlyticsCollectionEnabled(false)`
-before reading that preference. Turning the switch off disables collection immediately. What is sent, once it is
-on: the stack and the exception type. `CrashReporting.sanitize` drops the exception message before the
-Crashlytics handler sees it, so an amount or text the user typed is not uploaded. The app never sets a
-Crashlytics user id, email, custom key, or log. There is no `google-services.json` in CI, so CI builds stay a no-op.
+`firebase_crashlytics_collection_enabled` to false, so the SDK stays off until code enables it. The choice is
+mirrored into a small SharedPreferences file (`lucento_crash_reports`) whenever it is saved, and copied once from
+DataStore for an install that opted in before the mirror existed. `Application.onCreate` reads that flag
+synchronously and passes it to `CrashReporting.install` before the rest of startup, so a crash in the first
+moments is reported for someone who already opted in. Turning the switch off disables collection immediately and
+deletes reports that have not been sent (`deleteUnsentReports`). With no Crashlytics class those calls do nothing.
+What is sent, once it is on: the stack and the exception type. `CrashReporting.sanitize` drops the exception
+message before the Crashlytics handler sees it, so an amount or text the user typed is not uploaded. The app never
+sets a Crashlytics user id, email, custom key, or log. There is no `google-services.json` in CI, so CI builds stay
+a no-op.
 
 ANRs are recorded by Crashlytics itself once the SDK is on the classpath. Without the json file there is no ANR
 reporting either.

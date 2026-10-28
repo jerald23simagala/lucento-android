@@ -17,12 +17,13 @@ object CrashReporting {
         private set
 
     /**
-     * Installs the sanitising handler and leaves collection off. The Settings toggle calls
-     * [setCollectionEnabled] after the stored preference is read. With no Crashlytics class this is a no-op.
-     * No user id, custom key, or log is ever set.
+     * Installs the sanitising handler and sets collection to [enabled]. Pass the synchronous opt-in from
+     * [CrashReportsFlag] so a crash in the first moments is reported for someone who already turned reports on.
+     * The default is off. With no Crashlytics class this does not touch Firebase. No user id, custom key, or log
+     * is ever set.
      */
-    fun install() {
-        setCollectionEnabled(false)
+    fun install(enabled: Boolean = false) {
+        setCollectionEnabled(enabled)
         val crashlytics = crashlyticsClass() ?: return
         val instance = instance(crashlytics) ?: return
         if (handlerInstalled) return

@@ -10,12 +10,15 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.lucento.app.core.crash.CrashReportsFlag
 import com.lucento.app.core.money.CurrencyRules
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.Currency
 import java.util.Locale
@@ -59,9 +62,12 @@ data class UserPreferences(
     val guideStep: com.lucento.app.domain.GuideStep? = null,
 )
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
 
-class UserPreferencesRepository(private val context: Context) {
+class UserPreferencesRepository(
+    private val context: Context,
+    private val crashReportsFlag: CrashReportsFlag.Store = SharedPreferencesCrashReportsStore(context),
+) {
 
     private object Keys {
         val onboardingComplete = booleanPreferencesKey("onboarding_complete")
@@ -143,6 +149,8 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun setCrashReports(enabled: Boolean) {
+        // The flag is committed first so the next process enables collection before DataStore loads.
+        withContext(Dispatchers.IO) { CrashReportsFlag.set(crashReportsFlag, enabled) }
         context.dataStore.edit { it[Keys.crashReports] = enabled }
     }
 
@@ -202,6 +210,7 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     companion object {
+        const val DATA_STORE_NAME = "user_preferences"
         const val MAX_DISPLAY_NAME = 40
 
         fun defaultCurrency(locale: Locale = Locale.getDefault()): String =
