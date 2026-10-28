@@ -95,6 +95,26 @@ class CashflowCalculatorTest {
         assertNull(result.perDay)
     }
 
+    @Test fun aBillPaidFromSavingsDoesNotReduceSpendableMoney() {
+        val result = CashflowCalculator.safeToSpend(
+            "USD", today, emptyList(),
+            wallets = listOf(
+                wallet(1, WalletType.CASH, 1_000_00, code = "USD"),
+                wallet(2, WalletType.SAVINGS, 5_000_00, code = "USD"),
+            ),
+            budgets = emptyList(),
+            schedules = listOf(
+                RecurringSchedule(
+                    9, "Set aside", TransactionType.EXPENSE, Money(100_00, "USD"), 2, null,
+                    Frequency.MONTHLY, 1, LocalDate.parse("2026-10-28"), null, 0, false,
+                ),
+            ),
+        )!!
+        assertEquals(Money(1_000_00, "USD"), result.spendableBalance)
+        assertEquals(Money.zero("USD"), result.committed)
+        assertEquals(Money(1_000_00, "USD"), result.amount)
+    }
+
     @Test fun noBudgetAndNoSpendableAccountGivesNoFigure() {
         assertNull(CashflowCalculator.safeToSpend("PHP", today, txs, listOf(wallet(1, WalletType.SAVINGS, 1)), emptyList(), emptyList()))
     }
