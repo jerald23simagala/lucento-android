@@ -1,5 +1,7 @@
 package com.lucento.app.core.crash
 
+import com.lucento.app.data.preferences.ThemeMode
+import com.lucento.app.data.preferences.UserPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -23,7 +25,16 @@ class CrashReportingTest {
         assertEquals(original.stackTrace.toList(), safe.stackTrace.toList())
     }
 
-    @Test fun installDoesNothingWhenFirebaseIsAbsent() {
+    @Test fun thePreferenceDefaultsToOff() {
+        assertFalse(UserPreferences(onboardingComplete = false, themeMode = ThemeMode.SYSTEM, primaryCurrency = "USD").crashReports)
+    }
+
+    @Test fun collectionStartsDisabledAndTheToggleChangesItImmediately() {
         CrashReporting.install()
+        assertEquals(false, CrashReporting.collectionEnabled)
+        CrashReporting.setCollectionEnabled(true)
+        assertEquals(true, CrashReporting.collectionEnabled)
+        CrashReporting.setCollectionEnabled(false)
+        assertEquals(false, CrashReporting.collectionEnabled)
     }
 }

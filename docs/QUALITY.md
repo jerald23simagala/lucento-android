@@ -80,9 +80,12 @@ To turn reports on:
    mapping files for minified release builds when the plugin is applied.
 4. Confirm in the Firebase console after a test crash from a build that included the file.
 
-What is sent: the stack and the exception type. `CrashReporting.sanitize` drops the exception message before the
-Crashlytics handler sees it, so an amount or text the user typed in a message is not uploaded. The app never sets
-a Crashlytics user id, email or custom key. There is no `google-services.json` in CI, so CI builds stay a no-op.
+Collection is **off** until the user turns on Settings › Privacy › Send crash reports. The manifest sets
+`firebase_crashlytics_collection_enabled` to false, and startup calls `setCrashlyticsCollectionEnabled(false)`
+before reading that preference. Turning the switch off disables collection immediately. What is sent, once it is
+on: the stack and the exception type. `CrashReporting.sanitize` drops the exception message before the
+Crashlytics handler sees it, so an amount or text the user typed is not uploaded. The app never sets a
+Crashlytics user id, email, custom key, or log. There is no `google-services.json` in CI, so CI builds stay a no-op.
 
 ANRs are recorded by Crashlytics itself once the SDK is on the classpath. Without the json file there is no ANR
 reporting either.

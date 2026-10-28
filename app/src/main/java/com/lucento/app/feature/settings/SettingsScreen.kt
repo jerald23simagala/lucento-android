@@ -107,6 +107,7 @@ fun SettingsScreen(
                 onPickCurrency = { pickingCurrency = true },
                 onFeature = viewModel::setFeatureEnabled,
                 onSmartReading = viewModel::setSmartReading,
+                onCrashReports = viewModel::setCrashReports,
                 onExport = {
                     exportMessage = null
                     exporter.launch("lucento-transactions-${LocalDate.now()}.csv")
@@ -230,6 +231,7 @@ private fun SettingsContent(
     onPickCurrency: () -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
     onSmartReading: (Boolean) -> Unit,
+    onCrashReports: (Boolean) -> Unit,
     onExport: () -> Unit,
     exportMessage: String?,
     onConnectGoogle: () -> Unit,
@@ -324,6 +326,12 @@ private fun SettingsContent(
         )
 
         SectionHeader("Privacy", Modifier.padding(top = Spacing.section))
+        SwitchRow(
+            title = "Send crash reports",
+            checked = prefs.crashReports,
+            onCheckedChange = onCrashReports,
+            description = "Off unless you turn this on. A report is the stack and the kind of error — never an amount, a note, or what you typed.",
+        )
         Fact(
             Icons.Outlined.PhoneAndroid,
             if (current.cloudSync.status.enabled) "Kept on this device, copied to your account" else "Stored only on this device",

@@ -8,21 +8,46 @@ package com.lucento.app.core.crash
  * typed, is never sent. No user id, email or custom key is set.
  */
 object CrashReporting {
+    /** The last value asked of the SDK. Null until [install] or [setCollectionEnabled]. Visible for tests. */
+    internal var collectionEnabled: Boolean? = null
+        private set
+
+    /**
+     * Installs the sanitising handler and leaves collection off. The Settings toggle calls
+     * [setCollectionEnabled] after the stored preference is read. With no Crashlytics class this is a no-op.
+     * No user id, custom key, or log is ever set.
+     */
     fun install() {
-        val crashlytics = runCatching {
-            Class.forName("com.google.firebase.crashlytics.FirebaseCrashlytics")
-        }.getOrNull() ?: return
-        val instance = runCatching { crashlytics.getMethod("getInstance").invoke(null) }.getOrNull() ?: return
-        runCatching {
-            crashlytics.getMethod("setCrashlyticsCollectionEnabled", Boolean::class.javaPrimitiveType)
-                .invoke(instance, true)
-        }
+        setCollectionEnabled(false)
+        val crashlytics = crashlyticsClass() ?: return
+        val instance = instance(crashlytics) ?: return
+        if (handlerInstalled) return
+        handlerInstalled = true
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val safe = sanitize(throwable)
             if (previous != null) previous.uncaughtException(thread, safe) else throw safe
         }
     }
+
+    /** Turns collection on or off immediately. No-op when the SDK isn't in this build. */
+    fun setCollectionEnabled(enabled: Boolean) {
+        collectionEnabled = enabled
+        val crashlytics = crashlyticsClass() ?: return
+        val instance = instance(crashlytics) ?: return
+        runCatching {
+            crashlytics.getMethod("setCrashlyticsCollectionEnabled", Boolean::class.javaPrimitiveType)
+                .invoke(instance, enabled)
+        }
+    }
+
+    private var handlerInstalled = false
+
+    private fun crashlyticsClass(): Class<*>? =
+        runCatching { Class.forName("com.google.firebase.crashlytics.FirebaseCrashlytics") }.getOrNull()
+
+    private fun instance(crashlytics: Class<*>): Any? =
+        runCatching { crashlytics.getMethod("getInstance").invoke(null) }.getOrNull()
 
     /** A throwable whose message is only the original type name, with the same stack. */
     fun sanitize(throwable: Throwable): Throwable {

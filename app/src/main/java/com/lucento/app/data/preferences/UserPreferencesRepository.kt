@@ -48,6 +48,8 @@ data class UserPreferences(
      * user after the consent dialog in Settings; nothing is sent to a model while it is off.
      */
     val smartReading: Boolean = false,
+    /** Crash reports. Off until the user turns them on in Settings. Nothing is sent while this is false. */
+    val crashReports: Boolean = false,
     /** Where the guided setup after onboarding stands; null when finished or never started (older installs). */
     val guideStep: com.lucento.app.domain.GuideStep? = null,
 )
@@ -67,6 +69,7 @@ class UserPreferencesRepository(private val context: Context) {
         val defaultWalletId = longPreferencesKey("default_wallet_id")
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
+        val crashReports = booleanPreferencesKey("crash_reports")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -90,6 +93,7 @@ class UserPreferencesRepository(private val context: Context) {
                 defaultWalletId = p[Keys.defaultWalletId],
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
                 smartReading = p[Keys.smartReading] ?: false,
+                crashReports = p[Keys.crashReports] ?: false,
             )
         }
 
@@ -127,6 +131,10 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setSmartReading(enabled: Boolean) {
         context.dataStore.edit { it[Keys.smartReading] = enabled }
+    }
+
+    suspend fun setCrashReports(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.crashReports] = enabled }
     }
 
     /** Saves the guided setup's progress; null when it is finished (or was never started, as for older installs). */

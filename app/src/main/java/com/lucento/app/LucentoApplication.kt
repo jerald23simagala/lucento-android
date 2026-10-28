@@ -35,9 +35,12 @@ class LucentoApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // No-op unless app/google-services.json was present at build time. Messages are stripped; see CrashReporting.
+        // Collection stays off until the stored opt-in is read. No-op without google-services.json.
         CrashReporting.install()
         container = AppContainer(this)
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            CrashReporting.setCollectionEnabled(container.preferences.preferences.first().crashReports)
+        }
         // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {

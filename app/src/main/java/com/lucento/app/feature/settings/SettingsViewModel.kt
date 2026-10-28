@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import android.app.Application
 import android.content.Context
 import com.lucento.app.core.applicationContainerFactory
+import com.lucento.app.core.crash.CrashReporting
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.data.preferences.UserPreferencesRepository
@@ -278,6 +279,12 @@ class SettingsViewModel(
     /** Smarter reading; turned on only from the consent dialog in Settings. */
     fun setSmartReading(enabled: Boolean) {
         viewModelScope.launch { preferences.setSmartReading(enabled) }
+    }
+
+    /** Off by default. Turning it off stops collection immediately; nothing but the stack is ever attached. */
+    fun setCrashReports(enabled: Boolean) {
+        CrashReporting.setCollectionEnabled(enabled)
+        viewModelScope.launch { preferences.setCrashReports(enabled) }
     }
 
     fun setFeatureEnabled(feature: Feature, enabled: Boolean) {
