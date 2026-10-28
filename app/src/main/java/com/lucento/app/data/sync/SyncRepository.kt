@@ -104,7 +104,20 @@ class SyncRepository(
             report += pushGoals(r, userId, rejected)
             report += pushGoalContributions(r, userId, rejected)
 
-            report += pull(r, userId, rejected)
+            val pulled = pull(r, userId, rejected)
+            report += pulled
+            // A same-moment local edit was kept and nudged later; send it now so this cycle converges.
+            if (pulled.pendingKept > 0) {
+                val again = Rejected()
+                report += pushTombstones(r, userId, again)
+                report += pushWallets(r, userId, again)
+                report += pushCategories(r, userId, again)
+                report += pushBudgets(r, userId, again)
+                report += pushTransactions(r, userId, again)
+                report += pushRecurring(r, userId, again)
+                report += pushGoals(r, userId, again)
+                report += pushGoalContributions(r, userId, again)
+            }
             // Copies of one category from two setups on this account fold into one; the merge's edits go up now.
             if (mergeDuplicateCategories() > 0) {
                 val again = Rejected()
@@ -352,6 +365,7 @@ class SyncRepository(
         var pulled = 0
         var conflicts = 0
         var parentsRestored = 0
+        var pendingKept = 0
         val deletes = mutableListOf<PendingDelete>()
         /** Soft-deleted parents seen in this pull, including ones this phone never stored. */
         val deletedWallets = mutableMapOf<String, WalletRow>()
@@ -417,16 +431,22 @@ class SyncRepository(
             conflicts = state.conflicts,
             deletedLocally = deletedLocally,
             parentsRestored = state.parentsRestored,
+            pendingKept = state.pendingKept,
         )
     }
 
-    /** Applies one pulled row. With [serverWins] (the server refused this device's write) the server copy always wins. */
+    /**
+     * Applies one pulled row. With [serverWins] (the server refused this device's write) the server copy wins,
+     * except a pending local edit that is not older than that copy — a same-moment edit is not overwritten.
+     */
     private suspend fun applyPulled(table: String, json: JsonObject, s: PullState, serverWins: Boolean) {
         val revision = json.revisionOrNull()
         fun decide(localExists: Boolean, dirty: Boolean, base: Long?, updatedAt: Long, remoteUpdatedAtIso: String): PullDecision {
+            val remoteAt = SyncTime.fromIso(remoteUpdatedAtIso)
             val decision = when {
+                serverWins && localExists && dirty && protectsPendingEdit(base, updatedAt, revision, remoteAt) -> PullDecision.KEEP_LOCAL
                 serverWins -> if (localExists) PullDecision.UPDATE else PullDecision.INSERT
-                else -> pullDecision(localExists, dirty, base, updatedAt, revision, SyncTime.fromIso(remoteUpdatedAtIso))
+                else -> pullDecision(localExists, dirty, base, updatedAt, revision, remoteAt)
             }
             // A rejected delete returns with localExists = false: the row this device removed comes back, which is a conflict too.
             // Keeping a causal successor (base = server revision) is just an unpushed edit, not a conflict.
@@ -444,8 +464,19 @@ class SyncRepository(
                 }
                 val walletId = when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> wallets.insert(row.toEntity(syncedAt = clock()))
-                    PullDecision.UPDATE -> local!!.id.also { wallets.update(row.toEntity(syncedAt = freshSyncedAt(local.syncedAt), id = it)) }
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            wallets.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        local!!.id.also { wallets.update(row.toEntity(syncedAt = freshSyncedAt(local.syncedAt), id = it)) }
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            wallets.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 applyDebtTerms(walletId, row)
                 s.pulled++
@@ -459,8 +490,19 @@ class SyncRepository(
                 }
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> categories.insert(row.toEntity(syncedAt = clock()))
-                    PullDecision.UPDATE -> categories.update(row.toEntity(syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            categories.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        categories.update(row.toEntity(syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            categories.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
@@ -471,8 +513,19 @@ class SyncRepository(
                 val categoryId = resolveCategory(row.categoryId, "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> budgets.insert(row.toEntity(categoryId, syncedAt = clock()))
-                    PullDecision.UPDATE -> budgets.update(row.toEntity(categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            budgets.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        budgets.update(row.toEntity(categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            budgets.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
@@ -484,8 +537,19 @@ class SyncRepository(
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> transactions.insert(row.toEntity(walletId, categoryId, syncedAt = clock()))
-                    PullDecision.UPDATE -> transactions.update(row.toEntity(walletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            transactions.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        transactions.update(row.toEntity(walletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            transactions.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
@@ -499,8 +563,19 @@ class SyncRepository(
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> dao.insert(row.toEntity(walletId, toWalletId, categoryId, syncedAt = clock()))
-                    PullDecision.UPDATE -> dao.update(row.toEntity(walletId, toWalletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            dao.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        dao.update(row.toEntity(walletId, toWalletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            dao.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
@@ -516,10 +591,21 @@ class SyncRepository(
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     // photoPath never comes from the cloud — it names a file on the device that chose it.
                     PullDecision.INSERT -> goals.insert(row.toEntity(walletId, photoPath = null, syncedAt = clock()))
-                    PullDecision.UPDATE -> goals.update(
-                        row.toEntity(walletId, photoPath = local!!.photoPath, syncedAt = freshSyncedAt(local.syncedAt), id = local.id)
-                    )
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            goals.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        goals.update(
+                            row.toEntity(walletId, photoPath = local!!.photoPath, syncedAt = freshSyncedAt(local.syncedAt), id = local.id)
+                        )
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            goals.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
@@ -560,6 +646,29 @@ class SyncRepository(
                 termMonths = row.termMonths, installmentMinor = row.installmentMinor, updatedAt = SyncTime.fromIso(row.updatedAt),
             )
         )
+    }
+
+    /**
+     * True when [dirty] pending values must be left in place. A timestamp tie is moved one millisecond later so the
+     * server's tie-to-stored rule will accept the push.
+     */
+    private suspend fun holdPending(
+        dirty: Boolean,
+        base: Long?,
+        updatedAt: Long,
+        remoteRevision: Long?,
+        remoteUpdatedAtIso: String,
+        s: PullState,
+        bump: suspend (Long) -> Unit,
+    ): Boolean {
+        val remoteAt = SyncTime.fromIso(remoteUpdatedAtIso)
+        if (!dirty || !protectsPendingEdit(base, updatedAt, remoteRevision, remoteAt)) return false
+        val next = tieBreakUpdatedAt(dirty, base, updatedAt, remoteRevision, remoteAt)
+        if (next != null) {
+            bump(next)
+            s.pendingKept++
+        }
+        return true
     }
 
     /**
