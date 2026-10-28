@@ -2,7 +2,8 @@
 
 Lucento stays local-first. Room is the source of truth for every read and write, every core feature works offline
 with no account, and nothing leaves the device until the user signs in with Google **and** keeps cloud sync on in
-Settings → Cloud sync. Signing out never deletes local data.
+Settings → Cloud sync. Signing out removes that account’s data from this phone and clears the sync
+binding, so the next account starts clean and one person’s ledger is never uploaded into another account.
 
 ## Architecture
 
@@ -171,10 +172,20 @@ Onboarding's welcome screen offers **I already have an account** (only in builds
 
 Main currency, theme and enabled modules are device preferences (DataStore), never synced.
 
-## Sign-out
+## Sign-out and switching accounts
 
-"Disconnect" cancels background sync, turns sync off and clears the Supabase session. Local wallets, transactions,
-budgets and goals are never touched. The device stays tied to the account it first synced with (step 2).
+"Disconnect" asks first, then cancels background sync, turns sync off, clears the Supabase session, and **wipes**
+the local ledger (wallets, categories, transactions, budgets, goals, contributions, schedules, debt terms, goal
+photos) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
+again, as on a fresh install. Theme and other device preferences stay. Anything that had not synced is lost —
+the confirmation says so.
+
+Signing in to a **different** account does the same wipe before any push. If nothing is waiting to sync, it happens
+immediately. If there are unsynced changes, Lucento asks first; cancelling signs out of the new account and leaves
+the previous ledger in place. Sync refuses to push while the signed-in account and the stored binding disagree
+(`AccountMismatch`), so a background cycle cannot upload the previous ledger during that question.
+
+The device is no longer permanently tied to the first account. Signing back in to an account downloads it again.
 
 ## Security
 
@@ -260,10 +271,10 @@ Without step 4 the Settings section says connecting an account isn't available a
 
 Use a test Google account and test records only. Device A: add a wallet and a transaction → Settings → Connect with
 Google → check the row in Supabase (Table editor → `transactions`, `user_id` = that account's id). Edit the note →
-Sync now → note updated, still one row. Sync now twice more → still one row. Disconnect → the transaction is still
-on A. Device B (or a clean install), same account → Connect → the wallet and transaction arrive with the edited note.
-Sign in on B with a second test account → expect the account-mismatch message and no data from account 1 on the
-server under account 2.
+Sync now → note updated, still one row. Sync now twice more → still one row. Disconnect → confirm; the transaction leaves A (it is still in the account,
+and comes back if A signs in again). Device B (or a clean install), same account → Connect → the wallet and
+transaction arrive with the edited note. Sign in on B with a second test account → B’s local ledger is removed
+(after a confirmation if anything on B has not synced) and nothing of account 1 is uploaded under account 2.
 
 ## Known limitations
 
@@ -275,8 +286,8 @@ server under account 2.
   deleted) but costs one extra request.
 - A rejected write is resolved from the server's copy in the same cycle; if that copy's parent row is missing locally
   (an edge case after concurrent parent deletes), it waits for a later cycle like any deferred row.
-- One Google account per device install. Switching accounts on a device that already synced requires clearing the
-  app's data (which erases local records) or signing back in with the original account.
+- Switching accounts wipes this phone's ledger first (see Sign-out). Unsynced changes are kept only if the user
+  cancels the switch and signs back in to the original account.
 - Preferences and goal photos are not synced.
 - Rows with identical meaning created separately before their first sync are not de-duplicated (seed categories are
   the exception). Categories seeded by older versions (before v6) carry random ids, so two upgraded devices can show

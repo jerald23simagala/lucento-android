@@ -12,12 +12,17 @@ import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.TransactionRunner
 import com.lucento.app.data.repository.WalletRepository
+import com.lucento.app.data.local.LocalLedgerReset
+import com.lucento.app.data.media.GoalPhotos
+import com.lucento.app.data.sync.AccountBoundary
 import com.lucento.app.data.sync.AuthRepository
 import com.lucento.app.data.sync.SupabaseModule
 import com.lucento.app.data.sync.SupabaseSyncRemote
+import com.lucento.app.data.sync.SyncFlight
 import com.lucento.app.data.sync.SyncPreferences
 import com.lucento.app.data.sync.SyncRepository
 import com.lucento.app.data.sync.SyncScheduler
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,7 +38,16 @@ class LucentoApplication : Application() {
         // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            if (container.syncPreferences.isEnabled()) SyncScheduler.ensurePeriodic(this@LucentoApplication)
+            // A different account already signed in, with nothing unsynced, is wiped before the next sync
+            // so this phone never uploads the previous ledger. Unsynced changes wait for a confirmation in Settings.
+            when (container.accountBoundary.afterSignIn()) {
+                AccountBoundary.AfterSignIn.Wiped -> {
+                    container.syncPreferences.setEnabled(true)
+                    SyncScheduler.ensurePeriodic(this@LucentoApplication)
+                    container.syncRepository.sync()
+                }
+                else -> if (container.syncPreferences.isEnabled()) SyncScheduler.ensurePeriodic(this@LucentoApplication)
+            }
         }
     }
 }
@@ -41,6 +55,11 @@ class LucentoApplication : Application() {
 /** Minimal manual dependency container. Swap for Hilt if the graph grows substantially. */
 class AppContainer(application: Application) {
     private val database: LucentoDatabase by lazy { LucentoDatabase.build(application) }
+
+    init {
+        // Process-wide sync lock. Released by the OS if this process dies mid-sync.
+        SyncFlight.lockFile = File(application.filesDir, "sync/sync.lock")
+    }
 
     /** Multi-row writes (transfers, paying a schedule) run inside one Room transaction. */
     private val runner: TransactionRunner by lazy {
@@ -96,6 +115,25 @@ class AppContainer(application: Application) {
             preferences = syncPreferences,
             recurring = database.recurringDao(),
             debtTerms = database.debtTermsDao(),
+        )
+    }
+
+    private val ledgerReset: LocalLedgerReset by lazy {
+        LocalLedgerReset(database, syncPreferences, GoalPhotos(application))
+    }
+
+    /** Sign-out and account switching. Wipes the local ledger before another account can sync. */
+    val accountBoundary: AccountBoundary by lazy {
+        AccountBoundary(
+            currentUserId = auth::currentUserId,
+            syncedUserId = syncPreferences::syncedUserId,
+            hasUnsyncedChanges = syncRepository::hasUnsyncedChanges,
+            prepare = {
+                SyncScheduler.cancelPeriodic(application)
+                syncPreferences.setEnabled(false)
+            },
+            wipe = ledgerReset::wipe,
+            signOut = auth::signOut,
         )
     }
 }

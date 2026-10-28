@@ -118,6 +118,24 @@ fun SettingsScreen(
                 onDisconnect = viewModel::disconnectAccount,
                 onSyncNow = viewModel::syncNow,
             )
+            current.cloudSync.prompt?.let { prompt ->
+                ConfirmDialog(
+                    title = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect this account?" else "Switch account?",
+                    text = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) {
+                        "This removes the account’s wallets, transactions, budgets and goals from this phone. " +
+                            "Sign back in to download them again." +
+                            if (prompt.unsynced) " Changes that haven’t synced yet will be lost." else ""
+                    } else {
+                        "This phone’s data belongs to another account. It will be removed so it is never uploaded " +
+                            "to the account you just signed in to." +
+                            if (prompt.unsynced) " Changes that haven’t synced will be lost." else ""
+                    },
+                    confirmLabel = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect" else "Remove and switch",
+                    destructive = true,
+                    onConfirm = viewModel::confirmAccountPrompt,
+                    onDismiss = viewModel::dismissAccountPrompt,
+                )
+            }
         }
         Spacer(Modifier.height(Spacing.xxl))
     }

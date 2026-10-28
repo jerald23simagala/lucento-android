@@ -248,9 +248,8 @@ sealed interface SyncResult {
     data object NotSignedIn : SyncResult
     data object NotConfigured : SyncResult
     /**
-     * This device's data was already synced with a different account. Rows carry ids that already exist in that
-     * account, so pushing them to another one would be rejected by RLS on every attempt and mix two people's
-     * records on one device. Sync stops until the original account signs in again; nothing local is touched.
+     * This phone's ledger was synced with a different account. Nothing is pushed. Sign-out and account switching
+     * wipe the ledger first; this result is the guard if a sync starts before that wipe.
      */
     data object AccountMismatch : SyncResult
     /** Network/server failure; safe to retry later. Nothing local was lost. */

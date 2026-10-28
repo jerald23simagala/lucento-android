@@ -194,7 +194,13 @@ class AuthRepository(private val client: SupabaseClient?) {
     /** The signed-in session's access token, for Lucento's own proxy (Smarter reading); null when signed out. */
     suspend fun accessToken(): String? = runCatching { client?.auth?.currentAccessTokenOrNull() }.getOrNull()
 
-    /** Clears the Supabase session only. Local financial data is never touched by signing out. */
+    /** The signed-in account's id, or null. Used to tell an account switch from a return to the same account. */
+    suspend fun currentUserId(): String? = runCatching {
+        client?.auth?.awaitInitialization()
+        client?.auth?.currentUserOrNull()?.id
+    }.getOrNull()
+
+    /** Clears the Supabase session. The caller wipes the local ledger separately so accounts never mix. */
     suspend fun signOut() {
         runCatching { client?.auth?.signOut() }
     }

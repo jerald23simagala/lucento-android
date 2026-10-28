@@ -13,6 +13,7 @@ import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
+import com.lucento.app.data.sync.AccountBoundary
 import com.lucento.app.data.sync.AuthRepository
 import com.lucento.app.data.sync.SupabaseModule
 import com.lucento.app.data.sync.SyncPreferences
@@ -41,6 +42,11 @@ data class SettingsUiState(
 )
 
 /** Everything the "Cloud sync" section needs, kept separate so the rest of Settings never depends on it. */
+/** A wipe the user still has to confirm. [unsynced] means changes that have not reached the server would be lost. */
+data class AccountPrompt(val kind: Kind, val unsynced: Boolean) {
+    enum class Kind { SIGN_OUT, SWITCH }
+}
+
 data class CloudSyncUiState(
     val configured: Boolean,
     val googleSignInConfigured: Boolean,
@@ -48,6 +54,7 @@ data class CloudSyncUiState(
     val status: SyncStatus,
     val syncing: Boolean = false,
     val lastMessage: String? = null,
+    val prompt: AccountPrompt? = null,
 )
 
 class SettingsViewModel(
@@ -59,10 +66,25 @@ class SettingsViewModel(
     private val auth: AuthRepository,
     private val syncPreferences: SyncPreferences,
     private val syncRepository: SyncRepository,
+    private val accounts: AccountBoundary,
 ) : ViewModel() {
 
     private val syncing = MutableStateFlow(false)
     private val syncMessage = MutableStateFlow<String?>(null)
+    private val prompt = MutableStateFlow<AccountPrompt?>(null)
+
+    init {
+        // A previous session can already be a different account (the app was closed on the confirm step).
+        // Ready means "same account or signed out" — opening Settings must not start a sync on its own.
+        viewModelScope.launch {
+            when (val check = accounts.afterSignIn()) {
+                AccountBoundary.AfterSignIn.Ready -> Unit
+                AccountBoundary.AfterSignIn.Wiped -> enableSyncAndRun()
+                is AccountBoundary.AfterSignIn.ConfirmSwitch ->
+                    prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, check.unsynced)
+            }
+        }
+    }
 
     val uiState: StateFlow<SettingsUiState?> =
         combine(
@@ -73,6 +95,7 @@ class SettingsViewModel(
             syncing,
             syncMessage,
             auth.observeSignedInEmail(),
+            prompt,
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
@@ -81,6 +104,7 @@ class SettingsViewModel(
             val isSyncing = values[4] as Boolean
             val message = values[5] as String?
             val email = values[6] as String?
+            val accountPrompt = values[7] as AccountPrompt?
             SettingsUiState(
                 preferences = prefs,
                 walletCount = w.size,
@@ -92,11 +116,12 @@ class SettingsViewModel(
                     status = syncStatus,
                     syncing = isSyncing,
                     lastMessage = message,
+                    prompt = accountPrompt,
                 ),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** Signs in, then turns cloud sync on and runs a first sync immediately. Never touches local data itself. */
+    /** Signs in, then turns cloud sync on. A different account wipes the previous ledger before anything is pushed. */
     /** [activity] hosts Google's account picker; it is passed through for this call only and never stored. */
     fun connectGoogleAccount(activity: Context) {
         if (syncing.value) return
@@ -123,11 +148,7 @@ class SettingsViewModel(
 
     private suspend fun handleSignIn(result: AuthRepository.SignInResult) {
         when (result) {
-            AuthRepository.SignInResult.Success -> {
-                syncPreferences.setEnabled(true)
-                SyncScheduler.ensurePeriodic(application)
-                runSyncNow()
-            }
+            AuthRepository.SignInResult.Success -> followSignIn(accounts.afterSignIn())
             AuthRepository.SignInResult.Cancelled -> Unit
             AuthRepository.SignInResult.NotConfigured ->
                 syncMessage.value = "Cloud sync isn’t available in this version of Lucento yet."
@@ -137,14 +158,56 @@ class SettingsViewModel(
         }
     }
 
-    /** Signs out and turns sync off. Local wallets, transactions, budgets and goals are never touched. */
+    /** Asks before removing this account's data from the phone. Nothing is deleted until [confirmAccountPrompt]. */
     fun disconnectAccount() {
+        if (syncing.value) return
         viewModelScope.launch {
-            SyncScheduler.cancelPeriodic(application)
-            syncPreferences.setEnabled(false)
-            auth.signOut()
-            syncMessage.value = null
+            prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.hasUnsyncedChanges())
         }
+    }
+
+    fun confirmAccountPrompt() {
+        val current = prompt.value ?: return
+        if (syncing.value) return
+        viewModelScope.launch {
+            syncing.value = true
+            prompt.value = null
+            when (current.kind) {
+                AccountPrompt.Kind.SIGN_OUT -> {
+                    accounts.signOutAndWipe()
+                    syncMessage.value = "Signed out. This account’s data has been removed from this phone."
+                }
+                AccountPrompt.Kind.SWITCH -> {
+                    accounts.confirmSwitch()
+                    syncMessage.value = null
+                    enableSyncAndRun()
+                }
+            }
+            syncing.value = false
+        }
+    }
+
+    /** Keeps the previous ledger. A pending account switch drops the new session instead. */
+    fun dismissAccountPrompt() {
+        val current = prompt.value ?: return
+        prompt.value = null
+        if (current.kind == AccountPrompt.Kind.SWITCH) {
+            viewModelScope.launch { accounts.cancelSwitch() }
+        }
+    }
+
+    private suspend fun followSignIn(check: AccountBoundary.AfterSignIn) {
+        when (check) {
+            AccountBoundary.AfterSignIn.Ready, AccountBoundary.AfterSignIn.Wiped -> enableSyncAndRun()
+            is AccountBoundary.AfterSignIn.ConfirmSwitch ->
+                prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, check.unsynced)
+        }
+    }
+
+    private suspend fun enableSyncAndRun() {
+        syncPreferences.setEnabled(true)
+        SyncScheduler.ensurePeriodic(application)
+        runSyncNow()
     }
 
     fun syncNow() {
@@ -165,7 +228,10 @@ class SettingsViewModel(
                     if (r.conflicts > 0) ". ${r.conflicts} changed on two devices at once — the later edit was kept" else ""
             }
             SyncResult.NotSignedIn -> "Not connected — sign in to sync."
-            SyncResult.AccountMismatch -> SyncRepository.ACCOUNT_MISMATCH_MESSAGE
+            SyncResult.AccountMismatch -> {
+                prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, syncRepository.hasUnsyncedChanges())
+                SyncRepository.ACCOUNT_MISMATCH_MESSAGE
+            }
             SyncResult.NotConfigured -> "Cloud sync isn’t available in this version of Lucento yet."
             is SyncResult.Retryable -> "Sync couldn't finish (${result.message}) — your data is safe and it will retry."
         }
@@ -228,6 +294,7 @@ class SettingsViewModel(
                 auth = container.auth,
                 syncPreferences = container.syncPreferences,
                 syncRepository = container.syncRepository,
+                accounts = container.accountBoundary,
             )
         }
     }

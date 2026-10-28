@@ -19,6 +19,7 @@ import com.lucento.app.data.local.WalletDao
 import com.lucento.app.data.local.WalletEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -65,7 +66,12 @@ class SyncRepository(
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
 
-    suspend fun sync(): SyncResult {
+    /** True when a sign-out or account switch would drop changes that have not reached the server. */
+    suspend fun hasUnsyncedChanges(): Boolean = observePendingChanges().first() > 0
+
+    suspend fun sync(): SyncResult = SyncFlight.exclusive { syncBody() }
+
+    private suspend fun syncBody(): SyncResult {
         val r = remote ?: return SyncResult.NotConfigured
         val userId = try {
             r.currentUserId()
@@ -570,7 +576,7 @@ class SyncRepository(
         const val CURSOR_OVERLAP_MS = 60_000L
         const val TOMBSTONE_RETENTION_MS = 30L * 24 * 60 * 60 * 1000
         const val ACCOUNT_MISMATCH_MESSAGE =
-            "This device's data is already synced with a different Google account. Sign in with that account to keep syncing."
+            "This phone still has another account’s data, so nothing was uploaded. Sign in with that account, or switch accounts to remove it from this phone."
         private val PARENT_FIRST = listOf("wallets", "categories", "budgets", "transactions", "recurring", "goals", "goal_contributions")
         private val CHILD_FIRST = listOf("goal_contributions", "recurring", "transactions", "budgets", "goals", "categories", "wallets")
     }

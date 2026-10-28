@@ -46,6 +46,7 @@ class OnboardingViewModel(
     /** For "I already have an account": the first sync pulls the account, then wallets and categories are read back. */
     private val sync: com.lucento.app.data.sync.SyncRepository? = null,
     private val wallets: com.lucento.app.data.repository.WalletRepository? = null,
+    private val accounts: com.lucento.app.data.sync.AccountBoundary? = null,
 ) : ViewModel() {
 
     /** The connected account's email, or null while signed out. */
@@ -57,6 +58,10 @@ class OnboardingViewModel(
 
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage
+
+    private val _switchPrompt = MutableStateFlow(false)
+    /** A different account signed in while this phone still has unsynced data. Nothing is wiped until confirmed. */
+    val switchPrompt: StateFlow<Boolean> = _switchPrompt
 
     val syncAvailable: Boolean get() = auth != null && com.lucento.app.data.sync.SupabaseModule.isConfigured
     val googleAvailable: Boolean get() = com.lucento.app.data.sync.SupabaseModule.isGoogleSignInConfigured
@@ -85,10 +90,18 @@ class OnboardingViewModel(
             try {
                 _syncMessage.value = when (val result = signIn()) {
                     com.lucento.app.data.sync.AuthRepository.SignInResult.Success -> {
-                        syncPreferences?.setEnabled(true)
-                        // Restoring: this phone has nothing of its own yet, so the account can be pulled right away.
-                        if (restoreStage.value == RestoreStage.SIGN_IN) runRestore()
-                        null
+                        when (accounts?.afterSignIn()) {
+                            is com.lucento.app.data.sync.AccountBoundary.AfterSignIn.ConfirmSwitch -> {
+                                _switchPrompt.value = true
+                                null
+                            }
+                            else -> {
+                                syncPreferences?.setEnabled(true)
+                                // Restoring: this phone has nothing of its own yet, so the account can be pulled right away.
+                                if (restoreStage.value == RestoreStage.SIGN_IN) runRestore()
+                                null
+                            }
+                        }
                     }
                     com.lucento.app.data.sync.AuthRepository.SignInResult.Cancelled, null -> null
                     com.lucento.app.data.sync.AuthRepository.SignInResult.NotConfigured ->
@@ -123,6 +136,24 @@ class OnboardingViewModel(
 
     private fun setRestoreStage(stage: RestoreStage) {
         savedState[KEY_RESTORE] = stage.name
+    }
+
+    /** Drops unsynced changes and the previous ledger, then continues with the account just signed in. */
+    fun confirmSwitch() {
+        viewModelScope.launch {
+            accounts?.confirmSwitch()
+            _switchPrompt.value = false
+            syncPreferences?.setEnabled(true)
+            if (restoreStage.value == RestoreStage.SIGN_IN) runRestore()
+        }
+    }
+
+    /** Keeps the previous ledger and leaves the new session. */
+    fun cancelSwitch() {
+        viewModelScope.launch {
+            accounts?.cancelSwitch()
+            _switchPrompt.value = false
+        }
     }
 
     /** "I already have an account": first the reminder to sync the old phone. */
@@ -167,6 +198,15 @@ class OnboardingViewModel(
         setRestoreStage(RestoreStage.RESTORING)
         viewModelScope.launch {
             try {
+                when (accounts?.afterSignIn()) {
+                    is com.lucento.app.data.sync.AccountBoundary.AfterSignIn.ConfirmSwitch -> {
+                        restoring = false
+                        _switchPrompt.value = true
+                        setRestoreStage(RestoreStage.SIGN_IN)
+                        return@launch
+                    }
+                    else -> syncPreferences?.setEnabled(true)
+                }
                 when (val result = repository.sync()) {
                     is com.lucento.app.data.sync.SyncResult.Success -> {
                         val restoredWallets = wallets?.observeWallets()?.first().orEmpty()
@@ -192,8 +232,8 @@ class OnboardingViewModel(
                         setRestoreStage(RestoreStage.FAILED)
                     }
                     com.lucento.app.data.sync.SyncResult.AccountMismatch -> {
-                        _restoreMessage.value = com.lucento.app.data.sync.SyncRepository.ACCOUNT_MISMATCH_MESSAGE
-                        setRestoreStage(RestoreStage.FAILED)
+                        _switchPrompt.value = true
+                        setRestoreStage(RestoreStage.SIGN_IN)
                     }
                     is com.lucento.app.data.sync.SyncResult.Retryable -> {
                         _restoreMessage.value = "Your data couldn’t be downloaded (${result.message}). Check your connection and try again."
@@ -347,6 +387,7 @@ class OnboardingViewModel(
                     createSavedStateHandle(), container.preferences, container.categories,
                     auth = container.auth, syncPreferences = container.syncPreferences, appContext = app?.applicationContext,
                     sync = container.syncRepository, wallets = container.wallets,
+                    accounts = container.accountBoundary,
                 )
             }
         }
