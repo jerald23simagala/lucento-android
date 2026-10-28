@@ -179,6 +179,17 @@ class BudgetPlanTest {
         assertEquals(31, upcoming.daysLeft)
         assertEquals(Money(516_12, "PHP"), upcoming.dailyAllowance) // 16,000 / 31, rounded down
 
+        // Month length and the boundary into the next month. Today still counts on the last day.
+        fun days(today: String, planMonth: YearMonth) =
+            BudgetPlanner.burn(BudgetPlanner.plan(categories, example, emptyList(), "PHP", planMonth), LocalDate.parse(today)).daysLeft
+        assertEquals(28, days("2026-02-01", YearMonth.of(2026, 2)))
+        assertEquals(1, days("2026-02-28", YearMonth.of(2026, 2)))
+        assertEquals(29, days("2028-02-01", YearMonth.of(2028, 2)))
+        assertEquals(1, days("2028-02-29", YearMonth.of(2028, 2)))
+        assertEquals(1, days("2026-12-31", YearMonth.of(2026, 12)))
+        assertEquals(0, days("2027-01-01", YearMonth.of(2026, 12)))
+        assertEquals(31, days("2027-01-01", YearMonth.of(2027, 1)))
+
         listOf(mid, last, upcoming).forEach { burn ->
             val allowance = burn.dailyAllowance!!
             // Spending the allowance every remaining day never exceeds what is left.

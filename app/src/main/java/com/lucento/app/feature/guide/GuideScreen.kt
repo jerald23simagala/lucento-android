@@ -27,8 +27,8 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -249,13 +249,13 @@ private fun BudgetsStep(
         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
     )
     state.expenseCategories.forEach { category ->
-        OutlinedTextField(
+        AmountTextField(
             value = text(category.id),
-            onValueChange = { onChange(category.id, it.take(20)) },
+            onValueChange = { onChange(category.id, it) },
+            filter = { it.take(20) },
             label = { Text(category.name) },
             prefix = { Text(MoneyFormatter.currencySymbol(state.currency) + " ") },
             placeholder = { Text("Not set") },
-            singleLine = true,
             isError = category.id in invalid,
             supportingText = if (category.id in invalid) ({ Text("Enter an amount above zero, like 250${separator}00.") }) else null,
             textStyle = AmountStyles.row,
@@ -320,7 +320,7 @@ private fun WelcomeStep(state: GuideUiState) {
             if (state.transactionCount > 0) add("${state.transactionCount} ${if (state.transactionCount == 1) "transaction" else "transactions"}")
         }
         Text(
-            "You’re set up: ${parts.joinToString(", ")}. Financial clarity without the complexity starts now.",
+            "You’re set up: ${parts.joinToString(", ")}. This stays only on this phone unless cloud sync is on.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

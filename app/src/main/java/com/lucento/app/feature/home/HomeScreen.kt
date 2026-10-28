@@ -97,6 +97,7 @@ import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.CardHeader
 import com.lucento.app.core.designsystem.component.CategoryTile
 import com.lucento.app.core.designsystem.component.Hairline
+import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoMark
@@ -205,6 +206,7 @@ fun HomeScreen(
                     state = state,
                     actions = actions,
                     onSelectMonth = viewModel::selectMonth,
+                    onDismissLocalDataNotice = viewModel::dismissLocalDataNotice,
                 )
             }
         }
@@ -475,9 +477,19 @@ private fun Overview(
     state: HomeUiState,
     actions: HomeActions,
     onSelectMonth: (YearMonth) -> Unit,
+    onDismissLocalDataNotice: () -> Unit,
 ) {
     val f = state.features
     Column {
+        if (state.showLocalDataNotice) {
+            InfoNote(
+                "Your wallets, transactions, budgets and goals stay only on this phone unless cloud sync is on. " +
+                    "Uninstalling Lucento or clearing its storage erases them.",
+                actionLabel = "Dismiss",
+                onAction = onDismissLocalDataNotice,
+            )
+            Spacer(Modifier.height(Spacing.sm))
+        }
         val plan = state.budget
         val burn = state.burn
         if (plan != null && burn != null) {
@@ -658,7 +670,7 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                         )
                         StatDivider()
                     }
-                    BudgetStat("${burn.daysInMonth - burn.daysElapsed}", "days left", Modifier.weight(0.8f))
+                    BudgetStat("${burn.daysLeft}", "days left", Modifier.weight(0.8f))
                 }
             }
 

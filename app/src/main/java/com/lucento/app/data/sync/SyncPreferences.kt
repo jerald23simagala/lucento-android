@@ -99,6 +99,17 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
         context.syncDataStore.edit { it[Keys.syncedUserId] = userId }
     }
 
+    /** Forgets which account this phone synced and the pull cursor. Called when that ledger is wiped. */
+    suspend fun clearBinding() {
+        context.syncDataStore.edit {
+            it[Keys.enabled] = false
+            it.remove(Keys.lastSyncedAt)
+            it.remove(Keys.lastError)
+            it.remove(Keys.pullCursor)
+            it.remove(Keys.syncedUserId)
+        }
+    }
+
     private companion object {
         const val MAX_ERROR_LENGTH = 300
     }

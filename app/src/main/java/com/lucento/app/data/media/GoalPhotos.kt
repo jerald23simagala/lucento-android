@@ -58,6 +58,11 @@ class GoalPhotos(context: Context) {
         if (file.parentFile == directory.absoluteFile) file.delete()
     }
 
+    /** Removes every saved goal photo. Used when this phone's ledger is wiped on sign-out. */
+    fun deleteAll() {
+        directory.deleteRecursively()
+    }
+
     companion object {
         const val DIRECTORY = "goal_photos"
         private const val MAX_EDGE_PX = 1280

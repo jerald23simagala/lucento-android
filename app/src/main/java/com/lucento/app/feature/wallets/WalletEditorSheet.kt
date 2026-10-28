@@ -40,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -283,16 +284,16 @@ fun WalletEditorSheet(
             Spacer(Modifier.height(Spacing.md))
             val amountError = error is DraftError.AmountInvalid ||
                 error is DraftError.AmountTooPrecise || error is DraftError.AmountTooLarge
-            OutlinedTextField(
+            AmountTextField(
                 value = draft.amountText,
                 onValueChange = {
-                    draft = draft.copy(amountText = it.take(20))
+                    draft = draft.copy(amountText = it)
                     if (amountError) error = null
                 },
+                filter = { it.take(20) },
                 label = { Text(amountLabel) },
                 prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
                 placeholder = { Text("0") },
-                singleLine = true,
                 isError = amountError,
                 textStyle = AmountStyles.medium,
                 supportingText = {
@@ -441,13 +442,13 @@ private fun DebtDetails(
 ) {
     Spacer(Modifier.height(Spacing.md))
     FieldHeader("Debt details")
-    OutlinedTextField(
+    AmountTextField(
         value = draft.interestText,
-        onValueChange = { input -> onChange(draft.copy(interestText = input.filter { it.isDigit() || it == '.' || it == ',' }.take(6))) },
+        onValueChange = { input -> onChange(draft.copy(interestText = input)) },
+        filter = { input -> input.filter { it.isDigit() || it == '.' || it == ',' }.take(6) },
         label = { Text("Interest rate (optional)") },
         suffix = { Text("% a year") },
         placeholder = { Text("0") },
-        singleLine = true,
         isError = error == DraftError.InterestInvalid,
         supportingText = {
             Text(if (error == DraftError.InterestInvalid) "Enter a yearly rate from 0 to 100, like 12.5." else "Shown on the wallet card. Lucento never fetches rates.")
@@ -479,13 +480,13 @@ private fun DebtDetails(
                 colors = fieldColors,
                 modifier = Modifier.weight(0.8f),
             )
-            OutlinedTextField(
+            AmountTextField(
                 value = draft.installmentText,
-                onValueChange = { onChange(draft.copy(installmentText = it.take(20))) },
+                onValueChange = { onChange(draft.copy(installmentText = it)) },
+                filter = { it.take(20) },
                 label = { Text("Monthly amortization") },
                 prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
                 placeholder = { Text("0") },
-                singleLine = true,
                 isError = error == DraftError.InstallmentInvalid,
                 textStyle = AmountStyles.medium,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),

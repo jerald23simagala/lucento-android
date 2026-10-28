@@ -65,6 +65,36 @@ network security config, WorkManager's unused FOREGROUND_SERVICE removed with `t
 - Signing: only from environment variables (`LUCENTO_KEYSTORE_FILE`, …); `.gitignore` excludes `*.jks`, `*.keystore`,
   `keystore.properties`. No secrets in source or build files.
 
+## Crash reporting
+
+Firebase Crashlytics is wired so a build **without** `app/google-services.json` does not apply the Google Services
+or Crashlytics Gradle plugins and does not depend on the SDK. `CrashReporting.install()` then finds no class and
+does nothing. This repository does not contain a Firebase project file (`app/google-services.json` is gitignored).
+
+To turn reports on:
+
+1. Create a Firebase project (or use an existing one) and add an Android app for `com.lucento.app` and, if you want
+   debug reports, `com.lucento.app.debug`.
+2. Download `google-services.json` and place it at `app/google-services.json`. Do not commit it.
+3. Rebuild. The plugins and `firebase-crashlytics` are applied only when that file exists. Crashlytics uploads
+   mapping files for minified release builds when the plugin is applied.
+4. Confirm in the Firebase console after a test crash from a build that included the file.
+
+Collection is **off** until the user turns on Settings › Privacy › Send crash reports. The manifest sets
+`firebase_crashlytics_collection_enabled` to false, so the SDK stays off until code enables it. The choice is
+mirrored into a small SharedPreferences file (`lucento_crash_reports`) whenever it is saved, and copied once from
+DataStore for an install that opted in before the mirror existed. `Application.onCreate` reads that flag
+synchronously and passes it to `CrashReporting.install` before the rest of startup, so a crash in the first
+moments is reported for someone who already opted in. Turning the switch off disables collection immediately and
+deletes reports that have not been sent (`deleteUnsentReports`). With no Crashlytics class those calls do nothing.
+What is sent, once it is on: the stack and the exception type. `CrashReporting.sanitize` drops the exception
+message before the Crashlytics handler sees it, so an amount or text the user typed is not uploaded. The app never
+sets a Crashlytics user id, email, custom key, or log. There is no `google-services.json` in CI, so CI builds stay
+a no-op.
+
+ANRs are recorded by Crashlytics itself once the SDK is on the classpath. Without the json file there is no ANR
+reporting either.
+
 ## Run the full verification locally (Windows)
 `powershell -ExecutionPolicy Bypass -File tools\verify.ps1` — runs unit tests, debug build, schema diff, lint,
 release build + bundle, and (if a device/emulator is connected) the migration tests; writes `build\verify-summary.txt`.

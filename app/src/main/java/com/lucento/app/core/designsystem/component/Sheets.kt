@@ -1,6 +1,8 @@
 package com.lucento.app.core.designsystem.component
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +43,10 @@ fun ConfirmDialog(
     onDismiss: () -> Unit,
     destructive: Boolean = false,
     dismissLabel: String? = "Cancel",
+    /** A second action, shown above Cancel. Used for a destructive alternative when [confirmLabel] is the safe one. */
+    secondaryLabel: String? = null,
+    onSecondary: (() -> Unit)? = null,
+    secondaryDestructive: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -56,8 +62,23 @@ fun ConfirmDialog(
                 )
             }
         },
-        dismissButton = if (dismissLabel != null) {
-            { TextButton(onClick = onDismiss) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) } }
+        dismissButton = if (dismissLabel != null || secondaryLabel != null) {
+            {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (secondaryLabel != null && onSecondary != null) {
+                        TextButton(onClick = onSecondary) {
+                            Text(
+                                secondaryLabel,
+                                color = if (secondaryDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
+                    if (dismissLabel != null) {
+                        TextButton(onClick = onDismiss) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) }
+                    }
+                }
+            }
         } else {
             null
         },

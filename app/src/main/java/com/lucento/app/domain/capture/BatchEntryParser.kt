@@ -133,6 +133,9 @@ object BatchEntryParser {
         val inferred = when {
             expense != null && income == null -> TransactionType.EXPENSE
             income != null && expense == null -> TransactionType.INCOME
+            // Both kinds match, or the words never say: spending is the safe default. A later step may still
+            // follow an earlier clause that did say income.
+            expense != null && income != null -> TransactionType.EXPENSE
             else -> null
         }
         val relevant = tokens.isNotEmpty() || explicitType != null || expense != null || income != null

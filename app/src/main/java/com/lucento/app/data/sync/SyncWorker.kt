@@ -57,10 +57,14 @@ object SyncScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
     }
 
-    /** "Sync now": replaces a previous manual run rather than queuing several behind each other. */
+    /**
+     * "Sync now". KEEP so a second tap does not cancel the running worker and start another beside it.
+     * The periodic worker uses a different unique name; [SyncRepository.sync] still admits only one cycle
+     * at a time ([SyncFlight]), including after process death (the file lock is released by the OS).
+     */
     fun syncNow(context: Context) {
         val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(constraints).build()
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(MANUAL_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+            .enqueueUniqueWork(MANUAL_WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
+import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -544,26 +545,34 @@ internal fun AmountEntry(
             maxLines = 1,
         )
         Spacer(Modifier.width(Spacing.xs))
-        BasicTextField(
+        AmountTextField(
             value = text,
-            onValueChange = { input -> onTextChange(input.filter { it.isDigit() || it == '.' || it == ',' }.take(20)) },
-            singleLine = true,
-            textStyle = style.copy(color = tint, textAlign = TextAlign.Start),
-            cursorBrush = SolidColor(colors.primary),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+            onValueChange = onTextChange,
+            filter = { input -> input.filter { it.isDigit() || it == '.' || it == ',' }.take(20) },
             modifier = Modifier
                 .weight(1f, fill = false)
                 .width(IntrinsicSize.Min)
                 .focusRequester(focusRequester)
                 .semantics { contentDescription = "Amount" + (currencyCode?.let { " in $it" } ?: "") },
-            decorationBox = { inner ->
-                Box {
-                    if (text.isEmpty()) {
-                        Text("0", style = style, color = colors.outline, maxLines = 1)
-                    }
-                    inner()
-                }
+            field = { editor, onEdit, fieldModifier ->
+                BasicTextField(
+                    value = editor,
+                    onValueChange = onEdit,
+                    singleLine = true,
+                    textStyle = style.copy(color = tint, textAlign = TextAlign.Start),
+                    cursorBrush = SolidColor(colors.primary),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+                    modifier = fieldModifier,
+                    decorationBox = { inner ->
+                        Box {
+                            if (editor.text.isEmpty()) {
+                                Text("0", style = style, color = colors.outline, maxLines = 1)
+                            }
+                            inner()
+                        }
+                    },
+                )
             },
         )
     }

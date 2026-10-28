@@ -3,8 +3,9 @@
 ## Unreleased — Optional cloud sync (Supabase + Google Sign-In)
 
 - **Settings → Cloud sync**: connect a Google account to back up and sync wallets, categories, transactions, budgets,
-  goals and goal contributions. Off by default; Lucento remains fully usable offline with no account; signing out
-  never deletes local data. Shows the connected account, last sync time / error, "Sync now" and "Disconnect". When the
+  goals and goal contributions. Off by default; Lucento remains fully usable offline with no account. Signing out,
+  and switching to a different account, removes that account’s data from this phone (unsynced changes ask first) so
+  it is never uploaded to another account. Shows the connected account, last sync time / error, "Sync now" and "Disconnect". When the
   build has no Supabase or Google OAuth configuration the section says so instead of showing a button that fails.
 - Offline-first engine (`data/sync`): Room stays the source of truth. Pushes dirty rows and deletion tombstones, pulls
   changes since the last cursor, merges by last-write-wins on `updated_at` (a newer unsynced local edit is never

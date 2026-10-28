@@ -4,8 +4,9 @@
 
     <!--
         Lucento is local-first; every core feature works fully offline with no account. INTERNET is needed
-        only for the optional, opt-in cloud sync (see docs/SYNC.md) — nothing reaches the network until the
-        user explicitly signs in and turns sync on in Settings. ACCESS_NETWORK_STATE lets sync wait for a
+        for optional cloud sync (see docs/SYNC.md) — nothing financial is sent until the user signs in and
+        keeps sync on — and, only when app/google-services.json was present at build time, crash stacks that
+        omit amounts and notes (docs/QUALITY.md). ACCESS_NETWORK_STATE lets sync wait for a
         connection instead of failing noisily when there isn't one. ML Kit's own (unrelated, optional)
         telemetry permissions are still stripped: this app grants no permission it does not itself use.
     -->
@@ -38,6 +39,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Lucento"
         tools:targetApi="35">
+
+        <!-- Off until Settings › Privacy › Send crash reports. Harmless when the SDK isn't in the build. -->
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
+            android:value="false" />
 
         <activity
             android:name=".MainActivity"

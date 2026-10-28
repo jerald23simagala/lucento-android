@@ -64,16 +64,21 @@ class PullRulesTest {
     }
 
     @Test
-    fun `concurrent - strictly later edit wins, a tie goes to the server`() {
+    fun `concurrent - strictly later edit wins, a pending tie stays local`() {
         assertEquals(PullDecision.KEEP_LOCAL, decide(dirty = true, base = 3, local = 11, remoteRev = 4, remote = 10))
-        assertEquals(PullDecision.UPDATE, decide(dirty = true, base = 3, local = 10, remoteRev = 4, remote = 10))
+        // Same moment: the unpushed edit is not overwritten. A clean row still takes the server's tie.
+        assertEquals(PullDecision.KEEP_LOCAL, decide(dirty = true, base = 3, local = 10, remoteRev = 4, remote = 10))
+        assertEquals(PullDecision.UPDATE, decide(dirty = false, base = 3, local = 10, remoteRev = 4, remote = 10))
         assertEquals(PullDecision.UPDATE, decide(dirty = true, base = 3, local = 9, remoteRev = 4, remote = 10))
+        assertEquals(11L, tieBreakUpdatedAt(dirty = true, localBaseRevision = 3, localUpdatedAt = 10, remoteRevision = 4, remoteUpdatedAt = 10))
+        assertEquals(null, tieBreakUpdatedAt(dirty = true, localBaseRevision = 4, localUpdatedAt = 10, remoteRevision = 4, remoteUpdatedAt = 10))
     }
 
     @Test
     fun `unknown base counts as concurrent`() {
         assertEquals(PullDecision.KEEP_LOCAL, decide(dirty = true, base = null, local = 11, remoteRev = 4, remote = 10))
-        assertEquals(PullDecision.UPDATE, decide(dirty = true, base = null, local = 10, remoteRev = 4, remote = 10))
+        assertEquals(PullDecision.KEEP_LOCAL, decide(dirty = true, base = null, local = 10, remoteRev = 4, remote = 10))
+        assertEquals(PullDecision.UPDATE, decide(dirty = true, base = null, local = 9, remoteRev = 4, remote = 10))
     }
 
     @Test

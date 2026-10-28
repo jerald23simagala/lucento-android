@@ -403,6 +403,7 @@ private fun GoalDetailSheet(
     var withdrawing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmingDelete by remember { mutableStateOf(false) }
+    var confirmingContributionId by remember { mutableStateOf<Long?>(null) }
 
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -482,7 +483,7 @@ private fun GoalDetailSheet(
                             showPlus = true,
                             color = if (c.amount.isNegative) MaterialTheme.colorScheme.onSurface else LucentoTheme.extendedColors.positive,
                         )
-                        IconButton(onClick = { onDeleteContribution(c.id) }) {
+                        IconButton(onClick = { confirmingContributionId = c.id }) {
                             Icon(Icons.Outlined.Delete, contentDescription = "Remove this entry", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -504,6 +505,19 @@ private fun GoalDetailSheet(
                 onDelete()
             },
             onDismiss = { confirmingDelete = false },
+        )
+    }
+    confirmingContributionId?.let { id ->
+        ConfirmDialog(
+            title = "Remove this entry?",
+            text = "This contribution is deleted on this phone and on every device that syncs this goal.",
+            confirmLabel = "Remove",
+            destructive = true,
+            onConfirm = {
+                confirmingContributionId = null
+                onDeleteContribution(id)
+            },
+            onDismiss = { confirmingContributionId = null },
         )
     }
 }

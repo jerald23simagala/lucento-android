@@ -21,6 +21,7 @@ import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.Wallet
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,7 +38,7 @@ class HomeViewModel(
     budgets: BudgetRepository,
     recurring: RecurringRepository,
     goals: GoalRepository,
-    preferences: UserPreferencesRepository,
+    private val preferences: UserPreferencesRepository,
     /** Inputs for the header's sync status; all local (preferences, Room, the system's network state). */
     syncStatus: Flow<SyncStatus>,
     signedInEmail: Flow<String?>,
@@ -101,8 +102,12 @@ class HomeViewModel(
             displayName = prefs.displayName,
             month = month ?: YearMonth.from(today),
             cloudStatus = cloudStatus,
-        )
+        ).copy(showLocalDataNotice = showLocalDataNotice(prefs.onboardingComplete, prefs.localDataNoticeSeen))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+
+    fun dismissLocalDataNotice() {
+        viewModelScope.launch { preferences.setLocalDataNoticeSeen() }
+    }
 
     /** Shows [month] on the budget card; the current month follows the calendar (null). */
     fun selectMonth(month: YearMonth) {

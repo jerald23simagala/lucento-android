@@ -122,7 +122,7 @@ enum class ComposerStart { TYPE, SPEAK, SCAN }
 /**
  * Lucento's only way to add transactions: describe what happened — typed, spoken or as a receipt photo — and every
  * transaction in it appears at once as an editable row. Fix anything that looks wrong in place, then save the batch
- * with one tap. Interpretation runs on this phone; nothing is sent anywhere and nothing is saved until the user saves.
+ * with one tap. Interpretation runs on this phone unless Smarter reading is on, and nothing is saved until the user saves.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -639,7 +639,7 @@ private fun ComposerIntro(transfersAllowed: Boolean, onExample: (String) -> Unit
         }
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            "Read on this phone — nothing is sent anywhere.",
+            "Read on this phone. Nothing is sent unless you turn on cloud sync, crash reports, or Smarter reading.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

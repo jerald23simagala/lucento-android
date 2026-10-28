@@ -10,12 +10,15 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.lucento.app.core.crash.CrashReportsFlag
 import com.lucento.app.core.money.CurrencyRules
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.Currency
 import java.util.Locale
@@ -48,13 +51,23 @@ data class UserPreferences(
      * user after the consent dialog in Settings; nothing is sent to a model while it is off.
      */
     val smartReading: Boolean = false,
+    /** Crash reports. Off until the user turns them on in Settings. Nothing is sent while this is false. */
+    val crashReports: Boolean = false,
+    /**
+     * The one-time Home note that data stays on this phone and uninstalling erases it. New setup marks this seen.
+     * Installs that finished onboarding before the note existed start unseen, so they are told once.
+     */
+    val localDataNoticeSeen: Boolean = false,
     /** Where the guided setup after onboarding stands; null when finished or never started (older installs). */
     val guideStep: com.lucento.app.domain.GuideStep? = null,
 )
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
 
-class UserPreferencesRepository(private val context: Context) {
+class UserPreferencesRepository(
+    private val context: Context,
+    private val crashReportsFlag: CrashReportsFlag.Store = SharedPreferencesCrashReportsStore(context),
+) {
 
     private object Keys {
         val onboardingComplete = booleanPreferencesKey("onboarding_complete")
@@ -67,6 +80,8 @@ class UserPreferencesRepository(private val context: Context) {
         val defaultWalletId = longPreferencesKey("default_wallet_id")
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
+        val crashReports = booleanPreferencesKey("crash_reports")
+        val localDataNoticeSeen = booleanPreferencesKey("local_data_notice_seen")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -90,6 +105,8 @@ class UserPreferencesRepository(private val context: Context) {
                 defaultWalletId = p[Keys.defaultWalletId],
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
                 smartReading = p[Keys.smartReading] ?: false,
+                crashReports = p[Keys.crashReports] ?: false,
+                localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
             )
         }
 
@@ -104,6 +121,7 @@ class UserPreferencesRepository(private val context: Context) {
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
             it[Keys.categorySetupDone] = true
             it[Keys.onboardingComplete] = true
+            it[Keys.localDataNoticeSeen] = true
             // A new user continues into the guided setup (wallets, budget, goal, first transactions).
             it[Keys.guideStep] = com.lucento.app.domain.GuideStep.WALLETS.key
         }
@@ -121,12 +139,23 @@ class UserPreferencesRepository(private val context: Context) {
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
             it[Keys.categorySetupDone] = categoriesChosen
             it[Keys.onboardingComplete] = true
+            it[Keys.localDataNoticeSeen] = true
             it.remove(Keys.guideStep)
         }
     }
 
     suspend fun setSmartReading(enabled: Boolean) {
         context.dataStore.edit { it[Keys.smartReading] = enabled }
+    }
+
+    suspend fun setCrashReports(enabled: Boolean) {
+        // The flag is committed first so the next process enables collection before DataStore loads.
+        withContext(Dispatchers.IO) { CrashReportsFlag.set(crashReportsFlag, enabled) }
+        context.dataStore.edit { it[Keys.crashReports] = enabled }
+    }
+
+    suspend fun setLocalDataNoticeSeen() {
+        context.dataStore.edit { it[Keys.localDataNoticeSeen] = true }
     }
 
     /** Saves the guided setup's progress; null when it is finished (or was never started, as for older installs). */
@@ -181,6 +210,7 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     companion object {
+        const val DATA_STORE_NAME = "user_preferences"
         const val MAX_DISPLAY_NAME = 40
 
         fun defaultCurrency(locale: Locale = Locale.getDefault()): String =

@@ -107,6 +107,7 @@ fun SettingsScreen(
                 onPickCurrency = { pickingCurrency = true },
                 onFeature = viewModel::setFeatureEnabled,
                 onSmartReading = viewModel::setSmartReading,
+                onCrashReports = viewModel::setCrashReports,
                 onExport = {
                     exportMessage = null
                     exporter.launch("lucento-transactions-${LocalDate.now()}.csv")
@@ -117,7 +118,31 @@ fun SettingsScreen(
                 onConnectEmail = viewModel::connectEmailAccount,
                 onDisconnect = viewModel::disconnectAccount,
                 onSyncNow = viewModel::syncNow,
+                onChangePassword = viewModel::changePassword,
             )
+            current.cloudSync.prompt?.let { prompt ->
+                val unsynced = signOutUnsyncedMessage(prompt.unsyncedCount)
+                val signOutWithLoss = prompt.kind == AccountPrompt.Kind.SIGN_OUT && unsynced != null
+                ConfirmDialog(
+                    title = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect this account?" else "Switch account?",
+                    text = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) {
+                        "This removes the account’s wallets, transactions, budgets and goals from this phone. " +
+                            "Sign back in to download them again." +
+                            (unsynced?.let { " $it" } ?: "")
+                    } else {
+                        "This phone’s data belongs to another account. It will be removed so it is never uploaded " +
+                            "to the account you just signed in to." +
+                            if (prompt.hasUnsynced) " Changes that haven’t synced will be lost." else ""
+                    },
+                    confirmLabel = if (signOutWithLoss) "Sync first" else if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect" else "Remove and switch",
+                    destructive = !signOutWithLoss,
+                    onConfirm = if (signOutWithLoss) viewModel::syncBeforeSignOut else viewModel::confirmAccountPrompt,
+                    onDismiss = viewModel::dismissAccountPrompt,
+                    secondaryLabel = if (signOutWithLoss) "Sign out anyway" else null,
+                    onSecondary = if (signOutWithLoss) viewModel::confirmAccountPrompt else null,
+                    secondaryDestructive = true,
+                )
+            }
         }
         Spacer(Modifier.height(Spacing.xxl))
     }
@@ -206,12 +231,14 @@ private fun SettingsContent(
     onPickCurrency: () -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
     onSmartReading: (Boolean) -> Unit,
+    onCrashReports: (Boolean) -> Unit,
     onExport: () -> Unit,
     exportMessage: String?,
     onConnectGoogle: () -> Unit,
     onConnectEmail: (String, String, EmailMode) -> Unit,
     onDisconnect: () -> Unit,
     onSyncNow: () -> Unit,
+    onChangePassword: (String) -> Unit,
 ) {
     val prefs = current.preferences
     Column {
@@ -273,13 +300,15 @@ private fun SettingsContent(
 
         EnabledFeaturesSection(current, onFeature)
 
-        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail)
+        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword)
 
-        SmartReadingSection(
-            on = prefs.smartReading,
-            signedIn = current.cloudSync.signedInEmail != null,
-            onChange = onSmartReading,
-        )
+        if (current.cloudSync.configured && current.cloudSync.signedInEmail != null) {
+            SmartReadingSection(
+                on = prefs.smartReading,
+                signedIn = true,
+                onChange = onSmartReading,
+            )
+        }
 
         SectionHeader("Your data", Modifier.padding(top = Spacing.section))
         NavRow(
@@ -293,27 +322,34 @@ private fun SettingsContent(
         }
         Spacer(Modifier.height(Spacing.sm))
         InfoNote(
-            "Full backup and restore isn’t available yet. Until it is, keep a CSV export somewhere safe: uninstalling " +
+            "Your wallets, transactions, budgets and goals stay only on this phone unless cloud sync is on. " +
+                "Full backup and restore isn’t available yet. Until it is, keep a CSV export somewhere safe: uninstalling " +
                 "Lucento or clearing its storage permanently erases your data.",
         )
 
         SectionHeader("Privacy", Modifier.padding(top = Spacing.section))
+        SwitchRow(
+            title = "Send crash reports",
+            checked = prefs.crashReports,
+            onCheckedChange = onCrashReports,
+            description = "Off unless you turn this on. A report is the stack and the kind of error — never an amount, a note, or what you typed.",
+        )
         Fact(
             Icons.Outlined.PhoneAndroid,
             if (current.cloudSync.status.enabled) "Kept on this device, copied to your account" else "Stored only on this device",
             if (current.cloudSync.status.enabled)
-                "Wallets, transactions, budgets and goals stay in Lucento’s private storage; cloud sync keeps a copy in your account, readable only by you."
+                "Wallets, transactions, budgets and goals stay in Lucento’s private storage; cloud sync keeps a copy in your account, readable only by you. Crash reports and Smarter reading are separate and stay off until you turn them on."
             else
-                "Wallets, transactions, budgets and goals live in Lucento’s private storage.",
+                "Wallets, transactions, budgets and goals stay on this phone unless you turn on cloud sync. Crash reports and Smarter reading stay off until you turn those on too.",
         )
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(
             Icons.Outlined.WifiOff,
             "Offline unless you turn sync on",
             if (current.cloudSync.status.enabled)
-                "Cloud sync is on for this account; everything else still works offline. Receipt reading runs on the phone either way."
+                "Cloud sync is on for this account. Crash reports and Smarter reading still wait for their own switches. Receipt reading runs on the phone either way."
             else
-                "Lucento makes no network connection until you connect an account above. Receipt reading runs on the phone.",
+                "Nothing is sent unless you turn on cloud sync, crash reports, or Smarter reading. Receipt reading runs on the phone.",
         )
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.KeyboardVoice, "Voice uses your phone’s recogniser", "Speech is converted to text by your device’s speech service; Lucento interprets it offline.")
@@ -417,6 +453,7 @@ internal fun CloudSyncSection(
     onDisconnect: () -> Unit,
     onSyncNow: () -> Unit,
     onConnectEmail: (String, String, EmailMode) -> Unit = { _, _, _ -> },
+    onChangePassword: (String) -> Unit = {},
 ) {
     Column {
         SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
@@ -427,8 +464,8 @@ internal fun CloudSyncSection(
             state.signedInEmail == null -> {
                 Text(
                     "Back up your wallets, transactions, budgets and goals and keep them in sync across your " +
-                        "devices. Lucento stays fully usable without this — nothing is sent anywhere until you " +
-                        "connect an account.",
+                        "devices. Lucento stays fully usable without this — your data stays on this phone until you " +
+                        "connect an account and keep sync on.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -472,6 +509,8 @@ internal fun CloudSyncSection(
                     }
                     OutlinedButton(onClick = onDisconnect, enabled = !state.syncing) { Text("Disconnect") }
                 }
+                Spacer(Modifier.height(Spacing.sm))
+                ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
             }
         }
         // The status line already shows the stored error; don't print the same sentence twice (account mismatch).

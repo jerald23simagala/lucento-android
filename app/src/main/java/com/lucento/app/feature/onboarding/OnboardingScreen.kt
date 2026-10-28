@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.CurrencyList
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
@@ -90,7 +91,21 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val restoreStage by viewModel.restoreStage.collectAsStateWithLifecycle()
     val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
+    val switchPrompt by viewModel.switchPrompt.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    if (switchPrompt) {
+        ConfirmDialog(
+            title = "Switch account?",
+            text = "This phone’s data belongs to another account, and some of it hasn’t synced. " +
+                "It will be removed so it is never uploaded to the account you just signed in to. " +
+                "Changes that haven’t synced will be lost.",
+            confirmLabel = "Remove and switch",
+            destructive = true,
+            onConfirm = viewModel::confirmSwitch,
+            onDismiss = viewModel::cancelSwitch,
+        )
+    }
 
     BackHandler(enabled = step > 0 && restoreStage == RestoreStage.NONE) { viewModel.back() }
     BackHandler(enabled = restoreStage != RestoreStage.NONE && restoreStage != RestoreStage.RESTORING) { viewModel.cancelRestore() }
@@ -241,7 +256,7 @@ private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
             }
             Spacer(Modifier.height(Spacing.lg))
             Text(
-                "Track what you spend, plan what’s next — privately, on this phone. No account, no bank login.",
+                "Track what you spend, plan what’s next. Your data stays only on this phone unless you turn on cloud sync. No account, no bank login.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -526,8 +541,8 @@ private fun SyncStep(
                 )
                 else -> {
                     InfoNote(
-                        "Optional. Nothing leaves this phone unless you connect an account and keep sync on. Signing out " +
-                            "later never deletes what’s on this device.",
+                        "Optional. Your data stays only on this phone unless you connect an account and keep sync on. " +
+                            "Signing out removes that account’s data from this phone so it can’t be uploaded to a different one.",
                     )
                     Spacer(Modifier.height(Spacing.md))
                     com.lucento.app.feature.settings.ConnectAccountPanel(
@@ -591,6 +606,9 @@ private fun ConfirmStep(
             val off = Feature.entries.filterNot { it in features }
             if (off.isNotEmpty()) SummaryRow("Turned off", off.joinToString { it.title })
             SummaryRow("Cloud sync", signedInEmail?.let { "On · ${it.ifEmpty { "connected" }}" } ?: "Off · everything stays on this phone")
+            if (signedInEmail == null) {
+                InfoNote("Until you turn on cloud sync, wallets, transactions, budgets and goals stay only on this phone.")
+            }
             Spacer(Modifier.height(Spacing.md))
             Text(
                 if (signedInEmail != null) "Next: add your first wallet on Home. It syncs to your account automatically."

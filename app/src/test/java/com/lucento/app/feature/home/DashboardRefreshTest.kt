@@ -84,7 +84,39 @@ class DashboardRefreshTest {
         assertEquals("Spending slower than the month", insight(30_000).message)
         val over = insight(112_500)
         assertEquals("Over budget. Let’s regroup!", over.bubble)
-        assertTrue(over.message, over.message.contains("$125.00 over your $1,000.00 budget with 14 days left"))
+        // 16 June through 30 June, today included: the same 15 days the allowance divides by.
+        assertEquals(15, BudgetPlanner.burn(
+            BudgetPlanner.plan(listOf(food), budget, listOf(spend(112_500, "2026-06-16")), "USD", YearMonth.of(2026, 6)),
+            LocalDate.parse("2026-06-16"),
+        ).daysLeft)
+        assertTrue(over.message, over.message.contains("$125.00 over your $1,000.00 budget with 15 days left"))
+    }
+
+    @Test fun daysLeftLabelCountsTodayOnTheFirstMidAndLastDayAndAcrossMonthBoundaries() {
+        fun overOn(date: String, month: YearMonth = YearMonth.from(LocalDate.parse(date))): String {
+            val plan = BudgetPlanner.plan(listOf(food), budget, listOf(spend(112_500, date)), "USD", month)
+            val burn = BudgetPlanner.burn(plan, LocalDate.parse(date))
+            return PaceCopy.describe(plan, burn, "Month", isCurrentMonth = month == YearMonth.from(LocalDate.parse(date))).message
+        }
+        assertTrue(overOn("2026-06-01").contains("with 30 days left"))
+        assertTrue(overOn("2026-06-16").contains("with 15 days left"))
+        assertTrue(overOn("2026-06-30").contains("with 1 day left"))
+        assertEquals("1 day", daysLeftLabel(1))
+        assertEquals("0 days", daysLeftLabel(0))
+
+        // Non-leap February, leap February, and the December/January boundary. The allowance uses this same count.
+        fun days(date: String, month: YearMonth = YearMonth.from(LocalDate.parse(date))) =
+            BudgetPlanner.burn(
+                BudgetPlanner.plan(listOf(food), budget, emptyList(), "USD", month),
+                LocalDate.parse(date),
+            ).daysLeft
+        assertEquals(28, days("2026-02-01"))
+        assertEquals(1, days("2026-02-28"))
+        assertEquals(29, days("2028-02-01"))
+        assertEquals(1, days("2028-02-29"))
+        assertEquals(1, days("2026-12-31"))
+        assertEquals(0, days("2027-01-01", YearMonth.of(2026, 12))) // December is finished
+        assertEquals(31, days("2027-01-01"))
     }
 
     @Test fun pastMonthIsDescribedAsFinished() {

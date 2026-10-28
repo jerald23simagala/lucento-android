@@ -19,6 +19,7 @@ import com.lucento.app.data.local.WalletDao
 import com.lucento.app.data.local.WalletEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -39,8 +40,10 @@ import java.util.UUID
  *    what it accepted, so accepted rows record their new revision and rejected ones are resolved below.
  * 4. Pull, in keyset pages, every row the **server** stamped since the cursor — parents before children. Rows whose
  *    push or delete the server rejected are fetched by id first and replaced by the server's copy (a rejected delete
- *    therefore brings the newer edit back). Remote deletions are applied last, children first; one that a local
- *    foreign key still blocks is kept and counted as a conflict instead of failing the sync.
+ *    therefore brings the newer edit back). A child whose wallet, category or goal is already gone is kept by
+ *    restoring that parent locally (or an Uncategorized category); it is never dropped and never holds the cursor.
+ *    Remote deletions are applied last, children first; one that a local foreign key still blocks is kept and counted
+ *    as a conflict instead of failing the sync.
  * 5. Save the new cursor only after all of that succeeded. Any failure leaves the cursor, every dirty flag and
  *    every local row exactly as they were, so the next cycle simply repeats the work.
  *
@@ -65,7 +68,18 @@ class SyncRepository(
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
 
-    suspend fun sync(): SyncResult {
+    /**
+     * Dirty rows plus deletions not yet pushed. The same total the Home header watches.
+     * Sign-out uses it before wiping the phone.
+     */
+    suspend fun pendingChangeCount(): Int = observePendingChanges().first()
+
+    /** True when a sign-out or account switch would drop changes that have not reached the server. */
+    suspend fun hasUnsyncedChanges(): Boolean = pendingChangeCount() > 0
+
+    suspend fun sync(): SyncResult = SyncFlight.exclusive { syncBody() }
+
+    private suspend fun syncBody(): SyncResult {
         val r = remote ?: return SyncResult.NotConfigured
         val userId = try {
             r.currentUserId()
@@ -96,7 +110,20 @@ class SyncRepository(
             report += pushGoals(r, userId, rejected)
             report += pushGoalContributions(r, userId, rejected)
 
-            report += pull(r, userId, rejected)
+            val pulled = pull(r, userId, rejected)
+            report += pulled
+            // A same-moment local edit was kept and nudged later; send it now so this cycle converges.
+            if (pulled.pendingKept > 0) {
+                val again = Rejected()
+                report += pushTombstones(r, userId, again)
+                report += pushWallets(r, userId, again)
+                report += pushCategories(r, userId, again)
+                report += pushBudgets(r, userId, again)
+                report += pushTransactions(r, userId, again)
+                report += pushRecurring(r, userId, again)
+                report += pushGoals(r, userId, again)
+                report += pushGoalContributions(r, userId, again)
+            }
             // Copies of one category from two setups on this account fold into one; the merge's edits go up now.
             if (mergeDuplicateCategories() > 0) {
                 val again = Rejected()
@@ -336,14 +363,24 @@ class SyncRepository(
     // --- pull ---
 
     /** A remote deletion found during the pull; applied only after every upsert, children first. */
-    private class PendingDelete(val table: String, val delete: suspend () -> Unit)
+    private class PendingDelete(val table: String, val clientUuid: String?, val delete: suspend () -> Unit)
 
     private class PullState(val sinceMillis: Long) {
         var newestSeen: Long? = null
         var oldestDeferred: Long? = null
         var pulled = 0
         var conflicts = 0
+        var parentsRestored = 0
+        var pendingKept = 0
         val deletes = mutableListOf<PendingDelete>()
+        /** Soft-deleted parents seen in this pull, including ones this phone never stored. */
+        val deletedWallets = mutableMapOf<String, WalletRow>()
+        val deletedCategories = mutableMapOf<String, CategoryRow>()
+        val deletedGoals = mutableMapOf<String, GoalRow>()
+
+        fun dropQueuedDelete(table: String, clientUuid: String) {
+            deletes.removeAll { it.table == table && it.clientUuid == clientUuid }
+        }
 
         fun seen(row: JsonObject) {
             val at = row.serverMillis() ?: return
@@ -395,16 +432,27 @@ class SyncRepository(
         preferences.setPullCursorIso(
             SyncTime.toIso(nextPullCursor(since, state.newestSeen, state.oldestDeferred, CURSOR_OVERLAP_MS))
         )
-        return SyncReport(pulled = state.pulled, conflicts = state.conflicts, deletedLocally = deletedLocally)
+        return SyncReport(
+            pulled = state.pulled,
+            conflicts = state.conflicts,
+            deletedLocally = deletedLocally,
+            parentsRestored = state.parentsRestored,
+            pendingKept = state.pendingKept,
+        )
     }
 
-    /** Applies one pulled row. With [serverWins] (the server refused this device's write) the server copy always wins. */
+    /**
+     * Applies one pulled row. With [serverWins] (the server refused this device's write) the server copy wins,
+     * except a pending local edit that is not older than that copy — a same-moment edit is not overwritten.
+     */
     private suspend fun applyPulled(table: String, json: JsonObject, s: PullState, serverWins: Boolean) {
         val revision = json.revisionOrNull()
         fun decide(localExists: Boolean, dirty: Boolean, base: Long?, updatedAt: Long, remoteUpdatedAtIso: String): PullDecision {
+            val remoteAt = SyncTime.fromIso(remoteUpdatedAtIso)
             val decision = when {
+                serverWins && localExists && dirty && protectsPendingEdit(base, updatedAt, revision, remoteAt) -> PullDecision.KEEP_LOCAL
                 serverWins -> if (localExists) PullDecision.UPDATE else PullDecision.INSERT
-                else -> pullDecision(localExists, dirty, base, updatedAt, revision, SyncTime.fromIso(remoteUpdatedAtIso))
+                else -> pullDecision(localExists, dirty, base, updatedAt, revision, remoteAt)
             }
             // A rejected delete returns with localExists = false: the row this device removed comes back, which is a conflict too.
             // Keeping a causal successor (base = server revision) is just an unpushed edit, not a conflict.
@@ -416,11 +464,25 @@ class SyncRepository(
             "wallets" -> {
                 val row = decode(WalletRow.serializer(), json)
                 val local = wallets.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { wallets.deleteById(local!!.id) }
+                if (row.deletedAt != null) {
+                    s.deletedWallets[row.id] = row
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { wallets.deleteById(local!!.id) }
+                }
                 val walletId = when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> wallets.insert(row.toEntity(syncedAt = clock()))
-                    PullDecision.UPDATE -> local!!.id.also { wallets.update(row.toEntity(syncedAt = freshSyncedAt(local.syncedAt), id = it)) }
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            wallets.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        local!!.id.also { wallets.update(row.toEntity(syncedAt = freshSyncedAt(local.syncedAt), id = it)) }
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            wallets.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 applyDebtTerms(walletId, row)
                 s.pulled++
@@ -428,38 +490,72 @@ class SyncRepository(
             "categories" -> {
                 val row = decode(CategoryRow.serializer(), json)
                 val local = categories.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { categories.deleteById(local!!.id) }
+                if (row.deletedAt != null) {
+                    s.deletedCategories[row.id] = row
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { categories.deleteById(local!!.id) }
+                }
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> categories.insert(row.toEntity(syncedAt = clock()))
-                    PullDecision.UPDATE -> categories.update(row.toEntity(syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            categories.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        categories.update(row.toEntity(syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            categories.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
             "budgets" -> {
                 val row = decode(BudgetRow.serializer(), json)
                 val local = budgets.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { budgets.deleteById(local!!.id) }
-                val categoryId = row.categoryId?.let { categories.findByClientUuid(it)?.id }
-                if (row.categoryId != null && categoryId == null) return s.defer(json)
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { budgets.deleteById(local!!.id) }
+                val categoryId = resolveCategory(row.categoryId, "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> budgets.insert(row.toEntity(categoryId, syncedAt = clock()))
-                    PullDecision.UPDATE -> budgets.update(row.toEntity(categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            budgets.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        budgets.update(row.toEntity(categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            budgets.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
             "transactions" -> {
                 val row = decode(TransactionRow.serializer(), json)
                 val local = transactions.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { transactions.deleteById(local!!.id) }
-                val walletId = wallets.findByClientUuid(row.walletId)?.id ?: return s.defer(json)
-                val categoryId = row.categoryId?.let { categories.findByClientUuid(it)?.id }
-                if (row.categoryId != null && categoryId == null) return s.defer(json)
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { transactions.deleteById(local!!.id) }
+                val walletId = resolveWallet(row.walletId, row.currencyCode, s)
+                val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> transactions.insert(row.toEntity(walletId, categoryId, syncedAt = clock()))
-                    PullDecision.UPDATE -> transactions.update(row.toEntity(walletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            transactions.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        transactions.update(row.toEntity(walletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            transactions.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
@@ -467,32 +563,55 @@ class SyncRepository(
                 val dao = recurring ?: return
                 val row = decode(RecurringRow.serializer(), json)
                 val local = dao.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { dao.deleteById(local!!.id) }
-                val walletId = wallets.findByClientUuid(row.walletId)?.id ?: return s.defer(json)
-                val toWalletId = row.toWalletId?.let { wallets.findByClientUuid(it)?.id }
-                if (row.toWalletId != null && toWalletId == null) return s.defer(json)
-                val categoryId = row.categoryId?.let { categories.findByClientUuid(it)?.id }
-                if (row.categoryId != null && categoryId == null) return s.defer(json)
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { dao.deleteById(local!!.id) }
+                val walletId = resolveWallet(row.walletId, row.currencyCode, s)
+                val toWalletId = row.toWalletId?.let { resolveWallet(it, row.currencyCode, s) }
+                val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> dao.insert(row.toEntity(walletId, toWalletId, categoryId, syncedAt = clock()))
-                    PullDecision.UPDATE -> dao.update(row.toEntity(walletId, toWalletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            dao.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        dao.update(row.toEntity(walletId, toWalletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            dao.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
             "goals" -> {
                 val row = decode(GoalRow.serializer(), json)
                 val local = goals.findGoalByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { goals.deleteById(local!!.id) }
+                if (row.deletedAt != null) {
+                    s.deletedGoals[row.id] = row
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { goals.deleteById(local!!.id) }
+                }
                 // A linked wallet that hasn't arrived is only informational on a goal, so the link is dropped, not deferred.
                 val walletId = row.walletId?.let { wallets.findByClientUuid(it)?.id }
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     // photoPath never comes from the cloud — it names a file on the device that chose it.
                     PullDecision.INSERT -> goals.insert(row.toEntity(walletId, photoPath = null, syncedAt = clock()))
-                    PullDecision.UPDATE -> goals.update(
-                        row.toEntity(walletId, photoPath = local!!.photoPath, syncedAt = freshSyncedAt(local.syncedAt), id = local.id)
-                    )
-                    PullDecision.KEEP_LOCAL, PullDecision.UNCHANGED -> return
+                    PullDecision.UPDATE -> {
+                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            goals.update(local.copy(updatedAt = at, dirty = true))
+                        }) return
+                        goals.update(
+                            row.toEntity(walletId, photoPath = local!!.photoPath, syncedAt = freshSyncedAt(local.syncedAt), id = local.id)
+                        )
+                    }
+                    PullDecision.KEEP_LOCAL -> {
+                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                            goals.update(local.copy(updatedAt = at, dirty = true))
+                        }
+                        return
+                    }
+                    PullDecision.UNCHANGED -> return
                 }
                 s.pulled++
             }
@@ -501,11 +620,11 @@ class SyncRepository(
                 val local = goals.findContributionByClientUuid(row.id)
                 if (row.deletedAt != null) {
                     // Contributions are immutable, so a remote delete always applies.
-                    if (local != null) s.deletes += PendingDelete(table) { goals.deleteContribution(local.id) }
+                    if (local != null) s.deletes += PendingDelete(table, row.id) { goals.deleteContribution(local.id) }
                     return
                 }
                 if (local != null) return
-                val goalId = goals.findGoalByClientUuid(row.goalId)?.id ?: return s.defer(json)
+                val goalId = resolveGoal(row.goalId, s)
                 goals.insertContribution(
                     GoalContributionEntity(
                         goalId = goalId, amountMinor = row.amountMinor, occurredOn = row.occurredOn, note = row.note,
@@ -535,9 +654,90 @@ class SyncRepository(
         )
     }
 
+    /**
+     * True when [dirty] pending values must be left in place. A timestamp tie is moved one millisecond later so the
+     * server's tie-to-stored rule will accept the push.
+     */
+    private suspend fun holdPending(
+        dirty: Boolean,
+        base: Long?,
+        updatedAt: Long,
+        remoteRevision: Long?,
+        remoteUpdatedAtIso: String,
+        s: PullState,
+        bump: suspend (Long) -> Unit,
+    ): Boolean {
+        val remoteAt = SyncTime.fromIso(remoteUpdatedAtIso)
+        if (!dirty || !protectsPendingEdit(base, updatedAt, remoteRevision, remoteAt)) return false
+        val next = tieBreakUpdatedAt(dirty, base, updatedAt, remoteRevision, remoteAt)
+        if (next != null) {
+            bump(next)
+            s.pendingKept++
+        }
+        return true
+    }
+
+    /**
+     * A pulled child whose parent is not on this phone. Restores the soft-deleted parent when this pull saw it,
+     * otherwise a fallback (a "Restored account", or an "Uncategorized" category) under the same client id.
+     * The restored row is not dirty, so it is not pushed and does not undelete the parent for other devices.
+     * The cursor is allowed to move: deferring here used to re-download every later row forever.
+     */
+    private suspend fun resolveWallet(clientUuid: String, currencyCode: String, s: PullState): Long {
+        wallets.findByClientUuid(clientUuid)?.let { return it.id }
+        val restored = s.deletedWallets[clientUuid]
+        val entity = if (restored != null) {
+            restored.toEntity(syncedAt = clock())
+        } else {
+            WalletEntity(
+                name = RESTORED_ACCOUNT_NAME, type = "CASH", currencyCode = currencyCode, openingBalanceMinor = 0,
+                createdAt = clock(), updatedAt = clock(), clientUuid = clientUuid, dirty = false, syncedAt = clock(),
+            )
+        }
+        s.dropQueuedDelete("wallets", clientUuid)
+        s.parentsRestored++
+        val id = wallets.insert(entity)
+        if (restored != null) applyDebtTerms(id, restored)
+        return id
+    }
+
+    private suspend fun resolveCategory(clientUuid: String?, kind: String, s: PullState): Long? {
+        if (clientUuid == null) return null
+        categories.findByClientUuid(clientUuid)?.let { return it.id }
+        val restored = s.deletedCategories[clientUuid]
+        val entity = if (restored != null) {
+            restored.toEntity(syncedAt = clock())
+        } else {
+            CategoryEntity(
+                name = UNCATEGORIZED_NAME, kind = kind, iconKey = "other", sortOrder = 0,
+                createdAt = clock(), updatedAt = clock(), clientUuid = clientUuid, dirty = false, syncedAt = clock(),
+            )
+        }
+        s.dropQueuedDelete("categories", clientUuid)
+        s.parentsRestored++
+        return categories.insert(entity)
+    }
+
+    private suspend fun resolveGoal(clientUuid: String, s: PullState): Long {
+        goals.findGoalByClientUuid(clientUuid)?.let { return it.id }
+        val restored = s.deletedGoals[clientUuid]
+        val entity = if (restored != null) {
+            restored.toEntity(localWalletId = null, photoPath = null, syncedAt = clock())
+        } else {
+            GoalEntity(
+                name = "Restored goal", targetMinor = 0, currencyCode = "USD", targetDate = null, walletId = null,
+                createdAt = clock(), updatedAt = clock(), clientUuid = clientUuid, dirty = false, syncedAt = clock(),
+            )
+        }
+        s.dropQueuedDelete("goals", clientUuid)
+        s.parentsRestored++
+        return goals.insert(entity)
+    }
+
     private fun queueDelete(
         s: PullState,
         table: String,
+        clientUuid: String?,
         localUpdatedAt: Long?,
         localDirty: Boolean?,
         deletedAtIso: String,
@@ -549,7 +749,7 @@ class SyncRepository(
             s.conflicts++ // a newer local edit survives; it is pushed and the server applies the same rule
         } else {
             if (serverWins && localDirty) s.conflicts++
-            s.deletes += PendingDelete(table, delete)
+            s.deletes += PendingDelete(table, clientUuid, delete)
         }
     }
 
@@ -569,8 +769,10 @@ class SyncRepository(
         /** Covers writes stamped by the server before a pull's read but committed after it. */
         const val CURSOR_OVERLAP_MS = 60_000L
         const val TOMBSTONE_RETENTION_MS = 30L * 24 * 60 * 60 * 1000
+        const val RESTORED_ACCOUNT_NAME = "Restored account"
+        const val UNCATEGORIZED_NAME = "Uncategorized"
         const val ACCOUNT_MISMATCH_MESSAGE =
-            "This device's data is already synced with a different Google account. Sign in with that account to keep syncing."
+            "This phone still has another account’s data, so nothing was uploaded. Sign in with that account, or switch accounts to remove it from this phone."
         private val PARENT_FIRST = listOf("wallets", "categories", "budgets", "transactions", "recurring", "goals", "goal_contributions")
         private val CHILD_FIRST = listOf("goal_contributions", "recurring", "transactions", "budgets", "goals", "categories", "wallets")
     }

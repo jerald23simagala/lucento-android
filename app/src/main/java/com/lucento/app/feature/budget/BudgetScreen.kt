@@ -368,7 +368,7 @@ private fun BudgetSummaryCard(plan: BudgetPlan, today: java.time.LocalDate, isCu
                         MoneyText(money = allowance, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f)
                     } else {
                         Text(
-                            if (isCurrentMonth) "${burn.daysInMonth - burn.daysElapsed} of ${burn.daysInMonth}" else "Closed",
+                            if (isCurrentMonth) "${burn.daysLeft} of ${burn.daysInMonth}" else "Closed",
                             style = AmountStyles.row,
                             color = ext.onHero,
                         )
