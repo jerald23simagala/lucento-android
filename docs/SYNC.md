@@ -142,9 +142,7 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   It wins outright, whatever any clock says. (Time-only last-write-wins got this wrong: a device whose clock ran an hour
   slow could pull the newest version, edit it, and have that edit silently discarded as "older".)
 - **Concurrent** — the server row changed since the edit's base (or the base is unknown). The strictly later edit time
-  wins. A tie on the server still keeps the stored row. A **pending local edit** at that same timestamp is not
-  overwritten by the pull: it is moved one millisecond later and pushed again in the same cycle, so the unsynced
-  change is the one that remains. A clean local row (nothing waiting) still takes the server's copy on a tie.
+  wins; a tie keeps the server's row. This is the only place a device clock still matters.
 - Server (`lucento_reject_stale_update`) and client (`localEditWins` / `pullDecision`) apply the same rule, so they
   always agree. A write the server refuses is not retried forever: the next pull fetches the server's copy by id and
   applies it, and the conflict is counted ("N changed on two devices at once — the later edit was kept").
