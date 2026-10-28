@@ -311,7 +311,8 @@ private fun SettingsContent(
         }
         Spacer(Modifier.height(Spacing.sm))
         InfoNote(
-            "Full backup and restore isn’t available yet. Until it is, keep a CSV export somewhere safe: uninstalling " +
+            "Your wallets, transactions, budgets and goals stay only on this phone unless cloud sync is on. " +
+                "Full backup and restore isn’t available yet. Until it is, keep a CSV export somewhere safe: uninstalling " +
                 "Lucento or clearing its storage permanently erases your data.",
         )
 

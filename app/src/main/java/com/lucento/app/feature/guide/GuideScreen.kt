@@ -320,7 +320,7 @@ private fun WelcomeStep(state: GuideUiState) {
             if (state.transactionCount > 0) add("${state.transactionCount} ${if (state.transactionCount == 1) "transaction" else "transactions"}")
         }
         Text(
-            "You’re set up: ${parts.joinToString(", ")}. Financial clarity without the complexity starts now.",
+            "You’re set up: ${parts.joinToString(", ")}. This stays only on this phone unless cloud sync is on.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

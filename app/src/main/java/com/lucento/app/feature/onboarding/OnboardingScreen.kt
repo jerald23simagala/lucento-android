@@ -256,7 +256,7 @@ private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
             }
             Spacer(Modifier.height(Spacing.lg))
             Text(
-                "Track what you spend, plan what’s next — privately, on this phone. No account, no bank login.",
+                "Track what you spend, plan what’s next. Your data stays only on this phone unless you turn on cloud sync. No account, no bank login.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -606,6 +606,9 @@ private fun ConfirmStep(
             val off = Feature.entries.filterNot { it in features }
             if (off.isNotEmpty()) SummaryRow("Turned off", off.joinToString { it.title })
             SummaryRow("Cloud sync", signedInEmail?.let { "On · ${it.ifEmpty { "connected" }}" } ?: "Off · everything stays on this phone")
+            if (signedInEmail == null) {
+                InfoNote("Until you turn on cloud sync, wallets, transactions, budgets and goals stay only on this phone.")
+            }
             Spacer(Modifier.height(Spacing.md))
             Text(
                 if (signedInEmail != null) "Next: add your first wallet on Home. It syncs to your account automatically."
