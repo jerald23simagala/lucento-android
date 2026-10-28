@@ -1,5 +1,6 @@
 package com.lucento.app.data.preferences
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.lucento.app.core.crash.CrashReportsFlag
 
@@ -12,6 +13,8 @@ class SharedPreferencesCrashReportsStore(context: Context) : CrashReportsFlag.St
 
     override fun getBoolean(key: String, default: Boolean): Boolean = prefs.getBoolean(key, default)
 
+    // commit(), not apply(): the next process must see the opt-in before Application.onCreate continues.
+    @SuppressLint("ApplySharedPref")
     override fun commit(edits: Map<String, Boolean>) {
         val editor = prefs.edit()
         for ((key, value) in edits) editor.putBoolean(key, value)
