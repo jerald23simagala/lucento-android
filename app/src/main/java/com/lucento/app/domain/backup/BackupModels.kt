@@ -261,4 +261,10 @@ interface BackupStore {
      * Throws before the new snapshot becomes visible if the write cannot finish.
      */
     suspend fun replaceAll(snapshot: BackupSnapshot)
+
+    /**
+     * Writes [snapshot] on top of the current ledger. A row whose content and timestamps already match
+     * is left untouched, including its dirty flag, so an identical backup does not upload again.
+     */
+    suspend fun mergeAll(snapshot: BackupSnapshot)
 }

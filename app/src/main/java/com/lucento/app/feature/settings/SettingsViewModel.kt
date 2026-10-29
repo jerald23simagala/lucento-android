@@ -70,6 +70,8 @@ data class CloudSyncUiState(
     val syncing: Boolean = false,
     val lastMessage: String? = null,
     val prompt: AccountPrompt? = null,
+    /** Dirty rows and unpushed deletions. "Synced just now" is withheld while this is not zero. */
+    val pendingChanges: Int = 0,
 )
 
 class SettingsViewModel(
@@ -113,6 +115,7 @@ class SettingsViewModel(
             syncMessage,
             auth.observeSignedInEmail(),
             prompt,
+            syncRepository.observePendingChanges(),
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
@@ -122,6 +125,7 @@ class SettingsViewModel(
             val message = values[5] as String?
             val email = values[6] as String?
             val accountPrompt = values[7] as AccountPrompt?
+            val pending = values[8] as Int
             SettingsUiState(
                 preferences = prefs,
                 walletCount = w.size,
@@ -134,6 +138,7 @@ class SettingsViewModel(
                     syncing = isSyncing,
                     lastMessage = message,
                     prompt = accountPrompt,
+                    pendingChanges = pending,
                 ),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

@@ -48,7 +48,10 @@ class BackupEngine(
             RestoreMode.MERGE -> BackupMerge.merge(local, incoming, now)
             RestoreMode.REPLACE -> BackupMerge.replace(local, incoming, now)
         }
-        store.replaceAll(next)
+        when (mode) {
+            RestoreMode.MERGE -> store.mergeAll(next)
+            RestoreMode.REPLACE -> store.replaceAll(next)
+        }
     }
 
     private fun document(appVersion: String, snapshot: BackupSnapshot): BackupDocument = BackupDocument(

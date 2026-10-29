@@ -383,6 +383,7 @@ private fun SettingsContent(
             title = "Export backup (JSON)",
             summary = "Wallets, transactions, budgets, goals, debts and settings",
             onClick = onExportBackup,
+            wrapTitle = true,
         )
         NavRow(
             icon = Icons.Outlined.FileUpload,
@@ -601,18 +602,12 @@ internal fun CloudSyncSection(
     }
 }
 
-private fun syncStatusLine(state: CloudSyncUiState): String {
-    val error = state.status.lastError
-    if (error != null) return "Last sync failed: $error"
-    val last = state.status.lastSyncedAtMillis ?: return "Not synced yet"
-    val minutesAgo = (System.currentTimeMillis() - last) / 60_000
-    return when {
-        minutesAgo < 1 -> "Synced just now"
-        minutesAgo < 60 -> "Synced $minutesAgo min ago"
-        minutesAgo < 24 * 60 -> "Synced ${minutesAgo / 60} h ago"
-        else -> "Synced ${minutesAgo / (24 * 60)} d ago"
-    }
-}
+private fun syncStatusLine(state: CloudSyncUiState): String = syncStatusText(
+    lastSyncedAtMillis = state.status.lastSyncedAtMillis,
+    nowMillis = System.currentTimeMillis(),
+    pendingChanges = state.pendingChanges,
+    lastError = state.status.lastError,
+)
 
 /** A statement of how Lucento behaves — informational, not a toggle. */
 @Composable

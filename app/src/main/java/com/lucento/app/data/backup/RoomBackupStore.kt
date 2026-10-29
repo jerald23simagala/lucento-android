@@ -83,6 +83,27 @@ class RoomBackupStore(
         preferences.applyBackupSettings(snapshot.settings, defaultWallet)
     }
 
+    override suspend fun mergeAll(snapshot: BackupSnapshot) {
+        val droppedPhotos = runner.run {
+            ensureIds()
+            val previousPhotos = database.goalDao().getAll().mapNotNull { it.photoPath }.toSet()
+            val categoryIds = upsertCategories(snapshot.categories)
+            val walletIds = upsertWallets(snapshot.wallets)
+            upsertDebts(snapshot.debtTerms, walletIds)
+            upsertBudgets(snapshot.budgets, categoryIds)
+            val goalIds = upsertGoals(snapshot.goals, walletIds)
+            upsertContributions(snapshot.goalContributions, goalIds)
+            upsertTransactions(snapshot.transactions, walletIds, categoryIds)
+            upsertRecurring(snapshot.recurring, walletIds, categoryIds)
+            deleteMissing(snapshot)
+            insertMissingTombstones(snapshot.deletions)
+            previousPhotos - database.goalDao().getAll().mapNotNull { it.photoPath }.toSet()
+        }
+        droppedPhotos.forEach { goalPhotos.delete(it) }
+        val defaultWallet = snapshot.settings.defaultWalletId?.let { database.walletDao().findByClientUuid(it)?.id }
+        preferences.applyBackupSettings(snapshot.settings, defaultWallet)
+    }
+
     private suspend fun ensureIds() {
         database.walletDao().getWithoutClientUuid().forEach {
             database.walletDao().assignClientUuid(it.id, UUID.randomUUID().toString())
@@ -295,6 +316,196 @@ class RoomBackupStore(
             )
         }
     }
+
+    private suspend fun upsertCategories(rows: List<BackupCategory>): Map<String, Long> {
+        val ids = HashMap<String, Long>(rows.size)
+        for (row in rows) {
+            val existing = database.categoryDao().findByClientUuid(row.id)
+            ids[row.id] = when {
+                existing == null -> database.categoryDao().insert(newCategory(row))
+                existing.toBackup() == row -> existing.id
+                else -> {
+                    database.categoryDao().update(existing.edited(row))
+                    existing.id
+                }
+            }
+        }
+        return ids
+    }
+
+    private suspend fun upsertWallets(rows: List<BackupWallet>): Map<String, Long> {
+        val ids = HashMap<String, Long>(rows.size)
+        for (row in rows) {
+            val existing = database.walletDao().findByClientUuid(row.id)
+            ids[row.id] = when {
+                existing == null -> database.walletDao().insert(newWallet(row))
+                existing.toBackup() == row -> existing.id
+                else -> {
+                    database.walletDao().update(existing.edited(row))
+                    existing.id
+                }
+            }
+        }
+        return ids
+    }
+
+    private suspend fun upsertDebts(rows: List<BackupDebtTerms>, walletIds: Map<String, Long>) {
+        for (row in rows) {
+            val walletLocal = walletIds.getValue(row.walletId)
+            val existing = database.debtTermsDao().get(walletLocal)
+            if (existing != null && existing.toBackup(mapOf(walletLocal to row.walletId)) == row) continue
+            database.debtTermsDao().upsert(
+                DebtTermsEntity(
+                    walletId = walletLocal,
+                    interestRateBps = row.interestRateBps,
+                    repayment = row.repayment.name,
+                    termMonths = row.termMonths,
+                    installmentMinor = row.installmentMinor,
+                    updatedAt = row.updatedAt,
+                ),
+            )
+            val wallet = database.walletDao().getById(walletLocal) ?: continue
+            if (wallet.updatedAt == row.updatedAt && wallet.dirty && wallet.baseRevision == null) continue
+            database.walletDao().update(
+                wallet.copy(
+                    updatedAt = maxOf(wallet.updatedAt, row.updatedAt),
+                    dirty = true,
+                    syncedAt = null,
+                    baseRevision = null,
+                ),
+            )
+        }
+    }
+
+    private suspend fun upsertBudgets(rows: List<BackupBudget>, categoryIds: Map<String, Long>) {
+        val categoryUuid = categoryIds.entries.associate { (uuid, id) -> id to uuid }
+        for (row in rows) {
+            val existing = database.budgetDao().findByClientUuid(row.id)
+            when {
+                existing == null -> database.budgetDao().insert(newBudget(row, categoryIds))
+                existing.toBackup(categoryUuid) == row -> Unit
+                else -> database.budgetDao().update(existing.edited(row, categoryIds))
+            }
+        }
+    }
+
+    private suspend fun upsertGoals(rows: List<BackupGoal>, walletIds: Map<String, Long>): Map<String, Long> {
+        val walletUuid = walletIds.entries.associate { (uuid, id) -> id to uuid }
+        val ids = HashMap<String, Long>(rows.size)
+        for (row in rows) {
+            val existing = database.goalDao().findGoalByClientUuid(row.id)
+            ids[row.id] = when {
+                existing == null -> database.goalDao().insert(newGoal(row, walletIds))
+                existing.toBackup(walletUuid) == row -> existing.id
+                else -> {
+                    database.goalDao().update(existing.edited(row, walletIds))
+                    existing.id
+                }
+            }
+        }
+        return ids
+    }
+
+    private suspend fun upsertContributions(rows: List<BackupGoalContribution>, goalIds: Map<String, Long>) {
+        val goalUuid = goalIds.entries.associate { (uuid, id) -> id to uuid }
+        for (row in rows) {
+            val existing = database.goalDao().findContributionByClientUuid(row.id)
+            when {
+                existing == null -> database.goalDao().insertContribution(newContribution(row, goalIds))
+                existing.toBackup(goalUuid) == row -> Unit
+                else -> {
+                    database.goalDao().deleteContribution(existing.id)
+                    database.goalDao().insertContribution(newContribution(row, goalIds))
+                }
+            }
+        }
+    }
+
+    private suspend fun upsertTransactions(
+        rows: List<BackupTransaction>,
+        walletIds: Map<String, Long>,
+        categoryIds: Map<String, Long>,
+    ) {
+        val walletUuid = walletIds.entries.associate { (uuid, id) -> id to uuid }
+        val categoryUuid = categoryIds.entries.associate { (uuid, id) -> id to uuid }
+        for (row in rows) {
+            val existing = database.transactionDao().findByClientUuid(row.id)
+            when {
+                existing == null -> database.transactionDao().insert(newTransaction(row, walletIds, categoryIds))
+                existing.toBackup(walletUuid, categoryUuid) == row -> Unit
+                else -> database.transactionDao().update(existing.edited(row, walletIds, categoryIds))
+            }
+        }
+    }
+
+    private suspend fun upsertRecurring(
+        rows: List<BackupRecurring>,
+        walletIds: Map<String, Long>,
+        categoryIds: Map<String, Long>,
+    ) {
+        val walletUuid = walletIds.entries.associate { (uuid, id) -> id to uuid }
+        val categoryUuid = categoryIds.entries.associate { (uuid, id) -> id to uuid }
+        for (row in rows) {
+            val existing = database.recurringDao().findByClientUuid(row.id)
+            when {
+                existing == null -> database.recurringDao().insert(newRecurring(row, walletIds, categoryIds))
+                existing.toBackup(walletUuid, categoryUuid) == row -> Unit
+                else -> database.recurringDao().update(existing.edited(row, walletIds, categoryIds))
+            }
+        }
+    }
+
+    private suspend fun deleteMissing(snapshot: BackupSnapshot) {
+        val transactions = snapshot.transactions.map { it.id }.toSet()
+        database.transactionDao().getAll().filter { it.clientUuid !in transactions }.forEach {
+            database.transactionDao().deleteById(it.id)
+        }
+        val recurring = snapshot.recurring.map { it.id }.toSet()
+        database.recurringDao().getAll().filter { it.clientUuid !in recurring }.forEach {
+            database.recurringDao().deleteById(it.id)
+        }
+        val contributions = snapshot.goalContributions.map { it.id }.toSet()
+        database.goalDao().getAllContributions().filter { it.clientUuid !in contributions }.forEach {
+            database.goalDao().deleteContribution(it.id)
+        }
+        val budgets = snapshot.budgets.map { it.id }.toSet()
+        database.budgetDao().getAll().filter { it.clientUuid !in budgets }.forEach {
+            database.budgetDao().deleteById(it.id)
+        }
+        val debtWallets = snapshot.debtTerms.map { it.walletId }.toSet()
+        database.debtTermsDao().getAll().forEach { terms ->
+            val uuid = database.walletDao().getById(terms.walletId)?.clientUuid
+            if (uuid == null || uuid !in debtWallets) database.debtTermsDao().delete(terms.walletId)
+        }
+        val goals = snapshot.goals.map { it.id }.toSet()
+        database.goalDao().getAll().filter { it.clientUuid !in goals }.forEach {
+            database.goalDao().deleteById(it.id)
+        }
+        val wallets = snapshot.wallets.map { it.id }.toSet()
+        database.walletDao().getAll().filter { it.clientUuid !in wallets }.forEach {
+            database.walletDao().deleteById(it.id)
+        }
+        val categories = snapshot.categories.map { it.id }.toSet()
+        database.categoryDao().getAll().filter { it.clientUuid !in categories }.forEach {
+            database.categoryDao().deleteById(it.id)
+        }
+    }
+
+    private suspend fun insertMissingTombstones(deletions: List<BackupDeletion>) {
+        val have = database.syncDao().unpushedTombstones().map { it.tableName to it.clientUuid }.toSet()
+        for (deletion in deletions) {
+            if ((deletion.table to deletion.id) in have) continue
+            database.syncDao().insert(
+                SyncTombstoneEntity(
+                    tableName = deletion.table,
+                    clientUuid = deletion.id,
+                    deletedAt = deletion.deletedAt,
+                    pushed = false,
+                    baseRevision = null,
+                ),
+            )
+        }
+    }
 }
 
 private fun WalletEntity.toBackup() = BackupWallet(
@@ -402,4 +613,222 @@ private fun SyncTombstoneEntity.toBackup() = BackupDeletion(
     table = tableName,
     id = clientUuid,
     deletedAt = deletedAt,
+)
+
+private fun newCategory(row: BackupCategory) = CategoryEntity(
+    name = row.name,
+    kind = row.kind.name,
+    iconKey = row.iconKey,
+    sortOrder = row.sortOrder,
+    archived = row.archived,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    clientUuid = row.id,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun CategoryEntity.edited(row: BackupCategory) = copy(
+    name = row.name,
+    kind = row.kind.name,
+    iconKey = row.iconKey,
+    sortOrder = row.sortOrder,
+    archived = row.archived,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun newWallet(row: BackupWallet) = WalletEntity(
+    name = row.name,
+    type = row.type.name,
+    currencyCode = row.currency,
+    openingBalanceMinor = row.openingBalanceMinor,
+    sortOrder = row.sortOrder,
+    archived = row.archived,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    clientUuid = row.id,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun WalletEntity.edited(row: BackupWallet) = copy(
+    name = row.name,
+    type = row.type.name,
+    currencyCode = row.currency,
+    openingBalanceMinor = row.openingBalanceMinor,
+    sortOrder = row.sortOrder,
+    archived = row.archived,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun newBudget(row: BackupBudget, categoryIds: Map<String, Long>) = BudgetEntity(
+    categoryId = row.categoryId?.let { categoryIds.getValue(it) },
+    currencyCode = row.currency,
+    limitMinor = row.limitMinor,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    clientUuid = row.id,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun BudgetEntity.edited(row: BackupBudget, categoryIds: Map<String, Long>) = copy(
+    categoryId = row.categoryId?.let { categoryIds.getValue(it) },
+    currencyCode = row.currency,
+    limitMinor = row.limitMinor,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun newGoal(row: BackupGoal, walletIds: Map<String, Long>) = GoalEntity(
+    name = row.name,
+    targetMinor = row.targetMinor,
+    currencyCode = row.currency,
+    targetDate = row.targetDate?.toEpochDay(),
+    walletId = row.walletId?.let { walletIds.getValue(it) },
+    archived = row.archived,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    sceneKey = row.sceneKey,
+    photoPath = row.photoPath,
+    clientUuid = row.id,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun GoalEntity.edited(row: BackupGoal, walletIds: Map<String, Long>) = copy(
+    name = row.name,
+    targetMinor = row.targetMinor,
+    currencyCode = row.currency,
+    targetDate = row.targetDate?.toEpochDay(),
+    walletId = row.walletId?.let { walletIds.getValue(it) },
+    archived = row.archived,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    sceneKey = row.sceneKey,
+    photoPath = row.photoPath,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun newContribution(row: BackupGoalContribution, goalIds: Map<String, Long>) = GoalContributionEntity(
+    goalId = goalIds.getValue(row.goalId),
+    amountMinor = row.amountMinor,
+    occurredOn = row.occurredOn.toEpochDay(),
+    note = row.note,
+    clientUuid = row.id,
+    createdAt = row.createdAt,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun newTransaction(
+    row: BackupTransaction,
+    walletIds: Map<String, Long>,
+    categoryIds: Map<String, Long>,
+) = TransactionEntity(
+    type = row.type.name,
+    amountMinor = row.amountMinor,
+    currencyCode = row.currency,
+    walletId = walletIds.getValue(row.walletId),
+    categoryId = row.categoryId?.let { categoryIds.getValue(it) },
+    occurredOn = row.occurredOn.toEpochDay(),
+    note = row.note,
+    clientUuid = row.id,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    transferGroup = row.transferGroup,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun TransactionEntity.edited(
+    row: BackupTransaction,
+    walletIds: Map<String, Long>,
+    categoryIds: Map<String, Long>,
+) = copy(
+    type = row.type.name,
+    amountMinor = row.amountMinor,
+    currencyCode = row.currency,
+    walletId = walletIds.getValue(row.walletId),
+    categoryId = row.categoryId?.let { categoryIds.getValue(it) },
+    occurredOn = row.occurredOn.toEpochDay(),
+    note = row.note,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    transferGroup = row.transferGroup,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun newRecurring(
+    row: BackupRecurring,
+    walletIds: Map<String, Long>,
+    categoryIds: Map<String, Long>,
+) = RecurringEntity(
+    name = row.name,
+    type = row.type.name,
+    amountMinor = row.amountMinor,
+    currencyCode = row.currency,
+    walletId = walletIds.getValue(row.walletId),
+    categoryId = row.categoryId?.let { categoryIds.getValue(it) },
+    frequency = row.frequency.name,
+    intervalCount = row.intervalCount,
+    startOn = row.startOn.toEpochDay(),
+    endOn = row.endOn?.toEpochDay(),
+    nextIndex = row.nextIndex,
+    paused = row.paused,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    toWalletId = row.toWalletId?.let { walletIds.getValue(it) },
+    interestMinor = row.interestMinor,
+    clientUuid = row.id,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
+)
+
+private fun RecurringEntity.edited(
+    row: BackupRecurring,
+    walletIds: Map<String, Long>,
+    categoryIds: Map<String, Long>,
+) = copy(
+    name = row.name,
+    type = row.type.name,
+    amountMinor = row.amountMinor,
+    currencyCode = row.currency,
+    walletId = walletIds.getValue(row.walletId),
+    categoryId = row.categoryId?.let { categoryIds.getValue(it) },
+    frequency = row.frequency.name,
+    intervalCount = row.intervalCount,
+    startOn = row.startOn.toEpochDay(),
+    endOn = row.endOn?.toEpochDay(),
+    nextIndex = row.nextIndex,
+    paused = row.paused,
+    createdAt = row.createdAt,
+    updatedAt = row.updatedAt,
+    toWalletId = row.toWalletId?.let { walletIds.getValue(it) },
+    interestMinor = row.interestMinor,
+    dirty = true,
+    syncedAt = null,
+    baseRevision = null,
 )

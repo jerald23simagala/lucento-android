@@ -94,6 +94,26 @@ class BackupTest {
         assertEquals("DARK", store.snapshot.settings.themeMode)
     }
 
+    @Test fun mergeOfAnIdenticalBackupDoesNotMarkRowsForSync() = runTest {
+        val original = sample()
+        val store = MemoryBackupStore(original)
+        val keptAt = original.transactions.first { it.id == "tx-1" }.updatedAt
+        engine(store).restore(encode(original), RestoreMode.MERGE)
+        assertEquals(original, store.snapshot)
+        assertEquals(keptAt, store.snapshot.transactions.first { it.id == "tx-1" }.updatedAt)
+        assertTrue(store.pendingIds.isEmpty())
+
+        val edited = original.copy(
+            transactions = original.transactions.map {
+                if (it.id == "tx-1") it.copy(note = "changed", updatedAt = it.updatedAt + 1) else it
+            },
+        )
+        engine(store).restore(encode(edited), RestoreMode.MERGE)
+        assertEquals(setOf("tx-1"), store.pendingIds)
+        assertEquals("changed", store.snapshot.transactions.first { it.id == "tx-1" }.note)
+        assertEquals(original.wallets, store.snapshot.wallets)
+    }
+
     @Test fun mergeCombinesSeededFoodFromAnotherInstall() = runTest {
         val at = 5_000L
         val localFood = category("local-food", "Food", CategoryKind.EXPENSE, at)
@@ -293,7 +313,7 @@ class BackupTest {
     private fun encode(snapshot: BackupSnapshot): String =
         BackupCodec.encode(BackupDocument(1, "0.5.0", exportedAt, snapshot))
 
-    private class MemoryBackupStore(initial: BackupSnapshot) : BackupStore {
+    private inner class MemoryBackupStore(initial: BackupSnapshot) : BackupStore {
         var snapshot: BackupSnapshot = initial
         var writes: Int = 0
         var failOnWrite: Boolean = false
@@ -317,6 +337,42 @@ class BackupTest {
                 throw error
             }
         }
+
+        override suspend fun mergeAll(snapshot: BackupSnapshot) {
+            val checkpoint = this.snapshot
+            val checkpointPending = pendingIds
+            try {
+                if (failOnWrite) error("disk full")
+                val changed = differingIds(checkpoint, snapshot)
+                val newDeletions = snapshot.deletions.map { it.id }.toSet() - checkpoint.deletions.map { it.id }.toSet()
+                this.snapshot = snapshot
+                writes += 1
+                pendingIds = checkpointPending.intersect(liveIds(snapshot)) + changed + newDeletions
+            } catch (error: Throwable) {
+                this.snapshot = checkpoint
+                pendingIds = checkpointPending
+                throw error
+            }
+        }
+    }
+
+    private fun differingIds(before: BackupSnapshot, after: BackupSnapshot): Set<String> = buildSet {
+        addAll(diff(before.wallets, after.wallets) { it.id })
+        addAll(diff(before.categories, after.categories) { it.id })
+        addAll(diff(before.transactions, after.transactions) { it.id })
+        addAll(diff(before.budgets, after.budgets) { it.id })
+        addAll(diff(before.goals, after.goals) { it.id })
+        addAll(diff(before.goalContributions, after.goalContributions) { it.id })
+        addAll(diff(before.recurring, after.recurring) { it.id })
+        addAll(diff(before.debtTerms, after.debtTerms) { it.walletId })
+    }
+
+    private fun <T> diff(before: List<T>, after: List<T>, id: (T) -> String): Set<String> {
+        val previous = before.associateBy(id)
+        return after.mapNotNull { row ->
+            val old = previous[id(row)]
+            if (old == null || old != row) id(row) else null
+        }.toSet()
     }
 
     private fun sample(): BackupSnapshot {
