@@ -56,7 +56,14 @@ class OnboardingViewModel(
 
     fun setUsageOptIn(enabled: Boolean) {
         val counts = usage ?: return
-        viewModelScope.launch { counts.setOptIn(enabled) }
+        val wasOptedIn = usageOptIn.value
+        val onStep = step.value
+        viewModelScope.launch {
+            counts.setOptIn(enabled)
+            // The opt-in switch sits on Welcome, so Welcome's own view was counted while counts were still off and
+            // dropped. Record it once now (QA R6-12).
+            if (welcomeViewAfterOptIn(enabled, wasOptedIn, onStep)) counts.stepViewed(onboardingStepNumber(STEP_WELCOME))
+        }
     }
 
     /** Anonymous usage counts: one `onboarding_step_viewed` per screen, numbered from 1 (welcome). */
@@ -416,3 +423,7 @@ class OnboardingViewModel(
 
 /** The 1-based screen number sent with `onboarding_step_viewed`: welcome is 1, the confirmation is 8. */
 internal fun onboardingStepNumber(step: Int): Int = step.coerceIn(0, OnboardingViewModel.LAST_STEP) + 1
+
+/** Opting in on Welcome sends Welcome's `onboarding_step_viewed` (step 1), which was dropped while counts were off. */
+internal fun welcomeViewAfterOptIn(enabled: Boolean, wasOptedIn: Boolean, currentStep: Int): Boolean =
+    enabled && !wasOptedIn && currentStep == OnboardingViewModel.STEP_WELCOME
