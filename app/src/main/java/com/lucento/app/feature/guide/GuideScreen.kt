@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +87,8 @@ fun GuideScreen(
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Same as onboarding: one count each time a page comes on screen, keyed on the page.
+    if (!state.loading) LaunchedEffect(state.step) { viewModel.onStepShown(state.step) }
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
     var addingGoal by remember { mutableStateOf(false) }
     val haptics = rememberHaptics()
