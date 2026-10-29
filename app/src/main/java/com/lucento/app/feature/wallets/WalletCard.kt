@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -163,18 +164,18 @@ fun WalletCardPreview(type: WalletType, name: String, currencyCode: String, amou
                         name.ifBlank { "Your ${type.label.lowercase()}" },
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = if (name.isBlank()) muted else ink,
-                        maxLines = 1,
+                        maxLines = WalletPreviewLines.NAME,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         "$currencyCode · ${MoneyFormatter.currencyName(currencyCode)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = muted,
-                        maxLines = 1,
+                        maxLines = WalletPreviewLines.CURRENCY,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.size(Spacing.sm))
-                    Text(amountLabel, style = MaterialTheme.typography.labelMedium, color = muted, maxLines = 1)
+                    Text(amountLabel, style = MaterialTheme.typography.labelMedium, color = muted, maxLines = WalletPreviewLines.LABEL, overflow = TextOverflow.Ellipsis)
                     MoneyText(
                         money = amount ?: com.lucento.app.core.money.Money(0, currencyCode),
                         style = AmountStyles.large,
@@ -182,7 +183,7 @@ fun WalletCardPreview(type: WalletType, name: String, currencyCode: String, amou
                     )
                 }
                 Spacer(Modifier.width(Spacing.sm))
-                TypeMark(type, ink)
+                TypeMark(type, ink, Modifier.widthIn(max = WalletPreviewLines.TYPE_MARK_MAX))
             }
         }
     }
@@ -190,8 +191,8 @@ fun WalletCardPreview(type: WalletType, name: String, currencyCode: String, amou
 
 /** The card network's place: the wallet type's glyph above its name in small capitals. */
 @Composable
-private fun TypeMark(type: WalletType, ink: Color) {
-    Column(horizontalAlignment = Alignment.End) {
+private fun TypeMark(type: WalletType, ink: Color, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.End) {
         Box(
             Modifier.size(36.dp).background(ink.copy(alpha = 0.14f), RoundedCornerShape(50)),
             contentAlignment = Alignment.Center,
@@ -203,7 +204,7 @@ private fun TypeMark(type: WalletType, ink: Color) {
             type.label.uppercase(),
             style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Bold),
             color = ink,
-            maxLines = 1,
+            maxLines = 2,
         )
     }
 }
@@ -221,4 +222,16 @@ private fun CardField(label: String, value: String, muted: Color, ink: Color, mo
         Text(label.uppercase(), style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp), color = muted, maxLines = 1)
         Text(value, style = AmountStyles.row, color = ink, maxLines = 1)
     }
+}
+
+/**
+ * The new-wallet preview wraps instead of cutting words off: at 2.0× on a 360dp phone the name, currency and
+ * "Current balance" were clipped to "You…" and "Curren" (QA R6-10). The type mark is capped so the text keeps
+ * most of the card's width.
+ */
+internal object WalletPreviewLines {
+    const val NAME = 3
+    const val CURRENCY = 3
+    const val LABEL = 2
+    val TYPE_MARK_MAX = 72.dp
 }

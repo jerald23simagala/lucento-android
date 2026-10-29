@@ -61,7 +61,14 @@ class GuideViewModel(
     private val budgets: BudgetRepository,
     goals: GoalRepository,
     transactions: TransactionRepository,
+    private val usage: com.lucento.app.domain.UsageCountsService? = null,
 ) : ViewModel() {
+
+    /** Anonymous usage counts: the guided setup continues onboarding's numbering, pages 9 to 14. */
+    fun onStepShown(step: GuideStep) {
+        val counts = usage ?: return
+        viewModelScope.launch { counts.stepViewed(guideStepNumber(step)) }
+    }
 
     private val data = combine(
         wallets.observeWallets(),
@@ -142,7 +149,16 @@ class GuideViewModel(
 
     companion object {
         val Factory = containerFactory {
-            GuideViewModel(it.preferences, it.wallets, it.categories, it.budgets, it.goals, it.transactions)
+            GuideViewModel(it.preferences, it.wallets, it.categories, it.budgets, it.goals, it.transactions, it.usageCounts)
         }
     }
 }
+
+/**
+ * The `onboarding_step_viewed` number for a guided-setup page: accounts 9, cards and loans 10, budget 11, goal 12,
+ * first transactions 13, welcome 14. Fixed per page, so a skipped page leaves a gap instead of shifting the rest.
+ */
+internal fun guideStepNumber(step: GuideStep): Int = GUIDE_FIRST_STEP_NUMBER + step.ordinal
+
+/** Onboarding sends 1 to 8; the guided setup follows on from there. */
+internal const val GUIDE_FIRST_STEP_NUMBER = 9

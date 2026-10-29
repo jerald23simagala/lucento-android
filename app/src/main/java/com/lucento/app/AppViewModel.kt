@@ -37,11 +37,6 @@ class AppViewModel(private val preferences: UserPreferencesRepository) : ViewMod
         viewModelScope.launch { preferences.setThemeMode(mode) }
     }
 
-    /** The first-run composer has been saved or skipped, so it is not opened again. */
-    fun finishFirstEntry() {
-        viewModelScope.launch { preferences.setPendingFirstEntry(false) }
-    }
-
     companion object {
         val Factory = containerFactory { AppViewModel(it.preferences) }
     }

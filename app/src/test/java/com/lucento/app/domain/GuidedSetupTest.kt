@@ -10,12 +10,9 @@ class GuidedSetupTest {
     private val minimal = FeatureSet(FeatureSet.ALL.enabled - setOf(Feature.DEBTS_LOANS, Feature.SAVINGS_GOALS, Feature.BUDGETS))
 
     @Test
-    fun `the story runs wallets, goal, transactions, welcome`() {
-        assertEquals(
-            listOf(GuideStep.WALLETS, GuideStep.GOAL, GuideStep.TRANSACTIONS, GuideStep.WELCOME),
-            GuidedSetup.steps(everything),
-        )
-        assertEquals(GuideStep.GOAL, GuidedSetup.next(GuideStep.WALLETS, everything))
+    fun `the story runs wallets, debts, budgets, goal, transactions, welcome`() {
+        assertEquals(GuideStep.entries.toList(), GuidedSetup.steps(everything))
+        assertEquals(GuideStep.DEBTS, GuidedSetup.next(GuideStep.WALLETS, everything))
         assertEquals(null, GuidedSetup.next(GuideStep.WELCOME, everything))
     }
 
@@ -27,10 +24,12 @@ class GuidedSetupTest {
     }
 
     @Test
-    fun `wallets need one account and the old budget step never blocks`() {
+    fun `wallets need one account and budgets two amounts, or every category when there are fewer`() {
         assertFalse(GuidedSetup.canContinue(GuideStep.WALLETS, assetWallets = 0, budgetedCategories = 0, expenseCategories = 5))
         assertTrue(GuidedSetup.canContinue(GuideStep.WALLETS, assetWallets = 1, budgetedCategories = 0, expenseCategories = 5))
-        assertTrue(GuidedSetup.canContinue(GuideStep.BUDGETS, assetWallets = 1, budgetedCategories = 0, expenseCategories = 5))
+        assertFalse(GuidedSetup.canContinue(GuideStep.BUDGETS, assetWallets = 1, budgetedCategories = 1, expenseCategories = 5))
+        assertTrue(GuidedSetup.canContinue(GuideStep.BUDGETS, assetWallets = 1, budgetedCategories = 2, expenseCategories = 5))
+        assertTrue(GuidedSetup.canContinue(GuideStep.BUDGETS, assetWallets = 1, budgetedCategories = 1, expenseCategories = 1))
         assertTrue(GuidedSetup.canContinue(GuideStep.GOAL, assetWallets = 0, budgetedCategories = 0, expenseCategories = 0))
     }
 

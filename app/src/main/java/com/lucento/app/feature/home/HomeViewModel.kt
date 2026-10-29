@@ -16,7 +16,6 @@ import com.lucento.app.data.sync.SyncStatus
 import com.lucento.app.domain.Budget
 import com.lucento.app.domain.BudgetSuggestions
 import com.lucento.app.domain.Category
-import com.lucento.app.domain.FirstWeek
 import com.lucento.app.domain.UsageCountsService
 import com.lucento.app.domain.Goal
 import com.lucento.app.domain.GoalContribution
@@ -123,12 +122,6 @@ class HomeViewModel(
             val budgeted = core.budgets.filter { it.limit.amountMinor > 0L }.mapNotNull { it.categoryId }.toSet()
             built.copy(
                 showLocalDataNotice = showLocalDataNotice(prefs.onboardingComplete, prefs.localDataNoticeSeen),
-                dayOneHome = prefs.dayOneHome,
-                firstWeekDismissed = prefs.firstWeekDismissed,
-                celebrateFirstEntry = FirstWeek.celebrate(prefs.dayOneHome, prefs.firstEntryCelebrated, built.realEntryCount),
-                firstWeekDoneShown = prefs.firstWeekDoneShown,
-                examplePreviewOpened = prefs.examplePreviewOpened,
-                insightsChecked = prefs.insightsChecked,
                 budgetSuggestion = BudgetSuggestions.suggest(
                     expenses = spent,
                     today = today,
@@ -144,26 +137,6 @@ class HomeViewModel(
 
     fun dismissLocalDataNotice() {
         viewModelScope.launch { preferences.setLocalDataNoticeSeen() }
-    }
-
-    fun dismissFirstWeek() {
-        viewModelScope.launch { preferences.setFirstWeekDismissed() }
-    }
-
-    fun markFirstEntryCelebrated() {
-        viewModelScope.launch { preferences.setFirstEntryCelebrated() }
-    }
-
-    fun markFirstWeekDoneShown() {
-        viewModelScope.launch { preferences.setFirstWeekDoneShown() }
-    }
-
-    fun markExamplePreviewOpened() {
-        viewModelScope.launch { preferences.setExamplePreviewOpened() }
-    }
-
-    fun markInsightsChecked() {
-        viewModelScope.launch { preferences.setInsightsChecked() }
     }
 
     fun snoozeBudgetSuggestion() {
@@ -200,7 +173,7 @@ class HomeViewModel(
             log.onHome(
                 realEntries = state.realEntryCount,
                 suggestionDays = state.budgetSuggestion?.days,
-                doneSteps = state.firstWeekSteps.filter { it.done }.map { it.id }.toSet(),
+                doneSteps = emptySet(),
                 budgetedCategories = state.budgetSuggestion?.lines?.size ?: 0,
                 acceptSuggestion = false,
                 markAdjust = true,
@@ -217,7 +190,7 @@ class HomeViewModel(
                     log.onHome(
                         realEntries = state.realEntryCount,
                         suggestionDays = state.budgetSuggestion?.days,
-                        doneSteps = state.firstWeekSteps.filter { it.done }.map { it.id }.toSet(),
+                        doneSteps = emptySet(),
                         budgetedCategories = state.budgetSuggestion?.lines?.size ?: 0,
                         acceptSuggestion = false,
                         markAdjust = false,
