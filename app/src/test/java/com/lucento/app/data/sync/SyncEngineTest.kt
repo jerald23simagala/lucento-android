@@ -217,6 +217,57 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `R9-03 an account with no income categories keeps this phone's income defaults and uploads them`() = runTest {
+        existingAccount() // expense categories only
+        val fresh = Device()
+        fresh.addCategory("Streaming services") // expense: the account has expense categories, so it is dropped
+        fresh.addCategory("Salary", kind = "INCOME")
+        fresh.addCategory("Freelance", kind = "INCOME")
+        success(fresh.sync())
+
+        val live = server.live("categories", user).map { it.str("name") }.toSet()
+        assertTrue("Salary" in live)
+        assertTrue("Freelance" in live)
+        assertTrue("Streaming services" !in live)
+        assertEquals(setOf("Rent", "Water", "Salary", "Freelance"), fresh.categories.getAll().map { it.name }.toSet())
+    }
+
+    @Test
+    fun `R9-03 an account that has income categories still drops unused local income ones`() = runTest {
+        val old = Device()
+        old.addCategory("Rent")
+        old.addCategory("Salary", kind = "INCOME")
+        old.addWallet()
+        success(old.sync())
+        val fresh = Device()
+        fresh.addCategory("Freelance", kind = "INCOME")
+        fresh.addCategory("Gifts", kind = "EXPENSE")
+        success(fresh.sync())
+
+        assertEquals(setOf("Rent", "Salary"), fresh.categories.getAll().map { it.name }.toSet())
+        assertEquals(setOf("Rent", "Salary"), server.live("categories", user).map { it.str("name") }.toSet())
+    }
+
+    @Test
+    fun `R9-03 an account with no categories of any type keeps every local default`() = runTest {
+        val old = Device()
+        old.addWallet() // data, but no categories at all
+        success(old.sync())
+        val fresh = Device()
+        fresh.addCategory("Groceries")
+        fresh.addCategory("Salary", kind = "INCOME")
+        success(fresh.sync())
+
+        assertEquals(setOf("Groceries", "Salary"), server.live("categories", user).map { it.str("name") }.toSet())
+    }
+
+    @Test
+    fun `R9-03 drop rule keeps a type the account lacks`() {
+        assertFalse(FirstSignInCategories.drop(hasServerRow = false, transactions = 0, budgets = 0, schedules = 0, accountHasKind = false))
+        assertTrue(FirstSignInCategories.drop(hasServerRow = false, transactions = 0, budgets = 0, schedules = 0, accountHasKind = true))
+    }
+
+    @Test
     fun `R6-14 drop rule`() {
         assertTrue(FirstSignInCategories.drop(hasServerRow = false, transactions = 0, budgets = 0, schedules = 0))
         assertFalse(FirstSignInCategories.drop(hasServerRow = true, transactions = 0, budgets = 0, schedules = 0))

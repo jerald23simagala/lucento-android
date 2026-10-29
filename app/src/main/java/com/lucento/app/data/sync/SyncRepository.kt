@@ -174,12 +174,17 @@ class SyncRepository(
      * the same name, that is the merge: the account's copy stays. Anything referenced is kept, and a referenced copy
      * with a matching name is folded later by [mergeDuplicateCategories], which moves its references.
      * The server never had these rows, so their tombstones are marked sent rather than pushed.
+     * A type the account has no categories of at all (say, no income categories) is left alone: this phone's
+     * categories of that type are kept and uploaded, so the account is not left without any (QA R9-03).
      */
     private suspend fun dropUnusedLocalCategories(): Int {
         val all = categories.getAll()
+        // R9-03: a type (expense, income, ...) the account has no categories of keeps this phone's ones; they upload.
+        val kindsOnServer = all.filter { it.syncedAt != null || it.baseRevision != null }.map { it.kind }.toSet()
         val doomed = all.filter { c ->
             FirstSignInCategories.drop(
                 hasServerRow = c.syncedAt != null || c.baseRevision != null,
+                accountHasKind = c.kind in kindsOnServer,
                 transactions = categories.transactionCount(c.id),
                 budgets = categories.budgetCount(c.id),
                 schedules = categories.recurringCount(c.id),
@@ -869,8 +874,9 @@ private fun GoalRow.toEntity(localWalletId: Long?, photoPath: String?, syncedAt:
 
 /** Which local categories a first sign-in into an account with data removes (QA R6-14). */
 internal object FirstSignInCategories {
-    fun drop(hasServerRow: Boolean, transactions: Int, budgets: Int, schedules: Int): Boolean =
-        !hasServerRow && transactions == 0 && budgets == 0 && schedules == 0
+    /** [accountHasKind]: the account already has at least one category of this one's type (QA R9-03). */
+    fun drop(hasServerRow: Boolean, transactions: Int, budgets: Int, schedules: Int, accountHasKind: Boolean = true): Boolean =
+        accountHasKind && !hasServerRow && transactions == 0 && budgets == 0 && schedules == 0
 }
 
 private val FIRST_SIGN_IN_PROBE = listOf("wallets", "categories", "transactions")
