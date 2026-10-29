@@ -17,7 +17,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -312,26 +311,43 @@ private fun HomeHeader(
     bell: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    // Wraps instead of letting the status chip sit against the wordmark (2.0× on a 360dp phone).
-    FlowRow(
+    // One row at every width and font scale (QA R6-09): the avatar never wraps onto its own line. The chip, bell and
+    // avatar keep their size; the brand takes what is left, and the wordmark shrinks to fit or steps aside.
+    // spacedBy keeps a gap between the wordmark and the chip at 2.0× (LQA-039).
+    Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = Sizes.topBar)
             .padding(top = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        verticalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
-            Modifier.semantics(mergeDescendants = true) { heading() },
+            Modifier
+                .weight(1f)
+                .semantics(mergeDescendants = true) { heading() },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LucentoMark(size = 28.dp, animate = false)
+            LucentoMark(size = HeaderLayout.MARK, animate = false)
             Spacer(Modifier.width(Spacing.sm))
-            LucentoWordmark(height = 20.dp)
+            LucentoWordmark(height = 20.dp, modifier = Modifier.weight(1f, fill = false))
         }
-        SyncStatusChip(status, onClick = onOpenSyncSettings)
+        SyncStatusChip(status, onClick = onOpenSyncSettings, modifier = Modifier.widthIn(max = HeaderLayout.CHIP_MAX))
         bell?.invoke()
         ProfileButton()
+    }
+}
+
+/** Fixed sizes in the Home header, so the brand always keeps room for its mark (see [HeaderLayout.brandRoom]). */
+internal object HeaderLayout {
+    val MARK = 28.dp
+    val CHIP_MAX = 128.dp
+    val ACTION = 48.dp
+
+    /** Width left for the brand once the chip (at most [CHIP_MAX]), bell and avatar are placed with [gap] between. */
+    fun brandRoom(rowWidth: androidx.compose.ui.unit.Dp, hasBell: Boolean, gap: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp {
+        val actions = if (hasBell) 2 else 1
+        return rowWidth - CHIP_MAX - ACTION * actions - gap * (actions + 1)
     }
 }
 
@@ -435,7 +451,7 @@ private fun dueLabel(item: UpcomingPayment, today: LocalDate): String {
 
 /** A compact chip: icon plus a one-word state, so the meaning never relies on colour. Opens Settings › Cloud sync. */
 @Composable
-private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
+private fun SyncStatusChip(status: CloudStatus, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val tone: TonePair
     val icon: ImageVector
     when (status) {
@@ -446,7 +462,7 @@ private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
         CloudStatus.ERROR -> { tone = StatusTones.negative; icon = Icons.Outlined.SyncProblem }
     }
     Box(
-        Modifier
+        modifier
             .heightIn(min = Sizes.minTouch)
             .clip(MaterialTheme.shapes.small)
             .clickable(role = Role.Button, onClickLabel = "Open cloud sync settings", onClick = onClick)
