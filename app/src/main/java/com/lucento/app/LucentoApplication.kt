@@ -20,6 +20,7 @@ import com.lucento.app.core.network.observeOnline
 import com.lucento.app.core.crash.CrashReportsFlag
 import com.lucento.app.data.local.LocalLedgerReset
 import com.lucento.app.data.media.GoalPhotos
+import com.lucento.app.core.network.isOnlineNow
 import com.lucento.app.data.sync.AccountBoundary
 import com.lucento.app.data.sync.AuthRepository
 import com.lucento.app.data.sync.SupabaseModule
@@ -67,6 +68,8 @@ class LucentoApplication : Application() {
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             // A different account already signed in, with nothing unsynced, is wiped before the next sync
             // so this phone never uploads the previous ledger. Unsynced changes wait for a confirmation in Settings.
+            // A sign-out wipe killed halfway is finished first (QA O-1).
+            com.lucento.app.data.sync.SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
             when (container.accountBoundary.afterSignIn()) {
                 AccountBoundary.AfterSignIn.Wiped -> {
                     container.syncPreferences.setEnabled(true)
@@ -138,7 +141,11 @@ class AppContainer(application: Application) {
     }
     private val supabaseClient by lazy { SupabaseModule.create(sessionStore) }
     val syncPreferences: SyncPreferences by lazy { SyncPreferences(application) }
-    val auth: AuthRepository by lazy { AuthRepository(supabaseClient, clearStoredSession = { sessionStore?.clearNow() ?: true }) }
+    val auth: AuthRepository by lazy { AuthRepository(
+            supabaseClient,
+            clearStoredSession = { sessionStore?.clearNow() ?: true },
+            isOnline = { application.isOnlineNow() },
+        ) }
 
     /** The composer's reader: Gemini when Smarter reading is on (see docs/CAPTURE.md), else this phone. */
     val interpreter: com.lucento.app.domain.capture.TransactionInterpreter by lazy {
@@ -164,8 +171,13 @@ class AppContainer(application: Application) {
         )
     }
 
-    private val ledgerReset: LocalLedgerReset by lazy {
-        LocalLedgerReset(database, syncPreferences, GoalPhotos(application), preferences)
+    val ledgerReset: LocalLedgerReset by lazy {
+        LocalLedgerReset(
+            database, syncPreferences, GoalPhotos(application), preferences,
+            marker = com.lucento.app.data.local.WipeMarker.Prefs(
+                application.getSharedPreferences("lucento_ledger_wipe", android.content.Context.MODE_PRIVATE),
+            ),
+        )
     }
 
     private val usageScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

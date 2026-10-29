@@ -32,3 +32,10 @@ fun Context.observeOnline(): Flow<Boolean> = callbackFlow {
     manager.registerDefaultNetworkCallback(callback)
     awaitClose { manager.unregisterNetworkCallback(callback) }
 }.distinctUntilChanged()
+
+/** The same check as [observeOnline], once. True when the system cannot say. */
+fun Context.isOnlineNow(): Boolean {
+    val manager = getSystemService(ConnectivityManager::class.java) ?: return true
+    return manager.getNetworkCapabilities(manager.activeNetwork)
+        ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+}

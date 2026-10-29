@@ -1,7 +1,12 @@
 package com.lucento.app.data.sync
 
 import android.content.SharedPreferences
+import com.russhwolf.settings.SharedPreferencesSettings
+import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.auth.SettingsSessionManager
+import io.github.jan.supabase.auth.createDefaultSettingsKey
+import io.github.jan.supabase.auth.user.UserSession
+import io.github.jan.supabase.createSupabaseClient
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -53,11 +58,65 @@ class SessionStoreTest {
         assertFalse(auth.clearStoredSessionNow())
     }
 
-    @Test fun sessionKeyMatchesSupabaseDefault() {
-        assertEquals("sb-https:--abc-supabase-co-session", sessionKey("https://abc.supabase.co/"))
-        assertEquals("sb-https:--abc-supabase-co-session", sessionKey("https://abc.supabase.co"))
+    @OptIn(SupabaseInternal::class)
+    @Test fun sessionKeyIsTheLibrarysOwnKey() {
+        // The library's own derivation: the client keeps the URL without its scheme, then createDefaultSettingsKey.
+        val url = "https://abc.supabase.co"
+        val client = createSupabaseClient(url, "anon-key") {}
+        val libraryKey = createDefaultSettingsKey(client.supabaseUrl) + "-session"
+        assertEquals("sb-abc-supabase-co-session", libraryKey)
+        assertEquals(libraryKey, sessionKey(url))
+        assertEquals(libraryKey, sessionKey("$url/"))
+        assertEquals("sb-https:--abc-supabase-co-session", legacySessionKey(url))
     }
 
+    @Test fun aSessionSavedByTheStockLibraryIsStillReadAfterTheUpgrade() = runTest {
+        val url = "https://abc.supabase.co"
+        val disk = DiskPrefs(mutableMapOf())
+        // Before the upgrade: the stock manager, apply()-based settings, the library's key.
+        SettingsSessionManager(SharedPreferencesSettings(disk), "sb-abc-supabase-co-session").saveSession(session("old-refresh"))
+        disk.flush()
+        // After the upgrade: Lucento's store over the same file.
+        val store = SessionStore(disk, sessionKey(url), listOf(legacySessionKey(url)))
+        assertTrue(store.migrateLegacy())
+        val loaded = SettingsSessionManager(store.settings, store.key).loadSession()
+        assertEquals("old-refresh", loaded?.refreshToken)
+    }
+
+    @Test fun signOutDeletesTheRealKeyAndTheWrongKey() {
+        val url = "https://abc.supabase.co"
+        val disk = DiskPrefs(mutableMapOf(sessionKey(url) to "a", legacySessionKey(url) to "b"))
+        val store = SessionStore(disk, sessionKey(url), listOf(legacySessionKey(url)))
+        assertTrue(store.clearNow())
+        disk.kill()
+        assertFalse(disk.contains(sessionKey(url)))
+        assertFalse(disk.contains(legacySessionKey(url)))
+    }
+
+    @Test fun aSessionUnderTheWrongKeyMovesToTheRealKey() {
+        val url = "https://abc.supabase.co"
+        val disk = DiskPrefs(mutableMapOf(legacySessionKey(url) to "json"))
+        val store = SessionStore(disk, sessionKey(url), listOf(legacySessionKey(url)))
+        assertTrue(store.migrateLegacy())
+        disk.kill()
+        assertEquals("json", disk.getString(sessionKey(url), null))
+        assertFalse(disk.contains(legacySessionKey(url)))
+    }
+
+    @Test fun theWrongKeyNeverOverwritesTheRealSession() {
+        val url = "https://abc.supabase.co"
+        val disk = DiskPrefs(mutableMapOf(sessionKey(url) to "current", legacySessionKey(url) to "stale"))
+        SessionStore(disk, sessionKey(url), listOf(legacySessionKey(url))).migrateLegacy()
+        assertEquals("current", disk.getString(sessionKey(url), null))
+        assertFalse(disk.contains(legacySessionKey(url)))
+    }
+
+    private fun session(refresh: String) = UserSession(
+        accessToken = "access",
+        refreshToken = refresh,
+        expiresIn = 3600,
+        tokenType = "bearer",
+    )
 
     @Test fun signOutClearsTheSessionBeforeSyncStopsAndTheWipe() = runTest {
         val order = mutableListOf<String>()
@@ -76,6 +135,13 @@ class SessionStoreTest {
         private fun view(): Map<String, Any?> = (file - pendingRemovals) + pending
 
         fun kill() { pending.clear(); pendingRemovals.clear() }
+
+        /** The queued apply() writes reach the file, as they do when the process lives long enough. */
+        fun flush() {
+            pendingRemovals.forEach(file::remove)
+            file.putAll(pending)
+            kill()
+        }
 
         override fun getAll(): MutableMap<String, *> = view().toMutableMap()
         override fun getString(key: String?, defValue: String?): String? = view()[key] as? String ?: defValue
