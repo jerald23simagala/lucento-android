@@ -309,3 +309,22 @@ internal val SyncJson = kotlinx.serialization.json.Json {
     ignoreUnknownKeys = true
     encodeDefaults = false
 }
+
+/**
+ * Whether a pulled row means two devices really changed the same thing. A rejected delete coming back
+ * (localExists = false under [serverWins]) is one. A local row that never synced (base revision null) has no server
+ * version to have raced with: it can only meet a server row through a deterministic id such as a seed category,
+ * which a fresh sign-in adopts — not a conflict (QA R6-07). Keeping a causal successor is just an unpushed edit.
+ */
+internal fun countsAsConflict(
+    decision: PullDecision,
+    serverWins: Boolean,
+    localExists: Boolean,
+    localDirty: Boolean,
+    localBaseRevision: Long?,
+    remoteRevision: Long?,
+): Boolean {
+    if (localExists && localBaseRevision == null) return false
+    val concurrentKeep = decision == PullDecision.KEEP_LOCAL && !(remoteRevision != null && localBaseRevision == remoteRevision)
+    return concurrentKeep || (serverWins && (localDirty || !localExists))
+}

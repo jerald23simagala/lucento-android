@@ -6,7 +6,9 @@ import com.lucento.app.core.containerFactory
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.data.preferences.UserPreferencesRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -18,7 +20,13 @@ sealed interface AppUiState {
     data class Ready(val preferences: UserPreferences) : AppUiState
 }
 
-class AppViewModel(private val preferences: UserPreferencesRepository) : ViewModel() {
+class AppViewModel(
+    private val preferences: UserPreferencesRepository,
+    signedInEmail: Flow<String?> = flowOf(null),
+) : ViewModel() {
+    /** The cloud account on this device, for the profile card; null when signed out. */
+    val signedInEmail: StateFlow<String?> = signedInEmail.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     val uiState: StateFlow<AppUiState> = preferences.preferences
         .map<UserPreferences, AppUiState> { AppUiState.Ready(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState.Loading)
@@ -38,6 +46,6 @@ class AppViewModel(private val preferences: UserPreferencesRepository) : ViewMod
     }
 
     companion object {
-        val Factory = containerFactory { AppViewModel(it.preferences) }
+        val Factory = containerFactory { AppViewModel(it.preferences, it.auth.observeSignedInEmail()) }
     }
 }

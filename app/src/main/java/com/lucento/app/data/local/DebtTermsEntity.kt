@@ -51,4 +51,10 @@ interface DebtTermsDao {
     /** Read by cloud sync, which carries a debt's terms on its wallet row (see docs/SYNC.md). */
     @Query("SELECT * FROM debt_terms WHERE wallet_id = :walletId")
     suspend fun get(walletId: Long): DebtTermsEntity?
+
+    @Query("SELECT * FROM debt_terms")
+    suspend fun getAll(): List<DebtTermsEntity>
+
+    @Query("DELETE FROM debt_terms")
+    suspend fun deleteAll()
 }

@@ -57,4 +57,10 @@ interface SyncDao {
 
     @Insert
     suspend fun insert(tombstone: SyncTombstoneEntity): Long
+
+    @Query("SELECT * FROM sync_tombstones")
+    suspend fun getAll(): List<SyncTombstoneEntity>
+
+    @Query("DELETE FROM sync_tombstones")
+    suspend fun deleteAll()
 }

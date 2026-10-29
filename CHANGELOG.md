@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — JSON backup and restore
+
+- **Settings → Your data**: export a versioned JSON backup (`schemaVersion`, app version, export time) and restore it.
+  The file contains wallets, categories, transactions, budgets, goals and contributions, scheduled payments, debt terms,
+  deletion tombstones, and the preferences that belong in a backup (theme, currency, enabled features, display name,
+  default wallet, guide step, Smarter reading). Amounts are integer minor units; dates are ISO-8601. Stable ids are
+  each row’s `client_uuid`.
+- Restore shows counts and the transaction date range, then **Merge** (upsert by id; the newer `updatedAt` wins) or
+  **Replace** (wipe the local ledger and import it inside one Room transaction). A malformed file, an unknown
+  schema version, or a tampered field changes nothing. Older files migrate forward (version 0 used `accounts` and
+  epoch numbers).
+- Merge folds a category from another install into the local one when the normalized name and the kind both match,
+  and points transactions, budgets and schedules at that category. A matching name with a different kind is shown in
+  the preview and both categories are kept.
+- Replace stamps restored `updatedAt` (and a contribution’s `createdAt`, which sync sends as `updated_at`) with the
+  restore time, so the server’s concurrent last-write-wins rule does not skip the restore. Rows the replace removed
+  are unpushed deletion tombstones and are uploaded on the next sync.
+- Restored rows are marked dirty with no base revision, so they upload on the next sync and still restore when signed out.
+  Sign-in, crash reports, sync cursors and goal photo files are not in the backup. CSV export is unchanged.
+- Goal photos stay on the device. A goal restored from a file keeps its scene and not a custom photo.
+
 ## Unreleased — Short first run
 
 - First run is four screens: welcome (data stays on this phone; uninstalling erases it unless sync is on), main

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.app.Application
 import android.content.Context
+import com.lucento.app.BuildConfig
 import com.lucento.app.core.applicationContainerFactory
 import com.lucento.app.core.crash.CrashReportOptOut
 import com.lucento.app.core.crash.CrashReporting
@@ -26,6 +27,15 @@ import com.lucento.app.data.sync.SyncScheduler
 import com.lucento.app.data.sync.SyncStatus
 import com.lucento.app.domain.CsvExporter
 import com.lucento.app.domain.Feature
+import com.lucento.app.domain.backup.BackupCodec
+import com.lucento.app.domain.backup.BackupEngine
+import com.lucento.app.domain.backup.BackupFailure
+import com.lucento.app.domain.backup.BackupFormatException
+import com.lucento.app.domain.backup.BackupPreview
+import com.lucento.app.domain.backup.RestoreMode
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.CodingErrorAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -60,6 +70,8 @@ data class CloudSyncUiState(
     val syncing: Boolean = false,
     val lastMessage: String? = null,
     val prompt: AccountPrompt? = null,
+    /** Dirty rows and unpushed deletions. "Synced just now" is withheld while this is not zero. */
+    val pendingChanges: Int = 0,
 )
 
 class SettingsViewModel(
@@ -73,6 +85,7 @@ class SettingsViewModel(
     private val syncRepository: SyncRepository,
     private val accounts: AccountBoundary,
     private val usage: UsageCountsService? = null,
+    private val backup: BackupEngine,
 ) : ViewModel() {
 
     private val syncing = MutableStateFlow(false)
@@ -102,6 +115,7 @@ class SettingsViewModel(
             syncMessage,
             auth.observeSignedInEmail(),
             prompt,
+            syncRepository.observePendingChanges(),
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
@@ -111,6 +125,7 @@ class SettingsViewModel(
             val message = values[5] as String?
             val email = values[6] as String?
             val accountPrompt = values[7] as AccountPrompt?
+            val pending = values[8] as Int
             SettingsUiState(
                 preferences = prefs,
                 walletCount = w.size,
@@ -123,6 +138,7 @@ class SettingsViewModel(
                     syncing = isSyncing,
                     lastMessage = message,
                     prompt = accountPrompt,
+                    pendingChanges = pending,
                 ),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -317,6 +333,7 @@ class SettingsViewModel(
     }
 
     private var exporting = false
+    private var pendingRestore: String? = null
 
     /** Writes every transaction as CSV to [uri] (chosen by the user through the system file picker). */
     fun exportCsv(resolver: ContentResolver, uri: Uri, onResult: (String) -> Unit) {
@@ -344,6 +361,91 @@ class SettingsViewModel(
         }
     }
 
+    /** Writes a versioned JSON backup to [uri]. Does not include sign-in, crash reports, or goal photos. */
+    fun exportBackup(resolver: ContentResolver, uri: Uri, onResult: (String) -> Unit) {
+        if (exporting) return
+        exporting = true
+        viewModelScope.launch {
+            val message = try {
+                val json = withContext(Dispatchers.IO) { backup.export(BuildConfig.VERSION_NAME) }
+                withContext(Dispatchers.IO) {
+                    val stream = resolver.openOutputStream(uri) ?: error("Could not open the file")
+                    stream.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                }
+                "Backup saved"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                "Couldn’t save the backup. Nothing was changed."
+            } finally {
+                exporting = false
+            }
+            onResult(message)
+        }
+    }
+
+    /** Reads [uri] and, when it is a valid backup, keeps it until [restoreBackup]. A bad file changes nothing. */
+    fun inspectBackup(resolver: ContentResolver, uri: Uri, onPreview: (BackupPreview) -> Unit, onError: (String) -> Unit) {
+        if (exporting) return
+        exporting = true
+        viewModelScope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) { readBackup(resolver, uri) }
+                val preview = withContext(Dispatchers.IO) { backup.preview(text) }
+                pendingRestore = text
+                onPreview(preview)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: BackupFormatException) {
+                pendingRestore = null
+                onError(e.message ?: "This file isn’t a valid Lucento backup. Nothing was changed.")
+            } catch (e: Exception) {
+                pendingRestore = null
+                onError("Couldn’t read that file. Nothing was changed.")
+            } finally {
+                exporting = false
+            }
+        }
+    }
+
+    fun restoreBackup(mode: RestoreMode, onResult: (String) -> Unit) {
+        val json = pendingRestore ?: return
+        if (exporting) return
+        exporting = true
+        viewModelScope.launch {
+            val message = try {
+                withContext(Dispatchers.IO) { backup.restore(json, mode) }
+                pendingRestore = null
+                if (mode == RestoreMode.REPLACE) "Replaced this device’s data with the backup." else "Merged the backup into this device."
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: BackupFormatException) {
+                e.message ?: "This file isn’t a valid Lucento backup. Nothing was changed."
+            } catch (e: Exception) {
+                "Couldn’t finish restoring. Nothing was changed."
+            } finally {
+                exporting = false
+            }
+            onResult(message)
+        }
+    }
+
+    private fun readBackup(resolver: ContentResolver, uri: Uri): String {
+        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw BackupFormatException(BackupFailure.MALFORMED, "Couldn’t read that file. Nothing was changed.")
+        if (bytes.size > BackupCodec.MAX_CHARS) {
+            throw BackupFormatException(BackupFailure.TOO_LARGE, "This backup is too large to restore. Nothing was changed.")
+        }
+        val decoder = Charsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+        return try {
+            decoder.decode(ByteBuffer.wrap(bytes)).toString()
+        } catch (_: CharacterCodingException) {
+            throw BackupFormatException(BackupFailure.MALFORMED, "This file isn’t valid JSON. Nothing was changed.")
+        }
+    }
+
     companion object {
         val Factory = applicationContainerFactory { app, container ->
             SettingsViewModel(
@@ -357,6 +459,7 @@ class SettingsViewModel(
                 syncRepository = container.syncRepository,
                 accounts = container.accountBoundary,
                 usage = container.usageCounts,
+                backup = container.backup,
             )
         }
     }

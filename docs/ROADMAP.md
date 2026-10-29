@@ -158,8 +158,11 @@ recurring-schedule sync, syncing preferences.
 
 ## M10 — Export, backup & restore
 - CSV export (RFC 4180, ISO dates, minor→decimal exact) via Storage Access Framework.
-- Full backup: versioned JSON (or DB copy) + checksum; optional password encryption; restore with schema-version checks
-  and a dry-run summary before overwriting.
+- JSON backup and restore (schema version 1, Storage Access Framework). The file holds wallets, categories,
+  transactions, budgets, goals, contributions, schedules, debt terms, unpushed deletions and the device preferences
+  that belong in a backup. Amounts are integer minor units. Restore previews counts and the transaction date range,
+  then merges by stable id (newer `updatedAt` wins) or replaces the ledger inside one Room transaction. Older files
+  migrate forward. Password encryption and a checksum are not included.
 
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
@@ -170,7 +173,7 @@ recurring-schedule sync, syncing preferences.
 1. Push v0.4.0 (or run `tools/verify.ps1`), fix any compile errors CI reports, confirm the migration job is green.
 2. Device QA against `docs/design-reference/lucento-mock.png`: light/dark, small phones, font scale 200%, TalkBack,
    reduced motion; Lottie on lottie-android; receipts in PHP/JPY/KWD/EUR; speech without Google services.
-3. Category management screen on top of the tested archive/restore rules; full backup/restore; opt-in reminders.
+3. Opt-in reminders. JSON backup and restore is in Settings (see docs/BACKUP.md).
 
 ## Known gaps
 - The authoring environment (cloud + device VM) has no Android SDK or Maven access, so Compose/Android code is

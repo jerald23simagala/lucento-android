@@ -14,7 +14,8 @@ import kotlin.math.max
  * A savings goal's own picture. The chosen image is copied into the app's private files folder and downscaled, so the
  * goal keeps it without depending on the original file. Photos never leave the device.
  *
- * Photos are not part of any backup: the app has no backup or restore yet.
+ * Photos are not part of a JSON backup. Restoring a goal from a file keeps its scene and drops a custom photo,
+ * because the picture file never leaves this device.
  */
 class GoalPhotos(context: Context) {
     private val appContext = context.applicationContext

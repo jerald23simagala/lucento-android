@@ -46,6 +46,8 @@ fun NavRow(
     summary: String? = null,
     tone: TonePair? = null,
     trailing: (@Composable () -> Unit)? = null,
+    /** When true the title wraps instead of ellipsizing, so a large font scale does not clip it. */
+    wrapTitle: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     Row(
@@ -64,14 +66,19 @@ fun NavRow(
         )
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = if (wrapTitle) Int.MAX_VALUE else 1,
+                overflow = if (wrapTitle) TextOverflow.Clip else TextOverflow.Ellipsis,
+            )
             if (summary != null) {
                 Text(
                     summary,
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    maxLines = if (wrapTitle) Int.MAX_VALUE else 2,
+                    overflow = if (wrapTitle) TextOverflow.Clip else TextOverflow.Ellipsis,
                 )
             }
         }

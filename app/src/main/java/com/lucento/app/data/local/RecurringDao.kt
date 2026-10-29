@@ -41,4 +41,16 @@ interface RecurringDao {
             "dirty = CASE WHEN updated_at = :expectedUpdatedAt THEN 0 ELSE dirty END WHERE client_uuid = :clientUuid"
     )
     suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
+
+    @Query("SELECT * FROM recurring ORDER BY id ASC")
+    suspend fun getAll(): List<RecurringEntity>
+
+    @Query("DELETE FROM recurring")
+    suspend fun deleteAll()
+
+    @Query("SELECT * FROM recurring WHERE client_uuid IS NULL")
+    suspend fun getWithoutClientUuid(): List<RecurringEntity>
+
+    @Query("UPDATE recurring SET client_uuid = :clientUuid, dirty = 1 WHERE id = :id AND client_uuid IS NULL")
+    suspend fun assignClientUuid(id: Long, clientUuid: String)
 }

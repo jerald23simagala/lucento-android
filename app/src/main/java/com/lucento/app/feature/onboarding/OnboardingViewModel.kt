@@ -346,9 +346,10 @@ class OnboardingViewModel(
                 preferences.completeOnboarding(currency.value, theme.value, features.value)
                 // Connected on the sync step: start syncing now that the user's own setup is saved.
                 val context = appContext
-                if (context != null && syncPreferences?.isEnabled() == true && signedInEmail.value != null) {
+                val syncOn = syncPreferences?.isEnabled() == true && auth?.currentUserId() != null
+                if (context != null && syncOn) {
                     com.lucento.app.data.sync.SyncScheduler.ensurePeriodic(context)
-                    com.lucento.app.data.sync.SyncScheduler.syncNow(context)
+                    com.lucento.app.data.sync.SyncScheduler.enqueueAfterLocalWrite(context)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

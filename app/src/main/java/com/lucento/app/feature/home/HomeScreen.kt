@@ -483,8 +483,8 @@ private fun Overview(
     Column {
         if (state.showLocalDataNotice) {
             InfoNote(
-                "Your wallets, transactions, budgets and goals stay only on this phone unless cloud sync is on. " +
-                    "Uninstalling Lucento or clearing its storage erases them.",
+                "Your wallets, transactions, budgets and goals stay only on this phone unless cloud sync is on or you export a backup. " +
+                    "Uninstalling Lucento or clearing its storage erases anything that isn’t saved that way.",
                 actionLabel = "Dismiss",
                 onAction = onDismissLocalDataNotice,
             )

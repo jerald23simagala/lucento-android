@@ -49,4 +49,17 @@ interface WalletDao {
             "dirty = CASE WHEN updated_at = :expectedUpdatedAt THEN 0 ELSE dirty END WHERE client_uuid = :clientUuid"
     )
     suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
+
+    @Query("SELECT * FROM wallets ORDER BY sort_order ASC, id ASC")
+    suspend fun getAll(): List<WalletEntity>
+
+    @Query("DELETE FROM wallets")
+    suspend fun deleteAll()
+
+    @Query("SELECT * FROM wallets WHERE client_uuid IS NULL")
+    suspend fun getWithoutClientUuid(): List<WalletEntity>
+
+    /** Gives a stable id before a backup. Sets dirty without touching updated_at, so the edit trigger stays quiet. */
+    @Query("UPDATE wallets SET client_uuid = :clientUuid, dirty = 1 WHERE id = :id AND client_uuid IS NULL")
+    suspend fun assignClientUuid(id: Long, clientUuid: String)
 }
