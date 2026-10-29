@@ -57,13 +57,10 @@ import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.SyncProblem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,9 +69,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,7 +92,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -132,9 +126,6 @@ import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.BudgetBurn
 import com.lucento.app.domain.BudgetPlan
 import com.lucento.app.domain.BudgetSuggestion
-import com.lucento.app.domain.FirstWeek
-import com.lucento.app.domain.FirstWeekStep
-import com.lucento.app.domain.PreviewExample
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalsOverview
@@ -169,8 +160,6 @@ data class HomeActions(
     val onOpenDebts: () -> Unit = {},
     /** Where the sync status leads: Settings, which explains and controls cloud sync. */
     val onOpenSettings: () -> Unit = {},
-    /** Opens the composer to log another entry. */
-    val onAddEntry: () -> Unit = {},
 )
 
 /**
@@ -181,23 +170,10 @@ data class HomeActions(
 @Composable
 fun HomeScreen(
     actions: HomeActions,
-    /** In-memory example. Null means the person's own figures. Never stored. */
-    preview: PreviewExample? = null,
-    onPreview: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
-    val real by viewModel.uiState.collectAsStateWithLifecycle()
-    var tourOpened by rememberSaveable { mutableStateOf(false) }
-    // The tour replaces every figure. The invitation row leaves only once that replacement is on screen.
-    LaunchedEffect(preview) {
-        if (preview != null) {
-            tourOpened = true
-            viewModel.markExamplePreviewOpened()
-        }
-    }
-    val state = if (preview == null) real else openExampleTour(real)
-    val showExampleInvite = preview == null && !tourOpened && real.showExamplePreview
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
 
     val scroll = rememberScrollState()
@@ -236,41 +212,15 @@ fun HomeScreen(
                 )
                 HomeContent.Overview -> Overview(
                     state = state,
-                    actions = if (preview == null) {
-                        actions.copy(onOpenInsights = {
-                            viewModel.markInsightsChecked()
-                            actions.onOpenInsights()
-                        })
-                    } else {
-                        actions.copy(
-                            onOpenBudget = {},
-                            onChooseCategories = {},
-                            onOpenInsights = {},
-                            onOpenGoals = {},
-                            onOpenRecurring = { _ -> },
-                            onOpenWallets = {},
-                            onOpenDebts = {},
-                            onOpenSettings = {},
-                            onAddEntry = {},
-                        )
+                    actions = actions,
+                    onSelectMonth = viewModel::selectMonth,
+                    onDismissLocalDataNotice = viewModel::dismissLocalDataNotice,
+                    onSnoozeSuggestion = viewModel::snoozeBudgetSuggestion,
+                    onUseSuggestion = viewModel::applyBudgetSuggestion,
+                    onAdjustSuggestion = {
+                        viewModel.noteBudgetAdjust()
+                        actions.onOpenBudget()
                     },
-                    onSelectMonth = if (preview == null) viewModel::selectMonth else ({ _ -> }),
-                    onDismissLocalDataNotice = if (preview == null) viewModel::dismissLocalDataNotice else ({}),
-                    onDismissFirstWeek = if (preview == null) viewModel::dismissFirstWeek else ({}),
-                    onSnoozeSuggestion = if (preview == null) viewModel::snoozeBudgetSuggestion else ({}),
-                    onUseSuggestion = if (preview == null) viewModel::applyBudgetSuggestion else ({}),
-                    onCelebrateShown = if (preview == null) viewModel::markFirstEntryCelebrated else ({}),
-                    onAdjustSuggestion = if (preview == null) {
-                        {
-                            viewModel.noteBudgetAdjust()
-                            actions.onOpenBudget()
-                        }
-                    } else {
-                        {}
-                    },
-                    onFirstWeekDoneShown = if (preview == null) viewModel::markFirstWeekDoneShown else ({}),
-                    onOpenExample = { onPreview(true) },
-                    showExampleInvite = showExampleInvite,
             )
             }
         }
@@ -577,30 +527,11 @@ private fun Overview(
     actions: HomeActions,
     onSelectMonth: (YearMonth) -> Unit,
     onDismissLocalDataNotice: () -> Unit,
-    onDismissFirstWeek: () -> Unit,
     onSnoozeSuggestion: () -> Unit,
     onUseSuggestion: () -> Unit,
-    onCelebrateShown: () -> Unit,
     onAdjustSuggestion: () -> Unit,
-    onFirstWeekDoneShown: () -> Unit = {},
-    onOpenExample: () -> Unit = {},
-    showExampleInvite: Boolean = state.showExamplePreview,
 ) {
     val f = state.features
-    var showCelebration by rememberSaveable { mutableStateOf(false) }
-    var showWeekDone by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(state.celebrateFirstEntry) {
-        if (state.celebrateFirstEntry) {
-            showCelebration = true
-            onCelebrateShown()
-        }
-    }
-    LaunchedEffect(state.celebrateFirstWeekDone) {
-        if (state.celebrateFirstWeekDone) {
-            showWeekDone = true
-            onFirstWeekDoneShown()
-        }
-    }
     Column {
         if (state.showLocalDataNotice) {
             InfoNote(
@@ -611,47 +542,15 @@ private fun Overview(
             )
             Spacer(Modifier.height(Spacing.sm))
         }
-        if (showCelebration) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = Spacing.sm)) {
-                LucentoMascot(size = 56.dp, mood = MascotMood.Celebrate, contentDescription = null)
-                Spacer(Modifier.width(Spacing.md))
-                Text(FirstWeek.REACTION, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 3)
-            }
-        }
-        if (showWeekDone) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = Spacing.sm)) {
-                LucentoMascot(size = 56.dp, mood = MascotMood.Celebrate, contentDescription = null)
-                Spacer(Modifier.width(Spacing.md))
-                Text(
-                    stringResource(R.string.home_first_week_done),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 3,
-                )
-            }
-        }
-        BalanceAndRecent(state)
-        if (state.showFirstWeekCard) {
+        BalanceAndRecentBody(state)
+        state.budgetSuggestion?.let { suggestion ->
             Spacer(Modifier.height(Spacing.md))
-            FirstWeekCard(
-                state = state,
-                onDismiss = onDismissFirstWeek,
-                onLog = actions.onAddEntry,
-                onGoal = actions.onOpenGoals,
-                onBill = { actions.onOpenRecurring(null) },
-                onInsights = actions.onOpenInsights,
+            BudgetSuggestionCard(
+                suggestion = suggestion,
+                onUse = onUseSuggestion,
+                onAdjust = onAdjustSuggestion,
+                onNotNow = onSnoozeSuggestion,
             )
-        }
-        if (!state.dayOneHome) {
-            state.budgetSuggestion?.let { suggestion ->
-                Spacer(Modifier.height(Spacing.md))
-                BudgetSuggestionCard(
-                    suggestion = suggestion,
-                    onUse = onUseSuggestion,
-                    onAdjust = onAdjustSuggestion,
-                    onNotNow = onSnoozeSuggestion,
-                )
-            }
         }
         Spacer(Modifier.height(Spacing.md))
         val plan = state.budget
@@ -666,49 +565,26 @@ private fun Overview(
                     Spacer(Modifier.height(Spacing.sm))
                     MonthlyBudgetCard(state, plan, burn, actions)
                 }
-                if (!showCelebration) {
-                    LucentoMascot(
-                        size = MascotSize,
-                        mood = mood.mood,
-                        tier = mood.tier,
-                        contentDescription = if (mood.mood == MascotMood.Concerned) "Lucento, gently concerned, says: ${mood.bubble}" else "Lucento says: ${mood.bubble}",
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            // Bottom of the mascot sinks [MascotOverlap] into the card, below the month pill's row.
-                            .offset(y = Sizes.minTouch + Spacing.sm + MascotOverlap - MascotSize)
-                            .padding(end = Spacing.xs),
-                    )
-                }
+                LucentoMascot(
+                    size = MascotSize,
+                    mood = mood.mood,
+                    tier = mood.tier,
+                    contentDescription = if (mood.mood == MascotMood.Concerned) "Lucento, gently concerned, says: ${mood.bubble}" else "Lucento says: ${mood.bubble}",
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        // Bottom of the mascot sinks [MascotOverlap] into the card, below the month pill's row.
+                        .offset(y = Sizes.minTouch + Spacing.sm + MascotOverlap - MascotSize)
+                        .padding(end = Spacing.xs),
+                )
             }
         } else if (plan != null && burn != null) {
-            if (state.dayOneHome) {
-                SpendingThisMonthCard(spent = plan.spent, daysLeft = burn.daysLeft) {
-                    MonthPill(state, onSelectMonth)
-                }
-            } else {
-                MonthPill(state, onSelectMonth)
-                Spacer(Modifier.height(Spacing.sm))
-                SpendingThisMonthCard(spent = plan.spent, daysLeft = burn.daysLeft)
-            }
+            MonthPill(state, onSelectMonth)
+            Spacer(Modifier.height(Spacing.sm))
+            SpendingThisMonthCard(spent = plan.spent, daysLeft = burn.daysLeft)
         } else {
             MonthPill(state, onSelectMonth)
             Spacer(Modifier.height(Spacing.sm))
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
-        }
-        if (showExampleInvite) {
-            Spacer(Modifier.height(Spacing.sm))
-            PreviewExampleRow(onOpenExample)
-        }
-        if (state.dayOneHome) {
-            state.budgetSuggestion?.let { suggestion ->
-                Spacer(Modifier.height(Spacing.md))
-                BudgetSuggestionCard(
-                    suggestion = suggestion,
-                    onUse = onUseSuggestion,
-                    onAdjust = onAdjustSuggestion,
-                    onNotNow = onSnoozeSuggestion,
-                )
-            }
         }
 
         state.netWorthComposition?.let { composition ->
@@ -725,15 +601,6 @@ private fun Overview(
             Spacer(Modifier.height(Spacing.md))
             ScheduledCard(state, onOpen = actions.onOpenRecurring)
         }
-    }
-}
-
-@Composable
-private fun BalanceAndRecent(state: HomeUiState) {
-    if (state.dayOneHome) {
-        LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) { BalanceAndRecentBody(state) }
-    } else {
-        BalanceAndRecentBody(state)
     }
 }
 
@@ -784,7 +651,6 @@ private fun BalanceAndRecentBody(state: HomeUiState) {
 private fun SpendingThisMonthCard(
     spent: Money,
     daysLeft: Int,
-    monthPicker: (@Composable () -> Unit)? = null,
 ) {
     LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
         Text(
@@ -793,10 +659,6 @@ private fun SpendingThisMonthCard(
             maxLines = 2,
             modifier = Modifier.semantics { heading() },
         )
-        if (monthPicker != null) {
-            Spacer(Modifier.height(Spacing.sm))
-            monthPicker()
-        }
         Spacer(Modifier.height(Spacing.sm))
         MoneyText(money = spent, style = AmountStyles.large, minScale = 0.6f)
         Text(
@@ -805,103 +667,6 @@ private fun SpendingThisMonthCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
         )
-    }
-}
-
-@Composable
-private fun FirstWeekCard(
-    state: HomeUiState,
-    onDismiss: () -> Unit,
-    onLog: () -> Unit,
-    onGoal: () -> Unit,
-    onBill: () -> Unit,
-    onInsights: () -> Unit,
-) {
-    val (done, total) = FirstWeek.progress(state.firstWeekSteps)
-    val progressLabel = stringResource(R.string.home_first_week_progress, done, total)
-    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.home_first_week),
-                style = Hierarchy.sectionTitle,
-                maxLines = 2,
-                modifier = Modifier.weight(1f).semantics { heading() },
-            )
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.home_dismiss_first_week))
-            }
-        }
-        Text(progressLabel, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
-        Spacer(Modifier.height(Spacing.xs))
-        LinearProgressIndicator(
-            progress = { if (total == 0) 0f else done.toFloat() / total.toFloat() },
-            modifier = Modifier.fillMaxWidth().semantics { contentDescription = progressLabel },
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        state.firstWeekSteps.forEach { step ->
-            val open = when (step.id) {
-                "log3" -> onLog
-                "goal" -> onGoal
-                "bill" -> onBill
-                else -> onInsights
-            }
-            val label = FirstWeekActionLabel(step)
-            val spoken = label + if (step.done) ", done" else ", not done"
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = Sizes.minTouch)
-                    .clickable(role = Role.Button, onClick = open)
-                    .semantics(mergeDescendants = true) {
-                        role = Role.Button
-                        contentDescription = spoken
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(
-                    checked = step.done,
-                    onCheckedChange = null,
-                    modifier = Modifier.clearAndSetSemantics {},
-                )
-                Text(
-                    label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 3,
-                    textDecoration = if (step.done) TextDecoration.LineThrough else null,
-                    modifier = Modifier.weight(1f).clearAndSetSemantics {},
-                )
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    modifier = Modifier.clearAndSetSemantics {},
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FirstWeekActionLabel(step: FirstWeekStep): String = when (step.id) {
-    "log3" -> stringResource(R.string.home_log_more_expenses, step.progress ?: "0/3")
-    "goal" -> stringResource(R.string.home_set_goal)
-    "bill" -> stringResource(R.string.home_add_bill)
-    else -> stringResource(R.string.home_see_week)
-}
-
-/** One tap opens the in-memory example. Hidden once opened, and once a real entry exists. */
-@Composable
-private fun PreviewExampleRow(onOpen: () -> Unit) {
-    val label = stringResource(R.string.home_preview_example)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = Sizes.minTouch)
-            .clickable(role = Role.Button, onClick = onOpen)
-            .semantics { contentDescription = label },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 3)
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
     }
 }
 
@@ -1721,7 +1486,7 @@ private fun HomeFontScalePreview() {
             today = today,
             budgets = listOf(budget),
             goals = listOf(goal),
-        ).copy(dayOneHome = true, celebrateFirstEntry = true)
+        )
         Column(
             Modifier
                 .fillMaxSize()
@@ -1743,53 +1508,11 @@ private fun HomeFontScalePreview() {
                 ),
                 onSelectMonth = {},
                 onDismissLocalDataNotice = {},
-                onDismissFirstWeek = {},
                 onSnoozeSuggestion = {},
                 onUseSuggestion = {},
-                onCelebrateShown = {},
                 onAdjustSuggestion = {},
             )
         }
     }
 }
 
-@Preview(name = "Day one 1.3 × 360", fontScale = 1.3f, widthDp = 360, heightDp = 1200)
-@Preview(name = "Day one 2.0 × 360", fontScale = 2.0f, widthDp = 360, heightDp = 1600)
-@Composable
-private fun DayOneHomeFontScalePreview() {
-    LucentoTheme {
-        val today = LocalDate.of(2026, 10, 28)
-        val wallet = com.lucento.app.domain.Wallet(1, "Cash", com.lucento.app.domain.WalletType.CASH, Money(120_00, "USD"), 0)
-        val state = HomeStateBuilder.build(
-            all = emptyList(),
-            wallets = listOf(wallet),
-            categories = emptyList(),
-            primaryCurrency = "USD",
-            today = today,
-        ).copy(dayOneHome = true)
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.gutter),
-        ) {
-            Overview(
-                state = state,
-                actions = HomeActions(
-                    onOpenBudget = {},
-                    onChooseCategories = {},
-                    onOpenInsights = {},
-                    onOpenGoals = {},
-                    onOpenRecurring = {},
-                ),
-                onSelectMonth = {},
-                onDismissLocalDataNotice = {},
-                onDismissFirstWeek = {},
-                onSnoozeSuggestion = {},
-                onUseSuggestion = {},
-                onCelebrateShown = {},
-                onAdjustSuggestion = {},
-            )
-        }
-    }
-}

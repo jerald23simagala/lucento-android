@@ -132,26 +132,41 @@ class ScreenshotTourTest {
 
     @Test
     fun tour() {
-        // ---------------------------------------------------------------- short first run: welcome, currency, balance, composer
+        // ---------------------------------------------------------------- onboarding
         waitForText("Get started")
-        waitForText("Step 1 of 4")
         shot("01-onboarding-welcome")
         click("Get started")
-        waitForText("Your main currency")
-        waitForText("Step 2 of 4")
-        shot("02-onboarding-currency")
+        waitForText("main focus")
+        click("Skip") // optional questions only: it leads to the mandatory categories step
+        waitForText("What do you spend on?")
+        shot("02-onboarding-categories")
+        click("Review", substring = true)
+        waitForText("Your spending categories")
+        shot("03-onboarding-review")
+        click("Confirm", substring = true)
+        waitForText("Currency and look")
         click("Continue")
-        waitForText("main account", substring = true)
-        waitForText("Step 3 of 4")
-        shot("03-onboarding-wallet")
-        click("Continue")
-        waitForText("Add something you spent today")
-        waitForText("Step 4 of 4")
-        shot("04-onboarding-composer")
-        click("Skip for now")
+        waitForText("Back up and sync?")
+        shot("04a-onboarding-sync")
+        // The tour stays offline: no account is connected. A build without a sync key (CI) shows only Continue here;
+        // one with sync offers "Not now — keep it on this phone".
+        if (compose.onAllNodes(hasText("Not now", substring = true)).fetchSemanticsNodes().isNotEmpty()) {
+            click("Not now", substring = true)
+        } else {
+            click("Continue")
+        }
+        waitForText("You’re all set")
+        shot("04-onboarding-confirm")
+        click("Start using Lucento")
 
-        // ---------------------------------------------------------------- empty dashboard (a real wallet, no entries)
-        waitForText("Nothing logged yet")
+        // ---------------------------------------------------------------- guided setup (first page), then Home
+        waitForText("Add your accounts")
+        shot("04b-guide-accounts")
+        // The tour seeds its own data below, so it ends the guide here the way "Go to Home" does.
+        runBlocking { container.preferences.setGuideStep(null) }
+
+        // ---------------------------------------------------------------- empty dashboard
+        waitForText("Let’s set up your money")
         shot("05-home-first-run")
 
         // ---------------------------------------------------------------- seed realistic data through the repositories

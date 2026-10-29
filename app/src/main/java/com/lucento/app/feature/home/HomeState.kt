@@ -23,14 +23,11 @@ import com.lucento.app.domain.NetWorthComposer
 import com.lucento.app.domain.NetWorthComposition
 import com.lucento.app.domain.PacePosition
 import com.lucento.app.domain.PeriodTotals
-import com.lucento.app.domain.PreviewTour
 import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionQueries
 import com.lucento.app.domain.BudgetSuggestion
-import com.lucento.app.domain.FirstWeek
-import com.lucento.app.domain.FirstWeekStep
 import com.lucento.app.domain.UpcomingPayment
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.realEntries
@@ -195,30 +192,9 @@ data class HomeUiState(
     /** Income and expenses, newest first. Transfers and balance adjustments are not entries. */
     val recentEntries: List<Transaction> = emptyList(),
     val realEntryCount: Int = 0,
-    /** Short first run only. Older finished installs stay false, so they are not shown day-one prompts. */
-    val dayOneHome: Boolean = false,
-    val firstWeekDismissed: Boolean = false,
-    val celebrateFirstEntry: Boolean = false,
-    /** The one-time "First week done" line has already been shown. */
-    val firstWeekDoneShown: Boolean = false,
-    /** The example-data row has been opened. It stays hidden afterwards. */
-    val examplePreviewOpened: Boolean = false,
     val budgetSuggestion: BudgetSuggestion? = null,
-    val insightsChecked: Boolean = false,
     val loadError: Boolean = false,
 ) {
-    val firstWeekSteps: List<FirstWeekStep>
-        get() = FirstWeek.steps(
-            realEntryCount = realEntryCount,
-            hasGoal = hasAnyGoals,
-            hasBill = hasAnySchedules,
-            checkedInsights = insightsChecked,
-        )
-    private val firstWeekComplete: Boolean get() = firstWeekSteps.all { it.done }
-    val showFirstWeekCard: Boolean get() = FirstWeek.show(dayOneHome, firstWeekDismissed, firstWeekComplete)
-    val celebrateFirstWeekDone: Boolean
-        get() = FirstWeek.celebrateDone(dayOneHome, firstWeekDismissed, firstWeekDoneShown, firstWeekComplete)
-    val showExamplePreview: Boolean get() = PreviewTour.showRow(realEntryCount, examplePreviewOpened)
     val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
     val hasWallets: Boolean get() = wallets.isNotEmpty()
     val isCurrentMonth: Boolean get() = month == YearMonth.from(today)
