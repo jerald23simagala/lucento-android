@@ -557,8 +557,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     }
 
     if (showProfile) {
+        val profileEmail by appViewModel.signedInEmail.collectAsStateWithLifecycle()
         ProfileSheet(
             preferences = preferences,
+            signedInEmail = profileEmail,
             onSaveName = appViewModel::setDisplayName,
             onTheme = appViewModel::setThemeMode,
             onOpen = { destination ->

@@ -454,10 +454,7 @@ class SyncRepository(
                 serverWins -> if (localExists) PullDecision.UPDATE else PullDecision.INSERT
                 else -> pullDecision(localExists, dirty, base, updatedAt, revision, remoteAt)
             }
-            // A rejected delete returns with localExists = false: the row this device removed comes back, which is a conflict too.
-            // Keeping a causal successor (base = server revision) is just an unpushed edit, not a conflict.
-            val concurrentKeep = decision == PullDecision.KEEP_LOCAL && !(revision != null && base == revision)
-            if (concurrentKeep || (serverWins && (dirty || !localExists))) s.conflicts++
+            if (countsAsConflict(decision, serverWins, localExists, dirty, base, revision)) s.conflicts++
             return decision
         }
         when (table) {
@@ -466,7 +463,7 @@ class SyncRepository(
                 val local = wallets.findByClientUuid(row.id)
                 if (row.deletedAt != null) {
                     s.deletedWallets[row.id] = row
-                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { wallets.deleteById(local!!.id) }
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { wallets.deleteById(local!!.id) }
                 }
                 val walletId = when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> wallets.insert(row.toEntity(syncedAt = clock()))
@@ -492,7 +489,7 @@ class SyncRepository(
                 val local = categories.findByClientUuid(row.id)
                 if (row.deletedAt != null) {
                     s.deletedCategories[row.id] = row
-                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { categories.deleteById(local!!.id) }
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { categories.deleteById(local!!.id) }
                 }
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> categories.insert(row.toEntity(syncedAt = clock()))
@@ -515,7 +512,7 @@ class SyncRepository(
             "budgets" -> {
                 val row = decode(BudgetRow.serializer(), json)
                 val local = budgets.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { budgets.deleteById(local!!.id) }
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { budgets.deleteById(local!!.id) }
                 val categoryId = resolveCategory(row.categoryId, "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> budgets.insert(row.toEntity(categoryId, syncedAt = clock()))
@@ -538,7 +535,7 @@ class SyncRepository(
             "transactions" -> {
                 val row = decode(TransactionRow.serializer(), json)
                 val local = transactions.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { transactions.deleteById(local!!.id) }
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { transactions.deleteById(local!!.id) }
                 val walletId = resolveWallet(row.walletId, row.currencyCode, s)
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
@@ -563,7 +560,7 @@ class SyncRepository(
                 val dao = recurring ?: return
                 val row = decode(RecurringRow.serializer(), json)
                 val local = dao.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { dao.deleteById(local!!.id) }
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { dao.deleteById(local!!.id) }
                 val walletId = resolveWallet(row.walletId, row.currencyCode, s)
                 val toWalletId = row.toWalletId?.let { resolveWallet(it, row.currencyCode, s) }
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
@@ -590,7 +587,7 @@ class SyncRepository(
                 val local = goals.findGoalByClientUuid(row.id)
                 if (row.deletedAt != null) {
                     s.deletedGoals[row.id] = row
-                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, row.deletedAt, serverWins) { goals.deleteById(local!!.id) }
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { goals.deleteById(local!!.id) }
                 }
                 // A linked wallet that hasn't arrived is only informational on a goal, so the link is dropped, not deferred.
                 val walletId = row.walletId?.let { wallets.findByClientUuid(it)?.id }
@@ -740,6 +737,7 @@ class SyncRepository(
         clientUuid: String?,
         localUpdatedAt: Long?,
         localDirty: Boolean?,
+        localBaseRevision: Long?,
         deletedAtIso: String,
         serverWins: Boolean,
         delete: suspend () -> Unit,
@@ -748,7 +746,7 @@ class SyncRepository(
         if (!serverWins && localWinsOverRemoteDelete(localUpdatedAt, localDirty, SyncTime.fromIso(deletedAtIso))) {
             s.conflicts++ // a newer local edit survives; it is pushed and the server applies the same rule
         } else {
-            if (serverWins && localDirty) s.conflicts++
+            if (serverWins && localDirty && localBaseRevision != null) s.conflicts++
             s.deletes += PendingDelete(table, clientUuid, delete)
         }
     }

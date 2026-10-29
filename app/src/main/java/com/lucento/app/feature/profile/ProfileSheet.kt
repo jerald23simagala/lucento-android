@@ -70,6 +70,7 @@ fun ProfileSheet(
     onTheme: (ThemeMode) -> Unit,
     onOpen: (ProfileDestination) -> Unit,
     onDismiss: () -> Unit,
+    signedInEmail: String? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -108,7 +109,7 @@ fun ProfileSheet(
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        "No account needed · data stays on this phone unless you turn sync on",
+                        profileAccountLine(signedInEmail),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -171,4 +172,11 @@ fun ProfileSheet(
             Spacer(Modifier.height(Spacing.xl))
         }
     }
+}
+
+/** The line under the profile name: the signed-in account, or the local-only promise when there is none (QA R6-08). */
+internal fun profileAccountLine(signedInEmail: String?): String = when {
+    signedInEmail == null -> "No account needed · data stays on this phone unless you turn sync on"
+    signedInEmail.isBlank() -> "Signed in · cloud sync account"
+    else -> "Signed in as $signedInEmail"
 }

@@ -492,9 +492,8 @@ class RoomBackupStore(
     }
 
     private suspend fun insertMissingTombstones(deletions: List<BackupDeletion>) {
-        val have = database.syncDao().unpushedTombstones().map { it.tableName to it.clientUuid }.toSet()
-        for (deletion in deletions) {
-            if ((deletion.table to deletion.id) in have) continue
+        val have = database.syncDao().getAll().map { it.tableName to it.clientUuid }.toSet()
+        for (deletion in tombstonesToAdd(deletions, have)) {
             database.syncDao().insert(
                 SyncTombstoneEntity(
                     tableName = deletion.table,
@@ -832,3 +831,10 @@ private fun RecurringEntity.edited(
     syncedAt = null,
     baseRevision = null,
 )
+
+/**
+ * Deletions from a merged backup that this device does not already know about. A tombstone this device has already
+ * pushed counts as known: re-queueing it would stamp and upload the same delete again (QA R6-02).
+ */
+internal fun tombstonesToAdd(deletions: List<BackupDeletion>, known: Set<Pair<String, String>>): List<BackupDeletion> =
+    deletions.filter { (it.table to it.id) !in known }.distinctBy { it.table to it.id }
