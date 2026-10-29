@@ -47,7 +47,15 @@ import java.security.SecureRandom
 class AuthRepository(
     private val client: SupabaseClient?,
     private val passwords: PasswordPolicy = PasswordPolicy(),
+    /** Synchronous, durable delete of the stored session ([SessionStore.clearNow]). */
+    private val clearStoredSession: () -> Boolean = { true },
 ) {
+
+    /**
+     * Deletes the stored session on the calling thread before anything else in sign-out runs, so a force-stop right
+     * after the confirm tap relaunches signed out (QA R6-01). The in-memory session is cleared by [signOut].
+     */
+    fun clearStoredSessionNow(): Boolean = runCatching { clearStoredSession() }.getOrDefault(false)
 
     sealed interface SignInResult {
         data object Success : SignInResult
@@ -227,6 +235,8 @@ class AuthRepository(
      */
     suspend fun signOut() {
         val auth = client?.auth ?: return
+        // The stored copy goes first and durably; the logout request below only revokes the token on the server.
+        clearStoredSessionNow()
         endLocalSession(
             signOutLocal = { auth.signOut(SignOutScope.LOCAL) },
             clearSession = { auth.clearSession() },

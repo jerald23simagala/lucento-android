@@ -133,9 +133,12 @@ class AppContainer(application: Application) {
 
     // --- optional cloud sync (see docs/SYNC.md); every value here is safe to hold even when unconfigured ---
 
-    private val supabaseClient by lazy { SupabaseModule.create() }
+    private val sessionStore: com.lucento.app.data.sync.SessionStore? by lazy {
+        if (SupabaseModule.isConfigured) com.lucento.app.data.sync.SessionStore.forApp(application, BuildConfig.SUPABASE_URL) else null
+    }
+    private val supabaseClient by lazy { SupabaseModule.create(sessionStore) }
     val syncPreferences: SyncPreferences by lazy { SyncPreferences(application) }
-    val auth: AuthRepository by lazy { AuthRepository(supabaseClient) }
+    val auth: AuthRepository by lazy { AuthRepository(supabaseClient, clearStoredSession = { sessionStore?.clearNow() ?: true }) }
 
     /** The composer's reader: Gemini when Smarter reading is on (see docs/CAPTURE.md), else this phone. */
     val interpreter: com.lucento.app.domain.capture.TransactionInterpreter by lazy {

@@ -63,8 +63,8 @@ class AccountBoundary(
      */
     suspend fun signOutAndWipe() {
         exclusive {
-            prepare()
             signOut()
+            prepare()
             wipe()
         }
     }

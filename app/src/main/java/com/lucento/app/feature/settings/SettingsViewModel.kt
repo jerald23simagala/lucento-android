@@ -186,6 +186,8 @@ class SettingsViewModel(
     fun confirmAccountPrompt() {
         val current = prompt.value ?: return
         if (syncing.value) return
+        // Durable before the coroutine is even scheduled: a force-stop straight after this tap relaunches signed out.
+        if (current.kind == AccountPrompt.Kind.SIGN_OUT) auth.clearStoredSessionNow()
         viewModelScope.launch {
             syncing.value = true
             prompt.value = null
