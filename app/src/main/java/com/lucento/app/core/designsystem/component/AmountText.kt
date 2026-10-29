@@ -51,8 +51,9 @@ fun AmountText(
         modifier = modifier,
         style = style,
         color = color,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
     )
 }
 

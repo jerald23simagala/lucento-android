@@ -11,11 +11,6 @@ import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.domain.CategoryPresets
-import com.lucento.app.domain.FirstRunDefaults
-import com.lucento.app.domain.FirstRunStep
-import com.lucento.app.domain.OnboardingFlow
-import com.lucento.app.domain.WalletType
-import com.lucento.app.domain.startingBalance
 import com.lucento.app.feature.budget.CategoryPicks
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -32,11 +27,13 @@ import kotlinx.coroutines.launch
 enum class RestoreStage { NONE, WARN, SIGN_IN, RESTORING, EMPTY, FAILED }
 
 /**
- * Short first run: welcome → currency → starting balance, then the composer (opened once onboarding completes).
+ * Setup: welcome → focus → features → spending categories → review → currency & appearance → cloud sync (optional)
+ * → confirmation.
  *
- * Theme, categories, goals, recurring payments and the other modules use [FirstRunDefaults]. Sync stays off.
- * Categories are the recommended set, written before onboarding is marked complete. People who already finished
- * an older setup are not sent here again ([OnboardingFlow.showOnboarding]).
+ * Focus and features can be skipped (safe defaults). Choosing spending categories cannot: the budget is built from
+ * them, so at least one must be chosen and reviewed before onboarding completes. Categories are written to the
+ * database first; only then is onboarding marked complete, so a finished onboarding always has the user's categories.
+ * Choices only set the *initial* configuration; everything can be changed later. No personal information is collected.
  */
 class OnboardingViewModel(
     private val savedState: SavedStateHandle,
@@ -53,6 +50,15 @@ class OnboardingViewModel(
     private val usage: com.lucento.app.domain.UsageCountsService? = null,
 ) : ViewModel() {
 
+    /** Anonymous usage counts: one `onboarding_step_viewed` per screen, numbered from 1 (welcome). */
+    fun onStepShown(step: Int) {
+        val counts = usage ?: return
+        viewModelScope.launch {
+            if (step == STEP_WELCOME) counts.noteWelcome()
+            counts.stepViewed(onboardingStepNumber(step))
+        }
+    }
+
     /** The connected account's email, or null while signed out. */
     val signedInEmail: StateFlow<String?> = (auth?.observeSignedInEmail() ?: kotlinx.coroutines.flow.flowOf(null))
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -66,23 +72,6 @@ class OnboardingViewModel(
     private val _switchPrompt = MutableStateFlow(false)
     /** A different account signed in while this phone still has unsynced data. Nothing is wiped until confirmed. */
     val switchPrompt: StateFlow<Boolean> = _switchPrompt
-
-    val usageOptIn: StateFlow<Boolean> = preferences.preferences
-        .map { it.usageCounts }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    fun setUsageOptIn(enabled: Boolean) {
-        val counts = usage ?: return
-        viewModelScope.launch { counts.setOptIn(enabled) }
-    }
-
-    fun onStepShown(step: com.lucento.app.domain.FirstRunStep) {
-        val counts = usage ?: return
-        viewModelScope.launch {
-            if (step == com.lucento.app.domain.FirstRunStep.WELCOME) counts.noteWelcome()
-            counts.stepViewed(step.number)
-        }
-    }
 
     val syncAvailable: Boolean get() = auth != null && com.lucento.app.data.sync.SupabaseModule.isConfigured
     val googleAvailable: Boolean get() = com.lucento.app.data.sync.SupabaseModule.isGoogleSignInConfigured
@@ -203,8 +192,7 @@ class OnboardingViewModel(
     fun setUpAsNew() {
         _restoreMessage.value = null
         setRestoreStage(RestoreStage.NONE)
-        savedState[KEY_SHORT] = true
-        savedState[KEY_STEP] = FirstRunStep.CURRENCY.ordinal
+        savedState[KEY_STEP] = STEP_FOCUS
     }
 
     /**
@@ -274,13 +262,7 @@ class OnboardingViewModel(
         }
     }
 
-    private val stepIndex = savedState.getStateFlow(KEY_STEP, 0)
-    private val shortFlow = savedState.getStateFlow(KEY_SHORT, false)
-
-    /** Welcome, currency or wallet. The composer is the fourth screen and opens after [finishWallet]. */
-    val step: StateFlow<FirstRunStep> = combine(stepIndex, shortFlow) { index, short ->
-        OnboardingFlow.resume(onboardingComplete = false, savedIndex = index, shortFlow = short) ?: FirstRunStep.WELCOME
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, FirstRunStep.WELCOME)
+    val step: StateFlow<Int> = savedState.getStateFlow(KEY_STEP, 0)
     val currency: StateFlow<String> =
         savedState.getStateFlow(KEY_CURRENCY, UserPreferencesRepository.defaultCurrency())
 
@@ -310,18 +292,17 @@ class OnboardingViewModel(
 
     fun next() {
         val current = step.value
-        if (current == FirstRunStep.WALLET || current == FirstRunStep.FIRST_ENTRY) return
-        val following = OnboardingFlow.next(current) ?: return
-        if (following == FirstRunStep.FIRST_ENTRY) return
-        savedState[KEY_SHORT] = true
-        savedState[KEY_STEP] = following.ordinal
+        // Leaving the focus step: start the feature list from what the user said they care about.
+        if (current == STEP_FOCUS) {
+            savedState[KEY_FEATURES] = ArrayList(FinancialFocus.initialFeatures(focuses.value).map { it.key })
+        }
+        // Category selection is mandatory: the review step needs at least one category.
+        if ((current == STEP_CATEGORIES || current == STEP_REVIEW) && picks.value.count == 0) return
+        savedState[KEY_STEP] = (current + 1).coerceAtMost(LAST_STEP)
     }
 
-    fun goTo(target: FirstRunStep) {
-        if (target.ordinal <= step.value.ordinal && target != FirstRunStep.FIRST_ENTRY) {
-            savedState[KEY_SHORT] = true
-            savedState[KEY_STEP] = target.ordinal
-        }
+    fun goTo(target: Int) {
+        if (target in 0..LAST_STEP && target <= step.value) savedState[KEY_STEP] = target
     }
 
     fun setPicks(value: CategoryPicks) {
@@ -330,10 +311,7 @@ class OnboardingViewModel(
     }
 
     fun back() {
-        val previous = OnboardingFlow.previous(step.value) ?: return
-        if (previous == FirstRunStep.FIRST_ENTRY) return
-        savedState[KEY_SHORT] = true
-        savedState[KEY_STEP] = previous.ordinal
+        savedState[KEY_STEP] = (step.value - 1).coerceAtLeast(0)
     }
 
     fun toggleFocus(focus: FinancialFocus) {
@@ -357,43 +335,16 @@ class OnboardingViewModel(
         viewModelScope.launch { preferences.setThemeMode(mode) }
     }
 
-    /**
-     * Saves the recommended categories and one cash wallet, then marks onboarding complete. The shell opens the
-     * composer because [UserPreferencesRepository.completeOnboarding] sets the pending-first-entry flag.
-     * An empty balance starts at zero. A second tap reuses a wallet of the same name instead of duplicating it.
-     */
-    fun finishWallet(name: String, balanceText: String) {
-        if (finishing) return
-        val code = currency.value
-        val separator = com.lucento.app.core.money.MoneyFormatter.decimalSeparator()
-        val balance = startingBalance(balanceText, code, separator)
-        if (balance == null) {
-            _error.value = "Enter an amount, or leave it empty to start at zero."
-            return
-        }
-        val walletName = name.trim().ifEmpty { FirstRunDefaults.DEFAULT_WALLET_NAME }
+    fun finish() {
+        if (finishing || picks.value.count == 0) return
         finishing = true
         _error.value = null
         viewModelScope.launch {
             try {
-                val picks = CategoryPicks(presetKeys = FirstRunDefaults.categoryPresetKeys())
-                categories.applySelection(picks.choices(emptyList()))
-                val repository = wallets
-                if (repository != null) {
-                    val existing = repository.observeWallets().first().firstOrNull {
-                        !it.type.isLiability && it.currencyCode == code && it.name.equals(walletName, ignoreCase = true)
-                    }
-                    val id = existing?.id ?: when (val result = repository.create(walletName, WalletType.CASH, balance)) {
-                        is com.lucento.app.data.repository.WalletRepository.SaveResult.Saved -> result.id
-                        else -> {
-                            _error.value = "That account couldn’t be saved. Nothing else was changed — please try again."
-                            finishing = false
-                            return@launch
-                        }
-                    }
-                    preferences.setDefaultWallet(id)
-                }
-                preferences.completeOnboarding(code, theme.value, FirstRunDefaults.features())
+                // Existing rows (only income categories on a fresh install) are matched by name, never duplicated.
+                categories.applySelection(picks.value.choices(emptyList()))
+                preferences.completeOnboarding(currency.value, theme.value, features.value)
+                // Connected on the sync step: start syncing now that the user's own setup is saved.
                 val context = appContext
                 if (context != null && syncPreferences?.isEnabled() == true && signedInEmail.value != null) {
                     com.lucento.app.data.sync.SyncScheduler.ensurePeriodic(context)
@@ -402,16 +353,34 @@ class OnboardingViewModel(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                android.util.Log.w("Lucento", "Saving the first account failed", e)
-                _error.value = "Your account couldn’t be saved. Nothing was changed — please try again."
+                android.util.Log.w("Lucento", "Saving onboarding categories failed", e)
+                _error.value = "Your categories couldn’t be saved. Nothing was changed — please try again."
                 finishing = false
             }
         }
     }
 
+    /**
+     * Skips the optional questions (focus and features) with safe defaults — every module on — and continues to the
+     * spending categories, which are never skipped.
+     */
+    fun skip() {
+        if (step.value >= STEP_CATEGORIES) return
+        savedState[KEY_FEATURES] = ArrayList(Feature.entries.map { it.key })
+        savedState[KEY_STEP] = STEP_CATEGORIES
+    }
+
     companion object {
+        const val STEP_WELCOME = 0
+        const val STEP_FOCUS = 1
+        const val STEP_FEATURES = 2
+        const val STEP_CATEGORIES = 3
+        const val STEP_REVIEW = 4
+        const val STEP_ESSENTIALS = 5
+        const val STEP_SYNC = 6
+        const val STEP_CONFIRM = 7
+        const val LAST_STEP = STEP_CONFIRM
         private const val KEY_STEP = "step"
-        private const val KEY_SHORT = "short_flow"
         private const val KEY_RESTORE = "restore_stage"
         private const val KEY_CURRENCY = "currency"
         private const val KEY_FOCUS = "focus"
@@ -435,3 +404,7 @@ class OnboardingViewModel(
         }
     }
 }
+
+/** The 1-based screen number sent with `onboarding_step_viewed`: welcome is 1, the confirmation is 8. */
+internal fun onboardingStepNumber(step: Int): Int = step.coerceIn(0, OnboardingViewModel.LAST_STEP) + 1
+
