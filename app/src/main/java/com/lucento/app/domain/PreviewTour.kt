@@ -14,6 +14,9 @@ data class PreviewExample(
 )
 
 object PreviewTour {
+    /** The invitation row. It leaves for good after the first real entry, or once the person opens it. */
+    fun showRow(realEntryCount: Int, opened: Boolean): Boolean = realEntryCount == 0 && !opened
+
     fun example(currencyCode: String): PreviewExample {
         val digits = CurrencyRules.fractionDigits(currencyCode)
         fun major(units: Long): Long {

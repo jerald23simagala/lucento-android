@@ -45,10 +45,9 @@ create policy "usage_events: insert"
 create or replace function public.purge_usage_events()
 returns void
 language sql
-set search_path = ''
 as $$
   delete from public.usage_events
-  where created_at < pg_catalog.now() - interval '90 days';
+  where created_at < now() - interval '90 days';
 $$;
 
 revoke all on function public.purge_usage_events() from public, anon, authenticated;
@@ -68,22 +67,19 @@ $$;
 revoke all on function public.delete_usage_events(uuid) from public;
 grant execute on function public.delete_usage_events(uuid) to anon, authenticated;
 
--- Supabase Free allows pg_cron when it is created in pg_catalog. Unschedule any job with this name
--- first so applying the file again does not stack a second daily purge.
-create extension if not exists pg_cron with schema pg_catalog;
-
+-- pg_cron is optional. When the extension is already installed, schedule a daily purge.
+-- When it is not, run `select public.purge_usage_events();` daily from the Supabase dashboard
+-- or enable pg_cron and schedule: cron.schedule('purge-usage-events', '15 3 * * *', 'select public.purge_usage_events()');
 do $$
-declare
-  existing bigint;
 begin
-  for existing in select jobid from cron.job where jobname = 'purge-usage-events'
-  loop
-    perform cron.unschedule(existing);
-  end loop;
-  perform cron.schedule(
-    'purge-usage-events',
-    '15 3 * * *',
-    'select public.purge_usage_events()'
-  );
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    if not exists (select 1 from cron.job where jobname = 'purge-usage-events') then
+      perform cron.schedule(
+        'purge-usage-events',
+        '15 3 * * *',
+        'select public.purge_usage_events()'
+      );
+    end if;
+  end if;
 end
 $$;

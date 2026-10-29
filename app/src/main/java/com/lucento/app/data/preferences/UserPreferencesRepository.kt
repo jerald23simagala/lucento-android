@@ -72,6 +72,10 @@ data class UserPreferences(
     val firstWeekDismissed: Boolean = false,
     /** The mascot's one reaction to the first real entry has already played. */
     val firstEntryCelebrated: Boolean = false,
+    /** The one-time "First week done" line has already been shown. */
+    val firstWeekDoneShown: Boolean = false,
+    /** The example-data invitation was opened. It does not come back. */
+    val examplePreviewOpened: Boolean = false,
     /** Open the composer once after the short first run, until the first entry is saved or skipped. */
     val pendingFirstEntry: Boolean = false,
     /** The first-week "check your week" step, set when Insights is opened. */
@@ -112,6 +116,8 @@ class UserPreferencesRepository(
         val dayOneHome = booleanPreferencesKey("day_one_home")
         val firstWeekDismissed = booleanPreferencesKey("first_week_dismissed")
         val firstEntryCelebrated = booleanPreferencesKey("first_entry_celebrated")
+        val firstWeekDoneShown = booleanPreferencesKey("first_week_done_shown")
+        val examplePreviewOpened = booleanPreferencesKey("example_preview_opened")
         val pendingFirstEntry = booleanPreferencesKey("pending_first_entry")
         val insightsChecked = booleanPreferencesKey("first_week_insights_checked")
         val budgetSuggestionSnoozedUntil = stringPreferencesKey("budget_suggestion_snoozed_until")
@@ -144,6 +150,8 @@ class UserPreferencesRepository(
                 dayOneHome = p[Keys.dayOneHome] ?: false,
                 firstWeekDismissed = p[Keys.firstWeekDismissed] ?: false,
                 firstEntryCelebrated = p[Keys.firstEntryCelebrated] ?: false,
+                firstWeekDoneShown = p[Keys.firstWeekDoneShown] ?: false,
+                examplePreviewOpened = p[Keys.examplePreviewOpened] ?: false,
                 pendingFirstEntry = p[Keys.pendingFirstEntry] ?: false,
                 insightsChecked = p[Keys.insightsChecked] ?: false,
                 budgetSuggestionSnoozedUntil = p[Keys.budgetSuggestionSnoozedUntil]
@@ -254,6 +262,14 @@ class UserPreferencesRepository(
 
     suspend fun setFirstEntryCelebrated() {
         context.dataStore.edit { it[Keys.firstEntryCelebrated] = true }
+    }
+
+    suspend fun setFirstWeekDoneShown() {
+        context.dataStore.edit { it[Keys.firstWeekDoneShown] = true }
+    }
+
+    suspend fun setExamplePreviewOpened() {
+        context.dataStore.edit { it[Keys.examplePreviewOpened] = true }
     }
 
     suspend fun setInsightsChecked() {

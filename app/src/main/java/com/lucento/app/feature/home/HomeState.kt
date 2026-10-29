@@ -23,6 +23,7 @@ import com.lucento.app.domain.NetWorthComposer
 import com.lucento.app.domain.NetWorthComposition
 import com.lucento.app.domain.PacePosition
 import com.lucento.app.domain.PeriodTotals
+import com.lucento.app.domain.PreviewTour
 import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.Transaction
@@ -198,6 +199,10 @@ data class HomeUiState(
     val dayOneHome: Boolean = false,
     val firstWeekDismissed: Boolean = false,
     val celebrateFirstEntry: Boolean = false,
+    /** The one-time "First week done" line has already been shown. */
+    val firstWeekDoneShown: Boolean = false,
+    /** The example-data row has been opened. It stays hidden afterwards. */
+    val examplePreviewOpened: Boolean = false,
     val budgetSuggestion: BudgetSuggestion? = null,
     val insightsChecked: Boolean = false,
     val loadError: Boolean = false,
@@ -209,7 +214,11 @@ data class HomeUiState(
             hasBill = hasAnySchedules,
             checkedInsights = insightsChecked,
         )
-    val showFirstWeekCard: Boolean get() = FirstWeek.show(dayOneHome, firstWeekDismissed)
+    private val firstWeekComplete: Boolean get() = firstWeekSteps.all { it.done }
+    val showFirstWeekCard: Boolean get() = FirstWeek.show(dayOneHome, firstWeekDismissed, firstWeekComplete)
+    val celebrateFirstWeekDone: Boolean
+        get() = FirstWeek.celebrateDone(dayOneHome, firstWeekDismissed, firstWeekDoneShown, firstWeekComplete)
+    val showExamplePreview: Boolean get() = PreviewTour.showRow(realEntryCount, examplePreviewOpened)
     val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
     val hasWallets: Boolean get() = wallets.isNotEmpty()
     val isCurrentMonth: Boolean get() = month == YearMonth.from(today)

@@ -126,6 +126,8 @@ class HomeViewModel(
                 dayOneHome = prefs.dayOneHome,
                 firstWeekDismissed = prefs.firstWeekDismissed,
                 celebrateFirstEntry = FirstWeek.celebrate(prefs.dayOneHome, prefs.firstEntryCelebrated, built.realEntryCount),
+                firstWeekDoneShown = prefs.firstWeekDoneShown,
+                examplePreviewOpened = prefs.examplePreviewOpened,
                 insightsChecked = prefs.insightsChecked,
                 budgetSuggestion = BudgetSuggestions.suggest(
                     expenses = spent,
@@ -150,6 +152,14 @@ class HomeViewModel(
 
     fun markFirstEntryCelebrated() {
         viewModelScope.launch { preferences.setFirstEntryCelebrated() }
+    }
+
+    fun markFirstWeekDoneShown() {
+        viewModelScope.launch { preferences.setFirstWeekDoneShown() }
+    }
+
+    fun markExamplePreviewOpened() {
+        viewModelScope.launch { preferences.setExamplePreviewOpened() }
     }
 
     fun markInsightsChecked() {

@@ -68,7 +68,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,11 +91,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -133,7 +134,6 @@ import com.lucento.app.domain.BudgetPlan
 import com.lucento.app.domain.BudgetSuggestion
 import com.lucento.app.domain.FirstWeek
 import com.lucento.app.domain.Feature
-import com.lucento.app.domain.PreviewExample
 import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalsOverview
 import com.lucento.app.domain.NetWorthComposition
@@ -179,8 +179,6 @@ data class HomeActions(
 @Composable
 fun HomeScreen(
     actions: HomeActions,
-    /** In-memory example. Null means the person's own figures. Never stored. */
-    preview: PreviewExample? = null,
     onPreview: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
@@ -199,7 +197,6 @@ fun HomeScreen(
         )
         if (scroll.value > 0) Hairline()
 
-        val dayOne = state.dayOneHome && state.hasWallets && !state.loading && !state.loadError
         Column(
             Modifier
                 .weight(1f)
@@ -207,13 +204,6 @@ fun HomeScreen(
                 .verticalScroll(scroll)
                 .padding(horizontal = Spacing.gutter),
         ) {
-        if (!dayOne) {
-            PreviewEntry(
-                preview = preview,
-                currency = state.primaryCurrency,
-                onPreview = onPreview,
-            )
-        }
         AnimatedContent(
             targetState = when {
                 state.loadError -> HomeContent.Error
@@ -246,9 +236,11 @@ fun HomeScreen(
                     viewModel.noteBudgetAdjust()
                     actions.onOpenBudget()
                 },
-                preview = if (dayOne) preview else null,
-                onPreview = onPreview,
-                showExampleRow = dayOne,
+                onFirstWeekDoneShown = viewModel::markFirstWeekDoneShown,
+                onOpenExample = {
+                    viewModel.markExamplePreviewOpened()
+                    onPreview(true)
+                },
             )
             }
         }
@@ -268,42 +260,6 @@ fun HomeScreen(
 }
 
 private enum class HomeContent { Loading, Error, Welcome, Overview }
-
-@Composable
-private fun PreviewEntry(preview: PreviewExample?, currency: String, onPreview: (Boolean) -> Unit) {
-    if (preview == null) {
-        LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.lg) {
-            Text("Preview with example data", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                "A labelled sample, kept in memory. It is not saved with your accounts.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LucentoTextButton(text = "Preview", onClick = { onPreview(true) })
-        }
-        Spacer(Modifier.height(Spacing.md))
-    } else {
-        LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.lg) {
-            Text("Preview", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text("Example balance", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-            MoneyText(money = preview.balance, style = AmountStyles.large, minScale = 0.6f)
-            Spacer(Modifier.height(Spacing.sm))
-            Text("Example entry", style = MaterialTheme.typography.titleSmall)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(preview.entryNote, modifier = Modifier.weight(1f), maxLines = 2)
-                AmountText(money = -preview.entry, showPlus = true)
-            }
-            Text(
-                "These figures are not yours. ${preview.balance.currencyCode.ifEmpty { currency }} sample only.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LucentoTextButton(text = "Back to my data", onClick = { onPreview(false) })
-        }
-        Spacer(Modifier.height(Spacing.md))
-    }
-}
 
 // ------------------------------------------------------------------ Header
 
@@ -596,16 +552,22 @@ private fun Overview(
     onUseSuggestion: () -> Unit,
     onCelebrateShown: () -> Unit,
     onAdjustSuggestion: () -> Unit,
-    preview: PreviewExample? = null,
-    onPreview: (Boolean) -> Unit = {},
-    showExampleRow: Boolean = false,
+    onFirstWeekDoneShown: () -> Unit = {},
+    onOpenExample: () -> Unit = {},
 ) {
     val f = state.features
     var showCelebration by rememberSaveable { mutableStateOf(false) }
+    var showWeekDone by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.celebrateFirstEntry) {
         if (state.celebrateFirstEntry) {
             showCelebration = true
             onCelebrateShown()
+        }
+    }
+    LaunchedEffect(state.celebrateFirstWeekDone) {
+        if (state.celebrateFirstWeekDone) {
+            showWeekDone = true
+            onFirstWeekDoneShown()
         }
     }
     Column {
@@ -622,7 +584,19 @@ private fun Overview(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = Spacing.sm)) {
                 LucentoMascot(size = 56.dp, mood = MascotMood.Celebrate, contentDescription = null)
                 Spacer(Modifier.width(Spacing.md))
-                Text(FirstWeek.REACTION, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(FirstWeek.REACTION, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 3)
+            }
+        }
+        if (showWeekDone) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = Spacing.sm)) {
+                LucentoMascot(size = 56.dp, mood = MascotMood.Celebrate, contentDescription = null)
+                Spacer(Modifier.width(Spacing.md))
+                Text(
+                    stringResource(R.string.home_first_week_done),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 3,
+                )
             }
         }
         BalanceAndRecent(state)
@@ -690,6 +664,10 @@ private fun Overview(
             Spacer(Modifier.height(Spacing.sm))
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
         }
+        if (state.showExamplePreview) {
+            Spacer(Modifier.height(Spacing.sm))
+            PreviewExampleRow(onOpenExample)
+        }
         if (state.dayOneHome) {
             state.budgetSuggestion?.let { suggestion ->
                 Spacer(Modifier.height(Spacing.md))
@@ -715,10 +693,6 @@ private fun Overview(
         if (f.isEnabled(Feature.RECURRING)) {
             Spacer(Modifier.height(Spacing.md))
             ScheduledCard(state, onOpen = actions.onOpenRecurring)
-        }
-        if (showExampleRow) {
-            Spacer(Modifier.height(Spacing.md))
-            PreviewExampleRow(preview, onPreview)
         }
     }
 }
@@ -841,28 +815,48 @@ private fun FirstWeekCard(
                 else -> onInsights
             }
             val label = FirstWeekActionLabel(step.id)
+            val spoken = buildString {
+                append(label)
+                step.progress?.let { append(", ").append(it) }
+                append(if (step.done) ", done" else ", not done")
+            }
             Row(
-                Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch),
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Sizes.minTouch)
+                    .clickable(role = Role.Button, onClick = open)
+                    .semantics(mergeDescendants = true) {
+                        role = Role.Button
+                        contentDescription = spoken
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(
                     checked = step.done,
                     onCheckedChange = null,
-                    modifier = Modifier.semantics {
-                        contentDescription = if (step.done) "$label, done" else label
-                    },
+                    modifier = Modifier.clearAndSetSemantics {},
                 )
-                TextButton(
-                    onClick = open,
-                    modifier = Modifier.weight(1f).heightIn(min = Sizes.minTouch),
-                ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 3,
+                    textDecoration = if (step.done) TextDecoration.LineThrough else null,
+                    modifier = Modifier.weight(1f).clearAndSetSemantics {},
+                )
+                step.progress?.let { progress ->
                     Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
+                        progress,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        modifier = Modifier.clearAndSetSemantics {},
                     )
+                    Spacer(Modifier.width(Spacing.xs))
                 }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.clearAndSetSemantics {},
+                )
             }
         }
     }
@@ -876,48 +870,20 @@ private fun FirstWeekActionLabel(stepId: String): String = when (stepId) {
     else -> stringResource(R.string.home_check_week)
 }
 
-/** A single row that opens or leaves the in-memory example. It does not write anything. */
+/** One tap opens the in-memory example. Hidden once opened, and once a real entry exists. */
 @Composable
-private fun PreviewExampleRow(preview: PreviewExample?, onPreview: (Boolean) -> Unit) {
-    val showing = preview != null
-    val stacked = LocalDensity.current.fontScale >= 1.3f
-    if (stacked) {
-        Column(Modifier.fillMaxWidth().padding(vertical = Spacing.xs)) {
-            PreviewExampleLabel(preview)
-            LucentoTextButton(
-                text = stringResource(if (showing) R.string.home_preview_back else R.string.home_preview_open),
-                onClick = { onPreview(!showing) },
-            )
-        }
-    } else {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.weight(1f)) { PreviewExampleLabel(preview) }
-            LucentoTextButton(
-                text = stringResource(if (showing) R.string.home_preview_back else R.string.home_preview_open),
-                onClick = { onPreview(!showing) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun PreviewExampleLabel(preview: PreviewExample?) {
-    if (preview == null) {
-        Text(stringResource(R.string.home_preview_example), style = MaterialTheme.typography.bodyLarge, maxLines = 3)
-    } else {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.home_preview_showing),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-                maxLines = 3,
-            )
-            Spacer(Modifier.width(Spacing.sm))
-            AmountText(money = -preview.entry, showPlus = true)
-        }
+private fun PreviewExampleRow(onOpen: () -> Unit) {
+    val label = stringResource(R.string.home_preview_example)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = Sizes.minTouch)
+            .clickable(role = Role.Button, onClick = onOpen)
+            .semantics { contentDescription = label },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 3)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
     }
 }
 
@@ -1805,7 +1771,6 @@ private fun DayOneHomeFontScalePreview() {
                 onUseSuggestion = {},
                 onCelebrateShown = {},
                 onAdjustSuggestion = {},
-                showExampleRow = true,
             )
         }
     }

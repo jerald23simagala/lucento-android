@@ -111,6 +111,7 @@ data class FirstWeekStep(
 object FirstWeek {
     const val MORE_ENTRIES = 3
     const val REACTION = "First one logged — nice."
+    const val DONE_MESSAGE = "First week done"
 
     fun steps(
         realEntryCount: Int,
@@ -127,12 +128,20 @@ object FirstWeek {
         )
     }
 
-    /** Only the short first run opts in. Dismiss sticks. Older finished installs never see the card. */
-    fun show(dayOneHome: Boolean, dismissed: Boolean): Boolean = dayOneHome && !dismissed
+    /**
+     * Only the short first run opts in. Dismiss sticks. The card also leaves once every step is done;
+     * the "First week done" line is separate and plays once.
+     */
+    fun show(dayOneHome: Boolean, dismissed: Boolean, allDone: Boolean): Boolean =
+        dayOneHome && !dismissed && !allDone
 
     /** The mascot reaction plays once, on the visit after the first real entry, for a day-one home. */
     fun celebrate(dayOneHome: Boolean, alreadyCelebrated: Boolean, realEntryCount: Int): Boolean =
         dayOneHome && !alreadyCelebrated && realEntryCount >= 1
+
+    /** One mascot line when the four steps are all done. Dismissing the card early skips it. */
+    fun celebrateDone(dayOneHome: Boolean, dismissed: Boolean, alreadyShown: Boolean, allDone: Boolean): Boolean =
+        dayOneHome && !dismissed && !alreadyShown && allDone
 
     /** Done steps and the size of the list, for the "1 of 4 done" label. */
     fun progress(steps: List<FirstWeekStep>): Pair<Int, Int> = steps.count { it.done } to steps.size

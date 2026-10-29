@@ -10,8 +10,9 @@
   suggest category amounts. Nothing sample is written. People who already finished onboarding are not sent through
   it again; a saved debts or budget step resumes at the next step that still exists.
 - Day-one Home shows the real balance and recent entries, a dismissible first-week card, and one mascot reaction
-  to the first entry. Home offers "Preview with example data": the sample stays in memory, is labelled Preview on
-  every screen, and is not written to the ledger. Home layout wraps at font scale 1.3 and 2.0 and at 360dp.
+  to the first entry. Home offers "See Lucento with example data" until the first real entry or until that row is
+  opened. The sample stays in memory, is labelled Preview on every screen, and is not written to the ledger.
+  Home layout wraps at font scale 1.3 and 2.0 and at 360dp.
 - Anonymous usage counts stay off until the person opts in. Eight event names are queued on the device and inserted
   only while opted in. Opting out calls `delete_usage_events` for that install id before the id is forgotten; a failed
   delete is kept and retried next launch. The SQL is committed and not applied to a live project.
