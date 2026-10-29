@@ -428,6 +428,61 @@ class SyncEngineTest {
         assertTrue(phone.transactions.rows.value.single().dirty)
     }
 
+    @Test
+    fun `sync now after an offline sign-out requires sign-in and downloads nothing`() = runTest {
+        val source = Device()
+        val cash = source.addWallet()
+        source.addTransaction(cash.id, 42_00)
+        success(source.sync())
+        assertEquals(1, server.live("transactions", user).size)
+
+        val phone = Device()
+        var token: String? = "access-token"
+        var downloads = 0
+        endLocalSession(
+            signOutLocal = { error("offline") },
+            clearSession = { token = null },
+        )
+        assertNull(token)
+
+        val real = server.remote(user)
+        val remote = object : SyncRemote by real {
+            override suspend fun currentUserId(): String? = if (token == null) null else user
+            override suspend fun fetchByIds(table: String, userId: String, ids: List<String>): List<JsonObject> {
+                downloads += 1
+                return real.fetchByIds(table, userId, ids)
+            }
+            override suspend fun fetchPage(
+                table: String,
+                userId: String,
+                sinceIso: String,
+                after: SyncRemote.PageKey?,
+                limit: Long,
+            ): List<JsonObject> {
+                downloads += 1
+                return real.fetchPage(table, userId, sinceIso, after, limit)
+            }
+        }
+        val result = SyncRepository(
+            remote,
+            phone.wallets,
+            phone.categories,
+            phone.transactions,
+            phone.budgets,
+            phone.goals,
+            phone.tombstones,
+            phone.prefs,
+            recurring = phone.recurring,
+            debtTerms = phone.debtTerms,
+            clock = { phone.now },
+        ).sync()
+
+        assertEquals(SyncResult.NotSignedIn, result)
+        assertEquals(0, downloads)
+        assertEquals(0, phone.transactions.rows.value.size)
+        assertEquals(1, server.live("transactions", user).size)
+    }
+
     // --- causal conflict resolution (server revisions) ---
 
     @Test

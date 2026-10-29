@@ -46,6 +46,36 @@ class OfflineSignOutTest {
         assertNull(storage.token)
     }
 
+    @Test fun appKilledMidSignOutLeavesNoUsableSessionOnNextLaunch() = runTest {
+        val storage = SessionStorage(token = "access-token")
+        val order = mutableListOf<String>()
+        val boundary = AccountBoundary(
+            currentUserId = { storage.token?.let { "user-1" } },
+            syncedUserId = { "user-1" },
+            hasUnsyncedChanges = { false },
+            prepare = {},
+            signOut = {
+                endLocalSession(
+                    signOutLocal = { error("offline") },
+                    clearSession = {
+                        order += "clear"
+                        storage.token = null
+                    },
+                )
+            },
+            wipe = {
+                order += "wipe"
+                error("killed")
+            },
+            exclusive = { block -> block() },
+        )
+        val killed = runCatching { boundary.signOutAndWipe() }
+        assertTrue(killed.exceptionOrNull() is IllegalStateException)
+        // The session is cleared before the wipe. Dying mid-wipe must not leave a token for the next launch.
+        assertEquals(listOf("clear", "wipe"), order)
+        assertNull(storage.relaunch())
+    }
+
     private class SessionStorage(var token: String?) {
         fun relaunch(): String? = token
     }

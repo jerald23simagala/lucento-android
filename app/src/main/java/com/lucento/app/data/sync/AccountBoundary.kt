@@ -56,6 +56,11 @@ class AccountBoundary(
         exclusive { signOut() }
     }
 
+    /**
+     * Clears the stored session, then removes this phone's ledger.
+     * [signOut] finishes first — and still deletes the session when the logout request fails offline — so a kill
+     * during [wipe] cannot leave a token the next launch would use to download the account.
+     */
     suspend fun signOutAndWipe() {
         exclusive {
             prepare()
