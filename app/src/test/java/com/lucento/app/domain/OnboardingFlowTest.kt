@@ -124,6 +124,15 @@ class OnboardingFlowTest {
         assertFalse(FirstWeek.celebrate(dayOneHome = false, alreadyCelebrated = false, realEntryCount = 5))
         val one = FirstWeek.steps(realEntryCount = 1, hasGoal = true, hasBill = false, checkedInsights = false)
         assertEquals(1 to 4, FirstWeek.progress(one))
+        val labelled = FirstWeek.steps(realEntryCount = 0, hasGoal = false, hasBill = false, checkedInsights = false)
+        assertEquals("Log 3 more expenses (0/3)", FirstWeek.label(labelled.first { it.id == "log3" }))
+        assertEquals("Set a savings goal", FirstWeek.label(labelled.first { it.id == "goal" }))
+        assertEquals("Add a bill or subscription", FirstWeek.label(labelled.first { it.id == "bill" }))
+        assertEquals("See your week", FirstWeek.label(labelled.first { it.id == "insights" }))
+        assertEquals(
+            "Log 3 more expenses (1/3)",
+            FirstWeek.label(FirstWeek.steps(realEntryCount = 2, hasGoal = false, hasBill = false, checkedInsights = false).first { it.id == "log3" }),
+        )
     }
 
     @Test

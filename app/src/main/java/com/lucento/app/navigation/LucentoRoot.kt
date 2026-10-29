@@ -76,6 +76,7 @@ import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
+import com.lucento.app.domain.PreviewTour
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.feature.budget.BudgetScreen
@@ -363,13 +364,17 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     items = tabs.map { it.item },
                     selectedKey = selectedTab,
                     onSelect = { item ->
-                        val tab = tabs.first { it.item.key == item.key }
-                        selectedTab = item.key
-                        navigateTo(tab.route)
+                        if (!previewing) {
+                            val tab = tabs.first { it.item.key == item.key }
+                            selectedTab = item.key
+                            navigateTo(tab.route)
+                        }
                     },
                     onAdd = {
-                        haptics.tick()
-                        openComposer()
+                        if (!previewing) {
+                            haptics.tick()
+                            openComposer()
+                        }
                     },
                 )
             }
@@ -411,6 +416,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 onOpenSettings = { push(SettingsRoute) },
                                 onAddEntry = { openComposer() },
                             ),
+                            preview = if (previewing) PreviewTour.example(preferences.primaryCurrency) else null,
                             onPreview = { previewing = it },
                         )
                     }

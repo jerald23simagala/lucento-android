@@ -133,6 +133,8 @@ import com.lucento.app.domain.BudgetBurn
 import com.lucento.app.domain.BudgetPlan
 import com.lucento.app.domain.BudgetSuggestion
 import com.lucento.app.domain.FirstWeek
+import com.lucento.app.domain.FirstWeekStep
+import com.lucento.app.domain.PreviewExample
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalsOverview
@@ -179,11 +181,23 @@ data class HomeActions(
 @Composable
 fun HomeScreen(
     actions: HomeActions,
+    /** In-memory example. Null means the person's own figures. Never stored. */
+    preview: PreviewExample? = null,
     onPreview: (Boolean) -> Unit = {},
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val real by viewModel.uiState.collectAsStateWithLifecycle()
+    var tourOpened by rememberSaveable { mutableStateOf(false) }
+    // The tour replaces every figure. The invitation row leaves only once that replacement is on screen.
+    LaunchedEffect(preview) {
+        if (preview != null) {
+            tourOpened = true
+            viewModel.markExamplePreviewOpened()
+        }
+    }
+    val state = if (preview == null) real else openExampleTour(real)
+    val showExampleInvite = preview == null && !tourOpened && real.showExamplePreview
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
 
     val scroll = rememberScrollState()
@@ -222,25 +236,41 @@ fun HomeScreen(
                 )
                 HomeContent.Overview -> Overview(
                     state = state,
-                    actions = actions.copy(onOpenInsights = {
-                        viewModel.markInsightsChecked()
-                        actions.onOpenInsights()
-                    }),
-                    onSelectMonth = viewModel::selectMonth,
-                    onDismissLocalDataNotice = viewModel::dismissLocalDataNotice,
-                    onDismissFirstWeek = viewModel::dismissFirstWeek,
-                    onSnoozeSuggestion = viewModel::snoozeBudgetSuggestion,
-                onUseSuggestion = viewModel::applyBudgetSuggestion,
-                onCelebrateShown = viewModel::markFirstEntryCelebrated,
-                onAdjustSuggestion = {
-                    viewModel.noteBudgetAdjust()
-                    actions.onOpenBudget()
-                },
-                onFirstWeekDoneShown = viewModel::markFirstWeekDoneShown,
-                onOpenExample = {
-                    viewModel.markExamplePreviewOpened()
-                    onPreview(true)
-                },
+                    actions = if (preview == null) {
+                        actions.copy(onOpenInsights = {
+                            viewModel.markInsightsChecked()
+                            actions.onOpenInsights()
+                        })
+                    } else {
+                        actions.copy(
+                            onOpenBudget = {},
+                            onChooseCategories = {},
+                            onOpenInsights = {},
+                            onOpenGoals = {},
+                            onOpenRecurring = { _ -> },
+                            onOpenWallets = {},
+                            onOpenDebts = {},
+                            onOpenSettings = {},
+                            onAddEntry = {},
+                        )
+                    },
+                    onSelectMonth = if (preview == null) viewModel::selectMonth else ({ _ -> }),
+                    onDismissLocalDataNotice = if (preview == null) viewModel::dismissLocalDataNotice else ({}),
+                    onDismissFirstWeek = if (preview == null) viewModel::dismissFirstWeek else ({}),
+                    onSnoozeSuggestion = if (preview == null) viewModel::snoozeBudgetSuggestion else ({}),
+                    onUseSuggestion = if (preview == null) viewModel::applyBudgetSuggestion else ({}),
+                    onCelebrateShown = if (preview == null) viewModel::markFirstEntryCelebrated else ({}),
+                    onAdjustSuggestion = if (preview == null) {
+                        {
+                            viewModel.noteBudgetAdjust()
+                            actions.onOpenBudget()
+                        }
+                    } else {
+                        {}
+                    },
+                    onFirstWeekDoneShown = if (preview == null) viewModel::markFirstWeekDoneShown else ({}),
+                    onOpenExample = { onPreview(true) },
+                    showExampleInvite = showExampleInvite,
             )
             }
         }
@@ -554,6 +584,7 @@ private fun Overview(
     onAdjustSuggestion: () -> Unit,
     onFirstWeekDoneShown: () -> Unit = {},
     onOpenExample: () -> Unit = {},
+    showExampleInvite: Boolean = state.showExamplePreview,
 ) {
     val f = state.features
     var showCelebration by rememberSaveable { mutableStateOf(false) }
@@ -664,7 +695,7 @@ private fun Overview(
             Spacer(Modifier.height(Spacing.sm))
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
         }
-        if (state.showExamplePreview) {
+        if (showExampleInvite) {
             Spacer(Modifier.height(Spacing.sm))
             PreviewExampleRow(onOpenExample)
         }
@@ -814,12 +845,8 @@ private fun FirstWeekCard(
                 "bill" -> onBill
                 else -> onInsights
             }
-            val label = FirstWeekActionLabel(step.id)
-            val spoken = buildString {
-                append(label)
-                step.progress?.let { append(", ").append(it) }
-                append(if (step.done) ", done" else ", not done")
-            }
+            val label = FirstWeekActionLabel(step)
+            val spoken = label + if (step.done) ", done" else ", not done"
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -843,15 +870,6 @@ private fun FirstWeekCard(
                     textDecoration = if (step.done) TextDecoration.LineThrough else null,
                     modifier = Modifier.weight(1f).clearAndSetSemantics {},
                 )
-                step.progress?.let { progress ->
-                    Text(
-                        progress,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        modifier = Modifier.clearAndSetSemantics {},
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                }
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
@@ -863,11 +881,11 @@ private fun FirstWeekCard(
 }
 
 @Composable
-private fun FirstWeekActionLabel(stepId: String): String = when (stepId) {
-    "log3" -> stringResource(R.string.home_add_expense)
+private fun FirstWeekActionLabel(step: FirstWeekStep): String = when (step.id) {
+    "log3" -> stringResource(R.string.home_log_more_expenses, step.progress ?: "0/3")
     "goal" -> stringResource(R.string.home_set_goal)
     "bill" -> stringResource(R.string.home_add_bill)
-    else -> stringResource(R.string.home_check_week)
+    else -> stringResource(R.string.home_see_week)
 }
 
 /** One tap opens the in-memory example. Hidden once opened, and once a real entry exists. */

@@ -124,8 +124,16 @@ object FirstWeek {
             FirstWeekStep("log3", "Log 3 more things", more >= MORE_ENTRIES, "$more/$MORE_ENTRIES"),
             FirstWeekStep("goal", "Set a savings goal", hasGoal),
             FirstWeekStep("bill", "Add a bill or subscription", hasBill),
-            FirstWeekStep("insights", "Check your week", checkedInsights),
+            FirstWeekStep("insights", "See your week", checkedInsights),
         )
+    }
+
+    /** The words on each row. The log counter moves as more expenses are saved. */
+    fun label(step: FirstWeekStep): String = when (step.id) {
+        "log3" -> "Log 3 more expenses (${step.progress})"
+        "goal" -> "Set a savings goal"
+        "bill" -> "Add a bill or subscription"
+        else -> "See your week"
     }
 
     /**

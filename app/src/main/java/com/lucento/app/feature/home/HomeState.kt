@@ -242,6 +242,9 @@ object HomeStateBuilder {
     /** The month selector reaches back two years at most. */
     const val MAX_SELECTABLE_MONTHS = 24
 
+    /** Recent on Home lists at most this many income and expense rows. */
+    const val RECENT_LIMIT = 3
+
     fun build(
         all: List<Transaction>,
         wallets: List<Wallet>,
@@ -310,7 +313,7 @@ object HomeStateBuilder {
             hasAnySchedules = activeSchedules.any { !it.isFinished },
             categoriesById = categories.associateBy { it.id },
             cloudStatus = cloudStatus,
-            recentEntries = entries.take(5),
+            recentEntries = entries.take(RECENT_LIMIT),
             realEntryCount = entries.size,
         )
     }
