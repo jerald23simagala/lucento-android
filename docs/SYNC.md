@@ -191,7 +191,9 @@ Main currency, theme and enabled modules are device preferences (DataStore), nev
 the local ledger (wallets, categories, transactions, budgets, goals, contributions, schedules, debt terms, goal
 photos) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
 again, as on a fresh install. Theme and other device preferences stay. Anything that had not synced is lost —
-the confirmation says so.
+the confirmation says so. The stored session is cleared before that wipe, including when the logout
+request fails offline, so the next launch is signed out. Sync now then requires sign-in and downloads nothing.
+If the app is killed while the ledger is being removed, no usable session remains.
 
 Signing in to a **different** account does the same wipe before any push. If nothing is waiting to sync, it happens
 immediately. If there are unsynced changes, Lucento asks first; cancelling signs out of the new account and leaves

@@ -27,6 +27,7 @@ import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
@@ -46,7 +47,17 @@ import java.security.SecureRandom
 class AuthRepository(
     private val client: SupabaseClient?,
     private val passwords: PasswordPolicy = PasswordPolicy(),
+    /** Synchronous, durable delete of the stored session ([SessionStore.clearNow]). */
+    private val clearStoredSession: () -> Boolean = { true },
+    /** Whether to try the server-side logout at all; offline it is skipped instead of waiting for a timeout. */
+    private val isOnline: () -> Boolean = { true },
 ) {
+
+    /**
+     * Deletes the stored session on the calling thread before anything else in sign-out runs, so a force-stop right
+     * after the confirm tap relaunches signed out (QA R6-01). The in-memory session is cleared by [signOut].
+     */
+    fun clearStoredSessionNow(): Boolean = runCatching { clearStoredSession() }.getOrDefault(false)
 
     sealed interface SignInResult {
         data object Success : SignInResult
@@ -219,9 +230,79 @@ class AuthRepository(
         client?.auth?.currentUserOrNull()?.id
     }.getOrNull()
 
-    /** Clears the Supabase session. The caller wipes the local ledger separately so accounts never mix. */
+    /** Access token of the session [signOut] ended, kept only in memory so [revokeOnServer] can run after the wipe. */
+    @Volatile private var endedAccessToken: String? = null
+
+    /**
+     * Ends the session on this device, locally only: no network call (QA R9-01). The caller wipes the local ledger
+     * afterwards and then calls [revokeOnServer]. The stored session is deleted first and durably, so a kill at any
+     * later point relaunches signed out.
+     */
     suspend fun signOut() {
-        runCatching { client?.auth?.signOut() }
+        val auth = client?.auth ?: return
+        endedAccessToken = runCatching { auth.currentAccessTokenOrNull() }.getOrNull()
+        clearStoredSessionNow()
+        endLocalSession(
+            clearSession = {
+                clearStoredSessionNow()
+                auth.clearSession()
+            },
+        )
+    }
+
+    /**
+     * Best-effort revoke of the session [signOut] ended (POST /auth/v1/logout, scope=local), capped at
+     * [REVOKE_TIMEOUT_MS] and skipped offline. Called only after the local wipe has committed.
+     */
+    suspend fun revokeOnServer() {
+        val token = endedAccessToken ?: return
+        endedAccessToken = null
+        if (client == null || !SupabaseModule.isConfigured || !isOnline()) return
+        withTimeoutOrNull(REVOKE_TIMEOUT_MS) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val url = java.net.URL(BuildConfig.SUPABASE_URL.trimEnd('/') + "/auth/v1/logout?scope=local")
+                    (url.openConnection() as java.net.HttpURLConnection).run {
+                        requestMethod = "POST"
+                        connectTimeout = REVOKE_TIMEOUT_MS.toInt()
+                        readTimeout = REVOKE_TIMEOUT_MS.toInt()
+                        setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                        setRequestProperty("Authorization", "Bearer $token")
+                        responseCode
+                        disconnect()
+                    }
+                }
+            }
+        }
+    }
+
+    private companion object {
+        const val REVOKE_TIMEOUT_MS = 5_000L
+    }
+}
+
+/**
+ * Ends the session stored on this device. [signOutLocal] is supabase-kt `signOut(LOCAL)`, which only deletes the
+ * stored session after the network call returns. A failed call must still run [clearSession], or the tokens
+ * survive and the next launch is signed in again.
+ */
+internal suspend fun endLocalSession(signOutLocal: suspend () -> Unit = {}, clearSession: suspend () -> Unit) {
+    try {
+        signOutLocal()
+    } catch (e: CancellationException) {
+        runCatching { clearSession() }
+        throw e
+    } catch (_: Exception) {
+        // Offline, or the server rejected the logout. The stored tokens still have to go.
+    }
+    // A failed first attempt is retried once; a second failure is thrown so the caller does not wipe the ledger
+    // while a usable session survives.
+    try {
+        clearSession()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        clearSession()
     }
 }
 

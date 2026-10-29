@@ -16,7 +16,17 @@ class AccountBoundary(
     private val wipe: suspend () -> Unit,
     private val signOut: suspend () -> Unit,
     private val exclusive: suspend (suspend () -> Unit) -> Unit = { block -> SyncFlight.exclusive { block() } },
+    /** Durably records (commit(), synchronous) that a wipe must happen. Must not touch the network. */
+    private val markWipePending: () -> Boolean = { true },
+    /** Best-effort server-side revoke of the ended session. Runs last, after the local wipe has committed. */
+    private val revoke: suspend () -> Unit = {},
 ) {
+    /**
+     * QA R9-01: call on the confirm tap, before any coroutine or network call. A kill at any later point leaves the
+     * marker behind, so the next launch finishes the wipe ([com.lucento.app.data.local.LocalLedgerReset.resumeIfInterrupted]).
+     */
+    fun markWipePendingNow(): Boolean = runCatching { markWipePending() }.getOrDefault(false)
+
     sealed interface AfterSignIn {
         /** Same account, or this phone has never synced. Nothing was removed. */
         data object Ready : AfterSignIn
@@ -54,13 +64,21 @@ class AccountBoundary(
     /** Stay with the previous ledger. The new session is dropped; nothing local is removed. */
     suspend fun cancelSwitch() {
         exclusive { signOut() }
+        runCatching { revoke() }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
     }
 
+    /**
+     * Order (QA R9-01): 1) durable wipe marker, 2) local session cleared (no network), 3) sync stopped and the ledger
+     * wiped, 4) only then the server revoke, if online. A kill after step 1 relaunches into a finished wipe; a kill
+     * before it leaves everything (session and data) as it was. The revoke can no longer delay the marker.
+     */
     suspend fun signOutAndWipe() {
+        check(markWipePendingNow()) { "Could not record the wipe" }
         exclusive {
-            prepare()
             signOut()
+            prepare()
             wipe()
         }
+        runCatching { revoke() }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
     }
 }

@@ -3,6 +3,7 @@ package com.lucento.app.data.sync
 import com.lucento.app.BuildConfig
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.SettingsSessionManager
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import kotlin.time.Duration.Companion.seconds
@@ -21,7 +22,7 @@ object SupabaseModule {
     val isGoogleSignInConfigured: Boolean
         get() = BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank()
 
-    fun create(): SupabaseClient? {
+    fun create(sessionStore: SessionStore? = null): SupabaseClient? {
         if (!isConfigured) return null
         return createSupabaseClient(
             supabaseUrl = BuildConfig.SUPABASE_URL,
@@ -30,7 +31,10 @@ object SupabaseModule {
             // The default 10 s is too short for the first request after a cold start (new DNS lookup, TLS and a
             // waking server), which is exactly when onboarding connects an account.
             requestTimeout = 30.seconds
-            install(Auth)
+            install(Auth) {
+                // Durable session writes (commit, not apply): see SessionStore and QA R6-01.
+                if (sessionStore != null) sessionManager = SettingsSessionManager(sessionStore.settings, sessionStore.key)
+            }
             install(Postgrest)
         }
     }

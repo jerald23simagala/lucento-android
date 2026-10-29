@@ -20,6 +20,7 @@ import com.lucento.app.core.network.observeOnline
 import com.lucento.app.core.crash.CrashReportsFlag
 import com.lucento.app.data.local.LocalLedgerReset
 import com.lucento.app.data.media.GoalPhotos
+import com.lucento.app.core.network.isOnlineNow
 import com.lucento.app.data.sync.AccountBoundary
 import com.lucento.app.data.sync.AuthRepository
 import com.lucento.app.data.sync.SupabaseModule
@@ -50,6 +51,10 @@ class LucentoApplication : Application() {
         // enabled before the rest of startup. DataStore is read only when the flag has never been written.
         CrashReporting.install(storedCrashReports())
         container = AppContainer(this)
+        // QA R9-02: finish an interrupted sign-out wipe before any screen can read (and show) the old ledger.
+        finishInterruptedWipeBeforeUi(container.ledgerReset::isPending) {
+            SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
+        }
         // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
@@ -67,6 +72,10 @@ class LucentoApplication : Application() {
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             // A different account already signed in, with nothing unsynced, is wiped before the next sync
             // so this phone never uploads the previous ledger. Unsynced changes wait for a confirmation in Settings.
+            // A sign-out wipe killed halfway is finished first (QA O-1).
+            // Normally already finished synchronously in onCreate (see finishInterruptedWipeBeforeUi); this is the
+            // fallback if that attempt threw.
+            com.lucento.app.data.sync.SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
             when (container.accountBoundary.afterSignIn()) {
                 AccountBoundary.AfterSignIn.Wiped -> {
                     container.syncPreferences.setEnabled(true)
@@ -133,9 +142,16 @@ class AppContainer(application: Application) {
 
     // --- optional cloud sync (see docs/SYNC.md); every value here is safe to hold even when unconfigured ---
 
-    private val supabaseClient by lazy { SupabaseModule.create() }
+    private val sessionStore: com.lucento.app.data.sync.SessionStore? by lazy {
+        if (SupabaseModule.isConfigured) com.lucento.app.data.sync.SessionStore.forApp(application, BuildConfig.SUPABASE_URL) else null
+    }
+    private val supabaseClient by lazy { SupabaseModule.create(sessionStore) }
     val syncPreferences: SyncPreferences by lazy { SyncPreferences(application) }
-    val auth: AuthRepository by lazy { AuthRepository(supabaseClient) }
+    val auth: AuthRepository by lazy { AuthRepository(
+            supabaseClient,
+            clearStoredSession = { sessionStore?.clearNow() ?: true },
+            isOnline = { application.isOnlineNow() },
+        ) }
 
     /** The composer's reader: Gemini when Smarter reading is on (see docs/CAPTURE.md), else this phone. */
     val interpreter: com.lucento.app.domain.capture.TransactionInterpreter by lazy {
@@ -161,8 +177,13 @@ class AppContainer(application: Application) {
         )
     }
 
-    private val ledgerReset: LocalLedgerReset by lazy {
-        LocalLedgerReset(database, syncPreferences, GoalPhotos(application), preferences)
+    val ledgerReset: LocalLedgerReset by lazy {
+        LocalLedgerReset(
+            database, syncPreferences, GoalPhotos(application), preferences,
+            marker = com.lucento.app.data.local.WipeMarker.Prefs(
+                application.getSharedPreferences("lucento_ledger_wipe", android.content.Context.MODE_PRIVATE),
+            ),
+        )
     }
 
     private val usageScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -184,6 +205,8 @@ class AppContainer(application: Application) {
     /** Sign-out and account switching. Wipes the local ledger before another account can sync. */
     val accountBoundary: AccountBoundary by lazy {
         AccountBoundary(
+            markWipePending = ledgerReset::markPending,
+            revoke = auth::revokeOnServer,
             currentUserId = auth::currentUserId,
             syncedUserId = syncPreferences::syncedUserId,
             hasUnsyncedChanges = syncRepository::hasUnsyncedChanges,
@@ -195,4 +218,13 @@ class AppContainer(application: Application) {
             signOut = auth::signOut,
         )
     }
+}
+
+/**
+ * QA R9-02: an interrupted sign-out wipe is finished before any Activity (and so any ViewModel or Room flow) starts,
+ * instead of racing the first screen that reads the ledger. Blocks onCreate only when the marker is set.
+ */
+internal fun finishInterruptedWipeBeforeUi(isPending: () -> Boolean, resume: suspend () -> Unit) {
+    if (!isPending()) return
+    runCatching { runBlocking(kotlinx.coroutines.Dispatchers.IO) { resume() } }
 }

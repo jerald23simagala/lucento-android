@@ -186,6 +186,12 @@ class SettingsViewModel(
     fun confirmAccountPrompt() {
         val current = prompt.value ?: return
         if (syncing.value) return
+        // Durable before the coroutine is even scheduled: a force-stop straight after this tap relaunches signed out.
+        // R9-01: the wipe marker is committed first, then the stored session goes; no network call before either.
+        if (current.kind == AccountPrompt.Kind.SIGN_OUT) {
+            accounts.markWipePendingNow()
+            auth.clearStoredSessionNow()
+        }
         viewModelScope.launch {
             syncing.value = true
             prompt.value = null
