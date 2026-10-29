@@ -29,6 +29,7 @@ import com.lucento.app.data.sync.SyncFlight
 import com.lucento.app.data.sync.SyncPreferences
 import com.lucento.app.data.sync.SyncRepository
 import com.lucento.app.data.sync.SyncScheduler
+import com.lucento.app.data.sync.shouldSyncOnLaunch
 import com.lucento.app.data.usage.SupabaseUsageRemote
 import com.lucento.app.domain.UsageCountsService
 import com.lucento.app.domain.UsageEventDeleter
@@ -82,7 +83,11 @@ class LucentoApplication : Application() {
                     SyncScheduler.ensurePeriodic(this@LucentoApplication)
                     container.syncRepository.sync()
                 }
-                else -> if (container.syncPreferences.isEnabled()) SyncScheduler.ensurePeriodic(this@LucentoApplication)
+                else -> if (container.syncPreferences.isEnabled()) {
+                    SyncScheduler.ensurePeriodic(this@LucentoApplication)
+                    // ensurePeriodic keeps an existing schedule (KEEP), so a launch alone never pulled (QA R6-11).
+                    if (shouldSyncOnLaunch(true, container.auth.currentUserId())) SyncScheduler.syncNow(this@LucentoApplication)
+                }
             }
         }
     }
