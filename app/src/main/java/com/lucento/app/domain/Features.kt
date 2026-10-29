@@ -68,11 +68,12 @@ enum class FinancialFocus(val title: String, val description: String, val featur
 
     companion object {
         /**
-         * Modules a new install starts with. Goals, recurring payments and debts are on
-         * ([FirstRunDefaults.DEBTS_ON_BY_DEFAULT] is true). A chosen focus can still add its modules (used when an
-         * older in-progress setup is resumed). Everything remains switchable in Settings.
+         * Initial modules for the chosen focuses. Budgets, multiple wallets, quick capture and insights are on by
+         * default because they make everyday tracking easier (Budget is a primary tab, built from the categories
+         * chosen in onboarding); the user can still turn them off.
          */
         fun initialFeatures(focuses: Set<FinancialFocus>): Set<Feature> =
-            FirstRunDefaults.features() + focuses.flatMap { it.features }
+            setOf(Feature.BUDGETS, Feature.MULTIPLE_WALLETS, Feature.INSIGHTS, Feature.RECEIPT_SCANNING, Feature.VOICE_ENTRY) +
+                focuses.flatMap { it.features }
     }
 }

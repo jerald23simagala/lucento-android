@@ -63,25 +63,6 @@ data class UserPreferences(
     val localDataNoticeSeen: Boolean = false,
     /** Where the guided setup after onboarding stands; null when finished or never started (older installs). */
     val guideStep: com.lucento.app.domain.GuideStep? = null,
-    /**
-     * True only after the short first run finishes. Older installs leave this false, so they are not shown the
-     * day-one card or sent through setup again.
-     */
-    val dayOneHome: Boolean = false,
-    /** The first-week card has been dismissed. Stays dismissed across restarts. */
-    val firstWeekDismissed: Boolean = false,
-    /** The mascot's one reaction to the first real entry has already played. */
-    val firstEntryCelebrated: Boolean = false,
-    /** The one-time "First week done" line has already been shown. */
-    val firstWeekDoneShown: Boolean = false,
-    /** The example-data invitation was opened. It does not come back. */
-    val examplePreviewOpened: Boolean = false,
-    /** Open the composer once after the short first run, until the first entry is saved or skipped. */
-    val pendingFirstEntry: Boolean = false,
-    /** The first-week "check your week" step, set when Insights is opened. */
-    val insightsChecked: Boolean = false,
-    /** Budget suggestions stay hidden until this date (exclusive). Null when they have not been snoozed. */
-    val budgetSuggestionSnoozedUntil: java.time.LocalDate? = null,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
@@ -113,14 +94,6 @@ class UserPreferencesRepository(
         val usageAdjustPending = booleanPreferencesKey("usage_adjust_pending")
         val usagePendingDeletion = stringPreferencesKey("usage_pending_deletion_install_id")
         val localDataNoticeSeen = booleanPreferencesKey("local_data_notice_seen")
-        val dayOneHome = booleanPreferencesKey("day_one_home")
-        val firstWeekDismissed = booleanPreferencesKey("first_week_dismissed")
-        val firstEntryCelebrated = booleanPreferencesKey("first_entry_celebrated")
-        val firstWeekDoneShown = booleanPreferencesKey("first_week_done_shown")
-        val examplePreviewOpened = booleanPreferencesKey("example_preview_opened")
-        val pendingFirstEntry = booleanPreferencesKey("pending_first_entry")
-        val insightsChecked = booleanPreferencesKey("first_week_insights_checked")
-        val budgetSuggestionSnoozedUntil = stringPreferencesKey("budget_suggestion_snoozed_until")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -147,15 +120,6 @@ class UserPreferencesRepository(
                 crashReports = p[Keys.crashReports] ?: false,
                 usageCounts = p[Keys.usageCounts] ?: false,
                 localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
-                dayOneHome = p[Keys.dayOneHome] ?: false,
-                firstWeekDismissed = p[Keys.firstWeekDismissed] ?: false,
-                firstEntryCelebrated = p[Keys.firstEntryCelebrated] ?: false,
-                firstWeekDoneShown = p[Keys.firstWeekDoneShown] ?: false,
-                examplePreviewOpened = p[Keys.examplePreviewOpened] ?: false,
-                pendingFirstEntry = p[Keys.pendingFirstEntry] ?: false,
-                insightsChecked = p[Keys.insightsChecked] ?: false,
-                budgetSuggestionSnoozedUntil = p[Keys.budgetSuggestionSnoozedUntil]
-                    ?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() },
             )
         }
 
@@ -171,12 +135,8 @@ class UserPreferencesRepository(
             it[Keys.categorySetupDone] = true
             it[Keys.onboardingComplete] = true
             it[Keys.localDataNoticeSeen] = true
-            // The wallet and the first entry happen in the short first run. The old guided setup is not started.
-            it.remove(Keys.guideStep)
-            it[Keys.dayOneHome] = true
-            it[Keys.pendingFirstEntry] = true
-            it[Keys.firstWeekDismissed] = false
-            it[Keys.firstEntryCelebrated] = false
+            // A new user continues into the guided setup (wallets, budget, goal, first transactions).
+            it[Keys.guideStep] = com.lucento.app.domain.GuideStep.WALLETS.key
         }
     }
 
@@ -252,33 +212,12 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.localDataNoticeSeen] = true }
     }
 
-    suspend fun setPendingFirstEntry(pending: Boolean) {
-        context.dataStore.edit { it[Keys.pendingFirstEntry] = pending }
-    }
 
-    suspend fun setFirstWeekDismissed() {
-        context.dataStore.edit { it[Keys.firstWeekDismissed] = true }
-    }
 
-    suspend fun setFirstEntryCelebrated() {
-        context.dataStore.edit { it[Keys.firstEntryCelebrated] = true }
-    }
 
-    suspend fun setFirstWeekDoneShown() {
-        context.dataStore.edit { it[Keys.firstWeekDoneShown] = true }
-    }
 
-    suspend fun setExamplePreviewOpened() {
-        context.dataStore.edit { it[Keys.examplePreviewOpened] = true }
-    }
 
-    suspend fun setInsightsChecked() {
-        context.dataStore.edit { it[Keys.insightsChecked] = true }
-    }
 
-    suspend fun setBudgetSuggestionSnoozedUntil(date: java.time.LocalDate) {
-        context.dataStore.edit { it[Keys.budgetSuggestionSnoozedUntil] = date.toString() }
-    }
 
     /** Saves the guided setup's progress; null when it is finished (or was never started, as for older installs). */
     suspend fun setGuideStep(step: com.lucento.app.domain.GuideStep?) {

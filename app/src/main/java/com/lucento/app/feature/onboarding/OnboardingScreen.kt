@@ -2,75 +2,90 @@ package com.lucento.app.feature.onboarding
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.lucento.app.core.designsystem.component.AmountTextField
 import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.CurrencyList
-import com.lucento.app.core.designsystem.component.IllustratedSurface
+import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
-import com.lucento.app.core.designsystem.component.LucentoIllustration
-import com.lucento.app.core.designsystem.component.LucentoMascot
-import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
-import com.lucento.app.core.designsystem.component.LucentoStackedLockup
-import com.lucento.app.core.designsystem.component.LucentoTextButton
-import com.lucento.app.core.designsystem.component.SwitchRow
 import com.lucento.app.core.designsystem.component.LucentoWorkingIndicator
+import com.lucento.app.core.designsystem.component.LucentoStackedLockup
+import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.MascotMood
-import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
+import com.lucento.app.core.designsystem.component.LucentoTextButton
+import com.lucento.app.core.designsystem.component.SegmentedToggle
+import com.lucento.app.core.designsystem.component.SwitchRow
+import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
-import com.lucento.app.domain.FirstRunDefaults
-import com.lucento.app.domain.FirstRunStep
+import com.lucento.app.data.preferences.ThemeMode
+import com.lucento.app.domain.Feature
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.graphics.SolidColor
+import com.lucento.app.core.designsystem.component.IllustratedSurface
+import com.lucento.app.core.designsystem.component.LucentoIllustration
+import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.domain.FinancialFocus
+import com.lucento.app.feature.budget.CategoryPicks
+import com.lucento.app.feature.budget.CategoryPresetPicker
+import com.lucento.app.feature.budget.CategoryReview
 
 @Composable
 fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModel.Factory)) {
     val step by viewModel.step.collectAsStateWithLifecycle()
     val currency by viewModel.currency.collectAsStateWithLifecycle()
+    val focuses by viewModel.focuses.collectAsStateWithLifecycle()
+    val features by viewModel.features.collectAsStateWithLifecycle()
+    val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val picks by viewModel.picks.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val signedInEmail by viewModel.signedInEmail.collectAsStateWithLifecycle()
     val connecting by viewModel.connecting.collectAsStateWithLifecycle()
@@ -78,9 +93,9 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     val restoreStage by viewModel.restoreStage.collectAsStateWithLifecycle()
     val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
     val switchPrompt by viewModel.switchPrompt.collectAsStateWithLifecycle()
-    val usageOptIn by viewModel.usageOptIn.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
 
+    // Anonymous usage counts (opt-in in Settings): one onboarding_step_viewed per screen. Draws nothing.
     LaunchedEffect(step) { viewModel.onStepShown(step) }
 
     if (switchPrompt) {
@@ -96,7 +111,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
         )
     }
 
-    BackHandler(enabled = step != FirstRunStep.WELCOME && restoreStage == RestoreStage.NONE) { viewModel.back() }
+    BackHandler(enabled = step > 0 && restoreStage == RestoreStage.NONE) { viewModel.back() }
     BackHandler(enabled = restoreStage != RestoreStage.NONE && restoreStage != RestoreStage.RESTORING) { viewModel.cancelRestore() }
 
     // Restoring an account on a new phone replaces the story with its own short flow.
@@ -123,14 +138,20 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
-            .imePadding()
             .padding(horizontal = Spacing.gutter, vertical = Spacing.lg),
     ) {
-        StepLabel(step)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StepIndicator(current = step, count = OnboardingViewModel.LAST_STEP + 1, modifier = Modifier.weight(1f))
+            // Focus and features are optional; spending categories are not, so Skip leads to them.
+            if (step in OnboardingViewModel.STEP_FOCUS until OnboardingViewModel.STEP_CATEGORIES) {
+                LucentoTextButton(text = "Skip", onClick = viewModel::skip)
+            }
+        }
+
         AnimatedContent(
             targetState = step,
             transitionSpec = {
-                val forward = targetState.ordinal > initialState.ordinal
+                val forward = targetState > initialState
                 (slideInHorizontally(tween(320)) { w -> if (forward) w / 6 else -w / 6 } + fadeIn(tween(320)))
                     .togetherWith(slideOutHorizontally(tween(220)) { w -> if (forward) -w / 6 else w / 6 } + fadeOut(tween(180)))
             },
@@ -138,39 +159,64 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
             label = "onboarding-step",
         ) { target ->
             when (target) {
-                FirstRunStep.WELCOME -> WelcomeStep(
+                OnboardingViewModel.STEP_WELCOME -> WelcomeStep(
                     onContinue = viewModel::next,
                     onRestore = if (viewModel.syncAvailable) viewModel::startRestore else null,
-                    usageOptIn = usageOptIn,
-                    onUsageOptIn = viewModel::setUsageOptIn,
                 )
-                FirstRunStep.CURRENCY -> CurrencyStep(
-                    currency = currency,
-                    onCurrency = viewModel::selectCurrency,
+                OnboardingViewModel.STEP_FOCUS -> FocusStep(focuses, viewModel::toggleFocus, viewModel::next)
+                OnboardingViewModel.STEP_FEATURES -> FeaturesStep(features, viewModel::setFeature, viewModel::next)
+                OnboardingViewModel.STEP_CATEGORIES -> CategoriesStep(picks, viewModel::setPicks, viewModel::next)
+                OnboardingViewModel.STEP_REVIEW -> CategoryReviewStep(
+                    picks = picks,
+                    onChange = viewModel::setPicks,
+                    onEdit = { viewModel.goTo(OnboardingViewModel.STEP_CATEGORIES) },
                     onContinue = viewModel::next,
                 )
-                FirstRunStep.WALLET, FirstRunStep.FIRST_ENTRY -> WalletStep(
+                OnboardingViewModel.STEP_ESSENTIALS -> EssentialsStep(
                     currency = currency,
-                    error = error,
-                    onContinue = viewModel::finishWallet,
+                    onCurrency = viewModel::selectCurrency,
+                    theme = theme,
+                    onTheme = viewModel::selectTheme,
+                    onContinue = viewModel::next,
                 )
+                OnboardingViewModel.STEP_SYNC -> SyncStep(
+                    available = viewModel.syncAvailable,
+                    googleAvailable = viewModel.googleAvailable,
+                    signedInEmail = signedInEmail,
+                    connecting = connecting,
+                    message = syncMessage,
+                    onGoogle = { viewModel.connectGoogle(context) },
+                    onEmail = viewModel::connectEmail,
+                    onPrepareEmail = viewModel::prepareConnection,
+                    onContinue = viewModel::next,
+                )
+                else -> ConfirmStep(currency, theme, features, picks.count, error, signedInEmail, onFinish = viewModel::finish)
             }
         }
     }
 }
 
-/** "Step N of 4", visible and read once when the screen is focused. Not a live region, so it is not repeated. */
 @Composable
-private fun StepLabel(step: FirstRunStep) {
-    val label = FirstRunStep.progressLabel(step)
-    Text(
-        label,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .padding(top = Spacing.sm, bottom = Spacing.md)
-            .semantics { contentDescription = label },
-    )
+private fun StepIndicator(current: Int, count: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .padding(top = Spacing.sm, bottom = Spacing.lg)
+            .semantics { contentDescription = "Step ${current + 1} of $count" },
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        repeat(count) { index ->
+            val color by animateColorAsState(
+                targetValue = if (index <= current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                label = "step-color",
+            )
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(4.dp)
+                    .background(color, RoundedCornerShape(2.dp)),
+            )
+        }
+    }
 }
 
 @Composable
@@ -182,35 +228,24 @@ private fun StepTitle(title: String, body: String) {
 }
 
 @Composable
-private fun WelcomeStep(
-    onContinue: () -> Unit,
-    onRestore: (() -> Unit)?,
-    usageOptIn: Boolean,
-    onUsageOptIn: (Boolean) -> Unit,
-) {
-    val mascot = if (LocalDensity.current.fontScale >= 1.3f) 96.dp else 140.dp
+private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
     Column(Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Spacer(Modifier.height(Spacing.md))
-            LucentoStackedLockup(symbolSize = if (LocalDensity.current.fontScale >= 1.3f) 72.dp else 96.dp, animate = true, wordmarkModifier = Modifier.semantics { heading() })
+            // The Rising Crest symbol settles in once (never blocks the button); reduced motion shows it complete.
+            LucentoStackedLockup(symbolSize = 96.dp, animate = true, wordmarkModifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(Spacing.sm))
             Text(
                 "Financial clarity without the complexity.",
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.semantics { heading() },
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            Text(
-                "Track what you spend, plan what’s next — privately, on this phone. No account, no bank login.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.xl))
+            // Lucento greets the user standing in its sunrise landscape (decorative artwork; the mascot keeps its label).
             IllustratedSurface(
                 illustration = LucentoIllustration.SunriseLandscape,
                 modifier = Modifier.fillMaxWidth(),
@@ -220,78 +255,23 @@ private fun WelcomeStep(
                 contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.sm),
             ) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LucentoMascot(size = mascot, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
+                    LucentoMascot(size = 140.dp, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
                 }
             }
             Spacer(Modifier.height(Spacing.lg))
-            InfoNote(
-                "Your data stays on this phone. Uninstalling Lucento or clearing its storage erases it, unless cloud sync is on.",
+            Text(
+                "Track what you spend, plan what’s next. Your data stays only on this phone unless you turn on cloud sync. No account, no bank login.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(Spacing.md))
-            SwitchRow(
-                title = "Share anonymous usage counts",
-                description = "Helps improve Lucento. Never amounts or what you type. Event names and timings only, with a random install id, kept 90 days.",
-                checked = usageOptIn,
-                onCheckedChange = onUsageOptIn,
-            )
-            Spacer(Modifier.height(Spacing.md))
         }
         LucentoPrimaryButton(text = "Get started", onClick = onContinue)
+        // Moving to a new phone: sign in and bring the account across instead of setting up from scratch.
         if (onRestore != null) {
             Spacer(Modifier.height(Spacing.xs))
             LucentoTextButton(text = "I already have an account", onClick = onRestore, modifier = Modifier.fillMaxWidth())
         }
-    }
-}
-
-@Composable
-private fun CurrencyStep(currency: String, onCurrency: (String) -> Unit, onContinue: () -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f)) {
-            StepTitle("Your main currency", "Used on Home and Insights. Each account keeps its own currency — Lucento never converts.")
-            CurrencyList(selected = currency, onSelect = onCurrency, modifier = Modifier.weight(1f).fillMaxWidth())
-        }
-        Spacer(Modifier.height(Spacing.md))
-        LucentoPrimaryButton(text = "Continue", onClick = onContinue)
-    }
-}
-
-@Composable
-private fun WalletStep(currency: String, error: String?, onContinue: (String, String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf(FirstRunDefaults.DEFAULT_WALLET_NAME) }
-    var balance by rememberSaveable { mutableStateOf("") }
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepTitle(
-                "What’s in your main account?",
-                "One account is enough to start. You can add more later in Wallets.",
-            )
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it.take(40) },
-                label = { Text("Name") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(Spacing.md))
-            AmountTextField(
-                value = balance,
-                onValueChange = { balance = it },
-                label = { Text("Balance") },
-                prefix = { Text(MoneyFormatter.currencySymbol(currency) + " ") },
-                supportingText = { Text("Leave empty to start at zero.") },
-                isError = error != null,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (error != null) {
-                Spacer(Modifier.height(Spacing.sm))
-                Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
-        }
-        Spacer(Modifier.height(Spacing.md))
-        LucentoPrimaryButton(text = "Continue", onClick = { onContinue(name, balance) })
     }
 }
 
@@ -399,26 +379,261 @@ internal fun RestoreFlow(
     }
 }
 
-@Preview(name = "Welcome 1.3", fontScale = 1.3f, widthDp = 360, heightDp = 760)
-@Preview(name = "Welcome 2.0", fontScale = 2.0f, widthDp = 360, heightDp = 760)
 @Composable
-private fun WelcomeFontScalePreview() {
-    LucentoTheme {
-        Column(Modifier.background(MaterialTheme.colorScheme.background).padding(Spacing.gutter)) {
-            StepLabel(FirstRunStep.WELCOME)
-            WelcomeStep(onContinue = {}, onRestore = {}, usageOptIn = false, onUsageOptIn = {})
+private fun FocusStep(selected: Set<FinancialFocus>, onToggle: (FinancialFocus) -> Unit, onContinue: () -> Unit) {
+    val haptics = rememberHaptics()
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle("What’s your main focus?", "Choose one or more. This only decides what’s switched on at first.")
+            FinancialFocus.entries.forEach { focus ->
+                val isSelected = focus in selected
+                val border by animateColorAsState(
+                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    tween(160),
+                    label = "focus-border",
+                )
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Spacing.xs)
+                        .heightIn(min = 64.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .border(BorderStroke(if (isSelected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
+                        .toggleable(value = isSelected, role = Role.Checkbox) {
+                            haptics.tick()
+                            onToggle(focus)
+                        }
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(focus.title, style = MaterialTheme.typography.titleMedium)
+                        Text(focus.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(
+                        if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = null,
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+    }
+}
+
+@Composable
+private fun FeaturesStep(enabled: Set<Feature>, onSet: (Feature, Boolean) -> Unit, onContinue: () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle("Choose your features", "Based on your focus. Change any of these later in Settings — nothing is ever deleted.")
+            Feature.entries.forEachIndexed { index, feature ->
+                val missing = feature.requires.filterNot { it in enabled }
+                SwitchRow(
+                    title = feature.title,
+                    description = feature.description,
+                    note = if (feature in enabled && missing.isNotEmpty()) "Needs ${missing.joinToString { it.title }}" else null,
+                    checked = feature in enabled,
+                    onCheckedChange = { onSet(feature, it) },
+                )
+                if (index < Feature.entries.lastIndex) Hairline()
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+    }
+}
+
+@Composable
+private fun CategoriesStep(picks: CategoryPicks, onChange: (CategoryPicks) -> Unit, onContinue: () -> Unit) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle(
+                "What do you spend on?",
+                "Pick the categories that fit your life — your budget is built from them. We’ve started you with " +
+                    "everyday essentials; add or remove anything. You’ll set amounts later, on the Budget tab.",
+            )
+            CategoryPresetPicker(picks = picks, onChange = onChange)
+            Spacer(Modifier.height(Spacing.lg))
+        }
+        Spacer(Modifier.height(Spacing.md))
+        LucentoPrimaryButton(
+            text = if (picks.count == 0) "Choose at least one category" else "Review ${picks.count} ${if (picks.count == 1) "category" else "categories"}",
+            onClick = onContinue,
+            enabled = picks.count > 0,
+        )
+    }
+}
+
+@Composable
+private fun CategoryReviewStep(
+    picks: CategoryPicks,
+    onChange: (CategoryPicks) -> Unit,
+    onEdit: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle(
+                "Your spending categories",
+                "Tap one to remove it. You can rename, reorder or add categories any time on the Budget tab.",
+            )
+            CategoryReview(picks = picks, onChange = onChange, onEdit = onEdit)
+            Spacer(Modifier.height(Spacing.lg))
+        }
+        Spacer(Modifier.height(Spacing.md))
+        LucentoPrimaryButton(
+            text = if (picks.count == 0) "Choose at least one category" else "Confirm ${picks.count} ${if (picks.count == 1) "category" else "categories"}",
+            onClick = onContinue,
+            enabled = picks.count > 0,
+        )
+    }
+}
+
+@Composable
+private fun EssentialsStep(
+    currency: String,
+    onCurrency: (String) -> Unit,
+    theme: ThemeMode,
+    onTheme: (ThemeMode) -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        StepTitle("Currency and look", "Your main currency is used for totals. Each wallet can still use its own.")
+        SegmentedToggle(
+            options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"),
+            selected = theme,
+            onSelect = onTheme,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        CurrencyList(selected = currency, onSelect = onCurrency, modifier = Modifier.weight(1f))
+        Spacer(Modifier.height(Spacing.md))
+        LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+    }
+}
+
+/**
+ * Optional cloud sync: back up and sync across devices by connecting Google or an email account. Turning it on needs
+ * an account; "Not now" keeps everything on this phone (sync can be turned on later in Settings).
+ */
+@Composable
+private fun SyncStep(
+    available: Boolean,
+    googleAvailable: Boolean,
+    signedInEmail: String?,
+    connecting: Boolean,
+    message: String?,
+    onGoogle: () -> Unit,
+    onEmail: (String, String, com.lucento.app.feature.settings.EmailMode) -> Unit,
+    onPrepareEmail: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            StepTitle(
+                "Back up and sync?",
+                "Keep your wallets, transactions, budgets, goals and recurring payments safe and the same on every device.",
+            )
+            when {
+                !available -> InfoNote("Cloud sync isn’t available in this version of Lucento. Everything works fully offline.")
+                signedInEmail != null -> InfoNote(
+                    "Connected as ${signedInEmail.ifEmpty { "your account" }}. Sync starts when you finish setting up.",
+                    icon = Icons.Filled.CloudDone,
+                    container = MaterialTheme.colorScheme.primaryContainer,
+                    content = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                else -> {
+                    InfoNote(
+                        "Optional. Your data stays only on this phone unless you connect an account and keep sync on. " +
+                            "Signing out removes that account’s data from this phone so it can’t be uploaded to a different one.",
+                    )
+                    Spacer(Modifier.height(Spacing.md))
+                    com.lucento.app.feature.settings.ConnectAccountPanel(
+                        busy = connecting,
+                        googleAvailable = googleAvailable,
+                        onGoogle = onGoogle,
+                        onEmail = onEmail,
+                        onPrepareEmail = onPrepareEmail,
+                    )
+                }
+            }
+            if (message != null) {
+                Spacer(Modifier.height(Spacing.sm))
+                Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        if (signedInEmail != null || !available) {
+            LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+        } else {
+            LucentoTextButton(text = "Not now — keep it on this phone", onClick = onContinue, modifier = Modifier.fillMaxWidth())
         }
     }
 }
 
-@Preview(name = "Currency 1.3", fontScale = 1.3f, widthDp = 360, heightDp = 760)
-@Preview(name = "Wallet 2.0", fontScale = 2.0f, widthDp = 360, heightDp = 760)
 @Composable
-private fun SetupFontScalePreview() {
-    LucentoTheme {
-        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(Spacing.gutter)) {
-            StepLabel(FirstRunStep.WALLET)
-            WalletStep(currency = "PHP", error = null, onContinue = { _, _ -> })
+private fun ConfirmStep(
+    currency: String,
+    theme: ThemeMode,
+    features: Set<Feature>,
+    categoryCount: Int,
+    error: String?,
+    signedInEmail: String?,
+    onFinish: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("You’re all set", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
+                    Text(
+                        "Here’s how Lucento will start.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                LucentoMascot(size = 72.dp, mood = MascotMood.Success)
+            }
+            Spacer(Modifier.height(Spacing.lg))
+            SummaryRow("Main currency", "$currency · ${MoneyFormatter.currencyName(currency)}")
+            SummaryRow(
+                "Appearance",
+                when (theme) {
+                    ThemeMode.SYSTEM -> "Follows your phone"
+                    ThemeMode.LIGHT -> "Light"
+                    ThemeMode.DARK -> "Dark"
+                },
+            )
+            SummaryRow("Spending categories", "$categoryCount chosen · set amounts on the Budget tab")
+            SummaryRow("Turned on", Feature.entries.filter { it in features }.joinToString { it.title }.ifEmpty { "Just the essentials" })
+            val off = Feature.entries.filterNot { it in features }
+            if (off.isNotEmpty()) SummaryRow("Turned off", off.joinToString { it.title })
+            SummaryRow("Cloud sync", signedInEmail?.let { "On · ${it.ifEmpty { "connected" }}" } ?: "Off · everything stays on this phone")
+            if (signedInEmail == null) {
+                InfoNote("Until you turn on cloud sync, wallets, transactions, budgets and goals stay only on this phone.")
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                if (signedInEmail != null) "Next: add your first wallet on Home. It syncs to your account automatically."
+                else "Next: add your first wallet on Home. Everything stays on this device.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (error != null) {
+                Spacer(Modifier.height(Spacing.md))
+                InfoNote(error, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
+            }
         }
+        LucentoPrimaryButton(text = "Start using Lucento", onClick = onFinish)
     }
+}
+
+@Composable
+private fun SummaryRow(label: String, value: String) {
+    Column(Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyLarge)
+    }
+    Hairline()
 }

@@ -20,15 +20,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,8 +75,9 @@ import com.lucento.app.feature.wallets.WalletEditorSheet
 import com.lucento.app.feature.wallets.WalletsViewModel
 
 /**
- * The guided setup for someone who already started it: accounts, then a goal, a first few transactions, and the
- * welcome. Debts and the budget gate are no longer steps. New installs do not enter this story.
+ * The guided setup after onboarding, one step per page: accounts, then cards and loans, budget amounts (two at
+ * least), one goal, a first few transactions, and the welcome. Everything is saved as the user goes, through the
+ * same sheets and repositories as the rest of the app, and the story resumes where it was left.
  */
 @Composable
 fun GuideScreen(
@@ -79,9 +87,17 @@ fun GuideScreen(
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Same as onboarding: one count each time a page comes on screen, keyed on the page.
+    if (!state.loading) LaunchedEffect(state.step) { viewModel.onStepShown(state.step) }
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
     var addingGoal by remember { mutableStateOf(false) }
     val haptics = rememberHaptics()
+    // The budget step's fields, kept here so its button can sit in the bottom bar with the other steps' buttons.
+    val budgetTexts = remember { mutableStateMapOf<Long, String>() }
+    var invalidBudgets by remember { mutableStateOf(emptySet<Long>()) }
+    val separator = remember { MoneyFormatter.decimalSeparator() }
+    fun budgetText(categoryId: Long): String =
+        budgetTexts[categoryId] ?: state.allocation(categoryId)?.let(MoneyFormatter::formatPlain).orEmpty()
 
     // Back walks the story backwards; on the first page it stays (the setup resumes here on the next launch anyway).
     BackHandler(enabled = !state.loading) { viewModel.back() }
@@ -109,9 +125,22 @@ fun GuideScreen(
                         addLabel = if (state.assets.isEmpty()) "Add your first account" else "Add another account",
                         onAdd = { editingWallet = WalletDraft(type = WalletType.BANK, currencyCode = state.currency, isDefault = state.assets.isEmpty()) },
                     )
-                    GuideStep.DEBTS, GuideStep.BUDGETS -> StepHeader(
-                        "You can set this later",
-                        "Cards, loans and category budgets are no longer part of setup. Continue, then add them from Wallets or Budget whenever you want.",
+                    GuideStep.DEBTS -> WalletsStep(
+                        title = "Any cards or loans?",
+                        body = "Add credit cards and loans so your net worth is honest. Skip this if you have none — you can add them later.",
+                        wallets = state.debts,
+                        addLabel = "Add a card or loan",
+                        onAdd = { editingWallet = WalletDraft(type = WalletType.CREDIT_CARD, currencyCode = state.currency) },
+                    )
+                    GuideStep.BUDGETS -> BudgetsStep(
+                        state = state,
+                        text = ::budgetText,
+                        invalid = invalidBudgets,
+                        separator = separator,
+                        onChange = { id, value ->
+                            budgetTexts[id] = value
+                            invalidBudgets = invalidBudgets - id
+                        },
                     )
                     GuideStep.GOAL -> GoalStep(state, onAdd = { addingGoal = true })
                     GuideStep.TRANSACTIONS -> TransactionsStep(state, onRecordTransactions)
@@ -122,7 +151,17 @@ fun GuideScreen(
 
         Spacer(Modifier.height(Spacing.sm))
         run {
-            if (state.step == GuideStep.WELCOME) {
+            if (state.step == GuideStep.BUDGETS) {
+                val required = GuidedSetup.budgetsRequired(state.expenseCategories.size)
+                val filled = state.expenseCategories.count { budgetText(it.id).isNotBlank() }
+                LucentoPrimaryButton(
+                    text = if (filled >= required) "Save and continue" else "Set ${required - filled} more to continue",
+                    enabled = filled >= required,
+                    onClick = {
+                        viewModel.saveBudgets(state.expenseCategories.associate { it.id to budgetText(it.id) }, separator) { invalidBudgets = it }
+                    },
+                )
+            } else if (state.step == GuideStep.WELCOME) {
                 LucentoPrimaryButton(text = "Go to Home", onClick = {
                     haptics.confirm()
                     viewModel.finish(onFinished)
@@ -193,6 +232,42 @@ private fun WalletsStep(title: String, body: String, wallets: List<Wallet>, addL
         Spacer(Modifier.height(Spacing.md))
     }
     LucentoSecondaryButton(text = addLabel, onClick = onAdd, icon = Icons.Outlined.Add)
+}
+
+@Composable
+private fun BudgetsStep(
+    state: GuideUiState,
+    text: (Long) -> String,
+    invalid: Set<Long>,
+    separator: Char,
+    onChange: (Long, String) -> Unit,
+) {
+    val required = GuidedSetup.budgetsRequired(state.expenseCategories.size)
+    StepHeader(
+        "Set your monthly budget",
+        "Give at least $required ${if (required == 1) "category" else "categories"} an amount for ${state.currency}. The rest can wait — your total budget is always the sum of these.",
+    )
+    val colors = OutlinedTextFieldDefaults.colors(
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    )
+    state.expenseCategories.forEach { category ->
+        AmountTextField(
+            value = text(category.id),
+            onValueChange = { onChange(category.id, it) },
+            filter = { it.take(20) },
+            label = { Text(category.name) },
+            prefix = { Text(MoneyFormatter.currencySymbol(state.currency) + " ") },
+            placeholder = { Text("Not set") },
+            isError = category.id in invalid,
+            supportingText = if (category.id in invalid) ({ Text("Enter an amount above zero, like 250${separator}00.") }) else null,
+            textStyle = AmountStyles.row,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+            shape = MaterialTheme.shapes.small,
+            colors = colors,
+            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.sm),
+        )
+    }
 }
 
 @Composable

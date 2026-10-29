@@ -127,7 +127,7 @@ fun WalletDetailScreen(
                     onAction = { adjusting = true },
                 )
                 wallet.type == WalletType.SAVINGS -> InfoNote(
-                    "Savings aren’t counted as money you can spend, so money you set aside stays set aside.",
+                    "Savings aren’t counted in Safe to spend, so money you set aside stays set aside.",
                     modifier = notes,
                 )
             }
