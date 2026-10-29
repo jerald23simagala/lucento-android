@@ -97,11 +97,19 @@ class SyncRepository(
 
         return try {
             // Claimed before the first push: once any row has reached this account, no other account may follow.
+            // First sign-in into an account that already has data: pull first, so the account's own categories are
+            // here, then drop this phone's unused categories the account doesn't have. Only then upload (QA R6-14).
+            val firstIntoExisting = owner == null && remoteHasData(r, userId)
             if (owner == null) preferences.setSyncedUserId(userId)
+            var report = SyncReport()
+            if (firstIntoExisting) {
+                report += pull(r, userId, Rejected())
+                dropUnusedLocalCategories()
+            }
             assignMissingCategoryIds(userId)
 
             val rejected = Rejected()
-            var report = pushTombstones(r, userId, rejected)
+            report += pushTombstones(r, userId, rejected)
             report += pushWallets(r, userId, rejected)
             report += pushCategories(r, userId, rejected)
             report += pushBudgets(r, userId, rejected)
@@ -153,6 +161,41 @@ class SyncRepository(
     private class Rejected {
         val ids = mutableMapOf<String, MutableSet<String>>()
         fun add(table: String, id: String) = ids.getOrPut(table) { mutableSetOf() }.add(id)
+    }
+
+    private suspend fun remoteHasData(r: SyncRemote, userId: String): Boolean {
+        val since = SyncTime.toIso(0)
+        return FIRST_SIGN_IN_PROBE.any { table -> r.fetchPage(table, userId, since, null, 1).isNotEmpty() }
+    }
+
+    /**
+     * After the first pull into an existing account: a local category with no server row (it was never synced) and
+     * nothing pointing at it — no transaction, budget or recurring schedule — is deleted. When the account has one of
+     * the same name, that is the merge: the account's copy stays. Anything referenced is kept, and a referenced copy
+     * with a matching name is folded later by [mergeDuplicateCategories], which moves its references.
+     * The server never had these rows, so their tombstones are marked sent rather than pushed.
+     * A type the account has no categories of at all (say, no income categories) is left alone: this phone's
+     * categories of that type are kept and uploaded, so the account is not left without any (QA R9-03).
+     */
+    private suspend fun dropUnusedLocalCategories(): Int {
+        val all = categories.getAll()
+        // R9-03: a type (expense, income, ...) the account has no categories of keeps this phone's ones; they upload.
+        val kindsOnServer = all.filter { it.syncedAt != null || it.baseRevision != null }.map { it.kind }.toSet()
+        val doomed = all.filter { c ->
+            FirstSignInCategories.drop(
+                hasServerRow = c.syncedAt != null || c.baseRevision != null,
+                accountHasKind = c.kind in kindsOnServer,
+                transactions = categories.transactionCount(c.id),
+                budgets = categories.budgetCount(c.id),
+                schedules = categories.recurringCount(c.id),
+            )
+        }
+        if (doomed.isEmpty()) return 0
+        doomed.forEach { categories.deleteById(it.id) }
+        val uuids = doomed.mapNotNull { it.clientUuid }.toSet()
+        val tombstones = syncMeta.unpushedTombstones().filter { it.tableName == "categories" && it.clientUuid in uuids }
+        if (tombstones.isNotEmpty()) syncMeta.markPushed(tombstones.map { it.id })
+        return doomed.size
     }
 
     // --- stable ids ---
@@ -828,3 +871,12 @@ private fun GoalRow.toEntity(localWalletId: Long?, photoPath: String?, syncedAt:
     walletId = localWalletId, archived = archived, createdAt = SyncTime.fromIso(createdAt), updatedAt = SyncTime.fromIso(updatedAt),
     sceneKey = sceneKey, photoPath = photoPath, clientUuid = this.id, dirty = false, syncedAt = syncedAt, baseRevision = revision,
 )
+
+/** Which local categories a first sign-in into an account with data removes (QA R6-14). */
+internal object FirstSignInCategories {
+    /** [accountHasKind]: the account already has at least one category of this one's type (QA R9-03). */
+    fun drop(hasServerRow: Boolean, transactions: Int, budgets: Int, schedules: Int, accountHasKind: Boolean = true): Boolean =
+        accountHasKind && !hasServerRow && transactions == 0 && budgets == 0 && schedules == 0
+}
+
+private val FIRST_SIGN_IN_PROBE = listOf("wallets", "categories", "transactions")

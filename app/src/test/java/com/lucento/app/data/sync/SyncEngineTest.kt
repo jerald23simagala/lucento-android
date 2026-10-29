@@ -146,6 +146,136 @@ class SyncEngineTest {
         assertTrue(phone.transactions.rows.value.all { it.categoryId == phone.categories.findByClientUuid("a-rent")!!.id })
     }
 
+    /** An account set up on an older phone: Rent (budgeted) and Water, plus a wallet. */
+    private suspend fun existingAccount(): Device {
+        val old = Device()
+        val rent = old.addCategory("Rent")
+        old.addCategory("Water")
+        val cash = old.addWallet()
+        old.addTransaction(cash.id, 900_00, categoryId = rent.id)
+        success(old.sync())
+        return old
+    }
+
+    @Test
+    fun `R6-14 first sign-in drops an unused local category the account does not have`() = runTest {
+        existingAccount()
+        val fresh = Device()
+        fresh.addCategory("Streaming services") // a preset this phone picked and never used
+        success(fresh.sync())
+
+        assertTrue(server.live("categories", user).none { it.str("name") == "Streaming services" })
+        assertTrue(fresh.categories.getAll().none { it.name == "Streaming services" })
+        assertEquals(setOf("Rent", "Water"), fresh.categories.getAll().map { it.name }.toSet())
+    }
+
+    @Test
+    fun `R6-14 first sign-in keeps a used local category and uploads it`() = runTest {
+        existingAccount()
+        val fresh = Device()
+        val gym = fresh.addCategory("Gym")
+        val wallet = fresh.addWallet("Wallet")
+        fresh.addTransaction(wallet.id, 50_00, categoryId = gym.id)
+        val books = fresh.addCategory("Books")
+        fresh.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = books.id, currencyCode = "USD", limitMinor = 0, createdAt = fresh.now, updatedAt = fresh.now, clientUuid = UUID.randomUUID().toString()))
+        success(fresh.sync())
+
+        val names = server.live("categories", user).map { it.str("name") }.toSet()
+        assertTrue("Gym" in names)
+        assertTrue("Books" in names) // a budget is a reference too
+        assertEquals("Gym", fresh.categories.getById(fresh.transactions.rows.value.first { it.amountMinor == 50_00L }.categoryId!!)!!.name)
+    }
+
+    @Test
+    fun `R6-14 a matching name merges into the account's copy, unused or used`() = runTest {
+        val old = existingAccount()
+        val accountRent = server.live("categories", user).single { it.str("name") == "Rent" }.str("id")
+        val fresh = Device()
+        fresh.addCategory("rent ") // unused copy: the account's Rent stays, no second row
+        val water = fresh.addCategory("Water")
+        val wallet = fresh.addWallet("Wallet")
+        fresh.addTransaction(wallet.id, 30_00, categoryId = water.id) // used copy: folded, spending kept
+        success(fresh.sync())
+        success(old.sync())
+
+        val live = server.live("categories", user)
+        assertEquals(1, live.count { it.str("name").trim().equals("rent", ignoreCase = true) })
+        assertEquals(accountRent, live.single { it.str("name").trim().equals("rent", ignoreCase = true) }.str("id"))
+        // The used copy folds into one Water on this phone. (The fake DAOs record no tombstone on delete, which the
+        // Room trigger does on a device, so the server side of that fold is covered by the existing fold test.)
+        assertEquals(1, fresh.categories.getAll().count { it.name == "Water" })
+        val tx = fresh.transactions.rows.value.first { it.amountMinor == 30_00L }
+        assertEquals("Water", fresh.categories.getById(tx.categoryId!!)!!.name)
+    }
+
+    @Test
+    fun `R6-14 a first sign-in into an empty account uploads everything as before`() = runTest {
+        val fresh = Device()
+        fresh.addCategory("Streaming services")
+        success(fresh.sync())
+        assertTrue(server.live("categories", user).any { it.str("name") == "Streaming services" })
+    }
+
+    @Test
+    fun `R9-03 an account with no income categories keeps this phone's income defaults and uploads them`() = runTest {
+        existingAccount() // expense categories only
+        val fresh = Device()
+        fresh.addCategory("Streaming services") // expense: the account has expense categories, so it is dropped
+        fresh.addCategory("Salary", kind = "INCOME")
+        fresh.addCategory("Freelance", kind = "INCOME")
+        success(fresh.sync())
+
+        val live = server.live("categories", user).map { it.str("name") }.toSet()
+        assertTrue("Salary" in live)
+        assertTrue("Freelance" in live)
+        assertTrue("Streaming services" !in live)
+        assertEquals(setOf("Rent", "Water", "Salary", "Freelance"), fresh.categories.getAll().map { it.name }.toSet())
+    }
+
+    @Test
+    fun `R9-03 an account that has income categories still drops unused local income ones`() = runTest {
+        val old = Device()
+        old.addCategory("Rent")
+        old.addCategory("Salary", kind = "INCOME")
+        old.addWallet()
+        success(old.sync())
+        val fresh = Device()
+        fresh.addCategory("Freelance", kind = "INCOME")
+        fresh.addCategory("Gifts", kind = "EXPENSE")
+        success(fresh.sync())
+
+        assertEquals(setOf("Rent", "Salary"), fresh.categories.getAll().map { it.name }.toSet())
+        assertEquals(setOf("Rent", "Salary"), server.live("categories", user).map { it.str("name") }.toSet())
+    }
+
+    @Test
+    fun `R9-03 an account with no categories of any type keeps every local default`() = runTest {
+        val old = Device()
+        old.addWallet() // data, but no categories at all
+        success(old.sync())
+        val fresh = Device()
+        fresh.addCategory("Groceries")
+        fresh.addCategory("Salary", kind = "INCOME")
+        success(fresh.sync())
+
+        assertEquals(setOf("Groceries", "Salary"), server.live("categories", user).map { it.str("name") }.toSet())
+    }
+
+    @Test
+    fun `R9-03 drop rule keeps a type the account lacks`() {
+        assertFalse(FirstSignInCategories.drop(hasServerRow = false, transactions = 0, budgets = 0, schedules = 0, accountHasKind = false))
+        assertTrue(FirstSignInCategories.drop(hasServerRow = false, transactions = 0, budgets = 0, schedules = 0, accountHasKind = true))
+    }
+
+    @Test
+    fun `R6-14 drop rule`() {
+        assertTrue(FirstSignInCategories.drop(hasServerRow = false, transactions = 0, budgets = 0, schedules = 0))
+        assertFalse(FirstSignInCategories.drop(hasServerRow = true, transactions = 0, budgets = 0, schedules = 0))
+        assertFalse(FirstSignInCategories.drop(hasServerRow = false, transactions = 1, budgets = 0, schedules = 0))
+        assertFalse(FirstSignInCategories.drop(hasServerRow = false, transactions = 0, budgets = 1, schedules = 0))
+        assertFalse(FirstSignInCategories.drop(hasServerRow = false, transactions = 0, budgets = 0, schedules = 1))
+    }
+
     @Test
     fun `first sign-in uploads existing local data, and retrying never duplicates it`() = runTest {
         val phone = Device()
