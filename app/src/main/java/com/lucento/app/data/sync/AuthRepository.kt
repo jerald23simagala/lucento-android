@@ -16,6 +16,7 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.lucento.app.BuildConfig
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.exception.AuthErrorCode
 import io.github.jan.supabase.auth.exception.AuthRestException
@@ -219,10 +220,35 @@ class AuthRepository(
         client?.auth?.currentUserOrNull()?.id
     }.getOrNull()
 
-    /** Clears the Supabase session. The caller wipes the local ledger separately so accounts never mix. */
+    /**
+     * Clears the Supabase session on this device. The caller wipes the local ledger separately so accounts never mix.
+     * The logout request is local-scope; if it fails (offline), the stored session is still deleted so a relaunch
+     * does not come back signed in and download the account again.
+     */
     suspend fun signOut() {
-        runCatching { client?.auth?.signOut() }
+        val auth = client?.auth ?: return
+        endLocalSession(
+            signOutLocal = { auth.signOut(SignOutScope.LOCAL) },
+            clearSession = { auth.clearSession() },
+        )
     }
+}
+
+/**
+ * Ends the session stored on this device. [signOutLocal] is supabase-kt `signOut(LOCAL)`, which only deletes the
+ * stored session after the network call returns. A failed call must still run [clearSession], or the tokens
+ * survive and the next launch is signed in again.
+ */
+internal suspend fun endLocalSession(signOutLocal: suspend () -> Unit, clearSession: suspend () -> Unit) {
+    try {
+        signOutLocal()
+    } catch (e: CancellationException) {
+        runCatching { clearSession() }
+        throw e
+    } catch (_: Exception) {
+        // Offline, or the server rejected the logout. The stored tokens still have to go.
+    }
+    clearSession()
 }
 
 /**
