@@ -67,4 +67,15 @@ object SyncScheduler {
         WorkManager.getInstance(context)
             .enqueueUniqueWork(MANUAL_WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }
+
+    /**
+     * A sync that must run after new local rows were saved. [ExistingWorkPolicy.APPEND_OR_REPLACE] chains it
+     * behind a sync that is already queued, instead of [ExistingWorkPolicy.KEEP] which would drop it and leave
+     * those rows unsent.
+     */
+    fun enqueueAfterLocalWrite(context: Context) {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(constraints).build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(MANUAL_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+    }
 }
