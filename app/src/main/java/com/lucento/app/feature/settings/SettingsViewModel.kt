@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import android.app.Application
 import android.content.Context
 import com.lucento.app.core.applicationContainerFactory
+import com.lucento.app.core.crash.CrashReportOptOut
 import com.lucento.app.core.crash.CrashReporting
+import com.lucento.app.domain.UsageCountsService
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.data.preferences.UserPreferencesRepository
@@ -70,6 +72,7 @@ class SettingsViewModel(
     private val syncPreferences: SyncPreferences,
     private val syncRepository: SyncRepository,
     private val accounts: AccountBoundary,
+    private val usage: UsageCountsService? = null,
 ) : ViewModel() {
 
     private val syncing = MutableStateFlow(false)
@@ -281,10 +284,26 @@ class SettingsViewModel(
         viewModelScope.launch { preferences.setSmartReading(enabled) }
     }
 
-    /** Off by default. Turning it off stops collection immediately; nothing but the stack is ever attached. */
+    /**
+     * The off choice is stored in DataStore and committed to `lucento_crash_reports` before collection
+     * is disabled and unsent reports are dropped.
+     */
     fun setCrashReports(enabled: Boolean) {
-        CrashReporting.setCollectionEnabled(enabled)
-        viewModelScope.launch { preferences.setCrashReports(enabled) }
+        viewModelScope.launch {
+            CrashReportOptOut.apply(
+                enabled = enabled,
+                persistDataStore = preferences::writeCrashReportsPreference,
+                persistMirror = preferences::commitCrashReportsMirror,
+                setCollectionEnabled = CrashReporting::setCollectionEnabled,
+                deleteUnsentReports = CrashReporting::deleteUnsentReports,
+            )
+        }
+    }
+
+    /** Anonymous usage counts. Off stops sending and clears the local queue. */
+    fun setUsageCounts(enabled: Boolean) {
+        val counts = usage ?: return
+        viewModelScope.launch { counts.setOptIn(enabled) }
     }
 
     fun setFeatureEnabled(feature: Feature, enabled: Boolean) {
@@ -331,6 +350,7 @@ class SettingsViewModel(
                 syncPreferences = container.syncPreferences,
                 syncRepository = container.syncRepository,
                 accounts = container.accountBoundary,
+                usage = container.usageCounts,
             )
         }
     }

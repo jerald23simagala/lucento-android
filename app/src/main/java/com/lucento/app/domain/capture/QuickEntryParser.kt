@@ -150,12 +150,29 @@ object QuickEntryParser {
         transferWords.any { lower.contains(it) } -> TransactionType.TRANSFER_OUT
         // "paid my credit card" is a transfer into the card, not new spending.
         Regex(" (paid|pay) (my )?(credit )?card ").containsMatchIn(lower) -> TransactionType.TRANSFER_OUT
-        incomeWords.any { lower.contains(it) } ||
-            AMOUNT_RIGHT_AFTER_GOT_OR_RECEIVED.containsMatchIn(lower) ||
-            GAVE_ME.containsMatchIn(lower) -> TransactionType.INCOME
+        incomeWords.any { lower.contains(it) } || GAVE_ME.containsMatchIn(lower) -> TransactionType.INCOME
+        // "got 500 from Jollibee": the amount sits where a gift would, but the place is somewhere the user spends.
+        // That is a purchase. "got 20 from mom" names no expense keyword, so it stays income.
+        AMOUNT_RIGHT_AFTER_GOT_OR_RECEIVED.containsMatchIn(lower) && mentionsExpenseKeyword(lower) -> TransactionType.EXPENSE
+        AMOUNT_RIGHT_AFTER_GOT_OR_RECEIVED.containsMatchIn(lower) -> TransactionType.INCOME
         expenseWords.any { lower.contains(it) } -> TransactionType.EXPENSE
         else -> null
     }
+
+    /** Income icon keys. Their words are not purchases ("salary", "client", "refund"). */
+    private val incomeIconKeys = setOf("work", "business", "investments", "refund")
+
+    /**
+     * True when [lower] names a place or thing the built-in expense keywords treat as spending
+     * ("jollibee", "groceries", "coffee"). Used so "got 500 from Jollibee" is an expense even when the
+     * only income cue is the amount sitting right after "got"/"received".
+     */
+    internal fun mentionsExpenseKeyword(lower: String): Boolean =
+        categoryKeywords.any { (key, words) ->
+            key !in incomeIconKeys && words.any { word ->
+                Regex("(?<![\\w])" + Regex.escape(word) + "(?![\\w])").containsMatchIn(lower)
+            }
+        }
 
     // ---------------------------------------------------------------- date
 

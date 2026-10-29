@@ -14,11 +14,12 @@ import com.lucento.app.core.crash.CrashReportsFlag
 import com.lucento.app.core.money.CurrencyRules
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
-import kotlinx.coroutines.Dispatchers
+import com.lucento.app.domain.UsageLedger
+import com.lucento.app.domain.UsageLedgerCodec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.Currency
 import java.util.Locale
@@ -53,6 +54,8 @@ data class UserPreferences(
     val smartReading: Boolean = false,
     /** Crash reports. Off until the user turns them on in Settings. Nothing is sent while this is false. */
     val crashReports: Boolean = false,
+    /** Anonymous usage counts. Off until the user opts in. Nothing is sent while this is false. */
+    val usageCounts: Boolean = false,
     /**
      * The one-time Home note that data stays on this phone and uninstalling erases it. New setup marks this seen.
      * Installs that finished onboarding before the note existed start unseen, so they are told once.
@@ -60,6 +63,25 @@ data class UserPreferences(
     val localDataNoticeSeen: Boolean = false,
     /** Where the guided setup after onboarding stands; null when finished or never started (older installs). */
     val guideStep: com.lucento.app.domain.GuideStep? = null,
+    /**
+     * True only after the short first run finishes. Older installs leave this false, so they are not shown the
+     * day-one card or sent through setup again.
+     */
+    val dayOneHome: Boolean = false,
+    /** The first-week card has been dismissed. Stays dismissed across restarts. */
+    val firstWeekDismissed: Boolean = false,
+    /** The mascot's one reaction to the first real entry has already played. */
+    val firstEntryCelebrated: Boolean = false,
+    /** The one-time "First week done" line has already been shown. */
+    val firstWeekDoneShown: Boolean = false,
+    /** The example-data invitation was opened. It does not come back. */
+    val examplePreviewOpened: Boolean = false,
+    /** Open the composer once after the short first run, until the first entry is saved or skipped. */
+    val pendingFirstEntry: Boolean = false,
+    /** The first-week "check your week" step, set when Insights is opened. */
+    val insightsChecked: Boolean = false,
+    /** Budget suggestions stay hidden until this date (exclusive). Null when they have not been snoozed. */
+    val budgetSuggestionSnoozedUntil: java.time.LocalDate? = null,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
@@ -81,7 +103,24 @@ class UserPreferencesRepository(
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
         val crashReports = booleanPreferencesKey("crash_reports")
+        val usageCounts = booleanPreferencesKey("usage_counts")
+        val usageInstallId = stringPreferencesKey("usage_install_id")
+        val usageInstalledAt = longPreferencesKey("usage_installed_at")
+        val usageOnboardingStartedAt = longPreferencesKey("usage_onboarding_started_at")
+        val usageOnboardingSeen = booleanPreferencesKey("usage_onboarding_seen")
+        val usageQueue = stringPreferencesKey("usage_queue")
+        val usageSent = stringSetPreferencesKey("usage_sent")
+        val usageAdjustPending = booleanPreferencesKey("usage_adjust_pending")
+        val usagePendingDeletion = stringPreferencesKey("usage_pending_deletion_install_id")
         val localDataNoticeSeen = booleanPreferencesKey("local_data_notice_seen")
+        val dayOneHome = booleanPreferencesKey("day_one_home")
+        val firstWeekDismissed = booleanPreferencesKey("first_week_dismissed")
+        val firstEntryCelebrated = booleanPreferencesKey("first_entry_celebrated")
+        val firstWeekDoneShown = booleanPreferencesKey("first_week_done_shown")
+        val examplePreviewOpened = booleanPreferencesKey("example_preview_opened")
+        val pendingFirstEntry = booleanPreferencesKey("pending_first_entry")
+        val insightsChecked = booleanPreferencesKey("first_week_insights_checked")
+        val budgetSuggestionSnoozedUntil = stringPreferencesKey("budget_suggestion_snoozed_until")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -106,7 +145,17 @@ class UserPreferencesRepository(
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
                 smartReading = p[Keys.smartReading] ?: false,
                 crashReports = p[Keys.crashReports] ?: false,
+                usageCounts = p[Keys.usageCounts] ?: false,
                 localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
+                dayOneHome = p[Keys.dayOneHome] ?: false,
+                firstWeekDismissed = p[Keys.firstWeekDismissed] ?: false,
+                firstEntryCelebrated = p[Keys.firstEntryCelebrated] ?: false,
+                firstWeekDoneShown = p[Keys.firstWeekDoneShown] ?: false,
+                examplePreviewOpened = p[Keys.examplePreviewOpened] ?: false,
+                pendingFirstEntry = p[Keys.pendingFirstEntry] ?: false,
+                insightsChecked = p[Keys.insightsChecked] ?: false,
+                budgetSuggestionSnoozedUntil = p[Keys.budgetSuggestionSnoozedUntil]
+                    ?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() },
             )
         }
 
@@ -122,8 +171,12 @@ class UserPreferencesRepository(
             it[Keys.categorySetupDone] = true
             it[Keys.onboardingComplete] = true
             it[Keys.localDataNoticeSeen] = true
-            // A new user continues into the guided setup (wallets, budget, goal, first transactions).
-            it[Keys.guideStep] = com.lucento.app.domain.GuideStep.WALLETS.key
+            // The wallet and the first entry happen in the short first run. The old guided setup is not started.
+            it.remove(Keys.guideStep)
+            it[Keys.dayOneHome] = true
+            it[Keys.pendingFirstEntry] = true
+            it[Keys.firstWeekDismissed] = false
+            it[Keys.firstEntryCelebrated] = false
         }
     }
 
@@ -148,14 +201,83 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.smartReading] = enabled }
     }
 
-    suspend fun setCrashReports(enabled: Boolean) {
-        // The flag is committed first so the next process enables collection before DataStore loads.
-        withContext(Dispatchers.IO) { CrashReportsFlag.set(crashReportsFlag, enabled) }
+    /** DataStore copy of the crash-report choice. Written before the synchronous mirror. */
+    suspend fun writeCrashReportsPreference(enabled: Boolean) {
         context.dataStore.edit { it[Keys.crashReports] = enabled }
+    }
+
+    /** Synchronous `lucento_crash_reports` mirror. [CrashReportsFlag.set] uses commit(), not apply(). */
+    fun commitCrashReportsMirror(enabled: Boolean) {
+        CrashReportsFlag.set(crashReportsFlag, enabled)
+    }
+
+    suspend fun readUsageLedger(): UsageLedger {
+        val prefs = context.dataStore.data.first()
+        return UsageLedger(
+            optedIn = prefs[Keys.usageCounts] ?: false,
+            installId = prefs[Keys.usageInstallId],
+            installedAtMillis = prefs[Keys.usageInstalledAt],
+            onboardingStartedAtMillis = prefs[Keys.usageOnboardingStartedAt],
+            onboardingSeen = prefs[Keys.usageOnboardingSeen] ?: false,
+            queue = UsageLedgerCodec.decode(prefs[Keys.usageQueue].orEmpty()),
+            sent = prefs[Keys.usageSent].orEmpty(),
+            adjustPending = prefs[Keys.usageAdjustPending] ?: false,
+            pendingDeletionInstallId = prefs[Keys.usagePendingDeletion],
+        )
+    }
+
+    suspend fun writeUsageLedger(ledger: UsageLedger) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.usageCounts] = ledger.optedIn
+            if (ledger.installId == null) prefs.remove(Keys.usageInstallId) else prefs[Keys.usageInstallId] = ledger.installId
+            if (ledger.installedAtMillis == null) prefs.remove(Keys.usageInstalledAt) else prefs[Keys.usageInstalledAt] = ledger.installedAtMillis
+            if (ledger.onboardingStartedAtMillis == null) {
+                prefs.remove(Keys.usageOnboardingStartedAt)
+            } else {
+                prefs[Keys.usageOnboardingStartedAt] = ledger.onboardingStartedAtMillis
+            }
+            prefs[Keys.usageOnboardingSeen] = ledger.onboardingSeen
+            prefs[Keys.usageQueue] = UsageLedgerCodec.encode(ledger.queue)
+            prefs[Keys.usageSent] = ledger.sent
+            prefs[Keys.usageAdjustPending] = ledger.adjustPending
+            if (ledger.pendingDeletionInstallId == null) {
+                prefs.remove(Keys.usagePendingDeletion)
+            } else {
+                prefs[Keys.usagePendingDeletion] = ledger.pendingDeletionInstallId
+            }
+        }
     }
 
     suspend fun setLocalDataNoticeSeen() {
         context.dataStore.edit { it[Keys.localDataNoticeSeen] = true }
+    }
+
+    suspend fun setPendingFirstEntry(pending: Boolean) {
+        context.dataStore.edit { it[Keys.pendingFirstEntry] = pending }
+    }
+
+    suspend fun setFirstWeekDismissed() {
+        context.dataStore.edit { it[Keys.firstWeekDismissed] = true }
+    }
+
+    suspend fun setFirstEntryCelebrated() {
+        context.dataStore.edit { it[Keys.firstEntryCelebrated] = true }
+    }
+
+    suspend fun setFirstWeekDoneShown() {
+        context.dataStore.edit { it[Keys.firstWeekDoneShown] = true }
+    }
+
+    suspend fun setExamplePreviewOpened() {
+        context.dataStore.edit { it[Keys.examplePreviewOpened] = true }
+    }
+
+    suspend fun setInsightsChecked() {
+        context.dataStore.edit { it[Keys.insightsChecked] = true }
+    }
+
+    suspend fun setBudgetSuggestionSnoozedUntil(date: java.time.LocalDate) {
+        context.dataStore.edit { it[Keys.budgetSuggestionSnoozedUntil] = date.toString() }
     }
 
     /** Saves the guided setup's progress; null when it is finished (or was never started, as for older installs). */

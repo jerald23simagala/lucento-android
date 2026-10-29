@@ -164,4 +164,14 @@ class HomeStateBuilderTest {
         assertTrue(hidden.upcoming.isEmpty())
         assertNull(hidden.goals)
     }
+
+    @Test fun recentShowsAtMostThreeEntriesNewestFirst() {
+        val dates = listOf("2025-03-01", "2025-03-02", "2025-03-03", "2025-03-04", "2025-03-05")
+        val state = HomeStateBuilder.build(dates.map { tx(100, it) }, listOf(wallet("USD", 1_000)), emptyList(), "USD", today)
+        assertEquals(3, state.recentEntries.size)
+        assertEquals(
+            listOf("2025-03-05", "2025-03-04", "2025-03-03").map(LocalDate::parse),
+            state.recentEntries.map { it.date },
+        )
+    }
 }

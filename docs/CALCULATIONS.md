@@ -26,7 +26,7 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 | Income/expense trend | INCOME and EXPENSE per month (zero-filled); transfers never appear | `Insights.incomeExpenseTrend` |
 | Upcoming payments | next unpaid occurrence of each active schedule due within 30 days (overdue flagged), date order, max 4. Listing never records anything | `RecurringMath.upcomingPayments` |
 | Safe to spend — with category allocations | budget − budgeted spending − unpaid recurring expenses in budgeted categories due by month end (overdue included) | `CashflowCalculator.safeToSpend` |
-| Safe to spend — without a budget (estimate, labelled) | cash + bank + e-wallet balances − unpaid recurring expenses due by month end. Savings and liabilities excluded | same |
+| Safe to spend — without a budget (estimate, labelled) | cash + bank + e-wallet balances − unpaid recurring expenses due by month end that are paid from those accounts. Savings, liabilities, and bills paid from them are excluded | same |
 | Safe per day | safe to spend ÷ days left incl. today, rounded down; shown only when positive | same |
 | Category spent | EXPENSE in the calendar month, budget currency, matching category. No rollover; refunds recorded as income are not netted | `BudgetCalculator` |
 | Budget status | over when spent > limit; near when spent × 100 ≥ limit × 80 (exact, no rounding) | `BudgetProgress.status` |
@@ -45,8 +45,9 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
   Budget tab explains this once and offers "Remove the old limit" (`BudgetRepository.removeLegacyOverall`).
 - Savings-goal contributions are earmarks, not expenses; transfers and debt principal repayments are transfers. None
   of them count as budget spending unless the user records an actual EXPENSE.
-- Categories: a fresh install seeds only income categories; onboarding requires choosing at least one expense
-  category from the preset library (`CategoryPresets`) or custom names. Applying a selection (`CategorySelection`)
+- Categories: a fresh install seeds only income categories. The short first run then applies the recommended
+  expense presets (`FirstRunDefaults.categoryPresetKeys`) without asking. The same picker stays in Settings and on
+  the Budget screen. Applying a selection (`CategorySelection`)
   reuses categories by normalised name (case, spacing, "&" = "and"), restores archived matches with their ids,
   creates the rest, and deactivates unchosen ones (archived when used, deleted only when unused). No schema change
   was needed, so the database stays at version 3.

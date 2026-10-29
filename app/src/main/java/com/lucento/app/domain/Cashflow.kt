@@ -14,9 +14,10 @@ import java.time.temporal.ChronoUnit
  *
  * - [Basis.BUDGET] (category allocations exist in this currency; their sum is the budget, see [BudgetPlanner]):
  *   `budget − budgeted spending this month − unpaid recurring expenses in budgeted categories due by month end`.
- * - [Basis.BALANCES] (no allocations): `spendable balances − unpaid recurring expenses due by month end`.
- *   Spendable balances are cash, bank and e-wallet accounts only; savings and liabilities are excluded,
- *   so money set aside is never presented as spendable. This is an estimate and is labelled as one.
+ * - [Basis.BALANCES] (no allocations): `spendable balances − unpaid recurring expenses due by month end`
+ *   that are paid from a spendable account. Spendable balances are cash, bank and e-wallet only; savings and
+ *   liabilities are excluded, and a bill paid from one of those is not subtracted again. This is an estimate
+ *   and is labelled as one.
  *
  * Transfers never count as spending. The amount may be negative (over budget / overcommitted) and is
  * shown honestly rather than clamped.
@@ -108,7 +109,14 @@ object CashflowCalculator {
             }
             spendable != null -> {
                 spent = expensesIn(transactions, currencyCode, month)
-                committed = RecurringMath.committedExpenses(schedules, currencyCode, monthEnd)
+                // Savings (and other non-spendable accounts) are already out of [spendable]. A bill paid from
+                // one of them must not be subtracted again.
+                val spendableIds = spendableWallets.map { it.id }.toSet()
+                committed = RecurringMath.committedExpenses(
+                    schedules.filter { it.walletId in spendableIds },
+                    currencyCode,
+                    monthEnd,
+                )
                 SafeToSpend.Basis.BALANCES to (spendable - committed)
             }
             else -> return null
