@@ -38,6 +38,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import com.lucento.app.data.sync.uploadRequests
 
 class LucentoApplication : Application() {
     lateinit var container: AppContainer
@@ -55,6 +56,12 @@ class LucentoApplication : Application() {
             container.usageCounts.retryPendingDeletion()
             observeOnline().collect { online ->
                 if (online) container.usageCounts.retryPendingDeletion()
+            }
+        }
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now".
+            uploadRequests(container.syncRepository.observePendingChanges()).collect {
+                if (container.syncPreferences.isEnabled()) SyncScheduler.enqueueAfterLocalWrite(this@LucentoApplication)
             }
         }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
