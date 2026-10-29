@@ -124,6 +124,17 @@ class ThemeContrastTest {
     }
 
     @Test
+    fun `gold marks clear non-text contrast on light chips and ivory`() {
+        val lightChip = Color(0xFFF8FAFF)
+        val ivory = Color(0xFFFFFDF5)
+        val star = contrastingMark(Color(0xFFFFC928), lightChip, LightExtended.accentMark)
+        assertAtLeast(3.0, star, lightChip, "selected star on night chip")
+        assertAtLeast(3.0, LightExtended.accentMark, ivory, "onboarding gold mark on ivory")
+        assertAtLeast(3.0, DarkExtended.accentMark, DarkColors.background, "gold mark on night background")
+        assertAtLeast(3.0, contrastingMark(Color(0xFFFFC928), Color(0xFF17233F), LightExtended.accentMark), Color(0xFF17233F), "star on navy chip")
+    }
+
+    @Test
     fun `category and wallet glyphs stay legible on their tiles`() {
         listOf(LightExtended, DarkExtended).forEach { x ->
             (x.categoryTones.values + x.categoryFallback + listOf(x.cash, x.bank, x.eWallet, x.savings, x.credit, x.loan))

@@ -158,6 +158,11 @@ data class LucentoExtendedColors(
     val accent: Color,
     /** Yellow/amber that meets text contrast on the app background. */
     val accentText: Color,
+    /**
+     * Gold mark for icons and progress dots. Meets 3:1 on ivory, white, and the light inverse chip (`#F8FAFF`).
+     * Bright sunlight (`#FFC928`) stays [accent] for fills on navy, where it already passes.
+     */
+    val accentMark: Color,
     /** Bright tangerine: warm brand accent, never a status colour. */
     val warmAccent: Color,
     /** Ink on a sunlight or tangerine fill (navy in both themes: the fills don't change at night). */
@@ -272,6 +277,7 @@ internal val LightExtended = LucentoExtendedColors(
     infoContainer = Palette.PaleSky,
     accent = Palette.SunlightYellow,
     accentText = Palette.AmberText,
+    accentMark = Palette.Warning,
     warmAccent = Palette.BrightTangerine,
     onAccent = Palette.MidnightNavy,
     borderDefault = Palette.Border,
@@ -321,6 +327,13 @@ fun Color.compositeOver(behind: Color): Color {
     )
 }
 
+/**
+ * [preferred] when it clears [minimum] against [background] (icons need 3:1); otherwise [fallback].
+ * Used for the default-wallet star, which is gold on a navy chip by day and must switch on the light night chip.
+ */
+fun contrastingMark(preferred: Color, background: Color, fallback: Color, minimum: Double = 3.0): Color =
+    if (contrastRatio(preferred, background) >= minimum) preferred else fallback
+
 /** White when it clears WCAG AA on [fill] (blended over [behind]); midnight navy otherwise. */
 fun readableOn(fill: Color, behind: Color): Color {
     val flat = fill.compositeOver(behind)
@@ -351,6 +364,8 @@ internal val DarkExtended = LucentoExtendedColors(
     infoContainer = Color(0xFF1C2B55),
     accent = Palette.SunlightYellow,
     accentText = Palette.SunlightYellow,
+    // Same amber as day: bright gold fails 3:1 on the light selected chip.
+    accentMark = Palette.Warning,
     warmAccent = Palette.BrightTangerine,
     onAccent = Palette.MidnightNavy,
     borderDefault = Color(0xFF2D3D63),

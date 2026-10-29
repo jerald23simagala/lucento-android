@@ -164,7 +164,13 @@ private fun GuideProgress(current: Int, count: Int, modifier: Modifier = Modifie
         repeat(count) { i ->
             Box(
                 Modifier.weight(1f).height(4.dp).background(
-                    if (i <= current) LucentoTheme.extendedColors.accent else MaterialTheme.colorScheme.outlineVariant,
+                    if (i <= current) {
+                        // Bright gold is 1.51:1 on ivory; it stays on the night canvas, where it clears 3:1.
+                        val ext = LucentoTheme.extendedColors
+                        if (LucentoTheme.isDark) ext.accent else ext.accentMark
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant
+                    },
                     RoundedCornerShape(Radii.full),
                 ),
             )

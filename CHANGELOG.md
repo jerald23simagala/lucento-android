@@ -4,6 +4,7 @@
 
 - Sunrise Energy tokens: night background `#0B1222`, navy hero cards (`#17233F` by day, `#202E4D` at night) with a 3dp gold rule under the primary figure, card radius 24 and hero radius 28, border `#E8EAF0`, navy-tinted shadows. Transitional motion is 100/200/300 ms and still respects Remove animations.
 - Hero amounts cap at 1.5× font scale. Dock labels cap at 1.3× and shrink into their tab so they do not overlap at 2.0× (LQA-022/034). The Home wordmark scales to fit at 360dp instead of disappearing (LQA-039).
+- Home balance uses that same 1.5× cap. The default-wallet star and setup progress marks use an amber that clears 3:1 on ivory and on the light night chip. The Home header wraps so the sync chip does not sit against the wordmark at 2.0×.
 
 ## Unreleased — Short first run
 

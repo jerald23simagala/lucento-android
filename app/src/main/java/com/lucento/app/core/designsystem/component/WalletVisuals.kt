@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Radii
+import com.lucento.app.core.designsystem.theme.contrastingMark
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.domain.WalletType
 
@@ -115,6 +116,7 @@ fun WalletPill(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val content = if (selected) colors.inverseOnSurface else colors.onSurface
+            val chip = if (selected) colors.inverseSurface else colors.surfaceContainerLowest
             Icon(icon, contentDescription = null, tint = iconTint ?: content, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(label, style = MaterialTheme.typography.labelLarge, color = content, maxLines = 1)
@@ -123,7 +125,8 @@ fun WalletPill(
                 Icon(
                     Icons.Filled.Star,
                     contentDescription = null,
-                    tint = if (selected) ext.accent else ext.accentText,
+                    // Bright gold fails on the light night chip (#FFC928 on #F8FAFF is 1.47:1).
+                    tint = if (selected) contrastingMark(ext.accent, chip, ext.accentMark) else ext.accentText,
                     modifier = Modifier.size(14.dp),
                 )
             }

@@ -16,6 +16,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -121,6 +123,7 @@ import com.lucento.app.core.designsystem.component.StatementPanel
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.theme.AmountStyles
+import com.lucento.app.core.designsystem.theme.FontScaleCaps
 import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.theme.LucentoTheme
@@ -129,6 +132,7 @@ import com.lucento.app.core.designsystem.theme.readableOn
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
+import com.lucento.app.core.designsystem.theme.WithFontScaleCap
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.BudgetBurn
@@ -300,6 +304,7 @@ private enum class HomeContent { Loading, Error, Welcome, Overview }
 // ------------------------------------------------------------------ Header
 
 /** Brand on the left; sync status, the payments bell (when Scheduled is on) and the profile entry on the right. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HomeHeader(
     status: CloudStatus,
@@ -307,23 +312,22 @@ private fun HomeHeader(
     bell: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    // Wraps instead of letting the status chip sit against the wordmark (2.0× on a 360dp phone).
+    FlowRow(
         modifier
             .fillMaxWidth()
             .heightIn(min = Sizes.topBar)
             .padding(top = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.Center,
     ) {
         Row(
-            Modifier
-                .weight(1f)
-                .semantics(mergeDescendants = true) { heading() },
+            Modifier.semantics(mergeDescendants = true) { heading() },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             LucentoMark(size = 28.dp, animate = false)
             Spacer(Modifier.width(Spacing.sm))
-            // Scales down to the space left beside the chip and actions, including at 360dp.
-            LucentoWordmark(height = 20.dp, modifier = Modifier.weight(1f, fill = false))
+            LucentoWordmark(height = 20.dp)
         }
         SyncStatusChip(status, onClick = onOpenSyncSettings)
         bell?.invoke()
@@ -748,7 +752,10 @@ private fun BalanceAndRecentBody(state: HomeUiState) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
         )
-        MoneyText(money = balance, style = AmountStyles.large, minScale = 0.6f)
+        // Same 1.5× cap as the budget hero, so the balance does not grow to 2.0×.
+        WithFontScaleCap(FontScaleCaps.Hero) {
+            MoneyText(money = balance, style = AmountStyles.large, minScale = 0.6f)
+        }
         Spacer(Modifier.height(Spacing.sm))
     }
     Text(
