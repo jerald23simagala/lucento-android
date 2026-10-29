@@ -25,8 +25,12 @@ class LocalLedgerReset(
         marker = marker,
         clearBinding = { syncPreferences.clearBinding() },
         clearTables = {
+            // One Room transaction, then the seed; both run on this coroutine and have committed when it returns.
             database.clearAllTables()
             CategorySeed.insertFreshInstall(database.openHelper.writableDatabase, System.currentTimeMillis())
+            // Room only refreshes observed queries for its own transactions; the seed above wrote through the raw
+            // helper, so tell observers explicitly that every table changed (no stale ledger kept in a flow).
+            database.invalidationTracker.refreshVersionsAsync()
         },
         clearRest = {
             goalPhotos.deleteAll()
@@ -34,6 +38,11 @@ class LocalLedgerReset(
             userPreferences.setSmartReading(false)
         },
     )
+
+    /** Commits the marker synchronously. Called on the sign-out confirm tap, before any network call (QA R9-01). */
+    fun markPending(): Boolean = marker.set()
+
+    fun isPending(): Boolean = marker.isSet()
 
     /** Finishes a wipe a kill interrupted. Call at launch, before anything syncs. True when one was finished. */
     suspend fun resumeIfInterrupted(): Boolean {
@@ -66,7 +75,9 @@ internal suspend fun runWipe(
 ) {
     check(marker.set()) { "Could not record the wipe" }
     clearBinding()
+    // clearTables must return only once its transaction has committed (it is not launched or deferred), so the
+    // marker below is never cleared while rows could survive a kill (QA R9-02).
     clearTables()
     clearRest()
-    marker.clear()
+    check(marker.clear()) { "Could not clear the wipe marker" }
 }

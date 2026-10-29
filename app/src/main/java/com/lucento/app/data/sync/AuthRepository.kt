@@ -16,7 +16,6 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.lucento.app.BuildConfig
 import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.exception.AuthErrorCode
 import io.github.jan.supabase.auth.exception.AuthRestException
@@ -231,24 +230,50 @@ class AuthRepository(
         client?.auth?.currentUserOrNull()?.id
     }.getOrNull()
 
+    /** Access token of the session [signOut] ended, kept only in memory so [revokeOnServer] can run after the wipe. */
+    @Volatile private var endedAccessToken: String? = null
+
     /**
-     * Clears the Supabase session on this device. The caller wipes the local ledger separately so accounts never mix.
-     * The logout request is local-scope; if it fails (offline), the stored session is still deleted so a relaunch
-     * does not come back signed in and download the account again.
+     * Ends the session on this device, locally only: no network call (QA R9-01). The caller wipes the local ledger
+     * afterwards and then calls [revokeOnServer]. The stored session is deleted first and durably, so a kill at any
+     * later point relaunches signed out.
      */
     suspend fun signOut() {
         val auth = client?.auth ?: return
-        // Local first and durably; the logout request only revokes the refresh token on the server, best effort.
+        endedAccessToken = runCatching { auth.currentAccessTokenOrNull() }.getOrNull()
         clearStoredSessionNow()
         endLocalSession(
-            signOutLocal = {
-                if (isOnline()) withTimeoutOrNull(REVOKE_TIMEOUT_MS) { auth.signOut(SignOutScope.LOCAL) }
-            },
             clearSession = {
                 clearStoredSessionNow()
                 auth.clearSession()
             },
         )
+    }
+
+    /**
+     * Best-effort revoke of the session [signOut] ended (POST /auth/v1/logout, scope=local), capped at
+     * [REVOKE_TIMEOUT_MS] and skipped offline. Called only after the local wipe has committed.
+     */
+    suspend fun revokeOnServer() {
+        val token = endedAccessToken ?: return
+        endedAccessToken = null
+        if (client == null || !SupabaseModule.isConfigured || !isOnline()) return
+        withTimeoutOrNull(REVOKE_TIMEOUT_MS) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val url = java.net.URL(BuildConfig.SUPABASE_URL.trimEnd('/') + "/auth/v1/logout?scope=local")
+                    (url.openConnection() as java.net.HttpURLConnection).run {
+                        requestMethod = "POST"
+                        connectTimeout = REVOKE_TIMEOUT_MS.toInt()
+                        readTimeout = REVOKE_TIMEOUT_MS.toInt()
+                        setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                        setRequestProperty("Authorization", "Bearer $token")
+                        responseCode
+                        disconnect()
+                    }
+                }
+            }
+        }
     }
 
     private companion object {

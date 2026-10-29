@@ -51,6 +51,10 @@ class LucentoApplication : Application() {
         // enabled before the rest of startup. DataStore is read only when the flag has never been written.
         CrashReporting.install(storedCrashReports())
         container = AppContainer(this)
+        // QA R9-02: finish an interrupted sign-out wipe before any screen can read (and show) the old ledger.
+        finishInterruptedWipeBeforeUi(container.ledgerReset::isPending) {
+            SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
+        }
         // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
@@ -69,6 +73,8 @@ class LucentoApplication : Application() {
             // A different account already signed in, with nothing unsynced, is wiped before the next sync
             // so this phone never uploads the previous ledger. Unsynced changes wait for a confirmation in Settings.
             // A sign-out wipe killed halfway is finished first (QA O-1).
+            // Normally already finished synchronously in onCreate (see finishInterruptedWipeBeforeUi); this is the
+            // fallback if that attempt threw.
             com.lucento.app.data.sync.SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
             when (container.accountBoundary.afterSignIn()) {
                 AccountBoundary.AfterSignIn.Wiped -> {
@@ -199,6 +205,8 @@ class AppContainer(application: Application) {
     /** Sign-out and account switching. Wipes the local ledger before another account can sync. */
     val accountBoundary: AccountBoundary by lazy {
         AccountBoundary(
+            markWipePending = ledgerReset::markPending,
+            revoke = auth::revokeOnServer,
             currentUserId = auth::currentUserId,
             syncedUserId = syncPreferences::syncedUserId,
             hasUnsyncedChanges = syncRepository::hasUnsyncedChanges,
@@ -210,4 +218,13 @@ class AppContainer(application: Application) {
             signOut = auth::signOut,
         )
     }
+}
+
+/**
+ * QA R9-02: an interrupted sign-out wipe is finished before any Activity (and so any ViewModel or Room flow) starts,
+ * instead of racing the first screen that reads the ledger. Blocks onCreate only when the marker is set.
+ */
+internal fun finishInterruptedWipeBeforeUi(isPending: () -> Boolean, resume: suspend () -> Unit) {
+    if (!isPending()) return
+    runCatching { runBlocking(kotlinx.coroutines.Dispatchers.IO) { resume() } }
 }
