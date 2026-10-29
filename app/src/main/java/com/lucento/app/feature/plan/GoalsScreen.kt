@@ -276,7 +276,7 @@ private fun GoalsHero(progress: List<GoalProgress>, primaryCurrency: String) {
             Column(Modifier.weight(1.15f)) {
                 HeroPill("Saved for goals · $code", HeroTones.main, Modifier.semantics { heading() })
                 Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = saved, style = AmountStyles.hero, color = ext.onHero)
+                MoneyText(money = saved, style = AmountStyles.hero, color = ext.onHero, goldRule = true)
                 Text(
                     "of ${MoneyFormatter.format(target)} · ${mine.size} ${if (mine.size == 1) "goal" else "goals"}",
                     style = MaterialTheme.typography.bodySmall,

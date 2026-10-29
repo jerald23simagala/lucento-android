@@ -34,6 +34,7 @@ import com.lucento.app.core.designsystem.component.icon
 import com.lucento.app.core.designsystem.component.label
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.DebtMath
@@ -59,7 +60,7 @@ fun WalletCard(wallet: Wallet, movements: Int, modifier: Modifier = Modifier) {
     val valued = wallet.type.isValuedManually
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val minHeight = maxWidth / CardRatio
-        Surface(shape = RoundedCornerShape(20.dp), color = face.container, contentColor = ink, modifier = Modifier.fillMaxWidth()) {
+        Surface(shape = RoundedCornerShape(Radii.lg), color = face.container, contentColor = ink, modifier = Modifier.fillMaxWidth()) {
             Box {
                 Canvas(Modifier.matchParentSize()) {
                     drawCircle(ink.copy(alpha = 0.07f), radius = size.height * 0.8f, center = Offset(size.width * 1.02f, size.height * 1.08f))
@@ -152,7 +153,7 @@ fun WalletCardPreview(type: WalletType, name: String, currencyCode: String, amou
     val face = LucentoTheme.extendedColors.walletCard(type)
     val ink = face.content
     val muted = ink.copy(alpha = 0.74f)
-    Surface(shape = RoundedCornerShape(20.dp), color = face.container, contentColor = ink, modifier = modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(Radii.lg), color = face.container, contentColor = ink, modifier = modifier.fillMaxWidth()) {
         Box {
             Canvas(Modifier.matchParentSize()) {
                 drawCircle(ink.copy(alpha = 0.07f), radius = size.height * 0.9f, center = Offset(size.width * 1.0f, size.height * 1.15f))
@@ -193,7 +194,7 @@ fun WalletCardPreview(type: WalletType, name: String, currencyCode: String, amou
 private fun TypeMark(type: WalletType, ink: Color) {
     Column(horizontalAlignment = Alignment.End) {
         Box(
-            Modifier.size(36.dp).background(ink.copy(alpha = 0.14f), RoundedCornerShape(50)),
+            Modifier.size(36.dp).background(ink.copy(alpha = 0.14f), RoundedCornerShape(Radii.full)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(type.icon, contentDescription = null, tint = ink, modifier = Modifier.size(20.dp))
@@ -211,7 +212,7 @@ private fun TypeMark(type: WalletType, ink: Color) {
 /** A plain EMV-style chip: decoration that says "card" at a glance. */
 @Composable
 private fun Chip(color: Color) {
-    Box(Modifier.size(width = 38.dp, height = 28.dp).background(color, RoundedCornerShape(6.dp)))
+    Box(Modifier.size(width = 38.dp, height = 28.dp).background(color, RoundedCornerShape(Radii.xs)))
 }
 
 /** A small capitalised label over a value, like the name and expiry on a card. */

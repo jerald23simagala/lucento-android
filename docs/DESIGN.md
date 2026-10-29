@@ -14,7 +14,7 @@ Soft Ivory `#FFFDF5` · Midnight Navy `#17233F` · Pale Sky `#EAF1FF`.
 
 | Role | Light | Dark | Use |
 |---|---|---|---|
-| Background / surface | `#FFFDF5` ivory | `#10182B` | Screens sit on it. |
+| Background / surface | `#FFFDF5` ivory | `#0B1222` | Screens sit on it. |
 | Card | `#FFFFFF` + `#E2E8F3` hairline | `#17233F` + `#26365C` hairline | `LucentoCard`; white on ivory by day. |
 | Elevated / selected | `#EAF1FF` pale sky (`surfaceContainer`) | `#202E4D` (`surfaceContainerHigh`) | Info notes, search, segmented controls, selected cards. |
 | Brand highlight surface | `#FFF4D1` (`highlight`, navy text) | `#3D3214` (`#FFE9A8` text) | Rare brand moments (milestones). Never whole screens. |
@@ -22,7 +22,7 @@ Soft Ivory `#FFFDF5` · Midnight Navy `#17233F` · Pale Sky `#EAF1FF`.
 | Muted ink | `#5E687D` | `#B8C5DC` | Labels, captions (5.5:1, 4.9:1 on pale sky / 8.9:1). Derived from the brief's `#667085` (4.4:1 on pale sky). |
 | Primary — Electric Blue | `#3563F5`, white label 4.9:1 | `#7C9AFF`, navy label 6.7:1 | Primary actions, selection, the Add tab, links. |
 | On primary container | `#2447C7` on `#EAF1FF` | `#E4EBFF` on `#26397A` | Tonal actions (ActionTile, IconBadge), selected text. |
-| Statement panel (hero) | `#2F56E8` Electric Blue, white text, `#DCE5FF` muted | `#202E4D` elevated navy, `#F8FAFF` / `#B8C5DC` text | Budget hero, Wallets net-worth hero. At night blue stays for interaction only. |
+| Statement panel (hero) | `#17233F` navy, `#F8FAFF` text, `#B8C5DC` muted, 3dp `#FFC928` rule under the figure | `#202E4D` elevated navy, `#F8FAFF` / `#B8C5DC` text, same gold rule | Budget, Wallets, Insights, Goals and Recurring heroes. At night blue stays for interaction only. |
 | Wallet card faces (`walletCard`) | Cash sunlight · Bank blue hero · E-wallet tangerine · Savings green · Credit card navy · Loan deep blue · Other asset pale sky; navy or white ink | Same (physical-card faces don't change at night) | Wallet page balance card. Decoration: two faint ink circles and a chip block only. |
 | Accent — sunlight | `#FFC928` (decorative only), `#9A5806` (text) | `#FFC928` (text-safe 11.5:1) | The leaf, the mascot, hero rule, milestones. Sparingly. |
 | Warm accent — tangerine | `#FF8A24` (decorative only) | `#FF8A24` | Logo warmth, secondary chart series. Never a status. |
@@ -125,20 +125,22 @@ logos or UI in the art.
 ## Space & shape
 4dp grid (`Spacing`: xs 4 · sm 8 · md 12 · lg 16 · gutter 20 · xl 24 · xxl 32 · xxxl 48 = space-1 … space-12),
 28dp between sections.
-Radii (`Radii` / `LucentoShapes`): xs 6 badges · sm 10 inputs, icon tiles · md 14 buttons, dropdowns, chips, dock ·
-lg 20 cards, panels · xl 28 sheets, feature cards; `CircleShape` only for circular controls and thin tracks.
-Borders: `borderDefault` `#D8DDE7` / night `#2D3D63` for card, panel and dock edges (`outlineVariant` `#E8EAF0` read
-too faint on ivory), `outlineVariant` for separators and unselected pills,
+Radii (`Radii` / `LucentoShapes`): xs 8 badges · sm 12 inputs, icon tiles · md 16 buttons, dropdowns, chips ·
+lg 24 cards and the dock · xl 28 hero cards and sheets · full for pills and circular controls.
+Borders: `borderDefault` `#E8EAF0` / night `#2D3D63` for card, panel and dock edges,
+`outlineVariant` for separators and unselected pills,
 `outline` `#7A869F` for input/control boundaries (the brief's `#D8DDE7` is 1.4:1, below the 3:1 a control needs),
-focus = 2dp primary. Elevation (`Elevation` xs 1 · sm 2 · md 4 · lg 8 · xl 16dp, navy-tinted `shadow`): day cards
+focus = 2dp primary. Elevation (`Elevation` xs 1 · sm 2 · md 4 · lg 8 · xl 16dp, navy-tinted `shadow`, never black): day cards
 xs with their hairline, FAB sm→md, toast md, dialogs lg; the night theme uses tonal surfaces instead.
+Transitional motion is 100 / 200 / 300 ms and snaps to nothing when Remove animations is on. Hero amounts cap at
+1.5× font scale; dock labels cap at 1.3× and shrink to the tab so they do not overlap at 2.0×.
 Hairlines separate rows inside cards.
 
 ## Components (`core/designsystem/component`)
 | Component | Purpose |
 |---|---|
-| `LucentoCard`, `StatementPanel` | Card with hairline; solid blue statement panel for first-run setup. |
-| `HeroCard`, `HeroPill`, `HeroTones` | A page's statement figure on brand blue (Wallets net worth, Recurring due soon): main figure left on a white pill, two stacked figures right on sunlight / tangerine pills with navy ink. |
+| `LucentoCard`, `StatementPanel` | Card with hairline; solid navy statement panel for first-run setup. |
+| `HeroCard`, `HeroPill`, `HeroTones` | A page's statement figure on navy (Wallets net worth, Recurring due soon): main figure left on a light pill with a gold rule, two stacked figures right on sunlight / tangerine pills with navy ink. |
 | `MoneyText` / `AmountText` | Prominent animated figure / compact tabular figure; both signed. |
 | `ProgressRing`, `DonutChart`, `ShareBar`, `MonthlyBarChart` | Data visuals; each has a spoken description and the exact figures beside it. |
 | `ActionTile` | Round quick action with label (Home, account screens). |
@@ -154,7 +156,7 @@ Hairlines separate rows inside cards.
 | `LucentoLottieAnimation`, `EmptyIllustration`, `LucentoEmptyState`, `ConfirmationHost`, `LucentoWorkingIndicator` | Motion (see below). |
 
 ## Motion and Lottie (v0.4)
-Short and purposeful (120–800ms) Compose motion remains for structure: fade-through between tabs, pushed screens slide
+Short and purposeful (100/200/300ms) Compose motion remains for structure: fade-through between tabs, pushed screens slide
 from the trailing edge, rings/bars draw once, amounts roll on change. Character and moments use **original Lottie**
 files (`res/raw`, register in `docs/design/ANIMATION_ASSETS.md`) through two components:
 
@@ -190,7 +192,7 @@ environment (see `docs/QUALITY.md`).
 
 ## Navigation (v0.5)
 - **Dock** (`navigation/NavigationDock.kt`, persistent): **Home · Transactions · (+) · Budget · Wallets** on a floating
-  surface (24dp corners, 12dp side inset, hairline border; a soft shadow by day). The **+** is a raised 60dp brand-blue
+  surface (24dp corners, 12dp side inset, hairline border; a soft navy shadow by day). The **+** is a raised 60dp brand-blue
   circle in the centre, breaking the dock's top edge, with a brand-tinted shadow: the one transaction-entry action.
   Insights, savings goals, scheduled transactions and debts open from Home's **Quick links**; categories from the
   Budget tab. The selected tab shows its label under a tinted indicator; the others are icon-only (each keeps its
@@ -212,7 +214,7 @@ environment (see `docs/QUALITY.md`).
 
 ## Home dashboard (v0.6)
 No greeting: the header is working space. Top to bottom, as cards with a title and chevron (the card opens its page):
-1. **Header** — Lucento symbol + wordmark (symbol only under 360dp); a **sync status chip** (icon + word: On device ·
+1. **Header** — Lucento symbol + wordmark (the wordmark scales down to stay visible at 360dp, and drops only if it would be under 8dp tall); a **sync status chip** (icon + word: On device ·
    Synced · Sync needed · Offline · Sync issue; opens Settings › Cloud sync; "On device" is the normal local-only
    state); a **payments bell** (when Scheduled is on) whose badge counts scheduled
    items overdue or due within 7 days (red when any is overdue) and whose menu lists them — each opens its review

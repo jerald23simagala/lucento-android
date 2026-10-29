@@ -124,6 +124,8 @@ import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
+import com.lucento.app.core.designsystem.theme.readableOn
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
@@ -218,6 +220,7 @@ fun HomeScreen(
                 .verticalScroll(scroll)
                 .padding(horizontal = Spacing.gutter),
         ) {
+        val reducedMotion = LucentoTheme.reducedMotion
         AnimatedContent(
             targetState = when {
                 state.loadError -> HomeContent.Error
@@ -225,7 +228,10 @@ fun HomeScreen(
                 !state.hasWallets -> HomeContent.Welcome
                 else -> HomeContent.Overview
             },
-            transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(150)) },
+            transitionSpec = {
+                fadeIn(tween(if (reducedMotion) 0 else Motion.slow)) togetherWith
+                    fadeOut(tween(if (reducedMotion) 0 else Motion.fast))
+            },
             label = "home-content",
         ) { content ->
             when (content) {
@@ -301,32 +307,27 @@ private fun HomeHeader(
     bell: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    // On narrow phones the symbol alone carries the brand, leaving room for the status chip and actions.
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        val showWordmark = maxWidth >= 360.dp
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = Sizes.topBar)
+            .padding(top = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Row(
             Modifier
-                .fillMaxWidth()
-                .heightIn(min = Sizes.topBar)
-                .padding(top = Spacing.xs),
+                .weight(1f)
+                .semantics(mergeDescendants = true) { heading() },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier
-                    .weight(1f)
-                    .semantics(mergeDescendants = true) { heading() },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                LucentoMark(size = 28.dp, animate = false)
-                if (showWordmark) {
-                    Spacer(Modifier.width(Spacing.sm))
-                    LucentoWordmark(height = 20.dp)
-                }
-            }
-            SyncStatusChip(status, onClick = onOpenSyncSettings)
-            bell?.invoke()
-            ProfileButton()
+            LucentoMark(size = 28.dp, animate = false)
+            Spacer(Modifier.width(Spacing.sm))
+            // Scales down to the space left beside the chip and actions, including at 360dp.
+            LucentoWordmark(height = 20.dp, modifier = Modifier.weight(1f, fill = false))
         }
+        SyncStatusChip(status, onClick = onOpenSyncSettings)
+        bell?.invoke()
+        ProfileButton()
     }
 }
 
@@ -1157,7 +1158,13 @@ private fun PercentBar(fraction: Float, label: String, color: Color, description
             contentAlignment = Alignment.CenterEnd,
         ) {
             if (inside) {
-                Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(end = 6.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = readableOn(color, LucentoTheme.extendedColors.track),
+                    modifier = Modifier.padding(end = Spacing.sm),
+                )
             }
         }
         if (!inside) {
@@ -1165,7 +1172,7 @@ private fun PercentBar(fraction: Float, label: String, color: Color, description
                 label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = fill + 6.dp),
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = fill + Spacing.sm),
             )
         }
     }
@@ -1247,7 +1254,7 @@ private fun AdviceBanner(text: String, detail: String?, tones: PaceTones, onClic
         verticalAlignment = Alignment.Top,
     ) {
         Box(
-            Modifier.size(28.dp).clip(CircleShape).background(if (LucentoTheme.isDark) Color.Black.copy(alpha = 0.2f) else tones.banner.container),
+            Modifier.size(28.dp).clip(CircleShape).background(if (LucentoTheme.isDark) LucentoTheme.extendedColors.shadow.copy(alpha = 0.2f) else tones.banner.container),
             contentAlignment = Alignment.Center,
         ) {
             Icon(tones.icon, contentDescription = null, tint = tones.banner.content, modifier = Modifier.size(18.dp))

@@ -21,11 +21,12 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
 
 /**
- * A page's statement figure on solid brand blue (elevated navy at night), e.g. Wallets' net worth and Recurring's
+ * A page's statement figure on solid navy (an elevated navy card at night), e.g. Wallets' net worth and Recurring's
  * "due soon". Text inside uses `extendedColors.onHero` / `onHeroMuted`; labels sit on [HeroPill]s.
  */
 @Composable
@@ -33,7 +34,7 @@ fun HeroCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
     val ext = LucentoTheme.extendedColors
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         color = ext.hero,
         contentColor = ext.onHero,
     ) {
@@ -50,7 +51,7 @@ fun HeroPill(label: String, tone: TonePair, modifier: Modifier = Modifier) {
         color = tone.content,
         maxLines = 1,
         modifier = modifier
-            .background(tone.container, RoundedCornerShape(50))
+            .background(tone.container, RoundedCornerShape(Radii.full))
             .padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
     )
 }

@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.domain.WalletType
 
@@ -97,7 +98,7 @@ fun WalletPill(
 ) {
     val colors = MaterialTheme.colorScheme
     val ext = LucentoTheme.extendedColors
-    val shape = RoundedCornerShape(50)
+    val shape = RoundedCornerShape(Radii.full)
     Box(
         modifier
             .minimumInteractiveComponentSize()

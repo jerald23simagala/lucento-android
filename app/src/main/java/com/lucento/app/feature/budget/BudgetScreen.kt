@@ -332,7 +332,7 @@ private fun BudgetSummaryCard(plan: BudgetPlan, today: java.time.LocalDate, isCu
         if (!plan.hasBudget) {
             HeroPill("Monthly budget · ${plan.currencyCode}", HeroTones.main, Modifier.semantics { heading() })
             Spacer(Modifier.height(Spacing.xs))
-            MoneyText(money = plan.total, style = AmountStyles.hero, color = ext.onHero)
+            MoneyText(money = plan.total, style = AmountStyles.hero, color = ext.onHero, goldRule = true)
             Text(
                 "No amounts yet. Your total is the sum of your category amounts — set them below.",
                 style = MaterialTheme.typography.bodySmall,
@@ -349,7 +349,7 @@ private fun BudgetSummaryCard(plan: BudgetPlan, today: java.time.LocalDate, isCu
                     Modifier.semantics { heading() },
                 )
                 Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = if (over) -plan.remaining else plan.remaining, style = AmountStyles.hero, color = ext.onHero)
+                MoneyText(money = if (over) -plan.remaining else plan.remaining, style = AmountStyles.hero, color = ext.onHero, goldRule = true)
                 Text(
                     if (over) "over your ${MoneyFormatter.format(plan.total)} budget" else "left of ${MoneyFormatter.format(plan.total)}",
                     style = MaterialTheme.typography.bodySmall,

@@ -36,17 +36,25 @@ object Sizes {
 }
 
 /*
- * Sunrise Energy radius scale (dp): xs 6 badges and compact controls · sm 10 inputs, small buttons, icon tiles ·
- * md 14 standard buttons, dropdowns, pills · lg 20 cards and dashboard panels · xl 28 large feature cards and sheets.
- * Full rounding (CircleShape) only for circular controls and thin progress tracks. Dense lists are never pill-shaped.
+ * Radius scale (dp): 8 badges · 12 inputs and icon tiles · 16 buttons, dropdowns, chips · 24 cards ·
+ * 28 hero cards and sheets · full for circular controls and pills. Dense lists are never pill-shaped.
  * Lists are grouped by cards or hairlines, never both.
  */
 object Radii {
-    val xs = 6.dp
-    val sm = 10.dp
-    val md = 14.dp
-    val lg = 20.dp
+    val xs = 8.dp
+    val sm = 12.dp
+    val md = 16.dp
+    val lg = 24.dp
     val xl = 28.dp
+    /** Pill / circle. Coerced by the shape to half the shorter side. */
+    val full = 999.dp
+}
+
+/** Transitional motion. Ambient loops (mascot float, torch breath) stay longer so they do not buzz. */
+object Motion {
+    const val fast = 100
+    const val standard = 200
+    const val slow = 300
 }
 
 val LucentoShapes = Shapes(
@@ -58,9 +66,8 @@ val LucentoShapes = Shapes(
 )
 
 /*
- * Elevation scale, the native translation of the shadow-xs … shadow-xl references (navy-tinted, low opacity via
- * [LucentoExtendedColors.shadow] where the API allows it). Borders separate most surfaces; shadows are reserved for
- * floating elements. Night theme uses tonal surfaces instead of shadows.
+ * Elevation scale (navy-tinted, low opacity via [LucentoExtendedColors.shadow] — never a black shadow). Borders
+ * separate most surfaces; shadows are reserved for floating elements. Night theme uses tonal surfaces instead.
  */
 object Elevation {
     val xs = 1.dp // cards in the day theme (with a hairline)

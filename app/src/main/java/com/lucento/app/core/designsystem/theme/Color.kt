@@ -5,6 +5,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import com.lucento.app.domain.WalletType
+import kotlin.math.pow
 
 /*
  * Lucento palette — "Sunrise Energy": warm ivory canvas, midnight-navy ink and structure, electric blue for every
@@ -14,9 +15,9 @@ import com.lucento.app.domain.WalletType
  *
  * Contrast (WCAG 2.1, checked with a script; ratios against the surface they sit on):
  *   light  ink 15.3 · muted 5.5 (4.9 on pale sky) · primary 4.9 · white-on-primary 4.9 · on-primary-container 6.6
- *          positive 5.2 · warning 5.5 · negative 5.6 · navy-on-sunlight 10.1 · outline 3.6
- *   dark   ink 14.9 on cards · muted 8.9 · primary 6.7 · navy-on-primary 6.7 · positive 8.3 · warning 8.9
- *          negative 6.9 · sunlight text 11.5 · outline 4.2
+ *          positive 5.2 · warning 5.5 · negative 5.6 · navy-on-sunlight 10.1 · ink on navy hero 14.9 · outline 3.6
+ *   dark   ink 17.9 on #0B1222 · muted 10.7 · primary 7.1 · navy-on-primary 7.1 · positive 8.3 on cards
+ *          negative 6.9 · sunlight text 11.5 · outline 4.5 on the night background
  * Sunlight yellow (1.5:1) and tangerine (2.3:1) are decorative on light surfaces: never text, never the only cue.
  */
 internal object Palette {
@@ -29,24 +30,25 @@ internal object Palette {
     val PaleSky = Color(0xFFEAF1FF) // secondary backgrounds, selected cards
 
     // Derived blues
-    val BlueDeep = Color(0xFF2447C7) // blue text on pale sky
-    val BlueHero = Color(0xFF2F56E8) // statement panel (white text 5.8:1)
+    val BlueDeep = Color(0xFF2447C7) // links and blue text on pale sky
+    val BlueHero = Color(0xFF2F56E8) // bank-card face only (white text 5.8:1); page heroes are navy
     val BlueNight = Color(0xFF7C9AFF) // primary in the night theme
     val BlueAction = Color(0xFF5278FF) // night action accent (decorative fills, focus)
 
     // Derived warm
     val SunlightPale = Color(0xFFFFF4D1) // brand-highlight surface
     val AmberText = Color(0xFF9A5806) // text-safe amber (warning, accent text)
+    val Border = Color(0xFFE8EAF0) // hairline on ivory
 
     // Semantic
     val Positive = Color(0xFF16865C) // rings and bars
     val PositiveText = Color(0xFF137A53)
-    val Negative = Color(0xFFD64545) // indicators
+    val Negative = Color(0xFFCF4545) // indicators; white text on this red stays at 4.5:1
     val NegativeText = Color(0xFFB83838)
     val Warning = Color(0xFFB86A08) // indicators
 
     // Night
-    val NightBackground = Color(0xFF10182B)
+    val NightBackground = Color(0xFF0B1222)
     val NightSurface = Color(0xFF17233F)
     val NightElevated = Color(0xFF202E4D)
     val NightInk = Color(0xFFF8FAFF)
@@ -82,7 +84,7 @@ internal val LightColors = lightColorScheme(
     onErrorContainer = Color(0xFF5C1414),
     outline = Color(0xFF7A869F),
     outlineVariant = Color(0xFFE8EAF0), // border-subtle
-    scrim = Color.Black,
+    scrim = Palette.MidnightNavy,
     surfaceBright = Palette.SoftIvory,
     surfaceDim = Color(0xFFE9EBF1),
     surfaceContainerLowest = Color.White,
@@ -121,7 +123,7 @@ internal val DarkColors = darkColorScheme(
     onErrorContainer = Color(0xFFFDE2E2),
     outline = Color(0xFF6F7C99),
     outlineVariant = Color(0xFF26365C),
-    scrim = Color.Black,
+    scrim = Palette.MidnightNavy,
     surfaceBright = Color(0xFF283859),
     surfaceDim = Palette.NightBackground,
     surfaceContainerLowest = Color(0xFF0B1222),
@@ -162,7 +164,7 @@ data class LucentoExtendedColors(
     val onAccent: Color,
     /** border-default: stronger card/section boundaries (decorative; control boundaries use colorScheme.outline). */
     val borderDefault: Color,
-    /** Shadow tint for elevated surfaces (navy by day, black at night where shadows are rarely used). */
+    /** Shadow tint for elevated surfaces. Always navy — never black. */
     val shadow: Color,
     /** Pale sunlight surface for brand-highlight moments; text on it uses [onHighlight]. */
     val highlight: Color,
@@ -272,14 +274,15 @@ internal val LightExtended = LucentoExtendedColors(
     accentText = Palette.AmberText,
     warmAccent = Palette.BrightTangerine,
     onAccent = Palette.MidnightNavy,
-    borderDefault = Color(0xFFD8DDE7),
+    borderDefault = Palette.Border,
     shadow = Palette.MidnightNavy,
     highlight = Palette.SunlightPale,
     onHighlight = Palette.MidnightNavy,
-    hero = Palette.BlueHero,
-    onHero = Color.White,
-    onHeroMuted = Color(0xFFDCE5FF),
-    heroRule = Color(0xFF4A6EF0),
+    // The page hero is midnight navy in daylight, with light ink and a gold rule under the figure.
+    hero = Palette.MidnightNavy,
+    onHero = Palette.NightInk,
+    onHeroMuted = Palette.NightMuted,
+    heroRule = Palette.SunlightYellow,
     chartBar = Palette.ElectricBlue,
     chartBarMuted = Color(0xFFC7D5FC),
     chartHighlight = Palette.ElectricBlue,
@@ -306,6 +309,35 @@ internal val LightExtended = LucentoExtendedColors(
     categoryFallback = TonePair(Color(0xFFECEFF4), Color(0xFF56637D)),
 )
 
+/** Flatten [fill] over an opaque [behind]. Used when a bar is translucent and text sits on the blend. */
+fun Color.compositeOver(behind: Color): Color {
+    val a = alpha
+    if (a >= 0.999f) return copy(alpha = 1f)
+    return Color(
+        red = red * a + behind.red * (1f - a),
+        green = green * a + behind.green * (1f - a),
+        blue = blue * a + behind.blue * (1f - a),
+        alpha = 1f,
+    )
+}
+
+/** White when it clears WCAG AA on [fill] (blended over [behind]); midnight navy otherwise. */
+fun readableOn(fill: Color, behind: Color): Color {
+    val flat = fill.compositeOver(behind)
+    return if (contrastRatio(Color.White, flat) >= 4.5) Color.White else Palette.MidnightNavy
+}
+
+internal fun contrastRatio(a: Color, b: Color): Double {
+    val la = relativeLuminance(a)
+    val lb = relativeLuminance(b)
+    return (maxOf(la, lb) + 0.05) / (minOf(la, lb) + 0.05)
+}
+
+private fun relativeLuminance(color: Color): Double {
+    fun channel(c: Float): Double = if (c <= 0.03928f) c / 12.92 else ((c + 0.055) / 1.055).pow(2.4)
+    return 0.2126 * channel(color.red) + 0.7152 * channel(color.green) + 0.0722 * channel(color.blue)
+}
+
 internal val DarkExtended = LucentoExtendedColors(
     positive = Color(0xFF3DD68C),
     positiveContainer = Color(0xFF123B2A),
@@ -322,14 +354,14 @@ internal val DarkExtended = LucentoExtendedColors(
     warmAccent = Palette.BrightTangerine,
     onAccent = Palette.MidnightNavy,
     borderDefault = Color(0xFF2D3D63),
-    shadow = Color.Black,
+    shadow = Palette.MidnightNavy,
     highlight = Color(0xFF3D3214),
     onHighlight = Color(0xFFFFE9A8),
     // At night the statement panel is an elevated navy card; blue stays for interaction and the trend line.
     hero = Palette.NightElevated,
     onHero = Palette.NightInk,
     onHeroMuted = Palette.NightMuted,
-    heroRule = Color(0xFF2D3D63),
+    heroRule = Palette.SunlightYellow,
     chartBar = Palette.BlueNight,
     chartBarMuted = Color(0xFF2C3D66),
     chartHighlight = Palette.BlueNight,

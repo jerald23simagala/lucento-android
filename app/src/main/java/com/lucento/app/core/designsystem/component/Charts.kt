@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
@@ -60,7 +61,7 @@ fun MonthlyBarChart(
 
     val progress = remember(months) { Animatable(if (reducedMotion) 1f else 0f) }
     LaunchedEffect(months) {
-        if (!reducedMotion) progress.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+        if (!reducedMotion) progress.animateTo(1f, tween(Motion.slow, easing = FastOutSlowInEasing))
     }
 
     val locale = Locale.getDefault()
@@ -120,7 +121,7 @@ fun ShareBar(
     val reducedMotion = LucentoTheme.reducedMotion
     val animated by animateFloatAsState(
         targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = if (reducedMotion) tween(0) else tween(500, easing = FastOutSlowInEasing),
+        animationSpec = if (reducedMotion) tween(0) else tween(Motion.slow, easing = FastOutSlowInEasing),
         label = "share",
     )
     Box(

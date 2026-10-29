@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 
@@ -85,7 +86,7 @@ fun LucentoTopBar(
 fun BackPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        shape = RoundedCornerShape(Radii.full),
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.primary,
         modifier = modifier
@@ -110,7 +111,7 @@ fun AddPillButton(label: String, onClick: () -> Unit, modifier: Modifier = Modif
     val (container, content) = addActionColors()
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        shape = RoundedCornerShape(Radii.full),
         color = container,
         contentColor = content,
         modifier = modifier

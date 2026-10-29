@@ -262,7 +262,7 @@ private fun DueSoonCard(state: PlanUiState) {
             Column(Modifier.weight(1.15f)) {
                 HeroPill("To pay · next 30 days", HeroTones.main, Modifier.semantics { heading() })
                 Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = -dueTotal, style = AmountStyles.hero, color = ext.onHero)
+                MoneyText(money = -dueTotal, style = AmountStyles.hero, color = ext.onHero, goldRule = true)
                 Text(
                     buildString {
                         append(if (outgoing.size == 1) "1 payment" else "${outgoing.size} payments")

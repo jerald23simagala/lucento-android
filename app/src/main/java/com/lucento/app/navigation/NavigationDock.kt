@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -29,18 +28,29 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.component.rememberHaptics
+import com.lucento.app.core.designsystem.theme.FontScaleCaps
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
+import com.lucento.app.core.designsystem.theme.Radii
+import com.lucento.app.core.designsystem.theme.WithFontScaleCap
 
 /** One destination in the dock. */
 data class DockItem(
@@ -68,7 +78,7 @@ fun NavigationDock(
 ) {
     val haptics = rememberHaptics()
     val container = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLowest
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(Radii.lg)
     // Destinations split evenly around the + (the first half on the left).
     val leading = items.take((items.size + 1) / 2)
     val trailing = items.drop(leading.size)
@@ -144,12 +154,12 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
     val colors = MaterialTheme.colorScheme
     val indicator by animateColorAsState(
         if (selected) colors.primaryContainer else colors.primaryContainer.copy(alpha = 0f),
-        tween(180),
+        tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard),
         label = "dock-indicator",
     )
     val tint by animateColorAsState(
         if (selected) colors.primary else colors.onSurfaceVariant,
-        tween(180),
+        tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard),
         label = "dock-tint",
     )
     Column(
@@ -164,7 +174,7 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
             Modifier
                 .width(48.dp)
                 .height(28.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(Radii.full))
                 .background(indicator),
             contentAlignment = Alignment.Center,
         ) {
@@ -175,15 +185,44 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
                 modifier = Modifier.size(22.dp),
             )
         }
+        DockLabel(item.label, tint)
+    }
+}
+
+/**
+ * Dock labels stay inside their tab. Type is capped at 1.3× (so 2.0× system type does not overflow the 64dp bar)
+ * and then shrinks to the tab width, so neighbours never overlap and the word is not clipped.
+ */
+@Composable
+private fun DockLabel(text: String, color: Color) {
+    WithFontScaleCap(FontScaleCaps.Navigation) {
+        val style = MaterialTheme.typography.labelSmall
+        var scale by remember(text) { mutableFloatStateOf(1f) }
+        var ready by remember(text) { mutableStateOf(false) }
+        val scaled = if (scale == 1f) {
+            style
+        } else {
+            style.copy(fontSize = style.fontSize * scale, lineHeight = style.lineHeight * scale)
+        }
         Text(
-            item.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = tint,
+            text,
+            style = scaled,
+            color = color,
             maxLines = 1,
             softWrap = false,
-            overflow = TextOverflow.Visible,
-            // Measured at its natural width and centred, so "Transactions" may use a little of its neighbours' space.
-            modifier = Modifier.padding(top = 2.dp).wrapContentWidth(unbounded = true),
+            overflow = TextOverflow.Clip,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 2.dp)
+                .drawWithContent { if (ready) drawContent() },
+            onTextLayout = { result ->
+                if (result.hasVisualOverflow && scale > 0.55f) {
+                    scale = (scale - 0.05f).coerceAtLeast(0.55f)
+                } else {
+                    ready = true
+                }
+            },
         )
     }
 }

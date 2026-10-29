@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lucento.app.R
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -95,11 +96,11 @@ fun RisingMark(modifier: Modifier = Modifier, size: Dp = 96.dp, loop: Boolean = 
             progress.forEach { it.snapTo(0f) }
             progress.forEachIndexed { i, p ->
                 launch {
-                    delay(i * 140L)
-                    p.animateTo(1f, tween(durationMillis = if (i == progress.lastIndex) 320 else 460, easing = FastOutSlowInEasing))
+                    delay(i * Motion.fast.toLong())
+                    p.animateTo(1f, tween(durationMillis = Motion.slow, easing = FastOutSlowInEasing))
                 }
             }
-            delay((progress.size - 1) * 140L + 480L)
+            delay((progress.size - 1) * Motion.fast.toLong() + Motion.slow.toLong())
             onRisen()
             if (loop) delay(700)
         } while (loop)
@@ -149,7 +150,7 @@ fun LaunchAnimation(onFinished: () -> Unit) {
             RisingMark(size = 112.dp, onRisen = {
                 if (!still) {
                     scope.launch {
-                        word.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
+                        word.animateTo(1f, tween(Motion.slow, easing = FastOutSlowInEasing))
                         delay(260)
                         onFinished()
                     }

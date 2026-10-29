@@ -45,6 +45,7 @@ import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
 import com.lucento.app.domain.Transaction
@@ -148,7 +149,7 @@ fun TransactionDetailScreen(
                         style = MaterialTheme.typography.labelLarge,
                         color = tone.content,
                         modifier = Modifier
-                            .background(tone.container, RoundedCornerShape(50))
+                            .background(tone.container, RoundedCornerShape(Radii.full))
                             .padding(horizontal = Spacing.md, vertical = Spacing.xxs),
                     )
                 }
@@ -221,7 +222,7 @@ private fun DetailRow(label: String, value: String, muted: Boolean = false) {
 private fun EditPill(onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        shape = RoundedCornerShape(Radii.full),
         color = MaterialTheme.colorScheme.primary,
         contentColor = MaterialTheme.colorScheme.onPrimary,
         modifier = Modifier

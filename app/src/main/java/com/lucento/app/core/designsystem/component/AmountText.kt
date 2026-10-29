@@ -8,6 +8,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,7 +30,11 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.em
 import com.lucento.app.core.designsystem.theme.AmountStyles
+import com.lucento.app.core.designsystem.theme.FontScaleCaps
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
+import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.designsystem.theme.WithFontScaleCap
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 
@@ -71,26 +78,46 @@ fun MoneyText(
     fractionScale: Float = 0.62f,
     minScale: Float = 0.5f,
     animate: Boolean = true,
+    /** A 3dp gold rule under this figure. Used for the primary number on a hero card. */
+    goldRule: Boolean = false,
 ) {
-    val reducedMotion = LucentoTheme.reducedMotion
-    if (!animate || reducedMotion) {
-        ShrinkingMoney(money, style, color, showPlus, fractionScale, minScale, modifier)
+    val figure: @Composable (Modifier) -> Unit = { figureModifier ->
+        val body: @Composable () -> Unit = {
+            val reducedMotion = LucentoTheme.reducedMotion
+            if (!animate || reducedMotion) {
+                ShrinkingMoney(money, style, color, showPlus, fractionScale, minScale, figureModifier)
+            } else {
+                AnimatedContent(
+                    targetState = money,
+                    transitionSpec = {
+                        val rising = targetState.currencyCode == initialState.currencyCode &&
+                            targetState.amountMinor > initialState.amountMinor
+                        val enter = slideInVertically(tween(Motion.slow)) { h -> if (rising) h / 3 else -h / 3 } + fadeIn(tween(Motion.slow))
+                        val exit = slideOutVertically(tween(Motion.standard)) { h -> if (rising) -h / 3 else h / 3 } + fadeOut(tween(Motion.fast))
+                        (enter togetherWith exit).using(SizeTransform(clip = false))
+                    },
+                    contentAlignment = Alignment.CenterStart,
+                    modifier = figureModifier,
+                    label = "money",
+                ) { value ->
+                    ShrinkingMoney(value, style, color, showPlus, fractionScale, minScale, Modifier)
+                }
+            }
+        }
+        if (style.fontSize == AmountStyles.hero.fontSize || style.fontSize == AmountStyles.display.fontSize) {
+            WithFontScaleCap(FontScaleCaps.Hero, body)
+        } else {
+            body()
+        }
+    }
+    if (!goldRule) {
+        figure(modifier)
         return
     }
-    AnimatedContent(
-        targetState = money,
-        transitionSpec = {
-            val rising = targetState.currencyCode == initialState.currencyCode &&
-                targetState.amountMinor > initialState.amountMinor
-            val enter = slideInVertically(tween(260)) { h -> if (rising) h / 3 else -h / 3 } + fadeIn(tween(260))
-            val exit = slideOutVertically(tween(180)) { h -> if (rising) -h / 3 else h / 3 } + fadeOut(tween(140))
-            (enter togetherWith exit).using(SizeTransform(clip = false))
-        },
-        contentAlignment = Alignment.CenterStart,
-        modifier = modifier,
-        label = "money",
-    ) { value ->
-        ShrinkingMoney(value, style, color, showPlus, fractionScale, minScale, Modifier)
+    Column(modifier) {
+        figure(Modifier)
+        Spacer(Modifier.height(Spacing.xs))
+        GoldRule()
     }
 }
 

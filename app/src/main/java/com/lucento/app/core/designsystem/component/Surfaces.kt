@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.Elevation
 import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 
@@ -80,8 +81,19 @@ fun LucentoCard(
     }
 }
 
+/** A 3dp gold rule. Sits under a hero figure, and at the top of a [StatementPanel]. Decorative. */
+@Composable
+fun GoldRule(modifier: Modifier = Modifier, width: Dp = 28.dp) {
+    Box(
+        modifier
+            .width(width)
+            .height(3.dp)
+            .background(LucentoTheme.extendedColors.accent, RoundedCornerShape(Radii.full)),
+    )
+}
+
 /**
- * Lucento's "statement" panel: solid brand blue with white type and a short sun-yellow rule.
+ * Lucento's statement panel: solid navy with light type and a short gold rule.
  * Reserved for the one message a screen is about (first-run setup). Content colour is set for children.
  */
 @Composable
@@ -92,15 +104,10 @@ fun StatementPanel(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = LucentoTheme.extendedColors
-    val shape = MaterialTheme.shapes.large
+    val shape = MaterialTheme.shapes.extraLarge
     val body: @Composable () -> Unit = {
         Column(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.xl)) {
-            Box(
-                Modifier
-                    .width(28.dp)
-                    .height(3.dp)
-                    .background(colors.accent, RoundedCornerShape(2.dp)),
-            )
+            GoldRule()
             Spacer(Modifier.height(Spacing.lg))
             CompositionLocalProvider(LocalContentColor provides colors.onHero) { content() }
         }

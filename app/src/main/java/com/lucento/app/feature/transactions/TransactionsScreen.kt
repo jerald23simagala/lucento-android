@@ -99,6 +99,7 @@ import com.lucento.app.core.designsystem.component.ToneChip
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
 import com.lucento.app.core.money.Money
@@ -187,8 +188,8 @@ fun TransactionsScreen(
                 )
                 AnimatedVisibility(
                     visible = searching,
-                    enter = expandVertically(tween(180)) + fadeIn(tween(180)),
-                    exit = shrinkVertically(tween(160)) + fadeOut(tween(120)),
+                    enter = expandVertically(tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard)) + fadeIn(tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard)),
+                    exit = shrinkVertically(tween(if (LucentoTheme.reducedMotion) 0 else Motion.fast)) + fadeOut(tween(if (LucentoTheme.reducedMotion) 0 else Motion.fast)),
                 ) {
                     SearchField(
                         value = query,
@@ -364,7 +365,7 @@ private fun RevealableRow(
     val target = if (revealed) -maxPx else 0f
 
     LaunchedEffect(revealed) {
-        if (reducedMotion) offset.snapTo(target) else offset.animateTo(target, tween(220))
+        if (reducedMotion) offset.snapTo(target) else offset.animateTo(target, tween(Motion.standard))
     }
 
     val noun = when {
@@ -419,7 +420,7 @@ private fun RevealableRow(
                             haptics.tick()
                             onRevealChange(open)
                         } else {
-                            offset.animateTo(target, tween(180))
+                            offset.animateTo(target, tween(if (reducedMotion) 0 else Motion.standard))
                         }
                     },
                 ),

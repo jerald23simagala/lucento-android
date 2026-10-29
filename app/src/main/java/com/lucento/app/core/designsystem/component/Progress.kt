@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 
 /**
  * Circular progress (0..1, display only) with centred content, e.g. "62%" of a budget used.
@@ -42,7 +43,7 @@ fun ProgressRing(
     val reducedMotion = LucentoTheme.reducedMotion
     val animated by animateFloatAsState(
         targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = if (reducedMotion) tween(0) else tween(700, easing = FastOutSlowInEasing),
+        animationSpec = if (reducedMotion) tween(0) else tween(Motion.slow, easing = FastOutSlowInEasing),
         label = "ring",
     )
     Box(modifier.size(size).clearAndSetSemantics { contentDescription = description }, contentAlignment = Alignment.Center) {
@@ -77,7 +78,7 @@ fun DonutChart(
     val track = LucentoTheme.extendedColors.track
     val progress = remember(values) { Animatable(if (reducedMotion) 1f else 0f) }
     LaunchedEffect(values) {
-        if (!reducedMotion) progress.animateTo(1f, tween(800, easing = FastOutSlowInEasing))
+        if (!reducedMotion) progress.animateTo(1f, tween(Motion.slow, easing = FastOutSlowInEasing))
     }
     Box(modifier.size(size).clearAndSetSemantics { contentDescription = description }, contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(size)) {

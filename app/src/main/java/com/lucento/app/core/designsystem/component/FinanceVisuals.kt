@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
@@ -67,7 +68,7 @@ fun ConsumptionBar(
     val reducedMotion = LucentoTheme.reducedMotion
     val animated by animateFloatAsState(
         targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = if (reducedMotion) tween(0) else tween(700, easing = FastOutSlowInEasing),
+        animationSpec = if (reducedMotion) tween(0) else tween(Motion.slow, easing = FastOutSlowInEasing),
         label = "consumption",
     )
     val markerColor = MaterialTheme.colorScheme.onSurface
@@ -113,7 +114,7 @@ fun IncomeExpenseChart(
     val max = months.maxOf { maxOf(it.income.amountMinor, it.expense.amountMinor) }.let { Money(it, currency) }
     val progress = remember(months) { Animatable(if (reducedMotion) 1f else 0f) }
     LaunchedEffect(months) {
-        if (!reducedMotion) progress.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
+        if (!reducedMotion) progress.animateTo(1f, tween(Motion.slow, easing = FastOutSlowInEasing))
     }
     val locale = Locale.getDefault()
     val spoken = months.joinToString("; ") {
@@ -191,7 +192,7 @@ fun CompositionBar(
     val track = LucentoTheme.extendedColors.track
     val progress = remember(weights, scaleTo) { Animatable(if (reducedMotion) 1f else 0f) }
     LaunchedEffect(weights, scaleTo) {
-        if (!reducedMotion) progress.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
+        if (!reducedMotion) progress.animateTo(1f, tween(Motion.slow, easing = FastOutSlowInEasing))
     }
     Canvas(
         modifier

@@ -62,6 +62,7 @@ import com.lucento.app.core.designsystem.component.SwitchRow
 import com.lucento.app.core.designsystem.component.LucentoWorkingIndicator
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.FirstRunDefaults
@@ -127,12 +128,15 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
             .padding(horizontal = Spacing.gutter, vertical = Spacing.lg),
     ) {
         StepLabel(step)
+        val reducedMotion = LucentoTheme.reducedMotion
         AnimatedContent(
             targetState = step,
             transitionSpec = {
                 val forward = targetState.ordinal > initialState.ordinal
-                (slideInHorizontally(tween(320)) { w -> if (forward) w / 6 else -w / 6 } + fadeIn(tween(320)))
-                    .togetherWith(slideOutHorizontally(tween(220)) { w -> if (forward) -w / 6 else w / 6 } + fadeOut(tween(180)))
+                val slow = if (reducedMotion) 0 else Motion.slow
+                val standard = if (reducedMotion) 0 else Motion.standard
+                (slideInHorizontally(tween(slow)) { w -> if (forward) w / 6 else -w / 6 } + fadeIn(tween(slow)))
+                    .togetherWith(slideOutHorizontally(tween(standard)) { w -> if (forward) -w / 6 else w / 6 } + fadeOut(tween(standard)))
             },
             modifier = Modifier.weight(1f).fillMaxWidth(),
             label = "onboarding-step",

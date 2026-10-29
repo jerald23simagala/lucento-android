@@ -208,7 +208,7 @@ private fun NetWorthCard(net: Money, summary: NetWorthCalculator.Summary) {
                     Modifier.semantics { heading() },
                 )
                 Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = net, style = AmountStyles.hero, color = ext.onHero)
+                MoneyText(money = net, style = AmountStyles.hero, color = ext.onHero, goldRule = true)
             }
             VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {

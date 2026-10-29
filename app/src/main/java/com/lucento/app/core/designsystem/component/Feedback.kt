@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.Elevation
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import kotlinx.coroutines.delay
@@ -123,8 +124,8 @@ fun ConfirmationHost(
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AnimatedVisibility(
             visible = visible,
-            enter = if (reduced) fadeIn(tween(0)) else fadeIn(tween(160)) + scaleIn(tween(200), initialScale = 0.92f),
-            exit = if (reduced) fadeOut(tween(0)) else fadeOut(tween(200)) + scaleOut(tween(200), targetScale = 0.96f),
+            enter = if (reduced) fadeIn(tween(0)) else fadeIn(tween(Motion.fast)) + scaleIn(tween(Motion.standard), initialScale = 0.92f),
+            exit = if (reduced) fadeOut(tween(0)) else fadeOut(tween(Motion.standard)) + scaleOut(tween(Motion.standard), targetScale = 0.96f),
         ) {
             val c = shown ?: return@AnimatedVisibility
             Surface(

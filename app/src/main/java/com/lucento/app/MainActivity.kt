@@ -24,6 +24,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lucento.app.core.designsystem.component.LaunchAnimation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.isDark
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.navigation.LucentoRoot
@@ -69,7 +70,10 @@ class MainActivity : ComponentActivity() {
                     if (ready != null) {
                         LucentoRoot(preferences = ready.preferences)
                     }
-                    AnimatedVisibility(visible = launching || ready == null, exit = fadeOut(tween(220))) {
+                    AnimatedVisibility(
+                        visible = launching || ready == null,
+                        exit = fadeOut(tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard)),
+                    ) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             LaunchAnimation(onFinished = { launching = false })
                         }

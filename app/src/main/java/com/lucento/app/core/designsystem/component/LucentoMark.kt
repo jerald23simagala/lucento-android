@@ -4,10 +4,14 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -16,6 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lucento.app.R
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 
 /**
  * The Lucento symbol — Rising Crest: three leaf-cut bars (Lucento Blue, Sky Blue, Gold) and an orange dot
@@ -34,7 +39,7 @@ fun LucentoMark(
     val play = animate && !LucentoTheme.reducedMotion
     val entrance = remember { Animatable(if (play) 0f else 1f) }
     LaunchedEffect(play) {
-        if (play) entrance.animateTo(1f, tween(durationMillis = 520, easing = FastOutSlowInEasing))
+        if (play) entrance.animateTo(1f, tween(durationMillis = Motion.slow, easing = FastOutSlowInEasing))
     }
     Image(
         painter = painterResource(R.drawable.lucento_symbol),
@@ -53,16 +58,22 @@ fun LucentoMark(
 
 /**
  * The "lucento" wordmark (outlined Manrope Bold), navy on light grounds and white on dark, as the brand files supply
- * it. [height] sets the size; the width follows the artwork's proportions.
+ * it. [height] is the preferred size; the width follows the artwork. When the parent is narrower (a 360dp header
+ * beside the sync chip and profile button) the mark scales down instead of being clipped or dropped.
  */
 @Composable
 fun LucentoWordmark(modifier: Modifier = Modifier, height: Dp = 36.dp) {
-    Image(
-        painter = painterResource(if (LucentoTheme.isDark) R.drawable.lucento_wordmark_dark else R.drawable.lucento_wordmark_light),
-        contentDescription = "Lucento",
-        contentScale = ContentScale.Fit,
-        modifier = modifier.size(width = height * WORDMARK_ASPECT, height = height),
-    )
+    val dark = LucentoTheme.isDark
+    BoxWithConstraints(modifier) {
+        val fitted = if (constraints.hasBoundedWidth) minOf(height, maxWidth / WORDMARK_ASPECT) else height
+        if (fitted < 8.dp) return@BoxWithConstraints
+        Image(
+            painter = painterResource(if (dark) R.drawable.lucento_wordmark_dark else R.drawable.lucento_wordmark_light),
+            contentDescription = "Lucento",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.size(width = fitted * WORDMARK_ASPECT, height = fitted),
+        )
+    }
 }
 
 /**
@@ -77,12 +88,12 @@ fun LucentoStackedLockup(
     animate: Boolean = true,
     wordmarkModifier: Modifier = Modifier,
 ) {
-    androidx.compose.foundation.layout.Column(
+    Column(
         modifier = modifier,
-        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         LucentoMark(size = symbolSize, animate = animate)
-        androidx.compose.foundation.layout.Spacer(Modifier.size(symbolSize * LOCKUP_GAP_RATIO))
+        Spacer(Modifier.size(symbolSize * LOCKUP_GAP_RATIO))
         LucentoWordmark(height = symbolSize * LOCKUP_WORDMARK_RATIO, modifier = wordmarkModifier)
     }
 }

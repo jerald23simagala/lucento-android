@@ -41,6 +41,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 
@@ -142,7 +144,7 @@ fun <T> SegmentedToggle(
                     isSelected -> colors.surfaceContainerLowest
                     else -> track
                 },
-                animationSpec = tween(180),
+                animationSpec = tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard),
                 label = "segment",
             )
             val content by animateColorAsState(
@@ -151,7 +153,7 @@ fun <T> SegmentedToggle(
                     isSelected -> colors.onSurface
                     else -> colors.onSurfaceVariant
                 },
-                animationSpec = tween(180),
+                animationSpec = tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard),
                 label = "segment-text",
             )
             Box(
@@ -194,7 +196,7 @@ fun ChoicePill(
     val colors = MaterialTheme.colorScheme
     val container by animateColorAsState(
         if (selected) colors.primary else colors.surfaceContainerLowest,
-        tween(160),
+        tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard),
         label = "pill",
     )
     // Selected: solid primary with its label colour; unselected: a neutral pill with a hairline.

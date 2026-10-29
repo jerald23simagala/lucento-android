@@ -70,6 +70,8 @@ import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
@@ -401,10 +403,14 @@ private fun SettingsContent(
 @Composable
 private fun ThemeOption(mode: ThemeMode, selected: Boolean, onSelect: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    val border by animateColorAsState(if (selected) colors.primary else colors.outlineVariant, tween(160), label = "theme-border")
+    val border by animateColorAsState(
+        if (selected) colors.primary else colors.outlineVariant,
+        tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard),
+        label = "theme-border",
+    )
     // Literal previews of each theme (not tokens), so they look the same whichever theme is active.
     val light = Color(0xFFFFFDF5) to Color(0xFF3563F5)
-    val dark = Color(0xFF10182B) to Color(0xFF7C9AFF)
+    val dark = Color(0xFF0B1222) to Color(0xFF7C9AFF)
     Column(
         modifier
             .clip(MaterialTheme.shapes.medium)
@@ -455,7 +461,7 @@ private fun Swatch(colors: Pair<Color, Color>, modifier: Modifier) {
             Modifier
                 .width(22.dp)
                 .height(6.dp)
-                .background(colors.second, RoundedCornerShape(3.dp)),
+                .background(colors.second, RoundedCornerShape(Radii.full)),
         )
     }
 }

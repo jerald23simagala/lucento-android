@@ -72,6 +72,7 @@ import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.ProfileChrome
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.domain.Feature
@@ -197,9 +198,13 @@ private fun NavDestination?.isFocused(): Boolean =
 /** Switches between first-run onboarding and the main app once preferences are known. */
 @Composable
 fun LucentoRoot(preferences: UserPreferences) {
+    val reducedMotion = LucentoTheme.reducedMotion
     AnimatedContent(
         targetState = preferences.onboardingComplete,
-        transitionSpec = { fadeIn(tween(400)) togetherWith fadeOut(tween(200)) },
+        transitionSpec = {
+            fadeIn(tween(if (reducedMotion) 0 else Motion.slow)) togetherWith
+                fadeOut(tween(if (reducedMotion) 0 else Motion.standard))
+        },
         label = "root",
     ) { onboarded ->
         if (onboarded) {
@@ -391,8 +396,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     startDestination = HomeRoute,
                     modifier = Modifier.fillMaxSize(),
                     // Tab switches fade through; pushed screens slide in from the trailing edge.
-                    enterTransition = { if (reducedMotion) fadeIn(tween(0)) else fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.985f) },
-                    exitTransition = { fadeOut(tween(if (reducedMotion) 0 else 120)) },
+                    enterTransition = { if (reducedMotion) fadeIn(tween(0)) else fadeIn(tween(Motion.standard)) + scaleIn(tween(Motion.standard), initialScale = 0.985f) },
+                    exitTransition = { fadeOut(tween(if (reducedMotion) 0 else Motion.fast)) },
                 ) {
                     composable<GuideRoute> {
                         GuideScreen(
@@ -650,10 +655,10 @@ private inline fun <reified T : Any> androidx.navigation.NavGraphBuilder.pushed(
     noinline content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit,
 ) {
     composable<T>(
-        enterTransition = { slideInHorizontally(tween(if (reducedMotion) 0 else 260)) { it / 4 } + fadeIn(tween(200)) },
-        exitTransition = { fadeOut(tween(120)) },
-        popEnterTransition = { fadeIn(tween(200)) },
-        popExitTransition = { slideOutHorizontally(tween(if (reducedMotion) 0 else 220)) { it / 4 } + fadeOut(tween(180)) },
+        enterTransition = { slideInHorizontally(tween(if (reducedMotion) 0 else Motion.slow)) { it / 4 } + fadeIn(tween(if (reducedMotion) 0 else Motion.standard)) },
+        exitTransition = { fadeOut(tween(if (reducedMotion) 0 else Motion.fast)) },
+        popEnterTransition = { fadeIn(tween(if (reducedMotion) 0 else Motion.standard)) },
+        popExitTransition = { slideOutHorizontally(tween(if (reducedMotion) 0 else Motion.standard)) { it / 4 } + fadeOut(tween(if (reducedMotion) 0 else Motion.standard)) },
     ) { entry -> content(entry) }
 }
 

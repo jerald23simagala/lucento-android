@@ -103,6 +103,7 @@ import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.SwitchRow
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.TransactionType
@@ -690,7 +691,7 @@ private fun ComposerIntro(
 @Composable
 private fun UserBubble(message: ComposerMessage, editing: Boolean, canEdit: Boolean, onEdit: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp)
+    val shape = RoundedCornerShape(topStart = Radii.lg, topEnd = Radii.lg, bottomStart = Radii.lg, bottomEnd = Radii.xs)
     Column(Modifier.fillMaxWidth().padding(top = Spacing.sm, start = 48.dp), horizontalAlignment = Alignment.End) {
         Surface(shape = shape, color = colors.primary, contentColor = colors.onPrimary) {
             Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
@@ -708,7 +709,7 @@ private fun UserBubble(message: ComposerMessage, editing: Boolean, canEdit: Bool
             Spacer(Modifier.height(Spacing.xs))
             Surface(
                 onClick = onEdit,
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(Radii.full),
                 color = colors.primaryContainer,
                 contentColor = colors.primary,
                 modifier = Modifier.minimumInteractiveComponentSize(),
@@ -737,7 +738,7 @@ private fun SourceLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, l
 private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAttention: Int) {
     val colors = MaterialTheme.colorScheme
     val live = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-    val shape = RoundedCornerShape(topStart = 6.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
+    val shape = RoundedCornerShape(topStart = Radii.xs, topEnd = Radii.lg, bottomStart = Radii.lg, bottomEnd = Radii.lg)
     Row(Modifier.fillMaxWidth().padding(end = 48.dp), verticalAlignment = Alignment.Top) {
         LucentoMascot(size = AvatarSize, animate = false, mood = MascotMood.Curious)
         Spacer(Modifier.width(Spacing.sm))
@@ -857,7 +858,7 @@ private fun MessageField(value: String, onValueChange: (String) -> Unit, onSend:
         keyboardActions = KeyboardActions(onSend = { onSend() }),
         modifier = modifier.semantics { contentDescription = "Describe transactions" },
         decorationBox = { inner ->
-            val shape = RoundedCornerShape(ControlSize / 2)
+            val shape = RoundedCornerShape(Radii.full)
             Box(
                 Modifier
                     .background(if (LucentoTheme.isDark) colors.surfaceContainer else colors.surfaceContainerLowest, shape)

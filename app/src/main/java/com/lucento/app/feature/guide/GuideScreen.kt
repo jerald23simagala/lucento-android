@@ -56,6 +56,8 @@ import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.GuideStep
@@ -94,9 +96,12 @@ fun GuideScreen(
         if (state.step != GuideStep.WELCOME) {
             GuideProgress(index, steps.size - 1, Modifier.padding(top = Spacing.md))
         }
+        val reducedMotion = LucentoTheme.reducedMotion
         AnimatedContent(
             targetState = state.step,
-            transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) },
+            transitionSpec = {
+                fadeIn(tween(if (reducedMotion) 0 else Motion.standard)) togetherWith fadeOut(tween(if (reducedMotion) 0 else Motion.fast))
+            },
             label = "guide-step",
             modifier = Modifier.weight(1f),
         ) { step ->
@@ -160,7 +165,7 @@ private fun GuideProgress(current: Int, count: Int, modifier: Modifier = Modifie
             Box(
                 Modifier.weight(1f).height(4.dp).background(
                     if (i <= current) LucentoTheme.extendedColors.accent else MaterialTheme.colorScheme.outlineVariant,
-                    RoundedCornerShape(2.dp),
+                    RoundedCornerShape(Radii.full),
                 ),
             )
         }

@@ -90,6 +90,7 @@ import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
@@ -198,7 +199,7 @@ fun TransactionEditorScreen(
                 )
                 Spacer(Modifier.height(Spacing.sm))
                 // The amount sits on its own tinted panel, so it reads as the one figure that matters.
-                val panel by animateColorAsState(tone.container.copy(alpha = 0.55f), tween(180), label = "amount-panel")
+                val panel by animateColorAsState(tone.container.copy(alpha = 0.55f), tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard), label = "amount-panel")
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -424,7 +425,7 @@ private fun CategoryDropdown(
     var expanded by remember { mutableStateOf(false) }
     var fieldWidth by remember { mutableStateOf(0.dp) }
     val selected = categories.firstOrNull { it.id == selectedId }
-    val border by animateColorAsState(if (expanded) colors.primary else colors.outlineVariant, tween(160), label = "cat-field")
+    val border by animateColorAsState(if (expanded) colors.primary else colors.outlineVariant, tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard), label = "cat-field")
 
     Box(Modifier.fillMaxWidth()) {
         Surface(
@@ -509,7 +510,7 @@ internal fun AmountEntry(
             type == TransactionType.INCOME -> LucentoTheme.extendedColors.positive
             else -> colors.onSurface
         },
-        tween(180),
+        tween(if (LucentoTheme.reducedMotion) 0 else Motion.standard),
         label = "amount-tint",
     )
     val base = AmountStyles.entry

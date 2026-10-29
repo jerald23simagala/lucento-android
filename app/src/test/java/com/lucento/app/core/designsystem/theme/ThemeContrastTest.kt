@@ -1,6 +1,8 @@
 package com.lucento.app.core.designsystem.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.max
@@ -80,6 +82,45 @@ class ThemeContrastTest {
         assertAtLeast(4.5, x.onHero, x.hero, "hero text")
         assertAtLeast(4.5, x.onHeroMuted, x.hero, "hero muted text")
         assertAtLeast(3.0, c.outline, c.background, "control outline")
+    }
+
+    @Test
+    fun `approved style tokens`() {
+        assertEquals(Color(0xFF17233F), LightExtended.hero)
+        assertEquals(Color(0xFFF8FAFF), LightExtended.onHero)
+        assertEquals(Color(0xFFB8C5DC), LightExtended.onHeroMuted)
+        assertEquals(Color(0xFFFFC928), LightExtended.heroRule)
+        assertEquals(Color(0xFFE8EAF0), LightExtended.borderDefault)
+        assertEquals(Color(0xFF17233F), LightExtended.shadow)
+        assertEquals(Color(0xFF0B1222), DarkColors.background)
+        assertEquals(Color(0xFF17233F), DarkColors.surfaceContainer)
+        assertEquals(Color(0xFF202E4D), DarkColors.surfaceContainerHigh)
+        assertEquals(Color(0xFF17233F), DarkExtended.shadow)
+        assertEquals(Color(0xFF7C9AFF), DarkColors.primary)
+        assertEquals(1.5f, cappedFontScale(2f, FontScaleCaps.Hero), 0f)
+        assertEquals(1.3f, cappedFontScale(2f, FontScaleCaps.Navigation), 0f)
+        assertEquals(1.1f, cappedFontScale(1.1f, FontScaleCaps.Hero), 0f)
+        assertEquals(8.dp, Radii.xs)
+        assertEquals(12.dp, Radii.sm)
+        assertEquals(16.dp, Radii.md)
+        assertEquals(24.dp, Radii.lg)
+        assertEquals(28.dp, Radii.xl)
+    }
+
+    @Test
+    fun `bar labels stay AA on the fill they sit on`() {
+        val behind = LightExtended.track
+        listOf(LightExtended.success, LightExtended.negativeIndicator, LightColors.primary, LightColors.primary.copy(alpha = 0.55f))
+            .forEach { fill ->
+                val ink = readableOn(fill, behind)
+                assertAtLeast(4.5, ink, fill.compositeOver(behind), "bar label")
+            }
+        val nightBehind = DarkExtended.track
+        listOf(DarkExtended.success, DarkExtended.negativeIndicator, DarkColors.primary, DarkColors.primary.copy(alpha = 0.55f))
+            .forEach { fill ->
+                val ink = readableOn(fill, nightBehind)
+                assertAtLeast(4.5, ink, fill.compositeOver(nightBehind), "night bar label")
+            }
     }
 
     @Test

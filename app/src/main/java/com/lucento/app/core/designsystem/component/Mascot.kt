@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lucento.app.R
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Motion
 import com.lucento.app.domain.WellnessTier
 
 /**
@@ -88,14 +89,14 @@ fun LucentoMascot(
         rock.snapTo(0f)
         if (!moving) return@LaunchedEffect
         // Arrival: a small hop that settles with a soft spring, so the character reads as alive on screen entry.
-        hop.animateTo(1f, tween(durationMillis = 260, easing = FastOutSlowInEasing))
+        hop.animateTo(1f, tween(durationMillis = Motion.slow, easing = FastOutSlowInEasing))
         hop.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow))
         // Greeting: two gentle rocks of the whole sprite (the wave itself is in the artwork). Skipped below 96dp.
         if (mood.pose == MascotPose.GreetingHappy && !small) {
             repeat(2) {
-                rock.animateTo(1f, tween(durationMillis = 180, easing = FastOutSlowInEasing))
-                rock.animateTo(-1f, tween(durationMillis = 260, easing = FastOutSlowInEasing))
-                rock.animateTo(0f, tween(durationMillis = 180, easing = FastOutSlowInEasing))
+                rock.animateTo(1f, tween(durationMillis = Motion.standard, easing = FastOutSlowInEasing))
+                rock.animateTo(-1f, tween(durationMillis = Motion.slow, easing = FastOutSlowInEasing))
+                rock.animateTo(0f, tween(durationMillis = Motion.standard, easing = FastOutSlowInEasing))
             }
         }
         repeat(mood.idleCycles) {
@@ -115,7 +116,7 @@ fun LucentoMascot(
     Box(modifier.size(size).then(semantics)) {
         Crossfade(
             targetState = tier to mood.pose,
-            animationSpec = tween(durationMillis = if (moving) 300 else 0),
+            animationSpec = tween(durationMillis = if (moving) Motion.slow else 0),
             label = "mascot-pose",
         ) { (shownTier, shownPose) ->
             Image(

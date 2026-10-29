@@ -30,8 +30,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
-import com.lucento.app.core.designsystem.theme.TonePair
+import com.lucento.app.core.designsystem.theme.Radii
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.designsystem.theme.TonePair
 
 /**
  * A navigational row: tinted icon tile, title, one line of real status ("3 active budgets"), chevron.
@@ -189,7 +190,7 @@ fun InfoNote(
 fun ToneChip(label: String, tone: TonePair, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     Row(
         modifier
-            .background(tone.container, RoundedCornerShape(50))
+            .background(tone.container, RoundedCornerShape(Radii.full))
             .padding(start = if (icon != null) 6.dp else Spacing.sm, end = Spacing.sm, top = Spacing.xxs, bottom = Spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {

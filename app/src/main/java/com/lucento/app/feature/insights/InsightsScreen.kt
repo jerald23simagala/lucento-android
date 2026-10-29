@@ -148,7 +148,7 @@ private fun TrendSection(data: InsightsData, currency: String, period: TrendPeri
             Column(Modifier.weight(1.15f)) {
                 HeroPill("Net · last ${period.months} months", if (net.isNegative) HeroTones.tangerine else HeroTones.main)
                 Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = net, style = AmountStyles.hero, showPlus = true, color = ext.onHero)
+                MoneyText(money = net, style = AmountStyles.hero, showPlus = true, color = ext.onHero, goldRule = true)
                 Text(
                     if (net.isNegative) "More went out than came in" else "Money in minus money out",
                     style = MaterialTheme.typography.bodySmall,

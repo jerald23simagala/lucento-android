@@ -1,10 +1,14 @@
 package com.lucento.app.core.designsystem.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.lucento.app.R
@@ -80,6 +84,32 @@ object Hierarchy {
 
 /** Editorial overline for tiny labels (chart legends, figure captions). Uppercased by the caller. */
 val OverlineStyle = style(11, 16, FontWeight.SemiBold, tracking = 0.08)
+
+/**
+ * Caps so large type never clips: hero figures stop at 1.5×, dock labels at 1.3×.
+ * Below the cap the system scale is left alone.
+ */
+object FontScaleCaps {
+    const val Hero = 1.5f
+    const val Navigation = 1.3f
+}
+
+fun cappedFontScale(systemScale: Float, cap: Float): Float = systemScale.coerceAtMost(cap)
+
+/** Draws [content] with the system font scale, never above [maxScale]. Density (dp) is unchanged. */
+@Composable
+fun WithFontScaleCap(maxScale: Float, content: @Composable () -> Unit) {
+    val current = LocalDensity.current
+    val scale = cappedFontScale(current.fontScale, maxScale)
+    if (scale == current.fontScale) {
+        content()
+        return
+    }
+    CompositionLocalProvider(
+        LocalDensity provides Density(current.density, fontScale = scale),
+        content = content,
+    )
+}
 
 /** Amount styles. Always tabular. Prominent but never crowding the layout. */
 object AmountStyles {
