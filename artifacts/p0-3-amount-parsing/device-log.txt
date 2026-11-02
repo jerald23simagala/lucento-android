@@ -1,0 +1,22 @@
+P0-3 device checks, 2026-11-01. Emulator Lucento_P0_QA_ReturningUser (API 36.1), debug build from the working tree, en-US unless noted.
+Local-only setup ("Not now"): nothing synced, no QA account touched. Values read from the app database (run-as copy).
+
+O-13 re-run   Wallet balance typed "12,50" -> preview $12.50 (B-80) -> saved opening_balance_minor 1250 (B-81). Before P0-3: $1,250.00.
+AMBIGUOUS     Wallet balance "1.000" -> "This could be $1.00 or $1,000.00. Type "1" or "1000" to say which." (B-82); nothing saved; text kept.
+FONT 200%     Same message at font_scale 2.0: wraps under the red-outlined field, text not colour alone (B-83). Typed "1000" -> saved 100000.
+GUIDE BUDGET  Guided budgets "12,50" + "1.000" -> Electricity blocked with the same clarification (B-85; first build showed the generic
+              "Enter an amount above zero" - fixed in GuideScreen); after "1000": budgets 1250 and 100000.
+COMPOSER      "coffee 12,50 and lunch 1.500" -> Coffee -$12.50 (one row; before P0-3 the splitter cut "12,50" into rows 12 and 50);
+              Lunch offers one-tap "1.5" / "1500", save blocked until chosen (B-86); chose 1500 -> saved 1250 and 150000 (B-87).
+de-DE         Per-app locale de-DE: wallet balance "12.50" -> preview 12,50 $ (B-88) -> saved 1250. Before P0-3: 125000. App locale reset after.
+Crashes: 0 throughout.
+Not run on device: transfer editor, balance adjust, schedules, goals, debts, receipt OCR, Smarter reading (AI) - covered by unit tests
+(same MoneyParser call sites; AI via RemoteCandidatesTest).
+FINAL BUILD  Composer "coffee 12,50, groceries 1,500php and lunch 1.500" -> Coffee -$12.50, Groceries -$1,500.00 (was 1 before the QA fix), Lunch offers 1.5 / 1500 (B-89). 0 crashes. Not saved.
+FOLLOW-UP SCREENS (2026-11-01, local-only device):
+  Transfer P03-Cash -> P03-Bank: "1.000" -> clarification (B-91); "12,50" -> legs TRANSFER_OUT 1250 / TRANSFER_IN 1250 (B-92).
+  Adjust balance: "1.000" -> button disabled with no explanation (found) -> fixed: live clarification under the field (B-97); "990,25" -> ADJUSTMENT_IN 275.
+  Goal: "2.000" -> clarification (B-94); "2500,50" -> target 250050.
+  Schedule: "1.500" -> clarification (B-95); "15,50" -> amount 1550.
+  Loan instalment: "1.000" -> clarification (B-96); "450,75" -> installment_minor 45075 (opening owed 5000 -> 500000).
+  0 crashes.

@@ -1,0 +1,11 @@
+Baseline of pre-existing QA accounts on lucento-test, taken 2026-11-01 before any P0-2.1 device QA (read-only SQL).
+user8     table         rows  last_change (UTC)               md5(id:revision ordered)
+4972e508  budgets         4   2026-10-29 16:41:30.146017+00   fa821df04f0a40ee51447e288fa3fb9a
+4972e508  categories     56   2026-10-29 16:41:30.383485+00   84fac303b5453f4537833ea80255ee54
+4972e508  transactions    5   2026-10-29 15:45:07.522347+00   f4458b588b467bd12b7d0726c8d5a0f0
+4972e508  wallets         5   2026-10-29 16:41:28.389439+00   4cd69a26349ee8ee83df933975385747
+fe0d6ae4  categories     42   2026-10-29 07:33:31.252937+00   5b84e53e0ed4055e4903f68548a69320
+fe0d6ae4  transactions    8   2026-10-29 07:49:28.318036+00   c21d354d3e251f7ef854b44cc209cb11
+fe0d6ae4  wallets         3   2026-10-29 07:33:27.518111+00   6600cfe4c78cd0118e0531663d7a503f
+(no goals, goal_contributions or recurring rows for either user)
+Live (not deleted): fe0d6ae4 = 3 wallets, 18 categories, 6 transactions; 4972e508 = 5 wallets, 18 categories, 4 transactions, 2 budgets.

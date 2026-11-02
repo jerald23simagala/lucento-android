@@ -1,0 +1,16 @@
+P0 sign-out/session coordinator (R10-01, N-04, offline revoke) — device evidence, 2026-11-01, emulator Lucento_P0_QA_ReturningUser (API 36.1), lucento-test, QA account A.
+No tokens are recorded here.
+
+OFFLINE REVOKE  Settings sign-in A on a phone with local records -> combine dialog -> airplane ON -> "Don't connect" (19:08:33Z).
+  Local: pending-revoke record for session 6722d052 written; stored session gone; RevokeWorker queued (NET unsatisfied).
+  Server: session 6722d052 still alive while offline.
+  Airplane OFF (19:08:54Z) -> worker: POST /auth/v1/logout 204 at 19:08:56Z; record removed; session 6722d052 no longer in auth.sessions.
+  (Before: an offline sign-out never revoked the server session.)
+KILL MID SIGN-OUT (R10-01)  Signed in, unbound; Settings -> Disconnect -> "Sign out anyway" with airplane ON, force-stop in the same instant (19:39:50Z).
+  State after kill: record for session 9ef20d27 present; stored session gone; wipe marker set.
+  Server: session 9ef20d27 alive.
+  Airplane OFF, relaunch (19:40:28Z): interrupted wipe finished (marker cleared, 0 wallets/transactions, onboarding step 1);
+  RevokeWorker: POST /auth/v1/logout 204 at 19:40:58Z; record removed; session 9ef20d27 gone.
+  (Before: the access token lived only in memory, so a kill here left the server session alive forever.)
+Not run on device: expired-access-token path (refresh then logout) — covered by SessionRevocationTest; needs >1 h token age.
+Note: during this run the pending-revoke file was printed once to the operator console (test account A, session 9ef20d27); that session was revoked 70 s later, invalidating its refresh token.
