@@ -36,6 +36,13 @@ interface SyncRemote {
 
     /** Position in (`server_updated_at`, `id`) order. [serverUpdatedAt] is the server's exact string (µs precision). */
     data class PageKey(val serverUpdatedAt: String, val id: String)
+
+    /**
+     * Whether [table] holds at least one of the user's rows that is not soft-deleted. Used to tell a returning account
+     * from a new one; a deleted row means nothing is there to bring back. [kind] narrows `categories` to one kind, and
+     * [activeOnly] skips archived rows. Throws on any network or server error — an error is never reported as "no rows".
+     */
+    suspend fun hasLiveRows(table: String, userId: String, kind: String? = null, activeOnly: Boolean = false): Boolean
 }
 
 class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
@@ -104,6 +111,17 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
         order("id", Order.ASCENDING)
         limit(limit)
     }.decodeList<JsonObject>()
+
+    override suspend fun hasLiveRows(table: String, userId: String, kind: String?, activeOnly: Boolean): Boolean =
+        client.from(table).select(columns = Columns.list("id")) {
+            filter {
+                eq("user_id", userId)
+                exact("deleted_at", null)
+                if (kind != null) eq("kind", kind)
+                if (activeOnly) eq("archived", false)
+            }
+            limit(1)
+        }.decodeList<JsonObject>().isNotEmpty()
 
     companion object {
         const val SERVER_UPDATED_AT = "server_updated_at"

@@ -37,4 +37,12 @@ class FakeSyncPreferences(
     override suspend fun setSyncedUserId(userId: String) {
         syncedUser = userId
     }
+
+    var initialPullDone: String? = null
+
+    override suspend fun initialPullDoneFor(): String? = initialPullDone
+
+    override suspend fun setInitialPullDoneFor(userId: String) {
+        initialPullDone = userId
+    }
 }

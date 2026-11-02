@@ -160,15 +160,27 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
 
 ## First sign-in
 
-Linking an account never assumes either side is empty and never replaces local data with a cloud response:
+Linking an account never assumes either side is empty and never replaces local data with a cloud response (P0-2):
 
-- Every existing local row starts `dirty`, so the first cycle uploads full history (upserts — safe to interrupt and
-  repeat).
-- The first pull starts from the beginning and merges whatever the account already has; an empty cloud changes
-  nothing locally.
-- Direction: push first, then pull, so a second device on the same account ends up with the union of both.
-  **Duplicates by meaning are possible**: two devices that each created a wallet named "Cash" before ever syncing give
-  the account two "Cash" wallets. Nothing is merged by name, except fresh-install seed categories (step 3 above).
+- **Is the account new?** `SyncRepository.probeAccount()` checks the account's *live* rows with the restore's own rule
+  (a wallet, or an active spending category). A failed check is `Unavailable`, never "empty".
+  - Onboarding asks it on sign-in, at start-up when already signed in, and before finishing. A returning account is
+    restored instead of being set up again.
+  - Settings asks it before a never-synced phone's first sync. When both sides hold records, the user confirms joining
+    them, and both are kept.
+- **No sync while onboarding is unfinished.** Launch sync, upload-after-write and `SyncWorker` all check
+  `backgroundSyncAllowed`. Onboarding turns sync on when it finishes; its restore syncs directly.
+- **First pull, then push.** The first sync into an account with live data pulls first. It then drops only *unused*
+  local categories that copy an active account category, or are Lucento presets/defaults of a kind the account has. A
+  name the user typed is always kept and uploaded. After that it pushes.
+  - The ownership claim (`syncedUserId`) is made before anything is pulled.
+  - A separate marker (`initialPullDoneFor`) records that the first pull finished, so a first sync that failed
+    half-way pulls first again on retry.
+  - Installs from before this change that already completed a sync count as done.
+- **Every row starts `dirty`,** so the first cycle uploads full history (upserts, safe to interrupt and repeat).
+- **Duplicates by meaning are possible.** Two devices that each created a wallet named "Cash" before ever syncing give
+  the account two "Cash" wallets. Nothing financial is merged by name. The exceptions are fresh-install seed categories
+  (deterministic ids) and same-name categories, which fold.
 
 ## Restoring on a new phone
 
@@ -191,14 +203,24 @@ Main currency, theme and enabled modules are device preferences (DataStore), nev
 "Disconnect" asks first, then cancels background sync, turns sync off, clears the Supabase session, and **wipes**
 the local ledger (wallets, categories, transactions, budgets, goals, contributions, schedules, debt terms, goal
 photos) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
-again, as on a fresh install. Theme and other device preferences stay. Anything that had not synced is lost —
+again, as on a fresh install, and the account's setup is reset in one preference edit (F-7,
+`UserPreferencesRepository.resetAccountSetup`): onboarding and the category setup are marked not done, and the guided
+setup step, default wallet, display name, acknowledged budget month and Smarter reading are cleared. So Lucento goes
+back to onboarding, and the next account is checked there: one with data is restored, an empty one is set up
+(including the spending categories), and a failed check sets nothing up. Theme, currency, modules, crash-report and
+usage-count consent and notices already seen stay. Each wipe also bumps `setup_generation`, which keys onboarding's
+and the main screen's Activity-scoped ViewModels so the next account never sees the previous run's state. The wipe
+runs to the end even if the screen that started it is closed (`runWipe` is not cancellable), so its marker is never
+left behind to wipe the next account on a later launch. Anything that had not synced is lost —
 the confirmation says so. The stored session is cleared before that wipe, including when the logout
 request fails offline, so the next launch is signed out. Sync now then requires sign-in and downloads nothing.
 If the app is killed while the ledger is being removed, no usable session remains.
 
 Signing in to a **different** account does the same wipe before any push. If nothing is waiting to sync, it happens
 immediately. If there are unsynced changes, Lucento asks first; cancelling signs out of the new account and leaves
-the previous ledger in place. Sync refuses to push while the signed-in account and the stored binding disagree
+the previous ledger in place. After that wipe Settings does not sync the new account itself
+(`syncAfterAccountWipe`): onboarding, which the wipe has reopened, checks the account with the new session already
+signed in, then restores it or sets it up. Sync refuses to push while the signed-in account and the stored binding disagree
 (`AccountMismatch`), so a background cycle cannot upload the previous ledger during that question.
 
 The device is no longer permanently tied to the first account. Signing back in to an account downloads it again.
@@ -272,10 +294,25 @@ On 2026-10-25 the live project reported the Google provider as **enabled**.
    allows open email sign-up. **Do not** turn off "Allow new users to sign up" — that would also block every new
    Google user (Supabase creates the account on a user's first Google sign-in).
 4. **Local build**: `local.properties` → `LUCENTO_GOOGLE_WEB_CLIENT_ID=<Web client ID>` (the Web one, not Android).
-   `LUCENTO_SUPABASE_URL` and `LUCENTO_SUPABASE_ANON_KEY` are already set on the development machine.
-5. **CI** (optional — CI builds fine without them; Settings then says sync isn't available): repository secrets
-   `LUCENTO_SUPABASE_URL`, `LUCENTO_SUPABASE_ANON_KEY`, `LUCENTO_GOOGLE_WEB_CLIENT_ID`, exposed as `env:` on the Gradle
-   steps in `.github/workflows/android.yml` (not wired yet). A CI-signed release also needs its SHA-1 in step 1.
+   Each build type has its own Supabase project:
+
+   | Build type | Keys | Project |
+   |---|---|---|
+   | debug | `LUCENTO_DEBUG_SUPABASE_URL`, `LUCENTO_DEBUG_SUPABASE_ANON_KEY` | `lucento-test` (`ogenvdopfgocjdkcrsny`) |
+   | release | `LUCENTO_SUPABASE_URL`, `LUCENTO_SUPABASE_PUBLISHABLE_KEY` | `lucento` (`hmtcuttadbgbldvzsfhz`) |
+
+   Debug never falls back to the production keys (without its own it reports sync as not set up), and the build fails
+   if the debug URL is the production one. Both sets are already in `local.properties` on the development machine.
+   Google sign-in on a debug build also needs the test project's Google provider enabled with the same Web client ID
+   (step 2, on `lucento-test`).
+5. **CI.** The release job reads three public client identifiers from GitHub **repository variables** (Settings > Secrets
+   and variables > Actions > Variables), under the same names as in `local.properties` and Vercel:
+   `LUCENTO_SUPABASE_URL`, `LUCENTO_SUPABASE_PUBLISHABLE_KEY` and `LUCENTO_GOOGLE_WEB_CLIENT_ID`. They are variables,
+   not secrets, because all three ship inside the APK and are protected by Row Level Security / the OAuth audience, not
+   by secrecy. The repository variable `LUCENTO_REQUIRE_RELEASE_CONFIG=true` makes a release without them fail. Debug CI
+   builds carry no sync config (the `LUCENTO_DEBUG_*` test-project values are local-only). Only the signing credentials
+   (`LUCENTO_KEYSTORE_*`, `LUCENTO_KEY_*`) are GitHub **secrets**. `LUCENTO_SITE_URL` and `GEMINI_API_KEY` stay in Vercel
+   only. A CI-signed release also needs its SHA-1 in step 1.
 6. Test on a real device or an emulator image **with Google Play** and a Google account added; the sign-in sheet
    can't appear without one.
 
@@ -317,3 +354,14 @@ transaction arrive with the edited note. Sign in on B with a second test account
   only been validated as the equivalent SQL), two real accounts, R8 release behaviour of sync at runtime. JVM tests run
   the engine against an in-memory server that mirrors the migrations (`FakeSyncServer`); the SQL-level checks run
   against the real database.
+
+## Row validation (P2-9, N-06)
+
+- **Server:** CHECK constraints on wallets, categories, transactions, budgets, goals and recurring mirror the app's
+  enums, ISO 4217 codes and amount bounds (`supabase/migrations/20261101120000_*` and `20261101180000_*`). They apply to
+  live rows only (`deleted_at is not null or …`), so a soft delete always succeeds, and they are `NOT VALID`, so rolling
+  them out never fails on old data. Applied to `lucento-test`; production waits for the owner's approval.
+- **App:** `PulledRowRules` applies the same rules both ways. A pulled row that breaks them is skipped (never
+  reinterpreted, e.g. an unknown type is not read as an expense); a soft-deleted row always applies. A local row that
+  breaks them stays dirty on the phone instead of failing the whole upload batch. Both are counted in
+  `SyncReport.invalidSkipped`.

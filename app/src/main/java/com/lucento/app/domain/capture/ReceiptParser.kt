@@ -129,6 +129,8 @@ object ReceiptParser {
             // Two different separators ("1,234.50", "1.234,50"): the last one is the decimal mark.
             separators.size == 2 -> raw.substring(0, lastSep).filter { it.isDigit() } to raw.substring(lastSep + 1)
             digitsAfter == 3 && fractionDigits == 3 && raw[lastSep] == '.' && !grouped -> raw.substring(0, lastSep) to raw.substring(lastSep + 1)
+            // "0,500" is never 500 (P0-3): a thousands group can't follow a leading zero.
+            digitsAfter == 3 && !grouped && raw.substring(0, lastSep).startsWith("0") -> raw.substring(0, lastSep) to raw.substring(lastSep + 1)
             // "1,250" / "12.500": a group of three is a thousands separator unless the currency uses 3 decimals.
             digitsAfter == 3 -> raw.filter { it.isDigit() } to ""
             else -> raw.substring(0, lastSep).filter { it.isDigit() } to raw.substring(lastSep + 1)

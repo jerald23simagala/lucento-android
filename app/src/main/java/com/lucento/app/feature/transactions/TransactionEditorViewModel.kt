@@ -77,6 +77,8 @@ sealed interface TransferDraftError {
     data object AmountZero : TransferDraftError
     data class AmountTooPrecise(val digits: Int) : TransferDraftError
     data object AmountTooLarge : TransferDraftError
+    /** Ambiguous, or another currency's symbol: [message] says what to type (MoneyParser.clarification). */
+    data class AmountUnclear(val message: String) : TransferDraftError
     data object Rejected : TransferDraftError
 }
 
@@ -86,6 +88,8 @@ sealed interface TransactionDraftError {
     data object AmountZero : TransactionDraftError
     data class AmountTooPrecise(val digits: Int) : TransactionDraftError
     data object AmountTooLarge : TransactionDraftError
+    /** Ambiguous, or another currency's symbol: [message] says what to type (MoneyParser.clarification). */
+    data class AmountUnclear(val message: String) : TransactionDraftError
     /** The save was rejected by repository rules (e.g. the wallet or category changed underneath). */
     data object Rejected : TransactionDraftError
 }
@@ -143,6 +147,8 @@ class TransactionEditorViewModel(
             MoneyParser.Result.Empty, MoneyParser.Result.Invalid -> return onResult(TransactionDraftError.AmountInvalid)
             is MoneyParser.Result.TooManyDecimals -> return onResult(TransactionDraftError.AmountTooPrecise(parsed.allowed))
             MoneyParser.Result.TooLarge -> return onResult(TransactionDraftError.AmountTooLarge)
+            is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency ->
+                return onResult(TransactionDraftError.AmountUnclear(MoneyParser.clarification(parsed, decimalSeparator).orEmpty()))
         }
         if (amount.amountMinor <= 0L) return onResult(TransactionDraftError.AmountZero)
 
@@ -194,6 +200,8 @@ class TransactionEditorViewModel(
             MoneyParser.Result.Empty, MoneyParser.Result.Invalid -> return onResult(TransferDraftError.AmountInvalid)
             is MoneyParser.Result.TooManyDecimals -> return onResult(TransferDraftError.AmountTooPrecise(parsed.allowed))
             MoneyParser.Result.TooLarge -> return onResult(TransferDraftError.AmountTooLarge)
+            is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency ->
+                return onResult(TransferDraftError.AmountUnclear(MoneyParser.clarification(parsed, decimalSeparator).orEmpty()))
         }
         if (amount.amountMinor <= 0L) return onResult(TransferDraftError.AmountZero)
 

@@ -199,7 +199,16 @@ fun LucentoRoot(preferences: UserPreferences) {
         } else {
             // Onboarding has no Scaffold above it: this Surface sets the themed content colour, so text without an
             // explicit colour follows the theme instead of falling back to black (invisible in dark mode).
-            androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background) { OnboardingScreen() }
+            // Keyed per setup generation: these ViewModels live as long as the Activity, so without the key a second
+            // onboarding (after a sign-out wipe) would reuse the finished run's state (F-7).
+            androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background) {
+                OnboardingScreen(
+                    viewModel(
+                        key = "onboarding-${preferences.setupGeneration}",
+                        factory = com.lucento.app.feature.onboarding.OnboardingViewModel.Factory,
+                    ),
+                )
+            }
         }
     }
 }
@@ -214,10 +223,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     val haptics = rememberHaptics()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val appViewModel: AppViewModel = viewModel(factory = AppViewModel.Factory)
+    val generation = preferences.setupGeneration
+    val appViewModel: AppViewModel = viewModel(key = "app-$generation", factory = AppViewModel.Factory)
 
     // One transaction editor for the whole app (the + sheet, wallet screens, history, scan, speak and type).
-    val editorViewModel: TransactionEditorViewModel = viewModel(factory = TransactionEditorViewModel.Factory)
+    val editorViewModel: TransactionEditorViewModel =
+        viewModel(key = "editor-$generation", factory = TransactionEditorViewModel.Factory)
     val editorState by editorViewModel.state.collectAsStateWithLifecycle()
     var editorDraft by remember { mutableStateOf<TransactionDraft?>(null) }
     var transferDraft by remember { mutableStateOf<TransferDraft?>(null) }

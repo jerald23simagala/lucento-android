@@ -56,12 +56,16 @@ sealed interface DraftError {
     data object AmountInvalid : DraftError
     data class AmountTooPrecise(val digits: Int) : DraftError
     data object AmountTooLarge : DraftError
+    /** Ambiguous, or another currency's symbol: [message] says what to type (MoneyParser.clarification). */
+    data class AmountUnclear(val message: String) : DraftError
     data class CurrencyLocked(val usage: WalletUsage) : DraftError
     data class TypeLocked(val usage: WalletUsage) : DraftError
     data object NotFound : DraftError
     data object InterestInvalid : DraftError
     data object TermInvalid : DraftError
     data object InstallmentInvalid : DraftError
+    /** The instalment is ambiguous or carries another currency's symbol (MoneyParser.clarification). */
+    data class InstallmentUnclear(val message: String) : DraftError
 }
 
 /** Plain-language explanation of what still uses a wallet, e.g. "3 transactions and 1 recurring payment". */
@@ -104,6 +108,8 @@ class WalletsViewModel(
             MoneyParser.Result.Invalid -> return onResult(DraftError.AmountInvalid, null)
             is MoneyParser.Result.TooManyDecimals -> return onResult(DraftError.AmountTooPrecise(parsed.allowed), null)
             MoneyParser.Result.TooLarge -> return onResult(DraftError.AmountTooLarge, null)
+            is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency ->
+                return onResult(DraftError.AmountUnclear(MoneyParser.clarification(parsed, decimalSeparator).orEmpty()), null)
         }
         val debt = if (draft.type.isLiability) {
             when (val terms = debtTerms(draft, decimalSeparator)) {
@@ -158,7 +164,9 @@ class WalletsViewModel(
         if (draft.repayment == DebtRepayment.ONE_TIME) return DebtParse.Valid(DebtTerms(interestRateBps = rate))
         val months = draft.termMonthsText.trim().toIntOrNull()?.takeIf { it in 1..DebtTerms.MAX_TERM_MONTHS }
             ?: return DebtParse.Error(DraftError.TermInvalid)
-        val installment = (MoneyParser.parse(draft.installmentText, draft.currencyCode, decimalSeparator) as? MoneyParser.Result.Success)
+        val parsedInstallment = MoneyParser.parse(draft.installmentText, draft.currencyCode, decimalSeparator)
+        MoneyParser.clarification(parsedInstallment, decimalSeparator)?.let { return DebtParse.Error(DraftError.InstallmentUnclear(it)) }
+        val installment = (parsedInstallment as? MoneyParser.Result.Success)
             ?.money?.takeIf { it.amountMinor > 0 }
             ?: return DebtParse.Error(DraftError.InstallmentInvalid)
         return DebtParse.Valid(DebtTerms(interestRateBps = rate, repayment = DebtRepayment.MONTHLY, termMonths = months, installment = installment))

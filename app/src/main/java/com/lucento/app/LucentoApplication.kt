@@ -31,6 +31,7 @@ import com.lucento.app.data.sync.SyncPreferences
 import com.lucento.app.data.sync.SyncRepository
 import com.lucento.app.data.sync.SyncScheduler
 import com.lucento.app.data.sync.shouldSyncOnLaunch
+import com.lucento.app.data.sync.backgroundSyncAllowed
 import com.lucento.app.data.usage.SupabaseUsageRemote
 import com.lucento.app.domain.UsageCountsService
 import com.lucento.app.domain.UsageEventDeleter
@@ -60,6 +61,8 @@ class LucentoApplication : Application() {
         }
         // Safe even when cloud sync has never been turned on: ensurePeriodic() only (re-)schedules work that
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
+        // Sessions a sign-out ended but the server hasn't confirmed revoking (offline, killed): retried by RevokeWorker.
+        if (container.pendingRevokes.all().isNotEmpty()) com.lucento.app.data.sync.RevokeScheduler.schedule(this)
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             container.usageCounts.retryPendingDeletion()
             observeOnline().collect { online ->
@@ -69,7 +72,9 @@ class LucentoApplication : Application() {
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now".
             uploadRequests(container.syncRepository.observePendingChanges()).collect {
-                if (container.syncPreferences.isEnabled()) SyncScheduler.enqueueAfterLocalWrite(this@LucentoApplication)
+                if (backgroundSyncAllowed(container.syncPreferences.isEnabled(), container.onboardingComplete())) {
+                    SyncScheduler.enqueueAfterLocalWrite(this@LucentoApplication)
+                }
             }
         }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
@@ -79,7 +84,11 @@ class LucentoApplication : Application() {
             // Normally already finished synchronously in onCreate (see finishInterruptedWipeBeforeUi); this is the
             // fallback if that attempt threw.
             com.lucento.app.data.sync.SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
-            when (container.accountBoundary.afterSignIn()) {
+            val boundary = container.accountBoundary.afterSignIn()
+            // An unfinished onboarding never syncs from here (P0-2): it checks the account itself and turns sync on
+            // when it finishes. The account-boundary wipe above still applies.
+            if (!container.onboardingComplete()) return@launch
+            when (boundary) {
                 AccountBoundary.AfterSignIn.Wiped -> {
                     container.syncPreferences.setEnabled(true)
                     SyncScheduler.ensurePeriodic(this@LucentoApplication)
@@ -128,6 +137,12 @@ class AppContainer(application: Application) {
     }
 
     val preferences: UserPreferencesRepository by lazy { UserPreferencesRepository(application) }
+
+    /** P2-10: whether this process has been unlocked. Process-wide, so rotation never re-locks and a cold start does. */
+    val appLock: com.lucento.app.core.security.AppLockSession by lazy { com.lucento.app.core.security.AppLockSession() }
+
+    /** Background and launch sync wait for this (P0-2); onboarding's own restore syncs directly. */
+    suspend fun onboardingComplete(): Boolean = preferences.preferences.first().onboardingComplete
     val backup: BackupEngine by lazy {
         BackupEngine(RoomBackupStore(database, runner, preferences, GoalPhotos(application)))
     }
@@ -152,8 +167,25 @@ class AppContainer(application: Application) {
 
     // --- optional cloud sync (see docs/SYNC.md); every value here is safe to hold even when unconfigured ---
 
+    /** Sessions ended on this phone that the server hasn't confirmed revoking yet (R10-01). */
+    val pendingRevokes: com.lucento.app.data.sync.PendingRevokeStore by lazy {
+        com.lucento.app.data.sync.PrefsPendingRevokeStore.forApp(application)
+    }
+    val revokes: com.lucento.app.data.sync.PendingRevokeDrainer by lazy {
+        com.lucento.app.data.sync.PendingRevokeDrainer(pendingRevokes, http = {
+            if (SupabaseModule.isConfigured) com.lucento.app.data.sync.SupabaseRevokeHttp(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY) else null
+        })
+    }
+
     private val sessionStore: com.lucento.app.data.sync.SessionStore? by lazy {
-        if (SupabaseModule.isConfigured) com.lucento.app.data.sync.SessionStore.forApp(application, BuildConfig.SUPABASE_URL) else null
+        if (SupabaseModule.isConfigured) {
+            com.lucento.app.data.sync.SessionStore.forApp(application, BuildConfig.SUPABASE_URL).also { store ->
+                // Before the Auth plugin loads it: a session a killed sign-out had already ended is not restored.
+                store.dropIfEnded(pendingRevokes.all())
+            }
+        } else {
+            null
+        }
     }
     private val supabaseClient by lazy { SupabaseModule.create(sessionStore) }
     val syncPreferences: SyncPreferences by lazy { SyncPreferences(application) }
@@ -161,6 +193,9 @@ class AppContainer(application: Application) {
             supabaseClient,
             clearStoredSession = { sessionStore?.clearNow() ?: true },
             isOnline = { application.isOnlineNow() },
+            pendingRevokes = pendingRevokes,
+            drainRevokes = { revokes.drain() },
+            scheduleRevoke = { com.lucento.app.data.sync.RevokeScheduler.schedule(application) },
         ) }
 
     /** The composer's reader: Gemini when Smarter reading is on (see docs/CAPTURE.md), else this phone. */
@@ -184,15 +219,20 @@ class AppContainer(application: Application) {
             preferences = syncPreferences,
             recurring = database.recurringDao(),
             debtTerms = database.debtTermsDao(),
+            transact = { block -> runner.run { block() } },
         )
     }
 
     val ledgerReset: LocalLedgerReset by lazy {
+        val photos = GoalPhotos(application)
         LocalLedgerReset(
-            database, syncPreferences, GoalPhotos(application), preferences,
             marker = com.lucento.app.data.local.WipeMarker.Prefs(
                 application.getSharedPreferences("lucento_ledger_wipe", android.content.Context.MODE_PRIVATE),
             ),
+            clearBinding = { syncPreferences.clearBinding() },
+            clearTables = { com.lucento.app.data.local.clearLedgerTables(database) },
+            deleteGoalPhotos = { photos.deleteAll() },
+            accountSetup = preferences,
         )
     }
 

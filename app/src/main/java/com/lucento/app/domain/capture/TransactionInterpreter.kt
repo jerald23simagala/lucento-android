@@ -13,8 +13,16 @@ enum class CaptureSource { TYPED, SPOKEN, RECEIPT }
 enum class CandidateFlag {
     /** No amount was written. The user types it; nothing is guessed. */
     AMOUNT_MISSING,
-    /** Several numbers could be the amount; they are offered as one-tap choices, none is pre-filled. */
+    /**
+     * Several numbers could be the amount, or one number can be read two ways ("1.000": 1.00 or 1,000); the choices
+     * are offered as one-tap options, none is pre-filled.
+     */
     AMOUNT_AMBIGUOUS,
+    /**
+     * The amount may not be what was meant: a model's amount not written that way in the message, or groups joined by
+     * a typed space ("250 180"). Shown with a non-blocking "check the amount" note.
+     */
+    AMOUNT_UNVERIFIED,
     /** No category matched the words; the row can still be saved without one. */
     CATEGORY_UNMATCHED,
     /** The date was not found (receipt) or its day/month order is unclear. */
@@ -34,7 +42,16 @@ data class InterpretationContext(
     val defaultWalletId: Long?,
     /** Type to assume when nothing in a clause says income or expense (e.g. started from a wallet's "Income"). */
     val typeHint: TransactionType? = null,
-)
+    /** The phone's decimal mark, so written amounts are read the way [com.lucento.app.core.money.MoneyParser] reads them. */
+    val decimalSeparator: Char = '.',
+    /** The phone groups thousands with a space ("1 000"), so a space-grouped number is one number, not two. */
+    val spaceGrouping: Boolean = false,
+) {
+    /** Minor-unit digits of the account amounts go to by default (2 when there is none), for reading written numbers. */
+    val fractionDigits: Int
+        get() = (wallets.firstOrNull { it.id == defaultWalletId } ?: wallets.firstOrNull())
+            ?.let { com.lucento.app.core.money.CurrencyRules.fractionDigits(it.currencyCode) } ?: 2
+}
 
 /**
  * One proposed transaction. Every field is a suggestion shown in an editable row; nothing is saved without review.

@@ -88,9 +88,24 @@ class OnboardingViewModel(
         if (mode == com.lucento.app.feature.settings.EmailMode.CREATE) auth?.signUpWithEmail(email, password) else auth?.signInWithEmail(email, password)
     }
 
+    private val _accountCheck = MutableStateFlow<AccountCheck>(AccountCheck.Idle)
+    /** The connected account is being checked, or couldn't be (P0-2). Shown on the sync step. */
+    val accountCheck: StateFlow<AccountCheck> = _accountCheck
+
+    private val _holdsAccountData = MutableStateFlow(false)
     /**
-     * Signing in turns sync on, but the first sync waits until onboarding finishes (see [finish]): pulling an existing
-     * account's data in the middle of setup would mix it with categories the user hasn't confirmed yet.
+     * Part of the connected account is already on this phone (a restore that didn't finish). Leaving the account then
+     * removes that partial copy, so the screen asks first.
+     */
+    val holdsAccountData: StateFlow<Boolean> = _holdsAccountData
+
+    /** The restore started because a returning account was recognised, not because the user asked: "Welcome back". */
+    val welcomeBack: StateFlow<Boolean> = savedState.getStateFlow(KEY_WELCOME_BACK, false)
+
+    /**
+     * Signing in on the setup path checks the account first (P0-2): an account that already has data is restored
+     * instead of being set up again. Sync is turned on only when onboarding finishes (or a restore starts), so nothing
+     * is pulled into — or uploaded from — a half-finished setup.
      */
     private fun connect(signIn: suspend () -> com.lucento.app.data.sync.AuthRepository.SignInResult?) {
         if (_connecting.value) return
@@ -106,9 +121,7 @@ class OnboardingViewModel(
                                 null
                             }
                             else -> {
-                                syncPreferences?.setEnabled(true)
-                                // Restoring: this phone has nothing of its own yet, so the account can be pulled right away.
-                                if (restoreStage.value == RestoreStage.SIGN_IN) runRestore()
+                                continueAfterSignIn()
                                 null
                             }
                         }
@@ -141,7 +154,104 @@ class OnboardingViewModel(
 
     init {
         // The app was closed mid-download: pick it up again rather than leave the spinner with nothing behind it.
-        if (savedState.get<String>(KEY_RESTORE) == RestoreStage.RESTORING.name) runRestore()
+        if (savedState.get<String>(KEY_RESTORE) == RestoreStage.RESTORING.name) {
+            runRestore()
+        } else {
+            // Already signed in from an earlier, unfinished setup (the app was closed, or restarted after a crash):
+            // a returning account is recognised now rather than set up again (P0-2, scenario D). A failed check says
+            // nothing here; finishing checks again.
+            viewModelScope.launch {
+                refreshHoldsAccountData()
+                if (auth?.currentUserId() != null && restoreStage.value == RestoreStage.NONE) checkAccount(quiet = true)
+            }
+        }
+    }
+
+    /** After a sign-in on either path: restoring pulls right away; the setup path checks the account first. */
+    private suspend fun continueAfterSignIn() {
+        if (restoreStage.value == RestoreStage.SIGN_IN) {
+            // Restoring: this phone has nothing of its own yet, so the account can be pulled right away.
+            syncPreferences?.setEnabled(true)
+            runRestore()
+        } else {
+            checkAccount(quiet = false)
+        }
+    }
+
+    /**
+     * Asks whether the connected account already holds data and acts on the answer ([setupRoute]): a returning account
+     * goes to the restore ("Welcome back"); an empty one is remembered as new; a failed check shows Try again unless
+     * [quiet]. Writes nothing to the ledger.
+     */
+    private suspend fun checkAccount(quiet: Boolean): SetupRoute? {
+        val repository = sync ?: return null
+        if (!quiet) _accountCheck.value = AccountCheck.Checking
+        val probe = repository.probeAccount()
+        val route = setupRoute(probe, savedState[KEY_NEW_FOR])
+        when (route) {
+            SetupRoute.RESTORE -> {
+                _accountCheck.value = AccountCheck.Idle
+                savedState[KEY_WELCOME_BACK] = true
+                syncPreferences?.setEnabled(true)
+                runRestore()
+            }
+            SetupRoute.NEW_SETUP -> {
+                _accountCheck.value = AccountCheck.Idle
+                (probe as? com.lucento.app.data.sync.AccountProbe.Empty)?.let { savedState[KEY_NEW_FOR] = it.userId }
+            }
+            SetupRoute.RETRY -> if (!quiet) {
+                refreshHoldsAccountData()
+                _accountCheck.value = AccountCheck.Unavailable
+            }
+            SetupRoute.LOCAL -> _accountCheck.value = AccountCheck.Idle
+        }
+        return route
+    }
+
+    /** Try again after the account couldn't be checked. */
+    fun retryAccountCheck() {
+        if (_accountCheck.value == AccountCheck.Checking) return
+        viewModelScope.launch { checkAccount(quiet = false) }
+    }
+
+    private suspend fun refreshHoldsAccountData() {
+        _holdsAccountData.value = syncPreferences?.syncedUserId() != null
+    }
+
+    /**
+     * The way out when the account can't be checked or brought across (P0-2: never stuck in onboarding): disconnect it
+     * and set Lucento up on this phone only; sync can be turned on later in Settings. Nothing of the user's own is on
+     * this phone yet — onboarding hasn't finished — and nothing was uploaded. When a restore had already brought part of
+     * the account here, that partial copy is removed (the account keeps everything) through the ordinary sign-out wipe,
+     * so it is never mixed into a new setup; the screen confirms this first.
+     */
+    fun leaveAccount() {
+        if (restoring || restoreStage.value == RestoreStage.RESTORING) return
+        viewModelScope.launch {
+            try {
+                if (syncPreferences?.syncedUserId() != null) {
+                    accounts?.signOutAndWipe()
+                } else {
+                    auth?.signOut()
+                    auth?.revokeOnServer()
+                }
+                syncPreferences?.setEnabled(false)
+                _accountCheck.value = AccountCheck.Idle
+                savedState[KEY_WELCOME_BACK] = false
+                savedState.remove<String>(KEY_NEW_FOR)
+                _restoreMessage.value = null
+                setRestoreStage(RestoreStage.NONE)
+                _syncMessage.value = "Not connected. Your account keeps everything — sign in again any time, here or in " +
+                    "Settings, to bring it to this phone."
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("Lucento", "Leaving the account during onboarding failed", e)
+                _syncMessage.value = "Couldn’t disconnect the account. Try again."
+            } finally {
+                refreshHoldsAccountData()
+            }
+        }
     }
 
     private fun setRestoreStage(stage: RestoreStage) {
@@ -153,8 +263,7 @@ class OnboardingViewModel(
         viewModelScope.launch {
             accounts?.confirmSwitch()
             _switchPrompt.value = false
-            syncPreferences?.setEnabled(true)
-            if (restoreStage.value == RestoreStage.SIGN_IN) runRestore()
+            continueAfterSignIn()
         }
     }
 
@@ -182,6 +291,7 @@ class OnboardingViewModel(
     fun cancelRestore() {
         if (restoreStage.value == RestoreStage.RESTORING) return
         _restoreMessage.value = null
+        savedState[KEY_WELCOME_BACK] = false
         setRestoreStage(RestoreStage.NONE)
     }
 
@@ -191,8 +301,11 @@ class OnboardingViewModel(
      */
     fun setUpAsNew() {
         _restoreMessage.value = null
+        savedState[KEY_WELCOME_BACK] = false
         setRestoreStage(RestoreStage.NONE)
         savedState[KEY_STEP] = STEP_FOCUS
+        // The account was downloaded and had nothing to bring back: don't send it to the restore again when finishing.
+        viewModelScope.launch { auth?.currentUserId()?.let { savedState[KEY_NEW_FOR] = it } }
     }
 
     /**
@@ -221,7 +334,10 @@ class OnboardingViewModel(
                     is com.lucento.app.data.sync.SyncResult.Success -> {
                         val restoredWallets = wallets?.observeWallets()?.first().orEmpty()
                         val restoredCategories = categories.observeCategories().first()
-                        if (com.lucento.app.domain.RestorePlan.hasData(restoredWallets, restoredCategories)) {
+                        // Same rule as the check before onboarding (P0-2.1): archived wallets, transactions, schedules
+                        // and budgets count too, so a "Welcome back" never ends in "nothing to restore".
+                        val otherRecords = repository.localHasRestorableRecords()
+                        if (com.lucento.app.domain.RestorePlan.hasData(restoredWallets, restoredCategories, otherRecords)) {
                             preferences.completeRestore(
                                 primaryCurrency = com.lucento.app.domain.RestorePlan.primaryCurrency(restoredWallets, currency.value),
                                 themeMode = theme.value,
@@ -246,7 +362,8 @@ class OnboardingViewModel(
                         setRestoreStage(RestoreStage.SIGN_IN)
                     }
                     is com.lucento.app.data.sync.SyncResult.Retryable -> {
-                        _restoreMessage.value = "Your data couldn’t be downloaded (${result.message}). Check your connection and try again."
+                        // The technical reason is kept in sync status for diagnosis; the screen says what to do.
+                        _restoreMessage.value = "Check your connection and try again."
                         setRestoreStage(RestoreStage.FAILED)
                     }
                 }
@@ -258,6 +375,7 @@ class OnboardingViewModel(
                 setRestoreStage(RestoreStage.FAILED)
             } finally {
                 restoring = false
+                refreshHoldsAccountData()
             }
         }
     }
@@ -341,15 +459,49 @@ class OnboardingViewModel(
         _error.value = null
         viewModelScope.launch {
             try {
-                // Existing rows (only income categories on a fresh install) are matched by name, never duplicated.
-                categories.applySelection(picks.value.choices(emptyList()))
+                // P0-2: a connected account is checked before anything is set up. One that already has data is restored
+                // instead (no second set of categories, wallets or budgets); one that can't be checked stops here, with
+                // nothing written and onboarding not complete, and the sync step offers Try again.
+                val userId = auth?.currentUserId()
+                if (userId == null && syncPreferences?.syncedUserId() != null) {
+                    // An interrupted restore left part of an account here and the session has since ended: never finish
+                    // a new setup on top of it. Sign in to complete the restore, or leave the account (removes the copy).
+                    finishing = false
+                    refreshHoldsAccountData()
+                    _restoreMessage.value = "Sign in again to finish bringing your data across — or use Lucento without " +
+                        "this account."
+                    setRestoreStage(RestoreStage.SIGN_IN)
+                    return@launch
+                }
+                if (userId != null && syncAvailable && savedState.get<String>(KEY_NEW_FOR) != userId) {
+                    when (checkAccount(quiet = true)) {
+                        SetupRoute.RESTORE -> {
+                            finishing = false
+                            return@launch
+                        }
+                        SetupRoute.RETRY -> {
+                            finishing = false
+                            refreshHoldsAccountData()
+                            _accountCheck.value = AccountCheck.Unavailable
+                            savedState[KEY_STEP] = STEP_SYNC
+                            return@launch
+                        }
+                        SetupRoute.NEW_SETUP, SetupRoute.LOCAL, null -> Unit
+                    }
+                }
+                // Existing rows (only income categories on a fresh install) are matched by name, never duplicated, and a
+                // category that came from the account is never removed for being unchosen.
+                categories.applySelection(picks.value.choices(emptyList()), keepAccountCategories = true)
                 preferences.completeOnboarding(currency.value, theme.value, features.value)
-                // Connected on the sync step: start syncing now that the user's own setup is saved.
+                // Connected on the sync step: sync is turned on only now that the user's own setup is saved.
                 val context = appContext
-                val syncOn = syncPreferences?.isEnabled() == true && auth?.currentUserId() != null
-                if (context != null && syncOn) {
+                if (context != null && syncAvailable && auth?.currentUserId() != null) {
+                    syncPreferences?.setEnabled(true)
                     com.lucento.app.data.sync.SyncScheduler.ensurePeriodic(context)
                     com.lucento.app.data.sync.SyncScheduler.enqueueAfterLocalWrite(context)
+                } else {
+                    // Not connected: clear any switch left on by an earlier restore attempt.
+                    syncPreferences?.setEnabled(false)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -389,6 +541,9 @@ class OnboardingViewModel(
         private const val KEY_THEME = "theme"
         private const val KEY_PRESETS = "category_presets"
         private const val KEY_CUSTOM = "category_custom"
+        private const val KEY_WELCOME_BACK = "welcome_back"
+        /** The account the user chose to set up as new after its restore found nothing (see [setupRoute]). */
+        private const val KEY_NEW_FOR = "new_setup_for"
 
         val Factory = viewModelFactory {
             initializer {

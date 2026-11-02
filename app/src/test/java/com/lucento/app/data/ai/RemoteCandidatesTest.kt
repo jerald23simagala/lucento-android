@@ -75,4 +75,40 @@ class RemoteCandidatesTest {
         assertEquals(today, rows[2].date)
         assertTrue(CandidateFlag.DATE_UNCERTAIN in rows[2].flags)
     }
+
+    @Test
+    fun `the model's amount must be a plain decimal - a separator convention is never trusted`() {
+        val rows = RemoteCandidates.toCandidates(
+            listOf(
+                RemoteItem("Rent", "EXPENSE", "1,250"),
+                RemoteItem("Rent", "EXPENSE", "1.250,00"),
+                RemoteItem("Rent", "EXPENSE", "1e3"),
+                RemoteItem("Rent", "EXPENSE", " 1250.50 "),
+            ),
+            context,
+            "rent 1,250.50",
+        )
+        assertTrue(rows.take(3).all { it.amount == null && CandidateFlag.AMOUNT_MISSING in it.flags })
+        assertEquals(BigDecimal("1250.50"), rows[3].amount)
+        assertTrue(CandidateFlag.AMOUNT_UNVERIFIED !in rows[3].flags) // written that way in the message
+    }
+
+    @Test
+    fun `the model never settles a number the device reads two ways`() {
+        val rows = RemoteCandidates.toCandidates(listOf(RemoteItem("Rent", "EXPENSE", "1000")), context, "rent 1.000")
+        assertNull(rows.single().amount)
+        assertTrue(CandidateFlag.AMOUNT_AMBIGUOUS in rows.single().flags)
+        assertEquals(listOf(BigDecimal("1"), BigDecimal("1000")), rows.single().amountOptions)
+    }
+
+    @Test
+    fun `an amount the message doesn't contain is shown with a check-the-amount note`() {
+        val rows = RemoteCandidates.toCandidates(
+            listOf(RemoteItem("Coffee", "EXPENSE", "1250"), RemoteItem("Lunch", "EXPENSE", "200")),
+            context,
+            "coffee 12,50 and lunch two hundred",
+        )
+        assertTrue(CandidateFlag.AMOUNT_UNVERIFIED in rows[0].flags) // the model read 12,50 as 1250
+        assertTrue(CandidateFlag.AMOUNT_UNVERIFIED !in rows[1].flags) // number words are read on the device too
+    }
 }

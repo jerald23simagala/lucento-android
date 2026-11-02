@@ -46,16 +46,68 @@ fun AmountText(
     signed: Boolean = true,
     showPlus: Boolean = false,
 ) {
+    val formatted = if (signed) MoneyFormatter.formatSigned(money, showPlus) else MoneyFormatter.format(money)
+    FittingText(remember(formatted) { AnnotatedString(formatted) }, style, color, minScale = 0.6f, modifier = modifier)
+}
+
+/**
+ * One line, shrunk to fit. Below [minScale] (large font sizes on narrow screens, P1-7) it keeps shrinking to
+ * [FLOOR_SCALE] rather than wrapping: a number split over two lines ("1,234,5" / "67.89") reads as two amounts (QA
+ * note 11). A money figure is never clipped either — a cut-off "$1,234,5" would show a different amount. The fit
+ * restarts whenever the available width changes, so a figure grows back when there is room again.
+ */
+@Composable
+private fun FittingText(
+    text: AnnotatedString,
+    style: TextStyle,
+    color: Color,
+    minScale: Float,
+    modifier: Modifier = Modifier,
+) {
+    var scale by remember(text, style) { mutableFloatStateOf(1f) }
+    var ready by remember(text, style) { mutableStateOf(false) }
+    var fittedWidth by remember(text, style) { mutableStateOf(-1) }
+    val scaled = if (scale == 1f || !style.fontSize.isSp) {
+        style
+    } else {
+        style.copy(
+            fontSize = style.fontSize * scale,
+            lineHeight = if (style.lineHeight.isSp) style.lineHeight * scale else style.lineHeight,
+        )
+    }
     Text(
-        text = if (signed) MoneyFormatter.formatSigned(money, showPlus) else MoneyFormatter.format(money),
-        modifier = modifier,
-        style = style,
+        text = text,
+        style = scaled,
         color = color,
         maxLines = 1,
         softWrap = false,
-        overflow = TextOverflow.Clip,
+        overflow = TextOverflow.Visible,
+        modifier = modifier.drawWithContent { if (ready) drawContent() },
+        onTextLayout = { result ->
+            val width = result.layoutInput.constraints.maxWidth
+            when {
+                // New room (rotation, a resized pane, a font change): start again from full size.
+                width != fittedWidth -> {
+                    fittedWidth = width
+                    if (scale != 1f) {
+                        scale = 1f
+                        ready = false
+                    } else if (!result.hasVisualOverflow) {
+                        ready = true
+                    } else {
+                        scale = (scale - 0.06f).coerceAtLeast(minScale)
+                    }
+                }
+                result.hasVisualOverflow && scale > minScale -> scale = (scale - 0.06f).coerceAtLeast(minScale)
+                result.hasVisualOverflow && scale > FLOOR_SCALE -> scale = (scale - 0.06f).coerceAtLeast(FLOOR_SCALE)
+                else -> ready = true
+            }
+        },
     )
 }
+
+/** The smallest a figure ever gets, only when even [minScale] doesn't fit; still drawn whole, never wrapped. */
+private const val FLOOR_SCALE = 0.35f
 
 /**
  * A prominent money figure: minor units are typeset smaller than whole units ([fractionScale]),
@@ -107,31 +159,7 @@ private fun ShrinkingMoney(
 ) {
     val formatted = MoneyFormatter.formatSigned(money, showPlus)
     val text = remember(formatted, style, fractionScale) { typeset(formatted, money.fractionDigits, style, fractionScale) }
-    var scale by remember(formatted) { mutableFloatStateOf(1f) }
-    var ready by remember(formatted) { mutableStateOf(false) }
-    val scaled = if (scale == 1f || !style.fontSize.isSp) {
-        style
-    } else {
-        style.copy(
-            fontSize = style.fontSize * scale,
-            lineHeight = if (style.lineHeight.isSp) style.lineHeight * scale else style.lineHeight,
-        )
-    }
-    Text(
-        text = text,
-        style = scaled,
-        color = color,
-        maxLines = 1,
-        softWrap = false,
-        modifier = modifier.drawWithContent { if (ready) drawContent() },
-        onTextLayout = { result ->
-            if (result.hasVisualOverflow && scale > minScale) {
-                scale = (scale - 0.06f).coerceAtLeast(minScale)
-            } else {
-                ready = true
-            }
-        },
-    )
+    FittingText(text, style, color, minScale, modifier)
 }
 
 private fun typeset(formatted: String, fractionDigits: Int, style: TextStyle, fractionScale: Float): AnnotatedString {

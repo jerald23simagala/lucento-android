@@ -390,6 +390,8 @@ private fun parseInterest(text: String, currencyCode: String, separator: Char): 
         MoneyParser.Result.Invalid -> null to AmountError.Invalid
         is MoneyParser.Result.TooManyDecimals -> null to AmountError.TooPrecise(parsed.allowed)
         MoneyParser.Result.TooLarge -> null to AmountError.TooLarge
+        is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency ->
+            null to AmountError.Unclear(MoneyParser.clarification(parsed, separator).orEmpty())
     }
 }
 

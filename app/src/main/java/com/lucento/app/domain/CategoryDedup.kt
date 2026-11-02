@@ -25,9 +25,26 @@ object CategoryDedup {
         }
         .toMap()
 
+    /** One copy's budget for the same category and currency, as the fold sees it. */
+    data class Limit(val minor: Long, val updatedAt: Long, val clientUuid: String?)
+
     /**
-     * The budget amount the keeper ends with when both copies had one in the same currency: the keeper's, unless it is
-     * zero and the copy's is not — a set amount is never replaced by an unset one.
+     * The budget amount the keeper ends with when both copies had one in the same currency (P1-8, owner decision:
+     * **keep the latest edit**). A set amount is never replaced by an unset (0) one; otherwise the amount edited most
+     * recently wins, and an exact tie goes to the smaller sync id — the same answer on every device from the same rows.
+     * See docs/CALCULATIONS.md "Budget when categories are combined".
      */
-    fun mergedLimit(keeperMinor: Long, copyMinor: Long): Long = if (keeperMinor == 0L) copyMinor else keeperMinor
+    fun mergedLimit(keeper: Limit, copy: Limit): Long = winner(keeper, copy).minor
+
+    /**
+     * The whole winning [Limit], so a fold over three or more copies compares each next copy with the winner's *original*
+     * edit time, not the time of the merge (QA note 1). The rule is a pure selection, so the result doesn't depend on
+     * the order the copies are folded in — devices that see them in a different order still agree.
+     */
+    fun winner(keeper: Limit, copy: Limit): Limit = when {
+        keeper.minor == 0L -> copy
+        copy.minor == 0L -> keeper
+        copy.updatedAt != keeper.updatedAt -> if (copy.updatedAt > keeper.updatedAt) copy else keeper
+        else -> listOf(keeper, copy).minWith(compareBy(nullsLast()) { it.clientUuid })
+    }
 }

@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -30,6 +31,52 @@ val localProperties = Properties().apply {
 }
 fun lucentoConfig(key: String): String = localProperties.getProperty(key) ?: System.getenv(key) ?: ""
 
+// Each build type has its own Supabase project. Release keeps the production keys (LUCENTO_SUPABASE_*); debug reads
+// only LUCENTO_DEBUG_SUPABASE_* — the test project, lucento-test — and never falls back to production, so a developer or
+// QA sign-in can't write to live data. Debug without those keys simply reports cloud sync as not set up.
+val releaseSupabaseUrl = lucentoConfig("LUCENTO_SUPABASE_URL")
+val releaseSupabaseKey = lucentoConfig("LUCENTO_SUPABASE_PUBLISHABLE_KEY")
+val debugSupabaseUrl = lucentoConfig("LUCENTO_DEBUG_SUPABASE_URL")
+val debugSupabaseKey = lucentoConfig("LUCENTO_DEBUG_SUPABASE_ANON_KEY")
+if (debugSupabaseUrl.isNotBlank() && debugSupabaseUrl.trimEnd('/').equals(releaseSupabaseUrl.trimEnd('/'), ignoreCase = true)) {
+    throw GradleException("LUCENTO_DEBUG_SUPABASE_URL is the production project. Debug builds must use the test project.")
+}
+// Only a publishable (or legacy anon) key may ship in an APK. A secret key, or a legacy JWT whose role is service_role,
+// bypasses Row Level Security, so the build stops instead of packaging it. The key itself is never printed.
+fun isServerOnlyKey(key: String): Boolean {
+    if (key.startsWith("sb_secret_")) return true
+    val payload = key.split('.').takeIf { it.size == 3 }?.get(1) ?: return false
+    val json = runCatching { String(Base64.getUrlDecoder().decode(payload.padEnd((payload.length + 3) / 4 * 4, '='))) }
+        .getOrDefault("")
+    return json.contains("\"service_role\"")
+}
+listOf("LUCENTO_SUPABASE_PUBLISHABLE_KEY" to releaseSupabaseKey, "LUCENTO_DEBUG_SUPABASE_ANON_KEY" to debugSupabaseKey).forEach { (name, key) ->
+    if (isServerOnlyKey(key)) throw GradleException("$name is a server-only (secret or service_role) key. Use the publishable key.")
+}
+
+// Smarter reading's proxy, per build type. Debug never falls back to the production proxy: it only accepts tokens of the
+// production project and would receive test-build text. Without LUCENTO_DEBUG_AI_INTERPRET_URL debug simply has no
+// Smarter reading (the composer reads on the phone).
+val productionAiInterpretUrl = "https://www.lucentoapp.com/api/interpret"
+val releaseAiInterpretUrl = lucentoConfig("LUCENTO_AI_INTERPRET_URL").ifBlank { productionAiInterpretUrl }
+val debugAiInterpretUrl = lucentoConfig("LUCENTO_DEBUG_AI_INTERPRET_URL")
+if (debugAiInterpretUrl.trimEnd('/').equals(releaseAiInterpretUrl.trimEnd('/'), ignoreCase = true)) {
+    throw GradleException("LUCENTO_DEBUG_AI_INTERPRET_URL is the production proxy. Debug builds must use a test proxy or none.")
+}
+
+// CI's release job sets LUCENTO_REQUIRE_RELEASE_CONFIG=true: a release built without the production Supabase settings
+// would ship with cloud sync silently disabled (N-24), so it fails instead.
+if (System.getenv("LUCENTO_REQUIRE_RELEASE_CONFIG") == "true") {
+    // The Google web client id too: without it the release hides "Continue with Google" (QA note 12).
+    val missing = listOf(
+        "LUCENTO_SUPABASE_URL" to releaseSupabaseUrl,
+        "LUCENTO_SUPABASE_PUBLISHABLE_KEY" to releaseSupabaseKey,
+        "LUCENTO_GOOGLE_WEB_CLIENT_ID" to lucentoConfig("LUCENTO_GOOGLE_WEB_CLIENT_ID"),
+    )
+        .filter { (_, value) -> value.isBlank() }.map { it.first }
+    if (missing.isNotEmpty()) throw GradleException("Release configuration missing: ${missing.joinToString()}. Add them as GitHub repository variables (CI) or in local.properties.")
+}
+
 android {
     namespace = "com.lucento.app"
     compileSdk = 35
@@ -45,15 +92,9 @@ android {
 
         // Empty strings are a valid, safe default: the Settings screen detects them and tells the user cloud
         // sync setup is incomplete instead of showing a button that would fail. See docs/SYNC.md "Setup required".
-        buildConfigField("String", "SUPABASE_URL", "\"${lucentoConfig("LUCENTO_SUPABASE_URL")}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${lucentoConfig("LUCENTO_SUPABASE_ANON_KEY")}\"")
+        // SUPABASE_URL and SUPABASE_ANON_KEY are set per build type below.
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${lucentoConfig("LUCENTO_GOOGLE_WEB_CLIENT_ID")}\"")
-        // Smarter reading (opt-in): Lucento's own proxy, which holds the Gemini key. Never a model API key here.
-        buildConfigField(
-            "String",
-            "AI_INTERPRET_URL",
-            "\"${lucentoConfig("LUCENTO_AI_INTERPRET_URL").ifBlank { "https://www.lucentoapp.com/api/interpret" }}\"",
-        )
+        // Smarter reading (opt-in) goes through Lucento's own proxy, which holds the Gemini key; set per build type below.
     }
 
     // Release signing comes only from the environment (CI secrets or a developer's shell); nothing is committed.
@@ -74,8 +115,14 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            buildConfigField("String", "SUPABASE_URL", "\"$debugSupabaseUrl\"")
+            buildConfigField("String", "SUPABASE_ANON_KEY", "\"$debugSupabaseKey\"")
+            buildConfigField("String", "AI_INTERPRET_URL", "\"$debugAiInterpretUrl\"")
         }
         release {
+            buildConfigField("String", "SUPABASE_URL", "\"$releaseSupabaseUrl\"")
+            buildConfigField("String", "SUPABASE_ANON_KEY", "\"$releaseSupabaseKey\"")
+            buildConfigField("String", "AI_INTERPRET_URL", "\"$releaseAiInterpretUrl\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -158,6 +205,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment.ktx)
 
     // On-device receipt OCR (bundled model; works offline).
     implementation(libs.mlkit.text.recognition)

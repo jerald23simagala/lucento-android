@@ -88,7 +88,18 @@ fun AdjustBalanceSheet(
 
     val liability = wallet.type.isLiability
     val tracked = WalletBalanceCalculator.balanceOn(wallet.openingBalance, wallet.type, wallet.id, history, date)
-    val actual = (MoneyParser.parse(amountText, wallet.currencyCode, decimalSeparator) as? MoneyParser.Result.Success)?.money
+    val parsedActual = MoneyParser.parse(amountText, wallet.currencyCode, decimalSeparator)
+    val actual = (parsedActual as? MoneyParser.Result.Success)?.money
+    // The button stays off until the amount reads, so every reason it can't is explained here, live (P0-3, QA note 4).
+    val liveClarification = when (parsedActual) {
+        is MoneyParser.Result.Success, MoneyParser.Result.Empty -> null
+        MoneyParser.Result.Invalid -> "Enter a number, like 1250${decimalSeparator}00."
+        is MoneyParser.Result.TooManyDecimals ->
+            if (parsedActual.allowed == 0) "${wallet.currencyCode} has no decimal places."
+            else "${wallet.currencyCode} allows up to ${parsedActual.allowed} decimal places."
+        MoneyParser.Result.TooLarge -> "That amount is larger than Lucento supports."
+        else -> MoneyParser.clarification(parsedActual, decimalSeparator)
+    }
     val plan = actual?.let { BalanceAdjustment.plan(wallet.type, tracked, it) }
 
     fun close(then: () -> Unit) {
@@ -145,7 +156,7 @@ fun AdjustBalanceSheet(
 
             Spacer(Modifier.height(Spacing.sm))
             val amountError = error is AdjustError.AmountInvalid || error is AdjustError.AmountTooPrecise ||
-                error is AdjustError.AmountTooLarge
+                error is AdjustError.AmountTooLarge || error is AdjustError.AmountUnclear || liveClarification != null
             AmountTextField(
                 value = amountText,
                 onValueChange = {
@@ -166,8 +177,9 @@ fun AdjustBalanceSheet(
                                 if (e.digits == 0) "${wallet.currencyCode} has no decimal places."
                                 else "${wallet.currencyCode} allows up to ${e.digits} decimal places."
                             AdjustError.AmountTooLarge -> "That amount is larger than Lucento supports."
+                            is AdjustError.AmountUnclear -> e.message
                             AdjustError.Failed -> "Couldn’t save the adjustment. Nothing was changed."
-                            else -> if (liability) "From your latest statement or lender’s app." else "From your bank app, statement or a count of your cash."
+                            else -> liveClarification ?: if (liability) "From your latest statement or lender’s app." else "From your bank app, statement or a count of your cash."
                         }
                     )
                 },

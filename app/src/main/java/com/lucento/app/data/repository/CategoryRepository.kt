@@ -122,14 +122,27 @@ class CategoryRepository(
      * matching categories are kept with their ids, archived matches are restored, new ones are created in the order
      * chosen, and active expense categories left unchosen are deactivated through [remove] — archived when anything
      * references them, deleted only when nothing does. Income categories are never touched.
+     *
+     * [keepAccountCategories] (onboarding): a category that came from the synced account is never deactivated, even if
+     * unchosen — removing it here would tombstone it and delete it from every device (P0-2). The Budget screen's
+     * deliberate category setup leaves this off.
      */
-    suspend fun applySelection(choices: List<CategorySelection.Choice>): SelectionResult = runner.run {
-        val existing = dao.getAll().map { it.toDomain() }
+    suspend fun applySelection(
+        choices: List<CategorySelection.Choice>,
+        keepAccountCategories: Boolean = false,
+    ): SelectionResult = runner.run {
+        val rows = dao.getAll()
+        val existing = rows.map { it.toDomain() }
         val plan: CategorySelectionPlan = CategorySelection.plan(existing, choices)
+        val fromAccount = if (keepAccountCategories) {
+            rows.filter { it.syncedAt != null || it.baseRevision != null }.map { it.id }.toSet()
+        } else {
+            emptySet()
+        }
         var archived = 0
         var deleted = 0
         plan.restore.forEach { id -> dao.getById(id)?.let { dao.update(it.copy(archived = false)) } }
-        plan.deactivate.forEach { id ->
+        plan.deactivate.filterNot { it in fromAccount }.forEach { id ->
             when (remove(id)) {
                 is DeleteResult.Archived -> archived++
                 DeleteResult.Deleted -> deleted++

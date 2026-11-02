@@ -3,6 +3,8 @@ package com.lucento.app.data.sync
 import com.lucento.app.data.local.BudgetDao
 import com.lucento.app.data.local.BudgetEntity
 import com.lucento.app.domain.CategoryDedup
+import com.lucento.app.domain.CategoryPresets
+import com.lucento.app.domain.DefaultCategories
 import com.lucento.app.data.local.CategoryDao
 import com.lucento.app.data.local.CategoryEntity
 import com.lucento.app.data.local.DebtTermsDao
@@ -64,6 +66,12 @@ class SyncRepository(
     private val debtTerms: DebtTermsDao? = null,
     private val clock: () -> Long = System::currentTimeMillis,
     private val pageSize: Long = PULL_PAGE_SIZE,
+    /**
+     * Runs one pulled row's read-decide-write as a single Room transaction (P1-5, N-05), so an edit saved in the app
+     * lands either before it (the pull sees it pending and keeps it) or after it (it overwrites the pulled copy and is
+     * pushed) — never in between, where the pulled copy would silently replace it. Tests run it inline.
+     */
+    private val transact: suspend (suspend () -> Unit) -> Unit = { it() },
 ) {
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
@@ -96,16 +104,20 @@ class SyncRepository(
         }
 
         return try {
-            // Claimed before the first push: once any row has reached this account, no other account may follow.
             // First sign-in into an account that already has data: pull first, so the account's own categories are
-            // here, then drop this phone's unused categories the account doesn't have. Only then upload (QA R6-14).
-            val firstIntoExisting = owner == null && remoteHasData(r, userId)
+            // here, then drop this phone's unused preset copies. Only then upload (QA R6-14). This stays pending until
+            // that pull has finished, so a first sync that fails half-way pulls first again on the retry (P0-2).
+            val initialPullDone = initialPullDone(owner, userId)
+            val firstIntoExisting = !initialPullDone && remoteHasData(r, userId)
+            // Claimed before anything is pulled or pushed, and never moved later: a half-finished pull must still mark
+            // this phone as the account's, so a different account signing in next is wiped first (AccountBoundary).
             if (owner == null) preferences.setSyncedUserId(userId)
             var report = SyncReport()
             if (firstIntoExisting) {
                 report += pull(r, userId, Rejected())
                 dropUnusedLocalCategories()
             }
+            if (!initialPullDone) preferences.setInitialPullDoneFor(userId)
             assignMissingCategoryIds(userId)
 
             val rejected = Rejected()
@@ -163,24 +175,84 @@ class SyncRepository(
         fun add(table: String, id: String) = ids.getOrPut(table) { mutableSetOf() }.add(id)
     }
 
-    private suspend fun remoteHasData(r: SyncRemote, userId: String): Boolean {
-        val since = SyncTime.toIso(0)
-        return FIRST_SIGN_IN_PROBE.any { table -> r.fetchPage(table, userId, since, null, 1).isNotEmpty() }
+    /**
+     * Whether this account's first pull has finished here. Builds before P0-2 kept no such marker: for them a phone that
+     * already completed a full sync with this account ([SyncPreferencesStore.lastSyncedAtMillis] set) counts as done,
+     * and the marker is written so the question isn't asked again; one whose first sync never finished pulls first.
+     */
+    private suspend fun initialPullDone(owner: String?, userId: String): Boolean {
+        val done = preferences.initialPullDoneFor()
+        if (done != null) return done == userId
+        val legacyDone = owner == userId && preferences.lastSyncedAtMillis() != null
+        if (legacyDone) preferences.setInitialPullDoneFor(userId)
+        return legacyDone
+    }
+
+    /** Any live row of the user's in any synced table (seeded categories included): the first sync then pulls first. */
+    private suspend fun remoteHasData(r: SyncRemote, userId: String): Boolean =
+        PARENT_FIRST.any { table -> r.hasLiveRows(table, userId) }
+
+    /**
+     * Whether the signed-in account already holds financial data, asked before onboarding sets anything up so a
+     * returning user is restored instead of started over (P0-2). Only the user's own, live (not soft-deleted) rows count:
+     * a wallet (archived included), an active spending category, a transaction, a scheduled payment or a budget
+     * (P0-2.1). Seeded income categories alone are what any fresh install uploads, so they mean "empty"; goals alone
+     * are left out (a goal-only account is set up as new and its goals arrive with the first sync, without duplicates).
+     * The restore applies the same rule to what it downloaded ([com.lucento.app.domain.RestorePlan.hasData] with
+     * [localHasRestorableRecords]), so a "Welcome back" never ends in "nothing to restore".
+     *
+     * The checks stop at the first hit, cheapest and most common first, so an account with a wallet costs one request.
+     * Any error — network, expired session, permission or RLS refusal — is [AccountProbe.Unavailable], never "empty".
+     */
+    suspend fun probeAccount(): AccountProbe {
+        val r = remote ?: return AccountProbe.NotConfigured
+        return try {
+            val userId = r.currentUserId() ?: return AccountProbe.NotSignedIn
+            val found = r.hasLiveRows("wallets", userId) ||
+                r.hasLiveRows("categories", userId, kind = "EXPENSE", activeOnly = true) ||
+                r.hasLiveRows("transactions", userId) ||
+                r.hasLiveRows("recurring", userId) ||
+                r.hasLiveRows("budgets", userId)
+            if (found) AccountProbe.HasData(userId) else AccountProbe.Empty(userId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AccountProbe.Unavailable(safeFailureDescription(e))
+        }
     }
 
     /**
-     * After the first pull into an existing account: a local category with no server row (it was never synced) and
-     * nothing pointing at it — no transaction, budget or recurring schedule — is deleted. When the account has one of
-     * the same name, that is the merge: the account's copy stays. Anything referenced is kept, and a referenced copy
-     * with a matching name is folded later by [mergeDuplicateCategories], which moves its references.
-     * The server never had these rows, so their tombstones are marked sent rather than pushed.
-     * A type the account has no categories of at all (say, no income categories) is left alone: this phone's
-     * categories of that type are kept and uploaded, so the account is not left without any (QA R9-03).
+     * Whether this phone holds financial records of its own — a wallet, transaction, budget, schedule or goal. Seeded and
+     * chosen categories alone don't count. Used before a first sync merges this phone into an account that has data.
+     */
+    suspend fun localHasFinancialData(): Boolean =
+        localHasRestorableRecords() || goals.getAll().isNotEmpty()
+
+    /**
+     * After a restore: whether it brought back any wallet (archived included), transaction, scheduled payment or budget
+     * — the part of [probeAccount]'s rule that [com.lucento.app.domain.RestorePlan.hasData]'s own arguments (active
+     * wallets, categories) don't already cover.
+     */
+    suspend fun localHasRestorableRecords(): Boolean =
+        wallets.getAll().isNotEmpty() || transactions.getAll().isNotEmpty() || budgets.getAll().isNotEmpty() ||
+            recurring?.getAll()?.isNotEmpty() == true
+
+    /**
+     * After the first pull into an existing account, a local category with no server row (it was never synced) and
+     * nothing pointing at it — no transaction, budget or recurring schedule — is deleted only when it is a copy the
+     * account already has (same kind and name: the account's copy stays), or one of Lucento's own presets/defaults the
+     * user never used while the account has categories of that kind (QA R6-14, R9-03). A category the user named
+     * themselves is never deleted: it uploads (P0-2). Anything referenced is kept, and a referenced copy with a matching
+     * name is folded later by [mergeDuplicateCategories], which moves its references. The server never had these rows,
+     * so their tombstones are marked sent rather than pushed.
      */
     private suspend fun dropUnusedLocalCategories(): Int {
         val all = categories.getAll()
+        // Archived account categories don't count: an active local pick named like one would otherwise vanish from Budget.
+        val onServer = all.filter { (it.syncedAt != null || it.baseRevision != null) && !it.archived }
         // R9-03: a type (expense, income, ...) the account has no categories of keeps this phone's ones; they upload.
-        val kindsOnServer = all.filter { it.syncedAt != null || it.baseRevision != null }.map { it.kind }.toSet()
+        val kindsOnServer = onServer.map { it.kind }.toSet()
+        val namesOnServer = onServer.map { it.kind to CategoryPresets.normalize(it.name) }.toSet()
         val doomed = all.filter { c ->
             FirstSignInCategories.drop(
                 hasServerRow = c.syncedAt != null || c.baseRevision != null,
@@ -188,6 +260,8 @@ class SyncRepository(
                 transactions = categories.transactionCount(c.id),
                 budgets = categories.budgetCount(c.id),
                 schedules = categories.recurringCount(c.id),
+                isPresetName = FirstSignInCategories.isPresetName(c.name),
+                copiesAccountCategory = (c.kind to CategoryPresets.normalize(c.name)) in namesOnServer,
             )
         }
         if (doomed.isEmpty()) return 0
@@ -222,16 +296,25 @@ class SyncRepository(
         val plan = CategoryDedup.plan(categories.getAll().map { CategoryDedup.Candidate(it.id, it.kind, it.name, it.archived, it.clientUuid) })
         if (plan.isEmpty()) return 0
         val now = clock()
+        // The winning amount per (keeper, currency) with its original edit time: once a merge rewrites the keeper's row
+        // (updatedAt = now), the next copy must still be compared with the edit that won, or three copies end on the
+        // second one instead of the latest (QA note 1).
+        val winning = mutableMapOf<Pair<Long, String>, CategoryDedup.Limit>()
         plan.forEach { (copy, keeper) ->
             categories.moveTransactions(copy, keeper, now)
             categories.moveRecurring(copy, keeper, now)
             budgets.getForCategory(copy).forEach { moved ->
+                val key = keeper to moved.currencyCode
                 val existing = budgets.findAllocation(keeper, moved.currencyCode)
+                val incoming = CategoryDedup.Limit(moved.limitMinor, moved.updatedAt, moved.clientUuid)
                 if (existing == null) {
                     budgets.update(moved.copy(categoryId = keeper, updatedAt = now))
+                    winning[key] = incoming
                 } else {
-                    val limit = CategoryDedup.mergedLimit(existing.limitMinor, moved.limitMinor)
-                    if (limit != existing.limitMinor) budgets.update(existing.copy(limitMinor = limit, updatedAt = now))
+                    val current = winning[key] ?: CategoryDedup.Limit(existing.limitMinor, existing.updatedAt, existing.clientUuid)
+                    val won = CategoryDedup.winner(current, incoming)
+                    winning[key] = won
+                    if (won.minor != existing.limitMinor) budgets.update(existing.copy(limitMinor = won.minor, updatedAt = now))
                     budgets.deleteById(moved.id)
                 }
             }
@@ -279,9 +362,14 @@ class SyncRepository(
         rejected: Rejected,
     ): SyncReport {
         if (rows.isEmpty()) return SyncReport()
-        val acceptedRevisions = r.upsert(table, rows.map(encode)).associate { it.str("id") to it.revisionOrNull() }
+        // The server's CHECK constraints reject a whole batch for one bad row, so a row that breaks the same rules
+        // (legacy data, say) stays dirty on this phone instead of blocking every other upload (QA note 3).
+        val encoded = rows.map { it to encode(it) }
+        val (sendable, invalid) = encoded.partition { (_, json) -> PulledRowRules.problem(table, json) == null }
+        if (sendable.isEmpty()) return SyncReport(invalidSkipped = invalid.size)
+        val acceptedRevisions = r.upsert(table, sendable.map { it.second }).associate { it.str("id") to it.revisionOrNull() }
         var pushed = 0
-        rows.forEach { row ->
+        sendable.map { it.first }.forEach { row ->
             val revision = acceptedRevisions[idOf(row)]
             if (revision != null) {
                 markPushed(row, revision)
@@ -290,7 +378,7 @@ class SyncRepository(
                 rejected.add(table, idOf(row))
             }
         }
-        return SyncReport(pushed = pushed)
+        return SyncReport(pushed = pushed, invalidSkipped = invalid.size)
     }
 
     private suspend fun pushWallets(r: SyncRemote, userId: String, rejected: Rejected): SyncReport {
@@ -406,7 +494,17 @@ class SyncRepository(
     // --- pull ---
 
     /** A remote deletion found during the pull; applied only after every upsert, children first. */
-    private class PendingDelete(val table: String, val clientUuid: String?, val delete: suspend () -> Unit)
+    /**
+     * A delete pulled from the server, applied after every table is read. [queuedUpdatedAt] is the local row's
+     * `updated_at` when it was queued; [currentUpdatedAt] re-reads it, so an edit saved in between is not deleted.
+     */
+    private class PendingDelete(
+        val table: String,
+        val clientUuid: String?,
+        val queuedUpdatedAt: Long? = null,
+        val currentUpdatedAt: suspend () -> Long? = { null },
+        val delete: suspend () -> Unit,
+    )
 
     private class PullState(val sinceMillis: Long) {
         var newestSeen: Long? = null
@@ -415,6 +513,7 @@ class SyncRepository(
         var conflicts = 0
         var parentsRestored = 0
         var pendingKept = 0
+        var invalidSkipped = 0
         val deletes = mutableListOf<PendingDelete>()
         /** Soft-deleted parents seen in this pull, including ones this phone never stored. */
         val deletedWallets = mutableMapOf<String, WalletRow>()
@@ -447,7 +546,7 @@ class SyncRepository(
             // lost under the same rule both sides apply, so it is replaced rather than retried forever.
             rejected.ids[table]?.takeIf { it.isNotEmpty() }?.let { ids ->
                 r.fetchByIds(table, userId, ids.toList()).forEach { row ->
-                    applyPulled(table, row, state, serverWins = true)
+                    transact { applyPulled(table, row, state, serverWins = true) }
                 }
             }
             var after: SyncRemote.PageKey? = null
@@ -455,7 +554,7 @@ class SyncRepository(
                 val page = r.fetchPage(table, userId, sinceIso, after, pageSize)
                 page.forEach { row ->
                     state.seen(row)
-                    applyPulled(table, row, state, serverWins = false)
+                    transact { applyPulled(table, row, state, serverWins = false) }
                 }
                 if (page.size < pageSize) break
                 val last = page.last()
@@ -466,9 +565,18 @@ class SyncRepository(
         var deletedLocally = 0
         CHILD_FIRST.forEach { table ->
             state.deletes.filter { it.table == table }.forEach { pending ->
-                // A delete the local schema still refuses (e.g. this device added a transaction to a wallet another
-                // device deleted) is kept: the data survives here and the conflict is reported, not thrown.
-                if (runCatching { pending.delete() }.isSuccess) deletedLocally++ else state.conflicts++
+                transact {
+                    // Re-read inside the transaction (P1-5): an edit saved since the delete was queued is newer, and
+                    // the newer action wins (owner decision D3). It is kept and pushed; the server applies the same rule.
+                    val editedSince = pending.queuedUpdatedAt != null && pending.currentUpdatedAt() != pending.queuedUpdatedAt
+                    when {
+                        editedSince -> state.conflicts++
+                        // A delete the local schema still refuses (e.g. this device added a transaction to a wallet
+                        // another device deleted) is kept: the data survives here and the conflict is reported.
+                        runCatching { pending.delete() }.isSuccess -> deletedLocally++
+                        else -> state.conflicts++
+                    }
+                }
             }
         }
 
@@ -481,6 +589,7 @@ class SyncRepository(
             deletedLocally = deletedLocally,
             parentsRestored = state.parentsRestored,
             pendingKept = state.pendingKept,
+            invalidSkipped = state.invalidSkipped,
         )
     }
 
@@ -489,6 +598,11 @@ class SyncRepository(
      * except a pending local edit that is not older than that copy — a same-moment edit is not overwritten.
      */
     private suspend fun applyPulled(table: String, json: JsonObject, s: PullState, serverWins: Boolean) {
+        // P2-9: a row that breaks the record rules is skipped, never reinterpreted (e.g. an unknown type as an expense).
+        if (PulledRowRules.problem(table, json) != null) {
+            s.invalidSkipped++
+            return
+        }
         val revision = json.revisionOrNull()
         fun decide(localExists: Boolean, dirty: Boolean, base: Long?, updatedAt: Long, remoteUpdatedAtIso: String): PullDecision {
             val remoteAt = SyncTime.fromIso(remoteUpdatedAtIso)
@@ -506,7 +620,7 @@ class SyncRepository(
                 val local = wallets.findByClientUuid(row.id)
                 if (row.deletedAt != null) {
                     s.deletedWallets[row.id] = row
-                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { wallets.deleteById(local!!.id) }
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { wallets.findByClientUuid(row.id)?.updatedAt }) { wallets.deleteById(local!!.id) }
                 }
                 val walletId = when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> wallets.insert(row.toEntity(syncedAt = clock()))
@@ -532,7 +646,7 @@ class SyncRepository(
                 val local = categories.findByClientUuid(row.id)
                 if (row.deletedAt != null) {
                     s.deletedCategories[row.id] = row
-                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { categories.deleteById(local!!.id) }
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { categories.findByClientUuid(row.id)?.updatedAt }) { categories.deleteById(local!!.id) }
                 }
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> categories.insert(row.toEntity(syncedAt = clock()))
@@ -555,7 +669,7 @@ class SyncRepository(
             "budgets" -> {
                 val row = decode(BudgetRow.serializer(), json)
                 val local = budgets.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { budgets.deleteById(local!!.id) }
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { budgets.findByClientUuid(row.id)?.updatedAt }) { budgets.deleteById(local!!.id) }
                 val categoryId = resolveCategory(row.categoryId, "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> budgets.insert(row.toEntity(categoryId, syncedAt = clock()))
@@ -578,7 +692,7 @@ class SyncRepository(
             "transactions" -> {
                 val row = decode(TransactionRow.serializer(), json)
                 val local = transactions.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { transactions.deleteById(local!!.id) }
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { transactions.findByClientUuid(row.id)?.updatedAt }) { transactions.deleteById(local!!.id) }
                 val walletId = resolveWallet(row.walletId, row.currencyCode, s)
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
@@ -603,7 +717,7 @@ class SyncRepository(
                 val dao = recurring ?: return
                 val row = decode(RecurringRow.serializer(), json)
                 val local = dao.findByClientUuid(row.id)
-                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { dao.deleteById(local!!.id) }
+                if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { dao.findByClientUuid(row.id)?.updatedAt }) { dao.deleteById(local!!.id) }
                 val walletId = resolveWallet(row.walletId, row.currencyCode, s)
                 val toWalletId = row.toWalletId?.let { resolveWallet(it, row.currencyCode, s) }
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
@@ -630,7 +744,7 @@ class SyncRepository(
                 val local = goals.findGoalByClientUuid(row.id)
                 if (row.deletedAt != null) {
                     s.deletedGoals[row.id] = row
-                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins) { goals.deleteById(local!!.id) }
+                    return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { goals.findGoalByClientUuid(row.id)?.updatedAt }) { goals.deleteById(local!!.id) }
                 }
                 // A linked wallet that hasn't arrived is only informational on a goal, so the link is dropped, not deferred.
                 val walletId = row.walletId?.let { wallets.findByClientUuid(it)?.id }
@@ -783,6 +897,7 @@ class SyncRepository(
         localBaseRevision: Long?,
         deletedAtIso: String,
         serverWins: Boolean,
+        currentUpdatedAt: suspend () -> Long?,
         delete: suspend () -> Unit,
     ) {
         if (localUpdatedAt == null || localDirty == null) return // never had it, nothing to do
@@ -790,7 +905,7 @@ class SyncRepository(
             s.conflicts++ // a newer local edit survives; it is pushed and the server applies the same rule
         } else {
             if (serverWins && localDirty && localBaseRevision != null) s.conflicts++
-            s.deletes += PendingDelete(table, clientUuid, delete)
+            s.deletes += PendingDelete(table, clientUuid, localUpdatedAt, currentUpdatedAt, delete)
         }
     }
 
@@ -872,11 +987,43 @@ private fun GoalRow.toEntity(localWalletId: Long?, photoPath: String?, syncedAt:
     sceneKey = sceneKey, photoPath = photoPath, clientUuid = this.id, dirty = false, syncedAt = syncedAt, baseRevision = revision,
 )
 
-/** Which local categories a first sign-in into an account with data removes (QA R6-14). */
+/** Which local categories a first sign-in into an account with data removes (QA R6-14, R9-03, P0-2). */
 internal object FirstSignInCategories {
-    /** [accountHasKind]: the account already has at least one category of this one's type (QA R9-03). */
-    fun drop(hasServerRow: Boolean, transactions: Int, budgets: Int, schedules: Int, accountHasKind: Boolean = true): Boolean =
-        accountHasKind && !hasServerRow && transactions == 0 && budgets == 0 && schedules == 0
+    /**
+     * Never a category the account already has a server row for, nor one anything references. Otherwise: a copy of an
+     * account category ([copiesAccountCategory]) goes; a Lucento preset/default ([isPresetName]) goes when the account
+     * already has categories of its type ([accountHasKind]); a name the user typed themselves always stays.
+     */
+    fun drop(
+        hasServerRow: Boolean,
+        transactions: Int,
+        budgets: Int,
+        schedules: Int,
+        accountHasKind: Boolean = true,
+        isPresetName: Boolean = true,
+        copiesAccountCategory: Boolean = false,
+    ): Boolean {
+        if (hasServerRow || transactions > 0 || budgets > 0 || schedules > 0) return false
+        if (copiesAccountCategory) return true
+        return isPresetName && accountHasKind
+    }
+
+    private val presetNames: Set<String> by lazy {
+        (CategoryPresets.all.map { it.name } + DefaultCategories.all.map { it.name }).map(CategoryPresets::normalize).toSet()
+    }
+
+    /** One of the names Lucento offers itself (onboarding presets, fresh-install defaults), as opposed to a typed one. */
+    fun isPresetName(name: String): Boolean = CategoryPresets.normalize(name) in presetNames
 }
 
-private val FIRST_SIGN_IN_PROBE = listOf("wallets", "categories", "transactions")
+/** The account check before onboarding sets anything up ([SyncRepository.probeAccount]). */
+sealed interface AccountProbe {
+    data object NotConfigured : AccountProbe
+    data object NotSignedIn : AccountProbe
+    /** Nothing a person made is in the account: set up as new. */
+    data class Empty(val userId: String) : AccountProbe
+    /** The account has the user's data: restore it rather than starting over. */
+    data class HasData(val userId: String) : AccountProbe
+    /** The check couldn't finish (offline, server error). Never treated as "empty". */
+    data class Unavailable(val message: String) : AccountProbe
+}

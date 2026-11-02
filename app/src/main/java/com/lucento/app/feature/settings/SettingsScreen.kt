@@ -78,6 +78,8 @@ import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.data.preferences.ThemeMode
+import androidx.fragment.app.FragmentActivity
+import com.lucento.app.core.security.DeviceAuth
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.backup.BackupPreview
 import com.lucento.app.domain.backup.RestoreMode
@@ -93,6 +95,7 @@ fun SettingsScreen(
     var exportMessage by remember { mutableStateOf<String?>(null) }
     var backupPreview by remember { mutableStateOf<BackupPreview?>(null) }
     var confirmReplace by remember { mutableStateOf(false) }
+    var lockNotice by remember { mutableStateOf<String?>(null) }
     val haptics = rememberHaptics()
     val context = LocalContext.current
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
@@ -150,19 +153,58 @@ fun SettingsScreen(
                 onSyncNow = viewModel::syncNow,
                 onChangePassword = viewModel::changePassword,
                 onUsageCounts = viewModel::setUsageCounts,
+                onAppLock = { enable ->
+                    lockNotice = null
+                    val activity = context as? FragmentActivity
+                    when {
+                        !enable -> viewModel.setAppLock(false)
+                        activity == null || !DeviceAuth.isAvailable(context) ->
+                            lockNotice = "Set a screen lock in your phone’s settings first, then turn this on."
+                        // Proving it works before turning it on, so nobody locks themselves out.
+                        else -> DeviceAuth.authenticate(activity, "Turn on app lock", "Confirm it’s you") { outcome ->
+                            when (outcome) {
+                                DeviceAuth.Outcome.SUCCESS -> viewModel.setAppLock(true)
+                                DeviceAuth.Outcome.CANCELLED -> Unit
+                                DeviceAuth.Outcome.UNAVAILABLE ->
+                                    lockNotice = "Set a screen lock in your phone’s settings first, then turn this on."
+                            }
+                        }
+                    }
+                },
+                onHideInRecents = viewModel::setHideInRecents,
+                lockNotice = lockNotice,
             )
-            current.cloudSync.prompt?.let { prompt ->
+            current.cloudSync.prompt?.takeIf { it.kind == AccountPrompt.Kind.MERGE }?.let {
+                // P0-2: this phone and the account both have records. Both are kept; the user decides whether to join them.
+                ConfirmDialog(
+                    title = "Add this phone’s records to your account?",
+                    // P0-2.1: accurate about what combining does. Categories with the same name merge, and when both sides
+                    // budgeted that category, one amount is kept (sync behaviour unchanged; see NEXT_TASKS budget conflicts).
+                    text = "Your account already has Lucento data, and this phone has records of its own. Your wallets, " +
+                        "transactions, goals and scheduled payments from both are kept and added together.\n\n" +
+                        "Categories with the same name are combined into one. If both had a budget for that category, " +
+                        "the most recently changed amount is kept — check your budgets afterwards.\n\n" +
+                        "Anything you recorded in both places will appear twice and be counted twice in your totals " +
+                        "until you delete the extra copy.\n\n" +
+                        "Choose Don’t connect to leave this phone as it is, not signed in.",
+                    confirmLabel = "Add to account",
+                    onConfirm = viewModel::confirmAccountPrompt,
+                    onDismiss = viewModel::dismissAccountPrompt,
+                    dismissLabel = "Don’t connect",
+                )
+            }
+            current.cloudSync.prompt?.takeIf { it.kind != AccountPrompt.Kind.MERGE }?.let { prompt ->
                 val unsynced = signOutUnsyncedMessage(prompt.unsyncedCount)
                 val signOutWithLoss = prompt.kind == AccountPrompt.Kind.SIGN_OUT && unsynced != null
                 ConfirmDialog(
                     title = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect this account?" else "Switch account?",
                     text = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) {
-                        "This removes the account’s wallets, transactions, budgets and goals from this phone. " +
-                            "Sign back in to download them again." +
+                        "This removes the account’s wallets, transactions, budgets and goals from this phone, and " +
+                            "Lucento starts again from setup. Sign back in to download them again." +
                             (unsynced?.let { " $it" } ?: "")
                     } else {
                         "This phone’s data belongs to another account. It will be removed so it is never uploaded " +
-                            "to the account you just signed in to." +
+                            "to the account you just signed in to, and Lucento then checks that account and sets it up." +
                             if (prompt.hasUnsynced) " Changes that haven’t synced will be lost." else ""
                     },
                     confirmLabel = if (signOutWithLoss) "Sync first" else if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect" else "Remove and switch",
@@ -299,6 +341,9 @@ private fun SettingsContent(
     onSyncNow: () -> Unit,
     onChangePassword: (String) -> Unit,
     onUsageCounts: (Boolean) -> Unit,
+    onAppLock: (Boolean) -> Unit = {},
+    onHideInRecents: (Boolean) -> Unit = {},
+    lockNotice: String? = null,
 ) {
     val prefs = current.preferences
     Column {
@@ -362,7 +407,8 @@ private fun SettingsContent(
 
         CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword)
 
-        if (current.cloudSync.configured && current.cloudSync.signedInEmail != null) {
+        // Debug builds without a test proxy have no Smarter reading (P0-1): nothing to switch on.
+        if (current.cloudSync.configured && current.cloudSync.signedInEmail != null && com.lucento.app.BuildConfig.AI_INTERPRET_URL.isNotBlank()) {
             SmartReadingSection(
                 on = prefs.smartReading,
                 signedIn = true,
@@ -414,6 +460,20 @@ private fun SettingsContent(
             checked = prefs.usageCounts,
             onCheckedChange = onUsageCounts,
             description = "Off unless you turn this on. Event names and timings only, with a random install id. Never amounts or what you type. Kept 90 days. Turning this off deletes the counts for this install.",
+        )
+        // P2-10 (D8): both optional, both off by default, both only on this phone.
+        SwitchRow(
+            title = "Lock Lucento",
+            checked = prefs.appLock,
+            onCheckedChange = onAppLock,
+            description = "Ask for your fingerprint, face or screen lock when you open Lucento or come back after a minute away. Uses your phone’s own lock; Lucento stores nothing.",
+            note = lockNotice,
+        )
+        SwitchRow(
+            title = "Hide in recent apps",
+            checked = prefs.hideInRecents,
+            onCheckedChange = onHideInRecents,
+            description = "Shows a blank preview instead of your balances when you switch apps. This also blocks screenshots and screen recording of Lucento.",
         )
         Fact(
             Icons.Outlined.PhoneAndroid,

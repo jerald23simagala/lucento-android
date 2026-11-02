@@ -186,6 +186,8 @@ data class SyncReport(
     val parentsRestored: Int = 0,
     /** Pending local edits that tied with the server and were nudged one millisecond later so they can be pushed. */
     val pendingKept: Int = 0,
+    /** Pulled rows that broke the record rules ([PulledRowRules]) and were skipped, not reinterpreted. */
+    val invalidSkipped: Int = 0,
 ) {
     operator fun plus(other: SyncReport) = SyncReport(
         pushed + other.pushed,
@@ -195,6 +197,7 @@ data class SyncReport(
         deletedLocally + other.deletedLocally,
         parentsRestored + other.parentsRestored,
         pendingKept + other.pendingKept,
+        invalidSkipped + other.invalidSkipped,
     )
 }
 

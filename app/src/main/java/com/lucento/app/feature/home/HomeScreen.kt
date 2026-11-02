@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -630,6 +631,15 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                         when {
                             setupNeeded -> Text("Finish your budget setup", style = MaterialTheme.typography.titleMedium)
                             !plan.hasBudget -> Text("No budget yet", style = MaterialTheme.typography.titleMedium)
+                            // At large font sizes the "of … used" line sits under the percentage so it reads in order.
+                            largeText() -> Column {
+                                Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.large, maxLines = 1)
+                                Text(
+                                    "of ${MoneyFormatter.format(plan.total)} used",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                             else -> Row(verticalAlignment = Alignment.Bottom) {
                                 Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.large, maxLines = 1)
                                 Spacer(Modifier.width(Spacing.xs))
@@ -658,19 +668,28 @@ private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: Budget
                 PercentBar(burn.elapsedPercent / 100f, "${burn.elapsedPercent}% of month", elapsedColor, "Month elapsed: ${burn.elapsedPercent} percent")
 
                 Spacer(Modifier.height(Spacing.sm))
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                    if (plan.hasBudget) {
-                        MoneyStat(plan.spent, "Spent", Modifier.weight(1f))
-                        StatDivider()
-                        MoneyStat(
-                            if (plan.remaining.isNegative) -plan.remaining else plan.remaining,
-                            if (plan.remaining.isNegative) "Over budget" else "Remaining",
-                            Modifier.weight(1f),
-                            valueColor = if (plan.remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
-                        )
-                        StatDivider()
+                val remainingValue = if (plan.remaining.isNegative) -plan.remaining else plan.remaining
+                val remainingLabel = if (plan.remaining.isNegative) "Over budget" else "Remaining"
+                val remainingColor = if (plan.remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface
+                if (largeText()) {
+                    // P1-7: three columns cut "Remaining" short at large font sizes; one stat per line keeps every word.
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        if (plan.hasBudget) {
+                            MoneyStat(plan.spent, "Spent", Modifier.fillMaxWidth())
+                            MoneyStat(remainingValue, remainingLabel, Modifier.fillMaxWidth(), valueColor = remainingColor)
+                        }
+                        BudgetStat("${burn.daysLeft}", "days left", Modifier.fillMaxWidth())
                     }
-                    BudgetStat("${burn.daysLeft}", "days left", Modifier.weight(0.8f))
+                } else {
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                        if (plan.hasBudget) {
+                            MoneyStat(plan.spent, "Spent", Modifier.weight(1f))
+                            StatDivider()
+                            MoneyStat(remainingValue, remainingLabel, Modifier.weight(1f), valueColor = remainingColor)
+                            StatDivider()
+                        }
+                        BudgetStat("${burn.daysLeft}", "days left", Modifier.weight(0.8f))
+                    }
                 }
             }
 
@@ -761,10 +780,13 @@ private fun TorchLight(modifier: Modifier = Modifier) {
 @Composable
 private fun PercentBar(fraction: Float, label: String, color: Color, description: String) {
     val clamped = fraction.coerceIn(0f, 1f)
+    // The bar grows with the label's line height, so large font sizes don't clip the percentage (P1-7).
+    val labelLine = MaterialTheme.typography.labelSmall.lineHeight
+    val height = if (labelLine.isSp) maxOf(16.dp, with(LocalDensity.current) { labelLine.toDp() }) else 16.dp
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .height(16.dp)
+            .height(height)
             .clip(CircleShape)
             .background(LucentoTheme.extendedColors.track)
             .clearAndSetSemantics { contentDescription = description },
@@ -802,6 +824,10 @@ private fun LegendDot(color: Color, label: String) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+/** True when the system font size is large enough (150%+) that side-by-side figures and one-line copy stop fitting. */
+@Composable
+private fun largeText(): Boolean = LocalDensity.current.fontScale >= 1.5f
 
 @Composable
 private fun BudgetStat(value: String, label: String, modifier: Modifier = Modifier, valueLines: Int = 1) {
@@ -852,11 +878,12 @@ private fun AdviceBanner(text: String, detail: String?, tones: PaceTones, onClic
             Icon(tones.icon, contentDescription = null, tint = tones.banner.content, modifier = Modifier.size(18.dp))
         }
         Spacer(Modifier.width(Spacing.sm))
-        // Two one-liners: the verdict, then the daily allowance that keeps the month on budget.
+        // Two one-liners: the verdict, then the daily allowance that keeps the month on budget (wrapping at large sizes).
+        val lines = if (largeText()) 4 else 1
         Column(Modifier.weight(1f)) {
-            Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = lines, overflow = TextOverflow.Ellipsis)
             if (detail != null) {
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = lines, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -906,15 +933,17 @@ private fun NetWorthAndQuickLinks(state: HomeUiState, composition: NetWorthCompo
         // Budget and Wallets have their own places in the dock; Insights opens from here.
         if (f.isEnabled(Feature.INSIGHTS)) add(QuickLink("Insights", "Insights", Icons.Outlined.Insights, actions.onOpenInsights))
     }
+    // Breakpoints grow with the system font size (P1-7): at 2× text, half-width cards broke "Goals" into "Goal/s".
+    val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        if (maxWidth >= 300.dp) {
+        if (maxWidth >= 300.dp * textScale) {
             // The links card's share of the row (1 of 2.1 weights) minus its padding: too narrow for two tiles across
             // on small phones, where the links become a list. Worked out here because the row below measures its
             // children's intrinsic height, which a nested BoxWithConstraints cannot provide.
             val linksContentWidth = (maxWidth - Spacing.sm) / 2.1f - Spacing.md * 2
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 FlowAndWorthCard(state, composition, actions, Modifier.weight(1.1f).fillMaxHeight())
-                QuickLinksCard(links, asList = linksContentWidth < 140.dp, modifier = Modifier.weight(1f).fillMaxHeight())
+                QuickLinksCard(links, asList = linksContentWidth < 140.dp * textScale, modifier = Modifier.weight(1f).fillMaxHeight())
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {

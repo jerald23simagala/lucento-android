@@ -70,7 +70,8 @@ internal fun MoneyField(
     AmountTextField(
         value = value,
         onValueChange = onValueChange,
-        filter = { input -> input.filter { it.isDigit() || it == '.' || it == ',' }.take(20) },
+        // Length only: MoneyParser judges the text (dropping characters here turned "۱۲٫۵" into 125, P0-3).
+        filter = { it.take(20) },
         label = { Text(label) },
         prefix = { Text(MoneyFormatter.currencySymbol(currencyCode) + " ") },
         placeholder = { Text("0") },

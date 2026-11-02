@@ -63,6 +63,8 @@ sealed interface AmountError {
     data object Zero : AmountError
     data class TooPrecise(val digits: Int) : AmountError
     data object TooLarge : AmountError
+    /** Ambiguous, or another currency's symbol: [text] says what to type (MoneyParser.clarification). */
+    data class Unclear(val text: String) : AmountError
 }
 
 /** Parses a positive amount through [MoneyParser] (the only way user input becomes money). */
@@ -72,6 +74,8 @@ fun parsePositive(text: String, currencyCode: String, separator: Char): Pair<Mon
         MoneyParser.Result.Empty, MoneyParser.Result.Invalid -> null to AmountError.Invalid
         is MoneyParser.Result.TooManyDecimals -> null to AmountError.TooPrecise(parsed.allowed)
         MoneyParser.Result.TooLarge -> null to AmountError.TooLarge
+        is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency ->
+            null to AmountError.Unclear(MoneyParser.clarification(parsed, separator).orEmpty())
     }
 
 fun AmountError.message(currencyCode: String, separator: Char): String = when (this) {
@@ -79,6 +83,7 @@ fun AmountError.message(currencyCode: String, separator: Char): String = when (t
     AmountError.Zero -> "The amount must be greater than zero."
     is AmountError.TooPrecise -> if (digits == 0) "$currencyCode has no decimal places." else "$currencyCode allows up to $digits decimal places."
     AmountError.TooLarge -> "That amount is larger than Lucento supports."
+    is AmountError.Unclear -> text
 }
 
 class PlanViewModel(

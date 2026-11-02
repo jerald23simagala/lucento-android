@@ -52,6 +52,17 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
   creates the rest, and deactivates unchosen ones (archived when used, deleted only when unused). No schema change
   was needed, so the database stays at version 3.
 
+### Budget when categories are combined (P1-8)
+Sync folds live categories of the same kind and name into one keeper (the copy with the smallest sync id,
+`CategoryDedup.plan`). When both copies had a budget in the same currency, the keeper ends with
+(`CategoryDedup.mergedLimit`, owner decision **keep the latest edit**):
+1. the set amount, if only one of them is set (an unset 0 never replaces a set amount);
+2. otherwise the amount whose budget row was edited most recently (`updated_at`);
+3. on an exact tie, the amount of the row with the smaller sync id.
+The same rows give the same result on every device, in either order. The other amount is not kept; the Settings
+combine dialog says "the most recently changed amount is kept". Budget rows carry no month, so the kept amount applies
+to every month's view.
+
 ## Debt rules
 - Credit-card purchase: EXPENSE on the card (raises owed). Paying the card: TRANSFER from bank to card (lowers owed;
   not spending, so the purchase is not counted twice).

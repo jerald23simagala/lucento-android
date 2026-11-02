@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,7 +94,27 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     val restoreStage by viewModel.restoreStage.collectAsStateWithLifecycle()
     val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
     val switchPrompt by viewModel.switchPrompt.collectAsStateWithLifecycle()
+    val accountCheck by viewModel.accountCheck.collectAsStateWithLifecycle()
+    val welcomeBack by viewModel.welcomeBack.collectAsStateWithLifecycle()
+    val holdsAccountData by viewModel.holdsAccountData.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Leaving the account when part of it is already here removes that partial copy, so it is confirmed first.
+    var confirmLeave by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val onLeaveAccount = { if (holdsAccountData) confirmLeave = true else viewModel.leaveAccount() }
+    if (confirmLeave) {
+        ConfirmDialog(
+            title = "Use Lucento without this account?",
+            text = "Everything stays safe in your account. The part that was already downloaded is removed from this " +
+                "phone, and you set Lucento up without syncing. Sign in again any time to bring it all back.",
+            confirmLabel = "Continue without it",
+            onConfirm = {
+                confirmLeave = false
+                viewModel.leaveAccount()
+            },
+            onDismiss = { confirmLeave = false },
+        )
+    }
 
     // Anonymous usage counts (opt-in in Settings): one onboarding_step_viewed per screen. Draws nothing.
     LaunchedEffect(step) { viewModel.onStepShown(step) }
@@ -118,6 +139,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     if (restoreStage != RestoreStage.NONE) {
         RestoreFlow(
             stage = restoreStage,
+            welcomeBack = welcomeBack,
             signedInEmail = signedInEmail,
             googleAvailable = viewModel.googleAvailable,
             connecting = connecting,
@@ -129,6 +151,8 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
             onRetry = viewModel::runRestore,
             onSetUpAsNew = viewModel::setUpAsNew,
             onBack = viewModel::cancelRestore,
+            holdsAccountData = holdsAccountData,
+            onLeaveAccount = onLeaveAccount,
         )
         return
     }
@@ -185,9 +209,13 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
                     signedInEmail = signedInEmail,
                     connecting = connecting,
                     message = syncMessage,
+                    accountCheck = accountCheck,
                     onGoogle = { viewModel.connectGoogle(context) },
                     onEmail = viewModel::connectEmail,
                     onPrepareEmail = viewModel::prepareConnection,
+                    holdsAccountData = holdsAccountData,
+                    onRetryCheck = viewModel::retryAccountCheck,
+                    onContinueOffline = onLeaveAccount,
                     onContinue = viewModel::next,
                 )
                 else -> ConfirmStep(currency, theme, features, picks.count, error, signedInEmail, onFinish = viewModel::finish)
@@ -283,6 +311,7 @@ private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
 internal fun RestoreFlow(
     stage: RestoreStage,
     signedInEmail: String?,
+    welcomeBack: Boolean = false,
     googleAvailable: Boolean,
     connecting: Boolean,
     message: String?,
@@ -293,6 +322,10 @@ internal fun RestoreFlow(
     onRetry: () -> Unit,
     onSetUpAsNew: () -> Unit,
     onBack: () -> Unit,
+    /** Part of the account is already on this phone (an interrupted restore). */
+    holdsAccountData: Boolean = false,
+    /** The way out when the account can't be brought across: set Lucento up without it. */
+    onLeaveAccount: () -> Unit = {},
 ) {
     val ext = LucentoTheme.extendedColors
     Column(
@@ -335,11 +368,21 @@ internal fun RestoreFlow(
                     )
                 }
                 RestoreStage.RESTORING -> {
-                    StepTitle(
-                        "Bringing your money across",
-                        "Downloading ${signedInEmail?.takeIf { it.isNotEmpty() } ?: "your account"}. Keep Lucento open — " +
-                            "this can take a moment on a slow connection.",
-                    )
+                    if (welcomeBack) {
+                        // A returning account recognised on the setup path: say why setup changed course.
+                        StepTitle(
+                            "Welcome back",
+                            "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "Your account"} already has your Lucento data, " +
+                                "so we’re bringing it to this phone instead of starting over. Keep Lucento open — this can " +
+                                "take a moment on a slow connection.",
+                        )
+                    } else {
+                        StepTitle(
+                            "Bringing your money across",
+                            "Downloading ${signedInEmail?.takeIf { it.isNotEmpty() } ?: "your account"}. Keep Lucento open — " +
+                                "this can take a moment on a slow connection.",
+                        )
+                    }
                     Spacer(Modifier.height(Spacing.xl))
                     LucentoWorkingIndicator(label = "Restoring your account")
                 }
@@ -348,12 +391,18 @@ internal fun RestoreFlow(
                     Spacer(Modifier.height(Spacing.md))
                     StepTitle(
                         "Nothing to restore yet",
-                        "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "This account"} has no wallets or categories saved. " +
+                        "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "This account"} has no wallets, spending categories, " +
+                            "transactions, budgets or scheduled payments saved yet. " +
                             "Set Lucento up as new — you stay connected, and it syncs when you finish.",
                     )
                 }
                 RestoreStage.FAILED -> {
-                    StepTitle("Couldn’t bring your data across", "Nothing was changed on this phone.")
+                    // Part of the account may already be here (the download isn't all-or-nothing), so don't say otherwise.
+                    StepTitle(
+                        "Couldn’t finish bringing your data across",
+                        "Everything is still safe in your account. Some of it may already be on this phone — try again to " +
+                            "finish. Nothing is lost or duplicated by trying again.",
+                    )
                 }
                 RestoreStage.NONE -> Unit
             }
@@ -368,11 +417,23 @@ internal fun RestoreFlow(
                 LucentoPrimaryButton(text = "Continue", onClick = onContinue)
                 LucentoTextButton(text = "Back", onClick = onBack, modifier = Modifier.fillMaxWidth())
             }
-            RestoreStage.SIGN_IN -> LucentoTextButton(text = "Back", onClick = onBack, modifier = Modifier.fillMaxWidth(), enabled = !connecting)
+            RestoreStage.SIGN_IN -> if (holdsAccountData) {
+                // Signed out part-way through a restore: Back would only lead here again, so offer the real way out.
+                LucentoTextButton(
+                    text = "Use Lucento without this account",
+                    onClick = onLeaveAccount,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !connecting,
+                )
+            } else {
+                LucentoTextButton(text = "Back", onClick = onBack, modifier = Modifier.fillMaxWidth(), enabled = !connecting)
+            }
             RestoreStage.EMPTY -> LucentoPrimaryButton(text = "Set up as new", onClick = onSetUpAsNew)
             RestoreStage.FAILED -> {
                 LucentoPrimaryButton(text = "Try again", onClick = onRetry)
-                LucentoTextButton(text = "Set up as new instead", onClick = onSetUpAsNew, modifier = Modifier.fillMaxWidth())
+                // Not "set up as new": this account has data, and a second setup on top of it would duplicate it. The
+                // way out disconnects the account instead (and removes any part already downloaded), so nobody is stuck.
+                LucentoTextButton(text = "Use Lucento without this account", onClick = onLeaveAccount, modifier = Modifier.fillMaxWidth())
             }
             RestoreStage.RESTORING, RestoreStage.NONE -> Unit
         }
@@ -524,11 +585,16 @@ private fun SyncStep(
     signedInEmail: String?,
     connecting: Boolean,
     message: String?,
+    accountCheck: AccountCheck,
+    holdsAccountData: Boolean,
     onGoogle: () -> Unit,
     onEmail: (String, String, com.lucento.app.feature.settings.EmailMode) -> Unit,
     onPrepareEmail: () -> Unit,
+    onRetryCheck: () -> Unit,
+    onContinueOffline: () -> Unit,
     onContinue: () -> Unit,
 ) {
+    val ext = LucentoTheme.extendedColors
     Column(Modifier.fillMaxSize().imePadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             StepTitle(
@@ -537,6 +603,22 @@ private fun SyncStep(
             )
             when {
                 !available -> InfoNote("Cloud sync isn’t available in this version of Lucento. Everything works fully offline.")
+                signedInEmail != null && accountCheck == AccountCheck.Checking -> {
+                    Spacer(Modifier.height(Spacing.md))
+                    LucentoWorkingIndicator(label = "Checking your account")
+                }
+                signedInEmail != null && accountCheck == AccountCheck.Unavailable -> InfoNote(
+                    if (!holdsAccountData) {
+                        "We couldn’t reach your account to see what’s already in it, so nothing has been set up or " +
+                            "uploaded yet. Check your connection and try again — or carry on without syncing for now."
+                    } else {
+                        "We couldn’t reach your account, and part of it is already on this phone. Try again to finish " +
+                            "bringing it across — or use Lucento without this account for now. Your account keeps everything."
+                    },
+                    icon = Icons.Outlined.WarningAmber,
+                    container = ext.warningContainer,
+                    content = ext.warning,
+                )
                 signedInEmail != null -> InfoNote(
                     "Connected as ${signedInEmail.ifEmpty { "your account" }}. Sync starts when you finish setting up.",
                     icon = Icons.Filled.CloudDone,
@@ -564,7 +646,16 @@ private fun SyncStep(
             }
         }
         Spacer(Modifier.height(Spacing.md))
-        if (signedInEmail != null || !available) {
+        if (available && signedInEmail != null && accountCheck == AccountCheck.Unavailable) {
+            LucentoPrimaryButton(text = "Try again", onClick = onRetryCheck)
+            LucentoTextButton(
+                text = if (holdsAccountData) "Use Lucento without this account" else "Continue without syncing",
+                onClick = onContinueOffline,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else if (signedInEmail != null && accountCheck == AccountCheck.Checking) {
+            LucentoPrimaryButton(text = "Continue", onClick = {}, enabled = false)
+        } else if (signedInEmail != null || !available) {
             LucentoPrimaryButton(text = "Continue", onClick = onContinue)
         } else {
             LucentoTextButton(text = "Not now — keep it on this phone", onClick = onContinue, modifier = Modifier.fillMaxWidth())
