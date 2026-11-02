@@ -14,6 +14,7 @@
 *.jks
 keystore.properties
 .kotlin/
+app/google-services.json
 
 # Downloaded CI artifacts (schemas are copied into app/schemas deliberately)
 _ci_artifacts/
@@ -34,3 +35,12 @@ docs/mascot/lucento-mascot-studio*.zip
 
 # Local Claude scratch output
 /Claude outputs/
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
+
+# Local Claude temporary files
+.claude/settings.local.json
+# Local APK build artifacts
+/artifacts/apk/

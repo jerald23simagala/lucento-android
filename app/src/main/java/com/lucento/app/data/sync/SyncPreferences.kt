@@ -41,6 +41,13 @@ interface SyncPreferencesStore {
     /** The account this device's rows were first synced with; sync refuses to mix in a different one. */
     suspend fun syncedUserId(): String?
     suspend fun setSyncedUserId(userId: String)
+    /**
+     * The account whose first pull (and the first-sign-in category tidy-up after it) has finished on this phone. Kept
+     * apart from [syncedUserId], which is claimed before anything is pulled so no other account can follow: a first
+     * sync that fails half-way leaves the claim but not this, so the retry pulls first again instead of uploading.
+     */
+    suspend fun initialPullDoneFor(): String?
+    suspend fun setInitialPullDoneFor(userId: String)
 }
 
 /**
@@ -55,6 +62,7 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
         val lastError = stringPreferencesKey("last_sync_error")
         val pullCursor = stringPreferencesKey("pull_cursor_server_time")
         val syncedUserId = stringPreferencesKey("synced_user_id")
+        val initialPullDoneFor = stringPreferencesKey("initial_pull_done_for")
     }
 
     val status: Flow<SyncStatus> = context.syncDataStore.data
@@ -99,6 +107,12 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
         context.syncDataStore.edit { it[Keys.syncedUserId] = userId }
     }
 
+    override suspend fun initialPullDoneFor(): String? = context.syncDataStore.data.first()[Keys.initialPullDoneFor]
+
+    override suspend fun setInitialPullDoneFor(userId: String) {
+        context.syncDataStore.edit { it[Keys.initialPullDoneFor] = userId }
+    }
+
     /** Forgets which account this phone synced and the pull cursor. Called when that ledger is wiped. */
     suspend fun clearBinding() {
         context.syncDataStore.edit {
@@ -107,6 +121,7 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
             it.remove(Keys.lastError)
             it.remove(Keys.pullCursor)
             it.remove(Keys.syncedUserId)
+            it.remove(Keys.initialPullDoneFor)
         }
     }
 

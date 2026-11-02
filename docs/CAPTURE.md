@@ -95,7 +95,7 @@ read on this phone by `LocalTransactionInterpreter` (deterministic rules; never 
 |---|---|
 | Opt-in flag | `UserPreferences.smartReading` (DataStore), set only from the consent dialog |
 | Composer reader | `data/ai/HybridTransactionInterpreter`: Gemini when on, else local; falls back to local per request (offline, signed out, daily limit used, error, nothing found) and labels the reply "Read by Gemini" / "Read on this phone — <reason>" |
-| Client | `data/ai/RemoteTransactionInterpreter` → `BuildConfig.AI_INTERPRET_URL` (default `https://www.lucentoapp.com/api/interpret`, override with `LUCENTO_AI_INTERPRET_URL`) with the user's Supabase access token |
+| Client | `data/ai/RemoteTransactionInterpreter` → `BuildConfig.AI_INTERPRET_URL` (release: default `https://www.lucentoapp.com/api/interpret`, override with `LUCENTO_AI_INTERPRET_URL`; debug: only `LUCENTO_DEBUG_AI_INTERPRET_URL`, otherwise Smarter reading is hidden — debug never calls the production proxy) with the user's Supabase access token |
 | Validation | `RemoteCandidates`: ids must be the user's own, amounts positive decimals, kinds must fit; doubts become review flags. Rows still go through `BatchReview` and the user's review |
 | Proxy | `lucento-website/api/interpret.ts` (Vercel). Holds `GEMINI_API_KEY`; checks the token with Supabase Auth; counts the request with `public.consume_ai_quota()`; returns structured rows |
 | Daily limit | `supabase/migrations/20261027090000_ai_usage_quota.sql` (`public.ai_usage`, RLS read-own, no write grants) + `AI_DAILY_LIMIT` on Vercel (default 50/user/UTC day) |

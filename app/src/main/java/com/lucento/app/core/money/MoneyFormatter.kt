@@ -54,14 +54,12 @@ object MoneyFormatter {
     /** U+2212 MINUS SIGN: same width as "+" in Plus Jakarta Sans, unlike the hyphen-minus. */
     const val MINUS = "−"
 
-    /** Plain number without currency symbol, suitable for pre-filling an input field. */
-    fun formatPlain(money: Money, locale: Locale = Locale.getDefault()): String {
-        val nf = NumberFormat.getNumberInstance(locale)
-        nf.isGroupingUsed = false
-        nf.minimumFractionDigits = money.fractionDigits
-        nf.maximumFractionDigits = money.fractionDigits
-        return nf.format(money.toBigDecimal())
-    }
+    /**
+     * Plain number without currency symbol or grouping, suitable for pre-filling an input field: ASCII digits and the
+     * same decimal mark [decimalSeparator] gives the parser, so a prefilled amount always parses back to itself (P0-3).
+     */
+    fun formatPlain(money: Money, locale: Locale = Locale.getDefault()): String =
+        money.toBigDecimal().toPlainString().replace('.', decimalSeparator(locale))
 
     fun decimalSeparator(locale: Locale = Locale.getDefault()): Char {
         val sep = DecimalFormatSymbols.getInstance(locale).decimalSeparator

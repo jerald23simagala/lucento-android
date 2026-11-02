@@ -260,7 +260,11 @@ private fun BudgetsStep(
             prefix = { Text(MoneyFormatter.currencySymbol(state.currency) + " ") },
             placeholder = { Text("Not set") },
             isError = category.id in invalid,
-            supportingText = if (category.id in invalid) ({ Text("Enter an amount above zero, like 250${separator}00.") }) else null,
+            supportingText = if (category.id in invalid) ({
+                // An ambiguous amount or another currency's symbol says what to type instead (P0-3).
+                val parsed = com.lucento.app.core.money.MoneyParser.parse(text(category.id), state.currency, separator)
+                Text(com.lucento.app.core.money.MoneyParser.clarification(parsed, separator) ?: "Enter an amount above zero, like 250${separator}00.")
+            }) else null,
             textStyle = AmountStyles.row,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
             shape = MaterialTheme.shapes.small,

@@ -283,7 +283,7 @@ fun WalletEditorSheet(
 
             Spacer(Modifier.height(Spacing.md))
             val amountError = error is DraftError.AmountInvalid ||
-                error is DraftError.AmountTooPrecise || error is DraftError.AmountTooLarge
+                error is DraftError.AmountTooPrecise || error is DraftError.AmountTooLarge || error is DraftError.AmountUnclear
             AmountTextField(
                 value = draft.amountText,
                 onValueChange = {
@@ -304,6 +304,7 @@ fun WalletEditorSheet(
                                 if (e.digits == 0) "${draft.currencyCode} has no decimal places."
                                 else "${draft.currencyCode} allows up to ${e.digits} decimal places."
                             DraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
+                            is DraftError.AmountUnclear -> e.message
                             else -> when {
                                 draft.type.isValuedManually -> "What it’s worth today. Update it whenever the value changes — no transactions needed."
                                 initial.id != null -> "Where this wallet started, before the transactions you record."
@@ -329,7 +330,9 @@ fun WalletEditorSheet(
                     fieldColors = fieldColors,
                     onChange = {
                         draft = it
-                        if (error is DraftError.InterestInvalid || error is DraftError.TermInvalid || error is DraftError.InstallmentInvalid) error = null
+                        if (error is DraftError.InterestInvalid || error is DraftError.TermInvalid || error is DraftError.InstallmentInvalid ||
+                            error is DraftError.InstallmentUnclear
+                        ) error = null
                     },
                 )
             }
@@ -487,7 +490,7 @@ private fun DebtDetails(
                 label = { Text("Monthly amortization") },
                 prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
                 placeholder = { Text("0") },
-                isError = error == DraftError.InstallmentInvalid,
+                isError = error == DraftError.InstallmentInvalid || error is DraftError.InstallmentUnclear,
                 textStyle = AmountStyles.medium,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 shape = MaterialTheme.shapes.small,
@@ -502,6 +505,7 @@ private fun DebtDetails(
         when {
             error == DraftError.TermInvalid -> HintText("Enter how many months, from 1 to ${DebtTerms.MAX_TERM_MONTHS}.", isError = true)
             error == DraftError.InstallmentInvalid -> HintText("Enter what you pay each month.", isError = true)
+            error is DraftError.InstallmentUnclear -> HintText((error as DraftError.InstallmentUnclear).message, isError = true)
             suggested != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                 HintText(
                     "${MoneyFormatter.format(suggested)} a month repays ${MoneyFormatter.format(owed!!)} in $months months" +

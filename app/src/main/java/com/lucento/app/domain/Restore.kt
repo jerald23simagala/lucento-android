@@ -9,10 +9,13 @@ object RestorePlan {
 
     /**
      * True when the account brought something back: a wallet, or an expense category (a fresh install only seeds
-     * income categories, so those alone mean an empty account). An empty account continues with the normal setup.
+     * income categories, so those alone mean an empty account), or [otherRecords] — any wallet including archived ones,
+     * a transaction, a scheduled payment or a budget (P0-2.1). An empty account continues with the normal setup.
+     * The server-side check before onboarding (`SyncRepository.probeAccount`) counts exactly the same things, so a
+     * "Welcome back" never ends in "nothing to restore". Goals alone don't count (see the P0-2 acceptance review).
      */
-    fun hasData(wallets: List<Wallet>, categories: List<Category>): Boolean =
-        wallets.isNotEmpty() || categories.any { it.kind == CategoryKind.EXPENSE && !it.archived }
+    fun hasData(wallets: List<Wallet>, categories: List<Category>, otherRecords: Boolean = false): Boolean =
+        wallets.isNotEmpty() || categories.any { it.kind == CategoryKind.EXPENSE && !it.archived } || otherRecords
 
     /** The account has spending categories, so the category picker can be skipped too. */
     fun hasSpendingCategories(categories: List<Category>): Boolean =

@@ -479,7 +479,17 @@ fun TransactionComposerScreen(
         WalletPickerSheet(
             wallets = state.wallets,
             onChoose = { id, remember -> viewModel.chooseWallet(id, remember) },
-            onDismiss = viewModel::dismissWalletPicker,
+            // Dismissing never loses what was typed or said: the held message goes back into the field. A receipt is
+            // read again from the photo instead, so its amounts keep the receipt rules.
+            onDismiss = {
+                viewModel.dismissWalletPicker()?.let { (text, source) ->
+                    if (source == CaptureSource.RECEIPT) {
+                        notice = "Receipt not added. Choose a wallet, then scan it again."
+                    } else if (input.isBlank()) {
+                        input = text
+                    }
+                }
+            },
         )
     }
 

@@ -1,0 +1,21 @@
+End-of-run evidence, 2026-11-01 (read-only SQL on lucento-test, plus device DBs pulled with run-as).
+
+1) Pre-existing QA accounts, end of run (compare with 00-baseline-existing-qa.txt): identical.
+user8     table         rows  last_change (UTC)               md5(id:revision ordered)
+4972e508  budgets         4   2026-10-29 16:41:30.146017+00   fa821df04f0a40ee51447e288fa3fb9a
+4972e508  categories     56   2026-10-29 16:41:30.383485+00   84fac303b5453f4537833ea80255ee54
+4972e508  transactions    5   2026-10-29 15:45:07.522347+00   f4458b588b467bd12b7d0726c8d5a0f0
+4972e508  wallets         5   2026-10-29 16:41:28.389439+00   4cd69a26349ee8ee83df933975385747
+fe0d6ae4  categories     42   2026-10-29 07:33:31.252937+00   5b84e53e0ed4055e4903f68548a69320
+fe0d6ae4  transactions    8   2026-10-29 07:49:28.318036+00   c21d354d3e251f7ef854b44cc209cb11
+fe0d6ae4  wallets         3   2026-10-29 07:33:27.518111+00   6600cfe4c78cd0118e0531663d7a503f
+
+2) Account A (211a8bb2), snapshot A2 after the combine - CONTENT hashes (md5 of canonical rows, first 8 chars):
+   rows: wallets id|name|opening|archived; categories id|name|kind|archived; budgets id|category_uuid|currency|limit;
+   transactions id|type|amount|wallet_uuid|category_uuid|occurred_on; goals id|name|target; recurring id|amount|wallet_uuid|category_uuid|next_index
+   server              wallets=4:35c9713f categories=19:1e482607 budgets=2:d79ad5c8 transactions=5:f97c156c goals=1:e194d30d recurring=1:0bd62699
+   device A (converged) wallets=4:35c9713f categories=19:1e482607 budgets=2:d79ad5c8 transactions=5:f97c156c goals=1:e194d30d recurring=1:0bd62699
+   device B (after O-09) wallets=4:35c9713f categories=19:1e482607 budgets=2:d79ad5c8 transactions=5:f97c156c goals=1:e194d30d recurring=1:0bd62699
+   Device A held A1 and had never seen the combine; its launch sync pulled the folded categories, moved references and replaced budget - identical content everywhere, 0 dirty, 0 crashes.
+
+3) Account B (ae2e7a97): 0 rows in every table (never used; unconfirmed).

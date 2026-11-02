@@ -1,0 +1,20 @@
+P2-10 app lock + hide in recents — device log (2026-11-01, emulator-5556, API 36.1, debug build, QA account A)
+
+B-103 Turn on "Lock Lucento" with no screen lock on the phone -> refused with "Set a screen lock in your phone's
+      settings first, then turn this on." Setting stays off. PASS
+      (temporary emulator PIN set with `locksettings set-pin`, cleared at the end)
+B-104 Turn on with a PIN -> system prompt "Turn on app lock / Confirm it's you". PASS
+B-105 After the PIN: switch on, Settings stays open (the session counts as unlocked). PASS
+B-106 Hide in recent apps with setRecentsScreenshotEnabled(false): recents card still showed Settings (the launcher's
+      live tile). FAIL -> switched to FLAG_SECURE on every version.
+B-107 Home, wait 70 s, reopen -> "Unlock Lucento" prompt; PIN -> back on the same Settings screen, state intact. PASS
+B-108 Cold start -> prompt immediately. PASS
+B-109 Prompt dismissed -> "Lucento is locked" screen; the accessibility tree contains only the lock screen and the TEST
+      badge (balances hidden from TalkBack). PASS
+B-110 Unlock via the button -> Home. `dumpsys window` shows the SECURE flag. The host screenshot of recents still shows
+      content because the emulator console reads the GPU framebuffer directly; an in-guest screencap (which honours
+      FLAG_SECURE) failed on this image (ENV-1). Recents blanking is verified by the window flag only; check on a
+      physical device.
+      Lockout safety: PIN removed while the lock was on, 70 s away, reopen -> opened without a prompt and the stored
+      app_lock preference became false (toast explains). PASS
+End state: no PIN, app lock off, hide in recents off (no SECURE flag). Crashes: 0.

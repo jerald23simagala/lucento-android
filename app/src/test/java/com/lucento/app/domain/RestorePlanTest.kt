@@ -22,6 +22,9 @@ class RestorePlanTest {
     @Test fun aWalletOrASpendingCategoryMeansThereIsSomethingToRestore() {
         assertTrue(RestorePlan.hasData(listOf(wallet(1, "PHP")), listOf(salary)))
         assertTrue(RestorePlan.hasData(emptyList(), listOf(salary, food)))
+        // P0-2.1: archived wallets, transactions, schedules or budgets brought back count too.
+        assertTrue(RestorePlan.hasData(emptyList(), listOf(salary), otherRecords = true))
+        assertFalse(RestorePlan.hasData(emptyList(), listOf(salary, food.copy(archived = true)), otherRecords = false))
         assertTrue(RestorePlan.hasSpendingCategories(listOf(salary, food)))
     }
 

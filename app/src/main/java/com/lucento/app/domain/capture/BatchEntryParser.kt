@@ -29,7 +29,7 @@ object BatchEntryParser {
     const val MAX_INPUT = 2_000
 
     fun parse(text: String, context: InterpretationContext): List<TransactionCandidate> {
-        val input = NumberWords.normalize(text.take(MAX_INPUT)).trim()
+        val input = QuickEntryParser.asciiDigits(NumberWords.normalize(text.take(MAX_INPUT)), context.decimalSeparator).trim()
         if (input.isBlank()) return emptyList()
         val raws = segments(input, context.today)
             .map { read(it, context) }
@@ -94,6 +94,8 @@ object BatchEntryParser {
         val amount: BigDecimal?,
         val options: List<BigDecimal>,
         val amountFlag: CandidateFlag?,
+        /** The amount was read by joining space-separated groups: shown with a "check the amount" note. */
+        val amountCheck: Boolean,
         val explicitType: TransactionType?,
         val inferredType: TransactionType?,
         val relevant: Boolean,
@@ -105,23 +107,44 @@ object BatchEntryParser {
         val (date, lower) = QuickEntryParser.extractDate(padded, context.today)
         val explicitDate = if (lower != padded) date else null
 
-        val tokens = QuickEntryParser.amountTokens(lower)
+        val scan = QuickEntryParser.scanAmounts(lower, context.decimalSeparator, context.fractionDigits, context.spaceGrouping)
+        val tokens = scan.tokens
         val priced = tokens.filter { it.priceLike }
         val pool = priced.ifEmpty { tokens }
         var amount: BigDecimal? = null
         var options: List<BigDecimal> = emptyList()
         var flag: CandidateFlag? = null
+        // The one number that is the amount; if it reads two ways ("1.000"), the user picks (P0-3: never guessed).
+        var check = false
+        fun take(token: QuickEntryParser.AmountToken) {
+            if (token.readings.size > 1) {
+                flag = CandidateFlag.AMOUNT_AMBIGUOUS
+                options = token.readings
+            } else {
+                amount = token.value
+                // "250 180" on a phone that groups with spaces: 250180 by the locale, but two prices are possible.
+                check = token.spaceJoined
+            }
+        }
+        // Every reading of every number, so a choice never drops one ("1.000" offers 1 and 1000).
+        fun allOptions() = pool.sortedWith(compareByDescending<QuickEntryParser.AmountToken> { it.hasCurrency }.thenByDescending { it.value })
+            .flatMap { it.readings.ifEmpty { listOf(it.value) } }
+            .distinct()
+            .take(4)
         when {
             pool.isEmpty() -> flag = CandidateFlag.AMOUNT_MISSING
-            pool.size == 1 -> amount = pool.single().value
-            pool.count { it.hasCurrency } == 1 -> amount = pool.single { it.hasCurrency }.value
-            pool.map { it.value }.distinct().size == 1 -> amount = pool.first().value
+            // A number that looked like money couldn't be read ("12.345" on a 2-decimal account): never pick another
+            // number in its place; offer what could be read and let the user type the rest.
+            scan.unreadable -> {
+                flag = CandidateFlag.AMOUNT_AMBIGUOUS
+                options = allOptions()
+            }
+            pool.size == 1 -> take(pool.single())
+            pool.count { it.hasCurrency } == 1 -> take(pool.single { it.hasCurrency })
+            pool.map { it.value }.distinct().size == 1 && pool.all { it.readings.isEmpty() } -> amount = pool.first().value
             else -> {
                 flag = CandidateFlag.AMOUNT_AMBIGUOUS
-                options = pool.sortedWith(compareByDescending<QuickEntryParser.AmountToken> { it.hasCurrency }.thenByDescending { it.value })
-                    .map { it.value }
-                    .distinct()
-                    .take(4)
+                options = allOptions()
             }
         }
 
@@ -138,8 +161,9 @@ object BatchEntryParser {
             expense != null && income != null -> TransactionType.EXPENSE
             else -> null
         }
-        val relevant = tokens.isNotEmpty() || explicitType != null || expense != null || income != null
-        return Raw(segment.trim(), clean, lower, explicitDate, amount, options, flag, explicitType, inferred, relevant)
+        // A clause whose number couldn't be read stays as a row that asks for the amount, never silently dropped.
+        val relevant = tokens.isNotEmpty() || scan.unreadable || explicitType != null || expense != null || income != null
+        return Raw(segment.trim(), clean, lower, explicitDate, amount, options, flag, check && amount != null, explicitType, inferred, relevant)
     }
 
     private fun build(raw: Raw, type: TransactionType, date: LocalDate, context: InterpretationContext): TransactionCandidate {
@@ -158,6 +182,7 @@ object BatchEntryParser {
         val categoryId = if (type.isTransfer) null else QuickEntryParser.detectCategory(raw.lower, type, context.categories)
         val flags = buildSet {
             raw.amountFlag?.let { add(it) }
+            if (raw.amountCheck) add(CandidateFlag.AMOUNT_UNVERIFIED)
             if (!type.isTransfer && categoryId == null) add(CandidateFlag.CATEGORY_UNMATCHED)
         }
         return TransactionCandidate(
@@ -256,7 +281,7 @@ object BatchEntryParser {
         for (i in line.indices) {
             val boundary = when (line[i]) {
                 ';', '!', '?' -> true
-                ',' -> !isThousandsComma(line, i) && !isYearComma(line, i)
+                ',' -> !isCommaInNumber(line, i) && !isYearComma(line, i)
                 '.' -> i + 1 < line.length && line[i + 1].isWhitespace() && !MONTH_ABBREV_END.containsMatchIn(line.substring(0, i))
                 else -> false
             }
@@ -280,10 +305,13 @@ object BatchEntryParser {
         }
     }
 
-    private fun isThousandsComma(line: String, i: Int): Boolean =
-        i > 0 && line[i - 1].isDigit() &&
-            (1..3).all { k -> i + k < line.length && line[i + k].isDigit() } &&
-            (i + 4 >= line.length || !line[i + 4].isDigit())
+    /**
+     * A comma with a digit right before and after belongs to a number ("1,500", "12,50", "1,5k"), not a clause break
+     * (those are followed by a space or a word: "lunch 250, coffee 180"). Before P0-3 only a thousands comma counted,
+     * so "coffee 12,50" became two rows, 12 and 50.
+     */
+    private fun isCommaInNumber(line: String, i: Int): Boolean =
+        i > 0 && line[i - 1].isDigit() && i + 1 < line.length && line[i + 1].isDigit()
 
     private fun isYearComma(line: String, i: Int): Boolean {
         val before = line.substring(0, i)

@@ -166,7 +166,16 @@ class ComposerViewModel(
     /** Opens the "Where should these go?" picker (shown only while several accounts exist and none is active). */
     fun askForWallet() = session.update { it.copy(showWalletPicker = true) }
 
-    fun dismissWalletPicker() = session.update { it.copy(showWalletPicker = false, pending = null) }
+    /**
+     * Closes the picker without sending; returns the held message and where it came from, so the screen can put typed or
+     * spoken words back in the field. Receipt text is not handed back as typing: sent again as typed it would lose the
+     * receipt reading rules (QA note 10).
+     */
+    fun dismissWalletPicker(): Pair<String, CaptureSource>? {
+        val held = session.value.pending
+        session.update { it.copy(showWalletPicker = false, pending = null) }
+        return held
+    }
 
     /**
      * Makes [walletId] the active wallet: later messages go there, and unsaved rows that were only following the
@@ -272,7 +281,11 @@ class ComposerViewModel(
         val default = s.chosenWalletId?.takeIf { id -> loaded.wallets.any { it.id == id } }
             ?: loaded.activeWalletId
             ?: lastUsedWallet(loaded.wallets)
-        return InterpretationContext(loaded.wallets, loaded.categories, today(), default, s.typeHint)
+        return InterpretationContext(
+            loaded.wallets, loaded.categories, today(), default, s.typeHint,
+            decimalSeparator = separator,
+            spaceGrouping = java.text.DecimalFormatSymbols.getInstance().groupingSeparator in setOf(' ', ' ', ' ', ' '),
+        )
     }
 
     /** The account of the most recently recorded income or expense, so the usual account is the default. */

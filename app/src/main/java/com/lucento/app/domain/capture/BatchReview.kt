@@ -59,7 +59,12 @@ data class ReviewRow(
             walletFromText = candidate.walletFromText,
         )
 
-        fun plain(value: BigDecimal, separator: Char): String = value.toPlainString().replace('.', separator)
+        /**
+         * The phone's decimal mark, no grouping, no trailing zeros ("12.500" would read as ambiguous on save, P0-3), so
+         * the save-time parse gets exactly this value back.
+         */
+        fun plain(value: BigDecimal, separator: Char): String =
+            value.stripTrailingZeros().let { if (it.scale() < 0) it.setScale(0) else it }.toPlainString().replace('.', separator)
     }
 }
 
@@ -155,7 +160,9 @@ object BatchReview {
         }
     }
 
-    private val AMOUNT_FLAGS = setOf(CandidateFlag.AMOUNT_MISSING, CandidateFlag.AMOUNT_AMBIGUOUS, CandidateFlag.TOTAL_UNCONFIRMED)
+    private val AMOUNT_FLAGS = setOf(
+        CandidateFlag.AMOUNT_MISSING, CandidateFlag.AMOUNT_AMBIGUOUS, CandidateFlag.TOTAL_UNCONFIRMED, CandidateFlag.AMOUNT_UNVERIFIED,
+    )
 
     /**
      * Changing income ↔ expense keeps a category that still fits, otherwise finds one from the row's words again.
@@ -262,6 +269,9 @@ object BatchReview {
         if (CandidateFlag.DATE_UNCERTAIN in row.flags) {
             issues += RowIssue(RowField.DATE, "Check the date — the receipt’s date was missing or unclear", blocking = false)
         }
+        if (CandidateFlag.AMOUNT_UNVERIFIED in row.flags && RowField.AMOUNT !in row.edited) {
+            issues += RowIssue(RowField.AMOUNT, "Check the amount — make sure it was read the way you meant", blocking = false)
+        }
         if (CandidateFlag.ITEMS_DONT_ADD_UP in row.flags && RowField.AMOUNT !in row.edited) {
             issues += RowIssue(RowField.AMOUNT, "The items don’t add up to this total — check it", blocking = false)
         }
@@ -303,6 +313,10 @@ object BatchReview {
             }
             MoneyParser.Result.Empty, MoneyParser.Result.Invalid -> {
                 issues += RowIssue(RowField.AMOUNT, "Enter a valid amount", blocking = true)
+                null
+            }
+            is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency -> {
+                issues += RowIssue(RowField.AMOUNT, MoneyParser.clarification(parsed, separator).orEmpty(), blocking = true)
                 null
             }
         }

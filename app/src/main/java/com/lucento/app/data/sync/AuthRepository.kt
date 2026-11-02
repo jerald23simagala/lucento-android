@@ -51,6 +51,12 @@ class AuthRepository(
     private val clearStoredSession: () -> Boolean = { true },
     /** Whether to try the server-side logout at all; offline it is skipped instead of waiting for a timeout. */
     private val isOnline: () -> Boolean = { true },
+    /** Sessions ended on this phone and not yet revoked on the server (R10-01). */
+    private val pendingRevokes: PendingRevokeStore? = null,
+    /** Revokes what [pendingRevokes] holds; true when nothing is left. */
+    private val drainRevokes: suspend () -> Boolean = { true },
+    /** Hands the rest to [RevokeWorker] (network constraint, backoff). */
+    private val scheduleRevoke: () -> Unit = {},
 ) {
 
     /**
@@ -230,18 +236,38 @@ class AuthRepository(
         client?.auth?.currentUserOrNull()?.id
     }.getOrNull()
 
-    /** Access token of the session [signOut] ended, kept only in memory so [revokeOnServer] can run after the wipe. */
-    @Volatile private var endedAccessToken: String? = null
+    /**
+     * The first step of every sign-out, synchronous and with no network call (QA R9-01, R10-01): stops auto-refresh,
+     * records the current session for revoking on the server ([PendingRevoke], committed), then deletes the stored
+     * session. Called on the confirm tap, so a kill at any later point relaunches signed out *and* still revokes. Safe
+     * to call twice: the record is keyed by session id.
+     */
+    fun beginSignOutNow(): Boolean {
+        val auth = client?.auth
+        if (auth != null) {
+            runCatching { auth.stopAutoRefreshForCurrentSession() }
+            val session = runCatching { auth.currentSessionOrNull() }.getOrNull()
+            val sessionId = jwtSessionId(session?.accessToken)
+            if (session != null && sessionId != null) {
+                runCatching {
+                    pendingRevokes?.add(PendingRevoke(sessionId, session.accessToken, session.refreshToken, System.currentTimeMillis()))
+                }
+                // Queued now, not only after the wipe: a kill right after this tap still revokes once the network is
+                // up, without waiting for the app to be reopened (QA note 2). The drainer's lock makes a second run safe.
+                runCatching { scheduleRevoke() }
+            }
+        }
+        return clearStoredSessionNow()
+    }
 
     /**
      * Ends the session on this device, locally only: no network call (QA R9-01). The caller wipes the local ledger
-     * afterwards and then calls [revokeOnServer]. The stored session is deleted first and durably, so a kill at any
-     * later point relaunches signed out.
+     * afterwards and then calls [revokeOnServer]. The session is recorded for revoking and its stored copy deleted
+     * first ([beginSignOutNow]), so a kill at any later point relaunches signed out.
      */
     suspend fun signOut() {
         val auth = client?.auth ?: return
-        endedAccessToken = runCatching { auth.currentAccessTokenOrNull() }.getOrNull()
-        clearStoredSessionNow()
+        beginSignOutNow()
         endLocalSession(
             clearSession = {
                 clearStoredSessionNow()
@@ -251,33 +277,19 @@ class AuthRepository(
     }
 
     /**
-     * Best-effort revoke of the session [signOut] ended (POST /auth/v1/logout, scope=local), capped at
-     * [REVOKE_TIMEOUT_MS] and skipped offline. Called only after the local wipe has committed.
+     * Revokes ended sessions on the server (POST /auth/v1/logout, scope=local; refreshing first when the access token
+     * expired), capped at [REVOKE_TIMEOUT_MS]. Called after the local wipe has committed. Offline, interrupted or
+     * unfinished, [RevokeWorker] carries on with a network constraint — nothing is lost to a kill or a dead network.
      */
     suspend fun revokeOnServer() {
-        val token = endedAccessToken ?: return
-        endedAccessToken = null
-        if (client == null || !SupabaseModule.isConfigured || !isOnline()) return
-        withTimeoutOrNull(REVOKE_TIMEOUT_MS) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching {
-                    val url = java.net.URL(BuildConfig.SUPABASE_URL.trimEnd('/') + "/auth/v1/logout?scope=local")
-                    (url.openConnection() as java.net.HttpURLConnection).run {
-                        requestMethod = "POST"
-                        connectTimeout = REVOKE_TIMEOUT_MS.toInt()
-                        readTimeout = REVOKE_TIMEOUT_MS.toInt()
-                        setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY)
-                        setRequestProperty("Authorization", "Bearer $token")
-                        responseCode
-                        disconnect()
-                    }
-                }
-            }
-        }
+        if (client == null || !SupabaseModule.isConfigured) return
+        if (pendingRevokes?.all().isNullOrEmpty()) return
+        val done = isOnline() && withTimeoutOrNull(REVOKE_TIMEOUT_MS) { drainRevokes() } == true
+        if (!done) runCatching { scheduleRevoke() }
     }
 
     private companion object {
-        const val REVOKE_TIMEOUT_MS = 5_000L
+        const val REVOKE_TIMEOUT_MS = 8_000L
     }
 }
 
@@ -322,7 +334,10 @@ internal fun signInFailureMessage(e: Throwable, debug: Boolean): String {
         isTimeout(e) -> "The sync server took too long to answer. Check your connection and try again — your data is safe on this phone."
         else -> when (e) {
         is NoCredentialException ->
-            "No Google account could be used. Add a Google account in Android Settings, then try again."
+            // Google answers "no credential" both when the phone has no Google account and when this build's signing key
+            // isn't registered for Lucento's Google sign-in (P1-1): say both, and offer the way that always works.
+            "No Google account could be used. Add a Google account in Android Settings and try again — if one is " +
+                "already there, Google sign-in isn’t available in this version yet, so use email instead."
         is GetCredentialProviderConfigurationException ->
             "Signing in with Google needs Google Play services, which isn't available on this device."
         is GetCredentialInterruptedException -> "Google sign-in was interrupted. Try again."

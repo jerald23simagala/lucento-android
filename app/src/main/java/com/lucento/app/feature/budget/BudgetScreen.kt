@@ -393,6 +393,16 @@ private fun BudgetSummaryCard(plan: BudgetPlan, today: java.time.LocalDate, isCu
                 color = ext.onHeroMuted,
             )
         }
+        // D1 / P2-3: Spent is every expense; when some fell outside the plan, say how it splits so the figure adds up.
+        if (!plan.unbudgetedSpending.isZero) {
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                "Spent = ${MoneyFormatter.format(plan.budgetedSpending)} in your plan + " +
+                    "${MoneyFormatter.format(plan.unbudgetedSpending)} outside it",
+                style = MaterialTheme.typography.bodySmall,
+                color = ext.onHero,
+            )
+        }
     }
 }
 

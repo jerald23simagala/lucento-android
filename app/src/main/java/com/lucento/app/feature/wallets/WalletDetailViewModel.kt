@@ -37,6 +37,8 @@ sealed interface AdjustError {
     data object AmountInvalid : AdjustError
     data class AmountTooPrecise(val digits: Int) : AdjustError
     data object AmountTooLarge : AdjustError
+    /** Ambiguous, or another currency's symbol: [message] says what to type (MoneyParser.clarification). */
+    data class AmountUnclear(val message: String) : AdjustError
     data object FutureDate : AdjustError
     /** The actual balance already equals what Lucento tracked on that date. */
     data object Unchanged : AdjustError
@@ -82,6 +84,8 @@ class WalletDetailViewModel(
             MoneyParser.Result.Invalid -> return onResult(AdjustError.AmountInvalid)
             is MoneyParser.Result.TooManyDecimals -> return onResult(AdjustError.AmountTooPrecise(parsed.allowed))
             MoneyParser.Result.TooLarge -> return onResult(AdjustError.AmountTooLarge)
+            is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency ->
+                return onResult(AdjustError.AmountUnclear(MoneyParser.clarification(parsed, decimalSeparator).orEmpty()))
         }
         adjusting = true
         viewModelScope.launch {

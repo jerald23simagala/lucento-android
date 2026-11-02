@@ -87,7 +87,8 @@ fun TransferEditorSheet(
     // Destinations: any other wallet in the same currency.
     val destinations = wallets.filter { it.id != draft.fromWalletId && (from == null || it.currencyCode == from.currencyCode) }
     val amountError = error is TransferDraftError.AmountInvalid || error is TransferDraftError.AmountZero ||
-        error is TransferDraftError.AmountTooPrecise || error is TransferDraftError.AmountTooLarge
+        error is TransferDraftError.AmountTooPrecise || error is TransferDraftError.AmountTooLarge ||
+        error is TransferDraftError.AmountUnclear
 
     fun close() {
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
@@ -139,6 +140,7 @@ fun TransferEditorSheet(
                         if (e.digits == 0) "${from?.currencyCode.orEmpty()} has no decimal places."
                         else "${from?.currencyCode.orEmpty()} allows up to ${e.digits} decimal places."
                     TransferDraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
+                    is TransferDraftError.AmountUnclear -> e.message
                     else -> "Moving money between your accounts isn’t income or spending."
                 },
                 style = MaterialTheme.typography.bodySmall,

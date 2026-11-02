@@ -2,7 +2,9 @@ package com.lucento.app
 
 import android.graphics.Color
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.os.SystemClock
+import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,22 +17,75 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import com.lucento.app.core.security.AppLockSession
+import com.lucento.app.core.security.DeviceAuth
+import com.lucento.app.feature.lock.LockScreen
+import kotlinx.coroutines.launch
+import com.lucento.app.core.designsystem.component.EnvironmentBadge
 import com.lucento.app.core.designsystem.component.LaunchAnimation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.isDark
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.navigation.LucentoRoot
 
-class MainActivity : ComponentActivity() {
+// A FragmentActivity (still a ComponentActivity) because the app lock's BiometricPrompt needs one.
+class MainActivity : FragmentActivity() {
 
     private val appViewModel: AppViewModel by viewModels { AppViewModel.Factory }
+    private val lock by lazy { (application as LucentoApplication).container.appLock }
+
+    override fun onStart() {
+        super.onStart()
+        lock.onForeground(SystemClock.elapsedRealtime())
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // A rotation is not leaving the app.
+        if (!isChangingConfigurations) lock.onBackground(SystemClock.elapsedRealtime())
+    }
+
+    /** Opens the system prompt; when the phone no longer has any screen lock, the app lock turns itself off. */
+    private fun requestUnlock() {
+        lock.beginAuthentication()
+        DeviceAuth.authenticate(this, title = "Unlock Lucento", subtitle = "Use your fingerprint, face or screen lock") { outcome ->
+            when (outcome) {
+                DeviceAuth.Outcome.SUCCESS -> lock.unlock()
+                DeviceAuth.Outcome.CANCELLED -> lock.endAuthentication()
+                DeviceAuth.Outcome.UNAVAILABLE -> {
+                    // Removing the phone's screen lock already required it, so the owner has proved who they are; keeping
+                    // the lock on would shut them out of their own data.
+                    lock.unlock()
+                    lifecycleScope.launch { (application as LucentoApplication).container.preferences.setAppLock(false) }
+                    Toast.makeText(this, "App lock is off because this phone no longer has a screen lock.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    /**
+     * P2-10: a blank preview in recent apps. FLAG_SECURE on every version: setRecentsScreenshotEnabled (Android 13+) only
+     * skips the stored snapshot, and the launcher's live tile of the last app still showed balances (device-verified).
+     */
+    private fun applyHideInRecents(hide: Boolean) {
+        if (hide) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -62,12 +117,23 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
 
+            val hideInRecents = ready?.preferences?.hideInRecents ?: false
+            LaunchedEffect(hideInRecents) { applyHideInRecents(hideInRecents) }
+            val unlocked by lock.unlocked.collectAsStateWithLifecycle()
+            val locked = AppLockSession.isLocked(ready?.preferences?.appLock ?: false, unlocked)
+
             // The rising logo plays once per launch (not on rotation) while the app loads underneath.
             var launching by rememberSaveable { mutableStateOf(true) }
             LucentoTheme(darkTheme = dark) {
                 Box(Modifier.fillMaxSize()) {
                     if (ready != null) {
-                        LucentoRoot(preferences = ready.preferences)
+                        // Kept composed while locked so nothing in progress is lost, but hidden from TalkBack.
+                        Box(if (locked) Modifier.fillMaxSize().clearAndSetSemantics {} else Modifier.fillMaxSize()) {
+                            LucentoRoot(preferences = ready.preferences)
+                        }
+                        if (locked) LockScreen(onUnlock = ::requestUnlock)
+                        // Debug builds only (draws nothing in release): marks the test environment on every screen.
+                        EnvironmentBadge(Modifier.align(Alignment.BottomStart))
                     }
                     AnimatedVisibility(visible = launching || ready == null, exit = fadeOut(tween(220))) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {

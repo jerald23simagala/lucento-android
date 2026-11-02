@@ -57,7 +57,7 @@
   rolled-back cross-account test at the SQL level; Supabase security advisor clean.
 - Manifest: INTERNET + ACCESS_NETWORK_STATE now present for sync only; HTTPS-only network security config; CI checks
   release permissions against an allow-list instead of forbidding network access. Privacy copy in Settings updated.
-- Config via `local.properties` / CI env (`LUCENTO_SUPABASE_URL`, `LUCENTO_SUPABASE_ANON_KEY`,
+- Config via `local.properties` / CI env (`LUCENTO_SUPABASE_URL`, `LUCENTO_SUPABASE_PUBLISHABLE_KEY`,
   `LUCENTO_GOOGLE_WEB_CLIENT_ID`; see `local.properties.example`). Only the publishable key reaches the APK.
 - Not yet: Google OAuth client setup (so real sign-in is untested), recurring-schedule sync. See docs/SYNC.md.
 

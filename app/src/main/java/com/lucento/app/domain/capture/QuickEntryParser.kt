@@ -1,5 +1,6 @@
 package com.lucento.app.domain.capture
 
+import com.lucento.app.core.money.MoneyParser
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.CategoryKind
 import com.lucento.app.domain.TransactionType
@@ -262,23 +263,64 @@ object QuickEntryParser {
 
     /**
      * Finds the first written amount. Accepts "1,250.50", "1.250,50", "250", "4.5", "1.5k" and a leading or
-     * trailing currency sign. A comma or dot followed by exactly three digits is a thousands separator.
+     * trailing currency sign. Numbers are read by [MoneyParser.readNumber] with the phone's [decimalSeparator] and the
+     * account's [fractionDigits] (P0-3); a number with two readings returns null here (see [amountTokens]).
      */
-    internal fun extractAmount(lower: String): BigDecimal? {
-        val match = AMOUNT.find(lower) ?: return null
-        val raw = match.groupValues[1]
-        val suffix = match.groupValues[2]
-        val normalized = normalizeNumber(raw) ?: return null
-        val value = runCatching { BigDecimal(normalized) }.getOrNull() ?: return null
-        val scaled = when (suffix) {
-            "k" -> value.multiply(BigDecimal(1000))
-            "m" -> value.multiply(BigDecimal(1_000_000))
-            else -> value
+    internal fun extractAmount(lower: String, decimalSeparator: Char = '.', fractionDigits: Int = 2): BigDecimal? =
+        amountTokens(lower, decimalSeparator, fractionDigits).firstOrNull()?.takeIf { it.readings.isEmpty() }?.value
+
+    /** Every reading of one written number, suffix applied: one value, two when it's ambiguous, none when it isn't money. */
+    private fun readings(raw: String, suffix: String, decimalSeparator: Char, fractionDigits: Int): List<BigDecimal> {
+        val number = raw.trimEnd('.', ',', ' ', ' ', ' ', ' ', '\'', '’')
+        if (number.isEmpty()) return emptyList()
+        // A k/m multiplier may carry decimals the currency doesn't ("1.25k"): those are checked after scaling.
+        val digits = if (suffix.isEmpty()) fractionDigits else maxOf(fractionDigits, 3)
+        val values = when (val r = MoneyParser.readNumber(number, decimalSeparator, digits)) {
+            is MoneyParser.Reading.Value -> listOf(r.value)
+            is MoneyParser.Reading.Choice -> r.values
+            else -> emptyList()
         }
-        return if (scaled.signum() > 0) scaled.stripTrailingZeros().let { if (it.scale() < 0) it.setScale(0) else it } else null
+        return values.map { value ->
+            when (suffix) {
+                "k" -> value.multiply(BigDecimal(1000))
+                "m" -> value.multiply(BigDecimal(1_000_000))
+                else -> value
+            }
+        }.filter { it.signum() > 0 }
+            .map { it.stripTrailingZeros().let { v -> if (v.scale() < 0) v.setScale(0) else v } }
+            .distinct()
     }
 
-    internal val AMOUNT = Regex("(?<![\\w.,])(\\d[\\d.,]*)(k|m)?(?![\\w])")
+    /**
+     * A written number: digits with '.' or ',' and, between groups of exactly three digits, a space, no-break space or
+     * apostrophe ("1 000,50", "1'000.50"). Possessive, so letters right after it ("3.50eur") never make it give back
+     * digits; what follows is judged in [scanAmounts].
+     */
+    internal val AMOUNT = Regex("(?<![\\w.,])(\\d(?:[\\d.,]|(?<=\\d)[ \\u00A0\\u202F\\u2009'’](?=\\d{3}(?!\\d)))*+)")
+
+    private val TAIL = Regex("^[a-z]+")
+
+    /** Words that may follow a number directly ("250php", "3.50eur") without making it something other than money. */
+    private val CURRENCY_TAILS = setOf(
+        "php", "usd", "eur", "gbp", "jpy", "inr", "idr", "peso", "pesos", "dollar", "dollars", "euro", "euros",
+        "pound", "pounds", "yen", "rupee", "rupees", "rupiah", "bucks",
+    )
+
+    /** Every Unicode digit as ASCII; the Arabic decimal mark as [decimalSeparator], its thousands mark as a no-break space. */
+    internal fun asciiDigits(text: String, decimalSeparator: Char): String = buildString(text.length) {
+        for (ch in text) {
+            when {
+                ch in '0'..'9' -> append(ch)
+                Character.isDigit(ch) -> append('0' + Character.digit(ch, 10))
+                ch == '٫' -> append(decimalSeparator)
+                ch == '٬' -> append(' ')
+                else -> append(ch)
+            }
+        }
+    }
+
+    /** The numbers in a clause, and whether one of them looked like money but couldn't be read ("12.345", "2.5L"). */
+    internal data class AmountScan(val tokens: List<AmountToken>, val unreadable: Boolean)
 
     /** A number written in the text, with what is around it, so batch entry can tell a price from a quantity. */
     internal data class AmountToken(
@@ -289,45 +331,66 @@ object QuickEntryParser {
         val hasCurrency: Boolean,
         /** Looks like a price: two or more digits, a decimal part, a k/m suffix or a currency next to it. */
         val priceLike: Boolean,
+        /** Two readings of this one number ("1.000": 1 or 1000), smallest first; empty when [value] is the only one. */
+        val readings: List<BigDecimal> = emptyList(),
+        /** Groups joined by a typed space with no currency next to them ("250 180"): read as one number, worth a check. */
+        val spaceJoined: Boolean = false,
     )
 
     internal val currencyBefore = Regex("(₱|€|£|¥|₹|\\$|\\bphp|\\busd|\\beur|\\bgbp|\\bjpy|\\binr|\\bidr)\\s?$")
     internal val currencyAfter = Regex("^\\s?(₱|€|£|¥|₹|\\$|php\\b|usd\\b|eur\\b|gbp\\b|jpy\\b|inr\\b|idr\\b|pesos?\\b|dollars?\\b|euros?\\b|pounds?\\b|yen\\b|rupees?\\b|rupiah\\b|bucks\\b)")
 
     /** Every positive number in [lower] (already lower-cased, dates removed), in order. */
-    internal fun amountTokens(lower: String): List<AmountToken> = AMOUNT.findAll(lower).mapNotNull { m ->
-        val raw = m.groupValues[1]
-        val value = extractAmount(" " + m.value + " ") ?: return@mapNotNull null
-        val before = lower.substring(0, m.range.first)
-        val after = lower.substring(m.range.last + 1)
-        val currency = currencyBefore.containsMatchIn(before) || currencyAfter.containsMatchIn(after)
-        val digits = raw.count { it.isDigit() }
-        val priceLike = currency || digits >= 2 || m.groupValues[2].isNotEmpty() || raw.trimEnd('.', ',').any { it == '.' || it == ',' }
-        AmountToken(value, m.range.first, m.range.last + 1, currency, priceLike)
-    }.toList()
+    internal fun amountTokens(lower: String, decimalSeparator: Char = '.', fractionDigits: Int = 2, spaceGrouping: Boolean = false): List<AmountToken> =
+        scanAmounts(lower, decimalSeparator, fractionDigits, spaceGrouping).tokens
 
-    internal fun normalizeNumber(raw: String): String? {
-        val s = raw.trimEnd('.', ',')
-        if (s.isEmpty()) return null
-        val lastDot = s.lastIndexOf('.')
-        val lastComma = s.lastIndexOf(',')
-        return when {
-            lastDot < 0 && lastComma < 0 -> s
-            lastDot >= 0 && lastComma >= 0 -> {
-                // Both present: the later one is the decimal separator.
-                if (lastDot > lastComma) s.replace(",", "") else s.replace(".", "").replace(',', '.')
-            }
-            else -> {
-                val sep = if (lastDot >= 0) '.' else ','
-                val parts = s.split(sep)
-                val groupedThousands = parts.size > 1 && parts.drop(1).all { it.length == 3 } && parts.first().length in 1..3
-                when {
-                    groupedThousands -> parts.joinToString("")
-                    parts.size == 2 -> parts[0] + "." + parts[1]
-                    else -> null
+    /**
+     * Reads every number in [lower] (lower-cased, dates removed). [spaceGrouping]: the phone groups thousands with a
+     * space, so "1 000" is one number; otherwise a plain-space group is offered both ways (1000, or 1 and 000) rather
+     * than guessed. A number with letters right after it counts only with k/m or a currency word.
+     */
+    internal fun scanAmounts(lower: String, decimalSeparator: Char = '.', fractionDigits: Int = 2, spaceGrouping: Boolean = false): AmountScan {
+        var unreadable = false
+        val tokens = AMOUNT.findAll(lower).mapNotNull { m ->
+            val raw = m.groupValues[1].trimEnd(' ', ' ', ' ', ' ', '\'', '’')
+            val end = m.range.first + raw.length
+            val tail = TAIL.find(lower.substring(end))?.value.orEmpty()
+            val hasMark = raw.trimEnd('.', ',').any { it == '.' || it == ',' }
+            val suffix = when {
+                tail.isEmpty() || tail in CURRENCY_TAILS -> ""
+                tail == "k" || tail == "m" -> tail
+                else -> {
+                    // "2.5l", "1.2bn": a scale Lucento doesn't read. Not money as written — and never half of it.
+                    if (hasMark) unreadable = true
+                    return@mapNotNull null
                 }
             }
-        }
+            val merged = readings(raw, suffix, decimalSeparator, fractionDigits)
+            if (merged.isEmpty()) {
+                if (hasMark) unreadable = true
+                return@mapNotNull null
+            }
+            // "1 000" on a phone that doesn't group with spaces: one number, or two? Offer both.
+            val values = if (raw.contains(' ') && !spaceGrouping) {
+                val pieces = raw.split(' ').filter { it.isNotEmpty() && !(it.length > 1 && it[0] == '0') }
+                    .flatMap { readings(it, "", decimalSeparator, fractionDigits) }
+                (merged + pieces).distinct()
+            } else {
+                merged
+            }
+            val before = lower.substring(0, m.range.first)
+            val after = lower.substring(end)
+            val currency = currencyBefore.containsMatchIn(before) || currencyAfter.containsMatchIn(after) || tail in CURRENCY_TAILS
+            val digits = raw.count { it.isDigit() }
+            val priceLike = currency || digits >= 2 || suffix.isNotEmpty() || hasMark
+            AmountToken(
+                merged.last(), m.range.first, end + suffix.length, currency, priceLike,
+                readings = values.takeIf { it.size > 1 }.orEmpty(),
+                // "1 000" is plainly one number; "250 180" could be two prices.
+                spaceJoined = raw.contains(' ') && !currency && raw.substringBefore(' ').length >= 2,
+            )
+        }.toList()
+        return AmountScan(tokens, unreadable)
     }
 
     // ---------------------------------------------------------------- wallets

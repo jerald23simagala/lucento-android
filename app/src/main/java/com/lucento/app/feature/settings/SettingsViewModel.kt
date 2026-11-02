@@ -18,6 +18,7 @@ import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.data.sync.AccountBoundary
+import com.lucento.app.data.sync.AccountProbe
 import com.lucento.app.data.sync.AuthRepository
 import com.lucento.app.data.sync.SupabaseModule
 import com.lucento.app.data.sync.SyncPreferences
@@ -37,6 +38,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +59,8 @@ data class SettingsUiState(
 /** Everything the "Cloud sync" section needs, kept separate so the rest of Settings never depends on it. */
 /** A wipe the user still has to confirm. [unsynced] means changes that have not reached the server would be lost. */
 data class AccountPrompt(val kind: Kind, val unsyncedCount: Int) {
-    enum class Kind { SIGN_OUT, SWITCH }
+    /** [MERGE]: a first sync would join this phone's own records with an account that already has data (P0-2). */
+    enum class Kind { SIGN_OUT, SWITCH, MERGE }
 
     val hasUnsynced: Boolean get() = unsyncedCount > 0
 }
@@ -86,6 +89,7 @@ class SettingsViewModel(
     private val accounts: AccountBoundary,
     private val usage: UsageCountsService? = null,
     private val backup: BackupEngine,
+    private val appLock: com.lucento.app.core.security.AppLockSession? = null,
 ) : ViewModel() {
 
     private val syncing = MutableStateFlow(false)
@@ -98,7 +102,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             when (val check = accounts.afterSignIn()) {
                 AccountBoundary.AfterSignIn.Ready -> Unit
-                AccountBoundary.AfterSignIn.Wiped -> enableSyncAndRun()
+                AccountBoundary.AfterSignIn.Wiped -> continueAfterWipe()
                 is AccountBoundary.AfterSignIn.ConfirmSwitch ->
                     prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, syncRepository.pendingChangeCount())
             }
@@ -193,8 +197,14 @@ class SettingsViewModel(
         if (syncing.value) return
         viewModelScope.launch {
             syncing.value = true
-            runSyncNow()
-            prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.pendingChangeCount())
+            if (syncPreferences.syncedUserId() == null) {
+                // Never synced from this phone: uploading means joining it to the account, which needs the same consent.
+                prompt.value = null
+                firstSyncCheck()
+            } else {
+                runSyncNow()
+                prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.pendingChangeCount())
+            }
             syncing.value = false
         }
     }
@@ -205,19 +215,30 @@ class SettingsViewModel(
         // Durable before the coroutine is even scheduled: a force-stop straight after this tap relaunches signed out.
         // R9-01: the wipe marker is committed first, then the stored session goes; no network call before either.
         if (current.kind == AccountPrompt.Kind.SIGN_OUT) {
-            accounts.markWipePendingNow()
-            auth.clearStoredSessionNow()
+            // QA-N1: without a durable wipe marker, signing out could leave a half-removed ledger; stop instead of crashing.
+            if (!accounts.markWipePendingNow()) {
+                syncMessage.value = "Couldn’t sign out safely just now. Nothing was removed — please try again."
+                return
+            }
+            // Records the session for revoking on the server, then deletes it (R10-01): survives a kill from here on.
+            auth.beginSignOutNow()
         }
         viewModelScope.launch {
             syncing.value = true
             prompt.value = null
             when (current.kind) {
+                // Not cancellable: the wipe sends the app back to onboarding, which can clear this ViewModel before the
+                // server revoke that follows the wipe has run.
                 AccountPrompt.Kind.SIGN_OUT -> {
-                    accounts.signOutAndWipe()
+                    withContext(NonCancellable) { accounts.signOutAndWipe() }
                     syncMessage.value = "Signed out. This account’s data has been removed from this phone."
                 }
                 AccountPrompt.Kind.SWITCH -> {
-                    accounts.confirmSwitch()
+                    withContext(NonCancellable) { accounts.confirmSwitch() }
+                    syncMessage.value = null
+                    continueAfterWipe()
+                }
+                AccountPrompt.Kind.MERGE -> {
                     syncMessage.value = null
                     enableSyncAndRun()
                 }
@@ -226,21 +247,60 @@ class SettingsViewModel(
         }
     }
 
-    /** Keeps the previous ledger. A pending account switch drops the new session instead. */
+    /** Keeps the previous ledger. A pending account switch or merge drops the new session instead; nothing is removed. */
     fun dismissAccountPrompt() {
         val current = prompt.value ?: return
         prompt.value = null
-        if (current.kind == AccountPrompt.Kind.SWITCH) {
-            viewModelScope.launch { accounts.cancelSwitch() }
+        when (current.kind) {
+            AccountPrompt.Kind.SWITCH -> viewModelScope.launch { accounts.cancelSwitch() }
+            AccountPrompt.Kind.MERGE -> viewModelScope.launch {
+                disconnectUnsynced()
+                syncMessage.value = "Not connected. This phone’s records stay here, and nothing was uploaded."
+            }
+            AccountPrompt.Kind.SIGN_OUT -> Unit
         }
     }
 
     private suspend fun followSignIn(check: AccountBoundary.AfterSignIn) {
         when (check) {
-            AccountBoundary.AfterSignIn.Ready, AccountBoundary.AfterSignIn.Wiped -> enableSyncAndRun()
+            AccountBoundary.AfterSignIn.Ready -> firstSyncCheck()
+            AccountBoundary.AfterSignIn.Wiped -> continueAfterWipe()
             is AccountBoundary.AfterSignIn.ConfirmSwitch ->
                 prompt.value = AccountPrompt(AccountPrompt.Kind.SWITCH, syncRepository.pendingChangeCount())
         }
+    }
+
+    /**
+     * A phone that has never synced, signing in (P0-2, scenario C). When both this phone and the account hold records,
+     * the user confirms joining them first — both are kept, nothing is replaced. When the account can't be checked,
+     * nothing is uploaded and the new session is dropped, so a network error is never taken for an empty account.
+     */
+    private suspend fun firstSyncCheck() {
+        val bound = syncPreferences.syncedUserId() != null
+        val probe = if (bound) null else syncRepository.probeAccount()
+        val localData = probe is AccountProbe.HasData && syncRepository.localHasFinancialData()
+        when (firstSyncDecision(bound, probe, localData)) {
+            FirstSync.SYNC -> enableSyncAndRun()
+            FirstSync.ASK_MERGE -> prompt.value = AccountPrompt(AccountPrompt.Kind.MERGE, 0)
+            FirstSync.DISCONNECT -> {
+                disconnectUnsynced()
+                syncMessage.value = "Couldn’t reach your account to check what’s already in it, so nothing was uploaded " +
+                    "and you’re not connected. Your records are safe on this phone — try again when you’re online."
+            }
+        }
+    }
+
+    /** Ends a session that never synced from this phone: nothing to wipe, nothing uploaded. */
+    private suspend fun disconnectUnsynced() {
+        if (syncPreferences.syncedUserId() != null) return
+        syncPreferences.setEnabled(false)
+        auth.signOut()
+        auth.revokeOnServer()
+    }
+
+    /** Read after the wipe has returned, not inferred from cancellation: this ViewModel may outlive the switch. */
+    private suspend fun continueAfterWipe() {
+        if (syncAfterAccountWipe(preferences.preferences.first().onboardingComplete)) enableSyncAndRun()
     }
 
     private suspend fun enableSyncAndRun() {
@@ -265,10 +325,12 @@ class SettingsViewModel(
     }
 
     fun syncNow() {
-        if (syncing.value) return
+        if (syncing.value || prompt.value != null) return
         viewModelScope.launch {
             syncing.value = true
-            runSyncNow()
+            // Never synced from this phone (for example, the merge question was left unanswered): ask the same first-sync
+            // question as at sign-in, so "Sync now" can't upload this phone's records into an account without consent.
+            if (syncPreferences.syncedUserId() == null && auth.currentUserId() != null) firstSyncCheck() else runSyncNow()
             syncing.value = false
         }
     }
@@ -326,6 +388,19 @@ class SettingsViewModel(
     fun setUsageCounts(enabled: Boolean) {
         val counts = usage ?: return
         viewModelScope.launch { counts.setOptIn(enabled) }
+    }
+
+    /**
+     * P2-10. Called with true only after the system prompt succeeded, so this session counts as unlocked and the lock
+     * doesn't close over Settings the moment it turns on.
+     */
+    fun setAppLock(enabled: Boolean) {
+        if (enabled) appLock?.unlock()
+        viewModelScope.launch { preferences.setAppLock(enabled) }
+    }
+
+    fun setHideInRecents(enabled: Boolean) {
+        viewModelScope.launch { preferences.setHideInRecents(enabled) }
     }
 
     fun setFeatureEnabled(feature: Feature, enabled: Boolean) {
@@ -460,6 +535,7 @@ class SettingsViewModel(
                 accounts = container.accountBoundary,
                 usage = container.usageCounts,
                 backup = container.backup,
+                appLock = container.appLock,
             )
         }
     }

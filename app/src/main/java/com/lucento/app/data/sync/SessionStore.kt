@@ -44,6 +44,15 @@ class SessionStore(
 
     fun hasSession(): Boolean = prefs.contains(key)
 
+    /** The stored session as supabase-kt saved it (JSON), or null. */
+    fun storedJson(): String? = prefs.getString(key, null)
+
+    /**
+     * Deletes a stored session that a sign-out had already recorded for revoking (the app was killed before the delete).
+     * Runs before the Auth plugin loads the session, so the ended session is never signed in again.
+     */
+    fun dropIfEnded(pending: List<PendingRevoke>): Boolean = if (endedSessionSurvived(storedJson(), pending)) clearNow() else false
+
     companion object {
         fun forApp(context: Context, supabaseUrl: String): SessionStore = SessionStore(
             prefs = context.getSharedPreferences(context.packageName + "_preferences", Context.MODE_PRIVATE),

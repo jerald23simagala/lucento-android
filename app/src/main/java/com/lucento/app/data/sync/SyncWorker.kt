@@ -21,7 +21,8 @@ import java.util.concurrent.TimeUnit
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val container = (applicationContext as LucentoApplication).container
-        if (!container.syncPreferences.isEnabled()) return Result.success()
+        // Never mid-onboarding (P0-2; see backgroundSyncAllowed). Onboarding's restore syncs directly, not through here.
+        if (!backgroundSyncAllowed(container.syncPreferences.isEnabled(), container.onboardingComplete())) return Result.success()
         return when (val result = container.syncRepository.sync()) {
             is SyncResult.Success -> Result.success(workDataOf(KEY_PUSHED to result.report.pushed, KEY_PULLED to result.report.pulled))
             // Nothing a retry could fix; Settings shows the state (and the stored error for an account mismatch).

@@ -240,8 +240,10 @@ class SyncEngineTest {
         old.addWallet()
         success(old.sync())
         val fresh = Device()
-        fresh.addCategory("Freelance", kind = "INCOME")
-        fresh.addCategory("Gifts", kind = "EXPENSE")
+        // Lucento's own defaults/presets, never used. (A name the user typed is kept since P0-2 — see
+        // OnboardingDataSafetyTest.)
+        fresh.addCategory("Investments", kind = "INCOME")
+        fresh.addCategory("Gifts and celebrations", kind = "EXPENSE")
         success(fresh.sync())
 
         assertEquals(setOf("Rent", "Salary"), fresh.categories.getAll().map { it.name }.toSet())

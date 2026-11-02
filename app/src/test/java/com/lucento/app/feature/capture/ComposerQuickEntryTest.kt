@@ -109,4 +109,34 @@ class ComposerQuickEntryTest {
             collecting.cancel()
         }
     }
+
+    /** With several wallets and none active, Send asks where first; closing that question must not lose the message. */
+    @Test fun dismissingTheWalletPickerHandsBackTheTypedMessage() = runTest {
+        wallets.create("Cash", WalletType.CASH, Money(0, "USD"))
+        wallets.create("Bank", WalletType.BANK, Money(0, "USD"))
+        val viewModel = ComposerViewModel(
+            transactions,
+            wallets,
+            categories,
+            LocalTransactionInterpreter(),
+            today = { LocalDate.parse("2026-11-01") },
+        )
+        val collecting = launch(UnconfinedTestDispatcher()) { viewModel.state.collect {} }
+        try {
+            viewModel.state.first { it.loaded && it.wallets.size == 2 }
+            viewModel.send("  coffee 3,25 ", CaptureSource.TYPED)
+            assertTrue(viewModel.state.first { it.showWalletPicker }.rows.isEmpty())
+
+            assertEquals("coffee 3,25" to CaptureSource.TYPED, viewModel.dismissWalletPicker())
+            assertTrue(!viewModel.state.value.showWalletPicker)
+            // Nothing is held any more: a second dismiss has nothing to hand back.
+            assertEquals(null, viewModel.dismissWalletPicker())
+
+            // A receipt keeps its source, so the screen doesn't turn it into typing (QA note 10).
+            viewModel.send("TOTAL 25.000", CaptureSource.RECEIPT)
+            assertEquals("TOTAL 25.000" to CaptureSource.RECEIPT, viewModel.dismissWalletPicker())
+        } finally {
+            collecting.cancel()
+        }
+    }
 }

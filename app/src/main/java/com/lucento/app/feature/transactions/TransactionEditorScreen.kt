@@ -142,7 +142,8 @@ fun TransactionEditorScreen(
     // Archived categories stay selectable only when this transaction already uses one.
     val choices = categories.filter { it.kind == kind && (!it.archived || it.id == draft.categoryId) }
     val amountError = error is TransactionDraftError.AmountInvalid || error is TransactionDraftError.AmountZero ||
-        error is TransactionDraftError.AmountTooPrecise || error is TransactionDraftError.AmountTooLarge
+        error is TransactionDraftError.AmountTooPrecise || error is TransactionDraftError.AmountTooLarge ||
+        error is TransactionDraftError.AmountUnclear
     val isNew = initial.id == null
     val ext = LucentoTheme.extendedColors
     val expenseTone = TonePair(ext.negativeContainer, ext.negative)
@@ -225,6 +226,7 @@ fun TransactionEditorScreen(
                                 if (e.digits == 0) "${wallet?.currencyCode.orEmpty()} has no decimal places."
                                 else "${wallet?.currencyCode.orEmpty()} allows up to ${e.digits} decimal places."
                             TransactionDraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
+                            is TransactionDraftError.AmountUnclear -> e.message
                             else -> if (wallet == null) "Choose a wallet below" else null
                         }
                     if (caption != null) {
@@ -548,7 +550,8 @@ internal fun AmountEntry(
         AmountTextField(
             value = text,
             onValueChange = onTextChange,
-            filter = { input -> input.filter { it.isDigit() || it == '.' || it == ',' }.take(20) },
+            // Length only: MoneyParser judges the text (dropping characters here turned "۱۲٫۵" into 125, P0-3).
+            filter = { it.take(20) },
             modifier = Modifier
                 .weight(1f, fill = false)
                 .width(IntrinsicSize.Min)

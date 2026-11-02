@@ -1,0 +1,15 @@
+P1-7 accessibility — device log (2026-11-01, emulator-5556, API 36.1, debug build against lucento-test, QA account A)
+
+Baseline: font_scale 1.0, 1080x2400 @ 420dpi (~411dp). All settings restored afterwards (verified: 1.0, size/density reset).
+
+B-98  font_scale 2.0, before the Home fix: dock icon-only (labels hidden, names kept for TalkBack) — OK; amounts
+      whole — OK. Defects found: progress-bar labels clipped vertically, "Remaining" cut to "Remaini", quick-link
+      labels broken mid-word ("Goal/s", "Insig/hts"), "of $800.00 used" wrapped out of reading order.
+B-99  font_scale 2.0 after the fix: bars grow with the label line height; Spent/Remaining/days left stacked one per
+      line; advice banner wraps; percentage over "of $800.00 used".
+B-100 font_scale 2.0, lower Home: Net flow / Net worth stacked full width; quick links 2x2 with whole words.
+B-101 360dp (720x1600 @ 320dpi), font 1.0: dock keeps labels; quick links switch to a list; amounts whole.
+B-102 360dp, font 1.3, Transactions: dock icon-only; all amounts whole. Type tabs tight but readable (P1-7-L1).
+
+Crashes during the run: 0. TalkBack pass: not run (open).
+B-112/B-113 After the FittingText rewrite (QA note 11): Home at 1.0x and switched live to 2.0x; every amount drawn whole, none hidden or wrapped. Font scale reset to 1.0.

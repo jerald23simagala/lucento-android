@@ -121,6 +121,7 @@ internal object RemoteCandidates {
     fun toCandidates(items: List<RemoteItem>, context: InterpretationContext, source: String): List<TransactionCandidate> {
         val walletIds = context.wallets.map { it.id }.toSet()
         val categories = context.categories.filter { !it.archived }.associateBy { it.id }
+        val written = writtenAmounts(source, context)
         return items.take(MAX_ROWS).mapNotNull { item ->
             val type = when (item.type?.uppercase()) {
                 "INCOME" -> TransactionType.INCOME
@@ -128,7 +129,13 @@ internal object RemoteCandidates {
                 "EXPENSE", null -> TransactionType.EXPENSE
                 else -> return@mapNotNull null
             }
-            val amount = item.amount?.trim()?.toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
+            // P0-3: the model's amount is untrusted. Only a plain decimal ("1250.50") is accepted — never "1,250" or
+            // "1.250", whose meaning depends on a convention — and it is re-checked against the numbers in the message.
+            val parsed = item.amount?.trim()?.takeIf { CANONICAL_AMOUNT.matches(it) }?.toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
+            val match = parsed?.let { p -> written.firstOrNull { t -> t.readings.ifEmpty { listOf(t.value) }.any { it.compareTo(p) == 0 } } }
+            // The model picked one reading of a number the device reads two ways ("1.000"): the user picks, as locally.
+            val readingChoice = match?.readings?.takeIf { it.size > 1 }
+            val amount = if (readingChoice != null) null else parsed
             val wallet = item.walletId?.takeIf { it in walletIds }
             val toWallet = item.toWalletId?.takeIf { it in walletIds && it != wallet }
             if (type == TransactionType.TRANSFER_OUT && toWallet == null) return@mapNotNull null
@@ -138,7 +145,11 @@ internal object RemoteCandidates {
             }
             val date = item.date?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
             val flags = buildSet {
-                if (amount == null) add(CandidateFlag.AMOUNT_MISSING)
+                when {
+                    readingChoice != null -> add(CandidateFlag.AMOUNT_AMBIGUOUS)
+                    amount == null -> add(CandidateFlag.AMOUNT_MISSING)
+                    match == null -> add(CandidateFlag.AMOUNT_UNVERIFIED)
+                }
                 if (category == null && type != TransactionType.TRANSFER_OUT) add(CandidateFlag.CATEGORY_UNMATCHED)
                 if (date == null && item.date != null) add(CandidateFlag.DATE_UNCERTAIN)
             }
@@ -146,6 +157,7 @@ internal object RemoteCandidates {
                 description = item.description?.trim()?.take(MAX_DESCRIPTION).orEmpty().ifBlank { category?.name ?: "Transaction" },
                 type = type,
                 amount = amount,
+                amountOptions = readingChoice.orEmpty(),
                 walletId = wallet ?: context.defaultWalletId,
                 toWalletId = toWallet,
                 categoryId = category?.id,
@@ -158,6 +170,19 @@ internal object RemoteCandidates {
         }
     }
 
+    /**
+     * Every reading of every number in the message, read on the device the way the composer reads it (number words
+     * like "two hundred" included), so a model's amount can be checked deterministically.
+     */
+    private fun writtenAmounts(source: String, context: InterpretationContext): List<com.lucento.app.domain.capture.QuickEntryParser.AmountToken> {
+        val text = com.lucento.app.domain.capture.QuickEntryParser.asciiDigits(
+            com.lucento.app.domain.capture.NumberWords.normalize(source), context.decimalSeparator,
+        )
+        val lower = " " + text.lowercase(java.util.Locale.ROOT) + " "
+        return com.lucento.app.domain.capture.QuickEntryParser.amountTokens(lower, context.decimalSeparator, context.fractionDigits, context.spaceGrouping)
+    }
+
+    private val CANONICAL_AMOUNT = Regex("^\\d{1,13}(\\.\\d{1,3})?$")
     private const val MAX_ROWS = 30
     private const val MAX_DESCRIPTION = 80
 }

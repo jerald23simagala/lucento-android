@@ -72,6 +72,11 @@ class FakeSyncServer(var serverNow: Long = 1_000_000_000_000L) {
             return write(table, userId, JsonObject(patch)) != null
         }
 
+        override suspend fun hasLiveRows(table: String, userId: String, kind: String?, activeOnly: Boolean): Boolean =
+            live(table, userId).any { row ->
+                (kind == null || row.str("kind") == kind) && (!activeOnly || row["archived"]?.jsonPrimitive?.content != "true")
+            }
+
         override suspend fun fetchByIds(table: String, userId: String, ids: List<String>): List<JsonObject> =
             rows(table, userId).filter { it.str("id") in ids }
 

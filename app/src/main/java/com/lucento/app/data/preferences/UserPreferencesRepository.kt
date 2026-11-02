@@ -2,8 +2,10 @@ package com.lucento.app.data.preferences
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -64,14 +66,28 @@ data class UserPreferences(
     val localDataNoticeSeen: Boolean = false,
     /** Where the guided setup after onboarding stands; null when finished or never started (older installs). */
     val guideStep: com.lucento.app.domain.GuideStep? = null,
+    /** Bumped by every sign-out wipe, so the next account's onboarding never reuses the previous run's screen state. */
+    val setupGeneration: Int = 0,
+    /**
+     * App lock (P2-10): opening Lucento, or returning after a while, asks for the phone's fingerprint, face or screen
+     * lock. A device choice: never in backups, kept across account switches.
+     */
+    val appLock: Boolean = false,
+    /** Hides Lucento's screen in the recent-apps view (P2-10). A device choice like [appLock]. */
+    val hideInRecents: Boolean = false,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
 
+/** What a sign-out wipe resets in the preferences (F-7). An interface so the wipe can be tested without Android. */
+interface AccountSetupStore {
+    suspend fun resetForNextAccount()
+}
+
 class UserPreferencesRepository(
     private val context: Context,
     private val crashReportsFlag: CrashReportsFlag.Store = SharedPreferencesCrashReportsStore(context),
-) {
+) : AccountSetupStore {
 
     private object Keys {
         val onboardingComplete = booleanPreferencesKey("onboarding_complete")
@@ -95,6 +111,9 @@ class UserPreferencesRepository(
         val usageAdjustPending = booleanPreferencesKey("usage_adjust_pending")
         val usagePendingDeletion = stringPreferencesKey("usage_pending_deletion_install_id")
         val localDataNoticeSeen = booleanPreferencesKey("local_data_notice_seen")
+        val setupGeneration = intPreferencesKey("setup_generation")
+        val appLock = booleanPreferencesKey("app_lock")
+        val hideInRecents = booleanPreferencesKey("hide_in_recents")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -121,8 +140,16 @@ class UserPreferencesRepository(
                 crashReports = p[Keys.crashReports] ?: false,
                 usageCounts = p[Keys.usageCounts] ?: false,
                 localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
+                setupGeneration = p[Keys.setupGeneration] ?: 0,
+                appLock = p[Keys.appLock] ?: false,
+                hideInRecents = p[Keys.hideInRecents] ?: false,
             )
         }
+
+    /** One atomic edit, so no screen ever sees a half-reset state. See [resetAccountSetup]. */
+    override suspend fun resetForNextAccount() {
+        context.dataStore.edit { resetAccountSetup(it) }
+    }
 
     /**
      * Saves the onboarding choices in one atomic edit, then marks onboarding complete. Called only after the chosen
@@ -213,7 +240,13 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.localDataNoticeSeen] = true }
     }
 
+    suspend fun setAppLock(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.appLock] = enabled }
+    }
 
+    suspend fun setHideInRecents(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.hideInRecents] = enabled }
+    }
 
 
 
@@ -298,6 +331,26 @@ class UserPreferencesRepository(
 
     companion object {
         const val DATA_STORE_NAME = "user_preferences"
+
+        /**
+         * After a sign-out wipe the ledger is a fresh install's, so the setup that belonged to it goes too (F-7): the next
+         * account goes through onboarding, which checks it and restores or sets it up. Kept: device choices (theme,
+         * currency, modules), consent for crash reports and usage counts, and notices already shown. Smarter reading is
+         * switched off because it sends composer text and was opted into for the previous account.
+         */
+        internal fun resetAccountSetup(p: MutablePreferences) {
+            // A new generation only when onboarding had finished, so its finished ViewModel isn't reused. A wipe started
+            // inside onboarding (leaving a partial restore, or a switch while restoring) keeps the onboarding that is
+            // running: a new one would run a second restore beside it.
+            if (p[Keys.onboardingComplete] == true) p[Keys.setupGeneration] = (p[Keys.setupGeneration] ?: 0) + 1
+            p[Keys.onboardingComplete] = false
+            p[Keys.categorySetupDone] = false
+            p.remove(Keys.guideStep)
+            p.remove(Keys.defaultWalletId)
+            p.remove(Keys.displayName)
+            p.remove(Keys.acknowledgedBudgetMonth)
+            p[Keys.smartReading] = false
+        }
         const val MAX_DISPLAY_NAME = 40
 
         fun defaultCurrency(locale: Locale = Locale.getDefault()): String =

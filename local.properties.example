@@ -6,11 +6,23 @@ sdk.dir=/path/to/Android/Sdk
 # every core feature works fully offline with no account. The Settings screen tells the user cloud sync
 # setup is incomplete rather than showing a button that would fail.
 #
-# SUPABASE_URL / SUPABASE_ANON_KEY: from your Supabase project's Settings > API page. The anon/publishable
-# key is safe to ship in the APK (it is enforced by Postgres Row Level Security, not by secrecy) but is kept
-# out of source control anyway, as config.
+# SUPABASE_URL / PUBLISHABLE_KEY: from your Supabase project's Settings > API page. The publishable
+# (sb_publishable_...) key is safe to ship in the APK (it is enforced by Postgres Row Level Security, not by secrecy) but is kept
+# out of source control anyway, as config. Never a service-role or secret key.
+# LUCENTO_SUPABASE_URL / LUCENTO_SUPABASE_PUBLISHABLE_KEY are the PRODUCTION project and are used by release builds only
+# (the same names are GitHub repository variables for CI and Vercel environment variables for the website).
+# LUCENTO_DEBUG_SUPABASE_* is the TEST project (lucento-test) and is used by debug builds only. Debug never
+# falls back to production; the build fails if the debug URL is the production one.
 # GOOGLE_WEB_CLIENT_ID: the Web application OAuth client id from Google Cloud Console, also entered into
 # Supabase's Authentication > Providers > Google settings. See docs/SYNC.md "Setup required" for every step.
 LUCENTO_SUPABASE_URL=
-LUCENTO_SUPABASE_ANON_KEY=
+LUCENTO_SUPABASE_PUBLISHABLE_KEY=
+LUCENTO_DEBUG_SUPABASE_URL=
+LUCENTO_DEBUG_SUPABASE_ANON_KEY=
 LUCENTO_GOOGLE_WEB_CLIENT_ID=
+
+# Smarter reading (opt-in Gemini proxy, docs/CAPTURE.md). Release uses LUCENTO_AI_INTERPRET_URL, defaulting to
+# https://www.lucentoapp.com/api/interpret. Debug uses only LUCENTO_DEBUG_AI_INTERPRET_URL (a proxy that accepts
+# lucento-test tokens); left blank, debug builds hide Smarter reading. The build fails if it is the production proxy.
+LUCENTO_AI_INTERPRET_URL=
+LUCENTO_DEBUG_AI_INTERPRET_URL=

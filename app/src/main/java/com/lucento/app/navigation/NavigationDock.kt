@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +37,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.component.rememberHaptics
@@ -72,6 +76,17 @@ fun NavigationDock(
     // Destinations split evenly around the + (the first half on the left).
     val leading = items.take((items.size + 1) / 2)
     val trailing = items.drop(leading.size)
+    // P1-7 (N-25): at large font sizes or on narrow screens the labels no longer fit their tabs and ran into each other.
+    // When the longest label is wider than a tab, every tab shows its icon only; the name stays for TalkBack.
+    val measurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelSmall
+    val density = LocalDensity.current
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val tabWidth = (screenWidth - 24.dp - 8.dp - AddSize - 16.dp) / items.size.coerceAtLeast(1)
+    val longest = remember(items, labelStyle, density) {
+        items.maxOfOrNull { measurer.measure(it.label, labelStyle).size.width } ?: 0
+    }
+    val showLabels = with(density) { longest.toDp() } <= tabWidth + 8.dp
     Box(
         modifier
             .fillMaxWidth()
@@ -95,7 +110,7 @@ fun NavigationDock(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
+                    .heightIn(min = 64.dp)
                     .padding(horizontal = 4.dp)
                     .selectableGroup(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -105,11 +120,11 @@ fun NavigationDock(
                     onSelect(item)
                 }
                 leading.forEach { item ->
-                    DockTab(item, selected = item.key == selectedKey, onClick = { select(item) }, modifier = Modifier.weight(1f))
+                    DockTab(item, selected = item.key == selectedKey, onClick = { select(item) }, showLabel = showLabels, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.width(AddSize + 16.dp))
                 trailing.forEach { item ->
-                    DockTab(item, selected = item.key == selectedKey, onClick = { select(item) }, modifier = Modifier.weight(1f))
+                    DockTab(item, selected = item.key == selectedKey, onClick = { select(item) }, showLabel = showLabels, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -140,7 +155,7 @@ private fun AddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, showLabel: Boolean, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val indicator by animateColorAsState(
         if (selected) colors.primaryContainer else colors.primaryContainer.copy(alpha = 0f),
@@ -154,7 +169,7 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
     )
     Column(
         modifier
-            .fillMaxHeight()
+            .heightIn(min = 64.dp)
             .selectable(selected = selected, role = Role.Tab, onClick = onClick)
             .semantics { contentDescription = item.label },
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -175,15 +190,17 @@ private fun DockTab(item: DockItem, selected: Boolean, onClick: () -> Unit, modi
                 modifier = Modifier.size(22.dp),
             )
         }
-        Text(
-            item.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = tint,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Visible,
-            // Measured at its natural width and centred, so "Transactions" may use a little of its neighbours' space.
-            modifier = Modifier.padding(top = 2.dp).wrapContentWidth(unbounded = true),
-        )
+        if (showLabel) {
+            Text(
+                item.label,
+                style = MaterialTheme.typography.labelSmall,
+                color = tint,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Visible,
+                // Measured at its natural width and centred, so "Transactions" may use a little of its neighbours' space.
+                modifier = Modifier.padding(top = 2.dp).wrapContentWidth(unbounded = true),
+            )
+        }
     }
 }

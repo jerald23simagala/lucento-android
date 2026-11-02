@@ -40,7 +40,8 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,
   idempotent). Interpretation runs on the phone — no AI service, no network. See [docs/CAPTURE.md](docs/CAPTURE.md).
-- **Settings**: theme, main currency, Enabled features, CSV export, JSON backup and restore, privacy facts.
+- **Settings**: theme, main currency, Enabled features, CSV export, JSON backup and restore, privacy facts, an
+  optional app lock (fingerprint, face or screen lock) and Hide in recent apps.
 - **Motion**: the mascot's gentle float and pose cross-fades; original Lottie net-flow glyphs, onboarding mark,
   empty states, receipt scan beam, saved confirmation, milestones — bundled and reduced-motion aware.
 - Exact money math in minor units; 497 JVM unit tests; an emulator screenshot tour in CI.

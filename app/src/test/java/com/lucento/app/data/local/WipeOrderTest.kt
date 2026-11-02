@@ -1,5 +1,6 @@
 package com.lucento.app.data.local
 
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,6 +43,28 @@ class WipeOrderTest {
         assertTrue(marker.isSet())
         // Next launch: the marker is seen and the wipe runs again to the end.
         runWipe(marker, clearBinding = { cursor = null }, clearTables = { rows = 0 }, clearRest = {})
+        assertFalse(marker.isSet())
+    }
+
+    @Test fun aCallerCancelledMidWipeStillFinishesItAndClearsTheMarker() = runTest {
+        // F-7: the last step sends the app to onboarding, which can end the screen (and scope) that started the wipe. A
+        // marker left set would make the next launch wipe the next account's freshly restored ledger.
+        val marker = FakeMarker()
+        val inRest = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var restFinished = false
+        val job = launch {
+            runWipe(marker, clearBinding = {}, clearTables = {}, clearRest = {
+                inRest.complete(Unit)
+                release.await()
+                restFinished = true
+            })
+        }
+        inRest.await()
+        job.cancel()
+        release.complete(Unit)
+        job.join()
+        assertTrue(restFinished)
         assertFalse(marker.isSet())
     }
 
