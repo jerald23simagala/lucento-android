@@ -71,6 +71,11 @@ JDK 17, compileSdk 35, minSdk 26 (Android 8.0+). Application ID `com.lucento.app
 
 ## Build locally (Android Studio on Windows/macOS/Linux)
 1. `git clone` the repo and open the folder in Android Studio (Ladybug or newer). Let Gradle sync.
+   Gradle must run on **JDK 17–21** (CI uses 17). Recent Android Studio versions bundle JDK 25, which Kotlin 2.0.21 and
+   Gradle 8.11 can't run on, so set *Settings › Build Tools › Gradle › Gradle JDK* to a 17 or 21 JDK (or `JAVA_HOME` on the
+   command line). On JDK 25 the build fails at once with only `25.0.3` as the error — that message means this. Optionally
+   `./gradlew updateDaemonJvm
+   --jvm-version=21` writes a per-machine `gradle/gradle-daemon-jvm.properties` (gitignored) that picks an installed 21.
 2. Run the `app` configuration on a device/emulator, or:
    ```bash
    ./gradlew testDebugUnitTest   # unit tests

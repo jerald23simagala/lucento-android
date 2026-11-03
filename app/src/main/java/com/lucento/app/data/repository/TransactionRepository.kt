@@ -12,7 +12,9 @@ import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.WalletBalanceCalculator
 import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import java.time.LocalDate
 
 class TransactionRepository(
@@ -21,6 +23,8 @@ class TransactionRepository(
     private val categories: CategoryDao,
     private val clock: () -> Long = System::currentTimeMillis,
     private val runner: TransactionRunner = TransactionRunner.Direct,
+    /** The app's scope, so screens share one whole-table query (null in JVM tests: each collector reads directly). */
+    private val shareScope: kotlinx.coroutines.CoroutineScope? = null,
 ) {
 
     /** Everything needed to create or update a transaction. [clientUuid] makes creation idempotent. */
@@ -77,8 +81,27 @@ class TransactionRepository(
         data object FutureDate : AdjustResult
     }
 
-    fun observeTransactions(): Flow<List<Transaction>> =
-        transactions.observeAll().map { list -> list.map { it.toDomain() } }
+    /**
+     * Every transaction, newest first. With a [shareScope] (the app's), all screens share one Room query and one mapping
+     * per change instead of running their own (P2-8, N-12); the cache is dropped when nobody listens, so a returning
+     * screen never sees stale rows first.
+     */
+    private val all: Flow<List<Transaction>> = transactions.observeAll().map { list -> list.map { it.toDomain() } }.let { flow ->
+        if (shareScope == null) flow
+        else flow.shareIn(shareScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000, replayExpirationMillis = 0), replay = 1)
+    }
+
+    fun observeTransactions(): Flow<List<Transaction>> = all
+
+    /** How many transactions exist (P2-8: Settings' export summary needs only this). */
+    fun observeCount(): Flow<Int> = transactions.observeCount()
+
+    /** How many income and expense entries exist (P2-8: Home's opt-in usage count needs only this). */
+    fun observeCashFlowCount(): Flow<Int> = transactions.observeCashFlowCount()
+
+    /** One transaction and, for a transfer, its other leg (P2-8: the detail page needs only these). */
+    fun observeWithTransferLegs(id: Long): Flow<List<Transaction>> =
+        transactions.observeWithTransferLegs(id).map { list -> list.map { it.toDomain() } }
 
     suspend fun save(input: Input): SaveResult {
         if (!input.type.isCashFlow) return SaveResult.InvalidType

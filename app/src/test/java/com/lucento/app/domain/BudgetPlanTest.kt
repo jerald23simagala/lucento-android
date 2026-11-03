@@ -70,8 +70,8 @@ class BudgetPlanTest {
         val usd = plan(budgets, listOf(spend(40_00, 2, code = "USD"), spend(999_00, 2)), code = "USD")
         assertEquals(Money(100_00, "USD"), usd.total)
         assertEquals(Money(40_00, "USD"), usd.spent)
-        assertEquals(listOf("PHP", "USD"), BudgetPlanner.currencies(budgets, categories, "PHP"))
-        assertEquals(listOf("EUR", "PHP", "USD"), BudgetPlanner.currencies(budgets, categories, "EUR"))
+        assertEquals(listOf("PHP", "USD"), BudgetPlanner.currencies(budgets, categories, "PHP", java.time.YearMonth.of(2026, 6)))
+        assertEquals(listOf("EUR", "PHP", "USD"), BudgetPlanner.currencies(budgets, categories, "EUR", java.time.YearMonth.of(2026, 6)))
     }
 
     @Test fun duplicateAllocationsForOneCategoryCountOnce() {

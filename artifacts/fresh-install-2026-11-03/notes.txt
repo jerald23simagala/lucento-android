@@ -1,0 +1,37 @@
+Fresh-install pass — 2026-11-03, emulator-5556 (Lucento_P0_QA_ReturningUser, API 36.1), debug build -> lucento-test
+Screenshots in this folder are local evidence (not committed; repo convention keeps text logs only).
+
+Pre-check: device signed in as QA account B; 0 dirty rows in any table (everything on the server) -> pm clear.
+
+Start fresh (PASS)
+- Welcome: Start fresh / I already use Lucento.                                   01
+- Personalize: focus (spending + budgets always included; + goals, debts)        02-03
+- How do you pay? (Cash + Bank pre-selected; ended Cash + Credit card)            04-05
+- Categories: 12 chosen -> review -> confirm; currency USD, theme System          06-08
+- Set up: backups (Not now, this phone only); summary "Lucento is personalized"   09-10
+- Guide: Cash "Wallet" 500; bank "Chase Checking" 2,400 with picker -> Chase       11-20
+  (picker search list, "No bank or provider" first, Remove Chase offered)
+- Cards or loans: "Visa Card" owed 300 (guide list showed $300.00 unsigned ->
+  fixed to signed, RD-QA-9)                                                       21-23
+- Budget: Rent 400, Electricity 80, Groceries 300 (saved as recurring from 2026-11) 24-26
+- Goal: Emergency fund 1,000                                                       27-29
+- Get started: transactions skipped -> "You're ready": 3 accounts, 3 budgeted,
+  1 goal, first transaction not yet; milestones Money Keeper, Budget Builder,
+  Goal Setter                                                                      30-31
+- Home: first-transaction card + ringed +, card $2,600.00 (= 2,900 - 300),
+  budget $0 of $780 (= 400 + 80 + 300), Getting started 2 of 3                     32-33
+- Composer via +: "groceries 42.50" -> 1 transaction -> saved; ring cleared;
+  Home: "Milestone: First Step"; Wallets 2,857.50, net 2,557.50, 5% used           34-39
+- Wallets list (net worth 2,557.50, Visa −$300.00 owed) and Chase detail card      40-41
+DB after: wallets Wallet(CASH) / Chase Checking(BANK, us_chase) / Visa Card(CREDIT_CARD);
+budgets 40000/8000/30000 with effective_from 2026-11; 1 transaction; 1 goal. Crash buffer: 0.
+
+Returning user (PASS)
+- pm clear -> I already use Lucento -> Sign in to my account -> email (QA B)       50-51
+- Restored: fingerprints of wallets/categories/budgets/goals equal the pre-clear snapshot; 0 dirty.
+  Server also held a 5,000 transfer QA BDO Savings -> QA Chase Card created 2026-11-03 06:42 UTC by
+  another client (not this session), so transactions 9 vs 7 and the card shows overpaid +$3,750.
+
+Final build smoke (after QA fixes): installed over QA B, Home synced, 0 crashes            60
+ENV-1: each install restarted system_server; "failed to complete startup" ANRs for Lucento and Google
+system apps at load average ~24; Lucento recovered every time.

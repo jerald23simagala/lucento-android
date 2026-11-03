@@ -90,9 +90,29 @@ class BudgetViewModel(
         }
     }
 
-    /** Sets (or with null, removes) a category's monthly amount; the overall budget follows automatically. */
-    fun setAllocation(categoryId: Long, currencyCode: String, limit: Money?, onResult: (BudgetRepository.SaveResult) -> Unit) =
-        write({ budgets.setAllocation(categoryId, currencyCode, limit) }, onResult)
+    /**
+     * Sets (or with null, removes) a category's amount for [month] alone or for [month] onward — never for earlier
+     * months. The overall budget follows automatically.
+     */
+    fun saveAmount(
+        categoryId: Long,
+        currencyCode: String,
+        month: YearMonth,
+        limit: Money?,
+        scope: BudgetScope,
+        onResult: (BudgetRepository.SaveResult) -> Unit,
+    ) = write({
+        when (scope) {
+            BudgetScope.THIS_MONTH ->
+                if (limit == null) budgets.clearMonth(categoryId, currencyCode, month)
+                else budgets.setMonthAmount(categoryId, currencyCode, month, limit)
+            BudgetScope.ONWARD -> budgets.setFrom(categoryId, currencyCode, month, limit)
+        }
+    }, onResult)
+
+    /** Drops [month]'s own amount so the usual monthly amount applies to it again. */
+    fun useUsualAmount(categoryId: Long, currencyCode: String, month: YearMonth, onResult: (BudgetRepository.SaveResult) -> Unit) =
+        write({ budgets.setMonthAmount(categoryId, currencyCode, month, null) }, onResult)
 
     fun removeLegacyOverall() = write({ budgets.removeLegacyOverall() })
 

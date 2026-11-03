@@ -27,10 +27,12 @@ import kotlinx.coroutines.launch
 enum class RestoreStage { NONE, WARN, SIGN_IN, RESTORING, EMPTY, FAILED }
 
 /**
- * Setup: welcome → focus → features → spending categories → review → currency & appearance → cloud sync (optional)
- * → confirmation.
+ * Setup, in three stages people see (see [com.lucento.app.domain.SetupStage]):
+ * welcome (start fresh, sign in to an account, or restore a backup file) → **Personalize**: focus → how you pay →
+ * spending categories → review → currency & appearance → **Set up**: back up and sync (account, file or this phone
+ * only) → summary, then the guided setup (wallets, budget, …) → **Get started**.
  *
- * Focus and features can be skipped (safe defaults). Choosing spending categories cannot: the budget is built from
+ * Focus and payment types can be skipped (safe defaults); tracking spending and budgeting are always included. Choosing spending categories cannot: the budget is built from
  * them, so at least one must be chosen and reviewed before onboarding completes. Categories are written to the
  * database first; only then is onboarding marked complete, so a finished onboarding always has the user's categories.
  * Choices only set the *initial* configuration; everything can be changed later. No personal information is collected.
@@ -48,6 +50,8 @@ class OnboardingViewModel(
     private val wallets: com.lucento.app.data.repository.WalletRepository? = null,
     private val accounts: com.lucento.app.data.sync.AccountBoundary? = null,
     private val usage: com.lucento.app.domain.UsageCountsService? = null,
+    /** Restoring a backup file on the welcome screen (offline: nothing is sent anywhere). Null in tests. */
+    private val backup: com.lucento.app.domain.backup.BackupEngine? = null,
 ) : ViewModel() {
 
     /** Anonymous usage counts: one `onboarding_step_viewed` per screen, numbered from 1 (welcome). */
@@ -76,8 +80,12 @@ class OnboardingViewModel(
     val syncAvailable: Boolean get() = auth != null && com.lucento.app.data.sync.SupabaseModule.isConfigured
     val googleAvailable: Boolean get() = com.lucento.app.data.sync.SupabaseModule.isGoogleSignInConfigured
 
-    /** The user chose to connect by email: open the server connection while they type. */
+    /**
+     * The user switched to email: open the server connection while they type, and drop a message left from the Google
+     * attempt (e.g. "No Google account could be used"), which no longer applies to what is on screen.
+     */
     fun prepareConnection() {
+        _syncMessage.value = null
         auth?.prewarm()
     }
 
@@ -384,9 +392,24 @@ class OnboardingViewModel(
     val currency: StateFlow<String> =
         savedState.getStateFlow(KEY_CURRENCY, UserPreferencesRepository.defaultCurrency())
 
-    val focuses: StateFlow<Set<FinancialFocus>> = savedState.getStateFlow(KEY_FOCUS, arrayListOf(FinancialFocus.EVERYDAY_SPENDING.name))
-        .map { names -> names.mapNotNull { n -> FinancialFocus.entries.firstOrNull { it.name == n } }.toSet() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, setOf(FinancialFocus.EVERYDAY_SPENDING))
+    /** Always includes [FinancialFocus.MANDATORY]: tracking spending and budgeting can't be switched off here. */
+    val focuses: StateFlow<Set<FinancialFocus>> = savedState.getStateFlow(KEY_FOCUS, ArrayList(FinancialFocus.MANDATORY.map { it.name }))
+        .map { names -> names.mapNotNull { n -> FinancialFocus.entries.firstOrNull { it.name == n } }.toSet() + FinancialFocus.MANDATORY }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, FinancialFocus.MANDATORY)
+
+    val spendTypes: StateFlow<Set<com.lucento.app.domain.SpendType>> =
+        savedState.getStateFlow(KEY_SPEND, ArrayList(com.lucento.app.domain.SpendType.DEFAULT.map { it.name }))
+            .map { com.lucento.app.domain.SpendType.fromKeys(it) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, com.lucento.app.domain.SpendType.DEFAULT)
+
+    /** The backup choice on the sync step: an account, a file now and then, or this phone only. */
+    val backupPath: StateFlow<BackupPath> = savedState.getStateFlow(KEY_BACKUP_PATH, BackupPath.ACCOUNT.name)
+        .map { runCatching { BackupPath.valueOf(it) }.getOrDefault(BackupPath.ACCOUNT) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, BackupPath.ACCOUNT)
+
+    fun selectBackupPath(path: BackupPath) {
+        savedState[KEY_BACKUP_PATH] = path.name
+    }
 
     val features: StateFlow<Set<Feature>> = savedState.getStateFlow(KEY_FEATURES, ArrayList(FinancialFocus.initialFeatures(emptySet()).map { it.key }))
         .map { keys -> keys.mapNotNull(Feature::fromKey).toSet() }
@@ -410,9 +433,10 @@ class OnboardingViewModel(
 
     fun next() {
         val current = step.value
-        // Leaving the focus step: start the feature list from what the user said they care about.
-        if (current == STEP_FOCUS) {
-            savedState[KEY_FEATURES] = ArrayList(FinancialFocus.initialFeatures(focuses.value).map { it.key })
+        // Leaving the focus or payment step: modules follow what the user cares about and how they pay.
+        if (current == STEP_FOCUS || current == STEP_SPEND) {
+            val modules = FinancialFocus.initialFeatures(focuses.value) + com.lucento.app.domain.SpendType.features(spendTypes.value)
+            savedState[KEY_FEATURES] = ArrayList(modules.map { it.key })
         }
         // Category selection is mandatory: the review step needs at least one category.
         if ((current == STEP_CATEGORIES || current == STEP_REVIEW) && picks.value.count == 0) return
@@ -433,14 +457,15 @@ class OnboardingViewModel(
     }
 
     fun toggleFocus(focus: FinancialFocus) {
+        if (focus.mandatory) return
         val current = focuses.value
         val next = if (focus in current) current - focus else current + focus
         savedState[KEY_FOCUS] = ArrayList(next.map { it.name })
     }
 
-    fun setFeature(feature: Feature, on: Boolean) {
-        val next = if (on) features.value + feature else features.value - feature
-        savedState[KEY_FEATURES] = ArrayList(next.map { it.key })
+    fun toggleSpendType(type: com.lucento.app.domain.SpendType) {
+        val current = spendTypes.value
+        savedState[KEY_SPEND] = ArrayList((if (type in current) current - type else current + type).map { it.name })
     }
 
     fun selectCurrency(code: String) {
@@ -492,7 +517,7 @@ class OnboardingViewModel(
                 // Existing rows (only income categories on a fresh install) are matched by name, never duplicated, and a
                 // category that came from the account is never removed for being unchosen.
                 categories.applySelection(picks.value.choices(emptyList()), keepAccountCategories = true)
-                preferences.completeOnboarding(currency.value, theme.value, features.value)
+                preferences.completeOnboarding(currency.value, theme.value, features.value, spendTypes.value)
                 // Connected on the sync step: sync is turned on only now that the user's own setup is saved.
                 val context = appContext
                 if (context != null && syncAvailable && auth?.currentUserId() != null) {
@@ -514,8 +539,8 @@ class OnboardingViewModel(
     }
 
     /**
-     * Skips the optional questions (focus and features) with safe defaults — every module on — and continues to the
-     * spending categories, which are never skipped.
+     * Skips the optional questions (focus and payment types) with safe defaults — every module on — and continues to
+     * the spending categories, which are never skipped.
      */
     fun skip() {
         if (step.value >= STEP_CATEGORIES) return
@@ -523,10 +548,100 @@ class OnboardingViewModel(
         savedState[KEY_STEP] = STEP_CATEGORIES
     }
 
+    // ---------------------------------------------------------------- restoring a backup file (offline)
+
+    private val _filePreview = MutableStateFlow<com.lucento.app.domain.backup.BackupPreview?>(null)
+    /** What the chosen backup file holds; shown for confirmation before anything is written. */
+    val filePreview: StateFlow<com.lucento.app.domain.backup.BackupPreview?> = _filePreview
+
+    private val _fileMessage = MutableStateFlow<String?>(null)
+    /** Why a backup file couldn't be read or restored. Nothing was changed when this is set. */
+    val fileMessage: StateFlow<String?> = _fileMessage
+
+    private val _fileBusy = MutableStateFlow(false)
+    val fileBusy: StateFlow<Boolean> = _fileBusy
+
+    private var pendingFile: String? = null
+
+    /** Reads a backup file and previews it. A file that isn't a valid Lucento backup changes nothing. */
+    fun inspectBackupFile(read: suspend () -> String) {
+        val engine = backup ?: return
+        if (_fileBusy.value) return
+        _fileBusy.value = true
+        _fileMessage.value = null
+        viewModelScope.launch {
+            try {
+                val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { read() }
+                _filePreview.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { engine.preview(text) }
+                pendingFile = text
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: com.lucento.app.domain.backup.BackupFormatException) {
+                pendingFile = null
+                _fileMessage.value = e.message ?: "This file isn’t a valid Lucento backup. Nothing was changed."
+            } catch (e: Exception) {
+                pendingFile = null
+                _fileMessage.value = "Couldn’t read that file. Nothing was changed."
+            } finally {
+                _fileBusy.value = false
+            }
+        }
+    }
+
+    fun cancelBackupFile() {
+        pendingFile = null
+        _filePreview.value = null
+    }
+
+    /**
+     * Restores the previewed file onto this new phone (replacing the seeded starter rows) and opens Lucento with it — no
+     * story, no guided setup, nothing uploaded (sync stays off until the user connects an account in Settings). The
+     * backup's own settings come with it; if it predates finishing onboarding, onboarding is finished here.
+     */
+    fun restoreBackupFile() {
+        val engine = backup ?: return
+        val json = pendingFile ?: return
+        if (_fileBusy.value) return
+        _fileBusy.value = true
+        viewModelScope.launch {
+            try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    engine.restore(json, com.lucento.app.domain.backup.RestoreMode.REPLACE)
+                }
+                pendingFile = null
+                _filePreview.value = null
+                syncPreferences?.setEnabled(false)
+                val restored = preferences.preferences.first()
+                if (!restored.onboardingComplete) {
+                    val restoredWallets = wallets?.observeWallets()?.first().orEmpty()
+                    val restoredCategories = categories.observeCategories().first()
+                    preferences.completeRestore(
+                        primaryCurrency = com.lucento.app.domain.RestorePlan.primaryCurrency(restoredWallets, restored.primaryCurrency),
+                        themeMode = restored.themeMode,
+                        features = com.lucento.app.domain.RestorePlan.features,
+                        categoriesChosen = com.lucento.app.domain.RestorePlan.hasSpendingCategories(restoredCategories),
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: com.lucento.app.domain.backup.BackupFormatException) {
+                _fileMessage.value = e.message ?: "This file isn’t a valid Lucento backup. Nothing was changed."
+            } catch (e: Exception) {
+                android.util.Log.w("Lucento", "Restoring a backup file during onboarding failed", e)
+                _fileMessage.value = "Couldn’t finish restoring. Nothing was changed — try again."
+            } finally {
+                _fileBusy.value = false
+            }
+        }
+    }
+
+    val fileRestoreAvailable: Boolean get() = backup != null
+
     companion object {
         const val STEP_WELCOME = 0
         const val STEP_FOCUS = 1
-        const val STEP_FEATURES = 2
+        /** "How do you pay?" (replaced the feature switches; same position, so usage step numbers are unchanged). */
+        const val STEP_SPEND = 2
         const val STEP_CATEGORIES = 3
         const val STEP_REVIEW = 4
         const val STEP_ESSENTIALS = 5
@@ -538,6 +653,8 @@ class OnboardingViewModel(
         private const val KEY_CURRENCY = "currency"
         private const val KEY_FOCUS = "focus"
         private const val KEY_FEATURES = "features"
+        private const val KEY_SPEND = "spend_types"
+        private const val KEY_BACKUP_PATH = "backup_path"
         private const val KEY_THEME = "theme"
         private const val KEY_PRESETS = "category_presets"
         private const val KEY_CUSTOM = "category_custom"
@@ -555,10 +672,21 @@ class OnboardingViewModel(
                     sync = container.syncRepository, wallets = container.wallets,
                     accounts = container.accountBoundary,
                     usage = container.usageCounts,
+                    backup = container.backup,
                 )
             }
         }
     }
+}
+
+/** Where each backup choice on the sync step leads. Only [ACCOUNT] sends anything, and only after sign-in. */
+enum class BackupPath { ACCOUNT, FILE, DEVICE_ONLY }
+
+/** Which of the three visible stages an onboarding screen belongs to; the welcome screen shows none. */
+internal fun onboardingStage(step: Int): com.lucento.app.domain.SetupStage? = when (step) {
+    OnboardingViewModel.STEP_WELCOME -> null
+    in OnboardingViewModel.STEP_FOCUS..OnboardingViewModel.STEP_ESSENTIALS -> com.lucento.app.domain.SetupStage.PERSONALIZE
+    else -> com.lucento.app.domain.SetupStage.SET_UP
 }
 
 /** The 1-based screen number sent with `onboarding_step_viewed`: welcome is 1, the confirmation is 8. */

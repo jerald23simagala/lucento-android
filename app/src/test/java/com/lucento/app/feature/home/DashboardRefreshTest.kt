@@ -72,6 +72,16 @@ class DashboardRefreshTest {
         assertTrue(insight.message.startsWith("No budget for June yet."))
     }
 
+    @Test fun lastDayOfTheMonthSaysWhatIsLeftInsteadOfAPerDayFigure() {
+        // N-15: on June 30 "a day keeps you within budget" was just the whole remainder; it now says so.
+        val plan = BudgetPlanner.plan(listOf(food), budget, listOf(spend(30_000, "2026-06-10")), "USD", YearMonth.of(2026, 6))
+        val lastDay = PaceCopy.describe(plan, BudgetPlanner.burn(plan, LocalDate.parse("2026-06-30")), "June", isCurrentMonth = true)
+        assertTrue(lastDay.detail!!.startsWith("Last day of June: "))
+        assertTrue(lastDay.detail!!.endsWith(" left in your budget"))
+        val earlier = PaceCopy.describe(plan, BudgetPlanner.burn(plan, LocalDate.parse("2026-06-29")), "June", isCurrentMonth = true)
+        assertTrue(earlier.detail!!.contains(" a day keeps you within budget"))
+    }
+
     @Test fun insightWordsFollowTheFigures() {
         fun insight(spent: Long) = BudgetPlanner.plan(listOf(food), budget, listOf(spend(spent, "2026-06-16")), "USD", YearMonth.of(2026, 6))
             .let { PaceCopy.describe(it, BudgetPlanner.burn(it, LocalDate.parse("2026-06-16")), "June", isCurrentMonth = true) }

@@ -35,6 +35,11 @@ data class WalletEntity(
     @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
     /** Server `revision` this row was last synced at; a push based on it is a causal successor (v7, docs/SYNC.md). */
     @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
+    /**
+     * v10: the institution from the bundled banking registry (e.g. "ph_bdo"), chosen by the user; null = none (every
+     * wallet before v10, cash, or a bank not in the registry). Never inferred from the wallet's name.
+     */
+    @ColumnInfo(name = "institution_id") val institutionId: String? = null,
 )
 
 /** Money can be posted to this wallet: it is active and not a manually valued asset (see WalletType.isValuedManually). */

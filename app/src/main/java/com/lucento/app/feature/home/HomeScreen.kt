@@ -1,5 +1,46 @@
 package com.lucento.app.feature.home
 
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Category
+import com.lucento.app.core.designsystem.component.icon
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.material.icons.filled.Contactless
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.DonutLarge
+import androidx.compose.material.icons.outlined.TrackChanges
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.outlined.DocumentScanner
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material3.ExperimentalMaterial3Api
+import com.lucento.app.core.designsystem.component.Confirmation
+import com.lucento.app.core.designsystem.component.ConfirmationHost
+import com.lucento.app.core.designsystem.component.HeroCard
+import com.lucento.app.core.designsystem.component.HeroPill
+import com.lucento.app.core.designsystem.component.HeroTones
+import com.lucento.app.core.designsystem.component.rememberHaptics
+import kotlin.math.roundToInt
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -47,6 +88,7 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.EventRepeat
@@ -88,6 +130,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -153,14 +197,25 @@ data class HomeActions(
     val onOpenRecurring: (Long?) -> Unit,
     val onOpenWallets: () -> Unit = {},
     val onOpenDebts: () -> Unit = {},
-    /** Where the sync status leads: Settings, which explains and controls cloud sync. */
     val onOpenSettings: () -> Unit = {},
+    /** Settings › Account & sync, from the sync details sheet (P2-2). */
+    val onOpenAccountSettings: () -> Unit = onOpenSettings,
+    /** P2-1: recent activity — the full list, and one entry's page. */
+    val onOpenTransactions: () -> Unit = {},
+    val onViewTransaction: (com.lucento.app.domain.Transaction) -> Unit = {},
+    /** Part E quick actions: the composer (optionally as income), a transfer, and the receipt scanner (null when off). */
+    val onAddTransaction: (TransactionType?) -> Unit = {},
+    val onTransfer: () -> Unit = {},
+    val onScanReceipt: (() -> Unit)? = null,
+    /** A "top spending" tile: that category's transactions in the shown month. */
+    val onOpenCategory: (Long, YearMonth) -> Unit = { _, _ -> },
 )
 
 /**
- * The dashboard, top to bottom: the header (brand, sync status, notifications, profile) with the month pill; the
- * monthly budget card (budget used against month elapsed, with Lucento the mascot); net worth with quick access; the
- * top savings goal; and scheduled transactions. Every figure comes from [HomeUiState].
+ * The dashboard, top to bottom: a pinned header ("Dashboard", sync status, payments bell, profile) and month selector;
+ * the net wallet balance card; the month's budget with its top two categories; shortcuts; getting started (only until
+ * the basics are in place); upcoming scheduled transactions; recent transactions. Every month-dependent section follows
+ * the one selected month. Every figure comes from [HomeUiState].
  */
 @Composable
 fun HomeScreen(
@@ -170,16 +225,52 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
+    var showSync by remember { mutableStateOf(false) }
+    var showMilestones by remember { mutableStateOf(false) }
+    var celebration by remember { mutableStateOf<Confirmation?>(null) }
+
+    // Part D: milestones. The first time they exist, what's already earned is recorded quietly; after that each new
+    // one is acknowledged once — this runs only when the stored records change, i.e. after a committed write.
+    LaunchedEffect(state.loading, state.needsMilestoneBaseline, state.earned) {
+        if (state.loading) return@LaunchedEffect
+        if (state.needsMilestoneBaseline) viewModel.baselineMilestones(state.earned)
+    }
+    // Anyone who has recorded something doesn't need the + spotlight (also clears it for people who record from elsewhere).
+    LaunchedEffect(state.loading, state.recordedCount > 0) {
+        if (!state.loading && state.recordedCount > 0) viewModel.dismissAddSpotlight()
+    }
+    LaunchedEffect(state.milestoneToShow) {
+        val milestone = state.milestoneToShow ?: return@LaunchedEffect
+        celebration = Confirmation("Milestone: ${milestone.title}", kind = Confirmation.Kind.Milestone)
+        viewModel.acknowledgeMilestone(milestone)
+    }
 
     val scroll = rememberScrollState()
     Column(Modifier.fillMaxSize()) {
         // Pinned: the brand, sync status, notifications and profile stay put while the dashboard scrolls beneath.
         HomeHeader(
             status = state.cloudStatus,
-            onOpenSyncSettings = actions.onOpenSettings,
+            onOpenSyncSettings = { showSync = true },
             bell = if (state.features.isEnabled(Feature.RECURRING)) ({ PaymentsBell(state, actions.onOpenRecurring) }) else null,
             modifier = Modifier.padding(horizontal = Spacing.gutter),
         )
+        if (!state.loading && state.hasWallets) {
+            // Pinned with the header, so the month every section describes is always in view.
+            Row(
+                Modifier.fillMaxWidth().padding(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Overview",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                MonthPill(state, viewModel::selectMonth)
+            }
+        }
         if (scroll.value > 0) Hairline()
 
         Column(
@@ -199,7 +290,7 @@ fun HomeScreen(
             label = "home-content",
         ) { content ->
             when (content) {
-                HomeContent.Loading -> Spacer(Modifier.height(1.dp))
+                HomeContent.Loading -> HomeSkeleton()
                 HomeContent.Welcome -> WelcomePanel(
                     onAddWallet = { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) },
                 )
@@ -208,12 +299,32 @@ fun HomeScreen(
                     actions = actions,
                     onSelectMonth = viewModel::selectMonth,
                     onDismissLocalDataNotice = viewModel::dismissLocalDataNotice,
+                    onDismissOverridden = viewModel::dismissOverridden,
+                    onTurnOn = viewModel::turnOn,
+                    onHideOffers = viewModel::hideModuleOffers,
+                    onAddWallet = { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) },
+                    onOpenMilestones = { showMilestones = true },
+                    onDismissSpotlight = viewModel::dismissAddSpotlight,
                 )
             }
         }
         // Breathing room above the dock and its raised + button.
         Spacer(Modifier.height(Spacing.xl))
         }
+    }
+
+    if (showSync) {
+        SyncDetailsSheet(
+            status = state.cloudStatus,
+            details = state.syncDetails,
+            onSyncNow = viewModel::syncNow,
+            onOpenAccountSettings = {
+                showSync = false
+                actions.onOpenAccountSettings()
+            },
+            onDismissOverridden = viewModel::dismissOverridden,
+            onDismiss = { showSync = false },
+        )
     }
 
     editingWallet?.let { draft ->
@@ -224,13 +335,17 @@ fun HomeScreen(
             onDismiss = { editingWallet = null },
         )
     }
+    if (showMilestones) MilestonesSheet(state.earned, onDismiss = { showMilestones = false })
+    Box(Modifier.fillMaxSize()) {
+        ConfirmationHost(confirmation = celebration, onDismissed = { celebration = null }, modifier = Modifier.align(Alignment.BottomCenter))
+    }
 }
 
 private enum class HomeContent { Loading, Welcome, Overview }
 
 // ------------------------------------------------------------------ Header
 
-/** Brand on the left; sync status, the payments bell (when Scheduled is on) and the profile entry on the right. */
+/** "Dashboard" on the left; sync status, the payments bell (when Scheduled is on) and the profile entry on the right. */
 @Composable
 private fun HomeHeader(
     status: CloudStatus,
@@ -238,9 +353,7 @@ private fun HomeHeader(
     bell: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    // On narrow phones the symbol alone carries the brand, leaving room for the status chip and actions.
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        val showWordmark = maxWidth >= 360.dp
+    Box(modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -248,18 +361,14 @@ private fun HomeHeader(
                 .padding(top = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier
-                    .weight(1f)
-                    .semantics(mergeDescendants = true) { heading() },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                LucentoMark(size = 28.dp, animate = false)
-                if (showWordmark) {
-                    Spacer(Modifier.width(Spacing.sm))
-                    LucentoWordmark(height = 20.dp)
-                }
-            }
+            Text(
+                "Dashboard",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
             SyncStatusChip(status, onClick = onOpenSyncSettings)
             bell?.invoke()
             ProfileButton()
@@ -365,15 +474,17 @@ private fun dueLabel(item: UpcomingPayment, today: LocalDate): String {
     }
 }
 
-/** A compact chip: icon plus a one-word state, so the meaning never relies on colour. Opens Settings › Cloud sync. */
+/** A compact chip: icon plus a short state, so the meaning never relies on colour. Opens the sync details sheet (P2-2). */
 @Composable
 private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
+    val open = onClick
     val tone: TonePair
     val icon: ImageVector
     when (status) {
         CloudStatus.LOCAL -> { tone = StatusTones.neutral; icon = Icons.Outlined.PhoneAndroid }
         CloudStatus.SYNCED -> { tone = StatusTones.positive; icon = Icons.Outlined.CloudDone }
         CloudStatus.PENDING -> { tone = StatusTones.warning; icon = Icons.Outlined.CloudUpload }
+        CloudStatus.SYNCING -> { tone = StatusTones.brand; icon = Icons.Outlined.CloudSync }
         CloudStatus.OFFLINE -> { tone = StatusTones.neutral; icon = Icons.Outlined.CloudOff }
         CloudStatus.ERROR -> { tone = StatusTones.negative; icon = Icons.Outlined.SyncProblem }
     }
@@ -381,8 +492,12 @@ private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
         Modifier
             .heightIn(min = Sizes.minTouch)
             .clip(MaterialTheme.shapes.small)
-            .clickable(role = Role.Button, onClickLabel = "Open cloud sync settings", onClick = onClick)
-            .clearAndSetSemantics { contentDescription = "Sync status: ${status.label}. Opens cloud sync settings." },
+            .clickable(role = Role.Button, onClickLabel = "Show sync details", onClick = onClick)
+            .clearAndSetSemantics {
+                contentDescription = "Sync status: ${status.label}"
+                role = Role.Button
+                onClick(label = "Show sync details") { open(); true }
+            },
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -393,32 +508,41 @@ private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(Spacing.xs))
-            Text(status.label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
+            // At large text sizes the icon alone keeps the header readable; the status is still announced in full.
+            if (!largeText()) {
+                Spacer(Modifier.width(Spacing.xs))
+                Text(status.label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
+            }
         }
     }
 }
 
-/** The month pill: which month the budget card describes, with a menu of the months that have data. */
+/** The month selector: a compact white pill (calendar · month · chevron) with a menu of the months that have data. */
 @Composable
 private fun MonthPill(state: HomeUiState, onSelect: (YearMonth) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        Row(
+        Box(
             Modifier
                 .heightIn(min = Sizes.minTouch)
-                .clip(MaterialTheme.shapes.medium)
-                .border(BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault), MaterialTheme.shapes.medium)
-                .background(if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLowest)
-                .clickable(role = Role.Button, onClickLabel = "Choose month") { open = true }
-                .padding(horizontal = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(role = Role.Button, onClickLabel = "Choose month") { open = true },
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(Spacing.sm))
-            Text(monthYearLabel(state.month), style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.width(Spacing.xs))
-            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .border(BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(painterResource(com.lucento.app.R.drawable.ic_dash_calendar_days), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(7.dp))
+                Text(monthYearLabel(state.month), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Spacer(Modifier.width(7.dp))
+                Icon(painterResource(com.lucento.app.R.drawable.ic_dash_chevron_down), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
+            }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             state.availableMonths.forEach { month ->
@@ -479,9 +603,19 @@ private fun Overview(
     actions: HomeActions,
     onSelectMonth: (YearMonth) -> Unit,
     onDismissLocalDataNotice: () -> Unit,
+    onDismissOverridden: () -> Unit = {},
+    onTurnOn: (Feature) -> Unit = {},
+    onHideOffers: () -> Unit = {},
+    onAddWallet: () -> Unit = {},
+    onOpenMilestones: () -> Unit = {},
+    onDismissSpotlight: () -> Unit = {},
 ) {
     val f = state.features
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        // P2-6: said only when one of this phone's own changes lost to a newer one from another device.
+        overriddenNotice(state.syncDetails.overriddenChanges)?.let { notice ->
+            InfoNote(notice, actionLabel = "Got it", onAction = onDismissOverridden)
+        }
         if (state.showLocalDataNotice) {
             InfoNote(
                 "Your wallets, transactions, budgets and goals stay only on this phone unless cloud sync is on or you export a backup. " +
@@ -489,69 +623,39 @@ private fun Overview(
                 actionLabel = "Dismiss",
                 onAction = onDismissLocalDataNotice,
             )
-            Spacer(Modifier.height(Spacing.sm))
         }
+        if (state.showAddSpotlight) {
+            AddSpotlightCard(onRecord = { actions.onAddTransaction(null) }, onDismiss = onDismissSpotlight)
+        }
+
+        state.monthComposition?.let { WalletBalanceCard(state, it, actions.onOpenWallets) }
+
         val plan = state.budget
         val burn = state.burn
         if (plan != null && burn != null) {
-            // Lucento stands beside the month pill and leans over the budget card's corner, its torch lighting the card.
-            // Its mood follows the month's pace; the words are read out through its label rather than a bubble.
-            val mood = remember(plan, burn, state.isCurrentMonth, state.expenseCategoryCount) { budgetMood(state, plan, burn) }
-            Box(Modifier.fillMaxWidth()) {
-                Column {
-                    MonthPill(state, onSelectMonth)
-                    Spacer(Modifier.height(Spacing.sm))
-                    MonthlyBudgetCard(state, plan, burn, actions)
-                }
-                LucentoMascot(
-                    size = MascotSize,
-                    mood = mood.mood,
-                    tier = mood.tier,
-                    contentDescription = if (mood.mood == MascotMood.Concerned) "Lucento, gently concerned, says: ${mood.bubble}" else "Lucento says: ${mood.bubble}",
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        // Bottom of the mascot sinks [MascotOverlap] into the card, below the month pill's row.
-                        .offset(y = Sizes.minTouch + Spacing.sm + MascotOverlap - MascotSize)
-                        .padding(end = Spacing.xs),
-                )
-            }
+            MonthlyBudgetCard(
+                state, plan, burn,
+                open = if (state.expenseCategoryCount == 0) actions.onChooseCategories else actions.onOpenBudget,
+                onOpenCategory = { actions.onOpenCategory(it, state.month) },
+            )
         } else {
-            MonthPill(state, onSelectMonth)
-            Spacer(Modifier.height(Spacing.sm))
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
         }
 
-        state.netWorthComposition?.let { composition ->
-            Spacer(Modifier.height(Spacing.md))
-            NetWorthAndQuickLinks(state, composition, actions)
+        ShortcutRow(state, actions, onOpenMilestones, onTurnOn, onHideOffers)
+
+        if (state.gettingStartedLeft.isNotEmpty()) {
+            GettingStartedCard(
+                left = state.gettingStartedLeft,
+                onAddWallet = onAddWallet,
+                onBudget = if (state.expenseCategoryCount == 0) actions.onChooseCategories else actions.onOpenBudget,
+                onRecord = { actions.onAddTransaction(null) },
+            )
         }
 
-        if (f.isEnabled(Feature.SAVINGS_GOALS)) {
-            Spacer(Modifier.height(Spacing.md))
-            TopGoalCard(state.goals, hasAnyGoals = state.hasAnyGoals, onOpen = actions.onOpenGoals)
-        }
+        if (f.isEnabled(Feature.RECURRING) && state.isCurrentMonth) UpcomingScheduledCard(state, actions.onOpenRecurring)
 
-        if (f.isEnabled(Feature.RECURRING)) {
-            Spacer(Modifier.height(Spacing.md))
-            ScheduledCard(state, onOpen = actions.onOpenRecurring)
-        }
-    }
-}
-
-/** A card's title with a chevron, saying the whole card opens its page, and an optional trailing action. */
-@Composable
-private fun LinkedTitle(
-    title: String,
-    modifier: Modifier = Modifier,
-    compact: Boolean = false,
-    showChevron: Boolean = true,
-    trailing: @Composable (RowScope.() -> Unit)? = null,
-) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = if (compact) Hierarchy.cardTitle else Hierarchy.sectionTitle, modifier = Modifier.semantics { heading() })
-        if (showChevron) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
-        Spacer(Modifier.weight(1f))
-        if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+        RecentTransactionsCard(state, actions)
     }
 }
 
@@ -591,189 +695,6 @@ private fun paceTones(position: PacePosition?): PaceTones {
             icon = Icons.Outlined.Info,
         )
     }
-}
-
-/**
- * Budget health and burn rate in one card. The primary figure is the share of the month's budget used; two bars
- * compare it with the share of the month elapsed; the figures beneath give spent, remaining and the calendar; the
- * banner says in words whether spending runs faster than, with, or slower than the month. Lucento (the mascot) leans
- * over the top-right corner (see Overview) and its torch lights the card from there.
- */
-@Composable
-private fun MonthlyBudgetCard(state: HomeUiState, plan: BudgetPlan, burn: BudgetBurn, actions: HomeActions) {
-    val monthName = monthLabel(plan.month)
-    val setupNeeded = state.expenseCategoryCount == 0
-    val insight = remember(plan, burn, state.isCurrentMonth) { PaceCopy.describe(plan, burn, monthName, state.isCurrentMonth) }
-    val tones = paceTones(insight.position)
-    val open = if (setupNeeded) actions.onChooseCategories else actions.onOpenBudget
-    val elapsedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-
-    LucentoCard(Modifier.fillMaxWidth(), onClick = open, contentPadding = 0.dp) {
-      Box(Modifier.background(tones.card)) {
-        // The sunrise, barely there: a warm hint behind the figures, never competing with them.
-        Image(
-            painter = painterResource(com.lucento.app.core.designsystem.component.LucentoIllustration.SunriseLandscape.res),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.BottomCenter,
-            alpha = if (LucentoTheme.isDark) 0.10f else 0.14f,
-            modifier = Modifier.matchParentSize(),
-        )
-        TorchLight(Modifier.matchParentSize())
-        // Compact by design: the dashboard should show everything at a glance with little scrolling.
-        Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
-            run {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Leaves the top-right corner to the mascot leaning over it.
-                    Column(Modifier.weight(1f).padding(end = MascotClearance)) {
-                        LinkedTitle("Monthly budget")
-                        Spacer(Modifier.height(Spacing.xxs))
-                        when {
-                            setupNeeded -> Text("Finish your budget setup", style = MaterialTheme.typography.titleMedium)
-                            !plan.hasBudget -> Text("No budget yet", style = MaterialTheme.typography.titleMedium)
-                            // At large font sizes the "of … used" line sits under the percentage so it reads in order.
-                            largeText() -> Column {
-                                Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.large, maxLines = 1)
-                                Text(
-                                    "of ${MoneyFormatter.format(plan.total)} used",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                            else -> Row(verticalAlignment = Alignment.Bottom) {
-                                Text("${burn.consumedPercent ?: 0}%", style = AmountStyles.large, maxLines = 1)
-                                Spacer(Modifier.width(Spacing.xs))
-                                // One line, in full ink: the budget this percentage is of.
-                                Text(
-                                    "of ${MoneyFormatter.format(plan.total)} used",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(bottom = 2.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!setupNeeded) {
-                Spacer(Modifier.height(Spacing.sm))
-                // Each bar says what it is, so no legend row is needed.
-                if (plan.hasBudget) {
-                    PercentBar(burn.consumedFraction, "${burn.consumedPercent ?: 0}% used", tones.bar, "Budget used: ${burn.consumedPercent ?: 0} percent")
-                    Spacer(Modifier.height(Spacing.xs))
-                }
-                PercentBar(burn.elapsedPercent / 100f, "${burn.elapsedPercent}% of month", elapsedColor, "Month elapsed: ${burn.elapsedPercent} percent")
-
-                Spacer(Modifier.height(Spacing.sm))
-                val remainingValue = if (plan.remaining.isNegative) -plan.remaining else plan.remaining
-                val remainingLabel = if (plan.remaining.isNegative) "Over budget" else "Remaining"
-                val remainingColor = if (plan.remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface
-                if (largeText()) {
-                    // P1-7: three columns cut "Remaining" short at large font sizes; one stat per line keeps every word.
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        if (plan.hasBudget) {
-                            MoneyStat(plan.spent, "Spent", Modifier.fillMaxWidth())
-                            MoneyStat(remainingValue, remainingLabel, Modifier.fillMaxWidth(), valueColor = remainingColor)
-                        }
-                        BudgetStat("${burn.daysLeft}", "days left", Modifier.fillMaxWidth())
-                    }
-                } else {
-                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                        if (plan.hasBudget) {
-                            MoneyStat(plan.spent, "Spent", Modifier.weight(1f))
-                            StatDivider()
-                            MoneyStat(remainingValue, remainingLabel, Modifier.weight(1f), valueColor = remainingColor)
-                            StatDivider()
-                        }
-                        BudgetStat("${burn.daysLeft}", "days left", Modifier.weight(0.8f))
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(Spacing.sm))
-            AdviceBanner(
-                text = if (setupNeeded) "Choose the categories you spend on" else insight.message,
-                detail = if (setupNeeded) "Your budget is built from them" else insight.detail,
-                tones = tones,
-                onClick = open,
-            )
-
-            if (state.otherBudgetCurrencies.isNotEmpty()) {
-                Text(
-                    "Budgets in ${state.otherBudgetCurrencies.joinToString()} are on the Budgets tab.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = Spacing.sm),
-                )
-            }
-        }
-      }
-    }
-}
-
-/** Lucento's mood for the month's budget: the mascot's expression, wellness tier and speech bubble. */
-private class BudgetMood(val mood: MascotMood, val tier: WellnessTier, val bubble: String)
-
-private fun budgetMood(state: HomeUiState, plan: BudgetPlan, burn: BudgetBurn): BudgetMood {
-    val setupNeeded = state.expenseCategoryCount == 0
-    val insight = PaceCopy.describe(plan, burn, monthLabel(plan.month), state.isCurrentMonth)
-    val ahead = insight.position == PacePosition.AHEAD
-    val mood = when {
-        setupNeeded || !plan.hasBudget -> MascotMood.Curious
-        ahead || plan.health.isConcerning -> MascotMood.Concerned
-        else -> MascotMood.Happy
-    }
-    val tier = if (plan.hasBudget) WellnessTier.of(plan.health, aheadOfPace = ahead, overspent = plan.remaining.isNegative) else WellnessTier.STEADY
-    return BudgetMood(mood, tier, if (setupNeeded) "Pick your spending categories first." else insight.bubble)
-}
-
-/** The mascot beside the budget card: its size and how far it leans down over the card's top edge. */
-private val MascotSize = 96.dp
-private val MascotOverlap = 44.dp
-
-/** Room the card's title keeps free at its end, so the mascot never covers the figures. */
-private val MascotClearance = 72.dp
-
-/**
- * The mascot's torch lighting the budget card: a warm sunlight glow from the top-right corner (where Lucento leans
- * in), fading across the card. It breathes slowly; with reduced motion it holds still. Purely decorative.
- */
-@Composable
-private fun TorchLight(modifier: Modifier = Modifier) {
-    val ext = LucentoTheme.extendedColors
-    val strength = if (LucentoTheme.isDark) 0.38f else 0.62f
-    val pulse = if (LucentoTheme.reducedMotion) {
-        1f
-    } else {
-        val transition = rememberInfiniteTransition(label = "torch")
-        val value by transition.animateFloat(
-            initialValue = 0.82f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(2400), RepeatMode.Reverse),
-            label = "torch-pulse",
-        )
-        value
-    }
-    Box(
-        modifier.drawBehind {
-            // The torch sits just inside the corner, a little left of the edge where the mascot holds it.
-            val center = Offset(size.width - 34.dp.toPx(), 6.dp.toPx())
-            val radius = size.width * 0.78f
-            drawRect(
-                Brush.radialGradient(
-                    0f to ext.accent.copy(alpha = strength * pulse),
-                    0.18f to ext.warmAccent.copy(alpha = strength * 0.55f * pulse),
-                    0.55f to ext.accent.copy(alpha = strength * 0.16f * pulse),
-                    1f to Color.Transparent,
-                    center = center,
-                    radius = radius,
-                ),
-            )
-        },
-    )
 }
 
 /** A thick bar with its percentage printed at the end of the fill (inside it when there is room). */
@@ -816,15 +737,6 @@ private fun PercentBar(fraction: Float, label: String, color: Color, description
     }
 }
 
-@Composable
-private fun LegendDot(color: Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(Spacing.xs))
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
 /** True when the system font size is large enough (150%+) that side-by-side figures and one-line copy stop fitting. */
 @Composable
 private fun largeText(): Boolean = LocalDensity.current.fontScale >= 1.5f
@@ -857,38 +769,6 @@ private fun StatDivider() {
     )
 }
 
-/** The verdict as advice, with a glyph that matches it (up / check / info) and a way into the Budgets tab. */
-@Composable
-private fun AdviceBanner(text: String, detail: String?, tones: PaceTones, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = Sizes.minTouch)
-            .clip(MaterialTheme.shapes.medium)
-            // By day the card's tint is deep, so the banner sits on a frosted light panel rather than the same tint.
-            .background(if (LucentoTheme.isDark) tones.banner.container else MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.82f))
-            .clickable(role = Role.Button, onClickLabel = "Open budget", onClick = onClick)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(28.dp).clip(CircleShape).background(if (LucentoTheme.isDark) Color.Black.copy(alpha = 0.2f) else tones.banner.container),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(tones.icon, contentDescription = null, tint = tones.banner.content, modifier = Modifier.size(18.dp))
-        }
-        Spacer(Modifier.width(Spacing.sm))
-        // Two one-liners: the verdict, then the daily allowance that keeps the month on budget (wrapping at large sizes).
-        val lines = if (largeText()) 4 else 1
-        Column(Modifier.weight(1f)) {
-            Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = lines, overflow = TextOverflow.Ellipsis)
-            if (detail != null) {
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = lines, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
 /** Shown in place of the budget card when Budgets is switched off: the month's money in and out. */
 @Composable
 private fun CashFlowCard(state: HomeUiState, onOpenInsights: (() -> Unit)?) {
@@ -902,6 +782,7 @@ private fun CashFlowCard(state: HomeUiState, onOpenInsights: (() -> Unit)?) {
                 money = flow.net,
                 style = AmountStyles.large,
                 showPlus = true,
+                fractionScale = 1f,
                 color = when (state.flowDirection) {
                     FlowDirection.POSITIVE -> ext.positive
                     FlowDirection.NEGATIVE -> ext.negative
@@ -917,291 +798,135 @@ private fun CashFlowCard(state: HomeUiState, onOpenInsights: (() -> Unit)?) {
     }
 }
 
-// ------------------------------------------------------------------ Net worth and quick links
+// ------------------------------------------------------------------ Shortcuts
+
+private fun quickLinkName(feature: Feature): String = when (feature) {
+    Feature.SAVINGS_GOALS -> "Goals"
+    Feature.RECURRING -> "Scheduled"
+    Feature.DEBTS_LOANS -> "Debts"
+    Feature.INSIGHTS -> "Insights"
+    else -> feature.title
+}
+
+// ------------------------------------------------------------------ Dashboard: net wallet balance card
+
+// The card's own face (Figma "Net wallet balance"): the same in light and dark themes, like a physical card.
+private val CardBlue = Color(0xFF2768ED)
+private val CardNavy = Color(0xFF162D88)
+private val CardInk = Color.White
+private val TrendUp = Color(0xFFA7F3C5)
+private val TrendDown = Color(0xFFFFC2B8)
+private val CardFigureStyle = AmountStyles.large.copy(fontSize = 20.sp, letterSpacing = (-0.5).sp)
+private val CardInkMuted = Color(0xFFC9D7FF)
 
 /**
- * Two cards side by side: **Net worth** (opens Wallets) and **Quick links**. Compact type keeps both readable at half
- * width; on very narrow screens (under ~300dp) they stack.
+ * The dashboard's focal point, drawn as a physical card: ID-1 proportions (it only grows for large text), a soft drop
+ * shadow, a thin light edge, a glossy sheen across the top and a faint guilloché pattern like printed security lines.
+ * Label and amount sit together at the top; Wallets and Debt & Loans along the bottom edge. Opens Wallets.
  */
 @Composable
-private fun NetWorthAndQuickLinks(state: HomeUiState, composition: NetWorthComposition, actions: HomeActions) {
-    val f = state.features
-    val links = buildList {
-        if (f.isEnabled(Feature.SAVINGS_GOALS)) add(QuickLink("Goals", "Savings goals", Icons.Outlined.Savings, actions.onOpenGoals))
-        if (f.isEnabled(Feature.RECURRING)) add(QuickLink("Scheduled", "Scheduled transactions", Icons.Outlined.EventRepeat) { actions.onOpenRecurring(null) })
-        if (f.isEnabled(Feature.DEBTS_LOANS)) add(QuickLink("Debts", "Debts and loans", Icons.Outlined.CreditCard, actions.onOpenDebts))
-        // Budget and Wallets have their own places in the dock; Insights opens from here.
-        if (f.isEnabled(Feature.INSIGHTS)) add(QuickLink("Insights", "Insights", Icons.Outlined.Insights, actions.onOpenInsights))
+private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthComposition, onOpen: () -> Unit) {
+    val shape = RoundedCornerShape(20.dp)
+    val owed = -composition.totalLiabilities
+    val label = if (state.isCurrentMonth) "Net Wallet Balance" else "Net Wallet Balance · end of ${monthLabel(state.month)}"
+    val history = state.balanceHistory
+    val spoken = buildString {
+        append("$label ${MoneyFormatter.formatSigned(composition.netWorth)}. ")
+        append("Wallets ${MoneyFormatter.formatSigned(composition.totalAssets)}. ")
+        append("Debt and loans ${MoneyFormatter.formatSigned(owed)}. ")
+        if (history.size > 1) {
+            append("Compared with the end of ${monthLabel(history.first().month)}: ")
+            append(MoneyFormatter.formatSigned(history.last().netWorth - history.first().netWorth, showPlus = true))
+            state.balanceTrend?.let { append(", ${if (it >= 0) "up" else "down"} ${kotlin.math.abs(it)} percent") }
+        }
     }
-    // Breakpoints grow with the system font size (P1-7): at 2× text, half-width cards broke "Goals" into "Goal/s".
-    val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        if (maxWidth >= 300.dp * textScale) {
-            // The links card's share of the row (1 of 2.1 weights) minus its padding: too narrow for two tiles across
-            // on small phones, where the links become a list. Worked out here because the row below measures its
-            // children's intrinsic height, which a nested BoxWithConstraints cannot provide.
-            val linksContentWidth = (maxWidth - Spacing.sm) / 2.1f - Spacing.md * 2
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                FlowAndWorthCard(state, composition, actions, Modifier.weight(1.1f).fillMaxHeight())
-                QuickLinksCard(links, asList = linksContentWidth < 140.dp * textScale, modifier = Modifier.weight(1f).fillMaxHeight())
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                FlowAndWorthCard(state, composition, actions, Modifier.fillMaxWidth())
-                QuickLinksCard(links, asList = false, modifier = Modifier.fillMaxWidth())
-            }
-        }
-    }
-}
-
-/**
- * One card, two tappable halves: **Net flow** for the shown month on top (opens Insights) and **Net worth** today below
- * (opens Wallets).
- */
-@Composable
-private fun FlowAndWorthCard(state: HomeUiState, composition: NetWorthComposition, actions: HomeActions, modifier: Modifier) {
-    val ext = LucentoTheme.extendedColors
-    val insightsOn = state.features.isEnabled(Feature.INSIGHTS)
-    LucentoCard(modifier, contentPadding = 0.dp) {
-        state.netFlow?.let { flow ->
-            CardHalf(onClick = if (insightsOn) actions.onOpenInsights else null, clickLabel = "Open Insights") {
-                LinkedTitle("Net flow", compact = true, showChevron = insightsOn)
-                MoneyText(
-                    money = flow.net,
-                    style = AmountStyles.large,
-                    showPlus = true,
-                    fractionScale = 0.75f,
-                    minScale = 0.55f,
-                    color = when (state.flowDirection) {
-                        FlowDirection.POSITIVE -> ext.positive
-                        FlowDirection.NEGATIVE -> ext.negative
-                        FlowDirection.NEUTRAL -> MaterialTheme.colorScheme.onSurface
-                    },
-                )
-                Text(
-                    "${monthLabel(flow.month)} · money in minus money out",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+        val cardWidth = maxWidth
+        val cardHeight = cardWidth / CardRatioId1
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = cardHeight)
+                .shadow(12.dp, shape, ambientColor = CardNavy.copy(alpha = 0.35f), spotColor = CardNavy.copy(alpha = 0.55f))
+                .clip(shape)
+                .background(Brush.linearGradient(listOf(CardBlue, CardNavy), start = Offset.Zero, end = Offset.Infinite))
+                .clickable(role = Role.Button, onClickLabel = "Open wallets", onClick = onOpen),
+        ) {
+            // The Figma texture disc, then the printed surface. matchParentSize: neither makes the card taller.
+            Box(Modifier.matchParentSize()) {
+                Image(
+                    painterResource(com.lucento.app.R.drawable.bg_dash_card_texture),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .wrapContentSize(Alignment.TopStart, unbounded = true)
+                        .offset(x = cardWidth * 0.58f, y = (-90).dp)
+                        .size(285.dp),
                 )
             }
-            Hairline()
-        }
-        CardHalf(onClick = actions.onOpenWallets, clickLabel = "Open wallets") {
-            LinkedTitle("Net worth", compact = true)
+            Canvas(Modifier.matchParentSize()) { drawCardSurface() }
             Column(
-                Modifier.semantics(mergeDescendants = true) {
-                    contentDescription = "Net worth ${MoneyFormatter.format(composition.netWorth)}: assets ${MoneyFormatter.format(composition.totalAssets)} " +
-                        "minus liabilities ${MoneyFormatter.format(composition.totalLiabilities)}"
-                },
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = cardHeight)
+                    // The header row is a 48dp touch target, so a small top inset reads the same as the bottom one.
+                    .padding(start = Spacing.md, end = Spacing.md, top = 0.dp, bottom = Spacing.md),
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                MoneyText(money = composition.netWorth, style = AmountStyles.large, fractionScale = 0.75f, minScale = 0.55f, color = MaterialTheme.colorScheme.primary)
-                Text("Today · assets minus debts", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                state.netWorthMonthChange?.let { ChangeChip(it, Modifier.padding(top = Spacing.xs)) }
-            }
-            state.otherNetWorth.forEach { other ->
-                Text(
-                    "${other.currencyCode} ${MoneyFormatter.formatSigned(other)} (separate)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CardHalf(onClick: (() -> Unit)?, clickLabel: String, content: @Composable () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = clickLabel, onClick = onClick) else Modifier)
-            .padding(Spacing.md),
-    ) { content() }
-}
-
-/** This month's movement from recorded income and spending: an arrow and a signed amount, never colour alone. */
-@Composable
-private fun ChangeChip(change: Money, modifier: Modifier = Modifier) {
-    val up = !change.isNegative
-    val tone = if (up) StatusTones.positive else StatusTones.negative
-    Column(
-        modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(tone.container)
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-            .clearAndSetSemantics {
-                contentDescription = "${MoneyFormatter.formatSigned(change, showPlus = true)} this month from recorded income and spending"
-            },
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (up) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward, contentDescription = null, tint = tone.content, modifier = Modifier.size(12.dp))
-            Text(MoneyFormatter.formatSigned(change, showPlus = true), style = MaterialTheme.typography.labelSmall, color = tone.content, maxLines = 1)
-        }
-        Text("this month", style = MaterialTheme.typography.labelSmall, color = tone.content, maxLines = 1)
-    }
-}
-
-private data class QuickLink(val label: String, val accessibilityLabel: String, val icon: ImageVector, val onClick: () -> Unit)
-
-/**
- * Quick access to the pages around your money: a two-by-two grid of compact tiles, or — when the card is too narrow
- * for two tiles across (small phones) — a list of icon-and-label rows, so labels never break mid-word.
- */
-@Composable
-private fun QuickLinksCard(links: List<QuickLink>, asList: Boolean, modifier: Modifier) {
-    LucentoCard(modifier, contentPadding = Spacing.md) {
-        Text("Quick links", style = Hierarchy.cardTitle, modifier = Modifier.semantics { heading() })
-        Spacer(Modifier.height(Spacing.sm))
-        if (asList) {
-            Column { links.forEach { QuickLinkRow(it) } }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                links.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        pair.forEach { QuickLinkTile(it, Modifier.weight(1f).fillMaxHeight()) }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Label and (i) together on the left; the brand stays on the right.
+                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = CardInkMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics { contentDescription = spoken },
+                            )
+                            BalanceInfo()
+                        }
+                        Spacer(Modifier.width(Spacing.xs))
+                        Image(painterResource(com.lucento.app.R.drawable.lucento_symbol), contentDescription = null, modifier = Modifier.height(22.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Image(painterResource(com.lucento.app.R.drawable.lucento_wordmark_dark), contentDescription = null, modifier = Modifier.height(15.dp))
+                    }
+                    // Right under its label: one reading, "Net Wallet Balance −$2,339.35".
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        MoneyText(
+                            money = composition.netWorth,
+                            style = AmountStyles.hero,
+                            color = CardInk,
+                            fractionScale = 1f,
+                            minScale = 0.5f,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (history.size > 1) {
+                            Spacer(Modifier.width(Spacing.sm))
+                            BalanceTrend(history, state.balanceTrend)
+                        }
                     }
                 }
-            }
-        }
-    }
-}
-
-/** The raised, brand-tinted face shared by quick-link tiles and rows, so they read as buttons at a glance. */
-@Composable
-private fun Modifier.quickLinkFace(link: QuickLink, shape: androidx.compose.ui.graphics.Shape): Modifier {
-    val colors = MaterialTheme.colorScheme
-    return this
-        .shadow(elevation = 2.dp, shape = shape, clip = false, ambientColor = LucentoTheme.extendedColors.shadow.copy(alpha = 0.08f), spotColor = LucentoTheme.extendedColors.shadow.copy(alpha = 0.16f))
-        .clip(shape)
-        .background(colors.primaryContainer)
-        .border(BorderStroke(1.dp, colors.primary.copy(alpha = 0.22f)), shape)
-        .clickable(role = Role.Button, onClickLabel = "Open ${link.accessibilityLabel}", onClick = link.onClick)
-}
-
-/** A solid brand-blue badge with a white glyph: the button's icon. */
-@Composable
-private fun QuickLinkBadge(link: QuickLink) {
-    IconTile(
-        icon = link.icon,
-        size = 30.dp,
-        container = MaterialTheme.colorScheme.primary,
-        content = MaterialTheme.colorScheme.onPrimary,
-    )
-}
-
-@Composable
-private fun QuickLinkRow(link: QuickLink) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp)
-            .heightIn(min = Sizes.minTouch)
-            .quickLinkFace(link, MaterialTheme.shapes.small)
-            .padding(horizontal = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        QuickLinkBadge(link)
-        Spacer(Modifier.width(Spacing.sm))
-        Text(
-            link.label,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 2,
-            modifier = Modifier.weight(1f).semantics { contentDescription = link.accessibilityLabel },
-        )
-    }
-}
-
-@Composable
-private fun QuickLinkTile(link: QuickLink, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .heightIn(min = 72.dp)
-            .quickLinkFace(link, MaterialTheme.shapes.medium)
-            .padding(horizontal = 2.dp, vertical = Spacing.sm),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        QuickLinkBadge(link)
-        Spacer(Modifier.height(Spacing.xs))
-        Text(
-            link.label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.semantics { contentDescription = link.accessibilityLabel },
-        )
-    }
-}
-
-// ------------------------------------------------------------------ Top savings goal
-
-/** The goal closest to done (highest completion among goals still in progress): picture, name, %, bar, money, date. */
-@Composable
-private fun TopGoalCard(goals: GoalsOverview?, hasAnyGoals: Boolean, onOpen: () -> Unit) {
-    val ext = LucentoTheme.extendedColors
-    val top = goals?.top
-    LucentoCard(Modifier.fillMaxWidth(), onClick = onOpen, contentPadding = Spacing.lg) {
-        LinkedTitle("Top savings goal") {
-            if (top != null) LucentoTextButton(text = "View all", onClick = onOpen)
-        }
-        if (top == null) {
-            Text(
-                if (hasAnyGoals) "Your goals are in other currencies — open Savings goals to see them."
-                else "Set a target — a trip, a cushion, a new laptop — and watch it fill up.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (!hasAnyGoals) LucentoTextButton(text = "Start a savings goal", onClick = onOpen)
-            return@LucentoCard
-        }
-        Spacer(Modifier.height(Spacing.sm))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            GoalThumbnail(top.goal.name, top.goal.sceneKey, top.goal.photoPath)
-            Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(top.goal.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text("${top.percent}%", style = AmountStyles.medium, color = ext.success)
+                // Where a real card carries its chip: the chip and the contactless mark (decorative, no card number).
+                Row(Modifier.padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                    com.lucento.app.core.designsystem.component.CardChip()
+                    Spacer(Modifier.width(Spacing.sm))
+                    Icon(Icons.Filled.Contactless, contentDescription = null, tint = CardInkMuted.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
                 }
-                Spacer(Modifier.height(Spacing.xs))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(CircleShape)
-                        .background(ext.track)
-                        .clearAndSetSemantics { contentDescription = "${top.goal.name}: ${top.percent}% saved" },
-                ) {
-                    Box(Modifier.fillMaxWidth(top.fraction.coerceIn(0f, 1f)).fillMaxHeight().clip(CircleShape).background(ext.success))
-                }
-                Spacer(Modifier.height(Spacing.xs))
-                Row(verticalAlignment = Alignment.Top) {
-                    Text(
-                        "${MoneyFormatter.format(top.saved)} of ${MoneyFormatter.format(top.goal.target)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                    val formatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault()) }
-                    val date = top.goal.targetDate
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            when {
-                                top.reached -> "Reached"
-                                date != null -> "Target"
-                                top.projectedCompletion != null -> "At your pace"
-                                else -> "No target date"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        (date ?: top.projectedCompletion)?.takeIf { !top.reached }?.let {
-                            Text(it.format(formatter), style = MaterialTheme.typography.labelMedium)
+                Column {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(CardInk.copy(alpha = 0.14f)))
+                    Spacer(Modifier.height(Spacing.sm))
+                    val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+                    if (cardWidth >= 330.dp * textScale) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Wallets", composition.totalAssets, Modifier.weight(1f))
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debt & Loans", owed, Modifier.weight(1f))
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Wallets", composition.totalAssets, Modifier.fillMaxWidth())
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debt & Loans", owed, Modifier.fillMaxWidth())
                         }
                     }
                 }
@@ -1210,70 +935,595 @@ private fun TopGoalCard(goals: GoalsOverview?, hasAnyGoals: Boolean, onOpen: () 
     }
 }
 
-/** The goal's own photo or card picture, small; a savings glyph when it has neither. Decorative. */
+/** ISO/IEC 7810 ID-1 (85.60 × 53.98 mm): the proportions of a real bank card. */
+private const val CardRatioId1 = 1.586f
+
+/**
+ * The printed surface of the card, all very faint so nothing competes with the figures: a guilloché fan of fine
+ * concentric lines from the bottom-right corner, a glossy sheen across the top third, and a thin light edge.
+ */
+private fun DrawScope.drawCardSurface() {
+    val corner = CornerRadius(20.dp.toPx())
+    val line = 0.8.dp.toPx()
+    val centre = Offset(size.width * 1.02f, size.height * 1.18f)
+    for (i in 0 until 18) {
+        drawCircle(
+            Color.White.copy(alpha = 0.045f),
+            radius = size.height * (0.42f + i * 0.065f),
+            center = centre,
+            style = Stroke(line),
+        )
+    }
+    drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = 0.13f), 0.42f to Color.Transparent))
+    drawRoundRect(
+        Color.White.copy(alpha = 0.18f),
+        topLeft = Offset(line / 2, line / 2),
+        size = Size(size.width - line, size.height - line),
+        cornerRadius = corner,
+        style = Stroke(line),
+    )
+}
+
+/** The (i) beside the label: what the figure means, one tap away (tooltip; also on long-press). */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GoalThumbnail(name: String, sceneKey: String?, photoPath: String?) {
-    val photo = rememberGoalPhoto(photoPath)
-    val art = remember(name, sceneKey) { GoalScene.forGoal(name, sceneKey).illustration() }
-    val modifier = Modifier.size(width = 64.dp, height = 56.dp).clip(MaterialTheme.shapes.small)
-    when {
-        photo != null -> Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
-        art != null -> Image(painterResource(art.res), contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
-        else -> IconTile(icon = Icons.Outlined.Savings, size = 56.dp, container = MaterialTheme.colorScheme.primaryContainer, content = MaterialTheme.colorScheme.primary)
+private fun BalanceInfo() {
+    val tip = rememberTooltipState(isPersistent = true)
+    val scope = rememberCoroutineScope()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text("What you have in your wallets minus what you owe on cards and loans. Nothing is converted between currencies.") } },
+        state = tip,
+    ) {
+        IconButton(onClick = { scope.launch { tip.show() } }, modifier = Modifier.size(Sizes.minTouch)) {
+            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net wallet balance means", tint = Color.Unspecified, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+@Composable
+private fun CardFigure(@androidx.annotation.DrawableRes icon: Int, iconWidth: Dp, label: String, money: Money, modifier: Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Image(painterResource(icon), contentDescription = null, modifier = Modifier.size(width = iconWidth, height = 42.dp))
+        Spacer(Modifier.width(7.dp))
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = CardInkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(5.dp))
+            MoneyText(money = money, style = CardFigureStyle, color = CardInk, fractionScale = 1f, minScale = 0.55f)
+        }
+    }
+}
+
+/** This month against last: two small bars, the change in percent (or amount), and "vs last month". */
+@Composable
+private fun BalanceTrend(history: List<com.lucento.app.domain.MonthBalance>, trend: Int?) {
+    val values = history.map { it.netWorth.amountMinor }
+    val min = values.min()
+    val max = values.max()
+    val barColors = listOf(Color(0xFF89C4FF), Color(0xFFC2E2FF))
+    Column(horizontalAlignment = Alignment.End) {
+        Row(Modifier.height(28.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
+            values.forEachIndexed { i, v ->
+                val share = if (max == min) 1f else (v - min).toFloat() / (max - min)
+                Box(
+                    Modifier
+                        .size(width = 12.dp, height = 12.dp + 16.dp * share)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(barColors[(barColors.size - values.size + i).coerceIn(0, barColors.lastIndex)]),
+                )
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+        if (trend != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painterResource(com.lucento.app.R.drawable.ic_dash_trending_up),
+                    contentDescription = null,
+                    tint = if (trend >= 0) TrendUp else TrendDown,
+                    modifier = Modifier.size(14.dp).graphicsLayer { if (trend < 0) scaleY = -1f },
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    "${if (trend >= 0) "+" else "−"}${kotlin.math.abs(trend)}%",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (trend >= 0) TrendUp else TrendDown,
+                    maxLines = 1,
+                )
+            }
+        } else {
+            MoneyText(money = history.last().netWorth - history.first().netWorth, style = MaterialTheme.typography.labelLarge, color = CardInk, showPlus = true, fractionScale = 1f, minScale = 0.5f)
+        }
+        Text("vs last month", style = MaterialTheme.typography.labelSmall, color = CardInkMuted, maxLines = 1)
+    }
+}
+
+@Composable
+private fun CardFigure(icon: ImageVector, label: String, money: Money, modifier: Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = CardInkMuted, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(Spacing.xs))
+        Column {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = CardInkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            MoneyText(money = money, style = AmountStyles.row, color = CardInk, fractionScale = 1f, minScale = 0.6f)
+        }
+    }
+}
+
+
+
+
+
+// ------------------------------------------------------------------ Dashboard: monthly budget
+
+@Composable
+private fun MonthlyBudgetCard(
+    state: HomeUiState,
+    plan: BudgetPlan,
+    burn: BudgetBurn,
+    open: () -> Unit,
+    onOpenCategory: (Long) -> Unit,
+) {
+    val setupNeeded = state.expenseCategoryCount == 0
+    val insight = remember(plan, burn, state.isCurrentMonth) { PaceCopy.describe(plan, burn, monthLabel(plan.month), state.isCurrentMonth) }
+    val tones = paceTones(insight.position)
+    val over = plan.remaining.isNegative
+    LucentoCard(Modifier.fillMaxWidth(), onClick = open, contentPadding = Spacing.lg) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(19.dp))
+            Spacer(Modifier.width(7.dp))
+            Text("Monthly Budget", style = Hierarchy.cardTitle, modifier = Modifier.weight(1f).semantics { heading() }, maxLines = 2)
+            if (!setupNeeded && plan.hasBudget && !largeText()) VerdictChip(verdictLabel(plan, insight.position, state.isCurrentMonth), tones.banner)
+        }
+        if (!setupNeeded && plan.hasBudget && largeText()) {
+            Spacer(Modifier.height(Spacing.xs))
+            VerdictChip(verdictLabel(plan, insight.position, state.isCurrentMonth), tones.banner)
+        }
+        Spacer(Modifier.height(Spacing.md))
+        when {
+            setupNeeded -> {
+                EmptyCardMessage("Choose the categories you spend on — your budget is built from them.")
+                LucentoTextButton(text = "Choose categories", onClick = open)
+            }
+            !plan.hasBudget -> {
+                EmptyCardMessage("No budget for ${monthLabel(plan.month)} yet. Give your categories an amount to see your pace.")
+                LucentoTextButton(text = "Set amounts", onClick = open)
+            }
+            else -> {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Column(Modifier.weight(1f)) {
+                        MoneyText(money = plan.spent, style = AmountStyles.hero, fractionScale = 1f, minScale = 0.55f)
+                        Spacer(Modifier.height(Spacing.xxs))
+                        Text("of ${MoneyFormatter.format(plan.total)} budget", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "${burn.consumedPercent ?: 0}%",
+                            style = AmountStyles.large,
+                            color = if (over) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                        )
+                        Text("used", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                BudgetBar(burn.consumedFraction, null, tones.bar, "Budget used ${burn.consumedPercent ?: 0} percent")
+            }
+        }
+        if (state.topCategories.isNotEmpty() && !setupNeeded) {
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                "Top ${state.topCategories.size} spending ${if (state.topCategories.size == 1) "category" else "categories"}",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                modifier = Modifier.padding(bottom = Spacing.xs),
+            )
+            val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth >= 300.dp * textScale) {
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.topCategories.forEach { slice -> CategoryWatchTile(slice, state, onOpenCategory, Modifier.weight(1f).fillMaxHeight()) }
+                        if (state.topCategories.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        state.topCategories.forEach { slice -> CategoryWatchTile(slice, state, onOpenCategory, Modifier.fillMaxWidth()) }
+                    }
+                }
+            }
+        }
+        if (state.otherBudgetCurrencies.isNotEmpty()) {
+            Text(
+                "Budgets in ${state.otherBudgetCurrencies.joinToString()} are on the Budget tab.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+        }
+    }
+}
+
+/** A card with nothing to show yet: Lucento on the left, one line of what to do on the right. */
+@Composable
+private fun EmptyCardMessage(text: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+        LucentoMascot(size = 56.dp, mood = MascotMood.Curious)
+        Spacer(Modifier.width(Spacing.md))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+    }
+}
+
+/** The budget used as one 7dp bar; [monthGone] adds a thin marker where the month stands (unused on the dashboard). */
+@Composable
+private fun BudgetBar(used: Float, monthGone: Float?, color: Color, description: String) {
+    val track = LucentoTheme.extendedColors.track
+    val marker = MaterialTheme.colorScheme.onSurface
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(7.dp)
+            .clearAndSetSemantics { contentDescription = description },
+    ) {
+        val r = CornerRadius(size.height / 2)
+        drawRoundRect(track, cornerRadius = r)
+        val w = size.width * used.coerceIn(0f, 1f)
+        if (w > 0f) drawRoundRect(color, size = Size(w.coerceAtLeast(size.height), size.height), cornerRadius = r)
+        if (monthGone != null) {
+            val x = size.width * monthGone.coerceIn(0f, 1f)
+            drawLine(marker, Offset(x, -2.dp.toPx()), Offset(x, size.height + 2.dp.toPx()), strokeWidth = 2.dp.toPx())
+        }
+    }
+}
+
+@Composable
+private fun CategoryWatchTile(slice: SpendingSlice, state: HomeUiState, onOpen: (Long) -> Unit, modifier: Modifier) {
+    val category = slice.categoryId?.let { state.categoriesById[it] }
+    val tone = category?.let { LucentoTheme.extendedColors.categoryTone(it.iconKey) }
+    val percent = (slice.fraction * 100).roundToInt()
+    Column(
+        modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background((tone?.container ?: MaterialTheme.colorScheme.surfaceContainerHigh).copy(alpha = 0.6f))
+            .clickable(role = Role.Button, onClickLabel = "Show ${slice.label} transactions") { slice.categoryId?.let(onOpen) }
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${slice.label}, ${MoneyFormatter.formatSigned(-slice.amount)}, $percent percent of spending"
+            }
+            .padding(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(category?.icon ?: Icons.Outlined.Category, contentDescription = null, tint = tone?.content ?: MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(slice.label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(9.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            MoneyText(money = -slice.amount, style = AmountStyles.row, fractionScale = 1f, minScale = 0.6f, modifier = Modifier.weight(1f))
+            Text("$percent%", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+    }
+}
+
+// ------------------------------------------------------------------ Dashboard: shortcuts
+
+private data class Shortcut(val label: String, val icon: ImageVector, val tone: TonePair, val onClick: () -> Unit)
+
+/** Five evenly spaced shortcuts: a soft-toned icon square with its label beneath (Figma "Quick access"). */
+@Composable
+private fun ShortcutRow(
+    state: HomeUiState,
+    actions: HomeActions,
+    onOpenMilestones: () -> Unit,
+    onTurnOn: (Feature) -> Unit,
+    onHideOffers: () -> Unit,
+) {
+    val f = state.features
+    val ext = LucentoTheme.extendedColors
+    val items = buildList {
+        if (f.isEnabled(Feature.SAVINGS_GOALS)) add(Shortcut("Goals", Icons.Outlined.TrackChanges, TonePair(ext.infoContainer, ext.info), actions.onOpenGoals))
+        if (f.isEnabled(Feature.INSIGHTS)) add(Shortcut("Insights", Icons.Outlined.BarChart, TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary), actions.onOpenInsights))
+        add(Shortcut("Milestones", Icons.Outlined.EmojiEvents, TonePair(ext.warningContainer, ext.warning), onOpenMilestones))
+        if (f.isEnabled(Feature.DEBTS_LOANS)) add(Shortcut("Debts", Icons.Outlined.CreditCard, TonePair(ext.negativeContainer, ext.negative), actions.onOpenDebts))
+        if (f.isEnabled(Feature.RECURRING)) add(Shortcut("Scheduled", Icons.Outlined.CalendarMonth, TonePair(ext.positiveContainer, ext.positive)) { actions.onOpenRecurring(null) })
+    }
+    val haptics = rememberHaptics()
+    val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    Column {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val perRow = when {
+                maxWidth >= 340.dp * textScale -> items.size.coerceAtLeast(1)
+                textScale >= 1.5f -> 2 // large text: two across so labels never break mid-word
+                else -> 3
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                items.chunked(perRow).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        row.forEach { item ->
+                            Column(
+                                Modifier
+                                    .weight(1f)
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .clickable(role = Role.Button, onClickLabel = "Open ${item.label}") {
+                                        haptics.tick()
+                                        item.onClick()
+                                    }
+                                    .padding(vertical = Spacing.xxs),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Box(
+                                    Modifier.size(width = 48.dp, height = 46.dp).clip(RoundedCornerShape(14.dp)).background(item.tone.container),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(item.icon, contentDescription = null, tint = item.tone.content, modifier = Modifier.size(24.dp))
+                                }
+                                Spacer(Modifier.height(Spacing.xs))
+                                Text(item.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
+                            }
+                        }
+                        repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+        val offers = if (state.moduleOffersHidden) emptyList() else f.rediscoverable()
+        if (offers.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Off: ${offers.joinToString { quickLinkName(it) }}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2,
+                )
+                if (offers.size == 1) {
+                    LucentoTextButton(text = "Turn on", onClick = { onTurnOn(offers.single()) }, modifier = Modifier.semantics { contentDescription = "Turn on ${offers.single().title}" })
+                } else {
+                    var open by remember { mutableStateOf(false) }
+                    Box {
+                        LucentoTextButton(text = "Turn on…", onClick = { open = true })
+                        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                            offers.forEach { feature ->
+                                DropdownMenuItem(text = { Text(feature.title) }, onClick = {
+                                    open = false
+                                    onTurnOn(feature)
+                                })
+                            }
+                        }
+                    }
+                }
+                LucentoTextButton(text = "Hide", onClick = onHideOffers, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.semantics { contentDescription = "Hide modules that are off. They stay in Settings, Enabled features." })
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------ Dashboard: scheduled and recent
+
+/** What's still due this month (overdue first, then by date). Empty months say so; past months don't show the section. */
+@Composable
+private fun UpcomingScheduledCard(state: HomeUiState, onOpen: (Long?) -> Unit) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
+        SectionHeader("Upcoming scheduled transactions", Icons.Outlined.CalendarMonth, onSeeAll = { onOpen(null) })
+        if (state.scheduledThisMonth.isEmpty()) {
+            EmptyCardMessage(
+                if (state.hasAnySchedules) "Nothing else due in ${monthLabel(state.month)}." else "Add rent, bills, subscriptions or salary and they show up here before they’re due.",
+            )
+            if (!state.hasAnySchedules) LucentoTextButton(text = "Schedule a transaction", onClick = { onOpen(null) })
+            return@LucentoCard
+        }
+        state.scheduledThisMonth.forEachIndexed { index, item ->
+            ScheduledRow(item, state, onClick = { onOpen(item.schedule.id) })
+            if (index < state.scheduledThisMonth.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
+        }
+    }
+}
+
+/** The month's newest entries, in the same rows as the Transactions list. */
+@Composable
+private fun RecentTransactionsCard(state: HomeUiState, actions: HomeActions) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
+        SectionHeader("Recent transactions", Icons.Outlined.History, onSeeAll = actions.onOpenTransactions)
+        if (state.recentInMonth.isEmpty()) {
+            EmptyCardMessage(
+                if (state.isCurrentMonth) "Nothing recorded in ${monthLabel(state.month)} yet. Tap + to add what you spend."
+                else "Nothing was recorded in ${monthLabel(state.month)}.",
+            )
+            return@LucentoCard
+        }
+        val names = remember(state.wallets) { state.wallets.associate { it.id to it.name } }
+        state.recentInMonth.forEachIndexed { index, t ->
+            com.lucento.app.feature.transactions.TransactionRow(
+                transaction = t,
+                category = t.categoryId?.let { state.categoriesById[it] },
+                wallet = state.walletsById[t.walletId],
+                onClick = { actions.onViewTransaction(t) },
+                transfer = t.transferGroup?.let { state.recentTransfers[it] },
+                walletNames = names,
+                dense = true,
+                onClickLabel = "View transaction",
+            )
+            if (index < state.recentInMonth.lastIndex) Hairline()
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, icon: ImageVector, onSeeAll: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(Spacing.sm))
+        Text(title, style = Hierarchy.cardTitle, modifier = Modifier.weight(1f).semantics { heading() }, maxLines = 2)
+        LucentoTextButton(text = "See all", onClick = onSeeAll, modifier = Modifier.semantics { contentDescription = "See all ${title.lowercase()}" })
+    }
+}
+
+// ------------------------------------------------------------------ Part E: budget and pace
+
+/**
+ * The budget status in a word or two: Under budget, On track or Over budget — plus "Ahead of pace" when spending runs
+ * faster than the month but hasn't gone over yet (the early warning worth acting on).
+ */
+internal fun verdictLabel(plan: BudgetPlan, position: PacePosition?, isCurrentMonth: Boolean): String = when {
+    plan.remaining.isNegative -> "Over budget"
+    !isCurrentMonth -> "Under budget"
+    position == PacePosition.AHEAD -> "Ahead of pace"
+    position == PacePosition.BEHIND -> "Under budget"
+    else -> "On track"
+}
+
+@Composable
+private fun VerdictChip(label: String, tone: TonePair) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = tone.content,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(tone.container)
+            .padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
+    )
+}
+
+// ------------------------------------------------------------------ Part D: getting started, + spotlight, milestones
+
+/**
+ * Progressive disclosure: the few basics still missing (accounts, a budget, a first entry), each one tap away. The card
+ * disappears for good once they're all in place.
+ */
+@Composable
+private fun GettingStartedCard(
+    left: List<com.lucento.app.domain.Achievement>,
+    onAddWallet: () -> Unit,
+    onBudget: () -> Unit,
+    onRecord: () -> Unit,
+) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+        Text("Getting started", style = Hierarchy.cardTitle, modifier = Modifier.semantics { heading() })
+        Text(
+            "${3 - left.size} of 3 done",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        left.forEach { step ->
+            val (title, action, onClick) = when (step) {
+                com.lucento.app.domain.Achievement.MONEY_KEEPER -> Triple("Add the accounts you use", "Add", onAddWallet)
+                com.lucento.app.domain.Achievement.BUDGET_BUILDER -> Triple("Give your categories an amount", "Set", onBudget)
+                else -> Triple("Record your first transaction", "Record", onRecord)
+            }
+            Row(Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Circle, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(Spacing.sm))
+                Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                LucentoTextButton(text = action, onClick = onClick, modifier = Modifier.semantics { contentDescription = title })
+            }
+        }
+    }
+}
+
+/** Part D: the one-time pointer to the dock's + after setup, until the first entry. Dismissible; never repeats. */
+@Composable
+private fun AddSpotlightCard(onRecord: () -> Unit, onDismiss: () -> Unit) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+        Row(verticalAlignment = Alignment.Top) {
+            IconTile(icon = Icons.Filled.Add, size = 40.dp, container = MaterialTheme.colorScheme.primary, content = MaterialTheme.colorScheme.onPrimary)
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text("Record your first transaction", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                Text(
+                    "Tap + below and type it like a message — “coffee 4.50, lunch 12”. You check it before anything is saved.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            LucentoTextButton(text = "Not now", onClick = onDismiss, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LucentoTextButton(text = "Record now", onClick = onRecord)
+        }
+    }
+}
+
+/** Every milestone, earned or not yet. Worked out from the user's records; nothing to keep up and nothing to lose. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MilestonesSheet(earned: Set<com.lucento.app.domain.Achievement>, onDismiss: () -> Unit) {
+    com.lucento.app.core.designsystem.component.LucentoBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = Spacing.gutter).padding(bottom = Spacing.xl).verticalScroll(rememberScrollState())) {
+            Text("Milestones", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+            Text(
+                "${earned.size} of ${com.lucento.app.domain.Achievement.entries.size} · from your own records. No streaks, nothing to lose.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.xxs, bottom = Spacing.md),
+            )
+            com.lucento.app.domain.Achievement.entries.forEach { a ->
+                val done = a in earned
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp)
+                        .semantics(mergeDescendants = true) {}
+                        .padding(vertical = Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconTile(
+                        icon = if (done) Icons.Filled.EmojiEvents else Icons.Outlined.EmojiEvents,
+                        size = 40.dp,
+                        container = if (done) LucentoTheme.extendedColors.accent else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        content = if (done) LucentoTheme.extendedColors.onAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(Spacing.md))
+                    Column(Modifier.weight(1f)) {
+                        Text(a.title, style = MaterialTheme.typography.titleMedium)
+                        Text(a.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(
+                        if (done) "Earned" else "Not yet",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+/** N-11: shapes where the dashboard will be, instead of a blank screen, while the first data loads. */
+@Composable
+private fun HomeSkeleton() {
+    val tone = MaterialTheme.colorScheme.surfaceContainer
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Loading your dashboard" },
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Box(Modifier.width(180.dp).height(Sizes.minTouch).clip(MaterialTheme.shapes.medium).background(tone))
+        Box(Modifier.fillMaxWidth().height(220.dp).clip(MaterialTheme.shapes.large).background(tone))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Box(Modifier.weight(1.1f).height(180.dp).clip(MaterialTheme.shapes.large).background(tone))
+            Box(Modifier.weight(1f).height(180.dp).clip(MaterialTheme.shapes.large).background(tone))
+        }
     }
 }
 
 // ------------------------------------------------------------------ Scheduled transactions
 
-@Composable
-private fun ScheduledCard(state: HomeUiState, onOpen: (Long?) -> Unit) {
-    LucentoCard(Modifier.fillMaxWidth(), onClick = { onOpen(null) }, contentPadding = Spacing.lg) {
-        LinkedTitle("Scheduled transactions") {
-            if (state.hasAnySchedules) LucentoTextButton(text = "See all", onClick = { onOpen(null) })
-        }
-        if (state.upcoming.isEmpty()) {
-            Spacer(Modifier.height(Spacing.xs))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconTile(icon = Icons.Outlined.EventRepeat)
-                Spacer(Modifier.width(Spacing.md))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (state.hasAnySchedules) "Nothing due in the next 30 days" else "Nothing scheduled",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        if (state.hasAnySchedules) "You’re all caught up." else "Add rent, bills, subscriptions or salary and they show up here before they’re due.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (!state.hasAnySchedules) LucentoTextButton(text = "Schedule a transaction", onClick = { onOpen(null) })
-            return@LucentoCard
-        }
-        state.upcoming.forEachIndexed { index, item ->
-            ScheduledRow(item, state, onClick = { onOpen(item.schedule.id) })
-            if (index < state.upcoming.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
-        }
-        Text(
-            "Nothing is recorded until you mark it as paid or received.",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Spacing.xs),
-        )
-    }
-}
-
+/** A scheduled item in the Figma two-line layout: name and signed amount, then date · category and when it's due. */
 @Composable
 private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () -> Unit) {
     val schedule = item.schedule
     val category = schedule.categoryId?.let { state.categoriesById[it] }
     val days = ChronoUnit.DAYS.between(state.today, item.dueDate)
     val relative = when {
+        item.overdue -> "Overdue"
         days == 0L -> "Today"
         days == 1L -> "Tomorrow"
-        days in 2L..6L -> "In $days days"
-        else -> null
+        else -> "In $days days"
     }
     val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()) }
     val income = schedule.type == TransactionType.INCOME
@@ -1281,31 +1531,37 @@ private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () 
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 60.dp)
+            .heightIn(min = 64.dp)
             .clickable(role = Role.Button, onClickLabel = "Review ${schedule.name}", onClick = onClick)
             .padding(vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryTile(category = category, type = schedule.type)
-        Spacer(Modifier.width(Spacing.md))
+        CategoryTile(category = category, type = schedule.type, size = 38.dp)
+        Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
-            Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(kind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Spacer(Modifier.width(Spacing.sm))
-        Column(horizontalAlignment = Alignment.End) {
-            when {
-                item.overdue -> StatusPill("Overdue", StatusTones.negative)
-                relative != null -> Text(relative, style = MaterialTheme.typography.labelMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(Spacing.sm))
+                AmountText(
+                    money = if (income) schedule.amount else -schedule.total,
+                    showPlus = true,
+                    color = if (income) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
+                )
             }
-            Text(item.dueDate.format(dateFormat), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(Spacing.xs))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${item.dueDate.format(dateFormat)} · $kind",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                StatusPill(relative, if (item.overdue) StatusTones.negative else StatusTones.brand)
+            }
         }
-        Spacer(Modifier.width(Spacing.md))
-        AmountText(
-            money = if (income) schedule.amount else -schedule.total,
-            showPlus = true,
-            color = if (income) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
-        )
     }
 }
 

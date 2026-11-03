@@ -50,7 +50,7 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
   the Budget screen. Applying a selection (`CategorySelection`)
   reuses categories by normalised name (case, spacing, "&" = "and"), restores archived matches with their ids,
   creates the rest, and deactivates unchosen ones (archived when used, deleted only when unused). No schema change
-  was needed, so the database stays at version 3.
+  was needed for this step.
 
 ### Budget when categories are combined (P1-8)
 Sync folds live categories of the same kind and name into one keeper (the copy with the smallest sync id,
@@ -60,8 +60,70 @@ Sync folds live categories of the same kind and name into one keeper (the copy w
 2. otherwise the amount whose budget row was edited most recently (`updated_at`);
 3. on an exact tie, the amount of the row with the smaller sync id.
 The same rows give the same result on every device, in either order. The other amount is not kept; the Settings
-combine dialog says "the most recently changed amount is kept". Budget rows carry no month, so the kept amount applies
-to every month's view.
+combine dialog says "the most recently changed amount is kept". Only rows of the same scope are combined (see "Budget
+lifecycle"): a month-only amount and a recurring amount are different budgets.
+
+### Two budgets for one category (sync QA C-3)
+Two phones that each give the same category an amount in the same currency create two budget rows. Without a rule each
+phone showed the row it stored first, so two devices could show different budgets. Sync now folds them
+(`SyncRepository.mergeDuplicateBudgets`): every device keeps the row with the smallest sync id, with the amount chosen by
+the same rule as above (`CategoryDedup.winner`: a set amount beats 0, then the latest edit, then the smaller sync id,
+also for three or more rows, in any order), and deletes the others; the deletions sync. Rows are folded only within one
+scope (category, currency, `month`, `effective_from`): two phones changing November alone end with one November amount,
+and the usual amount is untouched. Budgets in other currencies are never touched. When the amount this phone showed changes, the "changed on another device" notice counts it (P2-6).
+
+### Budget lifecycle (schema v10)
+A normal change to a category's amount affects **only the month being viewed**. Changing future months is a separate,
+explicit choice, and earlier months always keep the amount that applied to them, so history is never rewritten.
+
+Each budget row has one scope (`BudgetEntity.month` / `effective_from`, "yyyy-MM"; at most one is set):
+- **Month-only** (`month` set): the amount for exactly that month. 0 means "no amount this month".
+- **Recurring** (`effective_from` set): the amount from that month onward. 0 means "stopped from that month".
+- **Every month** (both null): every row written before v10. It behaves as it always did.
+
+The amount for category C in currency X in month M (`BudgetPlanner.effectiveAllocation`):
+1. the month-only row for M, if there is one;
+2. otherwise the recurring/every-month row with the latest start no later than M (every-month counts as the earliest);
+3. otherwise nothing.
+Within one tier, the first stored row with an amount wins, else the first stored row (the pre-v10 duplicate rule). A
+category whose resolved amount is 0 is not budgeted that month. The overall budget is still the sum (`BudgetPlanner.plan`).
+
+What each action writes (`BudgetRepository`):
+| Action (Budget sheet) | Write |
+| --- | --- |
+| "Only <month>": save | `setMonthAmount`: upsert the month-only row |
+| "Only <month>": remove | `clearMonth`: a 0 month-only row (deleted instead when no recurring amount applies) |
+| "Use the usual amount" | `setMonthAmount(…, null)`: delete the month-only row |
+| "<month> onward": save or remove (confirmed) | `setFrom`: delete M's month-only row, delete recurring rows starting after M, upsert the recurring row from M (a 0 row when removing while an earlier amount exists, else delete) |
+| First amount (onboarding, guide, a category with no amount) | `setAllocation` = recurring from the current month |
+
+Months changed on their own after M keep their amounts when "onward" is used, and the confirmation says so. Past months
+can only be corrected for themselves. Spending is counted by each transaction's calendar date, so a month starts on the
+1st in the user's local calendar.
+
+### Home: total balance and "Where it went" (redesign Part E)
+- **Total balance** is net worth in the dashboard currency (assets minus what is owed, `NetWorthComposition.netWorth`);
+  other currencies are listed separately and never converted.
+- **Where it went** (`spendingBreakdown`): the shown month's EXPENSE rows in the dashboard currency, grouped by
+  category, largest first; the top four are listed and the rest summed as "Other". Transfers, adjustments, goal
+  contributions and income never count. Shares are of that month's total spending in that currency.
+- **Vs last month** (wallet card, `BalanceHistory`): net wallet balance at the end of the previous month, rebuilt from
+  opening balances and transactions dated up to then (wallets created later are left out), against the shown month.
+  The percentage appears only when the previous month's balance is above zero and no wallet in that currency was added
+  in between (`comparableTrendPercent`): a new wallet's opening balance is not growth. The spoken comparison states the
+  signed amount difference.
+
+### Milestones (redesign Part D)
+Worked out from stored records (`Achievements.earned`), never from counters: Money Keeper (an asset wallet), Budget
+Builder (a category with an amount this month, lifecycle rules), First Step (an expense or income recorded), Getting
+Consistent (expenses or income on 7 different days, any order — no streak), Financial Explorer (Insights opened; a
+local flag), Goal Setter (a savings goal). Each is acknowledged once, after the write that earned it; the first run with
+milestones records what is already earned without showing anything.
+
+### Spendable now (Home, P2-1)
+The summed balances of cash, bank and e-wallet accounts in the dashboard currency (`NetWorthComposition.available`).
+Savings, other assets and debts are excluded; other currencies are never converted. It is part of the same balances as
+net worth and is shown beside it only when the two differ (some savings, other asset or debt exists).
 
 ## Debt rules
 - Credit-card purchase: EXPENSE on the card (raises owed). Paying the card: TRANSFER from bank to card (lowers owed;

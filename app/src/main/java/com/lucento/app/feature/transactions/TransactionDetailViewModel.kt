@@ -35,7 +35,7 @@ class TransactionDetailViewModel(
 ) : ViewModel() {
 
     val uiState: StateFlow<TransactionDetailUiState> = combine(
-        transactions.observeTransactions(),
+        transactions.observeWithTransferLegs(transactionId),
         wallets.observeWallets(),
         categories.observeCategories(),
     ) { all, walletList, categoryList ->

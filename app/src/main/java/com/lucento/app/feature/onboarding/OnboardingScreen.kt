@@ -1,5 +1,14 @@
 package com.lucento.app.feature.onboarding
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import com.lucento.app.core.designsystem.component.StageIndicator
+import com.lucento.app.core.designsystem.component.WalletTypeTile
+import com.lucento.app.domain.SpendType
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -97,7 +106,33 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
     val accountCheck by viewModel.accountCheck.collectAsStateWithLifecycle()
     val welcomeBack by viewModel.welcomeBack.collectAsStateWithLifecycle()
     val holdsAccountData by viewModel.holdsAccountData.collectAsStateWithLifecycle()
+    val spendTypes by viewModel.spendTypes.collectAsStateWithLifecycle()
+    val backupPath by viewModel.backupPath.collectAsStateWithLifecycle()
+    val filePreview by viewModel.filePreview.collectAsStateWithLifecycle()
+    val fileMessage by viewModel.fileMessage.collectAsStateWithLifecycle()
+    val fileBusy by viewModel.fileBusy.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+    // "Restore a backup file": Android's file picker; the file is read only after the user picks it.
+    val backupPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.inspectBackupFile {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                    ?: error("unreadable")
+            }
+        }
+    }
+    filePreview?.let { preview ->
+        ConfirmDialog(
+            title = "Restore this backup?",
+            text = "This backup holds:\n" + preview.summary().trim() +
+                "\n\nLucento opens with it on this phone. Nothing is uploaded; you can turn on sync later in Settings.",
+            confirmLabel = if (fileBusy) "Restoring…" else "Restore",
+            onConfirm = viewModel::restoreBackupFile,
+            onDismiss = viewModel::cancelBackupFile,
+        )
+    }
 
     // Leaving the account when part of it is already here removes that partial copy, so it is confirmed first.
     var confirmLeave by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
@@ -164,11 +199,17 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
             .safeDrawingPadding()
             .padding(horizontal = Spacing.gutter, vertical = Spacing.lg),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StepIndicator(current = step, count = OnboardingViewModel.LAST_STEP + 1, modifier = Modifier.weight(1f))
-            // Focus and features are optional; spending categories are not, so Skip leads to them.
-            if (step in OnboardingViewModel.STEP_FOCUS until OnboardingViewModel.STEP_CATEGORIES) {
-                LucentoTextButton(text = "Skip", onClick = viewModel::skip)
+        onboardingStage(step)?.let { stage ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StageIndicator(
+                    stage = stage,
+                    progress = stageProgress(step),
+                    modifier = Modifier.weight(1f),
+                )
+                // Focus and payment types are optional; spending categories are not, so Skip leads to them.
+                if (step in OnboardingViewModel.STEP_FOCUS until OnboardingViewModel.STEP_CATEGORIES) {
+                    LucentoTextButton(text = "Skip", onClick = viewModel::skip)
+                }
             }
         }
 
@@ -184,11 +225,18 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
         ) { target ->
             when (target) {
                 OnboardingViewModel.STEP_WELCOME -> WelcomeStep(
-                    onContinue = viewModel::next,
-                    onRestore = if (viewModel.syncAvailable) viewModel::startRestore else null,
+                    onStartFresh = viewModel::next,
+                    onSignIn = if (viewModel.syncAvailable) viewModel::startRestore else null,
+                    onRestoreFile = if (viewModel.fileRestoreAvailable) {
+                        { backupPicker.launch(arrayOf("application/json", "application/octet-stream", "text/plain")) }
+                    } else {
+                        null
+                    },
+                    fileMessage = fileMessage,
+                    fileBusy = fileBusy,
                 )
                 OnboardingViewModel.STEP_FOCUS -> FocusStep(focuses, viewModel::toggleFocus, viewModel::next)
-                OnboardingViewModel.STEP_FEATURES -> FeaturesStep(features, viewModel::setFeature, viewModel::next)
+                OnboardingViewModel.STEP_SPEND -> SpendStep(spendTypes, viewModel::toggleSpendType, viewModel::next)
                 OnboardingViewModel.STEP_CATEGORIES -> CategoriesStep(picks, viewModel::setPicks, viewModel::next)
                 OnboardingViewModel.STEP_REVIEW -> CategoryReviewStep(
                     picks = picks,
@@ -217,34 +265,27 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
                     onRetryCheck = viewModel::retryAccountCheck,
                     onContinueOffline = onLeaveAccount,
                     onContinue = viewModel::next,
+                    path = backupPath,
+                    onPath = viewModel::selectBackupPath,
                 )
-                else -> ConfirmStep(currency, theme, features, picks.count, error, signedInEmail, onFinish = viewModel::finish)
+                else -> ConfirmStep(
+                    currency, theme, features, picks.count, error, signedInEmail,
+                    spendTypes = spendTypes,
+                    backupPath = backupPath,
+                    onFinish = viewModel::finish,
+                )
             }
         }
     }
 }
 
-@Composable
-private fun StepIndicator(current: Int, count: Int, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .padding(top = Spacing.sm, bottom = Spacing.lg)
-            .semantics { contentDescription = "Step ${current + 1} of $count" },
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        repeat(count) { index ->
-            val color by animateColorAsState(
-                targetValue = if (index <= current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                label = "step-color",
-            )
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(4.dp)
-                    .background(color, RoundedCornerShape(2.dp)),
-            )
-        }
-    }
+/** How far through its stage a screen is (0..1), so the current stage's bar fills as the user moves on. */
+private fun stageProgress(step: Int): Float = when (onboardingStage(step)) {
+    com.lucento.app.domain.SetupStage.PERSONALIZE ->
+        (step - OnboardingViewModel.STEP_FOCUS + 1f) / (OnboardingViewModel.STEP_ESSENTIALS - OnboardingViewModel.STEP_FOCUS + 1f)
+    // Set up continues in the guided setup (wallets, budget): onboarding's part of it is the first third.
+    com.lucento.app.domain.SetupStage.SET_UP -> if (step == OnboardingViewModel.STEP_SYNC) 0.15f else 0.3f
+    else -> 0f
 }
 
 @Composable
@@ -256,7 +297,16 @@ private fun StepTitle(title: String, body: String) {
 }
 
 @Composable
-private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
+private fun WelcomeStep(
+    onStartFresh: () -> Unit,
+    /** Sign in to an account that already has data; null when cloud sync isn't available in this build. */
+    onSignIn: (() -> Unit)?,
+    /** Pick a backup file exported from Lucento; null when unavailable. */
+    onRestoreFile: (() -> Unit)?,
+    fileMessage: String?,
+    fileBusy: Boolean,
+) {
+    var choosing by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -294,11 +344,103 @@ private fun WelcomeStep(onContinue: () -> Unit, onRestore: (() -> Unit)?) {
                 textAlign = TextAlign.Center,
             )
         }
-        LucentoPrimaryButton(text = "Get started", onClick = onContinue)
-        // Moving to a new phone: sign in and bring the account across instead of setting up from scratch.
-        if (onRestore != null) {
+        if (fileMessage != null) {
+            InfoNote(fileMessage, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
+            Spacer(Modifier.height(Spacing.sm))
+        }
+        if (fileBusy) {
+            LucentoWorkingIndicator(label = "Reading the backup")
+            Spacer(Modifier.height(Spacing.sm))
+        }
+        LucentoPrimaryButton(text = "Start fresh", onClick = onStartFresh)
+        // Coming back: an account (sign in and download) or a backup file (offline). Never merged into a new setup.
+        if (onSignIn != null || onRestoreFile != null) {
             Spacer(Modifier.height(Spacing.xs))
-            LucentoTextButton(text = "I already have an account", onClick = onRestore, modifier = Modifier.fillMaxWidth())
+            LucentoTextButton(text = "I already use Lucento", onClick = { choosing = true }, modifier = Modifier.fillMaxWidth())
+        }
+    }
+    if (choosing) {
+        ReturningUserSheet(
+            onSignIn = onSignIn?.let { { choosing = false; it() } },
+            onRestoreFile = onRestoreFile?.let { { choosing = false; it() } },
+            onDismiss = { choosing = false },
+        )
+    }
+}
+
+/** "I already use Lucento": bring an account back by signing in, or a workspace from a backup file. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ReturningUserSheet(onSignIn: (() -> Unit)?, onRestoreFile: (() -> Unit)?, onDismiss: () -> Unit) {
+    com.lucento.app.core.designsystem.component.LucentoBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = Spacing.gutter).padding(bottom = Spacing.xl)) {
+            Text("Welcome back", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+            Text(
+                "Bring your money in with you. Nothing is combined with a new setup.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.xxs, bottom = Spacing.md),
+            )
+            if (onSignIn != null) {
+                ChoiceCard(
+                    icon = Icons.Filled.CloudDone,
+                    title = "Sign in to my account",
+                    body = "Downloads everything you synced: wallets, transactions, budgets and goals.",
+                    onClick = onSignIn,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+            }
+            if (onRestoreFile != null) {
+                ChoiceCard(
+                    icon = Icons.Outlined.FileOpen,
+                    title = "Restore a backup file",
+                    body = "A file you exported from Lucento. Stays on this phone; nothing is uploaded.",
+                    onClick = onRestoreFile,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChoiceCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    body: String,
+    onClick: () -> Unit,
+    selected: Boolean = false,
+    role: Role = Role.Button,
+) {
+    val border by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        tween(160),
+        label = "choice-border",
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .border(BorderStroke(if (selected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
+            .then(
+                if (role == Role.RadioButton) Modifier.selectable(selected = selected, role = role, onClick = onClick)
+                else Modifier.clickable(role = role, onClick = onClick)
+            )
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (role == Role.RadioButton) {
+            Icon(
+                if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            )
         }
     }
 }
@@ -445,9 +587,12 @@ private fun FocusStep(selected: Set<FinancialFocus>, onToggle: (FinancialFocus) 
     val haptics = rememberHaptics()
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepTitle("What’s your main focus?", "Choose one or more. This only decides what’s switched on at first.")
+            StepTitle(
+                "What do you want Lucento to help with?",
+                "Tracking spending and budgeting are always included. Add anything else — this only decides what’s switched on at first.",
+            )
             FinancialFocus.entries.forEach { focus ->
-                val isSelected = focus in selected
+                val isSelected = focus in selected || focus.mandatory
                 val border by animateColorAsState(
                     if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                     tween(160),
@@ -460,7 +605,7 @@ private fun FocusStep(selected: Set<FinancialFocus>, onToggle: (FinancialFocus) 
                         .heightIn(min = 64.dp)
                         .clip(MaterialTheme.shapes.medium)
                         .border(BorderStroke(if (isSelected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
-                        .toggleable(value = isSelected, role = Role.Checkbox) {
+                        .toggleable(value = isSelected, enabled = !focus.mandatory, role = Role.Checkbox) {
                             haptics.tick()
                             onToggle(focus)
                         }
@@ -469,7 +614,11 @@ private fun FocusStep(selected: Set<FinancialFocus>, onToggle: (FinancialFocus) 
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(focus.title, style = MaterialTheme.typography.titleMedium)
-                        Text(focus.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (focus.mandatory) "Always included · ${focus.description}" else focus.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     Icon(
                         if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
@@ -484,21 +633,49 @@ private fun FocusStep(selected: Set<FinancialFocus>, onToggle: (FinancialFocus) 
     }
 }
 
+/**
+ * "How do you pay?": a question people can answer instead of a list of module switches. Credit cards and loans turn on
+ * Debts & loans; the guided setup then suggests these account types first. Modules stay editable in Settings.
+ */
 @Composable
-private fun FeaturesStep(enabled: Set<Feature>, onSet: (Feature, Boolean) -> Unit, onContinue: () -> Unit) {
+private fun SpendStep(selected: Set<SpendType>, onToggle: (SpendType) -> Unit, onContinue: () -> Unit) {
+    val haptics = rememberHaptics()
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepTitle("Choose your features", "Based on your focus. Change any of these later in Settings — nothing is ever deleted.")
-            Feature.entries.forEachIndexed { index, feature ->
-                val missing = feature.requires.filterNot { it in enabled }
-                SwitchRow(
-                    title = feature.title,
-                    description = feature.description,
-                    note = if (feature in enabled && missing.isNotEmpty()) "Needs ${missing.joinToString { it.title }}" else null,
-                    checked = feature in enabled,
-                    onCheckedChange = { onSet(feature, it) },
+            StepTitle("How do you pay?", "Choose all that apply. You’ll add these accounts next; you can add others any time.")
+            SpendType.entries.forEach { type ->
+                val isSelected = type in selected
+                val border by animateColorAsState(
+                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    tween(160),
+                    label = "spend-border",
                 )
-                if (index < Feature.entries.lastIndex) Hairline()
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Spacing.xs)
+                        .heightIn(min = 64.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .border(BorderStroke(if (isSelected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
+                        .toggleable(value = isSelected, role = Role.Checkbox) {
+                            haptics.tick()
+                            onToggle(type)
+                        }
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    WalletTypeTile(type.walletType, size = 40.dp)
+                    Spacer(Modifier.width(Spacing.md))
+                    Column(Modifier.weight(1f)) {
+                        Text(type.title, style = MaterialTheme.typography.titleMedium)
+                        Text(type.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(
+                        if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = null,
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(Spacing.md))
@@ -593,14 +770,49 @@ private fun SyncStep(
     onRetryCheck: () -> Unit,
     onContinueOffline: () -> Unit,
     onContinue: () -> Unit,
+    path: BackupPath,
+    onPath: (BackupPath) -> Unit,
 ) {
     val ext = LucentoTheme.extendedColors
+    // Without cloud sync in this build, the account path isn't offered.
+    val shownPath = if (!available && path == BackupPath.ACCOUNT) BackupPath.FILE else path
     Column(Modifier.fillMaxSize().imePadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             StepTitle(
-                "Back up and sync?",
-                "Keep your wallets, transactions, budgets, goals and recurring payments safe and the same on every device.",
+                "Keep your money safe",
+                "Choose how Lucento protects your records. You can change this any time in Settings.",
             )
+            if (signedInEmail == null) {
+                if (available) {
+                    ChoiceCard(
+                        icon = Icons.Filled.CloudDone,
+                        title = "Sync with an account",
+                        body = "Backed up automatically and the same on every phone. Uses Google or an email account.",
+                        selected = shownPath == BackupPath.ACCOUNT,
+                        role = Role.RadioButton,
+                        onClick = { onPath(BackupPath.ACCOUNT) },
+                    )
+                    Spacer(Modifier.height(Spacing.sm))
+                }
+                ChoiceCard(
+                    icon = Icons.Outlined.FileOpen,
+                    title = "Back up to a file",
+                    body = "Export a backup whenever you like from Settings › Your data. Nothing leaves your phone unless you share the file.",
+                    selected = shownPath == BackupPath.FILE,
+                    role = Role.RadioButton,
+                    onClick = { onPath(BackupPath.FILE) },
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                ChoiceCard(
+                    icon = Icons.Outlined.PhoneAndroid,
+                    title = "Keep it on this phone only",
+                    body = "No copies anywhere. Uninstalling Lucento or losing this phone loses your records.",
+                    selected = shownPath == BackupPath.DEVICE_ONLY,
+                    role = Role.RadioButton,
+                    onClick = { onPath(BackupPath.DEVICE_ONLY) },
+                )
+                Spacer(Modifier.height(Spacing.md))
+            }
             when {
                 !available -> InfoNote("Cloud sync isn’t available in this version of Lucento. Everything works fully offline.")
                 signedInEmail != null && accountCheck == AccountCheck.Checking -> {
@@ -625,10 +837,11 @@ private fun SyncStep(
                     container = MaterialTheme.colorScheme.primaryContainer,
                     content = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
+                shownPath != BackupPath.ACCOUNT -> Unit
                 else -> {
                     InfoNote(
-                        "Optional. Your data stays only on this phone unless you connect an account and keep sync on. " +
-                            "Signing out removes that account’s data from this phone so it can’t be uploaded to a different one.",
+                        "Your data stays only on this phone until you connect an account. Signing out removes that " +
+                            "account’s data from this phone so it can’t be uploaded to a different one.",
                     )
                     Spacer(Modifier.height(Spacing.md))
                     com.lucento.app.feature.settings.ConnectAccountPanel(
@@ -655,10 +868,18 @@ private fun SyncStep(
             )
         } else if (signedInEmail != null && accountCheck == AccountCheck.Checking) {
             LucentoPrimaryButton(text = "Continue", onClick = {}, enabled = false)
-        } else if (signedInEmail != null || !available) {
+        } else if (signedInEmail != null || shownPath != BackupPath.ACCOUNT) {
             LucentoPrimaryButton(text = "Continue", onClick = onContinue)
         } else {
-            LucentoTextButton(text = "Not now — keep it on this phone", onClick = onContinue, modifier = Modifier.fillMaxWidth())
+            // Account chosen but not connected yet: the panel above signs in; this keeps going without it.
+            LucentoTextButton(
+                text = "Not now — keep it on this phone",
+                onClick = {
+                    onPath(BackupPath.DEVICE_ONLY)
+                    onContinue()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -671,15 +892,17 @@ private fun ConfirmStep(
     categoryCount: Int,
     error: String?,
     signedInEmail: String?,
+    spendTypes: Set<SpendType>,
+    backupPath: BackupPath,
     onFinish: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("You’re all set", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
+                    Text("Lucento is personalized", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
                     Text(
-                        "Here’s how Lucento will start.",
+                        "Here’s how it will start. Next, add the accounts you use and give your categories an amount.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -696,27 +919,23 @@ private fun ConfirmStep(
                     ThemeMode.DARK -> "Dark"
                 },
             )
-            SummaryRow("Spending categories", "$categoryCount chosen · set amounts on the Budget tab")
+            SummaryRow("Spending categories", "$categoryCount chosen · amounts come next")
+            if (spendTypes.isNotEmpty()) SummaryRow("You pay with", SpendType.entries.filter { it in spendTypes }.joinToString { it.title })
             SummaryRow("Turned on", Feature.entries.filter { it in features }.joinToString { it.title }.ifEmpty { "Just the essentials" })
-            val off = Feature.entries.filterNot { it in features }
-            if (off.isNotEmpty()) SummaryRow("Turned off", off.joinToString { it.title })
-            SummaryRow("Cloud sync", signedInEmail?.let { "On · ${it.ifEmpty { "connected" }}" } ?: "Off · everything stays on this phone")
-            if (signedInEmail == null) {
-                InfoNote("Until you turn on cloud sync, wallets, transactions, budgets and goals stay only on this phone.")
-            }
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                if (signedInEmail != null) "Next: add your first wallet on Home. It syncs to your account automatically."
-                else "Next: add your first wallet on Home. Everything stays on this device.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SummaryRow(
+                "Backups",
+                when {
+                    signedInEmail != null -> "Cloud sync · ${signedInEmail.ifEmpty { "connected" }}"
+                    backupPath == BackupPath.FILE -> "Backup files · export any time from Settings › Your data"
+                    else -> "This phone only"
+                },
             )
             if (error != null) {
                 Spacer(Modifier.height(Spacing.md))
                 InfoNote(error, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
-        LucentoPrimaryButton(text = "Start using Lucento", onClick = onFinish)
+        LucentoPrimaryButton(text = "Continue to set up", onClick = onFinish)
     }
 }
 

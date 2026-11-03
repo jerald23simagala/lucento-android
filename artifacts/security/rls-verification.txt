@@ -1,0 +1,25 @@
+P2-11 RLS verification — lucento-test only (2026-11-02). No tokens or keys recorded.
+
+1. Catalog (read-only SQL): RLS enabled on all 9 public tables. wallets, categories, transactions, budgets, goals,
+   goal_contributions, recurring: select/insert/update/delete policies on (select auth.uid()) = user_id (insert and
+   update also WITH CHECK); table grants to authenticated only, none to anon. ai_usage: read-own policy, SELECT grant
+   only. usage_events: anon+authenticated INSERT with check true (known N-09, P3).
+2. Behavioural write probe on lucento-test (role switch inside a rolled-back transaction): DECLINED by the session's
+   permission system (it contains write statements even though rolled back) — not run.
+3. pgTAP suite supabase/tests/rls_test.sql (54 assertions: RLS on, no anon privileges, own-row read/update/delete,
+   cross-user insert/move refused with 42501, ai_usage read-own and not client-writable, other user's rows untouched).
+   NOT EXECUTED here: `supabase test db` needs Docker (not installed on this machine). Run it locally or in CI.
+4. Cross-user REST probe (read-only, real tokens): signed in as QA account B with the test project's publishable key:
+   sign in as B: 200
+   wallets: A's rows via filter=0 (HTTP 200); visible=1, not B's=0 (HTTP 200); anon HTTP 401
+   categories: A's rows via filter=0 (HTTP 200); visible=20, not B's=0 (HTTP 200); anon HTTP 401
+   transactions: A's rows via filter=0 (HTTP 200); visible=9, not B's=0 (HTTP 200); anon HTTP 401
+   budgets: A's rows via filter=0 (HTTP 200); visible=2, not B's=0 (HTTP 200); anon HTTP 401
+   goals: A's rows via filter=0 (HTTP 200); visible=0, not B's=0 (HTTP 200); anon HTTP 401
+   goal_contributions: A's rows via filter=0 (HTTP 200); visible=0, not B's=0 (HTTP 200); anon HTTP 401
+   recurring: A's rows via filter=0 (HTTP 200); visible=0, not B's=0 (HTTP 200); anon HTTP 401
+   ai_usage: A's rows via filter=0 (HTTP 200); visible=0, not B's=0 (HTTP 200); anon HTTP 401
+   probe session signed out: 204
+   Account A owns 4 wallets, 6 transactions, 1 goal, 1 schedule on lucento-test: none visible to B, even when filtering
+   by A's user id. Every row B sees is B's own. Anonymous requests (publishable key, no user token): HTTP 401 on all 8
+   tables. Probe session signed out (204); afterwards B has only the two emulator sessions. PASS

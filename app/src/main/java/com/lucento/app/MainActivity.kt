@@ -16,7 +16,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.produceState
+import com.lucento.app.core.banks.InstitutionRegistry
+import com.lucento.app.core.designsystem.component.LocalInstitutions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -124,12 +128,17 @@ class MainActivity : FragmentActivity() {
 
             // The rising logo plays once per launch (not on rotation) while the app loads underneath.
             var launching by rememberSaveable { mutableStateOf(true) }
+            val institutions by produceState(InstitutionRegistry.EMPTY) {
+                value = (application as LucentoApplication).container.institutions.registry()
+            }
             LucentoTheme(darkTheme = dark) {
                 Box(Modifier.fillMaxSize()) {
                     if (ready != null) {
                         // Kept composed while locked so nothing in progress is lost, but hidden from TalkBack.
                         Box(if (locked) Modifier.fillMaxSize().clearAndSetSemantics {} else Modifier.fillMaxSize()) {
-                            LucentoRoot(preferences = ready.preferences)
+                            CompositionLocalProvider(LocalInstitutions provides institutions) {
+                                LucentoRoot(preferences = ready.preferences)
+                            }
                         }
                         if (locked) LockScreen(onUnlock = ::requestUnlock)
                         // Debug builds only (draws nothing in release): marks the test environment on every screen.

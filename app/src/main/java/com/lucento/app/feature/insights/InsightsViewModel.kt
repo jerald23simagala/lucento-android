@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 data class InsightsData(
@@ -46,6 +47,11 @@ class InsightsViewModel(
     budgets: BudgetRepository,
     preferences: UserPreferencesRepository,
 ) : ViewModel() {
+    init {
+        // Opening Insights earns the Financial Explorer milestone (a local flag; nothing is sent).
+        viewModelScope.launch { runCatching { preferences.setInsightsVisited() } }
+    }
+
     val data: StateFlow<InsightsData> = combine(
         transactions.observeTransactions(),
         wallets.observeWallets(),

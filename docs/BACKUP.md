@@ -10,7 +10,7 @@ Schema version **1** (`BackupMigrations.CURRENT`). Top-level fields:
 
 | Field | Meaning |
 |---|---|
-| `schemaVersion` | Integer. This app writes 1 and can read older versions through `BackupMigrations`. A newer version is refused. |
+| `schemaVersion` | Integer. This app writes 2 and can read older versions through `BackupMigrations`. A newer version is refused. |
 | `appVersion` | The Lucento version that wrote the file (`BuildConfig.VERSION_NAME`). |
 | `exportedAt` | ISO-8601 instant. |
 | `wallets`, `categories`, `transactions`, `budgets`, `goals`, `goalContributions`, `recurring`, `debtTerms` | The Room rows. |
@@ -56,4 +56,6 @@ later `updatedAt` wins. The file does not pretend to be based on a server revisi
 
 `BackupMigrations` walks the document from its `schemaVersion` up to the current one, one step at a time. Version 0
 called wallets `accounts` and stored dates as numbers (epoch milliseconds, or epoch days for calendar dates). The
-step renames and converts them and adds the collections version 0 did not have. A new schema version adds the next step.
+step renames and converts them and adds the collections version 0 did not have. Version 2 (app v10) adds
+`institutionId` to wallets and `month` / `effectiveFrom` to budgets; a version 1 file has none of them and reads as "no
+institution" and "every month". A new schema version adds the next step.

@@ -90,21 +90,22 @@ class CategorySetupRepositoryTest {
     }
 
     @Test fun allocationsDriveTheOverallBudgetAndCanBeChangedOrCleared() = runTest {
+        val october = YearMonth.of(2026, 10) // budgets start this month; a new budget does not reach back into earlier months
         categories.applySelection(listOf(preset("rent"), preset("groceries"), preset("public_transport")))
         val byName = categories.observeCategories().first().associateBy { it.name }
-        budgets.setAllocation(byName.getValue("Rent").id, "PHP", Money(15_000_00, "PHP"))
-        budgets.setAllocation(byName.getValue("Groceries").id, "PHP", Money(8_000_00, "PHP"))
-        budgets.setAllocation(byName.getValue("Public transportation").id, "PHP", Money(3_000_00, "PHP"))
+        budgets.setAllocation(byName.getValue("Rent").id, "PHP", Money(15_000_00, "PHP"), from = october)
+        budgets.setAllocation(byName.getValue("Groceries").id, "PHP", Money(8_000_00, "PHP"), from = october)
+        budgets.setAllocation(byName.getValue("Public transportation").id, "PHP", Money(3_000_00, "PHP"), from = october)
 
-        suspend fun total() = BudgetPlanner.plan(categories.observeCategories().first(), budgets.observeBudgets().first(), emptyList(), "PHP", YearMonth.of(2026, 10)).total
+        suspend fun total() = BudgetPlanner.plan(categories.observeCategories().first(), budgets.observeBudgets().first(), emptyList(), "PHP", october).total
         assertEquals(Money(26_000_00, "PHP"), total())
 
         val rentAllocation = budgetDao.rows.value.single { it.categoryId == byName.getValue("Rent").id }
-        budgets.setAllocation(byName.getValue("Rent").id, "PHP", Money(16_000_00, "PHP"))
+        budgets.setAllocation(byName.getValue("Rent").id, "PHP", Money(16_000_00, "PHP"), from = october)
         assertEquals(Money(27_000_00, "PHP"), total())
         assertEquals(rentAllocation.id, budgetDao.rows.value.single { it.categoryId == byName.getValue("Rent").id }.id) // updated in place
 
-        budgets.setAllocation(byName.getValue("Groceries").id, "PHP", null)
+        budgets.setAllocation(byName.getValue("Groceries").id, "PHP", null, from = october)
         assertEquals(Money(19_000_00, "PHP"), total())
 
         // Deactivating a category with an allocation archives it (the allocation is kept but no longer counts).

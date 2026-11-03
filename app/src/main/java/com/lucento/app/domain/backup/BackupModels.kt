@@ -46,6 +46,8 @@ data class BackupWallet(
     val archived: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    /** Institution registry id (v10), or null. Absent in backups written before v10. */
+    val institutionId: String? = null,
 )
 
 data class BackupCategory(
@@ -80,6 +82,10 @@ data class BackupBudget(
     val limitMinor: Long,
     val createdAt: Long,
     val updatedAt: Long,
+    /** Budget lifecycle: "yyyy-MM" month-only override, or null. Absent in backups written before v10. */
+    val month: String? = null,
+    /** Budget lifecycle: first month of a recurring amount, or null (every month). */
+    val effectiveFrom: String? = null,
 )
 
 data class BackupGoal(

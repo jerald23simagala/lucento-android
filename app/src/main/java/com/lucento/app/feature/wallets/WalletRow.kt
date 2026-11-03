@@ -28,6 +28,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.component.AmountText
+import com.lucento.app.core.designsystem.component.WalletIdentityTile
+import com.lucento.app.core.designsystem.component.institution
 import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.component.label
 import com.lucento.app.core.designsystem.theme.AmountStyles
@@ -63,7 +65,7 @@ fun WalletRow(
             .padding(horizontal = if (dense) Spacing.md else 0.dp, vertical = if (dense) Spacing.xs + Spacing.xxs else Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        WalletTypeTile(wallet.type, size = if (dense) 36.dp else Sizes.iconTile)
+        WalletIdentityTile(wallet, size = if (dense) 36.dp else Sizes.iconTile)
         Spacer(Modifier.width(if (dense) Spacing.md - Spacing.xxs else Spacing.md))
         Column(Modifier.weight(1f)) {
             Text(
@@ -73,7 +75,7 @@ fun WalletRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${wallet.type.label} · ${wallet.currencyCode}",
+                listOfNotNull(wallet.institution()?.name, wallet.type.label, wallet.currencyCode).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

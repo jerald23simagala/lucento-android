@@ -41,6 +41,8 @@ data class Wallet(
     val openingBalance: Money = balance,
     /** Interest rate and repayment plan of a card or loan, when the user entered them. Always null for assets. */
     val debt: DebtTerms? = null,
+    /** Bundled institution registry id (e.g. "ph_bdo") for the wallet's logo and card face; display only. */
+    val institutionId: String? = null,
 ) {
     val currencyCode: String get() = balance.currencyCode
 

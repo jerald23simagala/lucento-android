@@ -53,7 +53,7 @@ resolved items are kept at the bottom for traceability.
 
 | ID | Issue | Evidence | Next step |
 |---|---|---|---|
-| G-01 / P1-1 | Google one-tap fails on this machine's debug build: `NoCredentialException` (GetGoogleIdOperation 28433). Code intact; the test project's Google provider is enabled. **Cause:** the debug signing SHA-1 `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75` for package `com.lucento.app.debug` isn't registered as an Android OAuth client in the Google Cloud project of the web client in use | Verified (device log) | **Owner:** Google Cloud > Credentials > Create OAuth client (Android): package `com.lucento.app.debug` + that SHA-1. For release: `com.lucento.app` + the release/Play app-signing SHA-1 |
+| G-01 / P1-1 | Google one-tap shows `NoCredentialException` [28433] on the emulators. **Corrected diagnosis (2026-11-02):** neither QA emulator has a Google account (`dumpsys account`: 0), which alone produces 28433; the earlier "SHA-1 not registered" conclusion was not proven. The owner confirms the debug Android OAuth client (com.lucento.app.debug, SHA-1 49:AF:…:8C:75) is registered. Code reviewed: `setFilterByAuthorizedAccounts(false)`, Web client id as server client id, hashed nonce — correct | Verified (device accounts, code) | Test one-tap on a device that has a Google account (owner's Samsung); NOT TESTED on emulators |
 | N-16 / O-11 | ~~First sign-in deletes unused, uniquely named local categories~~. **Fixed locally in P0-2:** user-typed names are never dropped | Verified (unit tests) | Owner review |
 | O-05 | ~~Retry after a failed first sync skips the first-sign-in branch~~. **Fixed locally in P0-2:** separate `initialPullDoneFor` marker (claim unchanged, legacy rule for existing installs) | Verified (unit tests) | Owner review |
 | — | ~~`remoteHasData` probes three tables and counts soft-deleted rows~~. **Fixed locally in P0-2:** live rows only, all tables | Verified (unit tests) | Owner review |
@@ -82,6 +82,70 @@ resolved items are kept at the bottom for traceability.
 | QA-R14 | Dismissing a switch prompt runs in a cancellable coroutine (pre-existing) | Code-only | Low |
 | P1-7-L1 | Transactions type tabs are tight at 360dp/1.3x (still readable) | Verified (screen) | P3 polish |
 
+## Found and fixed in the stabilization cycle (2026-11-02, two-emulator QA)
+
+| ID | Issue | Evidence |
+|---|---|---|
+| SQ-C2 | ~~An offline delete uploaded later beat a newer edit from another device (violated D3)~~: tombstones were pushed with the upload time. **Fixed:** they carry the time of the delete | Verified (device retest, unit, mutation-checked) |
+| SQ-C3 | ~~Two phones budgeting the same category kept two budget rows; each phone could show a different budget~~. **Fixed:** sync folds them (latest edit, same row everywhere) | Verified (device retest + server, unit) |
+| SQ-NAV | ~~Back from a Settings page skipped the hub~~ (launchSingleTop replaced it). **Fixed** | Verified (device) |
+| SQ-COPY | ~~Delete dialog said "from this device" with sync on; stale Google error stayed after switching to email; guide said "only on this phone" with sync on~~. **Fixed** | Code-only (build) |
+
+## QA review of the stabilization cycle (read-only agent, 2026-11-02) — outcome
+
+Fixed (high/medium): H1 pgTAP "move a row" tests now expect the sync trigger's P0001 ('user_id cannot change');
+M1 the sheet's Try again uses `SyncScheduler.retryNow` (REPLACE when nothing runs) so WorkManager backoff can't swallow
+it; M2 account-mismatch has its own copy and goes to Account & sync, and "keeps retrying" is gone; M3 Settings pages
+reuse the hub's ViewModel (one account check, one prompt); M4 Home's module offers can be hidden ("Hide these");
+M5 the budget-fold notice counts only an unsynced amount that Budget was showing (never a 0 row, never an archived
+category); M6 the fold keeps the winning edit's own time; M7 a never-synced row being adopted is not "replaced".
+Fixed (low): L1 no "Set up cloud sync" in builds without sync; L2 privacy summary counts Smarter reading only where it
+is offered; L3 dismissing the notice subtracts only what was shown; L4 stray comments; L9 "Spendable now" only when it
+differs from net worth. Tests: SyncEngineTest (fold notice rule, fold time, M7), SyncTransparencyTest (mismatch,
+unconfigured), HomeOnTrackTest (L9).
+
+## Open after the stabilization cycle
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| SQ-F4 | A local row the server rules refuse (e.g. a corrupt amount) stays queued and the sync sheet says "1 change waiting … upload by themselves shortly", though it never will until fixed. Valid rows are not blocked | Verified (device F-4) | Name the held-back rows in the sheet (P2-2 follow-up) |
+| SQ-F3 | Expired/revoked session on a device not exercised on device | NOT TESTED | Revoke one device's session on test and wait out the token (about 1 h) |
+| SQ-TB | Full spoken TalkBack focus order not walked (adb can't drive TalkBack reliably on the emulator); label/target audit of 10 screens clean | Emulator only | Walk with TalkBack by hand on a device |
+| SQ-RLS | pgTAP suite `supabase/tests/rls_test.sql` written but not executed (no Docker here); a write-path probe on test was declined by the session's permission system. Read-only cross-user REST probe PASS | Partly verified | Run `supabase test db` locally or in CI |
+| SQ-IDX | Test-project advisor lists 10 unused indexes; FK indexes should stay; the old `*_user_updated` cursor indexes look superseded by the `server_updated_at` cursor | Advisor (test) | Decide on production with real statistics |
+| QA-L6 | The server clamps a fast clock's `updated_at` but not `deleted_at`, and the client compares remote deletes on `deleted_at`, so a delete from a phone whose clock runs fast can beat newer edits on devices that pull before they push | Code-only (QA) | Compare on `updated_at`, or clamp `deleted_at` in a new migration (test first) |
+| QA-L7 | The same deleted row can arrive by id (rejected) and in a page, queueing two deletes; the second adds a spurious conflict count (the P2-6 count is correct) | Code-only (QA) | De-duplicate queued deletes by table + id |
+| QA-L8 | CSV export reads the shared transactions flow, which can replay the value from just before a save lands | Code-only (QA) | Read the DAO directly for one-shot exports |
+| QA-L10 | An overpaid liability is announced as "minus liabilities −X" | Code-only (QA) | Word negative liabilities as credit |
+| QA-T | No instrumented Room test for the three new DAO queries; ScreenshotTourTest doesn't visit the Settings hub, sync sheet or module offers | Code-only (QA) | Add tests |
+| RD-C1 | **Rollout order (budget lifecycle, DB v10).** v10 always sends `budgets.month`/`effective_from`; a project without migration `20261102120000_budget_lifecycle_and_institutions.sql` rejects budget uploads (rows stay pending, nothing lost). Applied by the owner on `lucento-test` 2026-11-02 (columns + 4 CHECKs verified read-only) and **on production 2026-11-03** with `production-migration-2026-11-03.sql` (together with 20261101120000/180000) | Test verified; production owner-reported | Closed. Confirm the migration history was recorded (`supabase migration repair`) |
+| RD-C2 | **High for mixed-version accounts.** A pre-v10 client on the same account treats all of a category's budget rows as one budget: it shows the oldest row (maybe a month-only or onward amount), its edit changes that row's amount, and its duplicate-category fold can merge rows of different scopes. Upserts from it never clear the new columns | Design; confirmed by code review (QA 2026-11-03) | Owner decision 2026-11-03: document only — every phone on an account must run v10 before using month-only/onward amounts (release notes, docs/SYNC.md, PRODUCTION_MIGRATION.md) |
+| RD-C3 | ~~Two-device budget lifecycle~~ **PASS** on two emulators against `lucento-test` (month-only change, onward change with confirmation, earlier months unchanged on both phones and the server) | `artifacts/budget-lifecycle/two-device-log.txt` | Closed |
+| RD-A1 | 16 institution slots fall back (14 SVGs use mask/filter/pattern/text/symbol/switch; 1 invalid colour; 1 path over AAPT's 32 KB string limit) — card shows the monogram, list the app icon or monogram | `docs/design/INSTITUTION_ASSETS.md` | Ask the asset researcher for flattened SVGs, then rerun the pipeline |
+| RD-A2 | Wallet rows truncate long names and subtitles at 200% font (pre-existing row layout; institution names make subtitles longer) | Emulator (`partA-8`) | Let the subtitle wrap to two lines in `WalletRow` |
+| RD-A3 | Dark theme not checked on device for the avatar hairline; TalkBack reading of the merged card label not listened to (text verified in the UI tree) | Emulator only | Check in the next device pass |
+| RD-A4 | `CardNetworkIndicator` not built: wallets store no card network, and the design rules forbid network marks on the card face | Design decision | Only if a network field is wanted (new column + migration) |
+| RD-A5 | APK grows by about 1.47 MB compressed (logos 0.68, app icons 0.68, vector icons 0.10, registry 0.02) | Measured with aapt2 on the release APK | Acceptable; 96px icons would save about 0.25 MB if needed |
+| RD-B1 | ~~"Restore a backup file" during onboarding not run end to end on a device~~ **PASS**: tested by the owner 2026-11-03 | Owner device test | Closed |
+| RD-B2 | A backup taken mid-guide restores its guide step, so that user resumes the guided setup (their own saved state) rather than landing on Home | Design | Acceptable; revisit if confusing |
+| RD-DE1 | ~~Spotlight, Getting started and "You’re ready" not seen on a device for a new user~~ **PASS** in the 2026-11-03 fresh-install pass (ring, spotlight, Getting started 2 of 3, You’re ready with 3 milestones, First Step after the first save) | `artifacts/fresh-install-2026-11-03/` | Closed |
+| RD-DE2 | The Home budget card no longer has the mascot or its speech; the mascot remains on onboarding, empty states and the guide | Design decision (remove narrative) | — |
+| RD-DE3 | Emulator system_server restarted several times during this pass (host memory, ENV-1); one Lucento DeadSystemException, caused by the system dying, no app crash | Crash buffer | Tooling |
+| RD-E2-1 | Month-end balances leave out wallets created after that month and archived wallets; months before any wallet existed are not plotted (the history shows only when ≥ 2 months exist) | Design (`BalanceHistory`) | — |
+| RD-E2-2 | Figma MCP rate limit (Starter plan): only the header and the balance card came with full design context; the budget card, shortcuts and lists were matched from frame metadata and the reference image | Tool limit | Re-check against Figma when more MCP calls are available |
+| RD-E2-3 | ~~Balance card without chip~~ The owner asked for a more realistic card: the dashboard card now has a gold chip and a contactless glyph (decorative, hidden from TalkBack), as do wallet cards (decision D3) | Design decision | — |
+| RD-E2-4 | Every APK install on emulator-5556 now triggers a system_server restart (host memory pressure, ENV-1); device screenshots for this pass were taken between restarts | Environment | Free host memory or use a real device |
+| RD-QA-1 | ~~Category fold compared budget amounts across scopes (every-month amount could overwrite a November amount)~~ **Fixed**: fold key includes the scope | Unit (`SyncEngineTest` scope fold) | Closed |
+| RD-QA-2 | ~~A pulled `institution_id` outside the client pattern hid the whole wallet~~ **Fixed**: read as none, wallet kept. Server CHECK stays length-only (1–128) | Unit (`SyncEngineTest`, `PulledRowRulesTest`) | Closed |
+| RD-QA-3 | ~~Backup format still version 1 with new keys~~ **Fixed**: version 2 with a 1→2 step; older apps now say "from a newer Lucento" | Unit (`BackupTest`) | Closed |
+| RD-QA-4 | ~~TalkBack read an unsigned amount on institution cards~~; ~~a month removed on its own said "has its own amount"~~ and "Remove from <month> on" was unreachable there; ~~guide edit could be hidden by a month-only amount~~; `setMonthAmount` outside the transaction runner; pulled rows didn't check single scope; sheet amount lost on rotation; "Getting Consistent" copy said spending — **all fixed** | Unit (`BudgetChangeTest`, `PulledRowRulesTest`) + code | Closed |
+| RD-QA-5 | ~~"Vs last month" % counted a new wallet's opening balance as growth~~ **Fixed**: no % when a wallet in that currency was added in between | Unit (`BalanceHistoryTest`) | Closed |
+| RD-QA-6 | Milestones baseline: if Home records the silent baseline before a sync download or restore lands, later milestones may celebrate data that arrived from the account. New users see their setup milestones on "You’re ready" (verified), not as toasts | Code-only (QA risk) | Baseline again after the first pull completes |
+| RD-QA-7 | About 305 bank logos and 304 official app icons are bundled for display | `docs/design/INSTITUTION_ASSETS.md` | Trademark/licensing review skipped by owner decision 2026-11-03 |
+| RD-QA-8 | Two phones stopping the same category from the same month: "a set amount beats 0" lets an older amount win over a newer stop | Code-only (QA risk) | Revisit the fold rule for recurring 0 rows |
+| RD-QA-9 | ~~The guide's wallet list showed a card's amount owed unsigned ("Visa Card $300.00")~~ **Fixed**: signed (−$300.00) | Fresh-install pass; code | Closed (device recheck in the next pass) |
+| SQ-ENV | Emulator ANRs ("failed to complete startup", launcher and permission controller) right after guest restarts on API 36.1 images; Lucento itself recovered every time | Verified (load average ~25 after boot) | Tooling (ENV-1) |
+
 ## Open — P2 / P3
 
 | ID | Issue | Evidence |
@@ -89,19 +153,19 @@ resolved items are kept at the bottom for traceability.
 | N-06 | ~~No server CHECK constraints~~. **Done on `lucento-test` only** (22 NOT VALID constraints, live rows only); pulled *and pushed* rows are checked by `PulledRowRules`, so one invalid local row no longer blocks a batch. Production needs owner approval | Verified (test: invalid live row blocked, soft delete accepted, app write accepted) |
 | N-08 | Production leaked-password protection disabled (advisor) | Verified |
 | N-09 | `usage_events` accepts unlimited anonymous inserts; allowlist checks names only; `onboarding_completed` not allowed; dead event names remain | Code-only |
-| N-10 | Only 3 entries in `strings.xml`; no plurals ("1 days left"); blocks localization | Verified |
-| N-11 | Home loading state is blank | Code-only |
-| N-12 | 12 ViewModels observe the whole `transactions` table | Code-only |
+| N-10 | Only 3 entries in `strings.xml`; no plurals. **Partly done (P2-7):** every count string checked; the three that could say "1 rows" / "1 of 1 transactions" / "in 1 months" fixed; the rest were already guarded. Moving strings to resources (localization) is not started | Verified (code audit) |
+| N-11 | ~~Home loading state is blank~~. **Fixed (P2-1):** placeholder shapes ("Loading your dashboard") | Code-only (build) |
+| N-12 | 13 ViewModels observed the whole `transactions` table. **Partly done (P2-8):** one shared whole-table query per change for all screens (`TransactionRepository.shareScope`), and scoped queries for Settings (count), Home usage counts (count) and the transaction page (one row + transfer leg). Paging of long lists (Paging 3) and the release startup / baseline-profile measurement (N-13) remain | Verified (unit, device detail page) |
 | N-13 | Cold start 3.6–3.8 s (debug emulator); release unmeasured | Verified (debug) |
 | N-14 | ~~Budget hero vs. category rows don't reconcile~~. **D1:** the Budget summary now says "Spent = $X in your plan + $Y outside it" when there is outside-plan spending | Code-only (build) |
-| N-15 | Last-day pace message not useful | Verified (screen) |
+| N-15 | ~~Last-day pace message not useful~~. **Fixed:** on the last day the line says "Last day of <month>: $X left in your budget" | Verified (unit) |
 | N-17 | ~~No app lock or recents privacy~~. **Done locally (P2-10, D8):** optional lock (fingerprint/face/screen lock, 60 s grace, turns itself off if the phone loses its screen lock) and Hide in recent apps (`FLAG_SECURE`) | Verified (emulator; recents blanking verified by the window flag only, since host screenshots bypass it) |
 | N-20 | Backup Replace on a synced phone deletes cloud rows not in the file (documented) | Code-only |
-| N-21 | Disabled modules are hard to rediscover | Verified |
-| N-22 | Duplicated controls and repeated privacy copy; Settings very long | Verified |
-| N-23 | Sparse Quick links card, no recent activity on Home | Verified |
-| N-19 | Local toolchain drift (JDK 21 daemon file, foojay plugin uncommitted) and `hs_err` logs | Verified |
-| N-26 | Main-thread `runBlocking` wipe in `Application.onCreate` | Code-only |
+| N-21 | ~~Disabled modules are hard to rediscover~~. **Fixed (P2-5):** Home's Quick links list modules that are off with an inline Turn on (also turns on what they need, e.g. Multiple wallets for Debts) | Verified (unit) |
+| N-22 | ~~Duplicated controls and repeated privacy copy; Settings very long~~. **Fixed (P2-4):** Settings is a hub with pages (Account & sync, Money, Your data, Privacy & security, Enabled features); one theme control (profile sheet); "what leaves this phone" said once | Verified (device) |
+| N-23 | ~~Sparse Quick links card, no recent activity on Home~~. **Fixed (P2-1, P2-5):** Recent activity card (3 newest, transfers once); Quick links also offer modules that are off | Verified (device) |
+| N-19 | ~~Local toolchain drift~~. **Resolved:** the foojay plugin was not needed (no project toolchains; Gradle 8.11 can't auto-provision daemon JVMs) and is removed; README documents JDK 17–21 for Gradle (Android Studio's bundled JDK 25 fails with only `25.0.3`); `gradle/gradle-daemon-jvm.properties` is a per-machine choice and gitignored. CI stays on JDK 17 | Verified (local builds with and without the file; CI #108) |
+| N-26 | Main-thread `runBlocking` wipe in `Application.onCreate`. **Closed — by design:** it runs only when an interrupted sign-out wipe is pending (`finishInterruptedWipeBeforeUi` checks `isPending` first), so no screen can show the previous account's ledger (R9-02); normal launches never block | Code-only |
 | S-05 / S-06 | Whole-row LWW; a newer edit resurrects a deleted record (by design) | Code-only; owner decisions D2, D3 |
 | — | Device workflows not yet run on `7928c63`: onboarding-entry upload, empty-account defaults, no-income account, profile email line, amount select-all, onboarding events 1 and 9–14, backup cross-install merge | Unverified |
 | — | R9-02 (marker cleared while ledger visible): fix present, not reproduced | Code-only |

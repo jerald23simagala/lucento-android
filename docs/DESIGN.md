@@ -23,7 +23,7 @@ Soft Ivory `#FFFDF5` · Midnight Navy `#17233F` · Pale Sky `#EAF1FF`.
 | Primary — Electric Blue | `#3563F5`, white label 4.9:1 | `#7C9AFF`, navy label 6.7:1 | Primary actions, selection, the Add tab, links. |
 | On primary container | `#2447C7` on `#EAF1FF` | `#E4EBFF` on `#26397A` | Tonal actions (ActionTile, IconBadge), selected text. |
 | Statement panel (hero) | `#2F56E8` Electric Blue, white text, `#DCE5FF` muted | `#202E4D` elevated navy, `#F8FAFF` / `#B8C5DC` text | Budget hero, Wallets net-worth hero. At night blue stays for interaction only. |
-| Wallet card faces (`walletCard`) | Cash sunlight · Bank blue hero · E-wallet tangerine · Savings green · Credit card navy · Loan deep blue · Other asset pale sky; navy or white ink | Same (physical-card faces don't change at night) | Wallet page balance card. Decoration: two faint ink circles and a chip block only. |
+| Wallet card faces (`walletCard`) | Cash sunlight · Bank blue hero · E-wallet tangerine · Savings green · Credit card navy · Loan deep blue · Other asset pale sky; navy or white ink | Same (physical-card faces don't change at night) | Wallet page balance card without an institution. Decoration: two faint ink circles and a gold chip. Institution faces use the registry colours instead (see Wallet cards). |
 | Accent — sunlight | `#FFC928` (decorative only), `#9A5806` (text) | `#FFC928` (text-safe 11.5:1) | The leaf, the mascot, hero rule, milestones. Sparingly. |
 | Warm accent — tangerine | `#FF8A24` (decorative only) | `#FF8A24` | Logo warmth, secondary chart series. Never a status. |
 
@@ -210,31 +210,35 @@ environment (see `docs/QUALITY.md`).
   Enabled features, version. Lucento has no account; nothing here signs in.
 - One app-wide transaction editor and one transfer sheet. Opening a switched-off module explains and offers "Turn on".
 
-## Home dashboard (v0.6)
-No greeting: the header is working space. Top to bottom, as cards with a title and chevron (the card opens its page):
-1. **Header** — Lucento symbol + wordmark (symbol only under 360dp); a **sync status chip** (icon + word: On device ·
-   Synced · Sync needed · Offline · Sync issue; opens Settings › Cloud sync; "On device" is the normal local-only
-   state); a **payments bell** (when Scheduled is on) whose badge counts scheduled
-   items overdue or due within 7 days (red when any is overdue) and whose menu lists them — each opens its review
-   sheet — with "See all scheduled"; the profile button. Below it, the **month pill** (calendar icon, "October 2026", ▾) listing this month back to the first month
-   with data (≤ 24).
-2. **Monthly budget** — budget health and burn rate in one card, tinted by the verdict (red-tinted ahead, green in
-   step, blue slower). Primary figure **% of budget used** and "of <total> used". Lucento (96dp, no speech bubble; its
-   verdict is read out through its label) stands beside the month pill and leans over the card's top-right corner,
-   its torch casting a slowly breathing sunlight glow across the card (still under reduced motion); by day the card's
-   tint is deep enough for the glow to show, and the advice banner sits on a frosted light panel; two thick bars with their % printed at the fill's end — **Budget used** and **Month elapsed**
-   (real calendar days) — and a legend; three figures: Spent (every expense, budgeted or not) · Remaining (or Over budget) · "16 of 31 days / 52% of
-   month"; an **advice banner** with a matching glyph (up / check / info) and the daily allowance. With Budgets off, a
-   plain Net flow card takes its place.
-3. **Net flow / Net worth** and **Quick links** — two cards side by side (compact type; stacked under ~300dp). The left
-   card has two tappable halves: **Net flow** for the shown month on top (signed, coloured by direction; opens
-   Insights) and **Net worth** today below (assets − debts, with this month's change from recorded income and
-   spending; opens Wallets). Quick links: a 2×2 grid — Savings goals, Scheduled, Debts & loans (each only when its
-   module is on) and **Insights** (a list on small phones). Categories are managed from the Budget tab.
-4. **Top savings goal** — the in-progress goal closest to done (ties: earlier target date; all reached: the newest):
-   its picture, name, %, bar, saved of target, target (or projected) month; "View all".
-5. **Scheduled transactions** — the next recurring items within 30 days: name, category or "Recurring expense",
-   relative and calendar date, signed amount; overdue flagged in words; "See all". Never auto-recorded.
+## Home dashboard (redesign, v10)
+Header "Dashboard" with the sync status chip (On device · Synced · Sync needed · Offline · Sync issue; opens Settings ›
+Cloud sync) and the profile button. A pinned row stays visible while scrolling: "Overview" and the white **month pill**
+(calendar icon, "November 2026", ▾; this month back to the first month with data). Top to bottom:
+1. **First-run cards** (new users only): "Record your first transaction" spotlight (also rings the dock's + until the
+   first entry; the pulse stops under reduced motion) and **Getting started** (x of 3 done). Both disappear once used.
+2. **Net Wallet Balance card**: an ID-1-proportioned blue card (theme-independent, like a physical card) with a
+   guilloché texture, the Lucento mark, a decorative gold chip and a contactless glyph; the signed balance (info
+   tooltip explains assets − owed), "vs last month" mini-bars with a % only when comparable (docs/CALCULATIONS.md),
+   then **Wallets** (assets) and **Debt & Loans** (signed, −) figures. Empty: mascot on the left with a short prompt.
+3. **Monthly Budget**: spent (hero) "of <total> budget", % used, a 7dp bar, a verdict chip in words (Over budget ·
+   Under budget · Ahead of pace · On track), and a subtle italic "Top 2 spending categories" note above two tiles that
+   open Transactions filtered to that category and month.
+4. **Shortcuts**: Goals · Insights · Milestones · Debts · Scheduled (only modules that are on; switched-off ones offer
+   "Turn on" or "Hide").
+5. **Upcoming scheduled transactions** (≤ 3, two-line rows, never auto-recorded) and **Recent transactions** (≤ 5 in
+   the shown month), each with "See all".
+Amounts on cards use the same size for whole units and decimals. Milestones (docs/CALCULATIONS.md) are celebrated
+once, after the write that earned them, through `ConfirmationHost`.
+
+## Wallet cards (redesign Part A)
+- **Type face** (no institution): the `walletCard` colours below, a gold chip, the balance (signed for debts: −1,250.00
+  with "Amount owed"), opening balance and movement count along the bottom.
+- **Institution face** (a bank or provider picked in the wallet editor's searchable picker): the registry's
+  contrast-checked gradient and template, its logo on a white plate (or monogram) top-left, the type chip top-right,
+  a decorative chip, the wallet name and the signed balance. Logos come only from `app/src/main/assets/banks/` and are
+  never baked into card artwork (docs/design/INSTITUTION_ASSETS.md). Not a payment card: no number, expiry or network
+  mark. Debts read without colour: "Amount owed", the minus sign, a dashed type chip and a hatched trailing edge.
+  TalkBack reads institution, type, name and the same signed amount.
 
 ## Budget tab (v0.5)
 The total is always the **sum of category amounts**. Month switcher, currency pills (never summed across currencies),

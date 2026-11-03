@@ -21,6 +21,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -144,6 +145,327 @@ class SyncEngineTest {
             assertEquals(listOf(1_500_00L), budgets.map { it.limitMinor })
         }
         assertTrue(phone.transactions.rows.value.all { it.categoryId == phone.categories.findByClientUuid("a-rent")!!.id })
+    }
+
+    @Test
+    fun `D3 an offline delete loses to a later edit from another phone, even when it is uploaded last`() = runTest {
+        // Device sync QA C-2: phone A deletes "coffee" while offline; phone B edits it afterwards and syncs; A reconnects
+        // later. The delete must carry the time the user deleted, not the upload time, so B's newer edit survives.
+        val a = Device()
+        val cash = a.addWallet()
+        val coffee = a.addTransaction(cash.id, 450, note = "coffee")
+        success(a.sync())
+        val b = Device(now = a.now)
+        success(b.sync())
+
+        a.now += 60_000
+        a.deleteTransaction(coffee) // offline: nothing uploaded yet
+        b.now = a.now + 60_000
+        b.editNote(b.transactions.rows.value.single { it.clientUuid == coffee.clientUuid }, "coffee, large")
+        success(b.sync())
+
+        a.now = b.now + 10 * 60_000 // A comes back online much later
+        success(a.sync())
+        success(b.sync())
+
+        listOf(a, b).forEach { d ->
+            assertEquals(listOf("coffee, large"), d.transactions.rows.value.filter { it.clientUuid == coffee.clientUuid }.map { it.note })
+        }
+        assertEquals(1, server.live("transactions", user).count { it.str("id") == coffee.clientUuid })
+    }
+
+    @Test
+    fun `D3 a delete made after the other phone's edit still wins when uploaded`() = runTest {
+        val a = Device()
+        val cash = a.addWallet()
+        val coffee = a.addTransaction(cash.id, 450, note = "coffee")
+        success(a.sync())
+        val b = Device(now = a.now)
+        success(b.sync())
+
+        b.now = a.now + 60_000
+        b.editNote(b.transactions.rows.value.single { it.clientUuid == coffee.clientUuid }, "coffee, large")
+        success(b.sync())
+        a.now = b.now + 60_000
+        a.deleteTransaction(coffee) // later than B's edit, uploaded later still
+        a.now += 10 * 60_000
+        success(a.sync())
+        success(b.sync())
+
+        listOf(a, b).forEach { d -> assertTrue(d.transactions.rows.value.none { it.clientUuid == coffee.clientUuid }) }
+        assertTrue(server.live("transactions", user).none { it.str("id") == coffee.clientUuid })
+    }
+
+    /** Two phones on one account that both hold "coffee", synced. */
+    private suspend fun twoPhonesWithCoffee(): Triple<Device, Device, TransactionEntity> {
+        val a = Device()
+        val cash = a.addWallet()
+        val coffee = a.addTransaction(cash.id, 450, note = "coffee")
+        success(a.sync())
+        val b = Device(now = a.now)
+        success(b.sync())
+        return Triple(a, b, coffee)
+    }
+
+    private fun Device.coffee(c: TransactionEntity) = transactions.rows.value.singleOrNull { it.clientUuid == c.clientUuid }
+
+    @Test
+    fun `P2-6 an older pending edit replaced by a newer edit elsewhere is reported to that phone only`() = runTest {
+        val (a, b, coffee) = twoPhonesWithCoffee()
+        a.now += 60_000
+        a.editNote(a.coffee(coffee)!!, "older edit") // offline, older
+        b.now = a.now + 60_000
+        b.editNote(b.coffee(coffee)!!, "newer edit")
+        val bReport = success(b.sync())
+        a.now = b.now + 60_000
+        val aReport = success(a.sync())
+
+        assertEquals("newer edit", a.coffee(coffee)!!.note)
+        assertEquals(1, aReport.overridden)
+        assertEquals(1, a.prefs.overriddenChanges)
+        assertEquals(0, bReport.overridden)
+        assertEquals(0, b.prefs.overriddenChanges + success(b.sync()).overridden)
+    }
+
+    @Test
+    fun `P2-6 a delete undone by a newer edit elsewhere is reported`() = runTest {
+        val (a, b, coffee) = twoPhonesWithCoffee()
+        a.now += 60_000
+        a.deleteTransaction(a.coffee(coffee)!!)
+        b.now = a.now + 60_000
+        b.editNote(b.coffee(coffee)!!, "kept")
+        success(b.sync())
+        a.now = b.now + 60_000
+        val report = success(a.sync())
+
+        assertEquals("kept", a.coffee(coffee)!!.note)
+        assertEquals(1, report.overridden)
+    }
+
+    @Test
+    fun `P2-6 a pending edit removed by a newer delete elsewhere is reported`() = runTest {
+        val (a, b, coffee) = twoPhonesWithCoffee()
+        a.now += 60_000
+        a.editNote(a.coffee(coffee)!!, "older edit")
+        b.now = a.now + 60_000
+        b.deleteTransaction(b.coffee(coffee)!!)
+        success(b.sync())
+        a.now = b.now + 60_000
+        val report = success(a.sync())
+
+        assertEquals(null, a.coffee(coffee))
+        assertEquals(1, report.overridden)
+    }
+
+    @Test
+    fun `P2-6 this phone's edit winning, or an ordinary pull, is never reported`() = runTest {
+        val (a, b, coffee) = twoPhonesWithCoffee()
+        b.now = a.now + 60_000
+        b.editNote(b.coffee(coffee)!!, "older edit")
+        success(b.sync())
+        a.now = b.now + 60_000
+        a.editNote(a.coffee(coffee)!!, "newer edit") // A's later edit wins over B's
+        val aReport = success(a.sync())
+        b.now = a.now + 60_000
+        val bReport = success(b.sync()) // B's edit was already synced: replacing it is an ordinary pull, not a lost change
+
+        assertEquals("newer edit", b.coffee(coffee)!!.note)
+        assertEquals(0, aReport.overridden)
+        assertEquals(0, bReport.overridden)
+    }
+
+    @Test
+    fun `C-3 two phones budgeting the same category end with one budget and the same amount everywhere`() = runTest {
+        val a = Device()
+        val groceries = a.addCategory("Groceries", clientUuid = "cat-groceries")
+        success(a.sync())
+        val b = Device(now = a.now)
+        success(b.sync())
+        val bGroceries = b.categories.findByClientUuid("cat-groceries")!!
+
+        a.now += 60_000 // A, offline, budgets 300
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = groceries.id, currencyCode = "USD", limitMinor = 300_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-zzz"))
+        b.now = a.now + 60_000 // B budgets 400 later and syncs first
+        b.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = bGroceries.id, currencyCode = "USD", limitMinor = 400_00, createdAt = b.now, updatedAt = b.now, clientUuid = "b-aaa"))
+        success(b.sync())
+        a.now = b.now + 60_000
+        val aReport = success(a.sync())
+        b.now = a.now + 60_000
+        success(b.sync())
+
+        listOf(a, b).forEach { d ->
+            val rows = d.budgets.rows.value.filter { it.categoryId != null }
+            assertEquals("one row on each device", 1, rows.size)
+            assertEquals(400_00L, rows.single().limitMinor) // the later edit
+            assertEquals("b-aaa", rows.single().clientUuid) // the same row everywhere
+        }
+        // A's 300 was uploaded earlier in that same sync, so it is no longer an unsynced change: no notice (QA M5).
+        assertEquals(0, aReport.overridden)
+    }
+
+    @Test
+    fun `C-3 fold notice - only when the amount shown came from an unsynced edit, never for a 0 row`() = runTest {
+        val a = Device()
+        val food = a.addCategory("Food", clientUuid = "cat-food")
+        // Budget shows the first stored row WITH an amount: 500 here, and the fold keeps 500 -> no notice.
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = food.id, currencyCode = "USD", limitMinor = 0, createdAt = a.now, updatedAt = a.now + 5, clientUuid = "b-1"))
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = food.id, currencyCode = "USD", limitMinor = 500_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-2"))
+        assertEquals(0, success(a.sync()).overridden)
+
+        fun row(id: Long, minor: Long, dirty: Boolean, category: Long = 7) = com.lucento.app.data.local.BudgetEntity(
+            id = id, categoryId = category, currencyCode = "USD", limitMinor = minor, createdAt = 0, updatedAt = 0, dirty = dirty,
+        )
+        // Shown 300 (first stored, unsynced) and the fold keeps 900: this phone's unsynced amount was replaced.
+        assertTrue(budgetFoldReplacesUnsynced(listOf(row(1, 300_00, dirty = true), row(2, 900_00, dirty = false)), setOf(7L), 900_00))
+        // Already synced: not "an unsynced change of this phone".
+        assertFalse(budgetFoldReplacesUnsynced(listOf(row(1, 300_00, dirty = false), row(2, 900_00, dirty = false)), setOf(7L), 900_00))
+        // A 0 row is never what Budget showed; an archived category's budget isn't shown at all.
+        assertFalse(budgetFoldReplacesUnsynced(listOf(row(1, 0, dirty = true), row(2, 500_00, dirty = true)), setOf(7L), 500_00))
+        assertFalse(budgetFoldReplacesUnsynced(listOf(row(1, 300_00, dirty = true), row(2, 900_00, dirty = false)), emptySet(), 900_00))
+    }
+
+    @Test
+    fun `P2-6 a never-synced row adopting a server row is not reported as replaced (QA M7)`() {
+        assertFalse(overridesLocalChange(PullDecision.UPDATE, serverWins = false, localExists = true, localDirty = true, localBaseRevision = null))
+        assertTrue(overridesLocalChange(PullDecision.UPDATE, serverWins = false, localExists = true, localDirty = true, localBaseRevision = 3))
+        assertTrue(overridesLocalChange(PullDecision.INSERT, serverWins = true, localExists = false, localDirty = false, localBaseRevision = null))
+    }
+
+    @Test
+    fun `C-3 the fold keeps the winning edit's own time, so a later fold still compares real edit times`() = runTest {
+        val a = Device()
+        val rent = a.addCategory("Rent", clientUuid = "cat-rent")
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = rent.id, currencyCode = "USD", limitMinor = 300_00, createdAt = a.now, updatedAt = 1_000, clientUuid = "a-keeper"))
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = rent.id, currencyCode = "USD", limitMinor = 900_00, createdAt = a.now, updatedAt = 2_000, clientUuid = "z-copy"))
+        a.now = 9_999_999
+        success(a.sync())
+        val kept = a.budgets.rows.value.single { it.categoryId == rent.id }
+        assertEquals("a-keeper", kept.clientUuid)
+        assertEquals(900_00L, kept.limitMinor)
+        assertEquals(2_000L, kept.updatedAt) // not the fold's clock
+    }
+
+    @Test
+    fun `C-3 a set amount beats an unset one in the budget fold`() = runTest {
+        val a = Device()
+        val rent = a.addCategory("Rent", clientUuid = "cat-rent")
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = rent.id, currencyCode = "USD", limitMinor = 900_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-1"))
+        a.now += 60_000
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = rent.id, currencyCode = "USD", limitMinor = 0, createdAt = a.now, updatedAt = a.now, clientUuid = "b-2"))
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = rent.id, currencyCode = "EUR", limitMinor = 50_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-3"))
+        success(a.sync())
+
+        val usd = a.budgets.rows.value.filter { it.currencyCode == "USD" }
+        assertEquals(listOf(900_00L), usd.map { it.limitMinor })
+        assertEquals(listOf(50_00L), a.budgets.rows.value.filter { it.currencyCode == "EUR" }.map { it.limitMinor }) // other currency untouched
+    }
+
+    @Test
+    fun `budget lifecycle - a this-month change and a future change reach the other phone with their months`() = runTest {
+        val a = Device()
+        val food = a.addCategory("Food", clientUuid = "cat-food")
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = food.id, currencyCode = "USD", limitMinor = 500_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-usual"))
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = food.id, currencyCode = "USD", limitMinor = 650_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-nov", month = "2026-11"))
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = food.id, currencyCode = "USD", limitMinor = 700_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-dec", effectiveFrom = "2026-12"))
+        success(a.sync())
+        val b = Device(now = a.now + 60_000)
+        success(b.sync())
+
+        val rows = b.budgets.rows.value.associateBy { it.clientUuid }
+        assertEquals(3, rows.size) // a month-only row and a recurring row are different budgets, never folded together
+        assertEquals("2026-11" to null, rows.getValue("b-nov").month to rows.getValue("b-nov").effectiveFrom)
+        assertEquals(null to "2026-12", rows.getValue("b-dec").month to rows.getValue("b-dec").effectiveFrom)
+        assertEquals(null to null, rows.getValue("b-usual").month to rows.getValue("b-usual").effectiveFrom)
+        val pushed = server.rows("budgets", user).associateBy { it.str("id") }
+        assertEquals("2026-11", pushed.getValue("b-nov").str("month"))
+        assertEquals("2026-12", pushed.getValue("b-dec").str("effective_from"))
+    }
+
+    @Test
+    fun `budget lifecycle - two phones changing the same month offline end with one amount for that month`() = runTest {
+        val a = Device()
+        val food = a.addCategory("Food", clientUuid = "cat-food")
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = food.id, currencyCode = "USD", limitMinor = 500_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-usual"))
+        success(a.sync())
+        val b = Device(now = a.now)
+        success(b.sync())
+        val bFood = b.categories.findByClientUuid("cat-food")!!
+
+        a.now += 60_000
+        a.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = food.id, currencyCode = "USD", limitMinor = 600_00, createdAt = a.now, updatedAt = a.now, clientUuid = "b-zzz", month = "2026-11"))
+        b.now = a.now + 60_000
+        b.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = bFood.id, currencyCode = "USD", limitMinor = 650_00, createdAt = b.now, updatedAt = b.now, clientUuid = "b-aaa", month = "2026-11"))
+        success(b.sync())
+        a.now = b.now + 60_000
+        success(a.sync())
+        b.now = a.now + 60_000
+        success(b.sync())
+
+        listOf(a, b).forEach { d ->
+            val nov = d.budgets.rows.value.filter { it.month == "2026-11" }
+            assertEquals("one November amount on each device", 1, nov.size)
+            assertEquals(650_00L, nov.single().limitMinor) // the later edit
+            assertEquals(500_00L, d.budgets.rows.value.single { it.month == null }.limitMinor) // the usual amount untouched
+        }
+    }
+
+    @Test
+    fun `a pulled wallet with an institution id this build can't read keeps the wallet and drops only the logo`() = runTest {
+        val a = Device()
+        val w = a.addWallet("Everyday")
+        success(a.sync())
+        // Another client (or a future id format) writes an id outside the registry pattern.
+        val stored = server.rows("wallets", user).single()
+        server.tables.getValue("wallets")[stored.str("id")] = JsonObject(stored + ("institution_id" to JsonPrimitive("Bank-Of-Somewhere")))
+
+        val b = Device(now = a.now + 60_000)
+        success(b.sync())
+        val pulled = b.wallets.findByClientUuid(w.clientUuid!!)
+        assertNotNull("the wallet still arrives", pulled)
+        assertNull(pulled!!.institutionId)
+    }
+
+    @Test
+    fun `a category fold compares budget amounts within one scope only`() = runTest {
+        // The copy has a newer every-month amount (600) and a November amount (100); the keeper has November 0.
+        // November must end at 100 (a set amount beats 0), not take the every-month amount that was folded first.
+        val phone = Device()
+        val keep = phone.addCategory("Food", clientUuid = "a-food")
+        phone.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = keep.id, currencyCode = "USD", limitMinor = 0, createdAt = phone.now, updatedAt = phone.now, clientUuid = "k-nov", month = "2026-11"))
+        success(phone.sync())
+
+        val other = Device(now = phone.now + 60_000)
+        val copy = other.addCategory("food", clientUuid = "b-food")
+        other.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = copy.id, currencyCode = "USD", limitMinor = 600_00, createdAt = other.now, updatedAt = other.now + 5, clientUuid = "c-every", effectiveFrom = "2026-11"))
+        other.budgets.insert(com.lucento.app.data.local.BudgetEntity(categoryId = copy.id, currencyCode = "USD", limitMinor = 100_00, createdAt = other.now, updatedAt = other.now, clientUuid = "c-nov", month = "2026-11"))
+        success(other.sync())
+        success(phone.sync())
+
+        listOf(phone, other).forEach { d ->
+            val food = d.categories.findByClientUuid("a-food")!!
+            val rows = d.budgets.rows.value.filter { it.categoryId == food.id }
+            assertEquals(100_00L, rows.single { it.month == "2026-11" }.limitMinor)
+            assertEquals(600_00L, rows.single { it.effectiveFrom == "2026-11" }.limitMinor)
+        }
+    }
+
+    @Test
+    fun `a wallet's institution reaches the other phone, and clearing it syncs too`() = runTest {
+        val a = Device()
+        val w = a.addWallet("Everyday")
+        a.wallets.update(w.copy(institutionId = "ph_bdo", updatedAt = a.now + 1))
+        success(a.sync())
+        assertEquals("ph_bdo", server.rows("wallets", user).single().str("institution_id"))
+        val b = Device(now = a.now + 60_000)
+        success(b.sync())
+        assertEquals("ph_bdo", b.wallets.findByClientUuid(w.clientUuid!!)!!.institutionId)
+
+        a.now += 120_000
+        a.wallets.update(a.wallets.getById(w.id)!!.copy(institutionId = null, updatedAt = a.now, dirty = true))
+        success(a.sync())
+        b.now = a.now + 60_000
+        success(b.sync())
+        assertNull(b.wallets.findByClientUuid(w.clientUuid!!)!!.institutionId)
     }
 
     /** An account set up on an older phone: Rent (budgeted) and Water, plus a wallet. */

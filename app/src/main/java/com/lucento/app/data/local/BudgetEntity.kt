@@ -39,4 +39,8 @@ data class BudgetEntity(
     @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
     /** Server `revision` this row was last synced at; a push based on it is a causal successor (v7, docs/SYNC.md). */
     @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
+    /** v10, budget lifecycle: "yyyy-MM" makes this a month-only override; null = a recurring row. */
+    @ColumnInfo(name = "month") val month: String? = null,
+    /** v10: first month ("yyyy-MM") a recurring row applies; null = every month (rows saved before v10). */
+    @ColumnInfo(name = "effective_from") val effectiveFrom: String? = null,
 )

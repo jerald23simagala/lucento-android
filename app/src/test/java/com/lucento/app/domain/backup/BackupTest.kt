@@ -25,7 +25,7 @@ class BackupTest {
         val store = MemoryBackupStore(original)
         val engine = engine(store)
         val json = engine.export("0.5.0")
-        assertTrue(json.contains("\"schemaVersion\": 1"))
+        assertTrue(json.contains("\"schemaVersion\": 2"))
         assertTrue(json.contains("\"appVersion\": \"0.5.0\""))
         assertTrue(json.contains("\"exportedAt\": \"2026-03-01T00:00:00Z\""))
         assertTrue(json.contains("\"amountMinor\": 450"))
@@ -63,6 +63,58 @@ class BackupTest {
         assertEquals(LocalDate.parse("2026-01-20"), preview.latestTransaction)
         assertTrue(preview.summary().contains("2 wallets"))
         assertTrue(preview.summary().contains("Transactions from 2026-01-10 to 2026-01-20."))
+    }
+
+    @Test fun budgetLifecycleRowsRoundTripAndOlderFilesStillRestore() = runTest {
+        val at = exportedAt
+        val lifecycle = sample().let { s ->
+            s.copy(
+                budgets = s.budgets + listOf(
+                    BackupBudget("bud-nov", "cat-food", "USD", 45_000, at, at, month = "2026-11"),
+                    BackupBudget("bud-dec", "cat-food", "USD", 0, at, at, effectiveFrom = "2026-12"),
+                ),
+            )
+        }
+        val decoded = BackupCodec.decode(encode(lifecycle)).snapshot.budgets.associateBy { it.id }
+        assertEquals("2026-11", decoded.getValue("bud-nov").month)
+        assertEquals("2026-12", decoded.getValue("bud-dec").effectiveFrom)
+        assertEquals(0L, decoded.getValue("bud-dec").limitMinor)
+        assertNull(decoded.getValue("bud-1").month)
+
+        // A file written before the lifecycle has no month/effectiveFrom keys at all: every budget is "every month".
+        val legacy = encode(sample()).replace(Regex(""",\s*"(month|effectiveFrom)"\s*:\s*null"""), "").replace("\"schemaVersion\": 2", "\"schemaVersion\": 1")
+        assertTrue(!legacy.contains("effectiveFrom"))
+        val restored = BackupCodec.decode(legacy).snapshot.budgets.single()
+        assertNull(restored.month)
+        assertNull(restored.effectiveFrom)
+
+        // Merging keeps a month-only amount and the usual amount as two budgets.
+        val store = MemoryBackupStore(sample())
+        engine(store).restore(encode(lifecycle), RestoreMode.MERGE)
+        assertEquals(setOf("bud-1", "bud-nov", "bud-dec"), store.snapshot.budgets.map { it.id }.toSet())
+    }
+
+    @Test fun walletInstitutionRoundTripsAndOlderFilesStillRestore() = runTest {
+        val linked = sample().let { it.copy(wallets = it.wallets.map { w -> if (w.id == "wal-bank") w.copy(institutionId = "ph_bdo") else w }) }
+        val decoded = BackupCodec.decode(encode(linked)).snapshot.wallets.associateBy { it.id }
+        assertEquals("ph_bdo", decoded.getValue("wal-bank").institutionId)
+        assertNull(decoded.getValue("wal-card").institutionId)
+        val legacy = encode(sample()).replace(Regex(""",\s*"institutionId"\s*:\s*null"""), "").replace("\"schemaVersion\": 2", "\"schemaVersion\": 1")
+        assertTrue(!legacy.contains("institutionId"))
+        assertTrue(BackupCodec.decode(legacy).snapshot.wallets.all { it.institutionId == null })
+        val store = MemoryBackupStore(BackupSnapshot())
+        failure(engine(store), store, encode(linked).replace("\"ph_bdo\"", "\"Not an id\""))
+    }
+
+    @Test fun budgetLifecycleValuesAreValidated() {
+        val at = exportedAt
+        fun withBudget(budget: BackupBudget) = encode(sample().copy(budgets = listOf(budget)))
+        val store = MemoryBackupStore(BackupSnapshot())
+        listOf(
+            BackupBudget("b", "cat-food", "USD", 100, at, at, month = "2026-13"), // not a month
+            BackupBudget("b", "cat-food", "USD", 100, at, at, month = "2026-11", effectiveFrom = "2026-11"), // both scopes
+            BackupBudget("b", "cat-food", "USD", 0, at, at), // 0 means nothing without a month
+        ).forEach { failure(engine(store), store, withBudget(it)) }
     }
 
     @Test fun mergeKeepsTheNewerUpdatedAtAndLocalOnlyRows() = runTest {
@@ -223,9 +275,9 @@ class BackupTest {
 
         assertEquals(BackupFailure.MALFORMED, failure(engine, store, "{"))
         assertEquals(BackupFailure.MALFORMED, failure(engine, store, valid.replace("\"amountMinor\": 450", "\"amountMinor\": 4.50")))
-        assertEquals(BackupFailure.UNSUPPORTED_VERSION, failure(engine, store, valid.replace("\"schemaVersion\": 1", "\"schemaVersion\": 99")))
+        assertEquals(BackupFailure.UNSUPPORTED_VERSION, failure(engine, store, valid.replace("\"schemaVersion\": 2", "\"schemaVersion\": 99")))
         assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replaceFirst("{", "{\"accessToken\":\"secret\",")))
-        assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replace("\"schemaVersion\": 1", "\"schemaVersion\": \"1\"")))
+        assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replace("\"schemaVersion\": 2", "\"schemaVersion\": \"2\"")))
         assertEquals(sample(), store.snapshot)
         assertEquals(0, store.writes)
     }

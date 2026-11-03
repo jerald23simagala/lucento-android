@@ -379,7 +379,7 @@ fun TransactionEditorScreen(
     if (confirmingDelete && initial.id != null && onDelete != null) {
         ConfirmDialog(
             title = "Delete this transaction?",
-            text = "It will be permanently deleted from this device and the wallet balance will update. " +
+            text = "It will be permanently deleted — on your other devices too when cloud sync is on — and the wallet balance will update. " +
                 "This can’t be undone.",
             confirmLabel = "Delete permanently",
             destructive = true,

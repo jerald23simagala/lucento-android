@@ -48,6 +48,8 @@ data class WalletDraft(
     val installmentText: String = "",
     /** When set, saving opens a prefilled recurring payment starting on this day. */
     val reminderDate: LocalDate? = null,
+    /** Bank or provider from the bundled registry (display only); never kept for cash. */
+    val institutionId: String? = null,
 )
 
 sealed interface DraftError {
@@ -123,8 +125,9 @@ class WalletsViewModel(
         saving = true
         viewModelScope.launch {
             val result = try {
-                if (draft.id == null) wallets.create(draft.name, draft.type, amount, debt)
-                else wallets.update(draft.id, draft.name, draft.type, amount, debt)
+                val institution = draft.institutionId.takeIf { draft.type != WalletType.CASH }
+                if (draft.id == null) wallets.create(draft.name, draft.type, amount, debt, institution)
+                else wallets.update(draft.id, draft.name, draft.type, amount, debt, institution)
             } finally {
                 saving = false
             }

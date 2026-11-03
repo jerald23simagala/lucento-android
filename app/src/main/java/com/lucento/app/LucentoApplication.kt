@@ -155,11 +155,17 @@ class AppContainer(application: Application) {
             runner = runner,
         )
     }
+    val institutions: com.lucento.app.core.banks.InstitutionRepository by lazy {
+        com.lucento.app.core.banks.InstitutionRepository { application.assets.open("banks/institutions.json").bufferedReader().use { it.readText() } }
+    }
     val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao(), runner = runner) }
     val transactions: TransactionRepository by lazy {
-        TransactionRepository(database.transactionDao(), database.walletDao(), database.categoryDao(), runner = runner)
+        TransactionRepository(
+            database.transactionDao(), database.walletDao(), database.categoryDao(), runner = runner,
+            shareScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
     }
-    val budgets: BudgetRepository by lazy { BudgetRepository(database.budgetDao(), database.categoryDao()) }
+    val budgets: BudgetRepository by lazy { BudgetRepository(database.budgetDao(), database.categoryDao(), runner = runner) }
     val goals: GoalRepository by lazy { GoalRepository(database.goalDao()) }
     val recurring: RecurringRepository by lazy {
         RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner)

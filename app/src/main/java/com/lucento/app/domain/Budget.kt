@@ -19,8 +19,20 @@ data class Budget(
     val limit: Money,
     /** Local date the budget was created; null when unknown. Used to tell whether it covered a whole month. */
     val createdOn: java.time.LocalDate? = null,
+    /**
+     * Budget lifecycle (owner requirement C4): non-null makes this row a **month-only override** — the category's amount
+     * for exactly this month. A 0 override means "no amount this month". Never affects other months.
+     */
+    val month: YearMonth? = null,
+    /**
+     * For a **recurring** row ([month] null): the first month this amount applies; null = every month (rows saved before
+     * the lifecycle existed). "Update future months" adds a recurring row starting the month after, so earlier months
+     * keep the amount that applied to them. A 0 recurring row stops the allocation from that month.
+     */
+    val effectiveFrom: YearMonth? = null,
 ) {
     val currencyCode: String get() = limit.currencyCode
+    val isMonthOverride: Boolean get() = month != null
     /** A pre-0.5 "budget for everything". Ignored by all calculations; shown once so the user can remove it. */
     val isLegacyOverall: Boolean get() = categoryId == null
 }

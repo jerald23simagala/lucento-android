@@ -50,10 +50,30 @@ data class FeatureSet(val enabled: Set<Feature>) {
     /** Required modules that are currently off and block [feature]. */
     fun missingRequirements(feature: Feature): List<Feature> = feature.requires.filterNot { isEnabled(it) }
 
+    /**
+     * P2-5: everything to switch on so [feature] becomes usable — the module itself and any required module that is off
+     * (e.g. Debts & loans also needs Multiple wallets). Turning modules on never changes data.
+     */
+    fun toTurnOn(feature: Feature): Set<Feature> {
+        val out = linkedSetOf<Feature>()
+        fun visit(f: Feature) {
+            if (!isSwitchedOn(f)) out += f
+            f.requires.filterNot { isEnabled(it) }.forEach(::visit)
+        }
+        visit(feature)
+        return out
+    }
+
+    /** P2-5: modules that live behind Home's Quick links and are off, so Home can offer them again (N-21). */
+    fun rediscoverable(): List<Feature> = QUICK_LINK_MODULES.filterNot { isEnabled(it) }
+
     fun with(feature: Feature, on: Boolean): FeatureSet = FeatureSet(if (on) enabled + feature else enabled - feature)
 
     companion object {
         val ALL = FeatureSet(Feature.entries.toSet())
+
+        /** The modules Home's Quick links open, in their order there (Budget and Wallets have dock tabs). */
+        val QUICK_LINK_MODULES = listOf(Feature.SAVINGS_GOALS, Feature.RECURRING, Feature.DEBTS_LOANS, Feature.INSIGHTS)
     }
 }
 
@@ -66,7 +86,12 @@ enum class FinancialFocus(val title: String, val description: String, val featur
     RECURRING("Manage recurring payments", "Never miss a bill", setOf(Feature.RECURRING)),
     TRENDS("Understand financial trends", "See where your money goes", setOf(Feature.INSIGHTS));
 
+    /** Tracking spending and budgeting are what Lucento is for: always part of the focus, shown as included. */
+    val mandatory: Boolean get() = this == EVERYDAY_SPENDING || this == BUDGETS
+
     companion object {
+        val MANDATORY: Set<FinancialFocus> = entries.filter { it.mandatory }.toSet()
+
         /**
          * Initial modules for the chosen focuses. Budgets, multiple wallets, quick capture and insights are on by
          * default because they make everyday tracking easier (Budget is a primary tab, built from the categories

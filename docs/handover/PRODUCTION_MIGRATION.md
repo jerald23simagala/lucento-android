@@ -1,0 +1,48 @@
+# Production migration runbook — 2026-11-03
+
+**Status: applied to production by the owner on 2026-11-03.** Confirm STEP 4 (history repair) was done.
+
+**Owner-run.** Claude does not apply production migrations. Everything to paste is in
+[production-migration-2026-11-03.sql](production-migration-2026-11-03.sql).
+
+## What ships
+
+| Order | Migration | Effect | Data risk |
+|---|---|---|---|
+| 1 | `20261101120000_financial_check_constraints` | 22 CHECK constraints (currency ISO, known enums, amount bounds) on wallets, categories, transactions, budgets, goals, recurring | None: `NOT VALID`, old rows not re-checked |
+| 2 | `20261101180000_check_constraints_live_rows` | Re-creates the same 22 as `deleted_at is not null or (...)` so a soft delete of an old row always succeeds | None |
+| 3 | `20261102120000_budget_lifecycle_and_institutions` | `budgets.month`, `budgets.effective_from`, `wallets.institution_id` (nullable text) + 4 format checks | None: new columns are null on every existing row |
+
+All three have been on `lucento-test` since 2026-11-01/02. They passed the two-device lifecycle sync and the institution round trip there.
+
+## Ordering against app releases
+
+- **Apply before any v10 build (this branch) signs in against production.** v10 always sends `month`/`effective_from`/`institution_id`. Without the columns, PostgREST rejects the push (`PGRST204`) and sync stalls.
+- Older builds keep syncing afterwards. They never send the new columns, and an upsert leaves the columns it omits unchanged.
+- **Every phone on an account must run v10 before "Only <month>" or "<month> onward" budget amounts are used.** A pre-v10 phone shows those rows as ordinary monthly amounts and can overwrite them (RD-C2, owner decision 2026-11-03). Put this in the release notes.
+
+## Steps (Supabase dashboard → production project → SQL editor)
+
+1. **STEP 0, pre-checks (read-only).** Expected results:
+   - **0a** lists 11 versions, none of them the three above.
+   - **0b** returns 0 rows twice.
+   - **0c** returns 0 in every row.
+   - If **0c** is not zero, stop and send the counts. A live invalid row would fail its next sync push once the constraints exist. Fix the row or leave it as a known exception.
+2. **STEP 1, apply.** Run it as one `begin … commit` block, so a failure leaves nothing applied. ADD COLUMN is metadata-only. The 4 new checks scan `budgets`/`wallets` briefly under an exclusive lock, which takes milliseconds at the current volume.
+3. **STEP 2, verify.** Expected results:
+   - **2a**: 26 rows (22 `validated = false`, 4 `true`).
+   - **2b**: 3 text, nullable columns.
+   - **2c**: true × 3.
+   - **2d**: RLS true × 2.
+4. **Record the history.** The SQL editor does not write `supabase_migrations.schema_migrations`. From a linked CLI, run:
+   `supabase migration repair --status applied 20261101120000 20261101180000 20261102120000`
+5. **Smoke test.** Sign a v10 build in on a production account. Change one budget with "This month only" and set a wallet's bank, then check the rows in the Table editor.
+6. **STEP 3 (optional, later).** Run `VALIDATE CONSTRAINT` for the 22 constraints once 0c stays zero.
+
+## Version drift (N-07), separate decision
+
+Production records the earlier 3 migrations as `20261029030807/14/20`, while the repo files are `20261028180000`, `20261028190000` and `20261029010000`. Until this is reconciled, `supabase db push` would try to re-run them and fail on non-idempotent `create policy`. That is why this runbook uses the SQL editor rather than `db push`. If you want to reconcile it, run `supabase migration repair --status reverted 20261029030807 20261029030814 20261029030820` and then `supabase migration repair --status applied 20261028180000 20261028190000 20261029010000`. These commands touch the history only, not the schema.
+
+## Rollback
+
+The commented block at the end of the SQL file drops everything this rollout added. **Use it only if no v10 build has synced yet.** After a v10 build has synced, dropping the columns breaks v10 sync and discards month-specific budgets and wallet banks.

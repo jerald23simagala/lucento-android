@@ -1,0 +1,16 @@
+Parts D and E (activation, milestones, dashboard) - emulator-5556, debug v10, QA account B on lucento-test, 2026-11-02
+
+partE-1-home-top     Total balance hero first (assets / owed / spendable, month change chip), month pill, compact Budget
+                     card with a word verdict ("Over budget"), spent of total, used vs month bars, "$689.35 over budget ·
+                     29 days left"; quick actions (Expense, Income, Transfer, Scan receipt); "Where it went" breakdown.
+partE-2-home-lower   Recent activity (5), Shortcuts (Goals, Scheduled, Debts, Insights, Milestones). Getting started is
+                     hidden (basics done); top goal / scheduled hidden while there are none (progressive disclosure).
+partD-1-milestones   Milestones sheet: 3 of 6 earned from records; "No streaks, nothing to lose".
+partD-2-milestone-ack  After creating a goal (committed write) Home acknowledged "Milestone: Goal Setter" once (2.4 s);
+                     the top goal card then appeared. Financial Explorer was earned by opening Insights; the stored
+                     acknowledged set was checked in the preferences file (money_keeper, budget_builder, first_step baselined
+                     silently on first run; financial_explorer acknowledged).
+Spoken label fix found here: the hero read "minus owed +$1,250.00"; now "owed -$1,250.00".
+Not exercised on device: the + spotlight and Getting started for a brand-new user (unit-tested: showAddSpotlight,
+gettingStartedLeft), the guide's completion page.
+Test data added: savings goal "QA milestone goal" (target 500.00) on QA account B.

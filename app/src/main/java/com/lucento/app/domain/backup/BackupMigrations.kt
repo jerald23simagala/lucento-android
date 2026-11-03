@@ -14,10 +14,11 @@ fun interface BackupMigrationStep {
 }
 
 object BackupMigrations {
-    const val CURRENT = 1
+    const val CURRENT = 2
 
     private val steps: Map<Int, BackupMigrationStep> = mapOf(
         0 to Migrate0To1,
+        1 to Migrate1To2,
     )
 
     fun toCurrent(document: JsonValue.Obj): JsonValue.Obj {
@@ -41,6 +42,16 @@ object BackupMigrations {
         }
         return current
     }
+}
+
+/**
+ * Version 2 (app v10) adds `institutionId` to wallets and `month` / `effectiveFrom` to budgets. A version 1 file has
+ * none of them; its rows keep the original key sets, which the codec reads as "no institution" and "every month".
+ * The bump makes an older app refuse a version 2 file as "from a newer Lucento" instead of calling it invalid.
+ */
+private object Migrate1To2 : BackupMigrationStep {
+    override fun migrate(document: JsonValue.Obj): JsonValue.Obj =
+        JsonValue.Obj(LinkedHashMap(document.fields).apply { put("schemaVersion", JsonValue.Num("2")) })
 }
 
 /**

@@ -45,4 +45,19 @@ class PulledRowRulesTest {
     fun `a soft-deleted row is never blocked - the delete always applies`() {
         assertNull(PulledRowRules.problem("transactions", tx(type = "REFUND", deleted = true)))
     }
+
+    @Test
+    fun `an unreadable institution id never rejects the wallet, and a budget row is never both scopes`() {
+        assertNull(PulledRowRules.problem("wallets", buildJsonObject {
+            put("type", "BANK"); put("currency_code", "USD"); put("opening_balance_minor", 0); put("institution_id", "Not-An-Id")
+        }))
+        fun budget(month: String?, from: String?) = buildJsonObject {
+            put("currency_code", "USD"); put("limit_minor", 100)
+            month?.let { put("month", it) }; from?.let { put("effective_from", it) }
+        }
+        assertNull(PulledRowRules.problem("budgets", budget("2026-11", null)))
+        assertNull(PulledRowRules.problem("budgets", budget(null, "2026-11")))
+        assertEquals("effective_from", PulledRowRules.problem("budgets", budget("2026-11", "2026-11")))
+        assertEquals("month", PulledRowRules.problem("budgets", budget("2026-13", null)))
+    }
 }

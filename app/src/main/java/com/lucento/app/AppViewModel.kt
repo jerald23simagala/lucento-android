@@ -32,6 +32,10 @@ class AppViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState.Loading)
 
     /** Used when a disabled module is opened from a link: the user can switch it back on in place. */
+    fun markAddSpotlightSeen() {
+        viewModelScope.launch { preferences.setAddSpotlightSeen() }
+    }
+
     fun setFeatureEnabled(feature: Feature, enabled: Boolean) {
         viewModelScope.launch { preferences.setFeatureEnabled(feature, enabled) }
     }

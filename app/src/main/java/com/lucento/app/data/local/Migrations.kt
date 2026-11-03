@@ -370,6 +370,22 @@ object Migrations {
     }
 
     /**
+     * v10 — budget lifecycle and institution identity. Additive only, nothing rewritten:
+     * - `budgets.month`: "yyyy-MM" for a month-only override (owner requirement C4); existing rows stay recurring (null).
+     * - `budgets.effective_from`: first month of a recurring amount; existing rows keep null = every month, so every
+     *   month's budget reads exactly as before until the user edits it.
+     * - `wallets.institution_id`: banking-registry id chosen by the user; existing wallets have none.
+     * The existing dirty/tombstone triggers already cover these columns (they watch updated_at and deletes).
+     */
+    val MIGRATION_9_10: Migration = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `budgets` ADD COLUMN `month` TEXT")
+            db.execSQL("ALTER TABLE `budgets` ADD COLUMN `effective_from` TEXT")
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `institution_id` TEXT")
+        }
+    }
+
+    /**
      * v9 — recurring schedules join cloud sync (docs/SYNC.md): `recurring` gains the same bookkeeping as every synced
      * table — a stable random `client_uuid` (backfilled for existing schedules), `dirty` (existing rows start dirty so
      * the first sync uploads them), `synced_at` and `base_revision` — plus the tombstone and dirty-on-edit triggers.
@@ -403,6 +419,7 @@ object Migrations {
 
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+        MIGRATION_9_10,
     )
 }
 

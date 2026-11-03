@@ -364,6 +364,46 @@ class MigrationTest {
     }
 
     /**
+     * Budget lifecycle + institution identity: existing budgets become recurring "every month" rows (month and
+     * effective_from null, so nothing changes for the user and nothing re-uploads), wallets get no institution.
+     */
+    @Test
+    fun migrate9To10_keepsExistingBudgetsAsEveryMonthAndWalletsWithoutAnInstitution() {
+        helper.createDatabase(TEST_DB, 9).apply {
+            execSQL(
+                "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, dirty) " +
+                    "VALUES (1, 'Bank', 'BANK', 'USD', 100000, 0, 0, 1, 1, 'w-1', 0)"
+            )
+            execSQL(
+                "INSERT INTO budgets (id, category_id, currency_code, limit_minor, created_at, updated_at, client_uuid, dirty, synced_at, base_revision) " +
+                    "VALUES (1, NULL, 'USD', 200000, 1, 1, 'b-1', 0, 5, 2)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 10, true, Migrations.MIGRATION_9_10)
+
+        db.query("SELECT month, effective_from, dirty, limit_minor FROM budgets WHERE id = 1").use { c ->
+            assertTrue(c.moveToFirst())
+            assertTrue(c.isNull(0))
+            assertTrue(c.isNull(1))
+            assertEquals("a migrated budget is unchanged, so it does not re-upload", 0, c.getInt(2))
+            assertEquals(200000L, c.getLong(3))
+        }
+        assertEquals(1L, db.long("SELECT COUNT(*) FROM wallets WHERE institution_id IS NULL"))
+
+        // After the app opens the migrated database (which installs the sync triggers), lifecycle rows sync like any other.
+        SyncTriggers.ensure(db)
+        db.execSQL(
+            "INSERT INTO budgets (id, category_id, currency_code, limit_minor, created_at, updated_at, client_uuid, dirty, month) " +
+                "VALUES (2, NULL, 'USD', 250000, 2, 2, 'b-2', 1, '2027-01')"
+        )
+        db.execSQL("UPDATE budgets SET dirty = 0, synced_at = 6 WHERE id = 2")
+        db.execSQL("UPDATE budgets SET limit_minor = 260000, updated_at = 3 WHERE id = 2")
+        assertEquals(1L, db.long("SELECT dirty FROM budgets WHERE id = 2"))
+        db.assertNoForeignKeyViolations()
+    }
+
+    /**
      * A fresh install never runs a migration — Room creates the tables from the entities — so the sync triggers must
      * come from the open callback. Before SyncTriggers, a new install had none: deletes never reached other devices and
      * edits after the first sync were never pushed.

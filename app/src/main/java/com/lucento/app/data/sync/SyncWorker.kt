@@ -70,6 +70,17 @@ object SyncScheduler {
     }
 
     /**
+     * The sync sheet's Sync now / Try again (P2-2). REPLACE, not KEEP: after a failed run the manual work sits in
+     * WorkManager's backoff (possibly hours), and KEEP would silently drop the user's tap (QA M1). Callers use it only
+     * when no sync is running in this process, so a running cycle is never cancelled.
+     */
+    fun retryNow(context: Context) {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(constraints).build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(MANUAL_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+    }
+
+    /**
      * A sync that must run after new local rows were saved. [ExistingWorkPolicy.APPEND_OR_REPLACE] chains it
      * behind a sync that is already queued, instead of [ExistingWorkPolicy.KEEP] which would drop it and leave
      * those rows unsent.

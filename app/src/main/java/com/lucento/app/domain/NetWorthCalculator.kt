@@ -43,8 +43,18 @@ data class NetWorthComposition(
     val liabilities: List<NetWorthComponent>,
     val totalAssets: Money,
     val totalLiabilities: Money,
+    /**
+     * P2-1: money available for everyday spending — the summed balances of cash, bank and e-wallet accounts in this
+     * currency (savings, other assets and debts excluded). Part of [totalAssets], from the same balances.
+     */
+    val available: Money = Money.zero(currencyCode),
+    /** True when this differs from net worth, i.e. there are savings, other assets or debts; Home shows it only then. */
+    val hasNonSpendable: Boolean = false,
 ) {
     val netWorth: Money get() = totalAssets - totalLiabilities
+
+    /** Home shows "Spendable now" only when it says something net worth doesn't: the two figures differ (QA L9). */
+    val showSpendable: Boolean get() = hasNonSpendable && available != netWorth
     val isEmpty: Boolean get() = assets.isEmpty() && liabilities.isEmpty()
 }
 
@@ -67,6 +77,8 @@ object NetWorthComposer {
             liabilities = liabilities,
             totalAssets = Money.sum(currencyCode, assets.map { it.amount }),
             totalLiabilities = Money.sum(currencyCode, liabilities.map { it.amount }),
+            available = Money.sum(currencyCode, inCurrency.filter { it.type.isSpendable }.map { it.balance }),
+            hasNonSpendable = inCurrency.any { !it.type.isSpendable },
         )
     }
 

@@ -41,6 +41,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.AlertDialog
+import com.lucento.app.core.designsystem.component.SegmentedToggle
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -112,8 +114,8 @@ fun BudgetScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var monthOffset by rememberSaveable { mutableIntStateOf(0) }
     val month = YearMonth.from(state.today).minusMonths(monthOffset.toLong())
-    val currencies = remember(state.budgets, state.categories, state.primaryCurrency) {
-        BudgetPlanner.currencies(state.budgets, state.categories, state.primaryCurrency)
+    val currencies = remember(state.budgets, state.categories, state.primaryCurrency, month) {
+        BudgetPlanner.currencies(state.budgets, state.categories, state.primaryCurrency, month)
     }
     var currency by rememberSaveable { mutableStateOf<String?>(null) }
     val shownCurrency = currency?.takeIf { it in currencies } ?: state.primaryCurrency
@@ -282,7 +284,9 @@ fun BudgetScreen(
                 Spacer(Modifier.height(Spacing.lg))
                 LucentoSecondaryButton(text = "Manage categories", icon = Icons.Outlined.Category, onClick = onManageCategories)
                 InfoNote(
-                    "Budgets run from the 1st to the last day of each month and don’t roll over. Only expenses count — " +
+                    "Changing an amount affects the month you’re viewing; choose “onward” to change the months after it " +
+                        "too. Earlier months always keep their amounts. " +
+                        "Budgets run from the 1st to the last day of each month and don’t roll over. Only expenses count — " +
                         "transfers between your accounts, savings-goal contributions and income never do. Each currency " +
                         "has its own budget; nothing is converted.",
                     modifier = Modifier.padding(top = Spacing.lg),
@@ -293,10 +297,15 @@ fun BudgetScreen(
     }
 
     editing?.let { line ->
+        val change = remember(line, state.budgets, plan.currencyCode, month, state.today) {
+            BudgetChangeContext.of(state.budgets, line.category.id, line.category.name, plan.currencyCode, month, YearMonth.from(state.today))
+        }
         AllocationSheet(
             line = line,
             plan = plan,
-            onSave = { limit, done -> viewModel.setAllocation(line.category.id, plan.currencyCode, limit, done) },
+            change = change,
+            onSave = { limit, scope, done -> viewModel.saveAmount(line.category.id, plan.currencyCode, month, limit, scope, done) },
+            onUseUsual = { done -> viewModel.useUsualAmount(line.category.id, plan.currencyCode, month, done) },
             onDismiss = { editing = null },
         )
     }
@@ -506,24 +515,46 @@ private fun LegacyOverallCard(oldLimit: Money, plan: BudgetPlan, onRemove: () ->
     }
 }
 
-/** Sets, changes or removes one category's monthly amount, showing what the total becomes. */
+/**
+ * Sets, changes or removes one category's amount, showing what the month's total becomes. A change applies to the month
+ * being viewed unless "onward" is chosen; earlier months are never touched (docs/CALCULATIONS.md, "Budget lifecycle").
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AllocationSheet(
     line: CategoryBudgetLine,
     plan: BudgetPlan,
-    onSave: (Money?, (BudgetRepository.SaveResult) -> Unit) -> Unit,
+    change: BudgetChangeContext,
+    onSave: (Money?, BudgetScope, (BudgetRepository.SaveResult) -> Unit) -> Unit,
+    onUseUsual: ((BudgetRepository.SaveResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val separator = remember { MoneyFormatter.decimalSeparator() }
     val currency = plan.currencyCode
-    var text by remember { mutableStateOf(line.limit?.let { MoneyFormatter.formatPlain(it) }.orEmpty()) }
+    var text by rememberSaveable { mutableStateOf(line.limit?.let { MoneyFormatter.formatPlain(it) }.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var budgetScope by rememberSaveable { mutableStateOf(change.defaultScope) }
+    /** An "onward" change waiting for confirmation: the amount (null when removing). */
+    var confirming by remember { mutableStateOf<OnwardChange?>(null) }
 
     fun close() {
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    }
+
+    fun handle(result: BudgetRepository.SaveResult) {
+        when (result) {
+            is BudgetRepository.SaveResult.Saved -> close()
+            BudgetRepository.SaveResult.LimitNotPositive -> error = "The amount must be greater than zero."
+            BudgetRepository.SaveResult.InvalidCategory -> error = "This category is archived. Restore it in Manage categories first."
+            BudgetRepository.SaveResult.Duplicate, BudgetRepository.SaveResult.NotFound -> close()
+        }
+    }
+
+    fun submit(amount: Money?) {
+        if (change.needsConfirmation(budgetScope, removing = amount == null)) confirming = OnwardChange(amount)
+        else onSave(amount, budgetScope, ::handle)
     }
 
     val parsed = parsePositive(text, currency, separator).first
@@ -549,6 +580,9 @@ private fun AllocationSheet(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            change.status?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(Spacing.xs))
             MoneyField(
                 value = text,
@@ -556,10 +590,27 @@ private fun AllocationSheet(
                     text = it
                     error = null
                 },
-                label = "Monthly amount",
+                label = "Amount",
                 currencyCode = currency,
                 error = error,
-                supporting = newTotal?.let { "Your monthly budget becomes ${MoneyFormatter.format(it)}." },
+                supporting = newTotal?.let { "${monthLabel(plan.month)}’s budget becomes ${MoneyFormatter.format(it)}." },
+            )
+            if (change.scopes.size > 1) {
+                Text(
+                    "Apply to",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = Spacing.xs).semantics { heading() },
+                )
+                SegmentedToggle(
+                    options = change.scopes.map { it to change.scopeLabel(it) },
+                    selected = budgetScope,
+                    onSelect = { budgetScope = it },
+                )
+            }
+            Text(
+                change.scopeExplanation(budgetScope),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(Spacing.sm))
             LucentoPrimaryButton(
@@ -570,25 +621,50 @@ private fun AllocationSheet(
                         error = amountError?.message(currency, separator)
                         return@LucentoPrimaryButton
                     }
-                    onSave(money) { result ->
-                        when (result) {
-                            is BudgetRepository.SaveResult.Saved -> close()
-                            BudgetRepository.SaveResult.LimitNotPositive -> error = "The amount must be greater than zero."
-                            BudgetRepository.SaveResult.InvalidCategory -> error = "This category is archived. Restore it in Manage categories first."
-                            BudgetRepository.SaveResult.Duplicate, BudgetRepository.SaveResult.NotFound -> close()
-                        }
-                    }
+                    submit(money)
                 },
             )
-            if (line.isAllocated) {
+            val usual = change.usual
+            if (change.hasOwnAmount && usual != null) {
                 LucentoTextButton(
-                    text = "Remove amount",
+                    text = "Use the usual ${MoneyFormatter.format(usual)}",
+                    onClick = { onUseUsual(::handle) },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+            }
+            // A month removed on its own still has a usual amount that can be stopped from that month on.
+            if (line.isAllocated || (budgetScope == BudgetScope.ONWARD && usual != null)) {
+                LucentoTextButton(
+                    text = change.removeLabel(budgetScope),
                     color = MaterialTheme.colorScheme.error,
-                    onClick = { onSave(null) { close() } },
+                    onClick = { submit(null) },
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             }
             Spacer(Modifier.height(Spacing.lg))
         }
     }
+
+    confirming?.let { pending ->
+        val removing = pending.amount == null
+        AlertDialog(
+            onDismissRequest = { confirming = null },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            title = { Text(change.confirmTitle(removing), style = MaterialTheme.typography.headlineSmall) },
+            text = { Text(change.confirmBody(pending.amount, removing), style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                LucentoTextButton(
+                    text = if (removing) "Stop budgeting" else "Update",
+                    color = if (removing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    onClick = {
+                        confirming = null
+                        onSave(pending.amount, BudgetScope.ONWARD, ::handle)
+                    },
+                )
+            },
+            dismissButton = { LucentoTextButton(text = "Cancel", onClick = { confirming = null }) },
+        )
+    }
 }
+
+private data class OnwardChange(val amount: Money?)

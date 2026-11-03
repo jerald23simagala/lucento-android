@@ -69,6 +69,7 @@ import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.StatusTones
+import com.lucento.app.core.designsystem.component.WalletIdentityTile
 import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
@@ -332,7 +333,7 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (debt != null) {
-            WalletTypeTile(debt.type, size = 36.dp)
+            WalletIdentityTile(debt, size = 36.dp)
         } else {
             CategoryTile(category = schedule.categoryId?.let { state.categoriesById[it] }, type = schedule.type, size = 36.dp)
         }
@@ -463,7 +464,7 @@ private fun ScheduleActionsSheet(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (debt != null) {
-                    WalletTypeTile(debt.type)
+                    WalletIdentityTile(debt)
                 } else {
                     CategoryTile(category = schedule.categoryId?.let { state.categoriesById[it] }, type = schedule.type)
                 }

@@ -75,6 +75,16 @@ data class UserPreferences(
     val appLock: Boolean = false,
     /** Hides Lucento's screen in the recent-apps view (P2-10). A device choice like [appLock]. */
     val hideInRecents: Boolean = false,
+    /** P2-5: the user hid Home's "turn on" offers for modules that are off; Settings › Enabled features still has them. */
+    val moduleOffersHidden: Boolean = false,
+    /** How the user said they pay (onboarding); the guided setup suggests these account types first. Empty = not asked. */
+    val spendTypes: Set<com.lucento.app.domain.SpendType> = emptySet(),
+    /** Milestones already acknowledged (Part D); null until first baselined, so older installs aren't congratulated in bulk. */
+    val achievementsSeen: Set<com.lucento.app.domain.Achievement>? = null,
+    /** The user has opened Insights at least once (the Financial Explorer milestone). Local only. */
+    val insightsVisited: Boolean = false,
+    /** The one-time "+" spotlight after setup was shown and dismissed (or + was used). A device choice. */
+    val addSpotlightSeen: Boolean = false,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
@@ -114,6 +124,11 @@ class UserPreferencesRepository(
         val setupGeneration = intPreferencesKey("setup_generation")
         val appLock = booleanPreferencesKey("app_lock")
         val hideInRecents = booleanPreferencesKey("hide_in_recents")
+        val moduleOffersHidden = booleanPreferencesKey("module_offers_hidden")
+        val spendTypes = stringSetPreferencesKey("spend_types")
+        val achievementsSeen = stringSetPreferencesKey("achievements_seen")
+        val insightsVisited = booleanPreferencesKey("insights_visited")
+        val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -143,6 +158,11 @@ class UserPreferencesRepository(
                 setupGeneration = p[Keys.setupGeneration] ?: 0,
                 appLock = p[Keys.appLock] ?: false,
                 hideInRecents = p[Keys.hideInRecents] ?: false,
+                moduleOffersHidden = p[Keys.moduleOffersHidden] ?: false,
+                spendTypes = com.lucento.app.domain.SpendType.fromKeys(p[Keys.spendTypes].orEmpty()),
+                achievementsSeen = p[Keys.achievementsSeen]?.mapNotNull(com.lucento.app.domain.Achievement::fromKey)?.toSet(),
+                insightsVisited = p[Keys.insightsVisited] ?: false,
+                addSpotlightSeen = p[Keys.addSpotlightSeen] ?: false,
             )
         }
 
@@ -155,8 +175,14 @@ class UserPreferencesRepository(
      * Saves the onboarding choices in one atomic edit, then marks onboarding complete. Called only after the chosen
      * categories were written to the database, so a completed onboarding always has the user's categories.
      */
-    suspend fun completeOnboarding(primaryCurrency: String, themeMode: ThemeMode, features: Set<Feature>) {
+    suspend fun completeOnboarding(
+        primaryCurrency: String,
+        themeMode: ThemeMode,
+        features: Set<Feature>,
+        spendTypes: Set<com.lucento.app.domain.SpendType> = emptySet(),
+    ) {
         context.dataStore.edit {
+            it[Keys.spendTypes] = spendTypes.map { type -> type.name }.toSet()
             it[Keys.primaryCurrency] = primaryCurrency
             it[Keys.themeMode] = themeMode.name
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
@@ -248,6 +274,10 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.hideInRecents] = enabled }
     }
 
+    suspend fun setModuleOffersHidden(hidden: Boolean) {
+        context.dataStore.edit { it[Keys.moduleOffersHidden] = hidden }
+    }
+
 
 
 
@@ -299,6 +329,21 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.themeMode] = mode.name }
     }
 
+    /** Adds [achievements] to the acknowledged set (and baselines it on first use). */
+    suspend fun acknowledgeAchievements(achievements: Set<com.lucento.app.domain.Achievement>) {
+        context.dataStore.edit {
+            it[Keys.achievementsSeen] = it[Keys.achievementsSeen].orEmpty() + achievements.map { a -> a.key }
+        }
+    }
+
+    suspend fun setInsightsVisited() {
+        context.dataStore.edit { if (it[Keys.insightsVisited] != true) it[Keys.insightsVisited] = true }
+    }
+
+    suspend fun setAddSpotlightSeen() {
+        context.dataStore.edit { it[Keys.addSpotlightSeen] = true }
+    }
+
     suspend fun setPrimaryCurrency(code: String) {
         require(CurrencyRules.isSupported(code))
         context.dataStore.edit { it[Keys.primaryCurrency] = code }
@@ -346,6 +391,9 @@ class UserPreferencesRepository(
             p[Keys.onboardingComplete] = false
             p[Keys.categorySetupDone] = false
             p.remove(Keys.guideStep)
+            p.remove(Keys.spendTypes)
+            p.remove(Keys.achievementsSeen)
+            p.remove(Keys.insightsVisited)
             p.remove(Keys.defaultWalletId)
             p.remove(Keys.displayName)
             p.remove(Keys.acknowledgedBudgetMonth)

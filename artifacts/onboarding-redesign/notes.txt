@@ -1,0 +1,22 @@
+Onboarding refactor (redesign Part B) - emulator-5556, debug v10, lucento-test, 2026-11-02
+
+Fresh install (app data cleared; phone 2's data was fully synced to QA account B first - verified on the server):
+1 welcome            "Start fresh" + "I already use Lucento". No stage bar on the welcome screen.
+2 returning-sheet    "Welcome back": Sign in to my account / Restore a backup file ("Nothing is combined with a new setup").
+3 focus              Stage bar: Personalize · Set up · Get started. Track everyday spending and Manage budgets are
+                     "Always included" (not toggleable); the rest optional.
+4 spend              "How do you pay?" (replaces the feature switches): Cash + Bank preselected; Credit card added here.
+5 backup             Stage 2 Set up. Three paths: Sync with an account / Back up to a file / Keep it on this phone only.
+                     The account path shows Google + email; "Not now" keeps it on this phone.
+6 summary            "Lucento is personalized": currency, look, 12 categories, "You pay with", modules (Debts & loans on
+                     because of the credit card), Backups: "Backup files · export any time from Settings › Your data".
+7 guide-wallets      Guided setup continues Stage 2 (bar carries on).
+8 guide-add-account  The production New wallet sheet, preselected to Bank account (from "How do you pay?"), with the
+                     bank picker.
+Returning user (app data cleared again): I already use Lucento > Sign in to my account > reminder > email sign-in
+(QA account B) > straight to Home, synced, no questions and no guide.
+9 restored-wallets   Wallets restored with their institutions (BDO Unibank, Chase) - institution_id pulled from the server.
+
+Not exercised on device: "Restore a backup file" end to end (needs a backup file on the emulator; unit/engine
+covered by BackupTest), the offline-workspace merge prompt in Settings (unchanged FirstSync.ASK_MERGE path).
+Environment: phone 2 restarted its system UI once during this pass (ENV-1); waited for idle each time.

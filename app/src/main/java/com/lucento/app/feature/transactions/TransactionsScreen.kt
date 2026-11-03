@@ -127,8 +127,13 @@ fun TransactionsScreen(
     onScanReceipt: (() -> Unit)? = null,
     /** Shown on the empty state when voice entry is switched on. */
     onSpeak: (() -> Unit)? = null,
+    /** Opened from the dashboard for one category and month: a back arrow, and those filters applied once. */
+    onBack: (() -> Unit)? = null,
+    initialCategoryId: Long? = null,
+    initialMonth: java.time.YearMonth? = null,
     viewModel: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Factory),
 ) {
+    LaunchedEffect(Unit) { viewModel.applyInitial(initialCategoryId, initialMonth) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val hasHistory = !state.loading && state.wallets.isNotEmpty() && state.totalCount > 0
     // Local text state keeps typing responsive; the ViewModel receives every change.
@@ -154,6 +159,13 @@ fun TransactionsScreen(
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             LucentoTopBar(
                 title = "Transactions",
+                onBack = onBack,
+                subtitle = state.filter.month?.let { m ->
+                    listOfNotNull(
+                        state.filter.categoryId?.let { id -> state.categoriesById[id]?.name },
+                        m.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) + " ${m.year}",
+                    ).joinToString(" · ")
+                },
                 actions = {
                     if (hasHistory) {
                         IconButton(onClick = {
@@ -314,10 +326,10 @@ fun TransactionsScreen(
         ConfirmDialog(
             title = if (transfer) "Delete this transfer?" else "Delete this transaction?",
             text = if (transfer) {
-                "Both sides of the transfer will be permanently deleted from this device, and both wallet balances " +
+                "Both sides of the transfer will be permanently deleted — on your other devices too when cloud sync is on — and both wallet balances " +
                     "will update. This can’t be undone."
             } else {
-                "It will be permanently deleted from this device and the wallet balance will update. " +
+                "It will be permanently deleted — on your other devices too when cloud sync is on — and the wallet balance will update. " +
                     "This can’t be undone."
             },
             confirmLabel = "Delete permanently",
@@ -514,7 +526,7 @@ private fun ShownSummary(state: TransactionsUiState) {
         else -> TonePair(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface)
     }
     val scope = when {
-        state.filter.isActive -> "${state.matchCount} of ${state.totalCount} transactions"
+        state.filter.isActive -> "${state.matchCount} of ${state.totalCount} " + if (state.totalCount == 1) "transaction" else "transactions"
         else -> "${state.totalCount} ${if (state.totalCount == 1) "transaction" else "transactions"}"
     }
     LucentoCard(modifier = Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
@@ -563,8 +575,10 @@ private fun FilterRow(state: TransactionsUiState, viewModel: TransactionsViewMod
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         MenuPill(
-            label = rangeLabel(f.preset),
-            active = f.preset != RangePreset.ALL,
+            // A month from the dashboard shows as that month until the user picks another range.
+            label = f.month?.let { m -> m.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) + " ${m.year}" }
+                ?: rangeLabel(f.preset),
+            active = f.preset != RangePreset.ALL || f.month != null,
             options = RangePreset.entries.map { preset -> rangeLabel(preset) to { viewModel.setPreset(preset) } },
         )
         MenuPill(

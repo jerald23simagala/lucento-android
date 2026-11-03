@@ -33,9 +33,11 @@ data class TransactionFilterState(
     val walletId: Long? = null,
     val categoryId: Long? = null,
     val preset: RangePreset = RangePreset.ALL,
+    /** One calendar month (from the dashboard's "top spending" tiles); replaces [preset] while set. */
+    val month: java.time.YearMonth? = null,
 ) {
     val isActive: Boolean
-        get() = query.isNotBlank() || type != null || walletId != null || categoryId != null || preset != RangePreset.ALL
+        get() = query.isNotBlank() || type != null || walletId != null || categoryId != null || preset != RangePreset.ALL || month != null
 }
 
 /** A day of history with its net movement per currency (primary currency first). */
@@ -91,7 +93,7 @@ class TransactionsViewModel(
                 type = filter.type,
                 walletId = filter.walletId,
                 categoryId = filter.categoryId,
-                range = filter.preset.resolve(LocalDate.now()),
+                range = filter.month?.let { com.lucento.app.domain.DateRange.monthOf(it.atDay(1)) } ?: filter.preset.resolve(LocalDate.now()),
             ),
             categoryNames = categoryList.associate { it.id to it.name },
             walletNames = walletList.associate { it.id to it.name },
@@ -116,7 +118,16 @@ class TransactionsViewModel(
     fun setType(type: TransactionType?) = filterState.update { it.copy(type = type) }
     fun setWallet(walletId: Long?) = filterState.update { it.copy(walletId = walletId) }
     fun setCategory(categoryId: Long?) = filterState.update { it.copy(categoryId = categoryId) }
-    fun setPreset(preset: RangePreset) = filterState.update { it.copy(preset = preset) }
+    fun setPreset(preset: RangePreset) = filterState.update { it.copy(preset = preset, month = null) }
+
+    private var initialApplied = false
+
+    /** Opened for one category and month (dashboard tile): applied once per screen, then the user's own filters win. */
+    fun applyInitial(categoryId: Long?, month: java.time.YearMonth?) {
+        if (initialApplied || (categoryId == null && month == null)) return
+        initialApplied = true
+        filterState.update { it.copy(categoryId = categoryId, month = month) }
+    }
     fun clearFilters() = filterState.update { TransactionFilterState() }
 
     companion object {

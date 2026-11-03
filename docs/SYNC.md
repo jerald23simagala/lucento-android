@@ -153,8 +153,35 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
 - Deletes follow the same rule: a delete based on the current revision applies even from a slow clock; a delete that
   lost to a newer concurrent edit is rejected and the edited row comes back on the deleting device. On the receiving
   side a remote delete is skipped only if this device holds a newer unpushed edit (`localWinsOverRemoteDelete`).
+- A delete's time is **when the user deleted** (the tombstone's `deleted_at`), not when it is uploaded. Until
+  2026-11-02 the upload time was sent, so a delete made offline and uploaded later beat an edit another device made
+  after it (device QA C-2); `SyncEngineTest` "D3 …" covers both directions.
 - Retries are idempotent: a push whose reply was lost is refused the second time (same edit, stale base) and resolved
   from the identical server copy — no duplicate, no lost edit.
+- **Telling the user (P2-6).** Only when this phone's own unsynced change lost — a pending edit replaced, a delete undone
+  by a newer edit, a pending edit removed by a newer delete, or a duplicate budget folded to another amount — sync adds
+  to `SyncReport.overridden`, stored as `overridden_changes` in the sync preferences until dismissed. Home and the sync
+  sheet then say "A change you made on this phone was replaced by a newer change from another device. The newest
+  version is kept everywhere." This phone's edit winning is not reported (the other phone hears about it instead).
+- **Duplicate budgets** for one category and currency (two phones each set an amount) fold into one row on every device;
+  see docs/CALCULATIONS.md "Two budgets for one category".
+- **Budget lifecycle (v10).** `budgets.month` and `budgets.effective_from` ("yyyy-MM") sync like any other column and
+  are validated on pull (`PulledRowRules`) and on the server (format CHECKs, at most one set). v10 clients always send
+  both keys (null included), so a mixed bulk upsert can never drop one. **Rollout order:** migration
+  `20261102120000_budget_lifecycle_and_institutions.sql` must reach a project before any v10 build syncs against it,
+  or budget uploads fail because the columns are unknown (rows stay pending, nothing is lost). Older clients do not
+  know these columns: an upsert from them leaves the columns unchanged, but they treat every budget row of a category
+  as one budget. They show the oldest row (possibly a month-only or "from a month" amount) as the monthly amount, an
+  edit there changes that row's amount, and their duplicate-category fold can merge rows of different scopes. **Every
+  phone on an account must run v10 before month-only or "from a month" amounts are used** (owner decision 2026-11-03:
+  documented, no server guard). `wallets.institution_id` (same migration) carries the wallet's bundled institution id
+  (display only); v10 always sends it, null included, so removing an institution syncs. A pulled id that isn't
+  lowercase snake_case (≤ 128) is read as none, so the wallet still arrives; an id the bundled registry doesn't know
+  falls back to the per-type look.
+- **What the user sees (P2-2).** The Home chip shows On device · Offline · Syncing · Needs attention · Waiting to sync ·
+  Synced and opens a sheet with the state, Sync now / Try again (a phone that never synced is sent to Settings ›
+  Account & sync, which asks before combining data), and the notice above. The other device picks changes up on Sync
+  now, at launch, after its own saves, or on the 30-minute periodic sync — there is no live push.
 - Why not server arrival order alone: it would let an edit made offline yesterday overwrite one made online today.
   Revisions keep offline editing correct without trusting arrival order or device clocks for sequential edits.
 

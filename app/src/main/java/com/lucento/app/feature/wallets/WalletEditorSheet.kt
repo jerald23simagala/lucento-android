@@ -86,6 +86,10 @@ import com.lucento.app.domain.Wallet
 import com.lucento.app.feature.plan.DateField
 import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.launch
+import com.lucento.app.core.banks.Institution
+import com.lucento.app.core.designsystem.component.InstitutionAvatar
+import com.lucento.app.core.designsystem.component.LocalInstitutions
+import androidx.compose.material.icons.outlined.Close
 import java.time.LocalDate
 
 fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
@@ -100,6 +104,7 @@ fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     repayment = debt?.repayment ?: DebtRepayment.ONE_TIME,
     termMonthsText = debt?.termMonths?.toString().orEmpty(),
     installmentText = debt?.installment?.let { MoneyFormatter.formatPlain(it) }.orEmpty(),
+    institutionId = institutionId,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,6 +131,8 @@ fun WalletEditorSheet(
     var draft by remember { mutableStateOf(initial) }
     var error by remember { mutableStateOf<DraftError?>(null) }
     var pickingCurrency by remember { mutableStateOf(false) }
+    var pickingInstitution by remember { mutableStateOf(false) }
+    val institution = LocalInstitutions.current[draft.institutionId]
     var confirmingDelete by remember { mutableStateOf(false) }
     var blocked by remember { mutableStateOf<WalletRepository.DeleteResult?>(null) }
 
@@ -176,6 +183,7 @@ fun WalletEditorSheet(
                     currencyCode = draft.currencyCode,
                     amount = MoneyParser.parseOrNull(draft.amountText, draft.currencyCode, decimalSeparator),
                     amountLabel = amountLabel,
+                    institution = institution.takeIf { draft.type != WalletType.CASH },
                 )
             }
 
@@ -197,6 +205,16 @@ fun WalletEditorSheet(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = Spacing.xs),
+                )
+            }
+
+            if (draft.type != WalletType.CASH) {
+                Spacer(Modifier.height(Spacing.lg))
+                FieldHeader("Bank or provider (optional)")
+                InstitutionField(
+                    institution = institution,
+                    onClick = { pickingInstitution = true },
+                    onClear = { draft = draft.copy(institutionId = null) },
                 )
             }
 
@@ -391,6 +409,16 @@ fun WalletEditorSheet(
             onDismiss = { pickingCurrency = false },
         )
     }
+    if (pickingInstitution) {
+        InstitutionPickerSheet(
+            selectedId = draft.institutionId,
+            onSelect = {
+                draft = draft.copy(institutionId = it?.id)
+                pickingInstitution = false
+            },
+            onDismiss = { pickingInstitution = false },
+        )
+    }
 
     if (confirmingDelete && initial.id != null && onDelete != null) {
         ConfirmDialog(
@@ -508,7 +536,7 @@ private fun DebtDetails(
             error is DraftError.InstallmentUnclear -> HintText((error as DraftError.InstallmentUnclear).message, isError = true)
             suggested != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                 HintText(
-                    "${MoneyFormatter.format(suggested)} a month repays ${MoneyFormatter.format(owed!!)} in $months months" +
+                    "${MoneyFormatter.format(suggested)} a month repays ${MoneyFormatter.format(owed!!)} in ${if (months == 1) "1 month" else "$months months"}" +
                         (rate?.let { " at ${DebtMath.formatRate(it)}" } ?: "") + ".",
                     modifier = Modifier.weight(1f),
                 )
@@ -530,6 +558,47 @@ private fun DebtDetails(
         )
         if (draft.reminderDate != null) {
             HintText("After saving, a recurring payment opens with this filled in, so you can split it into principal and interest.")
+        }
+    }
+}
+
+/** The wallet's bank or provider: its icon and name, or a prompt; a clear button removes it. */
+@Composable
+private fun InstitutionField(institution: Institution?, onClick: () -> Unit, onClear: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), MaterialTheme.shapes.small)
+            .clickable(role = Role.Button, onClickLabel = if (institution == null) "Choose bank or provider" else "Change bank or provider", onClick = onClick)
+            .padding(start = Spacing.lg, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (institution != null) {
+            InstitutionAvatar(institution, size = 32.dp)
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(institution.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    "${institutionKind(institution.type)} · ${countryName(institution.country)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            IconButton(onClick = onClear) {
+                Icon(Icons.Outlined.Close, contentDescription = "Remove ${institution.name}")
+            }
+        } else {
+            Text(
+                "None — shows the wallet type’s look",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.padding(end = Spacing.sm))
         }
     }
 }

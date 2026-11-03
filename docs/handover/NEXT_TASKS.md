@@ -8,6 +8,56 @@
 > Production writes, production deploys, production env changes, merges and destructive Git operations need explicit
 > owner approval.
 
+## Stabilization cycle (2026-11-02, uncommitted on `main` from 01cfd04)
+
+| Item | Status | Evidence |
+|---|---|---|
+| GitHub Actions #108 (01cfd04) | **PASS** — all four repository variables reached the release step, enforcement on, the CI release APK embeds the exact URL / publishable key / Web client id (production project, no test project, no server-only keys) | run logs + downloaded artifact |
+| Toolchain (N-19) | **PASS** — foojay removed (not needed), JDK 17–21 documented, daemon file per machine (gitignored); CI on 17 | local builds |
+| Two-emulator sync QA | **PASS WITH NOTES** — basic, offline, conflicts, isolation, restart, invalid row PASS; two defects found and fixed (offline delete beating a newer edit; duplicate budgets per device); F-3 expired session NOT TESTED | `artifacts/sync-qa/sync-log.txt` |
+| P2-1 Home "Am I on track?" | **PASS WITH NOTES** — Recent activity, Spendable now, loading skeleton; pace card kept; Quick links enriched by P2-5 | `artifacts/p2-ux/`, unit |
+| P2-2 Sync transparency | **PASS** — chip states incl. Syncing / Needs attention, details sheet with Sync now / Try again, account-mismatch route; follow-up SQ-F4 (held-back rows) | device + unit |
+| P2-4 Settings IA | **PASS** — hub + pages, one theme control, privacy said once, Back to hub, shared ViewModel | device + unit |
+| P2-5 Module rediscovery | **PASS** — offers with Turn on (with requirements) and Hide | unit, device (partial) |
+| P2-6 "Changed on another device" | **PASS** — notice only when this phone's unsynced change lost | device + unit |
+| P2-7 Strings / plurals | **PARTIAL** — plural defects fixed; strings not moved to resources | code audit |
+| P2-8 Scoped queries / paging | **PARTIAL** — shared whole-table query + 3 scoped queries; paging and startup profile not done | unit, device |
+| P2-11 RLS suite | **PASS WITH NOTES** — read-only cross-user REST probe PASS on test; pgTAP suite written (54 assertions) but not executed (no Docker); write probe declined by the permission system | `artifacts/security/rls-verification.txt` |
+| TalkBack / accessibility | **PASS WITH NOTES (emulator only)** — 10-screen label/target audit clean; live spoken traversal not driven | `artifacts/accessibility/talkback-emulator.txt` |
+| P3 | **Partly done** — N-15 last-day copy, F-3 copy, delete-dialog copy, stale sign-in error, N-26 closed (by design), N-19 resolved. Not done: undo after save, N-09 usage-events limits (needs a server change), unused-index cleanup (production decision), visual/motion polish | — |
+| Independent QA | Done (read-only). Critical: none. H1, M1–M7 and L1–L4, L9 fixed; others in KNOWN_ISSUES | — |
+| Owner-confirmed (physical Samsung) | Hide in recent apps **PASS**, App lock **PASS** (owner) | owner |
+| Deferred by the owner | release keystore, signing secrets, release OAuth client, production migrations, N-07 | — |
+
+## Next programme — Unified product experience redesign (requested 2026-11-02)
+Wallet and banking identity (institution registry, BankCard, InstitutionAvatar, picker), onboarding and account lifecycle,
+budget education and month-specific budgets (a budget change applies to the selected month only), first-transaction
+activation with light achievements, dashboard cognitive-load redesign. Started after this cycle; see its own section.
+
+| Part | Status (2026-11-02) |
+|---|---|
+| C — month-specific budgets | **Implemented, uncommitted.** DB v10 (`MIGRATION_9_10`, schema `10.json` exported, `check_migrations.py` OK, instrumented `migrate9To10` PASS on emulator), `BudgetPlanner.effectiveAllocation`, `BudgetRepository.setMonthAmount/clearMonth/setFrom/setRecurring` (atomic), sync DTO + pull validation + scope-keyed folds, backup codec/merge (older files still restore), Budget sheet "Only <month>" / "<month> onward" with confirmation, past months month-only, guide + Budget copy. Docs: CALCULATIONS.md "Budget lifecycle", SYNC.md. Tests: BudgetLifecycleTest, BudgetChangeTest, SyncEngineTest (2), BackupTest (2). Two-emulator check PASS on `lucento-test` (`artifacts/budget-lifecycle/`). Production migration pending (RD-C1) |
+| A — wallet/banking identity | **Implemented, uncommitted.** Pipeline `tools/institutions/build_institutions.py` (Android's own Svg2Vector from the Gradle cache + svgo pre-pass; WebP 144px app icons; identical icons shared) → `assets/banks/institutions.json` (380 institutions; card networks excluded), 305 card logos + 70 vector icons + 302 WebP icons, generated `InstitutionArt.kt`, report `docs/design/INSTITUTION_ASSETS.md` (16 fallbacks with reasons). `Wallet.institutionId` through repository, sync (always sent; pull-validated), backup (older files restore). `InstitutionRegistry`/`InstitutionRepository`, `LocalInstitutions`, `InstitutionAvatar`, `WalletIdentityTile` (rows, guide, schedules, composer), institution card face in `WalletCard` (templates, plates, dashed chip + hatch for debts, signed amounts), picker sheet + editor field + live preview. APK +1.47 MB compressed (measured). Decision: official app icon over recoloured glyph (44 incl. Chase, N26, Robinhood). Not done: CardNetworkIndicator (needs a stored network; deferred), dark-theme device check |
+| B — onboarding | **Implemented, uncommitted.** Welcome = workspace choice (Start fresh · I already use Lucento → sign in to an account, or restore a backup file offline; never combined with a new setup). Three visible stages (`SetupStage`, `StageIndicator`) across onboarding and the guided setup. Focus: tracking spending and budgeting always included. "How do you pay?" (`SpendType`) replaces the feature switches (cards/loans turn on Debts & loans; the guide suggests those account types first, stored as `spend_types`). Backups step with three paths (account / file / this phone only); summary "Lucento is personalized" → "Continue to set up". The guide reuses the production New wallet sheet (now with the bank picker) and reads budget amounts with the lifecycle rules. Offline-workspace reconciliation: unchanged `FirstSync.ASK_MERGE` (asks before joining). Device: fresh path + returning sign-in path on emulator (`artifacts/onboarding-redesign/`). Not on device: backup-file restore end to end |
+| D — activation & milestones | **Implemented, uncommitted.** Guide completion "You’re ready" (checklist in words + milestones earned). One-time + spotlight after setup (Home card + ringed dock +, static under reduced motion), cleared by the first entry or "Not now". Six light milestones (`Achievement`, `Achievements.earned/facts/toAcknowledge`) from records only — no streaks, points or nags; baselined silently on first run; each acknowledged once after the committed write (Milestone confirmation); Milestones sheet from Shortcuts. Local prefs: `achievements_seen`, `insights_visited`, `add_spotlight_seen` |
+| E2 — dashboard to owner reference + Figma (`MhsrRL6KNILGrMzH1bYdmr`, frame 3:1366) | **Implemented, uncommitted, branch `feature/unified-redesign`.** Header "Dashboard" (+ sync, bell, profile); pinned second row "Overview" + month pill; every month-dependent section follows the one selected month. Net Wallet Balance card (Figma gradient #2768ED→#162D88, texture disc, (i) tooltip, Lucento symbol + white wordmark, 40sp balance, 3-bar month-end history + trend % only from a positive start, Wallets / Debt & Loans with the Figma icons — downloaded and converted to VectorDrawables `ic_dash_*`, `bg_dash_card_texture`). Past months show end-of-month balances (`BalanceHistory`). Monthly Budget card: spent of budget, % used, 7dp bar, status (Under budget / On track / Ahead of pace / Over budget), top two categories → Transactions filtered to that category and month (`CategoryTransactionsRoute`, month filter in Transactions). Shortcuts Goals · Insights · Milestones · Debts · Scheduled (icon squares + labels). Upcoming Scheduled Transactions (current month: due by month end, overdue first; two-line rows with due pill). Recent Transactions (the month's newest, shared transaction rows). Removed from Home: quick actions (still on +), "Where it went", top-goal card. Figma MCP Starter-plan limit hit after 2 design-context calls: budget, shortcuts and lists follow the file's metadata (sizes/structure) and the owner's reference image, not a full Figma render |
+| E3 — owner refinements (2026-11-02) | **Implemented, uncommitted.** Card amounts never shrink their decimals (`fractionScale = 1f` on dashboard and wallet cards). Net Wallet Balance card as a physical card: ID-1 proportions, drop shadow, light edge, top sheen, faint guilloché lines, chip + contactless mark in the chip position; balance 32sp (−20%) directly under its label; header raised to match the bottom inset; trend is "vs last month" (2 points). Monthly Budget: subtle italic "Top 2 spending categories" note. Empty cards (scheduled, recent, budget setup) show Lucento on the left. Screens: `artifacts/dashboard-figma/card-v2-*` |
+| E — dashboard (first pass) | **Superseded by E2;** Home order: total balance hero → compact budget pace card (word verdict, spent of total, used vs month bars, left/over + days; mascot narration and advice banner removed) → quick actions (Expense, Income, Transfer, Scan receipt) → "Where it went" (top 4 + Other) → recent (5) → Getting started (until the basics exist) → Shortcuts (+ Milestones, module offers) → top goal / scheduled only when present. Device: `artifacts/dashboard-redesign/` |
+
+### Redesign close-out (2026-11-03) and what comes next
+Done: fresh-install pass (PASS, `artifacts/fresh-install-2026-11-03/`), read-only QA review (fixes RD-QA-1…5, 9),
+production runbook (`PRODUCTION_MIGRATION.md`), final report (`REDESIGN_FINAL_REPORT.md`). Owner decision: RD-C2 is
+documented (every phone on v10 before month-only/onward amounts), no server guard.
+
+| Priority | Task | Owner |
+|---|---|---|
+| 1 | ~~Apply the three pending migrations to production~~ **Done by the owner 2026-11-03**; confirm `supabase migration repair` recorded the history | Owner |
+| 2 | ~~Commit `feature/unified-redesign`~~ **Committed 2026-11-03** (owner-authorized). Next: push and open a PR so CI runs schema drift, emulator migration tests and the screenshot tour (needs authorization) | Owner → Claude |
+| 3 | Release v10 with a note that every phone on an account must update before using "Only <month>" / "<month> onward" | Owner |
+| 4 | Device checks still open: dark theme on wallet/dashboard cards (RD-A3), live TalkBack traversal, guide signed owed amount (RD-QA-9); backup-file restore done by the owner (RD-B1) | Claude |
+| 5 | Milestone baseline after first pull (RD-QA-6); recurring-stop fold rule (RD-QA-8) | Claude |
+| 6 | ~~Trademark/licensing review of bundled logos (RD-QA-7)~~ Skipped by owner decision 2026-11-03 | — |
+
 ## Execution status — master backlog run (2026-11-01, uncommitted on `feature/ai-development-workflow`)
 
 Statuses below were verified against the code, tests and devices, not copied from older notes.
@@ -46,6 +96,7 @@ Statuses below were verified against the code, tests and devices, not copied fro
 | P1-8 | Budget amount when categories combine | **Keep the latest edit** (set beats unset; tie → smaller sync id) | 2026-11-01 |
 | D1 | Budget "Spent" | **All expenses, shown as in-plan + outside-plan** (P2-3) | 2026-11-01 |
 | D2 | Conflict policy | **Whole-row latest wins**, plus a "changed on another device" notice (P2-6) | 2026-11-01 |
+| D3 | Wallet card look | **Real-card feel**: drawn EMV-style chip on every face (overrides the design system's "no chip"); balance at 22sp, never oversized. Still no number, expiry, cardholder or network mark | 2026-11-02 |
 | D3 | Delete vs. later edit | **Newer action wins** (current) | 2026-11-01 |
 | D4 | Wallet dedup on first sign-in | **Never merge; keep the warning** (current behaviour) | 2026-11-01 |
 | D5 | R10-01 / offline revoke before beta | **Required before beta**, done locally (session coordinator) | 2026-11-01 |
