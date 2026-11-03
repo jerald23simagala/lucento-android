@@ -1,14 +1,17 @@
 package com.lucento.app.feature.wallets
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,18 +21,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingFlat
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,37 +46,57 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lucento.app.core.designsystem.component.CardOverline
+import com.lucento.app.core.designsystem.component.ChoicePill
+import com.lucento.app.core.designsystem.component.CompositionBar
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.HeroCard
-import com.lucento.app.core.designsystem.component.HeroPill
-import com.lucento.app.core.designsystem.component.HeroTones
 import com.lucento.app.core.designsystem.component.InfoNote
+import com.lucento.app.core.designsystem.component.LegendKey
+import com.lucento.app.core.designsystem.component.ListSectionHeader
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
+import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.ProfileButton
-import com.lucento.app.core.designsystem.component.ToneChip
+import com.lucento.app.core.designsystem.component.SegmentedToggle
+import com.lucento.app.core.designsystem.component.StatTile
+import com.lucento.app.core.designsystem.component.StatTileLayout
+import com.lucento.app.core.designsystem.component.TrendLine
+import com.lucento.app.core.designsystem.component.ViewOption
+import com.lucento.app.core.designsystem.component.ViewToggle
+import com.lucento.app.core.designsystem.component.screenGutter
 import com.lucento.app.core.designsystem.theme.AmountStyles
+import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
+import com.lucento.app.data.preferences.WalletsViewMode
 import com.lucento.app.domain.Insights
 import com.lucento.app.domain.NetWorthCalculator
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.balanceFlag
+import java.time.format.TextStyle
+import java.util.Locale
+import kotlin.math.abs
 
 @Composable
 fun WalletsScreen(
@@ -90,14 +118,17 @@ fun WalletsScreen(
     val newDraft = { WalletDraft(currencyCode = state.primaryCurrency) }
     val canAdd = allowAdding || state.wallets.isEmpty()
 
-    // Assets by type order, then liabilities: the two halves of net worth.
-    val assets = state.wallets.filterNot { it.type.isLiability }.sortedBy { it.type.ordinal }
-    val liabilities = state.wallets.filter { it.type.isLiability }
+    // Assets by type order, then liabilities: the two halves of net worth, after the side and type filters.
+    val shown = state.shown
+    val assets = shown.filterNot { it.type.isLiability }.sortedBy { it.type.ordinal }
+    val liabilities = shown.filter { it.type.isLiability }
     val flagged = state.wallets.count { it.balanceFlag != null }
+    val cards = state.viewMode == WalletsViewMode.CARDS
+    val gutter = screenGutter()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
+        contentPadding = PaddingValues(start = gutter, end = gutter, bottom = Spacing.fabClearance),
     ) {
         item(key = "title") {
             LucentoTopBar(
@@ -124,9 +155,16 @@ fun WalletsScreen(
             }
         }
 
-        state.summary?.let { summary ->
-            item(key = "summary") {
-                NetWorthCard(summary.totalFor(state.primaryCurrency) ?: summary.totals.first(), summary)
+        val summary = state.summary
+        val net = state.heroTotal
+        if (summary != null && net != null) {
+            item(key = "summary") { NetWorthCard(net, summary, state.trend) }
+            item(key = "split") { AssetsLiabilitiesSplit(net.currencyCode, summary) }
+        }
+
+        if (state.wallets.size >= 2) {
+            item(key = "filters") {
+                WalletFilters(state, onSide = viewModel::setSide, onType = viewModel::setTypeFilter, onViewMode = viewModel::setViewMode)
             }
         }
 
@@ -134,23 +172,35 @@ fun WalletsScreen(
             key = "assets",
             title = "Assets",
             caption = "What you have",
-            tone = { positiveTone() },
             wallets = assets,
             primaryCurrency = state.primaryCurrency,
+            cards = cards,
             onOpen = { onOpenWallet(it.id) },
         )
         walletSection(
             key = "liabilities",
             title = "Liabilities",
             caption = "What you owe",
-            tone = { negativeTone() },
             wallets = liabilities,
             primaryCurrency = state.primaryCurrency,
+            cards = cards,
             onOpen = { onOpenWallet(it.id) },
             // Payoff progress, payments and interest live in Debts & loans.
             link = onOpenDebts?.let { "Debts & loans" to it },
             footnote = "Cards and loans reduce your net worth; they’re never counted as money you have.",
         )
+
+        if (state.wallets.isNotEmpty() && shown.isEmpty()) {
+            item(key = "no-match") {
+                Column(Modifier.fillMaxWidth().padding(top = Spacing.lg), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("No wallets match these filters.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LucentoTextButton(text = "Show all wallets", onClick = {
+                        viewModel.setSide(WalletSide.ALL)
+                        viewModel.setTypeFilter(null)
+                    })
+                }
+            }
+        }
 
         if (!canAdd) {
             item(key = "single") {
@@ -182,77 +232,304 @@ fun WalletsScreen(
     }
 }
 
-@Composable
-private fun positiveTone(): TonePair = LucentoTheme.extendedColors.let { TonePair(it.positiveContainer, it.positive) }
-
-@Composable
-private fun negativeTone(): TonePair = LucentoTheme.extendedColors.let { TonePair(it.negativeContainer, it.negative) }
-
 /**
- * The page's statement: a solid brand-blue card (navy at night) with net worth on the left and its two halves stacked
- * on the right — Assets on a sunlight pill above, Liabilities on a tangerine pill below. Net worth's own pill turns
- * tangerine when it is negative. Every figure is signed, so the colours only reinforce the meaning.
+ * The page's statement on brand blue (navy at night): net worth with its change since last month and what is owed as a
+ * share of what is held, and — once there are two months to compare — the last six months as a sunlight trend line.
+ * The trend moves under the figure on narrow screens and at large text. Every figure is signed.
  */
 @Composable
-private fun NetWorthCard(net: Money, summary: NetWorthCalculator.Summary) {
+private fun NetWorthCard(net: Money, summary: NetWorthCalculator.Summary, trend: NetWorthTrend?) {
+    val ext = LucentoTheme.extendedColors
+    val code = net.currencyCode
+    val history = trend?.history.orEmpty()
+    val fontScale = LocalDensity.current.fontScale
+    HeroCard(Modifier.padding(top = Spacing.xs)) {
+        Spacer(Modifier.height(Spacing.xs))
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val showTrend = history.size >= 2
+            if (showTrend && maxWidth >= 300.dp && fontScale < 1.3f) {
+                Row(verticalAlignment = Alignment.Top) {
+                    NetFigure(net, summary, trend, Modifier.weight(1f))
+                    Spacer(Modifier.width(Spacing.md))
+                    TrendBlock(history, fontScale)
+                }
+            } else {
+                Column {
+                    NetFigure(net, summary, trend, Modifier.fillMaxWidth())
+                    if (showTrend) {
+                        Spacer(Modifier.height(Spacing.md))
+                        TrendBlock(history, fontScale, Modifier.align(Alignment.End))
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        val others = summary.totals.filter { it.currencyCode != code }
+        if (others.isNotEmpty()) {
+            Text(
+                "Also: " + others.joinToString(" · ") { MoneyFormatter.formatSigned(it, showPlus = false) },
+                style = MaterialTheme.typography.bodySmall,
+                color = ext.onHeroMuted,
+            )
+            Spacer(Modifier.height(Spacing.xs))
+        }
+    }
+}
+
+@Composable
+private fun NetFigure(net: Money, summary: NetWorthCalculator.Summary, trend: NetWorthTrend?, modifier: Modifier) {
     val ext = LucentoTheme.extendedColors
     val code = net.currencyCode
     val assets = summary.assets[code] ?: Money.zero(code)
     val owed = summary.liabilities[code] ?: Money.zero(code)
-    HeroCard(Modifier.padding(top = Spacing.xs)) {
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1.15f)) {
-                HeroPill(
-                    "Net worth · $code",
-                    if (net.isNegative) HeroTones.tangerine else HeroTones.main,
-                    Modifier.semantics { heading() },
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = net, style = AmountStyles.hero, color = ext.onHero)
-            }
-            VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                HalfLine("Assets", HeroTones.sunlight, assets)
-                HalfLine("Liabilities", HeroTones.tangerine, -owed)
-            }
+    Column(modifier) {
+        CardOverline("Net worth · $code", color = ext.onHeroMuted)
+        Spacer(Modifier.height(6.dp))
+        MoneyText(money = net, style = AmountStyles.hero, color = ext.onHero, fractionScale = 1f, minScale = 0.5f)
+        val change = trend?.monthOnMonth
+        val previous = trend?.history?.let { if (it.size >= 2) it[it.size - 2].month else null }
+        if (change != null && previous != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            ChangePill(change, previous.month.getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault()))
         }
         val percent = Insights.percentOf(owed, assets)
-        val notes = listOfNotNull(
-            if (!owed.isZero && percent != null) "You owe $percent% of what you have." else null,
-            if (summary.totals.size > 1) {
-                "Also: " + summary.totals.filter { it.currencyCode != code }
-                    .joinToString(" · ") { MoneyFormatter.formatSigned(it, showPlus = false) }
-            } else {
-                null
-            },
-        )
-        if (notes.isNotEmpty()) {
-            Spacer(Modifier.height(Spacing.sm))
-            Text(notes.joinToString(" "), style = MaterialTheme.typography.bodySmall, color = ext.onHeroMuted)
+        if (!owed.isZero && percent != null) {
+            Spacer(Modifier.height(10.dp))
+            Text("You owe $percent% of what you have.", style = MaterialTheme.typography.bodySmall, color = ext.onHeroMuted)
         }
     }
 }
 
+/** "+3% vs Oct": the change in net worth since the end of last month, with an arrow that agrees with the sign. */
 @Composable
-private fun HalfLine(label: String, tone: TonePair, money: Money) {
-    Column(Modifier.fillMaxWidth()) {
-        HeroPill(label, tone)
-        Spacer(Modifier.height(Spacing.xxs))
-        MoneyText(money = money, style = AmountStyles.row, color = LucentoTheme.extendedColors.onHero, fractionScale = 1f)
+private fun ChangePill(percent: Int, previousMonth: String) {
+    val ext = LucentoTheme.extendedColors
+    val sign = when {
+        percent > 0 -> "+"
+        percent < 0 -> "−"
+        else -> ""
+    }
+    val icon = when {
+        percent > 0 -> Icons.AutoMirrored.Filled.TrendingUp
+        percent < 0 -> Icons.AutoMirrored.Filled.TrendingDown
+        else -> Icons.AutoMirrored.Filled.TrendingFlat
+    }
+    val spoken = when {
+        percent > 0 -> "Up $percent percent since the end of $previousMonth"
+        percent < 0 -> "Down ${abs(percent)} percent since the end of $previousMonth"
+        else -> "Unchanged since the end of $previousMonth"
+    }
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(ext.onHero.copy(alpha = 0.16f))
+            .clearAndSetSemantics { contentDescription = spoken }
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = ext.onHero, modifier = Modifier.size(12.dp))
+        Spacer(Modifier.width(Spacing.xs))
+        Text("$sign${abs(percent)}% vs $previousMonth", style = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold), color = ext.onHero, maxLines = 1)
+    }
+}
+
+/** The last months of net worth: a caps caption, then a sunlight [TrendLine] with month names under it. */
+@Composable
+private fun TrendBlock(history: List<com.lucento.app.domain.MonthBalance>, fontScale: Float, modifier: Modifier = Modifier) {
+    val ext = LucentoTheme.extendedColors
+    val locale = Locale.getDefault()
+    // Three letters fit six months in 150dp; at large text only the initial does.
+    val nameStyle = if (fontScale >= 1.3f) TextStyle.NARROW_STANDALONE else TextStyle.SHORT_STANDALONE
+    val first = history.first()
+    val last = history.last()
+    val description = "Net worth over ${history.size} months, from ${MoneyFormatter.formatSigned(first.netWorth)} at the end of " +
+        "${first.month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)} to ${MoneyFormatter.formatSigned(last.netWorth)} now"
+    Column(modifier, horizontalAlignment = Alignment.End) {
+        Text(
+            "${history.size} MONTHS",
+            style = OverlineStyle.copy(fontSize = 10.sp),
+            color = ext.onHeroMuted,
+            modifier = Modifier.clearAndSetSemantics { },
+        )
+        Spacer(Modifier.height(10.dp))
+        TrendLine(
+            points = history.map { it.netWorth.amountMinor },
+            labels = history.map { it.month.month.getDisplayName(nameStyle, locale) },
+            color = ext.accent,
+            description = description,
+            labelColor = ext.onHeroMuted,
+            currentLabelColor = ext.onHero,
+            background = ext.hero,
+        )
     }
 }
 
 /**
- * Assets or liabilities: a tinted header (title, what it means, how many, per-currency subtotal) above one card that
- * holds the rows, split by hairlines — the same card treatment as a day in Transactions.
+ * Assets and liabilities as two stat cards (signed, coloured by side), then — when both sides hold something — how
+ * everything tracked divides between them, with the formula that turns them into net worth.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Summary) {
+    val ext = LucentoTheme.extendedColors
+    val assets = summary.assets[code] ?: Money.zero(code)
+    val owed = summary.liabilities[code] ?: Money.zero(code)
+    val figureStyle = AmountStyles.medium.copy(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold)
+    val assetsTile: @Composable (Modifier) -> Unit = { m ->
+        StatTile(
+            "Assets",
+            Icons.Outlined.AccountBalanceWallet,
+            TonePair(ext.positiveContainer, ext.success),
+            description = "Assets ${MoneyFormatter.formatSigned(assets, showPlus = false)}",
+            layout = StatTileLayout.Inline,
+            modifier = m,
+        ) { MoneyText(money = assets, style = figureStyle, color = ext.positive, fractionScale = 1f) }
+    }
+    val liabilitiesTile: @Composable (Modifier) -> Unit = { m ->
+        StatTile(
+            "Liabilities",
+            Icons.Outlined.CreditCard,
+            TonePair(ext.negativeContainer, ext.negativeIndicator),
+            description = "Liabilities ${MoneyFormatter.formatSigned(-owed)}",
+            layout = StatTileLayout.Inline,
+            modifier = m,
+        ) { MoneyText(money = -owed, style = figureStyle, color = ext.negative, fractionScale = 1f) }
+    }
+    Column(Modifier.padding(top = Spacing.md)) {
+        if (LocalDensity.current.fontScale >= 1.5f) {
+            // Very large text: one card per row, so "Liabilities" never breaks mid-word.
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                assetsTile(Modifier.fillMaxWidth())
+                liabilitiesTile(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                assetsTile(Modifier.weight(1f).fillMaxHeight())
+                liabilitiesTile(Modifier.weight(1f).fillMaxHeight())
+            }
+        }
+        val share = WalletsOverview.assetShare(assets, owed)
+        if (share != null) {
+            Spacer(Modifier.height(Spacing.md))
+            CompositionBar(
+                weights = listOf(assets.amountMinor, owed.amountMinor),
+                colors = listOf(ext.success, ext.negativeIndicator),
+                scaleTo = Math.addExact(assets.amountMinor, owed.amountMinor),
+                description = "Assets are $share percent and liabilities ${100 - share} percent of everything tracked",
+                height = 10.dp,
+                modifier = Modifier.padding(horizontal = Spacing.xxs),
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            FlowRow(
+                Modifier.fillMaxWidth().padding(horizontal = Spacing.xxs),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                LegendKey("Assets $share%", ext.success)
+                LegendKey("Liabilities ${100 - share}%", ext.negativeIndicator)
+                // Flows onto its own line when the row is full (and wraps there only at very large text).
+                Text(
+                    "Net worth = assets − liabilities",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * All / Assets / Liabilities (only when both sides exist), the row / card view toggle, and chips for the wallet types the
+ * user has on that side (only when there are two or more). Filtering is display-only; nothing is recalculated.
+ */
+@Composable
+private fun WalletFilters(
+    state: WalletsUiState,
+    onSide: (WalletSide) -> Unit,
+    onType: (com.lucento.app.domain.WalletType?) -> Unit,
+    onViewMode: (WalletsViewMode) -> Unit,
+) {
+    val hasBothSides = state.wallets.any { it.type.isLiability } && state.wallets.any { !it.type.isLiability }
+    val types = WalletsOverview.typesOn(state.wallets, state.side)
+    val fontScale = LocalDensity.current.fontScale
+    val sides: @Composable (Modifier) -> Unit = { m ->
+        if (fontScale >= 1.5f) {
+            // Very large text: three equal segments can't hold "Liabilities"; pills size to their words and scroll.
+            Row(m.horizontalScroll(rememberScrollState()).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                WalletSide.entries.forEach { side ->
+                    ChoicePill(label = side.label, selected = side == state.side, onClick = { onSide(side) })
+                }
+            }
+        } else {
+            SegmentedToggle(
+                options = WalletSide.entries.map { it to it.label },
+                selected = state.side,
+                onSelect = onSide,
+                compact = true,
+                modifier = m,
+            )
+        }
+    }
+    val view: @Composable () -> Unit = {
+        ViewToggle(
+            options = listOf(
+                ViewOption(WalletsViewMode.ROWS, Icons.AutoMirrored.Filled.List, "Row view"),
+                ViewOption(WalletsViewMode.CARDS, Icons.Outlined.GridView, "Card view"),
+            ),
+            selected = state.viewMode,
+            onSelect = onViewMode,
+        )
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = Spacing.md)) {
+        // "Liabilities" needs about 80dp at normal text: the side switch shares the row with the view toggle only when
+        // all three labels fit beside it; otherwise it takes its own row (narrow phones, large text).
+        val inline = !hasBothSides || maxWidth >= 96.dp + 240.dp * fontScale
+        Column {
+            if (inline) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (hasBothSides) sides(Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(Spacing.sm))
+                    view()
+                }
+            } else {
+                sides(Modifier.fillMaxWidth())
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { view() }
+            }
+            WalletTypeChips(state, types, onType)
+        }
+    }
+}
+
+/** Chips for the wallet types the user has on the chosen side; shown only when there are two or more to choose from. */
+@Composable
+private fun WalletTypeChips(
+    state: WalletsUiState,
+    types: List<com.lucento.app.domain.WalletType>,
+    onType: (com.lucento.app.domain.WalletType?) -> Unit,
+) {
+    if (types.size < 2) return
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        ChoicePill(label = "All types", selected = state.typeFilter == null, onClick = { onType(null) })
+        types.forEach { type ->
+            ChoicePill(label = type.chipLabel, selected = state.typeFilter == type, onClick = { onType(type) })
+        }
+    }
+}
+
+/**
+ * Assets or liabilities: the section title with what it holds (or a link) and its per-currency subtotal, then the
+ * wallets as rows in one card or, in card view, as wallet faces — two to a row (one under 340dp, three from 600dp).
  */
 private fun LazyListScope.walletSection(
     key: String,
     title: String,
     caption: String,
-    tone: @Composable () -> TonePair,
     wallets: List<Wallet>,
     primaryCurrency: String,
+    cards: Boolean,
     onOpen: (Wallet) -> Unit,
     /** A destination shown beside the title in place of the caption, e.g. Debts & loans. */
     link: Pair<String, () -> Unit>? = null,
@@ -264,23 +541,21 @@ private fun LazyListScope.walletSection(
         val subtotals = wallets.groupBy { it.currencyCode }
             .map { (code, list) -> Money.sum(code, list.map { it.netWorthContribution }) }
             .sortedWith(compareBy<Money> { it.currencyCode != primaryCurrency }.thenBy { it.currencyCode })
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(top = Spacing.md, bottom = Spacing.xs, start = Spacing.xxs),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ToneChip(title, tone(), modifier = Modifier.semantics { heading() })
-            Spacer(Modifier.width(Spacing.sm))
-            if (link != null) {
-                Box(Modifier.weight(1f)) {
+        ListSectionHeader(
+            title,
+            caption = "$caption · ${wallets.size}",
+            subtotal = subtotals.joinToString(" · ") { MoneyFormatter.formatSigned(it, showPlus = false) },
+            action = link?.let { (label, open) ->
+                {
                     Row(
                         Modifier
                             .heightIn(min = Sizes.minTouch)
                             .clip(MaterialTheme.shapes.small)
-                            .clickable(role = Role.Button, onClick = link.second)
+                            .clickable(role = Role.Button, onClick = open)
                             .padding(horizontal = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(link.first, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
                         Icon(
                             Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = null,
@@ -289,28 +564,18 @@ private fun LazyListScope.walletSection(
                         )
                     }
                 }
-            } else {
-                Text(
-                    "$caption · ${wallets.size}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                )
-            }
-            Text(
-                subtotals.joinToString(" · ") { MoneyFormatter.formatSigned(it, showPlus = false) },
-                style = AmountStyles.small,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
+            },
+        )
     }
     item(key = "card-$key") {
-        LucentoCard(modifier = Modifier.fillMaxWidth().animateItem(), contentPadding = 0.dp) {
-            wallets.forEachIndexed { index, wallet ->
-                WalletRow(wallet = wallet, onClick = { onOpen(wallet) }, dense = true)
-                if (index < wallets.lastIndex) Hairline(strong = true)
+        if (cards) {
+            WalletFaceGrid(wallets, onOpen, Modifier.animateItem())
+        } else {
+            LucentoCard(modifier = Modifier.fillMaxWidth().animateItem(), contentPadding = 0.dp) {
+                wallets.forEachIndexed { index, wallet ->
+                    WalletRow(wallet = wallet, onClick = { onOpen(wallet) }, dense = true)
+                    if (index < wallets.lastIndex) Hairline(strong = true)
+                }
             }
         }
     }
@@ -320,8 +585,29 @@ private fun LazyListScope.walletSection(
                 footnote,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.xs, start = Spacing.xxs),
+                modifier = Modifier.padding(top = Spacing.sm, start = Spacing.xxs),
             )
+        }
+    }
+}
+
+@Composable
+private fun WalletFaceGrid(wallets: List<Wallet>, onOpen: (Wallet) -> Unit, modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val columns = when {
+            maxWidth < 300.dp -> 1
+            maxWidth >= 520.dp -> 3
+            else -> 2
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            wallets.chunked(columns).forEach { row ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    row.forEach { wallet ->
+                        CompactWalletFace(wallet, onClick = { onOpen(wallet) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
         }
     }
 }

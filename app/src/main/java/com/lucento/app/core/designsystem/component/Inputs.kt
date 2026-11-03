@@ -10,8 +10,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -180,7 +191,10 @@ fun <T> SegmentedToggle(
     }
 }
 
-/** Selectable pill used for wallets, date shortcuts and filters. */
+/**
+ * Selectable pill used for wallets, date shortcuts and filters. Selected is solid primary; [tonal] makes it pale sky
+ * with deep-blue text instead, for a filter that is applied but shouldn't shout (Transactions' date range).
+ */
 @Composable
 fun ChoicePill(
     label: String,
@@ -190,15 +204,17 @@ fun ChoicePill(
     leadingIcon: ImageVector? = null,
     trailingIcon: ImageVector? = null,
     role: Role = Role.RadioButton,
+    tonal: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
+    val selectedContainer = if (tonal) colors.primaryContainer else colors.primary
     val container by animateColorAsState(
-        if (selected) colors.primary else colors.surfaceContainerLowest,
+        if (selected) selectedContainer else colors.surfaceContainerLowest,
         tween(160),
         label = "pill",
     )
-    // Selected: solid primary with its label colour; unselected: a neutral pill with a hairline.
-    val border = if (selected) colors.primary else colors.outlineVariant
+    // Selected: solid primary (or pale sky) with its label colour; unselected: a neutral pill with a hairline.
+    val border = if (selected) selectedContainer else colors.outlineVariant
     Surface(
         modifier = modifier
             .minimumInteractiveComponentSize()
@@ -207,7 +223,11 @@ fun ChoicePill(
             .selectable(selected = selected, role = role, onClick = onClick),
         shape = MaterialTheme.shapes.small,
         color = container,
-        contentColor = if (selected) colors.onPrimary else colors.onSurface,
+        contentColor = when {
+            !selected -> colors.onSurface
+            tonal -> colors.onPrimaryContainer
+            else -> colors.onPrimary
+        },
         border = BorderStroke(1.dp, border),
     ) {
         Row(
@@ -218,10 +238,84 @@ fun ChoicePill(
                 Icon(leadingIcon, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(Spacing.sm))
             }
-            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                label,
+                style = if (selected && tonal) MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold) else MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (trailingIcon != null) {
                 Spacer(Modifier.width(Spacing.xs))
                 Icon(trailingIcon, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+/** One choice in a [ViewToggle]: its value, glyph and spoken name. */
+data class ViewOption<T>(val value: T, val icon: ImageVector, val label: String)
+
+/**
+ * Icon buttons in one outlined pill (e.g. row view / card view). The selected one takes the pale-sky fill with an
+ * on-primary-container glyph. The pill is drawn 40dp tall, but each button's touch target is the full 48dp row.
+ */
+@Composable
+fun <T> ViewToggle(
+    options: List<ViewOption<T>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    val haptics = rememberHaptics()
+    val outline = colors.outlineVariant
+    val surface = colors.surfaceContainerLowest
+    Row(
+        modifier
+            .height(Sizes.minTouch)
+            .drawBehind {
+                val inset = 4.dp.toPx()
+                val radius = CornerRadius(13.dp.toPx())
+                drawRoundRect(surface, topLeft = Offset(0f, inset), size = Size(size.width, size.height - inset * 2), cornerRadius = radius)
+                drawRoundRect(
+                    outline,
+                    topLeft = Offset(0f, inset),
+                    size = Size(size.width, size.height - inset * 2),
+                    cornerRadius = radius,
+                    style = Stroke(1.dp.toPx()),
+                )
+            }
+            .padding(horizontal = Spacing.xs)
+            .selectableGroup(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEach { option ->
+            val isSelected = option.value == selected
+            val fill by animateColorAsState(if (isSelected) colors.primaryContainer else Color.Transparent, tween(160), label = "view-toggle")
+            Box(
+                Modifier
+                    .width(40.dp)
+                    .fillMaxHeight()
+                    .selectable(selected = isSelected, role = Role.RadioButton) {
+                        if (!isSelected) {
+                            haptics.tick()
+                            onSelect(option.value)
+                        }
+                    }
+                    .semantics { contentDescription = option.label },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(width = 36.dp, height = 32.dp).clip(RoundedCornerShape(9.dp)).background(fill),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        option.icon,
+                        contentDescription = null,
+                        tint = if (isSelected) colors.onPrimaryContainer else colors.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }

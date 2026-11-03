@@ -29,6 +29,8 @@ import kotlinx.coroutines.launch
 data class GuideUiState(
     val loading: Boolean = true,
     val step: GuideStep = GuideStep.WALLETS,
+    /** The furthest getting-started stage reached in this run (never behind [step]'s own stage). */
+    val furthestStage: com.lucento.app.domain.SetupStage = com.lucento.app.domain.SetupStage.SET_UP,
     val features: FeatureSet = FeatureSet.ALL,
     val currency: String = "USD",
     val wallets: List<Wallet> = emptyList(),
@@ -97,10 +99,19 @@ class GuideViewModel(
         val all: List<com.lucento.app.domain.Transaction>,
     )
 
+    /**
+     * The furthest stage reached since this screen opened, so going back from Get started to Set up keeps Get started
+     * shown as reached. Every step change is observed below, whichever action saved it.
+     */
+    private var furthestStage: com.lucento.app.domain.SetupStage? = null
+
     val uiState: StateFlow<GuideUiState> = combine(preferences.preferences, data) { p, d ->
+        val step = GuidedSetup.resume(p.guideStep ?: GuideStep.WELCOME, p.features)
+        val reached = maxOf(furthestStage ?: guideStage(step), guideStage(step)).also { furthestStage = it }
         GuideUiState(
             loading = false,
-            step = GuidedSetup.resume(p.guideStep ?: GuideStep.WELCOME, p.features),
+            step = step,
+            furthestStage = reached,
             features = p.features,
             currency = p.primaryCurrency,
             wallets = d.wallets,

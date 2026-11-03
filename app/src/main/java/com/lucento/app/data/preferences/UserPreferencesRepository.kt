@@ -29,6 +29,17 @@ import java.util.Locale
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** How the Wallets screen lists accounts: rows, or card faces two to a row. A device choice, never synced or backed up. */
+enum class WalletsViewMode(val key: String) {
+    ROWS("rows"),
+    CARDS("cards");
+
+    companion object {
+        /** Unknown or missing values fall back to rows, the default. */
+        fun fromKey(key: String?): WalletsViewMode = entries.firstOrNull { it.key == key } ?: ROWS
+    }
+}
+
 data class UserPreferences(
     val onboardingComplete: Boolean,
     val themeMode: ThemeMode,
@@ -85,6 +96,8 @@ data class UserPreferences(
     val insightsVisited: Boolean = false,
     /** The one-time "+" spotlight after setup was shown and dismissed (or + was used). A device choice. */
     val addSpotlightSeen: Boolean = false,
+    /** Wallets screen: rows or card faces. A device choice, kept across sign-outs like the theme. */
+    val walletsViewMode: WalletsViewMode = WalletsViewMode.ROWS,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
@@ -129,6 +142,7 @@ class UserPreferencesRepository(
         val achievementsSeen = stringSetPreferencesKey("achievements_seen")
         val insightsVisited = booleanPreferencesKey("insights_visited")
         val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
+        val walletsViewMode = stringPreferencesKey("wallets_view_mode")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -163,6 +177,7 @@ class UserPreferencesRepository(
                 achievementsSeen = p[Keys.achievementsSeen]?.mapNotNull(com.lucento.app.domain.Achievement::fromKey)?.toSet(),
                 insightsVisited = p[Keys.insightsVisited] ?: false,
                 addSpotlightSeen = p[Keys.addSpotlightSeen] ?: false,
+                walletsViewMode = WalletsViewMode.fromKey(p[Keys.walletsViewMode]),
             )
         }
 
@@ -276,6 +291,10 @@ class UserPreferencesRepository(
 
     suspend fun setModuleOffersHidden(hidden: Boolean) {
         context.dataStore.edit { it[Keys.moduleOffersHidden] = hidden }
+    }
+
+    suspend fun setWalletsViewMode(mode: WalletsViewMode) {
+        context.dataStore.edit { it[Keys.walletsViewMode] = mode.key }
     }
 
 

@@ -115,6 +115,21 @@ class CashflowCalculatorTest {
         assertEquals(Money(1_000_00, "USD"), result.amount)
     }
 
+    /**
+     * Pins the documented rule (docs/CALCULATIONS.md, corrected 2026-11-03): with a budget, safe to spend subtracts every
+     * expense this month, as Spent does (decision D1) — an expense in a category without an amount still counts.
+     */
+    @Test fun safeToSpendFromBudgetCountsSpendingOutsideBudgetedCategories() {
+        val onlyFood = listOf(Budget(1, 6, Money(10_000_00, "PHP"))) // housing has no amount
+        val withHousingExpense = txs + tx(TransactionType.EXPENSE, 1_500_00, "2026-10-21", category = 5)
+        val result = CashflowCalculator.safeToSpend(
+            "PHP", today, withHousingExpense, listOf(wallet(1, WalletType.BANK, 50_000_00)), onlyFood, emptyList(), categories,
+        )!!
+        assertEquals(SafeToSpend.Basis.BUDGET, result.basis)
+        assertEquals(Money(8_500_00, "PHP"), result.spentThisMonth) // 7,000 food + 1,500 housing
+        assertEquals(Money(1_500_00, "PHP"), result.amount) // 10,000 − 8,500
+    }
+
     @Test fun noBudgetAndNoSpendableAccountGivesNoFigure() {
         assertNull(CashflowCalculator.safeToSpend("PHP", today, txs, listOf(wallet(1, WalletType.SAVINGS, 1)), emptyList(), emptyList()))
     }

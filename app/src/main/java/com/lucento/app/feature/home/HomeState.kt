@@ -9,7 +9,9 @@ import com.lucento.app.domain.BudgetPlan
 import com.lucento.app.domain.BudgetPlanner
 import com.lucento.app.domain.CashflowCalculator
 import com.lucento.app.domain.Category
+import com.lucento.app.domain.CategoryBudgetLine
 import com.lucento.app.domain.CategoryKind
+import com.lucento.app.domain.SafeToSpend
 import com.lucento.app.domain.DateRange
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
@@ -32,6 +34,23 @@ import com.lucento.app.domain.UpcomingPayment
 import com.lucento.app.domain.Wallet
 import java.time.LocalDate
 import java.time.YearMonth
+
+/**
+ * The Monthly budget card's formula, read top to bottom (docs/CALCULATIONS.md):
+ * budget − used = remaining, where used = budgeted + unbudgeted spending (every expense counts), and for this month
+ * remaining − bills due = safe to spend. Each figure is taken from [BudgetPlan] or [SafeToSpend], never recomputed,
+ * so the card can't disagree with the Budget tab.
+ */
+data class BudgetFormula(
+    val budget: Money,
+    val used: Money,
+    val budgeted: Money,
+    val unbudgeted: Money,
+    val remaining: Money,
+    /** Unpaid bills in budgeted categories due by month end; null outside the current month. */
+    val billsDue: Money?,
+    val safeToSpend: Money?,
+)
 
 /** The net-flow state that picks the indicator animation and colour. Zero is neutral, never "good" or "bad". */
 enum class FlowDirection { POSITIVE, NEGATIVE, NEUTRAL }
@@ -293,8 +312,13 @@ data class HomeUiState(
     val balanceHistory: List<com.lucento.app.domain.MonthBalance> = emptyList(),
     /** Change across [balanceHistory] in whole percent, only when meaningful (see BalanceHistory.trendPercent). */
     val balanceTrend: Int? = null,
-    /** Budget card: the two categories with the most spending in [month] ("Top spending to watch"). */
-    val topCategories: List<SpendingSlice> = emptyList(),
+    /**
+     * Budget card: what can still be spent this month after the bills due by its end ([SafeToSpend.Basis.BUDGET]
+     * only). Null for past months, without a budget, or when Budgets is off — the card then shows what's left instead.
+     */
+    val safeToSpend: SafeToSpend? = null,
+    /** Budget card ("To watch"): up to three budgeted categories with spending in [month], closest to their limit first. */
+    val watchLines: List<CategoryBudgetLine> = emptyList(),
     /** Upcoming scheduled items due by the end of [month] (overdue included); empty for past months. */
     val scheduledThisMonth: List<UpcomingPayment> = emptyList(),
     /** The newest entries dated in [month], newest first (a transfer once). */
@@ -410,7 +434,13 @@ object HomeStateBuilder {
             monthComposition = if (wallets.isEmpty()) null else com.lucento.app.domain.BalanceHistory.compositionAt(wallets, all, focus, shown, today),
             balanceHistory = history,
             balanceTrend = com.lucento.app.domain.BalanceHistory.comparableTrendPercent(history, wallets, focus),
-            topCategories = spending.filter { it.categoryId != null && !it.isOther }.take(2),
+            safeToSpend = if (plan?.hasBudget == true && shown == current) {
+                CashflowCalculator.safeToSpend(focus, today, all, wallets, budgets, activeSchedules, categories)
+                    ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
+            } else {
+                null
+            },
+            watchLines = watchList(plan),
             scheduledThisMonth = if (shown != current) emptyList() else RecurringMath.upcomingPayments(
                 activeSchedules,
                 today,
@@ -423,6 +453,30 @@ object HomeStateBuilder {
             },
         )
     }
+
+    /**
+     * The budget card's "To watch" list: budgeted categories that have spending this month, closest to their limit first
+     * (the plan's own order, [BudgetPlanner.plan]), at most [WATCH_LIMIT]. Untouched categories are left out: a 0 % bar
+     * tells the user nothing.
+     */
+    fun watchList(plan: BudgetPlan?): List<CategoryBudgetLine> =
+        plan?.allocatedLines.orEmpty().filter { it.spent.amountMinor > 0L }.take(WATCH_LIMIT)
+
+    const val WATCH_LIMIT = 4
+
+    /**
+     * The budget card's formula. [safe] is [HomeUiState.safeToSpend]: present only for this month's budget, so a past
+     * month ends at Remaining.
+     */
+    fun budgetFormula(plan: BudgetPlan, safe: SafeToSpend?): BudgetFormula = BudgetFormula(
+        budget = plan.total,
+        used = plan.spent,
+        budgeted = plan.budgetedSpending,
+        unbudgeted = plan.unbudgetedSpending,
+        remaining = plan.remaining,
+        billsDue = safe?.committed,
+        safeToSpend = safe?.amount,
+    )
 
     /** The dashboard's scheduled section lists at most this many. */
     const val SCHEDULED_LIMIT = 3

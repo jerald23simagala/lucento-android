@@ -33,7 +33,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DonutLarge
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import com.lucento.app.core.designsystem.component.CategoryTile
+import com.lucento.app.core.money.MoneyParser
+import com.lucento.app.domain.Category
+import com.lucento.app.domain.TransactionType
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -117,9 +124,8 @@ fun GuideScreen(
 
     Column(Modifier.fillMaxSize().padding(horizontal = Spacing.gutter).imePadding()) {
         StageIndicator(
-            stage = guideStage(state.step),
-            progress = guideStageProgress(state.step, steps),
-            modifier = Modifier.fillMaxWidth().padding(top = Spacing.md),
+            com.lucento.app.domain.SetupProgress(guideStage(state.step), state.furthestStage, guideStageProgress(state.step, steps)),
+            modifier = Modifier.padding(top = Spacing.md),
         )
         AnimatedContent(
             targetState = state.step,
@@ -242,30 +248,111 @@ private fun BudgetsStep(
         "Set your monthly budget",
         "Give at least $required ${if (required == 1) "category" else "categories"} an amount for ${state.currency}. The rest can wait — your total budget is always the sum of these. They repeat every month; later you can change one month alone or every month from then on.",
     )
+    val total = GuidedSetup.draftTotal(state.expenseCategories.map { text(it.id) }, state.currency, separator)
+    // At large text the field moves under the category name, so neither has to squeeze.
+    val stacked = LocalDensity.current.fontScale >= 1.5f
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+        state.expenseCategories.forEachIndexed { i, category ->
+            BudgetAmountRow(
+                category = category,
+                currency = state.currency,
+                value = text(category.id),
+                error = if (category.id in invalid) {
+                    // An ambiguous amount or another currency's symbol says what to type instead (P0-3).
+                    val parsed = MoneyParser.parse(text(category.id), state.currency, separator)
+                    MoneyParser.clarification(parsed, separator) ?: "Enter an amount above zero, like 250${separator}00."
+                } else null,
+                stacked = stacked,
+                onChange = { onChange(category.id, it) },
+            )
+            if (i < state.expenseCategories.lastIndex) Hairline(inset = RowTextInset)
+        }
+        // The total is never typed: it is always the sum of the rows above, as the budget will be.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f))
+                .padding(horizontal = Spacing.md, vertical = Spacing.md)
+                .semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconTile(
+                icon = Icons.Outlined.DonutLarge,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                content = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text("Monthly budget", style = MaterialTheme.typography.titleSmall)
+                Text("The sum of these amounts", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(Spacing.sm))
+            MoneyText(money = total, style = AmountStyles.medium.copy(fontWeight = FontWeight.Bold), fractionScale = 1f)
+        }
+    }
+}
+
+/** Where a row's text starts: past the card's padding, the 40dp category tile and the gap after it. */
+private val RowTextInset = Spacing.md + Sizes.iconTile + Spacing.md
+
+/** One category: its tile and name on the left, the monthly amount typed on the right (below it at large text). */
+@Composable
+private fun BudgetAmountRow(
+    category: Category,
+    currency: String,
+    value: String,
+    error: String?,
+    stacked: Boolean,
+    onChange: (String) -> Unit,
+) {
     val colors = OutlinedTextFieldDefaults.colors(
         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
     )
-    state.expenseCategories.forEach { category ->
+    val field: @Composable (Modifier) -> Unit = { m ->
         AmountTextField(
-            value = text(category.id),
-            onValueChange = { onChange(category.id, it) },
+            value = value,
+            onValueChange = onChange,
             filter = { it.take(20) },
-            label = { Text(category.name) },
-            prefix = { Text(MoneyFormatter.currencySymbol(state.currency) + " ") },
-            placeholder = { Text("Not set") },
-            isError = category.id in invalid,
-            supportingText = if (category.id in invalid) ({
-                // An ambiguous amount or another currency's symbol says what to type instead (P0-3).
-                val parsed = com.lucento.app.core.money.MoneyParser.parse(text(category.id), state.currency, separator)
-                Text(com.lucento.app.core.money.MoneyParser.clarification(parsed, separator) ?: "Enter an amount above zero, like 250${separator}00.")
-            }) else null,
-            textStyle = AmountStyles.row,
+            prefix = { Text(MoneyFormatter.currencySymbol(currency) + " ") },
+            placeholder = { Text("Not set", textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth()) },
+            isError = error != null,
+            textStyle = AmountStyles.row.copy(textAlign = TextAlign.End),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
             shape = MaterialTheme.shapes.small,
             colors = colors,
-            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.sm),
+            // The field has no visible label: the category name beside it is the label, so TalkBack hears it too.
+            modifier = m.semantics { contentDescription = "${category.name} monthly budget" },
         )
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CategoryTile(category, TransactionType.EXPENSE)
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                category.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (!stacked) {
+                Spacer(Modifier.width(Spacing.md))
+                field(Modifier.width(144.dp))
+            }
+        }
+        if (stacked) {
+            Spacer(Modifier.height(Spacing.sm))
+            field(Modifier.fillMaxWidth())
+        }
+        if (error != null) {
+            Text(
+                error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = if (stacked) 0.dp else Sizes.iconTile + Spacing.md, top = Spacing.xs),
+            )
+        }
     }
 }
 

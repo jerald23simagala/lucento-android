@@ -1,5 +1,6 @@
 package com.lucento.app.domain
 
+import com.lucento.app.core.money.Money
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,5 +37,16 @@ class GuidedSetupTest {
     @Test
     fun `only debts, the goal and transactions can be skipped`() {
         assertEquals(setOf(GuideStep.DEBTS, GuideStep.GOAL, GuideStep.TRANSACTIONS), GuideStep.entries.filter(GuidedSetup::isSkippable).toSet())
+    }
+
+    @Test
+    fun `the budget step's total is the sum of the amounts typed so far`() {
+        // Blank, unclear and zero entries add nothing yet; the rest add up exactly, in minor units.
+        val typed = listOf("250.00", "", "1,200.50", "abc", "0", "49.5")
+        assertEquals(Money(1_500_00, "USD"), GuidedSetup.draftTotal(typed, "USD", '.'))
+        assertEquals(Money(0, "USD"), GuidedSetup.draftTotal(emptyList(), "USD", '.'))
+        // Currencies without minor units stay whole (JPY) and a comma separator is honoured.
+        assertEquals(Money(3_500, "JPY"), GuidedSetup.draftTotal(listOf("1500", "2000"), "JPY", '.'))
+        assertEquals(Money(12_75, "EUR"), GuidedSetup.draftTotal(listOf("10,25", "2,50"), "EUR", ','))
     }
 }

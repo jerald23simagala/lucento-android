@@ -12,6 +12,7 @@ import com.lucento.app.domain.PacePosition
 import com.lucento.app.domain.ProgressFacts
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.feature.budget.verdictLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

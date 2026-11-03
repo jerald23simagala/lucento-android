@@ -311,7 +311,7 @@ class OnboardingViewModel(
         _restoreMessage.value = null
         savedState[KEY_WELCOME_BACK] = false
         setRestoreStage(RestoreStage.NONE)
-        savedState[KEY_STEP] = STEP_FOCUS
+        moveTo(STEP_FOCUS)
         // The account was downloaded and had nothing to bring back: don't send it to the restore again when finishing.
         viewModelScope.launch { auth?.currentUserId()?.let { savedState[KEY_NEW_FOR] = it } }
     }
@@ -389,6 +389,18 @@ class OnboardingViewModel(
     }
 
     val step: StateFlow<Int> = savedState.getStateFlow(KEY_STEP, 0)
+
+    /**
+     * The furthest step reached in this run, so the stepper keeps a finished stage finished when the user goes back to
+     * an earlier screen. Saved with the step (it survives process death too).
+     */
+    val furthestStep: StateFlow<Int> = savedState.getStateFlow(KEY_FURTHEST, 0)
+
+    /** Every step change goes through here: the step, and the furthest step reached when it moves past it. */
+    private fun moveTo(target: Int) {
+        savedState[KEY_STEP] = target
+        if (target > furthestStep.value) savedState[KEY_FURTHEST] = target
+    }
     val currency: StateFlow<String> =
         savedState.getStateFlow(KEY_CURRENCY, UserPreferencesRepository.defaultCurrency())
 
@@ -440,11 +452,11 @@ class OnboardingViewModel(
         }
         // Category selection is mandatory: the review step needs at least one category.
         if ((current == STEP_CATEGORIES || current == STEP_REVIEW) && picks.value.count == 0) return
-        savedState[KEY_STEP] = (current + 1).coerceAtMost(LAST_STEP)
+        moveTo((current + 1).coerceAtMost(LAST_STEP))
     }
 
     fun goTo(target: Int) {
-        if (target in 0..LAST_STEP && target <= step.value) savedState[KEY_STEP] = target
+        if (target in 0..LAST_STEP && target <= step.value) moveTo(target)
     }
 
     fun setPicks(value: CategoryPicks) {
@@ -453,7 +465,7 @@ class OnboardingViewModel(
     }
 
     fun back() {
-        savedState[KEY_STEP] = (step.value - 1).coerceAtLeast(0)
+        moveTo((step.value - 1).coerceAtLeast(0))
     }
 
     fun toggleFocus(focus: FinancialFocus) {
@@ -508,7 +520,7 @@ class OnboardingViewModel(
                             finishing = false
                             refreshHoldsAccountData()
                             _accountCheck.value = AccountCheck.Unavailable
-                            savedState[KEY_STEP] = STEP_SYNC
+                            moveTo(STEP_SYNC)
                             return@launch
                         }
                         SetupRoute.NEW_SETUP, SetupRoute.LOCAL, null -> Unit
@@ -545,7 +557,7 @@ class OnboardingViewModel(
     fun skip() {
         if (step.value >= STEP_CATEGORIES) return
         savedState[KEY_FEATURES] = ArrayList(Feature.entries.map { it.key })
-        savedState[KEY_STEP] = STEP_CATEGORIES
+        moveTo(STEP_CATEGORIES)
     }
 
     // ---------------------------------------------------------------- restoring a backup file (offline)
@@ -649,6 +661,7 @@ class OnboardingViewModel(
         const val STEP_CONFIRM = 7
         const val LAST_STEP = STEP_CONFIRM
         private const val KEY_STEP = "step"
+        private const val KEY_FURTHEST = "furthest_step"
         private const val KEY_RESTORE = "restore_stage"
         private const val KEY_CURRENCY = "currency"
         private const val KEY_FOCUS = "focus"

@@ -318,3 +318,59 @@ validation and rate limiting (N-09); toolchain alignment (N-19); dependency upgr
 
 Main session implements. Architect and QA agents review P0-2, P0-4, P1-2 and P1-5 before merging. One coherent
 change per branch, tests with every change, exact reporting of what ran, no production writes without approval.
+
+## Core screens — owner review round (done 2026-11-03, uncommitted on `feature/core-screens-refinement`)
+
+Owner comments: guide budget rows (icon + category left, amount right); onboarding "alive" (icons on texts, styled rows,
+e.g. currency); Home: shortcuts right after the Net Wallet Balance card, budget card resized (ring = formula width, To
+watch as tall as the left half), formula Budget − Used = Remaining − Bills due = Safe to spend, and Used/Spent shown as
+budgeted + unbudgeted in the formula and the docs. As built: `docs/design/CORE_SCREENS_REFINEMENT.md` §6 "Owner review round".
+
+| Check | Result |
+|---|---|
+| Unit tests | **829/829** (825 before + 4: `HomeBudgetCardTest` formula adds up / past month / overspent signed; `GuidedSetupTest` draft total) |
+| Lint | 0 errors, 9 warnings (pre-existing) |
+| Build | `assembleDebug` and `assembleDebugAndroidTest` pass |
+| `ScreenshotTourTest` | **PASS** on API 28 (`Lucento_CoreScreens_API28`), with two new shots: 03b currency step, 04c guide budget step with typed amounts |
+| Device checks (API 28) | Home card 411dp and 360dp (side by side), 360dp @ 1.3 (stacked); currency step and guide budget step 360dp @ 1.5; day and night. Fixed on the way: watch names cut at 360dp (percent moved beside the bar), operator column now grows with text, currency step had no room for a single row at 360dp @ 1.5 (now one scrolling list) |
+| Not done | API 36 (CS-7), TalkBack traversal, ≥ 600dp, physical phone |
+
+Next: owner review of `artifacts/core-screens/review2/` and `r2-*.png`; authorize a commit.
+
+## Core screens refinement — implementation (done 2026-11-03, uncommitted on `feature/core-screens-refinement`)
+
+Owner decisions 2026-11-03: **D1** Budget's per-day figure is "Safe per day" (`CashflowCalculator.safeToSpend.perDay`),
+**D2** Bold section titles app-wide, **D3** Google "G" button in scope. What was built, the spec corrections and every
+deviation: `docs/design/CORE_SCREENS_REFINEMENT.md` §6.
+
+| Check | Result |
+|---|---|
+| Unit tests | **818/818** (784 before + 34 new: `HomeBudgetCardTest`, `BudgetDailyFigureTest`, `WalletsOverviewTest`, `HistoryLabelsTest`, `TrendHeightsTest`, a `CashflowCalculatorTest` pin) |
+| Lint | 0 errors, 9 warnings (all pre-existing, none in touched files) |
+| Build | `assembleDebug` and the androidTest compile pass |
+| `ScreenshotTourTest` | **PASS** end to end on API 28 emulator `Lucento_CoreScreens_API28` (repaired: it had been failing since Part B); 30 shots in `artifacts/core-screens/tour-411dp/` |
+| Device checks (API 28, 411dp) | Day and night on all four screens; card view; **view mode survives a force-stop** (Card view `checked=true` after relaunch); off-module tile → sheet → Turn on restores Scheduled; with Recurring off, safe to spend = remaining (no bills); trend line + "0% vs Dec" pill with a 3-month history (clock moved on the test AVD) |
+| Responsive | 360dp @ 1.3 and 320dp @ 2.0 on all four screens; seven layout defects found and fixed (§6) |
+| Not done | ≥ 600dp window, live TalkBack traversal, a physical phone, CI run (see KNOWN_ISSUES CS-5) |
+
+Next: owner review of the screens in `artifacts/core-screens/`; authorize a commit (and a push so CI runs the repaired
+tour). Original plan kept below for the record.
+
+Designs: canvas https://claude.ai/artifact/MocjXVBtQG5uW38yUQm9kE. Spec with file-level guidance:
+`docs/design/CORE_SCREENS_REFINEMENT.md`. No calculation changes; UI only. Suggested order, each step shippable alone:
+
+1. Design-system additions: `Hierarchy.cardOverline`, Bold `sectionTitle`, `CardOverline`, `StatTile`, `TrendLine`,
+   `ViewToggle`, `ProgressRing` centre content, `CompositionBar` segment gap. Update `ThemeContrastTest` if a token pair is added.
+2. Transactions: three stat cards (Income / Expenses / Net inflow or Net outflow), 16sp Bold day headers, day groups as
+   cards, red expense amounts. Screenshot light + night.
+3. Dashboard: drop "Overview", left month pill, two-half Monthly Budget card (donut + top-3 watch list, safe to spend),
+   dashed off-module tiles with a Turn on / Hide sheet, caps card headers. `HomeState.spendingBreakdown(top = 3)`.
+4. Budget: hero (remaining, % spent, utilisation with today marker, pace chip, Spent / Safe daily spend sub-cards),
+   compact month switcher, 18sp Bold section titles, refined allocation rows.
+5. Wallets: six-month trend in the hero (`BalanceHistory.lastMonths(count = 6)` in `WalletsViewModel`), Assets /
+   Liabilities stat cards, distribution bar, All / Assets / Liabilities + type filters, row / card view (persist
+   `wallets_view_mode` in DataStore), compact wallet faces (2 per row, 3 at ≥ 600dp).
+6. Global: official Google "G" mark on "Continue with Google" (`ConnectAccount.kt`), caps card headers on the other
+   screens that use `CardHeader` only if they are touched anyway.
+7. Validation: 320dp and 430dp widths, font scale 1.3 and 2.0, night theme, TalkBack labels on the new tiles and charts,
+   `ScreenshotTourTest` update, unit tests for any new pure helper (trend points, filter predicates).

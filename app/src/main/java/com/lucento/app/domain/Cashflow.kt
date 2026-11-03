@@ -13,7 +13,8 @@ import java.time.temporal.ChronoUnit
  * Two bases, chosen by the data that exists, and always disclosed to the user:
  *
  * - [Basis.BUDGET] (category allocations exist in this currency; their sum is the budget, see [BudgetPlanner]):
- *   `budget − budgeted spending this month − unpaid recurring expenses in budgeted categories due by month end`.
+ *   `budget − spent this month − unpaid recurring expenses in budgeted categories due by month end`, where spent is
+ *   every expense in the currency, budgeted or not ([BudgetPlan.spent], owner decision D1).
  * - [Basis.BALANCES] (no allocations): `spendable balances − unpaid recurring expenses due by month end`
  *   that are paid from a spendable account. Spendable balances are cash, bank and e-wallet only; savings and
  *   liabilities are excluded, and a bill paid from one of those is not subtracted again. This is an estimate
@@ -30,7 +31,7 @@ data class SafeToSpend(
     val daysLeft: Int,
     /** [amount] spread evenly over [daysLeft]; null when nothing is left to spread. */
     val perDay: Money?,
-    /** Expenses counted against the figure: budgeted spending for [Basis.BUDGET], all expenses for [Basis.BALANCES]. */
+    /** Expenses counted against the figure: every expense this month in the currency, for both bases. */
     val spentThisMonth: Money,
     /** Unpaid recurring expenses due on or before the last day of the month (overdue included). */
     val committed: Money,

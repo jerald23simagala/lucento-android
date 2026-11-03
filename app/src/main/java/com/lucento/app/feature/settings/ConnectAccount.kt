@@ -1,9 +1,27 @@
 package com.lucento.app.feature.settings
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.lucento.app.R
+import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Sizes
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -29,6 +47,48 @@ import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.data.sync.MIN_PASSWORD_LENGTH
+
+// Google's sign-in button colours (Google Identity branding guidelines), light and dark. Brand values, not Lucento tokens.
+private val GoogleLightFill = Color(0xFFFFFFFF)
+private val GoogleLightStroke = Color(0xFF747775)
+private val GoogleLightText = Color(0xFF1F1F1F)
+private val GoogleDarkFill = Color(0xFF131314)
+private val GoogleDarkStroke = Color(0xFF8E918F)
+private val GoogleDarkText = Color(0xFFE3E3E3)
+
+/**
+ * "Continue with Google" as Google's branding asks: the official multi-colour G (never retinted) on a white button with
+ * a hairline by day, the dark variant by night, in the system font at 14sp Medium. Same height as Lucento's buttons.
+ */
+@Composable
+private fun GoogleSignInButton(onClick: () -> Unit) {
+    val dark = LucentoTheme.isDark
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = Sizes.button),
+        shape = MaterialTheme.shapes.medium,
+        color = if (dark) GoogleDarkFill else GoogleLightFill,
+        border = BorderStroke(1.dp, if (dark) GoogleDarkStroke else GoogleLightStroke),
+    ) {
+        Row(
+            Modifier.padding(horizontal = Spacing.md),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(painterResource(R.drawable.ic_google_g), contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                "Continue with Google",
+                fontFamily = FontFamily.Default,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = if (dark) GoogleDarkText else GoogleLightText,
+                maxLines = 1,
+            )
+        }
+    }
+}
 
 /** What the user is doing with an email account: making one, or signing in to an existing one. */
 enum class EmailMode { CREATE, SIGN_IN }
@@ -76,7 +136,7 @@ fun ConnectAccountPanel(
             return@Column
         }
         if (googleAvailable) {
-            LucentoPrimaryButton(text = "Continue with Google", onClick = onGoogle)
+            GoogleSignInButton(onClick = onGoogle)
         }
         if (!usingEmail) {
             LucentoSecondaryButton(text = "Use email instead", onClick = {

@@ -3,10 +3,19 @@ package com.lucento.app.feature.wallets
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lucento.app.core.containerFactory
+import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyParser
 import com.lucento.app.data.preferences.UserPreferencesRepository
+import com.lucento.app.data.preferences.WalletsViewMode
 import com.lucento.app.data.repository.CategoryRepository
+import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import com.lucento.app.domain.CategoryKind
 import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.DebtRepayment
@@ -29,7 +38,19 @@ data class WalletsUiState(
     val primaryCurrency: String = "USD",
     val summary: NetWorthCalculator.Summary? = null,
     val defaultWalletId: Long? = null,
-)
+    /** The hero's net worth over the last months and its month-on-month change, in the hero's currency. */
+    val trend: NetWorthTrend? = null,
+    val viewMode: WalletsViewMode = WalletsViewMode.ROWS,
+    val side: WalletSide = WalletSide.ALL,
+    /** The type chip in use; null for all types. Always one the user has on [side]. */
+    val typeFilter: WalletType? = null,
+) {
+    /** The currency the hero shows: the main currency when held, otherwise the first one with wallets. Never converted. */
+    val heroTotal: Money? get() = summary?.let { it.totalFor(primaryCurrency) ?: it.totals.firstOrNull() }
+
+    /** What the list shows after the side and type filters. */
+    val shown: List<Wallet> get() = WalletsOverview.filter(wallets, side, typeFilter)
+}
 
 /** Editable form state for creating or updating a wallet. */
 data class WalletDraft(
@@ -80,18 +101,52 @@ class WalletsViewModel(
     private val wallets: WalletRepository,
     private val preferences: UserPreferencesRepository,
     private val categories: CategoryRepository? = null,
+    /** For the hero's balance history; the app shares one transactions query across screens. */
+    transactions: TransactionRepository? = null,
 ) : ViewModel() {
 
+    private val side = MutableStateFlow(WalletSide.ALL)
+    private val typeFilter = MutableStateFlow<WalletType?>(null)
+
+    /** Balances, net worth and the trend: rebuilt only when wallets, transactions or the main currency change. */
+    private val overview = combine(
+        wallets.observeWallets(),
+        transactions?.observeTransactions() ?: flowOf(emptyList()),
+        preferences.preferences.map { it.primaryCurrency }.distinctUntilChanged(),
+    ) { list, all, primary ->
+        val summary = if (list.isEmpty()) null else NetWorthCalculator.summarize(list, primary)
+        val currency = summary?.let { (it.totalFor(primary) ?: it.totals.first()).currencyCode }
+        Triple(list, summary, currency?.let { WalletsOverview.trend(list, all, it, LocalDate.now()) })
+    }.flowOn(Dispatchers.Default)
+
     val uiState: StateFlow<WalletsUiState> =
-        combine(wallets.observeWallets(), preferences.preferences) { list, prefs ->
+        combine(overview, preferences.preferences, side, typeFilter) { (list, summary, trend), prefs, side, type ->
             WalletsUiState(
                 loading = false,
                 wallets = list,
                 primaryCurrency = prefs.primaryCurrency,
-                summary = if (list.isEmpty()) null else NetWorthCalculator.summarize(list, prefs.primaryCurrency),
+                summary = summary,
                 defaultWalletId = prefs.defaultWalletId,
+                trend = trend,
+                viewMode = prefs.walletsViewMode,
+                side = side,
+                // A type the user no longer has on this side (or never had) quietly falls back to all types.
+                typeFilter = type?.takeIf { it in WalletsOverview.typesOn(list, side) },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WalletsUiState())
+
+    fun setSide(value: WalletSide) {
+        side.value = value
+    }
+
+    fun setTypeFilter(value: WalletType?) {
+        typeFilter.value = value
+    }
+
+    /** Remembered on this device (DataStore `wallets_view_mode`), so Wallets opens the way it was left. */
+    fun setViewMode(mode: WalletsViewMode) {
+        viewModelScope.launch { runCatching { preferences.setWalletsViewMode(mode) } }
+    }
 
     private var saving = false
 
@@ -190,6 +245,6 @@ class WalletsViewModel(
     }
 
     companion object {
-        val Factory = containerFactory { WalletsViewModel(it.wallets, it.preferences, it.categories) }
+        val Factory = containerFactory { WalletsViewModel(it.wallets, it.preferences, it.categories, it.transactions) }
     }
 }

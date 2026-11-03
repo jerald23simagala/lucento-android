@@ -63,6 +63,9 @@ fun ConsumptionBar(
     markerFraction: Float? = null,
     height: Dp = 10.dp,
     trackColor: Color = LucentoTheme.extendedColors.track,
+    markerColor: Color = MaterialTheme.colorScheme.onSurface,
+    /** A thin band either side of the marker so it reads over the fill; null on a hero, where the marker is white. */
+    markerGap: Color? = MaterialTheme.colorScheme.surfaceContainerLowest,
 ) {
     val reducedMotion = LucentoTheme.reducedMotion
     val animated by animateFloatAsState(
@@ -70,8 +73,6 @@ fun ConsumptionBar(
         animationSpec = if (reducedMotion) tween(0) else tween(700, easing = FastOutSlowInEasing),
         label = "consumption",
     )
-    val markerColor = MaterialTheme.colorScheme.onSurface
-    val gap = MaterialTheme.colorScheme.surfaceContainerLowest
     Canvas(
         modifier
             .fillMaxWidth()
@@ -89,7 +90,7 @@ fun ConsumptionBar(
         if (markerFraction != null && markerFraction in 0f..1f) {
             val x = (size.width * markerFraction).coerceIn(1.5.dp.toPx(), size.width - 1.5.dp.toPx())
             // A hairline gap either side keeps the marker legible over the filled part.
-            drawRect(gap, topLeft = Offset(x - 2.dp.toPx(), 0f), size = Size(4.dp.toPx(), size.height))
+            if (markerGap != null) drawRect(markerGap, topLeft = Offset(x - 2.dp.toPx(), 0f), size = Size(4.dp.toPx(), size.height))
             drawRect(markerColor, topLeft = Offset(x - 1.dp.toPx(), 0f), size = Size(2.dp.toPx(), size.height))
         }
     }

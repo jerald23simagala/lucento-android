@@ -1,5 +1,8 @@
 package com.lucento.app.domain
 
+import com.lucento.app.core.money.Money
+import com.lucento.app.core.money.MoneyParser
+
 /**
  * The guided setup that follows onboarding: a short story from an empty app to a working one. Steps for modules the
  * user switched off are left out. Progress is saved after each step, so the story resumes where it was left.
@@ -48,6 +51,17 @@ object GuidedSetup {
 
     /** How many categories need an amount before the budget step can be left. */
     fun budgetsRequired(expenseCategories: Int): Int = minOf(MIN_BUDGETED, expenseCategories)
+
+    /**
+     * The budget step's running total while the user types: the amounts that parse ([MoneyParser], as saving does)
+     * and are above zero, added up; blank or unclear entries add nothing yet. It previews the monthly budget
+     * [BudgetPlanner] will make of the saved allocations — always their sum.
+     */
+    fun draftTotal(texts: Collection<String>, currencyCode: String, decimalSeparator: Char): Money =
+        Money.sum(
+            currencyCode,
+            texts.mapNotNull { MoneyParser.parseOrNull(it, currencyCode, decimalSeparator)?.takeIf { m -> m.amountMinor > 0L } },
+        )
 
     /**
      * Whether [step] is complete enough to move on. Optional steps always are; wallets need one asset account and

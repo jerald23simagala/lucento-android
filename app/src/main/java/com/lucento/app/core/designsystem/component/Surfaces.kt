@@ -32,17 +32,29 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.Elevation
 import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.designsystem.theme.TonePair
+import java.util.Locale
 
 /**
  * Card: hairline border plus, by day only, the faint navy shadow-xs (night uses tonal separation). Use sparingly —
@@ -53,9 +65,9 @@ fun LucentoCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     contentPadding: Dp = Spacing.lg,
+    shape: Shape = MaterialTheme.shapes.large,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = MaterialTheme.shapes.large
     // Cards use the stronger border-default tone so their edges read clearly on the ivory / navy canvas.
     val border = BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault)
     // Cards lift off the canvas: white on ivory by day, a lighter navy by night.
@@ -191,6 +203,185 @@ fun CardHeader(
         if (trailing != null) {
             Spacer(Modifier.width(Spacing.sm))
             Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+        }
+    }
+}
+
+/** On wide windows (large phones in landscape, foldables) a screen's content is held to this width and centred. */
+val ContentMaxWidth = 560.dp
+
+/**
+ * The horizontal margin for a screen's content: the 20dp gutter on phones; from 600dp wide, whatever centres a
+ * [ContentMaxWidth] column. Use it in place of `Spacing.gutter` for a screen's outer padding.
+ */
+@Composable
+fun screenGutter(): Dp {
+    val width = LocalConfiguration.current.screenWidthDp.dp
+    return maxOf(Spacing.gutter, (width - ContentMaxWidth) / 2)
+}
+
+/**
+ * The top of a dashboard card: a 28dp tonal icon tile, the card's name as a quiet caps overline
+ * ([Hierarchy.cardOverline]) so the figure below stays the loudest thing on the card, and an optional trailing status
+ * pill or text action. The caps are visual only: TalkBack (and tests) read the sentence-case [title] as a heading.
+ */
+@Composable
+fun CardOverline(
+    title: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    tone: TonePair = StatusTones.brand,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    trailing: @Composable (RowScope.() -> Unit)? = null,
+) {
+    Row(modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (icon != null) {
+            IconTile(icon, container = tone.container, content = tone.content, size = 28.dp, shape = RoundedCornerShape(8.dp))
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(
+            title.uppercase(Locale.getDefault()),
+            style = Hierarchy.cardOverline,
+            color = color,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).clearAndSetSemantics {
+                heading()
+                text = AnnotatedString(title)
+            },
+        )
+        if (trailing != null) {
+            Spacer(Modifier.width(Spacing.sm))
+            Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+        }
+    }
+}
+
+/** How a [StatTile] arranges its icon, label and figure. */
+enum class StatTileLayout {
+    /** Icon above the caps label above the figure: three across (Transactions' summary). */
+    Stacked,
+
+    /** A larger icon beside the label and figure: two across (Wallets' assets and liabilities). */
+    Inline,
+}
+
+/**
+ * One labelled figure on its own small card: a tonal icon tile, a caps label ([OverlineStyle], uppercased here, visual
+ * only) and the figure, usually a [MoneyText]. [description] is what TalkBack reads for the whole tile, figure included,
+ * so it must carry the signed amount in words. Large text turns [StatTileLayout.Inline] into [StatTileLayout.Stacked].
+ */
+@Composable
+fun StatTile(
+    label: String,
+    icon: ImageVector,
+    tone: TonePair,
+    description: String,
+    modifier: Modifier = Modifier,
+    layout: StatTileLayout = StatTileLayout.Stacked,
+    value: @Composable () -> Unit,
+) {
+    val stacked = layout == StatTileLayout.Stacked || LocalDensity.current.fontScale >= 1.3f
+    LucentoCard(
+        modifier = modifier.clearAndSetSemantics { contentDescription = description },
+        contentPadding = if (stacked) Spacing.md else 14.dp,
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        if (stacked) {
+            IconTile(icon, container = tone.container, content = tone.content, size = 30.dp, shape = RoundedCornerShape(9.dp))
+            Spacer(Modifier.height(10.dp))
+            StatLabel(label, MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(Spacing.xxs))
+            value()
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(icon, container = tone.container, content = tone.content, size = Sizes.iconTile, shape = RoundedCornerShape(12.dp))
+                Spacer(Modifier.width(Spacing.md))
+                Column(Modifier.weight(1f)) {
+                    StatLabel(label, MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(Spacing.xxs))
+                    value()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A [StatTile] sitting on a [HeroCard]: a translucent white sub-card (14 % alpha) with a small icon and caps label on one
+ * line and the figure beneath. [description] is what TalkBack reads for the tile.
+ */
+@Composable
+fun HeroStatTile(
+    label: String,
+    icon: ImageVector,
+    description: String,
+    modifier: Modifier = Modifier,
+    value: @Composable () -> Unit,
+) {
+    val ext = LucentoTheme.extendedColors
+    Column(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(ext.onHero.copy(alpha = 0.14f))
+            .clearAndSetSemantics { contentDescription = description }
+            .padding(Spacing.md),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(icon, container = ext.onHero.copy(alpha = 0.18f), content = ext.onHero, size = 26.dp, shape = RoundedCornerShape(8.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            StatLabel(label, ext.onHeroMuted)
+        }
+        Spacer(Modifier.height(6.dp))
+        value()
+    }
+}
+
+/** A stat's caps label; at very large text it wraps to a second line rather than being cut short. */
+@Composable
+private fun StatLabel(label: String, color: Color) {
+    Text(label.uppercase(Locale.getDefault()), style = OverlineStyle, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis)
+}
+
+/**
+ * The header above a carded list (Budget's Budgeted / Not budgeted, Wallets' Assets / Liabilities): the title in
+ * [Hierarchy.sectionTitle], a short caption beside it (what it holds, how many) or an [action] in its place, and the
+ * group's subtotal at the end of the same line.
+ */
+@Composable
+fun ListSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    caption: String? = null,
+    subtotal: String? = null,
+    action: @Composable (RowScope.() -> Unit)? = null,
+) {
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 40.dp).padding(top = Spacing.lg, bottom = Spacing.xs, start = Spacing.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = Hierarchy.sectionTitle, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.width(Spacing.sm))
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            when {
+                action != null -> action()
+                caption != null -> Text(
+                    caption,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (subtotal != null) {
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                subtotal,
+                style = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }

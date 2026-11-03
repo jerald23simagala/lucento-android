@@ -7,13 +7,18 @@ import com.lucento.app.core.money.Money
 import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.BudgetRepository
 import com.lucento.app.data.repository.CategoryRepository
+import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
+import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.Budget
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.CategoryKind
 import com.lucento.app.domain.CategorySelection
+import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
+import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.Transaction
+import com.lucento.app.domain.Wallet
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -33,6 +38,10 @@ data class BudgetUiState(
     val transactions: List<Transaction> = emptyList(),
     val categorySetupDone: Boolean = true,
     val acknowledgedBudgetMonth: YearMonth? = null,
+    /** For "Safe per day" (safe to spend needs the bills due); see [budgetDailyFigure]. */
+    val wallets: List<Wallet> = emptyList(),
+    /** Recurring schedules, empty when Recurring is switched off (a switched-off module never influences figures). */
+    val schedules: List<RecurringSchedule> = emptyList(),
 ) {
     val expenseCategories: List<Category> get() = categories.filter { it.kind == CategoryKind.EXPENSE }
     val activeExpense: List<Category> get() = expenseCategories.filterNot { it.archived }
@@ -45,6 +54,8 @@ class BudgetViewModel(
     private val categories: CategoryRepository,
     private val budgets: BudgetRepository,
     private val preferences: UserPreferencesRepository,
+    wallets: WalletRepository,
+    recurring: RecurringRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<BudgetUiState> = combine(
@@ -52,7 +63,8 @@ class BudgetViewModel(
         categories.observeCategories(),
         budgets.observeBudgets(),
         preferences.preferences,
-    ) { t, c, b, p ->
+        combine(wallets.observeWallets(), recurring.observeSchedules(), ::Pair),
+    ) { t, c, b, p, (w, s) ->
         BudgetUiState(
             loading = false,
             today = LocalDate.now(),
@@ -63,6 +75,8 @@ class BudgetViewModel(
             transactions = t,
             categorySetupDone = p.categorySetupDone,
             acknowledgedBudgetMonth = p.acknowledgedBudgetMonth,
+            wallets = w,
+            schedules = if (p.features.isEnabled(Feature.RECURRING)) s else emptyList(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BudgetUiState())
 
@@ -146,6 +160,8 @@ class BudgetViewModel(
     }
 
     companion object {
-        val Factory = containerFactory { BudgetViewModel(it.transactions, it.categories, it.budgets, it.preferences) }
+        val Factory = containerFactory {
+            BudgetViewModel(it.transactions, it.categories, it.budgets, it.preferences, it.wallets, it.recurring)
+        }
     }
 }

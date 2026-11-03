@@ -146,6 +146,19 @@ unconfigured), HomeOnTrackTest (L9).
 | RD-QA-9 | ~~The guide's wallet list showed a card's amount owed unsigned ("Visa Card $300.00")~~ **Fixed**: signed (−$300.00) | Fresh-install pass; code | Closed (device recheck in the next pass) |
 | SQ-ENV | Emulator ANRs ("failed to complete startup", launcher and permission controller) right after guest restarts on API 36.1 images; Lucento itself recovered every time | Verified (load average ~25 after boot) | Tooling (ENV-1) |
 
+## Core screens refinement (2026-11-03, `feature/core-screens-refinement`)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| CS-1 | ~~`ScreenshotTourTest` had been failing since the Part B onboarding (waited for "Get started"; also stale "days left", "gently concerned", "Insights" / "Debts and loans" descriptions)~~ **Repaired** with this work | Passes end to end on the API 28 emulator (`artifacts/core-screens/tour-411dp/`) | Confirm in CI on the next push (API 30 emulator) |
+| CS-2 | emulator-5556 (`Lucento_P0_QA_ReturningUser`, API 36.1) crash-looped `system_server` every 4–5 min (task-snapshot GPU readback abort, host 1.7 GB free): ENV-1 / RD-E2-4. It was **stopped** to free memory; its data is on disk and it was not restarted. Validation used a new AVD `Lucento_CoreScreens_API28` (API 28, local data only, never signed in) | Verified (logcat crash buffer) | Restart it when needed with `-gpu host`; free host memory first |
+| CS-3 | Pre-existing: screen titles truncate at font 2.0 / 320dp ("Dashb…", "Transact…") in `HomeHeader` / `LucentoTopBar`; the debug TEST badge overlaps the navigation buttons at font 2.0 | Emulator (`w320-f20-*`) | P3: let titles shrink or wrap at very large text |
+| CS-4 | Pre-existing nit: a sticky day header on Transactions lets the day card's side borders show beside it while scrolling | Emulator | P3 |
+| CS-5 | Not validated on device: ≥ 600dp windows (`screenGutter()` 560dp column, three-column card grid), live TalkBack traversal of the new tiles/charts (descriptions verified in the UI tree only), a physical phone | — | Next device pass |
+| CS-7 | **API 36 emulators unusable here** (owner's primary test target). A fresh `Lucento_Stepper_API36` (android-36.1 google_apis_playstore r4, emulator 37.2.12) aborts SurfaceFlinger's RegionSampling thread every 20–60 s (`Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma`), also with `-gpu swiftshader_indirect` and `-feature -GLDMA,-GLDMA2`; installs and in-guest `screencap` trigger it too. Same root cause as ENV-1 / CS-2, not host memory (6 GB free) | Verified (crash buffer) | Owner: update the Android Emulator and/or the API 36 system image (or provide a working API 36 device); until then device checks run on API 28 |
+| CS-8 | Home budget card is taller than before (ring as wide as the left half plus a seven-line formula, ~360dp on a 411dp phone) and the "To watch" rows are spread with generous gaps when fewer than four categories have spending; both follow the owner's sizing request | Emulator (`r2-home-card-*.png`) | Owner review; if too tall, cap the ring (e.g. 140dp) or hide the Budgeted/Unbudgeted lines when unbudgeted is zero |
+| CS-6 | The trend line was checked on device only with a flat series (emulator clock moved forward two months on the test AVD); non-flat scaling is covered by `TrendHeightsTest` | Emulator + unit | Look at a real account with history |
+
 ## Open — P2 / P3
 
 | ID | Issue | Evidence |

@@ -133,11 +133,15 @@ class ScreenshotTourTest {
     @Test
     fun tour() {
         // ---------------------------------------------------------------- onboarding
-        waitForText("Get started")
+        // Part B onboarding: workspace choice, focus, how you pay, categories, currency, backups, summary.
+        waitForText("Start fresh")
         shot("01-onboarding-welcome")
-        click("Get started")
-        waitForText("main focus")
-        click("Skip") // optional questions only: it leads to the mandatory categories step
+        click("Start fresh")
+        waitForText("What do you want Lucento to help with?")
+        shot("01b-onboarding-focus")
+        click("Continue") // tracking spending and budgeting are always included
+        waitForText("How do you pay?")
+        click("Continue")
         waitForText("What do you spend on?")
         shot("02-onboarding-categories")
         click("Review", substring = true)
@@ -145,23 +149,28 @@ class ScreenshotTourTest {
         shot("03-onboarding-review")
         click("Confirm", substring = true)
         waitForText("Currency and look")
+        shot("03b-onboarding-currency")
         click("Continue")
-        waitForText("Back up and sync?")
-        shot("04a-onboarding-sync")
-        // The tour stays offline: no account is connected. A build without a sync key (CI) shows only Continue here;
-        // one with sync offers "Not now — keep it on this phone".
-        if (compose.onAllNodes(hasText("Not now", substring = true)).fetchSemanticsNodes().isNotEmpty()) {
-            click("Not now", substring = true)
-        } else {
-            click("Continue")
-        }
-        waitForText("You’re all set")
+        // The tour stays offline: no account is connected, everything stays on this phone. (With sync configured the
+        // account path is preselected and Continue appears only once another path is chosen.)
+        waitForText("Keep it on this phone only")
+        shot("04a-onboarding-backups")
+        click("Keep it on this phone only")
+        click("Continue")
+        waitForText("Lucento is personalized")
         shot("04-onboarding-confirm")
-        click("Start using Lucento")
+        click("Continue to set up")
 
         // ---------------------------------------------------------------- guided setup (first page), then Home
         waitForText("Add your accounts")
         shot("04b-guide-accounts")
+        // The budget step: category rows with an amount field each, and the total that is always their sum.
+        runBlocking { container.preferences.setGuideStep(com.lucento.app.domain.GuideStep.BUDGETS) }
+        waitForText("Set your monthly budget")
+        compose.onAllNodes(hasSetTextAction())[0].performTextInput("250")
+        compose.onAllNodes(hasSetTextAction())[1].performTextInput("120.50")
+        waitForText("The sum of these amounts")
+        shot("04c-guide-budgets")
         // The tour seeds its own data below, so it ends the guide here the way "Go to Home" does.
         runBlocking { container.preferences.setGuideStep(null) }
 
@@ -175,6 +184,8 @@ class ScreenshotTourTest {
         fun money(major: Long, cents: Long = 0) = Money(major * 100 + cents, currency)
         val day = { d: Int -> today.withDayOfMonth(minOf(d, today.dayOfMonth)) }
         runBlocking {
+            // Part B onboarding switches on only what the focus step chose; the tour visits every module.
+            com.lucento.app.domain.Feature.entries.forEach { container.preferences.setFeatureEnabled(it, true) }
             val wallets = container.wallets
             fun id(r: WalletRepository.SaveResult) = (r as WalletRepository.SaveResult.Saved).id
             val bank = id(wallets.create("Everyday bank", WalletType.BANK, money(3_250)))
@@ -237,7 +248,7 @@ class ScreenshotTourTest {
         val total = MoneyFormatter.format(money(2_590))
         waitForText("Monthly budget")
         waitForText(total) // the pace card's budget figure is the sum of the category amounts
-        waitForText("days left") // the compact pace card: bars are self-labelled, the stats end with days left
+        waitForText("Safe to spend") // the budget card's third figure this month: budget − spent − bills due
         shot("06-home-within-budget")
         // The bell lists scheduled payments due this week (the seeded gym membership is overdue).
         compose.onNode(hasContentDescription("Upcoming payments", substring = true)).performClick()
@@ -253,10 +264,10 @@ class ScreenshotTourTest {
         shot("08-composer-empty")
         compose.onNode(hasSetTextAction()).performTextInput("Lunch 45, groceries 120, and paid the electricity bill")
         compose.onNodeWithContentDescription("Send").performClick()
-        waitForText("Found 3 transactions")
-        waitForText("1 needs a look")
-        shot("09-composer-rows")
+        // The save bar is always in view; the rows' "Found 3 transactions" header can sit under the keyboard on a short
+        // screen and not be composed. One of the three rows needs a fix before anything can be saved.
         waitForText("Fix 1 highlighted to save")
+        shot("09-composer-rows")
         compose.onNodeWithContentDescription("Back").performClick()
         waitForText("Discard 3 unsaved transactions?")
         shot("10-composer-discard")
@@ -269,8 +280,12 @@ class ScreenshotTourTest {
         waitForText("Transactions")
         shot("11-transactions")
         // A left swipe reveals Edit and Delete; a tap opens the read-only View page, whose Edit pill opens the editor.
-        // The history is a lazy list: rows below the fold aren't composed yet, so scroll the list itself to the row.
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Weekly shop"))
+        // Search narrows the history to the row, so it sits near the top: scrolled to the bottom edge of the list on a
+        // short screen it would lie under the floating dock, which would take the swipe.
+        compose.onNodeWithContentDescription("Search transactions").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("Weekly")
+        compose.waitForIdle()
+        waitForText("Weekly shop")
         compose.onNodeWithText("Weekly shop").performTouchInput { swipeLeft() }
         waitForText("Delete")
         shot("11a-transaction-actions")
@@ -291,6 +306,12 @@ class ScreenshotTourTest {
         tab("Wallets")
         waitForText("Assets")
         shot("12-wallets")
+        // Card view: wallet faces two to a row. The choice is a device preference, so switch back for later shots.
+        compose.onNodeWithContentDescription("Card view").performScrollTo().performClick()
+        compose.waitForIdle()
+        shot("12b-wallets-cards")
+        compose.onNodeWithContentDescription("Row view").performScrollTo().performClick()
+        compose.waitForIdle()
         tab("Home")
         compose.onNodeWithContentDescription("Insights").performScrollTo().performClick()
         waitForText("Income and expenses")
@@ -300,7 +321,7 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         openBudgets()
-        waitForText("left of $total")
+        waitForText("Remaining of $total")
         shot("15-budget")
         compose.onNodeWithContentDescription("Manage categories").performClick()
         compose.waitForIdle()
@@ -337,7 +358,7 @@ class ScreenshotTourTest {
         shot("21-budget-dark")
         tab("Home")
 
-        // ---------------------------------------------------------------- almost used: Lucento turns supportively concerned
+        // ---------------------------------------------------------------- over in one category: it leads "To watch"
         runBlocking {
             val categories = container.categories.observeCategories().first()
             val restaurants = categories.first { it.name == "Restaurants" }.id
@@ -347,7 +368,11 @@ class ScreenshotTourTest {
             )
         }
         waitForText("Monthly budget")
-        compose.waitUntilAtLeastOneExists(hasContentDescription("gently concerned", substring = true), 10_000)
+        // Restaurants ($200 budgeted) is now well over, so it is the first category the budget card asks to watch.
+        compose.waitUntilAtLeastOneExists(
+            hasContentDescription("Restaurants,", substring = true) and hasContentDescription("of its budget used", substring = true),
+            10_000,
+        )
         runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
         shot("22-home-budget-almost-used-dark")
     }

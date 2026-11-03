@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -103,6 +112,86 @@ fun MonthlyBarChart(
                     maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Where each point sits between the lowest (0) and highest (1) of [values], for drawing only — never money. A flat
+ * series sits in the middle; negative values are handled like any other.
+ */
+internal fun trendHeights(values: List<Long>): List<Float> {
+    if (values.isEmpty()) return emptyList()
+    val min = values.min().toDouble()
+    val max = values.max().toDouble()
+    if (max == min) return values.map { 0.5f }
+    return values.map { ((it.toDouble() - min) / (max - min)).toFloat() }
+}
+
+/**
+ * A small line chart of one series, oldest left: the line, a faint area under it (18 %), a dot on the latest point and
+ * the [labels] (month names) beneath, the last one emphasised. Scaled to its own minimum and maximum, so it shows the
+ * shape of the change; the caller prints the figures. [description] (first and last values in words) is what TalkBack
+ * reads. Draws itself in left to right unless motion is reduced.
+ */
+@Composable
+fun TrendLine(
+    points: List<Long>,
+    labels: List<String>,
+    color: Color,
+    description: String,
+    modifier: Modifier = Modifier,
+    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    currentLabelColor: Color = MaterialTheme.colorScheme.onSurface,
+    /** The surface behind the chart, used to ring the end dot so it reads over the line. */
+    background: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    width: Dp = 150.dp,
+    height: Dp = 60.dp,
+) {
+    if (points.size < 2) return
+    val reducedMotion = LucentoTheme.reducedMotion
+    val progress = remember(points) { Animatable(if (reducedMotion) 1f else 0f) }
+    LaunchedEffect(points) {
+        if (!reducedMotion) progress.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
+    }
+    val heights = remember(points) { trendHeights(points) }
+    Column(modifier.width(width).clearAndSetSemantics { contentDescription = description }) {
+        Canvas(Modifier.width(width).height(height)) {
+            val inset = 4.dp.toPx()
+            val step = size.width / (heights.size - 1)
+            val positions = heights.mapIndexed { i, h -> Offset(i * step, inset + (1f - h) * (size.height - inset * 2)) }
+            val line = Path().apply {
+                moveTo(positions.first().x, positions.first().y)
+                positions.drop(1).forEach { lineTo(it.x, it.y) }
+            }
+            val area = Path().apply {
+                addPath(line)
+                lineTo(positions.last().x, size.height)
+                lineTo(positions.first().x, size.height)
+                close()
+            }
+            clipRect(right = size.width * progress.value + inset) {
+                drawPath(area, color.copy(alpha = 0.18f))
+                drawPath(line, color, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+            if (progress.value >= 1f) {
+                drawCircle(background, radius = 5.5.dp.toPx(), center = positions.last())
+                drawCircle(color, radius = 3.5.dp.toPx(), center = positions.last())
+            }
+        }
+        if (labels.size == points.size) {
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.width(width), horizontalArrangement = Arrangement.SpaceBetween) {
+                labels.forEachIndexed { index, label ->
+                    val current = index == labels.lastIndex
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = if (current) FontWeight.Bold else FontWeight.Medium),
+                        color = if (current) currentLabelColor else labelColor,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

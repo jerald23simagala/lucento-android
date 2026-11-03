@@ -54,6 +54,10 @@ import com.lucento.app.core.designsystem.component.label
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.designsystem.component.InstitutionAvatar
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.semantics.Role
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.DebtRepayment
@@ -292,7 +296,7 @@ private fun DrawScope.drawTemplate(template: String, ink: Color, accent: Color, 
 
 /** The account type on an institution card: filled for assets, a dashed outline for debts. */
 @Composable
-private fun TypeChip(type: WalletType, ink: Color) {
+private fun TypeChip(type: WalletType, ink: Color, label: String = type.label) {
     val shape = RoundedCornerShape(50)
     val chip = Modifier
         .then(
@@ -313,10 +317,11 @@ private fun TypeChip(type: WalletType, ink: Color) {
         )
         .padding(horizontal = Spacing.sm + Spacing.xxs, vertical = Spacing.xxs + 1.dp)
     Text(
-        type.label.uppercase(),
+        label.uppercase(),
         style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Bold),
         color = ink,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = chip,
     )
 }
@@ -409,6 +414,87 @@ private fun TypeMark(type: WalletType, ink: Color) {
     }
 }
 
+
+/**
+ * A wallet's face at list size (Wallets' card view, two or three to a row): the same type or institution face as
+ * [WalletCard], 118dp tall — chip or institution icon and the type chip on top, then the name (one line) and the balance,
+ * which shrinks rather than wraps. A debt reads without colour: a dashed type chip, a hatched trailing edge, the signed
+ * amount and "owed". TalkBack hears one sentence with the signed amount.
+ */
+@Composable
+fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val institution = wallet.institution()
+    val face = LucentoTheme.extendedColors.walletCard(wallet.type)
+    val ink = institution?.let { registryColor(it.card.ink) } ?: face.content
+    val stops = institution?.card?.stops?.map(::registryColor).orEmpty()
+    val background = when {
+        stops.size > 1 -> Brush.linearGradient(stops)
+        stops.size == 1 -> SolidColor(stops.first())
+        institution != null -> SolidColor(registryColor(institution.brand))
+        else -> SolidColor(face.container)
+    }
+    val liability = wallet.type.isLiability
+    val shape = RoundedCornerShape(16.dp)
+    val spoken = listOfNotNull(
+        institution?.name,
+        wallet.type.label,
+        wallet.name,
+        (if (liability) "amount owed " else "balance ") + MoneyFormatter.formatSigned(wallet.cardAmount, showPlus = false),
+    ).joinToString(", ")
+    Box(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 118.dp)
+            .clip(shape)
+            .background(background)
+            .clickable(role = Role.Button, onClickLabel = "Open wallet", onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = spoken },
+    ) {
+        Canvas(Modifier.matchParentSize()) {
+            val ring = Stroke(1.dp.toPx())
+            drawCircle(ink.copy(alpha = 0.12f), radius = 75.dp.toPx(), center = Offset(size.width + 15.dp.toPx(), 5.dp.toPx()), style = ring)
+            drawCircle(ink.copy(alpha = 0.12f), radius = 45.dp.toPx(), center = Offset(size.width - 25.dp.toPx(), size.height + 5.dp.toPx()), style = ring)
+            if (liability) drawTemplate("", ink, ink, liability = true)
+        }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 118.dp)
+                .padding(start = 14.dp, top = Spacing.md, bottom = Spacing.md, end = if (liability) 14.dp + HatchWidth else 14.dp),
+            // Name and balance sit at the bottom of the face, the marks at the top, however tall large text makes it.
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = Spacing.sm)) {
+                if (institution != null) InstitutionAvatar(institution, size = 28.dp) else CardChip(Modifier.size(width = 22.dp, height = 16.dp))
+                Spacer(Modifier.weight(1f).widthIn(min = Spacing.xs))
+                TypeChip(wallet.type, ink, label = wallet.type.shortLabel)
+            }
+            Column {
+            Text(
+                wallet.name,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                MoneyText(
+                    money = wallet.cardAmount,
+                    style = AmountStyles.medium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold),
+                    color = ink,
+                    fractionScale = 1f,
+                    minScale = 0.5f,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (liability) {
+                    Spacer(Modifier.width(6.dp))
+                    Text("owed", style = MaterialTheme.typography.labelSmall, color = ink.copy(alpha = 0.78f), maxLines = 1)
+                }
+            }
+            }
+        }
+    }
+}
 
 /** A small capitalised label over a value, like the name and expiry on a card. */
 @Composable
