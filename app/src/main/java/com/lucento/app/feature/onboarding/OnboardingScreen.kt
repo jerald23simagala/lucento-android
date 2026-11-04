@@ -114,6 +114,7 @@ import com.lucento.app.domain.FinancialFocus
 import com.lucento.app.feature.budget.CategoryPicks
 import com.lucento.app.feature.budget.CategoryPresetPicker
 import com.lucento.app.feature.budget.CategoryReview
+import com.lucento.app.core.designsystem.component.IconFieldHeader
 
 @Composable
 fun OnboardingScreen(
@@ -831,10 +832,10 @@ private fun EssentialsStep(
                             "Your main currency is used for totals. Each wallet can still use its own.",
                             icon = Icons.Outlined.Public,
                         )
-                        IconLabel(Icons.Outlined.Palette, "Appearance")
+                        IconFieldHeader(Icons.Outlined.Palette, "Appearance")
                         ThemeChoices(theme, onTheme)
                         Spacer(Modifier.height(Spacing.md))
-                        IconLabel(Icons.Outlined.Payments, "Main currency")
+                        IconFieldHeader(Icons.Outlined.Payments, "Main currency")
                     }
                 }
             },
@@ -1179,15 +1180,3 @@ private fun SummaryRow(icon: androidx.compose.ui.graphics.vector.ImageVector, la
     }
 }
 
-/** A small heading over a group of controls on a step, with the icon of what it sets. */
-@Composable
-private fun IconLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(bottom = Spacing.sm).semantics(mergeDescendants = true) { heading() },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(Spacing.sm))
-        Text(text, style = Hierarchy.fieldLabel, color = MaterialTheme.colorScheme.onSurface)
-    }
-}

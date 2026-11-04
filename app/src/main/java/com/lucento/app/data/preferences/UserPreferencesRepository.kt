@@ -66,6 +66,12 @@ data class UserPreferences(
      * user after the consent dialog in Settings; nothing is sent to a model while it is off.
      */
     val smartReading: Boolean = false,
+    /**
+     * Ask Lucento's AI answers: a free-form question goes to Gemini through Lucento's proxy with a summary of the user's
+     * figures (never transactions, notes or payees). Off by default, set only from Ask Lucento's consent sheet or
+     * Settings; never restored from a backup, so a restore can't switch sharing on.
+     */
+    val askLucentoAi: Boolean = false,
     /** Crash reports. Off until the user turns them on in Settings. Nothing is sent while this is false. */
     val crashReports: Boolean = false,
     /** Anonymous usage counts. Off until the user opts in. Nothing is sent while this is false. */
@@ -128,6 +134,7 @@ class UserPreferencesRepository(
         val defaultWalletId = longPreferencesKey("default_wallet_id")
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
+        val askLucentoAi = booleanPreferencesKey("ask_lucento_ai")
         val crashReports = booleanPreferencesKey("crash_reports")
         val usageCounts = booleanPreferencesKey("usage_counts")
         val usageInstallId = stringPreferencesKey("usage_install_id")
@@ -172,6 +179,7 @@ class UserPreferencesRepository(
                 defaultWalletId = p[Keys.defaultWalletId],
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
                 smartReading = p[Keys.smartReading] ?: false,
+                askLucentoAi = p[Keys.askLucentoAi] ?: false,
                 crashReports = p[Keys.crashReports] ?: false,
                 usageCounts = p[Keys.usageCounts] ?: false,
                 localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
@@ -235,6 +243,10 @@ class UserPreferencesRepository(
 
     suspend fun setSmartReading(enabled: Boolean) {
         context.dataStore.edit { it[Keys.smartReading] = enabled }
+    }
+
+    suspend fun setAskLucentoAi(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.askLucentoAi] = enabled }
     }
 
     /** DataStore copy of the crash-report choice. Written before the synchronous mirror. */
@@ -431,6 +443,7 @@ class UserPreferencesRepository(
             p.remove(Keys.profilePhotoVersion)
             p.remove(Keys.acknowledgedBudgetMonth)
             p[Keys.smartReading] = false
+            p[Keys.askLucentoAi] = false
         }
         const val MAX_DISPLAY_NAME = 40
 

@@ -368,6 +368,10 @@ class SettingsViewModel(
         viewModelScope.launch { preferences.setSmartReading(enabled) }
     }
 
+    fun setAskLucentoAi(enabled: Boolean) {
+        viewModelScope.launch { preferences.setAskLucentoAi(enabled) }
+    }
+
     /**
      * The off choice is stored in DataStore and committed to `lucento_crash_reports` before collection
      * is disabled and unsent reports are dropped.

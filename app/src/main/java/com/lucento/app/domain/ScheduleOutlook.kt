@@ -2,7 +2,6 @@ package com.lucento.app.domain
 
 import com.lucento.app.core.money.Money
 import java.time.LocalDate
-import java.time.YearMonth
 
 /**
  * How a scheduled item moves money: [INCOME] in, an [EXPENSE] (a bill: spending), or a [TRANSFER] to a card or loan —
@@ -60,8 +59,11 @@ data class FlowTotals(
     val count: Int,
     val overdueCount: Int,
 ) {
-    /** What the accounts are expected to gain (positive) or lose: income − bills − transfers out. */
-    val net: Money get() = income - expenses - transfers
+    /**
+     * Net flow: income − bills. Transfers (paying a card or loan from your own money) move money between your own wallets,
+     * so they are shown apart and never change the net (owner, 2026-11-03).
+     */
+    val net: Money get() = income - expenses
 
     val isEmpty: Boolean get() = count == 0
 
@@ -70,20 +72,14 @@ data class FlowTotals(
     }
 }
 
-/** One month of the projection: what is still scheduled in it (the current month also carries everything overdue). */
-data class MonthOutlook(val month: YearMonth, val totals: FlowTotals)
-
 /**
  * The scheduled outlook (docs/CALCULATIONS.md): unpaid occurrences of active schedules in a date range, their totals by
- * flow, and a month-by-month projection. Pure and unit-tested. Paused and finished schedules have no occurrences.
+ * flow. Pure and unit-tested. Paused and finished schedules have no occurrences.
  */
 object ScheduleOutlook {
 
     /** A custom range is at most this long, so a weekly plan can't list thousands of rows. */
     const val MAX_RANGE_DAYS = 366L
-
-    /** The projection covers this many months, starting with the current one. */
-    const val PROJECTION_MONTHS = 3
 
     /**
      * Unpaid occurrences of [schedule] dated [from]..[to], oldest first. When the range starts on or before [today],
@@ -140,27 +136,6 @@ object ScheduleOutlook {
             count = inCurrency.size,
             overdueCount = inCurrency.count { it.overdue },
         )
-    }
-
-    /**
-     * [months] months of what is still scheduled, starting with [today]'s month: the current month holds everything unpaid
-     * up to its end (overdue included), each later month what falls in it. Card payments count in the month they're due;
-     * only a card's current statement is known, so later statements don't appear.
-     */
-    fun projection(
-        schedules: List<RecurringSchedule>,
-        cardDues: List<CardDue>,
-        today: LocalDate,
-        currencyCode: String,
-        months: Int = PROJECTION_MONTHS,
-    ): List<MonthOutlook> {
-        val first = YearMonth.from(today)
-        val all = items(schedules, cardDues, today, today, first.plusMonths((months - 1).toLong()).atEndOfMonth())
-        return (0 until months).map { offset ->
-            val month = first.plusMonths(offset.toLong())
-            val inMonth = all.filter { item -> if (offset == 0) !item.date.isAfter(month.atEndOfMonth()) else YearMonth.from(item.date) == month }
-            MonthOutlook(month, totals(inMonth, currencyCode))
-        }
     }
 
     /** Currencies other than [currencyCode] that [items] hold, so the page can say "also scheduled in EUR". */

@@ -1,9 +1,5 @@
 package com.lucento.app.feature.plan
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -11,11 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +28,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DropdownMenu
@@ -43,10 +38,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,10 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -81,12 +70,10 @@ import com.lucento.app.core.designsystem.component.EmptyIllustration
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.MascotMessage
 import com.lucento.app.core.designsystem.component.FieldHeader
+import com.lucento.app.core.designsystem.component.FlowStatTiles
+import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.Hairline
-import com.lucento.app.core.designsystem.component.HeroCard
-import com.lucento.app.core.designsystem.component.HeroPill
-import com.lucento.app.core.designsystem.component.HeroTones
 import com.lucento.app.core.designsystem.component.InfoNote
-import com.lucento.app.core.designsystem.component.LegendKey
 import com.lucento.app.core.designsystem.component.LucentoAnimation
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoCard
@@ -114,13 +101,13 @@ import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.domain.CreditCardMath
 import com.lucento.app.domain.FlowTotals
 import com.lucento.app.domain.Frequency
-import com.lucento.app.domain.MonthOutlook
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.ScheduleOutlook
 import com.lucento.app.domain.ScheduledFlow
 import com.lucento.app.domain.ScheduledItem
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.flow
+import com.lucento.app.feature.transactions.netFlowLabel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -172,9 +159,9 @@ internal data class ScheduledFilter(val flow: ScheduledFlow? = null, val walletI
 
 /**
  * Scheduled transactions: plans you confirm. "Mark paid" records a real transaction (once, never twice), "Skip" moves to
- * the next date; nothing is posted automatically. The page opens on this month — what's still to come in income,
- * expenses and transfers — then a three-month projection, and an agenda of every dated occurrence (overdue first, then
- * today to the month's end by default) that the filters and a From–To range reshape. "All schedules" lists each plan once.
+ * the next date; nothing is posted automatically. The page opens on an agenda of every dated occurrence (overdue first,
+ * then today to the month's end by default) that the filters and a From–To range reshape, summed up under the filters as
+ * on Transactions — income, expenses and their net, with transfers apart. "All schedules" lists each plan once.
  */
 @Composable
 fun RecurringScreen(
@@ -204,15 +191,11 @@ fun RecurringScreen(
     val today = state.today
     val code = state.primaryCurrency
     val active = remember(state.schedules) { state.schedules.filter { !it.paused && !it.isFinished } }
-    // Card payments for the current statement of each card, as far ahead as the projection looks.
-    val cardDues = remember(state.wallets, state.transactions, today) {
-        CreditCardMath.dues(state.wallets, state.transactions, today, YearMonth.from(today).plusMonths(ScheduleOutlook.PROJECTION_MONTHS - 1L).atEndOfMonth())
-    }
-    val thisMonth = remember(active, cardDues, today, code) { ScheduleOutlook.projection(active, cardDues, today, code, months = 1).first() }
-    val projection = remember(active, cardDues, today, code, filter) {
-        ScheduleOutlook.projection(active.filter(filter::matches), cardDues.filter { filter.matches(ScheduledItem.CardPayment(it)) }, today, code)
-    }
     val (from, to) = scheduledRange(range, today, customFrom, customTo)
+    // Each card's payment for its current statement (later statements aren't known yet), when due by the range's end.
+    val cardDues = remember(state.wallets, state.transactions, today, to) {
+        CreditCardMath.dues(state.wallets, state.transactions, today, maxOf(to, YearMonth.from(today).atEndOfMonth()))
+    }
     val agenda = remember(active, cardDues, today, from, to, filter) {
         ScheduleOutlook.items(active, cardDues, today, from, to).filter(filter::matches)
     }
@@ -248,8 +231,6 @@ fun RecurringScreen(
                     )
                 }
             } else if (hasAnything) {
-                item(key = "hero") { MonthHero(thisMonth, today) }
-                item(key = "projection") { ProjectionCard(projection, filter.isActive) }
                 item(key = "view") {
                     val colors = MaterialTheme.colorScheme
                     SegmentedToggle(
@@ -258,7 +239,7 @@ fun RecurringScreen(
                         onSelect = { view = it },
                         compact = true,
                         selectedTone = { TonePair(colors.primary, colors.onPrimary) },
-                        modifier = Modifier.padding(top = Spacing.lg),
+                        modifier = Modifier.padding(top = Spacing.xs),
                     )
                 }
                 item(key = "filters") {
@@ -306,7 +287,7 @@ fun RecurringScreen(
                 item(key = "rule") {
                     InfoNote(
                         "Scheduled items aren’t transactions until you mark them paid, so balances only change when money really moves. " +
-                            "Transfers pay a card or loan from your own money: they lower what you owe and aren’t spending.",
+                            "Transfers pay a card or loan from your own money: they lower what you owe, aren’t spending, and stay out of net flow.",
                         modifier = Modifier.padding(top = Spacing.md),
                     )
                 }
@@ -367,191 +348,6 @@ private fun monthName(month: YearMonth, locale: Locale = Locale.getDefault()): S
     month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)
 
 private val shortDate: DateTimeFormatter get() = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
-
-/**
- * The page's statement on brand blue: what this month still holds — the net (income less expenses and transfers) as
- * the figure, then income, expenses and transfers side by side, and how many items are overdue. Main currency only.
- */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun MonthHero(outlook: MonthOutlook, today: LocalDate) {
-    val ext = LucentoTheme.extendedColors
-    val t = outlook.totals
-    val spoken = "${monthName(outlook.month)}, still scheduled: net ${MoneyFormatter.formatSigned(t.net, showPlus = true)}. " +
-        "Income ${MoneyFormatter.formatSigned(t.income, showPlus = true)}, expenses ${MoneyFormatter.formatSigned(-t.expenses)}, " +
-        "transfers ${MoneyFormatter.formatSigned(-t.transfers)}" + if (t.overdueCount > 0) ". ${t.overdueCount} overdue" else ""
-    HeroCard(Modifier.padding(top = Spacing.xs).clearAndSetSemantics { contentDescription = spoken }) {
-        // The overdue pill follows the title, or takes the next line when both don't fit (narrow screens, large text).
-        androidx.compose.foundation.layout.FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            HeroPill("${monthName(outlook.month)} · still scheduled", HeroTones.main, Modifier.semantics { heading() })
-            if (t.overdueCount > 0) HeroPill("${t.overdueCount} overdue", HeroTones.tangerine)
-        }
-        Spacer(Modifier.height(Spacing.sm))
-        Text("Net after everything scheduled", style = MaterialTheme.typography.bodySmall, color = ext.onHeroMuted, maxLines = 1)
-        MoneyText(money = t.net, style = AmountStyles.hero, color = ext.onHero, showPlus = true, minScale = 0.5f)
-        Text(
-            when {
-                t.isEmpty -> "Nothing else due by ${YearMonth.from(today).atEndOfMonth().format(shortDate)}."
-                t.count == 1 -> "1 item until ${outlook.month.atEndOfMonth().format(shortDate)}"
-                else -> "${t.count} items until ${outlook.month.atEndOfMonth().format(shortDate)}"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = ext.onHeroMuted,
-            maxLines = 1,
-        )
-        Spacer(Modifier.height(Spacing.md))
-        // Three across from normal text; at large text each flow is one line — its pill, then the amount at the end.
-        val stacked = LocalDensity.current.fontScale >= 1.3f
-        if (stacked) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                HeroFlowLine(ScheduledFlow.INCOME, t.income, HeroTones.sunlight)
-                HeroFlowLine(ScheduledFlow.EXPENSE, t.expenses, HeroTones.tangerine)
-                HeroFlowLine(ScheduledFlow.TRANSFER, t.transfers, HeroTones.main)
-            }
-        } else {
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                HeroFlow(ScheduledFlow.INCOME, t.income, HeroTones.sunlight, Modifier.weight(1f))
-                VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.sm))
-                HeroFlow(ScheduledFlow.EXPENSE, t.expenses, HeroTones.tangerine, Modifier.weight(1f))
-                VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.sm))
-                HeroFlow(ScheduledFlow.TRANSFER, t.transfers, HeroTones.main, Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeroFlowLine(flow: ScheduledFlow, amount: Money, tone: TonePair) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        HeroPill(flow.label(), tone)
-        Spacer(Modifier.width(Spacing.sm))
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            MoneyText(
-                money = signed(flow, amount),
-                style = AmountStyles.row,
-                color = LucentoTheme.extendedColors.onHero,
-                showPlus = flow == ScheduledFlow.INCOME,
-                fractionScale = 1f,
-                minScale = 0.55f,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HeroFlow(flow: ScheduledFlow, amount: Money, tone: TonePair, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        HeroPill(flow.label(), tone)
-        Spacer(Modifier.height(Spacing.xxs))
-        MoneyText(
-            money = signed(flow, amount),
-            style = AmountStyles.row,
-            color = LucentoTheme.extendedColors.onHero,
-            showPlus = flow == ScheduledFlow.INCOME,
-            fractionScale = 1f,
-            minScale = 0.55f,
-        )
-    }
-}
-
-/**
- * Three months ahead: income, expenses and transfers as bars for each month (scaled to the largest), with the month's
- * net under it. Follows the kind, wallet and category filters; the first month includes what is overdue (as the hero
- * says). Kept compact so the agenda starts within the first screen.
- */
-@Composable
-private fun ProjectionCard(months: List<MonthOutlook>, filtered: Boolean) {
-    val ext = LucentoTheme.extendedColors
-    val colors = listOf(ext.positive, ext.negative, transferInk())
-    val reducedMotion = LucentoTheme.reducedMotion
-    val progress = remember(months) { Animatable(if (reducedMotion) 1f else 0f) }
-    LaunchedEffect(months) { if (!reducedMotion) progress.animateTo(1f, tween(650, easing = FastOutSlowInEasing)) }
-    val max = months.maxOfOrNull { m -> maxOf(m.totals.income.amountMinor, m.totals.expenses.amountMinor, m.totals.transfers.amountMinor) } ?: 0L
-    val spoken = months.joinToString("; ") { m ->
-        "${monthName(m.month)}: income ${MoneyFormatter.format(m.totals.income)}, expenses ${MoneyFormatter.format(m.totals.expenses)}, " +
-            "transfers ${MoneyFormatter.format(m.totals.transfers)}, net ${MoneyFormatter.formatSigned(m.totals.net, showPlus = true)}"
-    }
-    LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.md), contentPadding = Spacing.md) {
-        com.lucento.app.core.designsystem.component.CardOverline(
-            "Next ${months.size} months",
-            icon = Icons.Outlined.CalendarMonth,
-            trailing = {
-                Text(
-                    if (filtered) "Filtered · net per month" else "Net per month",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            },
-        )
-        Spacer(Modifier.height(Spacing.md))
-        val track = ext.track
-        Canvas(
-            Modifier
-                .fillMaxWidth()
-                .height(92.dp)
-                .clearAndSetSemantics { contentDescription = "Scheduled by month. $spoken" },
-        ) {
-            val count = months.size.coerceAtLeast(1)
-            val groupGap = 20.dp.toPx()
-            val barGap = 4.dp.toPx()
-            val groupWidth = (size.width - groupGap * (count - 1)) / count
-            val barWidth = ((groupWidth - barGap * 2) / 3f).coerceIn(2f, 22.dp.toPx())
-            val inner = barWidth * 3 + barGap * 2
-            val radius = CornerRadius(4.dp.toPx())
-            val stub = 2.dp.toPx()
-            drawRect(track, topLeft = Offset(0f, size.height - 1.dp.toPx()), size = Size(size.width, 1.dp.toPx()))
-            months.forEachIndexed { i, m ->
-                val left = i * (groupWidth + groupGap) + (groupWidth - inner) / 2f
-                listOf(m.totals.income, m.totals.expenses, m.totals.transfers).forEachIndexed { j, amount ->
-                    val f = if (max <= 0L) 0f else (amount.amountMinor.toDouble() / max).toFloat()
-                    val h = if (f <= 0f) stub else (size.height * f * progress.value).coerceAtLeast(stub)
-                    drawRoundRect(
-                        color = if (f <= 0f) track else colors[j],
-                        topLeft = Offset(left + j * (barWidth + barGap), size.height - h),
-                        size = Size(barWidth, h),
-                        cornerRadius = radius,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(Spacing.sm))
-        Row(Modifier.fillMaxWidth().clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            months.forEachIndexed { i, m ->
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        m.month.month.getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault()),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (i == 0) FontWeight.Bold else null,
-                        color = if (i == 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                    MoneyText(
-                        money = m.totals.net,
-                        style = AmountStyles.small,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        showPlus = true,
-                        fractionScale = 1f,
-                        minScale = 0.5f,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(Spacing.sm))
-        Row(Modifier.fillMaxWidth().clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            LegendKey("Income", colors[0])
-            LegendKey("Expenses", colors[1])
-            LegendKey("Transfers", colors[2])
-        }
-    }
-}
-
-/** Transfers are neither income nor spending: neutral ink, a touch lighter so the bars still read as three. */
-@Composable
-private fun transferInk(): Color = MaterialTheme.colorScheme.onSurfaceVariant
 
 /**
  * The Transactions-style filters: kind as a segmented control, then pills for the date range (the agenda only), the
@@ -694,8 +490,8 @@ private fun FilterMenuPill(
 }
 
 /**
- * The agenda: a summary of the range when it isn't the default view, then overdue items, then one card per month with
- * a row for every dated occurrence (and card payment). Empty ranges say so with the mascot.
+ * The agenda: the range's summary (as on Transactions), then overdue items, then one card per month with a row for every
+ * dated occurrence (and card payment). Empty ranges say so with the mascot.
  */
 private fun androidx.compose.foundation.lazy.LazyListScope.agendaItems(
     agenda: List<ScheduledItem>,
@@ -707,7 +503,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.agendaItems(
     onOpen: (ScheduledItem) -> Unit,
 ) {
     val today = state.today
-    item(key = "range-summary") { RangeSummary(ScheduleOutlook.totals(agenda, currency), agenda, range, from, to, currency) }
+    item(key = "range-summary") { AgendaSummary(ScheduleOutlook.totals(agenda, currency), agenda, range, from, to, currency) }
     if (agenda.isEmpty()) {
         item(key = "agenda-empty") {
             LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.md) {
@@ -723,68 +519,126 @@ private fun androidx.compose.foundation.lazy.LazyListScope.agendaItems(
     val ahead = agenda.filterNot { it.overdue }.groupBy { YearMonth.from(it.date) }
     if (overdue.isNotEmpty()) {
         item(key = "overdue-head") {
-            ToneSectionHeader(
-                "Overdue",
-                StatusTones.negative,
-                caption = if (overdue.size == 1) "1 item · still owed" else "${overdue.size} items · still owed",
-            )
+            AgendaHeader("Overdue", if (overdue.size == 1) "1 item · still owed" else "${overdue.size} items · still owed", null, alert = true)
         }
         item(key = "overdue") { AgendaCard(overdue, state, today, onOpen) }
     }
     ahead.forEach { (month, items) ->
         item(key = "head-$month") {
-            val net = ScheduleOutlook.totals(items, currency).net
-            ToneSectionHeader(
+            val totals = ScheduleOutlook.totals(items, currency)
+            AgendaHeader(
                 monthName(month) + if (month.year != today.year) " ${month.year}" else "",
-                StatusTones.brand,
-                caption = if (items.size == 1) "1 item" else "${items.size} items",
-                trailing = { MoneyText(money = net, style = AmountStyles.small, color = MaterialTheme.colorScheme.onSurfaceVariant, showPlus = true, fractionScale = 1f) },
+                if (items.size == 1) "1 item" else "${items.size} items",
+                // A month of transfers only has no net flow to show.
+                totals.net.takeIf { !totals.income.isZero || !totals.expenses.isZero },
             )
         }
         item(key = "month-$month") { AgendaCard(items, state, today, onOpen) }
     }
 }
 
+/** A section of the agenda, styled like Transactions' day headers: the title, what it holds, and its net flow. */
+@Composable
+private fun AgendaHeader(title: String, caption: String, net: Money?, alert: Boolean = false) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 40.dp)
+            .padding(top = Spacing.md, bottom = Spacing.sm, start = Spacing.xxs, end = Spacing.xxs)
+            .semantics(mergeDescendants = true) { heading() },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = if (alert) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            caption,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (net != null) {
+            Spacer(Modifier.width(Spacing.xs))
+            AmountText(
+                money = net,
+                style = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold),
+                showPlus = true,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 /**
- * What the chosen range holds, as on Transactions: income, expenses and transfers with the net, and how many items.
- * The default (this month) skips it — the hero says the same.
+ * What the chosen range holds, in the Transactions summary's cards: income, expenses and their net flow. Transfers — card
+ * and loan payments from the user's own money — sit on their own line beneath: they aren't spending and never change the
+ * net. Then how many items, over which dates. Main currency only; others are named, never added in.
  */
 @Composable
-private fun RangeSummary(totals: FlowTotals, agenda: List<ScheduledItem>, range: ScheduledRange, from: LocalDate, to: LocalDate, currency: String) {
-    if (range == ScheduledRange.THIS_MONTH) {
-        Spacer(Modifier.height(Spacing.xs))
-        return
-    }
+private fun AgendaSummary(totals: FlowTotals, agenda: List<ScheduledItem>, range: ScheduledRange, from: LocalDate, to: LocalDate, currency: String) {
     val others = ScheduleOutlook.otherCurrencies(agenda, currency)
-    LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.md) {
+    Column(Modifier.padding(top = Spacing.sm)) {
+        FlowStatTiles(income = totals.income, expenses = totals.expenses, net = totals.net, netLabel = netFlowLabel(totals.net))
+        if (!totals.transfers.isZero) {
+            Spacer(Modifier.height(Spacing.sm))
+            TransfersLine(totals.transfers)
+        }
+        Spacer(Modifier.height(Spacing.sm))
         Text(
-            "${from.format(shortDate)} – ${to.format(shortDate)} · " + if (totals.count == 1) "1 item" else "${totals.count} items",
-            style = MaterialTheme.typography.labelMedium,
+            buildString {
+                append(if (totals.count == 1) "1 item" else "${totals.count} items")
+                append(" · ")
+                append(if (range == ScheduledRange.THIS_MONTH) "to ${to.format(shortDate)}" else "${from.format(shortDate)} – ${to.format(shortDate)}")
+                if (totals.overdueCount > 0) append(" · ${totals.overdueCount} overdue included")
+                if (others.isNotEmpty()) append(" · also in ").append(others.joinToString())
+            },
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(Spacing.xs))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            listOf(
-                ScheduledFlow.INCOME to totals.income,
-                ScheduledFlow.EXPENSE to totals.expenses,
-                ScheduledFlow.TRANSFER to totals.transfers,
-            ).forEach { (flow, amount) ->
-                Column(Modifier.weight(1f)) {
-                    Text(flow.label(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                    MoneyText(money = signed(flow, amount), style = AmountStyles.row, color = scheduledFlowColor(flow), showPlus = flow == ScheduledFlow.INCOME, fractionScale = 1f, minScale = 0.55f)
-                }
+    }
+}
+
+/** Scheduled transfers on their own card: neutral ink, and said plainly that they stay out of net flow. */
+@Composable
+private fun TransfersLine(transfers: Money) {
+    val shown = -transfers
+    LucentoCard(
+        Modifier.fillMaxWidth().clearAndSetSemantics {
+            contentDescription = "Transfers ${MoneyFormatter.formatSigned(shown)}, card and loan payments from your own money, not in net flow"
+        },
+        contentPadding = Spacing.md,
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(
+                Icons.Outlined.SwapHoriz,
+                container = MaterialTheme.colorScheme.surfaceContainerHigh,
+                content = MaterialTheme.colorScheme.onSurfaceVariant,
+                size = 30.dp,
+                shape = RoundedCornerShape(9.dp),
+            )
+            Spacer(Modifier.width(Spacing.sm + Spacing.xxs))
+            Column(Modifier.weight(1f)) {
+                Text("Transfers", style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                Text(
+                    "Card and loan payments · not in net flow",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                Text("Net", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                MoneyText(money = totals.net, style = AmountStyles.row.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface, showPlus = true, fractionScale = 1f, minScale = 0.55f)
-            }
-        }
-        if (others.isNotEmpty()) {
-            Text(
-                "Also scheduled in ${others.joinToString()} (listed below, not added in).",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.xs),
+            Spacer(Modifier.width(Spacing.sm))
+            MoneyText(
+                money = shown,
+                style = AmountStyles.row.copy(fontWeight = FontWeight.Bold),
+                color = scheduledFlowColor(ScheduledFlow.TRANSFER),
+                fractionScale = 1f,
+                minScale = 0.6f,
             )
         }
     }

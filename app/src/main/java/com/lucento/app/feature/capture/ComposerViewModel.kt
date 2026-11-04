@@ -51,6 +51,8 @@ data class ComposerMessage(
     val source: CaptureSource,
     val text: String,
     val state: MessageState,
+    /** When it was sent, for the time under the bubble. */
+    val sentAtEpochMillis: Long = System.currentTimeMillis(),
 )
 
 sealed interface MessageState {

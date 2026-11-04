@@ -155,6 +155,7 @@ fun SettingsScreen(
                 onPickCurrency = { pickingCurrency = true },
                 onFeature = viewModel::setFeatureEnabled,
                 onSmartReading = viewModel::setSmartReading,
+                onAskLucentoAi = viewModel::setAskLucentoAi,
                 onCrashReports = viewModel::setCrashReports,
                 onExport = {
                     exportMessage = null
@@ -354,6 +355,7 @@ private fun SettingsContent(
     onPickCurrency: () -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
     onSmartReading: (Boolean) -> Unit,
+    onAskLucentoAi: (Boolean) -> Unit,
     onCrashReports: (Boolean) -> Unit,
     onExport: () -> Unit,
     onExportBackup: () -> Unit,
@@ -495,6 +497,9 @@ private fun SettingsContent(
                 onChange = onSmartReading,
             )
         }
+        if (current.cloudSync.configured && current.cloudSync.signedInEmail != null && com.lucento.app.BuildConfig.AI_ASK_URL.isNotBlank()) {
+            AskLucentoAiSection(on = prefs.askLucentoAi, onChange = onAskLucentoAi)
+        }
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.KeyboardVoice, "Voice and receipts are read on this phone", "Speech is turned into text by your phone’s own speech service and receipts by on-device text recognition; Lucento reads both offline.")
         Hairline(inset = Sizes.iconTile + Spacing.md)
@@ -635,6 +640,38 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
                 "Balances and your history are not sent. Google processes the text under the Gemini API terms. Each " +
                 "account has a daily allowance; after it, reading happens on this phone. You review every row before " +
                 "anything is saved, receipts are still read on this phone, and you can turn this off at any time.",
+            confirmLabel = "Turn on",
+            onConfirm = {
+                asking = false
+                onChange(true)
+            },
+            onDismiss = { asking = false },
+        )
+    }
+}
+
+/**
+ * Ask Lucento's AI answers (docs/ASK.md): off until the user agrees to what is sent. Reports are always calculated on
+ * this phone, with or without it.
+ */
+@Composable
+private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
+    var asking by remember { mutableStateOf(false) }
+    SectionHeader("Ask Lucento", Modifier.padding(top = Spacing.section))
+    SwitchRow(
+        title = "AI answers with Gemini",
+        checked = on,
+        onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
+        description = "Ask anything about your money. Off, Ask Lucento still prepares your reports on this phone.",
+    )
+    if (asking) {
+        ConfirmDialog(
+            title = "Turn on AI answers?",
+            text = "When you ask Ask Lucento a question of your own, Lucento sends it, with a summary of your figures — " +
+                "monthly totals, totals by category, balances by wallet, budgets, debts and upcoming bills — to Lucento’s " +
+                "server, which asks Google’s Gemini. Your transactions, notes, payees, receipts and photos are never sent. " +
+                "Answers quote figures calculated on this phone. It isn’t financial advice. Each account has a daily " +
+                "allowance, shared with Smarter reading, and you can turn this off at any time.",
             confirmLabel = "Turn on",
             onConfirm = {
                 asking = false

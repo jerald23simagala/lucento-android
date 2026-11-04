@@ -2,7 +2,8 @@
 
 ## Pending: credit card billing (app schema v11, branch `feature/core-screens-refinement`)
 
-**Status: not applied anywhere** (neither `lucento-test` nor production). Owner-run, like the migrations below.
+**Status: applied by the owner to `lucento-test` and production (2026-11-03)**, and sync checked on a phone (OT-1..3).
+Owner-run, like the migrations below.
 
 | Migration | Effect | Data risk |
 |---|---|---|

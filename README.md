@@ -27,7 +27,12 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
   the budget shown transparently; amounts per month and currency; manage categories (add, rename, reorder,
   deactivate, restore). Existing users keep their categories and can personalise them from presets.
-- **Insights**: income and expenses over 3/6/12 months (transfers excluded) and net-worth composition by account type.
+- **Insights**: income and expenses over 3/6/12 months (transfers excluded, with the change against the period before)
+  and net-worth composition by account type.
+- **Ask Lucento** (from Insights): questions about your money and four statements — net worth, cash flow, budget vs
+  actual, debts & loans — calculated on the phone, saved or shared as PDFs. Optional AI answers (Gemini through
+  Lucento's proxy) only with consent, sending summaries of your figures, never transactions or notes. See
+  [docs/ASK.md](docs/ASK.md).
 - **Transactions**: search, filters (date, type incl. transfers, wallet, category), day groups, edit/delete.
 - **Transfers** between your own accounts (two linked legs, atomic, never income or spending).
 - **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
@@ -37,9 +42,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   instalment bar and payment reminders; credit cards: credit limit, available credit, statement and due days with an
   amount-due reminder that is never counted in Safe to spend),
   **Scheduled transactions** (bills, income and debt payments split into principal and interest; every bill and income
-  has a category; mark paid / skip / pause — never auto-posted). The Scheduled page opens on this month's income,
-  expenses and transfers, projects the next three months, and lists every dated occurrence with Transactions-style
-  filters and a From–To range.
+  has a category; mark paid / skip / pause — never auto-posted). The Scheduled page lists every dated occurrence with
+  Transactions-style filters and a From–To range, summed up in the Transactions page's cards (income, expenses and net
+  flow, with card and loan transfers apart).
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,

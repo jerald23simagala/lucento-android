@@ -114,6 +114,8 @@ internal fun ReviewRowItem(
     onPickDate: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Inside Lucento's reply card: a flat, tinted panel instead of a raised card of its own. */
+    nested: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val category = categories.firstOrNull { it.id == row.categoryId }
@@ -129,12 +131,21 @@ internal fun ReviewRowItem(
     Surface(
         shape = shape,
         // By day a soft navy shadow lifts each card off the canvas; by night (where shadows don't read) a lighter tone.
-        color = if (dark) colors.surfaceContainerHigh else colors.surfaceContainerLowest,
-        border = if (incomplete) BorderStroke(1.5.dp, StatusTones.negative.content) else BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault),
+        // Nested in a reply, rows are tinted panels on the reply's card, outlined only when they need fixing.
+        color = when {
+            nested -> if (dark) colors.surfaceContainerHighest else colors.surfaceContainer
+            dark -> colors.surfaceContainerHigh
+            else -> colors.surfaceContainerLowest
+        },
+        border = when {
+            incomplete -> BorderStroke(1.5.dp, StatusTones.negative.content)
+            nested -> null
+            else -> BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault)
+        },
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (dark) Modifier else Modifier.shadow(
+                if (dark || nested) Modifier else Modifier.shadow(
                     elevation = 4.dp,
                     shape = shape,
                     clip = false,

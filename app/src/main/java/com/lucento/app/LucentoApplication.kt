@@ -213,6 +213,14 @@ class AppContainer(application: Application) {
             currency = { preferences.preferences.first().primaryCurrency },
         )
     }
+
+    /** Ask Lucento's AI answers: only while the user's consent is on (docs/ASK.md). Reports never need it. */
+    val askClient: com.lucento.app.data.ai.AskLucentoClient by lazy {
+        com.lucento.app.data.ai.AskLucentoClient(accessToken = auth::accessToken)
+    }
+
+    /** Ask Lucento's reports as PDF files, written on the phone. */
+    val reportPdf: com.lucento.app.data.reports.ReportPdfWriter by lazy { com.lucento.app.data.reports.ReportPdfWriter(application) }
     val syncRepository: SyncRepository by lazy {
         SyncRepository(
             remote = supabaseClient?.let(::SupabaseSyncRemote),

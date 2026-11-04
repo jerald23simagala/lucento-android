@@ -187,15 +187,38 @@ For a loan repaid monthly with a term (`LoanMath.progress`):
   statement only (later statements aren't known yet). Ranges: This month (default: overdue, then today to the month's
   end), Next 30 days, Next 3 months, or a custom From–To of at most 366 days.
 - **Totals** per flow are in one currency (the main one), never converted; other currencies are listed, not added.
-  **Net** = income − expenses − transfers: what the accounts are expected to gain or lose.
-- **This month** (the page's hero) = everything still scheduled up to the month's end, overdue included.
-- **Projection**: three months starting with this one, the first carrying the overdue items; each later month what falls
-  in it. Follows the kind / wallet / category filters.
+  **Net flow** = income − expenses. **Transfers** (card and loan payments from the user's own money) are totalled on
+  their own line and never change net flow (owner, 2026-11-03, round 4; round 3 subtracted them). The page's summary,
+  under the filters in the Transactions page's cards, covers the chosen range and follows the kind / wallet / category
+  filters; each month's header shows that month's net flow. (Round 3's month hero and three-month projection were
+  removed in round 4: too much at once.)
 - A debt payment's total (principal + any planned interest) is the transfer; its interest part becomes spending only when
   it is marked paid (see below), so Bills due counts just that interest.
 - **Category required**: a scheduled bill or income must have a category (`RecurringRepository.SaveResult.CategoryRequired`,
   owner 2026-11-03); a debt payment gets the shared "Debt interest" category for its interest. Older schedules without
   one keep working and ask for one when edited.
+
+## Ask Lucento reports
+`domain/ask/Reports.kt` (`ReportBuilder`, pure, unit-tested); one currency per report, others named and never converted;
+the same `Report` is drawn on screen and written to the PDF. See docs/ASK.md for what the AI may see.
+- **Net worth statement** (a month): each wallet's balance at the month's end (today for the current month), rebuilt as
+  `BalanceHistory.walletsAt` does; assets, liabilities (amounts owed) and net worth = assets − liabilities; change =
+  net worth − net worth at the end of the month before (omitted when no wallet existed then).
+- **Cash flow statement** (a month; the current month runs to today): income and expenses by category
+  (`Insights.categoryBreakdown`), each with its share of its total; net flow = income − expenses. Transfers (the
+  outgoing legs) and balance adjustments (signed) are listed apart, never in net flow.
+- **Budget vs actual** (a month): `BudgetPlanner.plan` — for each budgeted category its budget, spent and left; spending
+  without a budget (unbudgeted categories, uncategorised); the month's total budget, everything spent, and what's left
+  (the Budget screen's figures).
+- **Debts & loans summary** (today): each card and loan in the currency with what's owed, its rate, a loan's
+  instalments (`LoanMath`), a card's amount due (`CreditCardMath`) and the next unpaid occurrence of a schedule paying it;
+  total owed.
+- **Top spending categories** (a month): the top N (default 5, at most 20) expense categories with their share of all
+  spending, then "everything else".
+- **Insights change chip**: `Insights.changePercent(net, previous net)` — the period's net flow against the equal period
+  before it, as a whole percentage of the previous amount's size (half-up); omitted when the earlier period has no
+  records or a zero net. **Chart axis**: `Insights.axisTicks` — round gridlines (1, 2, 2.5 or 5 × a power of ten), at
+  most five intervals, the top at or above the largest bar; bars scale to the top gridline.
 
 ## Debt payments (recurring)
 A recurring schedule with `to_wallet_id` set pays a card or loan from a money account (same currency). It is planned

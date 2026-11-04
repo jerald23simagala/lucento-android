@@ -20,6 +20,7 @@ class AccountSetupResetTest {
     private val name = stringPreferencesKey("display_name")
     private val budgetMonth = stringPreferencesKey("acknowledged_budget_month")
     private val smart = booleanPreferencesKey("smart_reading")
+    private val askAi = booleanPreferencesKey("ask_lucento_ai")
     private val generation = intPreferencesKey("setup_generation")
     private val theme = stringPreferencesKey("theme_mode")
     private val currency = stringPreferencesKey("primary_currency")
@@ -31,7 +32,7 @@ class AccountSetupResetTest {
 
     private fun accountASetUp() = mutablePreferencesOf(
         onboarding to true, categorySetup to true, guide to "budget", defaultWallet to 7L, name to "Alex", photo to 1_762_000_000_000L,
-        budgetMonth to "2026-10", smart to true,
+        budgetMonth to "2026-10", smart to true, askAi to true,
         theme to "DARK", currency to "EUR", features to setOf("budgets", "goals"), crash to true, usage to true, notice to true,
     )
 
@@ -42,6 +43,8 @@ class AccountSetupResetTest {
         assertEquals(false, p[onboarding])
         assertEquals(false, p[categorySetup])
         assertEquals(false, p[smart])
+        // Ask Lucento's AI answers were the previous account's consent: the next account starts with them off.
+        assertEquals(false, p[askAi])
         assertNull(p[guide])
         assertNull(p[defaultWallet])
         assertNull(p[name])

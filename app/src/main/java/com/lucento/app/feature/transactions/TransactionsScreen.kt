@@ -35,18 +35,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingDown
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.selection.selectableGroup
-import com.lucento.app.core.designsystem.component.StatTile
+import com.lucento.app.core.designsystem.component.FlowStatTiles
 import com.lucento.app.core.money.MoneyFormatter
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SouthWest
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DocumentScanner
@@ -561,60 +557,14 @@ internal fun netFlowLabel(net: Money): String = if (net.amountMinor >= 0L) "Net 
 private fun ShownSummary(state: TransactionsUiState) {
     val primary: PeriodTotals = state.shownTotals.firstOrNull() ?: return
     val others = state.shownTotals.drop(1)
-    val ext = LucentoTheme.extendedColors
-    val net = primary.net
-    val expenses = -primary.expense
-    val netLabel = netFlowLabel(net)
     val scope = when {
         state.filter.isActive -> "${state.matchCount} of ${state.totalCount} " + if (state.totalCount == 1) "transaction" else "transactions"
         else -> "${state.totalCount} ${if (state.totalCount == 1) "transaction" else "transactions"}"
     }
     val range = state.filter.month?.let { m -> m.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) + " ${m.year}" }
         ?: state.filter.preset.takeIf { it != RangePreset.ALL }?.let(::rangeLabel)
-    val income: @Composable (Modifier) -> Unit = { m ->
-        StatTile(
-            "Income", Icons.Filled.SouthWest, TonePair(ext.positiveContainer, ext.success),
-            description = "Income ${MoneyFormatter.formatSigned(primary.income, showPlus = true)}", modifier = m,
-        ) { MoneyText(money = primary.income, style = SummaryFigureStyle, showPlus = true, color = ext.positive, fractionScale = 1f) }
-    }
-    val spent: @Composable (Modifier) -> Unit = { m ->
-        StatTile(
-            "Expenses", Icons.Filled.NorthEast, TonePair(ext.negativeContainer, ext.negativeIndicator),
-            description = "Expenses ${MoneyFormatter.formatSigned(expenses)}", modifier = m,
-        ) { MoneyText(money = expenses, style = SummaryFigureStyle, color = ext.negative, fractionScale = 1f) }
-    }
-    val netTile: @Composable (Modifier) -> Unit = { m ->
-        StatTile(
-            netLabel,
-            if (net.isNegative) Icons.AutoMirrored.Filled.TrendingDown else Icons.AutoMirrored.Filled.TrendingUp,
-            TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary),
-            description = "$netLabel ${MoneyFormatter.formatSigned(net, showPlus = true)}",
-            modifier = m,
-        ) { MoneyText(money = net, style = SummaryFigureStyle, showPlus = true, color = MaterialTheme.colorScheme.onSurface, fractionScale = 1f) }
-    }
-    val fontScale = LocalDensity.current.fontScale
     Column {
-        if (fontScale >= 1.5f) {
-            // Very large text: one card per row, so no label has to break mid-word.
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                income(Modifier.fillMaxWidth())
-                spent(Modifier.fillMaxWidth())
-                netTile(Modifier.fillMaxWidth())
-            }
-        } else if (fontScale >= 1.3f) {
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                income(Modifier.weight(1f).fillMaxHeight())
-                spent(Modifier.weight(1f).fillMaxHeight())
-            }
-            Spacer(Modifier.height(Spacing.sm))
-            netTile(Modifier.fillMaxWidth())
-        } else {
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                income(Modifier.weight(1f).fillMaxHeight())
-                spent(Modifier.weight(1f).fillMaxHeight())
-                netTile(Modifier.weight(1f).fillMaxHeight())
-            }
-        }
+        FlowStatTiles(income = primary.income, expenses = primary.expense, net = primary.net, netLabel = netFlowLabel(primary.net))
         Spacer(Modifier.height(Spacing.sm))
         Text(
             buildString {
@@ -628,9 +578,6 @@ private fun ShownSummary(state: TransactionsUiState) {
         )
     }
 }
-
-/** Stat-card figures: 15sp Bold, tabular; they shrink to fit rather than wrap. */
-private val SummaryFigureStyle = AmountStyles.row.copy(fontWeight = FontWeight.Bold)
 
 @Composable
 private fun FilterRow(state: TransactionsUiState, viewModel: TransactionsViewModel, onClear: () -> Unit) {

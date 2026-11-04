@@ -327,13 +327,13 @@ class ScreenshotTourTest {
 
         // ---------------------------------------------------------------- the composer: several transactions in one message
         compose.onNodeWithContentDescription("Add transaction").performClick()
-        waitForText("Describe what happened")
+        waitForText("Tell me about your transaction")
         shot("08-composer-empty")
         compose.onNode(hasSetTextAction()).performTextInput("Lunch 45, groceries 120, and paid the electricity bill")
         compose.onNodeWithContentDescription("Send").performClick()
-        // The save bar is always in view; the rows' "Found 3 transactions" header can sit under the keyboard on a short
-        // screen and not be composed. One of the three rows needs a fix before anything can be saved.
-        waitForText("Fix 1 highlighted to save")
+        // The save bar is always in view (one compact line while the keyboard is up); one of the three rows needs a fix
+        // before anything can be saved.
+        waitForText("1 transaction is incomplete")
         shot("09-composer-rows")
         compose.onNodeWithContentDescription("Back").performClick()
         waitForText("Discard 3 unsaved transactions?")
@@ -408,6 +408,21 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Insights").performScrollTo().performClick()
         waitForText("Income and expenses")
         shot("13-insights-trends")
+        // Ask Lucento: preset questions and reports are worked out on the phone (debug builds have no AI proxy).
+        compose.onNodeWithContentDescription("Ask Lucento", substring = true).performClick()
+        waitForText("Ask me about your money")
+        shot("13a-ask-lucento")
+        click("What are my top 5 spending categories?")
+        waitForText("Calculated on this phone")
+        shot("13b-ask-answer")
+        scrollToText("Open report")
+        click("Open report")
+        waitForText("Save as PDF")
+        shot("13c-ask-report")
+        backUntilGone("Save as PDF")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
+        waitForText("Income and expenses")
         runCatching { compose.onNodeWithText("Savings goals aren’t added here", substring = true).performScrollTo() }
         shot("14-insights-net-worth")
         compose.onNodeWithContentDescription("Back").performClick()
@@ -428,8 +443,8 @@ class ScreenshotTourTest {
         shot("17-quick-links")
         // Scroll to the tile itself: after scrolling to Debts, the row above can sit under the pinned header.
         compose.onNodeWithContentDescription("Scheduled transactions").performScrollTo().performClick()
-        // The hero is one spoken summary for TalkBack, so wait for the projection card under it.
-        waitForText("Next 3 months")
+        // The agenda's summary (Transactions' tiles, transfers apart) says what the range holds, overdue included.
+        waitForText("overdue included", substring = true)
         shot("18-recurring")
         // The agenda: overdue first, then this month's dates; then each plan once under All schedules.
         scrollToText("Fibre internet")

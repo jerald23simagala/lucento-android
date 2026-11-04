@@ -12,9 +12,11 @@
 
 | # | To-do | Status | Why it matters |
 |---|---|---|---|
-| OT-1 | Apply `supabase/migrations/20261103180000_credit_card_billing.sql` to **`lucento-test`** (SQL editor, one `begin … commit` block; verify query in `PRODUCTION_MIGRATION.md`, top section) | **Not done** (owner confirmed 2026-11-03) | A v11 build sends `credit_limit_minor`, `statement_day`, `due_day` on every wallet row; until the project has them, wallet sync from a v11 build stalls (rows stay pending, nothing is lost) |
-| OT-2 | Apply the same migration to **production** before any v11 release | **Not done** | Same as OT-1, for release builds |
-| OT-3 | Re-check sync on a phone after OT-1 (add a card with a limit and billing days, sync, see it on a second device) | Waits on OT-1 | The only end-to-end check of the v11 sync columns; not possible here until the migration is applied |
+| OT-1 | Apply `supabase/migrations/20261103180000_credit_card_billing.sql` to **`lucento-test`** (SQL editor, one `begin … commit` block; verify query in `PRODUCTION_MIGRATION.md`, top section) | **Done** (owner, 2026-11-03) | A v11 build sends `credit_limit_minor`, `statement_day`, `due_day` on every wallet row; until the project has them, wallet sync from a v11 build stalls (rows stay pending, nothing is lost) |
+| OT-2 | Apply the same migration to **production** before any v11 release | **Done** (owner, 2026-11-03) | Same as OT-1, for release builds |
+| OT-3 | Re-check sync on a phone after OT-1 (add a card with a limit and billing days, sync, see it on a second device) | **Done** (owner, 2026-11-03) | The only end-to-end check of the v11 sync columns |
+| OT-4 | Deploy Ask Lucento's AI answers: review and merge `lucento-website` branch `feature/ask-lucento` (new `src/pages/api/ask.ts`, uncommitted there), deploy, then `curl -i -X POST -H "Content-Type: application/json" -d "{}" https://www.lucentoapp.com/api/ask` → `401 sign_in_required` (docs/ASK.md "Setting it up"). Same env vars as `/api/interpret`; the quota migration `20261027090000_ai_usage_quota.sql` must be applied | **Not done** (round 4, 2026-11-03) | Until then a release build's AI answers fail and Lucento falls back to on-phone reports with the reason; reports and PDFs work regardless |
+| OT-5 | On a signed-in phone (release build, or debug with `LUCENTO_DEBUG_AI_INTERPRET_URL` pointing at a test proxy): Insights › Ask Lucento › ask a question of your own › accept the consent › check the answer's bold figures | Waits on OT-4 | The AI path can't run here (no proxy in debug builds, no Google sign-in on this machine) |
 
 ## Stabilization cycle (2026-11-02, uncommitted on `main` from 01cfd04)
 
@@ -327,7 +329,34 @@ validation and rate limiting (N-09); toolchain alignment (N-19); dependency upgr
 Main session implements. Architect and QA agents review P0-2, P0-4, P1-2 and P1-5 before merging. One coherent
 change per branch, tests with every change, exact reporting of what ran, no production writes without approval.
 
-## Core screens — owner review round 3 (2026-11-03, uncommitted on `feature/core-screens-refinement`)
+## Core screens — owner review round 4 (2026-11-03, uncommitted on `feature/core-screens-refinement`)
+
+Owner comments: Scheduled without projection or hero, transfers apart from net flow, summary in Transactions' style;
+transaction view with icons and an editor wallet dropdown; wallet editor in onboarding's style, wallet page action row
+with a reconcile note, "View wallet"; Insights restyled after a reference, an Ask Lucento hero and the new Ask Lucento
+page (AI over the user's records, preset reports as PDFs, safeguards; owner answers: Gemini proxy, summaries only, all
+four reports); composer chat styled after a reference with real wallet icons. As built:
+`docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 4"; `docs/ASK.md`; `docs/CALCULATIONS.md` ("Scheduled
+outlook", "Ask Lucento reports").
+
+| Next | Why |
+|---|---|
+| **Owner: OT-4 / OT-5** (deploy `/api/ask`, then try AI answers on a signed-in phone; top of this file) | AI answers can't run until the proxy endpoint is live; reports and PDFs work without it |
+| Owner review on a real phone: Ask Lucento, Insights, composer, transaction view, wallet page | Visual sign-off; API 36 still blocked here (CS-7) |
+| Optional: a Settings shortcut to Ask Lucento's reports, and a Home entry point | Today it opens from Insights only |
+| Optional: compact the Insights hero's "Net · last N months" pill at large text (CS-17) | It truncates at 360dp @ 1.3 (predates round 4) |
+
+| Check | Result |
+|---|---|
+| Unit tests | **877/877** (+22: `ReportBuilderTest` ×8 net worth incl. change and empty months, cash flow, budget vs actual, debts, top categories, answer sentences; `AskTest` ×9 routing, months, snapshot never carries notes or other currencies, figure fill-in, unknown ids, unverified amounts, links, follow-ups; `AskRequestTest` ×2; `AskHeroTypingTest`; `InsightsTest` +2 change percent and axis; `ScheduleOutlookTest` net without transfers; `AccountSetupResetTest` AI consent cleared) |
+| Lint | 0 errors, 9 warnings — same types as before (AutoboxingStateCreation is now reported as information) |
+| Build | `assembleDebug`, `assembleDebugAndroidTest`; APK `artifacts/apk/lucento-debug-review5.apk` |
+| `ScreenshotTourTest` | **PASS** on API 28, final code (42 shots in `artifacts/core-screens/review5/`); new: 13a Ask Lucento, 13b preset answer, 13c report sheet |
+| Device checks (API 28) | Ask: preset answer with report card; free question without AI → honest "what I can do"; report month stepper (an empty month now says no wallets existed); Save as PDF via the system picker → `Download/Lucento-Net-worth-statement-2026-11.pdf` and `…Budget-vs-actual…` rendered and inspected (fixed: right-aligned figures, word spacing via scaled text). Composer with keyboard (fixed: double nav-bar gap at the root; compact save bar while typing; greeting scrolls with the conversation); transfer view Route card; 360dp @ 1.3 (fixed: report card title, Transfers caption); light + dark |
+| Website | `lucento-website/src/pages/api/ask.ts`: eslint clean, `astro check` no errors in it (the repo's 29 existing errors are in the e2e Playwright files) |
+| Not run | AI answers end to end (no proxy in debug; OT-4 / OT-5); sharing to another app; API 36 (CS-7) |
+
+## Core screens — owner review round 3 (2026-11-03, committed in `9021ed0`)
 
 Owner comments: dialogs aligned and livelier (Add Wallet's card = the wallet being built), category required on scheduled
 transactions, a livelier bell; budget card Safe to spend sticky (0 and red when over), Bills due always zero, Assets % /
@@ -338,7 +367,7 @@ From–To, 3-month projection, default to due today and this month); profile pic
 
 | Next | Why |
 |---|---|
-| **Owner: OT-1 / OT-2** (credit card billing migration, top of this file) | Still not applied; a v11 build's wallet sync stalls without it |
+| ~~Owner: OT-1 / OT-2~~ (credit card billing migration) | Done by the owner 2026-11-03, with OT-3 (sync checked on a phone) |
 | Owner: try "Use my Google photo" on a phone signed in with Google (CS-11) | The only path not exercised here (no Google sign-in on this machine's debug key) |
 | Owner review on a real phone: Scheduled page, bell, New wallet, budget card | Visual sign-off; API 36 still blocked here (CS-7) |
 | Optional: a one-time prompt to give pre-round-3 schedules a category (CS-12) | They keep working; editing asks for one |

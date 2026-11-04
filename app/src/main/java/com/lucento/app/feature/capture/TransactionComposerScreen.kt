@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.lucento.app.core.designsystem.component.icon
-import com.lucento.app.core.designsystem.component.WalletPill
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,28 +40,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.SwapHoriz
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,17 +68,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -97,7 +82,6 @@ import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
-import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
@@ -117,6 +101,24 @@ import com.lucento.app.feature.wallets.WalletRow
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
+import com.lucento.app.core.designsystem.component.ChatDayDivider
+import com.lucento.app.core.designsystem.component.ChatInputBar
+import com.lucento.app.core.designsystem.component.ChatMessageField
+import com.lucento.app.core.designsystem.component.ChatSendButton
+import com.lucento.app.core.designsystem.component.ChatTimestamp
+import com.lucento.app.core.designsystem.component.ChatToolButton
+import com.lucento.app.core.designsystem.component.LucentoReply
+import com.lucento.app.core.designsystem.component.MascotSpeech
+import com.lucento.app.core.designsystem.component.TypingDots
+import com.lucento.app.core.designsystem.component.UserChatBubble
+import com.lucento.app.core.designsystem.component.WalletIdentityTile
+import com.lucento.app.core.designsystem.component.IconTile
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.Button
 
 /** How the composer opens: ready to type, listening, or taking a receipt photo. */
 enum class ComposerStart { TYPE, SPEAK, SCAN }
@@ -245,16 +247,15 @@ fun TransactionComposerScreen(
         }
     }
 
-    // Bring the newest message to the top: its bubble, Lucento's one-line reply and as many of its rows as fit.
-    // Scrolling to the list's last item instead would push the bubble and reply off-screen whenever a message
-    // produces more rows than fit. Index arithmetic mirrors the items emitted below (optional notice, then per
-    // message: bubble, reply, rows).
+    // Bring the newest message to the top: its bubble, then Lucento's reply card with as many of its rows as fit.
+    // Scrolling to the list's last item instead would push the bubble off-screen whenever a message produces more rows
+    // than fit. Index arithmetic mirrors the items emitted below (optional notice, Lucento's greeting, the day divider,
+    // then per message: bubble, reply).
     val itemCount = state.messages.size
     LaunchedEffect(itemCount) {
         if (itemCount == 0) return@LaunchedEffect
         val notice = if (state.loaded && state.wallets.isEmpty()) 1 else 0
-        val before = state.messages.dropLast(1).sumOf { m -> 2 + state.rows.count { it.messageId == m.id } }
-        listState.animateScrollToItem(notice + before)
+        listState.animateScrollToItem(notice + 2 + (itemCount - 1) * 2)
     }
 
     fun requestBack() {
@@ -268,13 +269,8 @@ fun TransactionComposerScreen(
             onBack = ::requestBack,
             modifier = Modifier.padding(horizontal = Spacing.gutter),
         )
-        // Pinned: Lucento and the one instruction stay in view while the conversation scrolls beneath.
-        ComposerBanner(
-            mood = when {
-                state.summary.total > 0 && state.summary.canSave -> MascotMood.Happy
-                else -> MascotMood.Curious
-            },
-        )
+        // Pinned: the wallet everything goes into. Lucento's greeting is the conversation's first message, so it scrolls
+        // away and leaves the rows room above the keyboard.
         if (state.wallets.size > 1) {
             WalletBar(
                 wallets = state.wallets,
@@ -309,10 +305,23 @@ fun TransactionComposerScreen(
                     }
                 }
             }
+            item(key = "greeting") {
+                ComposerBanner(
+                    mood = when {
+                        state.summary.total > 0 && state.summary.canSave -> MascotMood.Happy
+                        state.messages.isEmpty() -> MascotMood.Greeting
+                        else -> MascotMood.Curious
+                    },
+                    transfersAllowed = state.transfersAllowed,
+                )
+            }
             if (state.messages.isEmpty()) {
                 item(key = "intro") {
                     ComposerIntro(transfersAllowed = state.transfersAllowed, onExample = { input = it })
                 }
+            }
+            if (state.messages.isNotEmpty()) {
+                item(key = "today") { ChatDayDivider("Today") }
             }
             state.messages.forEach { message ->
                 item(key = "m${message.id}") {
@@ -325,14 +334,10 @@ fun TransactionComposerScreen(
                     )
                 }
                 item(key = "r${message.id}") {
+                    // Lucento's reply card holds its one-line answer and every row it found, each a tinted panel.
                     val rows = state.rows.filter { it.messageId == message.id }
-                    Response(message, rows, state.statuses.filterKeys { k -> rows.any { it.key == k } }.count { !it.value.ready })
-                }
-                val rows = state.rows.filter { it.messageId == message.id }
-                rows.forEach { row ->
-                    item(key = row.key) {
-                        // Lucento's rows sit under its reply, indented past the avatar; each is its own card.
-                        Box(Modifier.padding(start = ReplyIndent)) {
+                    Response(message, rows, state.statuses.filterKeys { k -> rows.any { it.key == k } }.count { !it.value.ready }) {
+                        rows.forEach { row ->
                             ReviewRowItem(
                                 row = row,
                                 status = state.statuses[row.key],
@@ -347,6 +352,8 @@ fun TransactionComposerScreen(
                                     haptics.tick()
                                     viewModel.remove(row.key)
                                 },
+                                nested = true,
+                                modifier = Modifier.padding(top = Spacing.sm),
                             )
                         }
                     }
@@ -396,18 +403,11 @@ fun TransactionComposerScreen(
         }
 
         // ---------------------------------------------------------------- composer
-        // Every control is the same height and spacing so the bar reads as one balanced row when it first appears.
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = Spacing.gutter, vertical = Spacing.sm),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalAlignment = Alignment.Bottom,
-        ) {
+        // One raised bar: scan and voice as soft tiles, the message field, and send — every control the same height.
+        ChatInputBar(Modifier.background(MaterialTheme.colorScheme.background).padding(horizontal = Spacing.gutter, vertical = Spacing.sm)) {
             if (scanEnabled) {
                 Box {
-                    ComposerToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt") { scanMenu = true }
+                    ChatToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt", onClick = { scanMenu = true })
                     DropdownMenu(expanded = scanMenu, onDismissRequest = { scanMenu = false }) {
                         DropdownMenuItem(
                             text = { Text("Take a photo") },
@@ -429,25 +429,17 @@ fun TransactionComposerScreen(
                 }
             }
             if (voiceEnabled) {
-                ComposerToolButton(Icons.Outlined.KeyboardVoice, "Speak transactions", ::listen)
+                ChatToolButton(Icons.Outlined.KeyboardVoice, "Speak transactions", onClick = ::listen)
             }
-            MessageField(
+            ChatMessageField(
                 value = input,
                 onValueChange = { input = it.take(1_000) },
                 onSend = { submit() },
+                placeholder = "Type a transaction…",
+                description = "Describe transactions",
                 modifier = Modifier.weight(1f),
             )
-            FilledIconButton(
-                onClick = { submit() },
-                enabled = input.isNotBlank() && state.loaded && state.wallets.isNotEmpty(),
-                modifier = Modifier.size(ControlSize),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(20.dp))
-            }
+            ChatSendButton(enabled = input.isNotBlank() && state.loaded && state.wallets.isNotEmpty(), onClick = { submit() })
         }
     }
 
@@ -513,8 +505,9 @@ fun TransactionComposerScreen(
 }
 
 /**
- * The wallet everything flows into, pinned under the banner: one pill per account, the active one filled. Tapping
- * another moves the unsaved rows that were following it. A trailing pill starts a transfer from the active wallet.
+ * The wallet everything flows into, pinned under the banner: "Into", then one chip per account with its own icon (its
+ * bank's mark or its type's), the active one filled, the default starred. Tapping another moves the unsaved rows that
+ * were following it. A trailing chip starts a transfer from the active wallet.
  */
 @Composable
 private fun WalletBar(
@@ -528,49 +521,89 @@ private fun WalletBar(
     onTransfer: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.gutter)
-            .padding(bottom = Spacing.xs)
-            .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Column(Modifier.fillMaxWidth().padding(bottom = Spacing.xs)) {
         Text(
-            if (activeWalletId == null) "CHOOSE A WALLET" else "INTO",
-            style = MaterialTheme.typography.labelSmall,
+            if (activeWalletId == null) "Choose a wallet" else "Into",
+            style = MaterialTheme.typography.labelLarge,
             color = if (activeWalletId == null) LucentoTheme.extendedColors.negative else colors.onSurfaceVariant,
-            modifier = if (activeWalletId == null) Modifier.clickable(onClick = onChooseMissing) else Modifier,
+            modifier = Modifier
+                .padding(horizontal = Spacing.gutter)
+                .then(if (activeWalletId == null) Modifier.clickable(onClick = onChooseMissing) else Modifier),
         )
-        // The default wallet leads; the rest keep their usual order.
-        wallets.sortedByDescending { it.id == defaultWalletId }.forEach { wallet ->
-            val selected = wallet.id == activeWalletId
-            val isDefault = wallet.id == defaultWalletId
-            val name = if (isDefault) "${wallet.name}, default wallet" else wallet.name
-            WalletPill(
-                label = wallet.name,
-                icon = if (selected) Icons.Filled.Check else wallet.type.icon,
-                iconTint = if (selected) null else LucentoTheme.extendedColors.tone(wallet.type).content,
-                selected = selected,
-                isDefault = isDefault,
-                role = Role.RadioButton,
-                description = if (selected) "$name, active" else "Use $name",
-                onClick = { if (enabled && !selected) onChoose(wallet.id) },
-            )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.gutter)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The default wallet leads; the rest keep their usual order.
+            wallets.sortedByDescending { it.id == defaultWalletId }.forEach { wallet ->
+                val selected = wallet.id == activeWalletId
+                val isDefault = wallet.id == defaultWalletId
+                val name = if (isDefault) "${wallet.name}, default wallet" else wallet.name
+                WalletChip(
+                    label = wallet.name,
+                    selected = selected,
+                    starred = isDefault,
+                    description = if (selected) "$name, active" else "Use $name",
+                    role = Role.RadioButton,
+                    onClick = { if (enabled && !selected) onChoose(wallet.id) },
+                ) { WalletIdentityTile(wallet, size = 26.dp) }
+            }
+            if (transfersAllowed) {
+                WalletChip(
+                    label = "Transfer",
+                    selected = false,
+                    starred = false,
+                    description = "New transfer between your accounts",
+                    role = Role.Button,
+                    onClick = { if (enabled) onTransfer() },
+                ) {
+                    IconTile(Icons.Outlined.SwapHoriz, container = colors.primaryContainer, content = colors.primary, size = 26.dp, shape = RoundedCornerShape(7.dp))
+                }
+            }
         }
-        if (transfersAllowed) {
-            WalletPill(
-                label = "Transfer",
-                icon = Icons.Outlined.SwapHoriz,
-                iconTint = colors.primary,
-                selected = false,
-                isDefault = false,
-                role = Role.Button,
-                description = "New transfer between your accounts",
-                onClick = { if (enabled) onTransfer() },
-            )
+    }
+}
+
+/** A wallet as a rounded chip: its tile, its name, a star when it's the default; filled brand blue when active. */
+@Composable
+private fun WalletChip(
+    label: String,
+    selected: Boolean,
+    starred: Boolean,
+    description: String,
+    role: Role,
+    onClick: () -> Unit,
+    tile: @Composable () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val ext = LucentoTheme.extendedColors
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (selected) colors.primary else if (LucentoTheme.isDark) colors.surfaceContainerHigh else colors.surfaceContainerLowest,
+        contentColor = if (selected) colors.onPrimary else colors.onSurface,
+        border = if (selected) null else BorderStroke(1.dp, ext.borderDefault),
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                this.role = role
+                if (role == Role.RadioButton) this.selected = selected
+            },
+    ) {
+        Row(Modifier.padding(start = 6.dp, end = Spacing.md, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            tile()
+            Spacer(Modifier.width(Spacing.sm))
+            Text(label, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+            if (starred) {
+                Spacer(Modifier.width(Spacing.xs))
+                Icon(Icons.Filled.Star, contentDescription = null, tint = ext.accent, modifier = Modifier.size(16.dp))
+            }
         }
     }
 }
@@ -608,30 +641,15 @@ private fun WalletPickerSheet(wallets: List<Wallet>, onChoose: (Long, Boolean) -
     }
 }
 
-/** Height of every control in the input bar, so scan, voice, the message field and send line up. */
-private val ControlSize = 48.dp
-private val AvatarSize = 28.dp
-/** Lucento's replies and rows start past its avatar. */
-private val ReplyIndent = AvatarSize + Spacing.sm
-
-/** The pinned header under the top bar: Lucento and the one instruction. Never scrolls away. */
+/** Lucento's greeting, the conversation's first message: what to do, in its speech bubble. */
 @Composable
-private fun ComposerBanner(mood: MascotMood) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter, vertical = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LucentoMascot(size = 48.dp, mood = mood)
-        Spacer(Modifier.width(Spacing.md))
-        Column(Modifier.weight(1f)) {
-            Text("Describe what happened", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-            Text(
-                "Write several at once — each becomes a row to check before saving.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+private fun ComposerBanner(mood: MascotMood, transfersAllowed: Boolean) {
+    MascotSpeech(
+        title = "Tell me about your transaction",
+        body = "You can write naturally, like “Lunch 250 and groceries 800”" + if (transfersAllowed) " or “Transfer 5,000 to savings.”" else ".",
+        mood = mood,
+        mascotSize = 60.dp,
+    )
 }
 
 @Composable
@@ -656,39 +674,40 @@ private fun ComposerIntro(transfersAllowed: Boolean, onExample: (String) -> Unit
     }
 }
 
-/** The user's message: a brand-blue bubble on the trailing side, tail toward the edge. */
+/** The user's message: a pale-blue bubble on the trailing side, its time beneath, and "Edit message" when it can be. */
 @Composable
 private fun UserBubble(message: ComposerMessage, editing: Boolean, canEdit: Boolean, onEdit: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp)
-    Column(Modifier.fillMaxWidth().padding(top = Spacing.sm, start = 48.dp), horizontalAlignment = Alignment.End) {
-        Surface(shape = shape, color = colors.primary, contentColor = colors.onPrimary) {
-            Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
-                when (message.source) {
-                    CaptureSource.SPOKEN -> SourceLabel(Icons.Outlined.KeyboardVoice, "Spoken")
-                    CaptureSource.RECEIPT -> SourceLabel(Icons.Outlined.DocumentScanner, "Receipt")
-                    CaptureSource.TYPED -> Unit
+    Column(Modifier.fillMaxWidth().padding(top = Spacing.xs, start = 48.dp), horizontalAlignment = Alignment.End) {
+        UserChatBubble(
+            text = message.text,
+            top = when (message.source) {
+                CaptureSource.SPOKEN -> ({ SourceLabel(Icons.Outlined.KeyboardVoice, "Spoken") })
+                CaptureSource.RECEIPT -> ({ SourceLabel(Icons.Outlined.DocumentScanner, "Receipt") })
+                CaptureSource.TYPED -> null
+            },
+        )
+        Row(Modifier.padding(top = Spacing.xxs), verticalAlignment = Alignment.CenterVertically) {
+            if (editing) {
+                Text("Editing…", style = MaterialTheme.typography.labelMedium, color = colors.primary)
+                Spacer(Modifier.width(Spacing.sm))
+            } else if (canEdit) {
+                Surface(
+                    onClick = onEdit,
+                    shape = RoundedCornerShape(50),
+                    color = colors.primaryContainer,
+                    contentColor = colors.primary,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Row(Modifier.padding(horizontal = Spacing.md, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(Spacing.xs))
+                        Text("Edit message", style = MaterialTheme.typography.labelLarge)
+                    }
                 }
-                Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.width(Spacing.sm))
             }
-        }
-        if (editing) {
-            Text("Editing…", style = MaterialTheme.typography.labelMedium, color = colors.primary, modifier = Modifier.padding(top = Spacing.xs))
-        } else if (canEdit) {
-            Spacer(Modifier.height(Spacing.xs))
-            Surface(
-                onClick = onEdit,
-                shape = RoundedCornerShape(50),
-                color = colors.primaryContainer,
-                contentColor = colors.primary,
-                modifier = Modifier.minimumInteractiveComponentSize(),
-            ) {
-                Row(Modifier.padding(horizontal = Spacing.md, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text("Edit message", style = MaterialTheme.typography.labelLarge)
-                }
-            }
+            ChatTimestamp(timeOf(message.sentAtEpochMillis))
         }
     }
 }
@@ -702,58 +721,56 @@ private fun SourceLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, l
     }
 }
 
-/** Lucento's reply: its avatar and one short line in a neutral bubble on the leading side. The rows follow. */
+/** "6:49 PM", in the phone's own time format. */
+private fun timeOf(epochMillis: Long): String =
+    java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+        .withLocale(java.util.Locale.getDefault())
+        .format(java.time.Instant.ofEpochMilli(epochMillis).atZone(java.time.ZoneId.systemDefault()))
+
+/**
+ * Lucento's reply: its avatar and a card with one short line — "Got it! Here are 3 transactions I’ll add:" — then the
+ * rows it found ([rows]), and who read the message when it wasn't plain on-device reading. Its time sits beneath.
+ */
 @Composable
-private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAttention: Int) {
-    val colors = MaterialTheme.colorScheme
+private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAttention: Int, rowsContent: @Composable () -> Unit) {
     val live = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-    val shape = RoundedCornerShape(topStart = 6.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
-    Row(Modifier.fillMaxWidth().padding(end = 48.dp), verticalAlignment = Alignment.Top) {
-        LucentoMascot(size = AvatarSize, animate = false, mood = MascotMood.Curious)
-        Spacer(Modifier.width(Spacing.sm))
-        Surface(
-            shape = shape,
-            color = if (LucentoTheme.isDark) colors.surfaceContainerHigh else colors.surfaceContainer,
-            contentColor = colors.onSurface,
-        ) {
-            Box(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
-                when (val s = message.state) {
-                    MessageState.Reading -> Row(verticalAlignment = Alignment.CenterVertically, modifier = live) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(
-                            if (message.source == CaptureSource.RECEIPT) "Reading the receipt on this phone…" else "Reading…",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    is MessageState.NothingFound -> Text(s.message, style = MaterialTheme.typography.bodyMedium, modifier = live)
-                    is MessageState.Read -> {
-                        val text = when {
-                            rows.isEmpty() && s.saved > 0 -> if (s.saved == 1) "Saved." else "Saved all ${s.saved}."
-                            rows.isEmpty() -> "Removed."
-                            else -> buildString {
-                                append(if (s.found == 1) "Found 1 transaction." else "Found ${s.found} transactions.")
-                                append(
-                                    when (needsAttention) {
-                                        0 -> " Review anything that looks wrong."
-                                        1 -> " 1 needs a look."
-                                        else -> " $needsAttention need a look."
-                                    }
-                                )
-                            }
-                        }
-                        androidx.compose.foundation.layout.Column {
-                        Text(text, style = MaterialTheme.typography.bodyMedium, modifier = live)
-                        // Who read it, whenever it isn't plain on-device reading: Gemini, or this phone with the reason.
-                        s.engine?.takeIf { !it.onDevice || it.label.contains("·") }?.let { engine ->
-                            Text(
-                                if (engine.onDevice) "Read on this phone — ${engine.label.substringAfter("· ")}" else "Read by ${engine.label}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        }
-                    }
+    val reading = message.state is MessageState.Reading
+    LucentoReply(
+        mood = when {
+            reading -> MascotMood.Curious
+            rows.isNotEmpty() && needsAttention == 0 -> MascotMood.Happy
+            else -> MascotMood.Curious
+        },
+        footer = if (reading) null else ({ ChatTimestamp(timeOf(message.sentAtEpochMillis)) }),
+    ) {
+        when (val s = message.state) {
+            MessageState.Reading -> Row(verticalAlignment = Alignment.CenterVertically, modifier = live) {
+                TypingDots(description = "Reading")
+                Spacer(Modifier.width(Spacing.sm))
+                Text(
+                    if (message.source == CaptureSource.RECEIPT) "Reading the receipt on this phone…" else "Reading…",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            is MessageState.NothingFound -> Text(s.message, style = MaterialTheme.typography.bodyMedium, modifier = live)
+            is MessageState.Read -> {
+                val text = when {
+                    rows.isEmpty() && s.saved > 0 -> if (s.saved == 1) "Saved." else "Saved all ${s.saved}."
+                    rows.isEmpty() -> "Removed."
+                    needsAttention == 0 -> if (rows.size == 1) "Got it! Here’s the transaction I’ll add:" else "Got it! Here are ${rows.size} transactions I’ll add:"
+                    needsAttention == 1 -> if (rows.size == 1) "Here’s what I read — it needs a look:" else "Here are ${rows.size} transactions — 1 needs a look:"
+                    else -> "Here are ${rows.size} transactions — $needsAttention need a look:"
+                }
+                Text(text, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), modifier = live)
+                rowsContent()
+                // Who read it, whenever it isn't plain on-device reading: Gemini, or this phone with the reason.
+                s.engine?.takeIf { !it.onDevice || it.label.contains("·") }?.let { engine ->
+                    Text(
+                        if (engine.onDevice) "Read on this phone — ${engine.label.substringAfter("· ")}" else "Read by ${engine.label}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = Spacing.sm),
+                    )
                 }
             }
         }
@@ -762,92 +779,69 @@ private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAtten
 
 /**
  * The summary and the one primary action. The batch saves all at once, so the button stays disabled — and says why —
- * until every highlighted row is fixed or removed.
+ * until every highlighted row is fixed or removed. While the keyboard is up it folds into one line with a compact button,
+ * so the conversation keeps room above the keyboard.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BatchBar(summary: BatchSummary, saving: Boolean, onSave: () -> Unit) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val compact = WindowInsets.isImeVisible
+    val title = when {
+        summary.needsAttention == 0 -> if (summary.ready == 1) "1 transaction ready" else "${summary.ready} transactions ready"
+        summary.needsAttention == 1 -> "1 transaction is incomplete"
+        else -> "${summary.needsAttention} transactions are incomplete"
+    }
+    val label = when {
+        saving -> "Saving…"
+        summary.needsAttention == 1 -> "Fix 1 highlighted to save"
+        summary.needsAttention > 1 -> "Fix ${summary.needsAttention} highlighted to save"
+        summary.ready == 1 -> "Save 1 transaction"
+        else -> "Save ${summary.ready} transactions"
+    }
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
         Hairline()
-        Column(Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.sm)) {
-            Text(
-                when {
-                    summary.needsAttention == 0 -> if (summary.ready == 1) "1 transaction ready" else "${summary.ready} transactions ready"
-                    summary.needsAttention == 1 -> "1 transaction is incomplete"
-                    else -> "${summary.needsAttention} transactions are incomplete"
-                },
-                style = MaterialTheme.typography.titleSmall,
-                color = if (summary.canSave) MaterialTheme.colorScheme.onSurface else LucentoTheme.extendedColors.negative,
-            )
-            totalsLine(summary)?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = muted) }
-            Spacer(Modifier.height(Spacing.sm))
-            LucentoPrimaryButton(
-                text = when {
-                    saving -> "Saving…"
-                    summary.needsAttention == 1 -> "Fix 1 highlighted to save"
-                    summary.needsAttention > 1 -> "Fix ${summary.needsAttention} highlighted to save"
-                    summary.ready == 1 -> "Save 1 transaction"
-                    else -> "Save ${summary.ready} transactions"
-                },
-                onClick = onSave,
-                enabled = !saving && summary.canSave,
-            )
-        }
-    }
-}
-
-/** A round, tonal tool in the input bar (scan, voice). */
-@Composable
-private fun ComposerToolButton(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) {
-    FilledTonalIconButton(
-        onClick = onClick,
-        modifier = Modifier.size(ControlSize),
-        colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.primary,
-        ),
-    ) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(20.dp))
-    }
-}
-
-/** The pill-shaped message field: one line tall at rest (matching the round buttons), growing to four. */
-@Composable
-private fun MessageField(value: String, onValueChange: (String) -> Unit, onSend: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    val style = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface)
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        textStyle = style,
-        maxLines = 4,
-        cursorBrush = SolidColor(colors.primary),
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
-        keyboardActions = KeyboardActions(onSend = { onSend() }),
-        modifier = modifier.semantics { contentDescription = "Describe transactions" },
-        decorationBox = { inner ->
-            val shape = RoundedCornerShape(ControlSize / 2)
-            Box(
-                Modifier
-                    .background(if (LucentoTheme.isDark) colors.surfaceContainer else colors.surfaceContainerLowest, shape)
-                    .border(BorderStroke(1.dp, colors.outline), shape)
-                    .heightIn(min = ControlSize)
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                if (value.isEmpty()) {
+        if (compact) {
+            Row(Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        "Lunch 250, groceries 800…",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = colors.onSurfaceVariant,
+                        title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (summary.canSave) MaterialTheme.colorScheme.onSurface else LucentoTheme.extendedColors.negative,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    )
+                    totalsLine(summary)?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = muted, maxLines = 1) }
+                }
+                Spacer(Modifier.width(Spacing.sm))
+                Button(
+                    onClick = onSave,
+                    enabled = !saving && summary.canSave,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Text(
+                        when {
+                            saving -> "Saving…"
+                            summary.needsAttention > 0 -> "Fix ${summary.needsAttention} first"
+                            else -> "Save ${summary.ready}"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
                     )
                 }
-                inner()
             }
-        },
-    )
+        } else {
+            Column(Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.sm)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (summary.canSave) MaterialTheme.colorScheme.onSurface else LucentoTheme.extendedColors.negative,
+                )
+                totalsLine(summary)?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = muted) }
+                Spacer(Modifier.height(Spacing.sm))
+                LucentoPrimaryButton(text = label, onClick = onSave, enabled = !saving && summary.canSave)
+            }
+        }
+    }
 }
 
 private fun totalsLine(summary: BatchSummary): String? {

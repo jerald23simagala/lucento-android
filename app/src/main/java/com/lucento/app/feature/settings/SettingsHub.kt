@@ -117,7 +117,8 @@ internal fun accountSummary(state: CloudSyncUiState, nowMillis: Long): String = 
 /** The Privacy & security row's summary: the app lock, and how many data-sharing switches are on (none by default). */
 internal fun privacySummary(prefs: UserPreferences, smartReadingOffered: Boolean = true): String {
     val lock = if (prefs.appLock) "App lock on" else "App lock off"
-    val sharing = listOf(prefs.crashReports, prefs.usageCounts, prefs.smartReading && smartReadingOffered).count { it }
+    // Ask Lucento's AI answers use the same proxy and sign-in as Smarter reading, so they're offered in the same builds.
+    val sharing = listOf(prefs.crashReports, prefs.usageCounts, prefs.smartReading && smartReadingOffered, prefs.askLucentoAi && smartReadingOffered).count { it }
     val shared = when (sharing) {
         0 -> "nothing shared"
         1 -> "1 sharing option on"

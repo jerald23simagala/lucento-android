@@ -239,7 +239,8 @@ the local ledger (wallets, categories, transactions, budgets, goals, contributio
 photos, the profile photo) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
 again, as on a fresh install, and the account's setup is reset in one preference edit (F-7,
 `UserPreferencesRepository.resetAccountSetup`): onboarding and the category setup are marked not done, and the guided
-setup step, default wallet, display name, acknowledged budget month and Smarter reading are cleared. So Lucento goes
+setup step, default wallet, display name, acknowledged budget month, Smarter reading and Ask Lucento's AI answers are
+cleared. So Lucento goes
 back to onboarding, and the next account is checked there: one with data is restored, an empty one is set up
 (including the spending categories), and a failed check sets nothing up. Theme, currency, modules, crash-report and
 usage-count consent and notices already seen stay. Each wipe also bumps `setup_generation`, which keys onboarding's

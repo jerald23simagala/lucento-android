@@ -7,7 +7,7 @@ import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
 
-/** The Scheduled page's agenda, totals and three-month projection (docs/CALCULATIONS.md "Scheduled outlook"). */
+/** The Scheduled page's agenda and totals (docs/CALCULATIONS.md "Scheduled outlook"). */
 class ScheduleOutlookTest {
 
     private fun usd(minor: Long) = Money(minor, "USD")
@@ -84,7 +84,8 @@ class ScheduleOutlookTest {
         assertEquals(usd(120_000 + 4 * 2_500), totals.expenses)
         // Transfers: the loan payment in full (principal 400 + interest 50) and the card's 450 due.
         assertEquals(usd(45_000 + 45_000), totals.transfers)
-        assertEquals(totals.income - totals.expenses - totals.transfers, totals.net)
+        // Transfers stay apart: they move money between the user's own wallets and never change the net.
+        assertEquals(totals.income - totals.expenses, totals.net)
         assertEquals(1, totals.overdueCount)
         assertEquals(items.size, totals.count)
     }
@@ -98,25 +99,20 @@ class ScheduleOutlookTest {
         assertEquals(listOf("EUR"), ScheduleOutlook.otherCurrencies(items, "USD"))
     }
 
-    @Test fun projectionCoversThreeMonthsWithOverdueInTheFirst() {
-        val months = ScheduleOutlook.projection(listOf(salary, rent, loan), listOf(cardDue("2026-12-10", 30_000)), today, "USD")
-        assertEquals(listOf(YearMonth.of(2026, 11), YearMonth.of(2026, 12), YearMonth.of(2027, 1)), months.map { it.month })
-        val (nov, dec, jan) = months.map { it.totals }
-        // November: salary, the overdue rent and the loan payment.
-        assertEquals(usd(300_000), nov.income)
-        assertEquals(usd(120_000), nov.expenses)
-        assertEquals(usd(45_000), nov.transfers)
-        // December: the next of each, plus the card's current statement, due on the 10th.
-        assertEquals(usd(120_000), dec.expenses)
-        assertEquals(usd(45_000 + 30_000), dec.transfers)
-        // January: no card statement is known yet.
-        assertEquals(usd(45_000), jan.transfers)
-        assertEquals(usd(300_000), jan.income)
+    @Test fun aThreeMonthRangeCarriesOverdueAndOnlyTheCurrentCardStatement() {
+        val end = YearMonth.of(2027, 1).atEndOfMonth()
+        val items = ScheduleOutlook.items(listOf(salary, rent, loan), listOf(cardDue("2026-12-10", 30_000)), today, today, end)
+        val totals = ScheduleOutlook.totals(items, "USD")
+        // Three salaries, the overdue rent and two more, three loan payments and the card's one known statement.
+        assertEquals(usd(3 * 300_000), totals.income)
+        assertEquals(usd(3 * 120_000), totals.expenses)
+        assertEquals(usd(3 * 45_000 + 30_000), totals.transfers)
+        assertEquals(usd(3 * 300_000 - 3 * 120_000), totals.net)
+        assertEquals(1, totals.overdueCount)
     }
 
-    @Test fun emptyScheduleListProjectsZeroes() {
-        val months = ScheduleOutlook.projection(emptyList(), emptyList(), today, "USD")
-        assertEquals(3, months.size)
-        assertTrue(months.all { it.totals.isEmpty && it.totals.net.isZero })
+    @Test fun nothingScheduledTotalsZero() {
+        val totals = ScheduleOutlook.totals(emptyList(), "USD")
+        assertTrue(totals.isEmpty && totals.net.isZero && totals.transfers.isZero)
     }
 }

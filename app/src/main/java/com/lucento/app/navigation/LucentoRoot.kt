@@ -108,12 +108,15 @@ import com.lucento.app.feature.wallets.WalletsScreen
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
+import androidx.compose.foundation.layout.consumeWindowInsets
 
 // Primary destinations: the five tabs of the navigation dock.
 @Serializable data object HomeRoute
 @Serializable data object TransactionsRoute
 @Serializable data object WalletsRoute
 @Serializable data object InsightsRoute
+/** Ask Lucento: questions about the user's money and the preset reports (opened from Insights' hero). */
+@Serializable data object AskRoute
 @Serializable data object BudgetRoute
 /** The guided setup after onboarding (wallets, debts, budget, goal, first transactions, welcome). */
 @Serializable data object GuideRoute
@@ -183,6 +186,7 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     TransactionEditRoute::class,
     TransactionViewRoute::class,
     RecurringEditRoute::class,
+    AskRoute::class,
 )
 
 private fun NavDestination?.primaryKey(): String? =
@@ -394,7 +398,9 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     ) { innerPadding ->
         val profilePhoto by appViewModel.profilePhoto.collectAsStateWithLifecycle()
         CompositionLocalProvider(LocalProfileChrome provides ProfileChrome(preferences.displayName, profilePhoto) { showProfile = true }) {
-            Box(Modifier.fillMaxSize().padding(innerPadding)) {
+            // The padding is consumed as insets too, so a screen's imePadding() adds only the keyboard above the navigation
+            // bar the Scaffold already cleared, not the bar a second time (a gap above the keyboard in the composer).
+            Box(Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding)) {
                 NavHost(
                     navController = navController,
                     startDestination = HomeRoute,
@@ -482,7 +488,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         }
                     }
                     pushed<InsightsRoute>(reducedMotion) {
-                        Gated(Feature.INSIGHTS, features, enableFeature, back) { InsightsScreen(onBack = back) }
+                        Gated(Feature.INSIGHTS, features, enableFeature, back) { InsightsScreen(onBack = back, onAsk = { push(AskRoute) }) }
+                    }
+                    pushed<AskRoute>(reducedMotion) {
+                        Gated(Feature.INSIGHTS, features, enableFeature, back) { com.lucento.app.feature.ask.AskLucentoScreen(onBack = back) }
                     }
 
                     pushed<WalletDetailRoute>(reducedMotion) { entry ->

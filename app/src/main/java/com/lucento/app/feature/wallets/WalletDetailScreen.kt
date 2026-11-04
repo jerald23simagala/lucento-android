@@ -1,18 +1,15 @@
 package com.lucento.app.feature.wallets
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Percent
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -31,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.lucento.app.core.designsystem.component.ActionTile
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.LucentoCard
@@ -41,7 +37,6 @@ import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
-import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.Transaction
@@ -50,6 +45,24 @@ import com.lucento.app.domain.WalletType
 import com.lucento.app.domain.balanceFlag
 import com.lucento.app.feature.transactions.TransactionRow
 import com.lucento.app.feature.transactions.shortDayLabel
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import com.lucento.app.core.designsystem.component.IconTile
+import com.lucento.app.core.designsystem.component.LucentoTextButton
+import com.lucento.app.core.designsystem.component.rememberHaptics
 
 /**
  * One account: what it is, its current balance (opening balance ± recorded movements), and its own
@@ -89,8 +102,8 @@ fun WalletDetailScreen(
     ) {
         item(key = "bar") {
             LucentoTopBar(
-                // The wallet's name and type live on the card itself.
-                title = if (wallet == null) "Account" else "",
+                // The wallet's name and type live on the card itself; the bar says what the page is.
+                title = "View wallet",
                 onBack = onBack,
                 actions = {
                     if (wallet != null) {
@@ -142,25 +155,38 @@ fun WalletDetailScreen(
         if (valued) return@LazyColumn
 
         item(key = "actions") {
-            Row(Modifier.fillMaxWidth().padding(top = Spacing.md), horizontalArrangement = Arrangement.SpaceBetween) {
-                if (wallet.type == WalletType.LOAN) {
-                    if (transfersEnabled) {
-                        ActionTile("Repay loan", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(1f), primary = true)
+            // Spending and income are added with the dock's +; an account's own page moves money (left) and reconciles
+            // its balance with the real one (right, with how that works), so the row is never half empty.
+            val loan = wallet.type == WalletType.LOAN
+            Row(
+                Modifier.fillMaxWidth().padding(top = Spacing.md).height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                if (transfersEnabled) {
+                    when {
+                        loan -> MoveMoneyCard("Repay loan", "From your bank or cash", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(0.38f).fillMaxHeight())
+                        liability -> MoveMoneyCard("Payment", "Pay this card", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(0.38f).fillMaxHeight())
+                        else -> MoveMoneyCard("Transfer", "Between your wallets", Icons.Outlined.SwapHoriz, { onTransfer(wallet.id, null) }, Modifier.weight(0.38f).fillMaxHeight())
                     }
-                    // A loan has no purchases: its balance is corrected with the as-of balance adjustment instead.
-                    ActionTile("Adjust loan", Icons.Filled.Tune, { adjusting = true }, Modifier.weight(1f))
-                    ActionTile("Interest/fee", Icons.Outlined.Percent, { onAddTransaction(TransactionType.EXPENSE, wallet.id) }, Modifier.weight(1f))
-                } else {
-                    // Spending and income are added with the dock's +; an account's own page moves money and corrects it.
-                    if (transfersEnabled) {
-                        if (liability) {
-                            ActionTile("Payment", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(1f), primary = true)
-                        } else {
-                            ActionTile("Transfer", Icons.Outlined.SwapHoriz, { onTransfer(wallet.id, null) }, Modifier.weight(1f), primary = true)
-                        }
-                    }
-                    ActionTile("Adjust balance", Icons.Filled.Tune, { adjusting = true }, Modifier.weight(1f), primary = !transfersEnabled)
                 }
+                ReconcileCard(
+                    title = if (loan) "Adjust loan" else "Adjust balance",
+                    body = when {
+                        loan -> "Lender’s statement says otherwise? Enter what you owe on a date — the gap is recorded as an adjustment, not borrowing or spending."
+                        liability -> "Card statement says otherwise? Enter what you owe — the gap is recorded as an adjustment, not a purchase or a payment."
+                        else -> "Bank says otherwise? Enter the real balance — the gap is recorded as an adjustment, not income or spending."
+                    },
+                    onClick = { adjusting = true },
+                    modifier = Modifier.weight(0.62f).fillMaxHeight(),
+                )
+            }
+            if (loan) {
+                // A loan has no purchases; interest and fees are expenses recorded on it.
+                LucentoTextButton(
+                    text = "Record interest or a fee",
+                    onClick = { onAddTransaction(TransactionType.EXPENSE, wallet.id) },
+                    modifier = Modifier.padding(top = Spacing.xxs),
+                )
             }
             if (liability) {
                 val cycle = state.cardCycle
@@ -187,8 +213,8 @@ fun WalletDetailScreen(
             return@LazyColumn
         }
 
-        item(key = "history-header") { SectionHeader("History", Modifier.padding(top = Spacing.lg)) }
         if (state.history.isEmpty()) {
+            item(key = "history-header") { SectionHeader("History", Modifier.padding(top = Spacing.lg)) }
             item(key = "empty") {
                 EmptyState(
                     title = "Nothing recorded yet",
@@ -196,19 +222,36 @@ fun WalletDetailScreen(
                 )
             }
         }
-        itemsIndexed(state.history, key = { _, t -> "tx-${t.id}" }) { index, transaction ->
-            Column {
-                TransactionRow(
-                    transaction = transaction,
-                    category = transaction.categoryId?.let { state.categoriesById[it] },
-                    wallet = wallet,
-                    onClick = { onEditTransaction(transaction) },
-                    trailingCaption = shortDayLabel(transaction.date),
-                    transfer = transaction.transferGroup?.let { state.transfers[it] },
-                    walletNames = state.walletNames,
-                    perspectiveOfWallet = true,
-                )
-                if (index < state.history.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
+        // History by month, each on one card of compact rows (as on Transactions), newest first.
+        state.history.groupBy { java.time.YearMonth.from(it.date) }.forEach { (month, rows) ->
+            item(key = "month-head-$month") {
+                SectionHeader(monthTitle(month, state.today), Modifier.padding(top = Spacing.lg)) {
+                    Text(
+                        if (rows.size == 1) "1 movement" else "${rows.size} movements",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+            item(key = "month-$month") {
+                LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+                    rows.forEachIndexed { index, transaction ->
+                        TransactionRow(
+                            transaction = transaction,
+                            category = transaction.categoryId?.let { state.categoriesById[it] },
+                            wallet = wallet,
+                            onClick = { onEditTransaction(transaction) },
+                            trailingCaption = shortDayLabel(transaction.date),
+                            transfer = transaction.transferGroup?.let { state.transfers[it] },
+                            walletNames = state.walletNames,
+                            perspectiveOfWallet = true,
+                            dense = true,
+                        )
+                        // Inset to the row text (12dp padding + 36dp tile + 10dp gap), not under the tile.
+                        if (index < rows.lastIndex) Hairline(inset = 58.dp)
+                    }
+                }
             }
         }
         item(key = "note") {
@@ -248,6 +291,61 @@ fun WalletDetailScreen(
             },
             onDismiss = { adjusting = false },
         )
+    }
+}
+
+/** "November", or "November 2025" outside the current year. */
+private fun monthTitle(month: java.time.YearMonth, today: java.time.LocalDate): String {
+    val name = month.month.getDisplayName(java.time.format.TextStyle.FULL_STANDALONE, java.util.Locale.getDefault())
+    return if (month.year == today.year) name else "$name ${month.year}"
+}
+
+/** The page's money-moving action: a filled brand circle, the verb and what it does, as one compact card. */
+@Composable
+private fun MoveMoneyCard(label: String, caption: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val haptics = rememberHaptics()
+    val colors = MaterialTheme.colorScheme
+    LucentoCard(
+        modifier = modifier,
+        onClick = {
+            haptics.tick()
+            onClick()
+        },
+        contentPadding = Spacing.md,
+    ) {
+        Box(Modifier.size(44.dp).clip(CircleShape).background(colors.primary), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.weight(1f).heightIn(min = Spacing.sm))
+        Text(label, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(caption, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 2)
+    }
+}
+
+/**
+ * Reconciling, explained where it's done: a tonal tile, the action, one line on how an adjustment works, and the call to
+ * act. The whole card is one touch target.
+ */
+@Composable
+private fun ReconcileCard(title: String, body: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val haptics = rememberHaptics()
+    val colors = MaterialTheme.colorScheme
+    LucentoCard(
+        modifier = modifier,
+        onClick = {
+            haptics.tick()
+            onClick()
+        },
+        contentPadding = Spacing.md,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(Icons.Filled.Tune, container = colors.primaryContainer, content = colors.onPrimaryContainer, size = 32.dp, shape = RoundedCornerShape(10.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        Text(body, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
     }
 }
 

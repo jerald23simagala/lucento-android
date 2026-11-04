@@ -114,6 +114,11 @@ recurring-schedule sync, syncing preferences.
   always shown (0 in red when nothing is left); scheduled amounts coloured by flow; category required on scheduled bills
   and income; one sheet header and confirm dialog style across the app; New wallet draws the real wallet card live;
   profile photo (photo picker, or the Google picture on request).
+- Owner review round 4 (2026-11-03): **Ask Lucento** (docs/ASK.md) — Insights hero, preset questions and four reports
+  calculated on the phone with PDF export, opt-in AI answers through the Gemini proxy with summaries only; Scheduled page
+  without the hero and projection, transfers apart from net flow; transaction view and editor redesigned (wallet
+  dropdown with real wallet icons); wallet editor in onboarding's field style; wallet page reconcile card and month
+  cards; Insights restyled; composer chat restyled with shared chat components.
 - Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
   email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
   Insights adopt the brand hero and carded sections.

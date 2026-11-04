@@ -24,6 +24,8 @@ data class TransactionDetailUiState(
     /** Both legs, when the transaction is one side of a transfer. */
     val transfer: Transfer? = null,
     val walletNames: Map<Long, String> = emptyMap(),
+    /** Every wallet by id, so a transfer's two sides show with their own tiles. */
+    val walletsById: Map<Long, Wallet> = emptyMap(),
 )
 
 /** Read-only view of one transaction; it follows edits made on the editor page. */
@@ -47,6 +49,7 @@ class TransactionDetailViewModel(
             wallet = transaction?.let { t -> walletList.firstOrNull { it.id == t.walletId } },
             transfer = transaction?.transferGroup?.let { Transfer.pair(all)[it] },
             walletNames = walletList.associate { it.id to it.name },
+            walletsById = walletList.associateBy { it.id },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionDetailUiState())
 

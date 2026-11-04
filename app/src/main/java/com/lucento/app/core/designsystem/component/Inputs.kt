@@ -54,6 +54,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextFieldColors
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.heading
+import com.lucento.app.core.designsystem.theme.Hierarchy
 
 /** Filled, borderless search field. */
 @Composable
@@ -318,5 +323,64 @@ fun <T> ViewToggle(
                 }
             }
         }
+    }
+}
+
+/**
+ * Onboarding's field look, shared by forms that follow it (the wallet editor): a tinted, filled container with rounded
+ * corners and no outline until focused (then brand blue), as in setup's currency search.
+ */
+object LucentoFields {
+    val shape: Shape
+        @Composable get() = MaterialTheme.shapes.medium
+
+    @Composable
+    fun filledColors(): TextFieldColors {
+        val colors = MaterialTheme.colorScheme
+        return OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = colors.surfaceContainer,
+            focusedContainerColor = colors.surfaceContainer,
+            errorContainerColor = colors.surfaceContainer,
+            disabledContainerColor = colors.surfaceContainer,
+            unfocusedBorderColor = Color.Transparent,
+            disabledBorderColor = Color.Transparent,
+            focusedBorderColor = colors.primary,
+        )
+    }
+}
+
+/**
+ * A tappable field in the [LucentoFields] look — a picker that opens a menu or sheet: tinted, rounded, outlined in brand
+ * blue only while [active] (its menu is open) and in the error colour when [isError].
+ */
+@Composable
+fun Modifier.filledField(active: Boolean = false, isError: Boolean = false): Modifier {
+    val colors = MaterialTheme.colorScheme
+    val shape = LucentoFields.shape
+    val edge by animateColorAsState(
+        when {
+            isError -> colors.error
+            active -> colors.primary
+            else -> Color.Transparent
+        },
+        tween(160),
+        label = "field-edge",
+    )
+    return this
+        .clip(shape)
+        .background(colors.surfaceContainer)
+        .border(BorderStroke(if (active || isError) 1.5.dp else 1.dp, edge), shape)
+}
+
+/** A form section's label with its icon in brand blue (onboarding's "Appearance", "Main currency"). */
+@Composable
+fun IconFieldHeader(icon: ImageVector, text: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().padding(bottom = Spacing.sm).semantics(mergeDescendants = true) { heading() },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(Spacing.sm))
+        Text(text, style = Hierarchy.fieldLabel, color = MaterialTheme.colorScheme.onSurface)
     }
 }
