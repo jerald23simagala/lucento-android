@@ -167,7 +167,11 @@ Optional per card (`debt_terms.credit_limit_minor`, `statement_day`, `due_day`; 
 - **Payment reminder**: with billing days set, the due date becomes a reminder on Home (Upcoming card and the bell)
   showing the amount due, while there is something to pay. It is derived every time, never stored as a recurring
   payment, and **never counted in Safe to spend**: the card's purchases were already counted as spending, and paying the
-  card is a transfer (Debt rules above). A tap opens the card, where Payment records the transfer (`CreditCardMath.dues`).
+  card is a transfer (Debt rules above). A tap (the bell, Upcoming, or Payment on the card) opens that transfer filled
+  in: the amount due, today, the note "<card> payment", to the card, from the **paying account** — the account that paid
+  the card last (the source of the latest transfer into it), otherwise the cash, bank or e-wallet account in the card's
+  currency with the most money (savings only when there is no everyday account), never another card or loan or another
+  currency (`CreditCardMath.dues` / `payingWallet`). Every field stays editable; nothing is saved until the user saves.
 - The wallet card shows Credit limit, Available and Amount due ("by Nov 5", or "Overdue · Nov 5").
 
 ## Instalment loan progress (v11 display)
@@ -217,6 +221,19 @@ the same `Report` is drawn on screen and written to the PDF. See docs/ASK.md for
   total owed.
 - **Top spending categories** (a month): the top N (default 5, at most 20) expense categories with their share of all
   spending, then "everything else".
+- **AI answers' figures** (docs/ASK.md; `AskSnapshotBuilder`, all on the phone): *projected spending* this month =
+  spending so far ÷ days so far × days in the month (`CashflowCalculator.burnRate`); *averages* = totals over the last
+  full months on record (up to three, never the current month) ÷ their number, half-up; *share of income kept* = (income −
+  expenses) ÷ income over those months, whole percent; *money on hand* = cash, bank and e-wallet balances; goals use
+  `GoalCalculator` (still to save, needed a month by the target date, projected date at the pace so far); a debt's
+  *monthly interest* = owed × yearly rate ÷ 12 (`DebtMath.monthlyInterest`). **Transaction patterns** (expenses, one
+  currency; the payee is the note, lower-cased, punctuation and 4+-digit runs dropped): *top payees* over 90 days;
+  *monthly repeats* = a payee in 3+ of the last 6 months within 15% of its median, or in 2 consecutive months within 2%;
+  *unusual* = this month's expense ≥ 2.5 × its category's median over the 90 days before the month (4+ earlier expenses
+  needed); *possible duplicates* = same account, day, amount and payee within 60 days. **Calculations in answers**
+  (`AskCalc`): `[[= expression ]]` over figure ids, numbers, + − × ÷ and brackets, in exact decimals; amount ± amount
+  (same currency), amount × or ÷ number, amount ÷ amount = number; anything else (mixed currencies, ÷ 0, a text figure,
+  an unknown id) shows "—". Amounts round half-up to the currency's minor unit; numbers show at most one decimal.
 - **Insights change chip**: `Insights.changePercent(net, previous net)` — the period's net flow against the equal period
   before it, as a whole percentage of the previous amount's size (half-up); omitted when the earlier period has no
   records or a zero net. **Chart axis**: `Insights.axisTicks` — round gridlines (1, 2, 2.5 or 5 × a power of ten), at
@@ -283,9 +300,37 @@ reduces, but cannot guarantee against, every spreadsheet's import behaviour (e.g
 apostrophe).
 
 ## Receipt amounts
+**Which line is the total**, best first: "Grand total"; "Amount due" / "Total due" / "Balance due" / "Amount payable" /
+"Amount to pay"; "Total amount" / "Net total" / "Net amount" / "Total"; "Amount paid" / "Total paid" / "You paid". Never
+"Subtotal", tax lines, change, cash tendered or "Minimum amount due". When the only label is "Amount paid" and a change
+line is printed, the total is paid − change (`ReceiptParser.findTotal`).
 Amounts are read with the minor-unit digits of the currency printed on the receipt (unambiguous symbols/ISO codes
 only; `$` and `¥` are ambiguous and ignored), else the default wallet's currency, else 2. A group of three after a
 single separator is thousands (`1,250`, `12.500`) except for 3-decimal currencies with a `.` (`12.500` KWD). Plain
 integers count only on a line labelled as the total. Dates, times, percentages, phone/TIN/reference numbers and
 quantities are masked first. The result is always a suggestion on an editable review screen; missing values stay
 missing.
+
+## Statement scans
+`domain/capture/StatementParser.kt` (pure, unit-tested; `ScanOcrTest` runs it on real on-device OCR). A scan is a
+**statement** (one transaction per line) when two or more lines each carry a date and an amount; or dates head (or sit
+under) groups of amounts, with +/− marks or statement words, and no more receipt words than statement words; or three or
+more lines carry +/− marks and nothing reads like a receipt. Otherwise it is a **receipt** (one payment, above).
+- **Lines**: opening/closing balances, totals, minimum due, limits and due dates are never transactions; an opening
+  balance anchors the balance check. A wrapped second line joins the dated line above it.
+- **Amount**: with a balance column (a header naming "balance", or most amount lines carrying two amounts) the first
+  amount is the transaction and the last the running balance; otherwise the last amount. Bare integers count only with
+  a currency or a sign beside them.
+- **Direction** (money in or out of the account), strongest first: the running balance (previous − amount = this
+  balance → out; previous + amount → in), checked oldest-first and newest-first and the better fit kept; a mark beside
+  the amount (−, +, ( ), CR, DR; a trailing minus is a credit on a card statement and a debit on a bank's); the words
+  (deposit, salary, received, cash in, refund → in; withdrawal, purchase, payment to, transfer to, fee → out); on a card
+  statement, a charge unless it says payment, credit or refund. Anything else is marked for the user to check.
+- **Dates**: a day above 12 settles day/month order for the whole statement; otherwise the order that keeps its dates
+  within about two months, then the phone's order, and the dates are marked as unclear. A year not printed is the latest
+  one that keeps the date on or before the statement's newest full date (or today). Future dates and dates more than
+  five years back are dropped (the row's date is then marked).
+- **Rows** (`StatementCandidates`): all in the scanned account; out → expense, in → income, except money into a card or
+  loan (a payment: a transfer whose source the user picks) and a line naming another of the user's same-currency
+  accounts (a transfer between them). "Already saved?" for a statement row matches the same amount and type in the
+  account within three days, whatever the description.

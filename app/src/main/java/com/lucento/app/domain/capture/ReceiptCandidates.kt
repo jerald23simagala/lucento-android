@@ -13,7 +13,10 @@ import java.util.Locale
  */
 object ReceiptCandidates {
 
-    fun from(lines: List<String>, context: InterpretationContext): TransactionCandidate? {
+    fun from(lines: List<String>, context: InterpretationContext): TransactionCandidate? = read(lines, context)?.first
+
+    /** The candidate and the suggestion it came from (for the reply that says which line was the total). */
+    internal fun read(lines: List<String>, context: InterpretationContext): Pair<TransactionCandidate, ReceiptSuggestion>? {
         val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
         if (clean.isEmpty()) return null
         val defaultWallet = context.wallets.firstOrNull { it.id == context.defaultWalletId } ?: context.wallets.firstOrNull()
@@ -55,6 +58,6 @@ object ReceiptCandidates {
             mentionedCurrency = suggestion.currencyCode,
             sourceText = clean.joinToString("\n"),
             flags = flags,
-        )
+        ) to suggestion
     }
 }

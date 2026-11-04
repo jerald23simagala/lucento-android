@@ -3,6 +3,7 @@ package com.lucento.app.data.ai
 import com.lucento.app.domain.ask.AskSnapshot
 import com.lucento.app.domain.ask.SnapshotFigure
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
@@ -25,5 +26,11 @@ class AskRequestTest {
         assertEquals("PHP", request.currency)
         assertEquals("2026-11-15", request.today)
         assertEquals(listOf(AskFigure("nw", "Net worth today", "₱10,000.00")), request.figures)
+    }
+
+    @Test fun theBodyTellsTheProxyThisAppIsVersion2() {
+        // Without it the proxy answers with the summaries-only prompt (no advice, no calculations).
+        val body = AskLucentoClient.body(AskRequest.from("How can I save more?", emptyList(), snapshot))
+        assertTrue(body, body.contains("\"version\":2"))
     }
 }

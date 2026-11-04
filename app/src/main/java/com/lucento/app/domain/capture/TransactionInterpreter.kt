@@ -6,7 +6,7 @@ import com.lucento.app.domain.Wallet
 import java.math.BigDecimal
 import java.time.LocalDate
 
-/** Where a message came from. All three go through the same interpreter and the same review. */
+/** Where a message came from. All three go through the same interpreter and the same review. RECEIPT is any scanned image. */
 enum class CaptureSource { TYPED, SPOKEN, RECEIPT }
 
 /** Something the interpreter could not settle on its own; the review row points at the field concerned. */
@@ -31,6 +31,13 @@ enum class CandidateFlag {
     TOTAL_UNCONFIRMED,
     /** A receipt whose items don't add up to the printed total. */
     ITEMS_DONT_ADD_UP,
+    /** A statement line whose direction (money in or out) the statement didn't settle; read as money out. */
+    DIRECTION_UNCERTAIN,
+    /**
+     * Read from a statement: the "already saved?" check allows a few days' difference (posting dates lag) and a different
+     * description (the bank's words, not the user's).
+     */
+    FROM_STATEMENT,
 }
 
 /** What the interpreter needs to know about the user's setup. Nothing here leaves the device. */
@@ -46,6 +53,8 @@ data class InterpretationContext(
     val decimalSeparator: Char = '.',
     /** The phone groups thousands with a space ("1 000"), so a space-grouped number is one number, not two. */
     val spaceGrouping: Boolean = false,
+    /** The phone writes dates day first ("03/11"); used only when a scanned statement's own dates can't settle it. */
+    val dayFirst: Boolean? = null,
 ) {
     /** Minor-unit digits of the account amounts go to by default (2 when there is none), for reading written numbers. */
     val fractionDigits: Int
@@ -84,7 +93,8 @@ data class TransactionCandidate(
 data class InterpreterEngine(val label: String, val onDevice: Boolean)
 
 sealed interface Interpretation {
-    data class Candidates(val items: List<TransactionCandidate>, val engine: InterpreterEngine) : Interpretation
+    /** [note]: a line for the reply about what was read ("Read as a statement: 7 transactions…"); null for messages. */
+    data class Candidates(val items: List<TransactionCandidate>, val engine: InterpreterEngine, val note: String? = null) : Interpretation
     /** Nothing that looks like a transaction; [message] says what would help. */
     data class NothingFound(val message: String) : Interpretation
 }
@@ -99,10 +109,12 @@ sealed interface Interpretation {
 interface TransactionInterpreter {
     val engine: InterpreterEngine
     suspend fun interpretText(text: String, context: InterpretationContext): Interpretation
-    suspend fun interpretReceipt(lines: List<String>, context: InterpretationContext): Interpretation
+
+    /** A scanned image's rows: one receipt (one transaction) or a statement (one per line); see [StatementParser]. */
+    suspend fun interpretScan(lines: List<String>, context: InterpretationContext): Interpretation
 }
 
-/** On-device interpretation with [BatchEntryParser] and [ReceiptCandidates]. */
+/** On-device interpretation with [BatchEntryParser], [ReceiptCandidates] and [StatementParser]. */
 class LocalTransactionInterpreter : TransactionInterpreter {
     override val engine = InterpreterEngine(label = "On this phone", onDevice = true)
 
@@ -115,9 +127,26 @@ class LocalTransactionInterpreter : TransactionInterpreter {
         }
     }
 
-    override suspend fun interpretReceipt(lines: List<String>, context: InterpretationContext): Interpretation {
-        val candidate = ReceiptCandidates.from(lines, context)
-            ?: return Interpretation.NothingFound("No text was found. Try again with the whole receipt in view, flat and well lit.")
-        return Interpretation.Candidates(listOf(candidate), engine)
+    override suspend fun interpretScan(lines: List<String>, context: InterpretationContext): Interpretation {
+        val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
+        if (clean.isEmpty()) return Interpretation.NothingFound("No text was found. Try again with the whole page in view, flat and well lit.")
+        if (StatementParser.classify(clean) == ScanKind.STATEMENT) {
+            val account = context.wallets.firstOrNull { it.id == context.defaultWalletId } ?: context.wallets.firstOrNull()
+            val reading = StatementParser.parse(
+                clean, context.today,
+                expectedCurrency = account?.currencyCode,
+                accountIsCard = account?.type == com.lucento.app.domain.WalletType.CREDIT_CARD,
+                dayFirst = context.dayFirst,
+            )
+            val items = StatementCandidates.from(reading, context)
+            if (items.isNotEmpty()) return Interpretation.Candidates(items, engine, StatementCandidates.note(reading, items))
+        }
+        val (candidate, suggestion) = ReceiptCandidates.read(clean, context)
+            ?: return Interpretation.NothingFound("No text was found. Try again with the whole page in view, flat and well lit.")
+        val note = when {
+            suggestion.totalLabel != null -> "Read as one receipt: one payment for the “${suggestion.totalLabel}” line, not each item."
+            else -> "Read as one receipt: one payment, not each item."
+        }
+        return Interpretation.Candidates(listOf(candidate), engine, note)
     }
 }

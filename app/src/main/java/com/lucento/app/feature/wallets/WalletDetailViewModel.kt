@@ -34,6 +34,10 @@ data class WalletDetailUiState(
     val categoriesById: Map<Long, Category> = emptyMap(),
     /** A credit card's current statement and amount due; null without billing days (CreditCardMath.cycle). */
     val cardCycle: CardCycle? = null,
+    /** A card with an amount due: what its Payment button fills in (the same transfer as Home's reminder). */
+    val cardDue: com.lucento.app.domain.CardDue? = null,
+    /** For a card or loan: the account its payments usually come from ([CreditCardMath.payingWallet]). */
+    val payFromWalletId: Long? = null,
     /** An instalment loan's principal, repaid and remaining, and instalments paid (LoanMath.progress). */
     val loanProgress: LoanProgress? = null,
     val today: LocalDate = LocalDate.now(),
@@ -70,6 +74,8 @@ class WalletDetailViewModel(
         val wallet = walletList.firstOrNull { it.id == walletId }
         val history = all.filter { it.walletId == walletId }
         val today = LocalDate.now()
+        val cycle = wallet?.let { CreditCardMath.cycle(it, history, today) }
+        val payFrom = wallet?.takeIf { it.type.isLiability }?.let { CreditCardMath.payingWallet(it, walletList, all)?.id }
         WalletDetailUiState(
             loading = false,
             wallet = wallet,
@@ -77,7 +83,9 @@ class WalletDetailViewModel(
             history = history,
             transfers = Transfer.pair(all),
             categoriesById = categoryList.associateBy { it.id },
-            cardCycle = wallet?.let { CreditCardMath.cycle(it, history, today) },
+            cardCycle = cycle,
+            cardDue = cycle?.takeIf { it.amountDue.amountMinor > 0L }?.let { com.lucento.app.domain.CardDue(wallet, it, it.isOverdue(today), payFrom) },
+            payFromWalletId = payFrom,
             loanProgress = wallet?.let { LoanMath.progress(it, history) },
             today = today,
         )

@@ -139,7 +139,12 @@ class UserPreferencesRepository(
         val defaultWalletId = longPreferencesKey("default_wallet_id")
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
-        val askLucentoAi = booleanPreferencesKey("ask_lucento_ai")
+        /**
+         * v2 (owner, 2026-11-04): AI answers now send recent transactions, goals and projections. Agreeing to v1
+         * ("ask_lucento_ai", summaries only) doesn't cover that, so v1 is ignored and removed: the user is asked again.
+         */
+        val askLucentoAi = booleanPreferencesKey("ask_lucento_ai_v2")
+        val askLucentoAiV1 = booleanPreferencesKey("ask_lucento_ai")
         val crashReports = booleanPreferencesKey("crash_reports")
         val usageCounts = booleanPreferencesKey("usage_counts")
         val usageInstallId = stringPreferencesKey("usage_install_id")
@@ -253,7 +258,10 @@ class UserPreferencesRepository(
     }
 
     suspend fun setAskLucentoAi(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.askLucentoAi] = enabled }
+        context.dataStore.edit {
+            it[Keys.askLucentoAi] = enabled
+            it.remove(Keys.askLucentoAiV1)
+        }
     }
 
     /** DataStore copy of the crash-report choice. Written before the synchronous mirror. */
@@ -455,6 +463,7 @@ class UserPreferencesRepository(
             p.remove(Keys.acknowledgedBudgetMonth)
             p[Keys.smartReading] = false
             p[Keys.askLucentoAi] = false
+            p.remove(Keys.askLucentoAiV1)
         }
         const val MAX_DISPLAY_NAME = 40
 

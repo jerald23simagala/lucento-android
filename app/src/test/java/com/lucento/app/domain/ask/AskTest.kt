@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.YearMonth
 
-/** Ask Lucento's safeguards: local routing, what the AI may see (summaries only) and the check on every answer. */
+/** Ask Lucento's safeguards: local routing, what the AI may see and the check on every answer. */
 class AskTest {
 
     private val today = AskFixtures.today
@@ -41,11 +41,13 @@ class AskTest {
 
     // ---- what the AI may see -----------------------------------------------------------------
 
-    @Test fun theSnapshotHoldsSummariesOnlyNeverNotesOrOtherCurrencies() {
+    @Test fun theSnapshotHoldsTheMainCurrencyOnly() {
         val snapshot = AskSnapshotBuilder.build(AskFixtures.inputs(), "USD")
         val text = snapshot.figures.joinToString("\n") { "${it.id} ${it.label} ${it.value}" }
-        assertFalse(text, AskFixtures.PRIVATE_NOTE in text)
+        // Owner, 2026-11-04: transactions (with their notes) are sent under the v2 consent; other currencies never are.
+        assertTrue(text, AskFixtures.PRIVATE_NOTE in text)
         assertFalse(text, "Lisbon" in text)
+        assertFalse(text, "€" in text)
         assertEquals(snapshot.figures.size, snapshot.figures.map { it.id }.toSet().size)
         assertTrue(snapshot.figures.size <= AskSnapshotBuilder.MAX_FIGURES)
         assertTrue(snapshot.byId.containsKey("nw"))

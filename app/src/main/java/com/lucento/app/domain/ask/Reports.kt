@@ -78,6 +78,9 @@ data class ReportInputs(
     val schedules: List<RecurringSchedule>,
     val today: LocalDate,
     val zone: ZoneId = ZoneId.systemDefault(),
+    /** Active savings goals and their contributions (for Ask Lucento's AI; the reports don't use them). */
+    val goals: List<com.lucento.app.domain.Goal> = emptyList(),
+    val contributions: List<com.lucento.app.domain.GoalContribution> = emptyList(),
 )
 
 /**

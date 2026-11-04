@@ -20,6 +20,7 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
 | `domain/capture/NumberWords.kt` | "two thousand five hundred" → 2500 for spoken amounts. |
 | `domain/capture/QuickEntryParser.kt` | Single-clause rules (dates incl. "October 12", transfer roles, account mentions, category keywords). |
 | `domain/capture/ReceiptCandidates.kt`, `ReceiptParser.kt` | Receipt text → one expense; `checkItems` compares items with the total. |
+| `domain/capture/StatementParser.kt`, `StatementCandidates.kt` | Tells a statement from a receipt; a statement's lines → one row each (see "Scanning"). |
 | `domain/capture/BatchReview.kt` | Editable `ReviewRow`, edits (`RowEdit`), validation (`RowStatus`), totals, carry-over of corrections, "already saved?" hint. |
 | `data/repository/TransactionRepository.saveBatch` | Validates every entry with the normal rules, then writes them all in one DB transaction. |
 | `feature/capture/ComposerViewModel.kt`, `TransactionComposerScreen.kt`, `ComposerRows.kt` | State and UI. |
@@ -49,8 +50,8 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
   "cash in", "paid my credit card" or "paid off my loan", that account is the destination and the source is the active
   wallet. A fee clause right after a transfer ("…, fee 15") becomes a "Transfer fee" expense on the transfer's source.
   Transfers need the Multiple wallets module and two same-currency accounts; amounts are never converted.
-- **Receipts**: one expense for the total paid (never one transaction per item). A labelled total is pre-filled; an
-  unlabelled one is offered as choices; items that don't add up and missing/unclear dates are flagged.
+- **Scans**: a receipt is one expense for the total (never one transaction per item); a statement or an app's
+  transaction history is one row per transaction. See "Scanning" below.
 
 ## Active wallet
 
@@ -79,6 +80,33 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
 - "Edit message" puts the text back in the input; sending it again re-reads it but keeps every field the user changed.
 - Leaving with unsaved rows asks before discarding.
 
+## Scanning: one receipt, or a statement's many lines
+
+Owner, 2026-11-04: a scan should tell a receipt (many lines, one payment) from a statement or a photo of a transaction
+list (many payments). Everything is read on this phone (`LocalTransactionInterpreter.interpretScan`), never presented as AI.
+
+1. **OCR rows.** ML Kit returns text lines with positions; `ReceiptParser.mergeRows` joins the pieces of each printed
+   line left to right (columns become one row).
+2. **Receipt or statement?** `StatementParser.classify`: several lines that each carry a date and an amount, dates
+   heading or under groups of amounts (an e-wallet's history), or +/− marks on several lines make a statement; anything
+   else is a receipt.
+3. **A receipt** becomes one expense for its total. The total line is chosen by label: "Amount due" outranks "Total",
+   "Amount paid" is used only when nothing better is printed (less the change, when change is printed); "Subtotal",
+   VAT, cash tendered and "Minimum amount due" never count.
+4. **A statement** becomes one row per transaction, each with its own date, description and amount, in the scanned
+   account (the active wallet). Money in or out comes from the running balance when one is printed, else CR/DR and
+   +/− marks, else the words; a card statement's lines are charges unless they say payment or credit. A payment into a
+   card or loan becomes a transfer whose source the user picks; a line naming another of the user's accounts becomes a
+   transfer between them. At most 60 lines per scan.
+5. **The reply says what it read**: "Read as one receipt: one payment for the “Amount due” line, not each item." or
+   "Read as a statement: 7 transactions, Oct 3 – Oct 31, each its own row. Money in and out matches the running
+   balance." Rows whose direction or date the statement didn't settle carry a hint ("Money in or out? …", "Check the
+   date"); choosing the type answers it. Rows that look already recorded (same amount and type in the account within
+   three days) say so, without blocking.
+
+Definitions: docs/CALCULATIONS.md "Statement scans" and "Receipt amounts". Tests: `StatementScanTest` (JVM) and
+`ScanOcrTest` (device, real OCR on made-up images in `androidTest/assets/scans`).
+
 ## Speech and camera
 
 Speech uses the system recogniser through `RecognizerIntent` (offline preferred). Lucento itself holds no microphone
@@ -102,7 +130,8 @@ read on this phone by `LocalTransactionInterpreter` (deterministic rules; never 
 | Daily limit | `supabase/migrations/20261027090000_ai_usage_quota.sql` (`public.ai_usage`, RLS read-own, no write grants) + `AI_DAILY_LIMIT` on Vercel (default 50/user/UTC day) |
 
 **Sent:** the message text, today's date, the main currency, category names/kinds and wallet names/types with their
-local ids. **Never sent:** balances, history, receipts (always read on this phone), the Gemini key (only on Vercel).
+local ids. **Never sent:** balances, history, scans (receipts and statements are always read on this phone), the Gemini
+key (only on Vercel).
 A sync account is required: it identifies the user for the daily allowance.
 
 ### Setting it up

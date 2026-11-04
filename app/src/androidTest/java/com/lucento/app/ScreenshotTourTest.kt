@@ -3,7 +3,9 @@ package com.lucento.app
 import android.graphics.Bitmap
 import android.view.KeyEvent
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -321,7 +323,14 @@ class ScreenshotTourTest {
         compose.onNode(hasContentDescription("Upcoming payments", substring = true)).performClick()
         waitForText("See all scheduled")
         shot("06b-home-bell")
+        // A card's payment in the bell opens the transfer that pays it, filled in: from the everyday account with the
+        // most money (the card has never been paid), to the card, for the amount due (owner, round 8).
+        compose.onNode(hasText("Visa card payment") and hasAnyAncestor(isPopup())).performClick()
+        waitForText("Amount due by")
+        waitForText("Change the amount for a partial payment")
+        shot("06c-bell-pays-card")
         back()
+        compose.waitForIdle()
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
 

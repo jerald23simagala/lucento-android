@@ -38,7 +38,9 @@ ACCESS_NETWORK_STATE for opt-in cloud sync, WAKE_LOCK, RECEIVE_BOOT_COMPLETED fo
 → size table in the run summary → artifacts (debug APK, release AAB/APK + R8 mapping, schemas, reports).
 
 Job **migrations** (needs build): fails immediately if schema history is incomplete, otherwise boots an API 30 x86_64
-emulator (Pixel 6 profile) and runs `MigrationTest`, then `ScreenshotTourTest` — a fresh install walked through
+emulator (Pixel 6 profile) and runs `MigrationTest`, `ReconciliationTest` (Home, Transactions and Budget agree on a
+month's spending), `ScanOcrTest` (real on-device OCR on made-up statement, e-wallet and receipt images: a statement is
+read line by line, a receipt as one payment), then `ScreenshotTourTest` — a fresh install walked through
 mandatory category onboarding, every dock destination, the + / More / Profile sheets, light and dark, with assertions
 on the budget total and the mascot state — and uploads its screenshots (`ui-screenshots` artifact). No `continue-on-error` anywhere: a red job means
 something did not pass.

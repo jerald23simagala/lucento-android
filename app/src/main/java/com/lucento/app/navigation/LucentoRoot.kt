@@ -323,6 +323,15 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         transferDraft = editorViewModel.newTransferDraft(from, to)
     }
 
+    /** A card's payment reminder: the transfer that pays it, filled in from the statement, for the user to check and save. */
+    fun openCardPayment(due: com.lucento.app.domain.CardDue) {
+        openTransfer(due.payFromWalletId, due.wallet.id)
+        if (transferDraft == null) return
+        transferDraft = editorViewModel.cardPaymentDraft(due)
+        transferNote = "Amount due by ${due.cycle.dueDate.format(java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.getDefault()))}. " +
+            if (due.payFromWalletId == null) "Choose the account you’re paying from, then save." else "Change the amount for a partial payment, or the account it comes from."
+    }
+
     fun edit(transaction: Transaction) {
         val group = transaction.transferGroup
         if (group != null) {
@@ -428,6 +437,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 onOpenRecurring = { id -> push(RecurringRoute(id ?: NO_SCHEDULE)) },
                                 onOpenWallets = { navigateTo(WalletsRoute) },
                                 onOpenWallet = { push(WalletDetailRoute(it)) },
+                                onPayCard = { if (features.isEnabled(Feature.MULTIPLE_WALLETS)) openCardPayment(it) else push(WalletDetailRoute(it.wallet.id)) },
                                 onOpenDebts = { push(DebtsRoute) },
                                 onOpenSettings = { push(SettingsRoute()) },
                                 onOpenAccountSettings = { push(SettingsRoute(SettingsPage.ACCOUNT.key)) },
@@ -505,6 +515,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
                             onAdjusted = { notify("Balance adjusted") },
                             onPlanDebtPayment = planDebtPayment,
+                            onPayCard = { openCardPayment(it) },
                         )
                     }
                     pushed<GoalsRoute>(reducedMotion) {

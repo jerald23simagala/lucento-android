@@ -3,12 +3,17 @@ package com.lucento.app.domain.ask
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.BudgetPlanner
+import com.lucento.app.domain.CashflowCalculator
 import com.lucento.app.domain.CreditCardMath
 import com.lucento.app.domain.DebtMath
+import com.lucento.app.domain.GoalCalculator
 import com.lucento.app.domain.Insights
+import com.lucento.app.domain.LoanMath
 import com.lucento.app.domain.ScheduleOutlook
 import com.lucento.app.domain.ScheduledFlow
 import com.lucento.app.domain.ScheduledItem
+import com.lucento.app.domain.TransactionType
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.Month
 import java.time.YearMonth
@@ -111,6 +116,15 @@ object LocalAnswers {
         }
     }
 
+    /** Questions for the AI, offered as chips while AI answers are on: advice, projections, transactions. */
+    val adviceSuggestions: List<String> = listOf(
+        "How can I save more each month?",
+        "Will I stay within budget this month?",
+        "When will I reach my goals at this pace?",
+        "Which subscriptions and repeat charges do I have?",
+        "Anything unusual in my spending lately?",
+    )
+
     /** The preset questions offered as chips; each is answered on the phone. */
     val suggestions: List<String> = listOf(
         "What are my top 5 spending categories?",
@@ -121,13 +135,31 @@ object LocalAnswers {
     )
 }
 
-/** One figure the AI may quote: it writes `[[id]]` and the app puts in [value], calculated on the phone. */
-data class SnapshotFigure(val id: String, val label: String, val value: String)
+/**
+ * One figure the AI may quote: it writes `[[id]]` and the app puts in [value], calculated on the phone. [amount] (an
+ * amount of money) or [number] (a count, a percentage, days) lets the AI calculate with it in `[[= … ]]` ([AskCalc]);
+ * neither is sent — only the id, the label and the value as text.
+ */
+data class SnapshotFigure(
+    val id: String,
+    val label: String,
+    val value: String,
+    val amount: Money? = null,
+    val number: BigDecimal? = null,
+)
 
 /**
- * What Ask Lucento's AI sees (owner, 2026-11-03: summaries only): totals by month and category, balances by wallet,
- * budgets, debts and what's scheduled — each as a labelled figure with an id. Never transactions, notes, payees or
- * receipts. Wallet and category names are the user's own labels.
+ * What Ask Lucento's AI sees (docs/ASK.md), every figure calculated on the phone and labelled, with an id:
+ * - summaries: net worth and balances, income, expenses and net flow by month, spending and income by category, the
+ *   budget, debts and what's still scheduled;
+ * - projections: this month's pace and projected spending, safe to spend, averages over the last full months, the share
+ *   of income kept, money on hand;
+ * - goals: target, saved, still to save, the monthly amount needed and the projected date;
+ * - debts in depth: what's owed, monthly interest at the rate, instalments left;
+ * - transaction patterns: top payees, monthly repeats, unusual and possibly duplicated charges;
+ * - the last [AskSnapshotBuilder.TRANSACTION_DAYS] days of transactions, newest first, while there is room.
+ * Owner, 2026-11-04: transaction-level answers and advice, under their own consent (the v2 AI answers consent). Main
+ * currency only; never receipts or photos. Wallet, category and payee names are the user's own words.
  */
 data class AskSnapshot(
     val currency: String,
@@ -140,17 +172,23 @@ data class AskSnapshot(
 object AskSnapshotBuilder {
 
     const val MAX_FIGURES = 400
+    const val TRANSACTION_DAYS = 60L
     private const val MONTHS = 12
     private const val CATEGORY_ROWS = 15
+    private const val AVERAGE_MONTHS = 3
 
     fun build(inputs: ReportInputs, currency: String): AskSnapshot {
         val today = inputs.today
         val current = YearMonth.from(today)
         val out = ArrayList<SnapshotFigure>()
-        fun add(id: String, label: String, value: String) {
-            if (out.size < MAX_FIGURES) out.add(SnapshotFigure(id, label.take(100), value.take(40)))
+        fun add(id: String, label: String, value: String, amount: Money? = null, number: BigDecimal? = null) {
+            if (out.size < MAX_FIGURES) out.add(SnapshotFigure(id, label.take(100), value.take(40), amount, number))
         }
-        fun money(id: String, label: String, m: Money) = add(id, label, Figures.plain(m))
+        fun money(id: String, label: String, m: Money) = add(id, label, Figures.plain(m), amount = m)
+        fun count(id: String, label: String, n: Long) = add(id, label, n.toString(), number = BigDecimal.valueOf(n))
+        fun percent(id: String, label: String, p: Int) = add(id, label, "$p%", number = BigDecimal.valueOf(p.toLong()))
+        val names = inputs.categories.associate { it.id to it.name }
+        val walletNames = inputs.wallets.associate { it.id to it.name }
 
         // Net worth and each wallet's balance.
         val worth = ReportBuilder.netWorth(inputs, currency, current)
@@ -177,12 +215,11 @@ object AskSnapshotBuilder {
         listOf(0L, 1L).forEach { back ->
             val month = current.minusMonths(back)
             val range = ReportBuilder.monthRange(month, today)
-            val names = inputs.categories.associate { it.id to it.name }
             val name = monthName(month) + if (back == 0L) " (so far)" else ""
             Insights.categoryBreakdown(inputs.transactions, currency, range).take(CATEGORY_ROWS).forEachIndexed { i, s ->
                 money("cat${back}_$i", "Spent on ${s.categoryId?.let(names::get) ?: "Uncategorized"}, $name", s.amount)
             }
-            Insights.categoryBreakdown(inputs.transactions, currency, range, com.lucento.app.domain.TransactionType.INCOME).take(8).forEachIndexed { i, s ->
+            Insights.categoryBreakdown(inputs.transactions, currency, range, TransactionType.INCOME).take(8).forEachIndexed { i, s ->
                 money("inc${back}_$i", "Income from ${s.categoryId?.let(names::get) ?: "Uncategorized"}, $name", s.amount)
             }
         }
@@ -193,7 +230,7 @@ object AskSnapshotBuilder {
             money("bud_total", "Budget, ${monthName(current)}", plan.total)
             money("bud_spent", "Spent against the budget, ${monthName(current)} so far", plan.spent)
             money("bud_left", "Budget left, ${monthName(current)} (negative = over)", plan.remaining)
-            plan.percentUsed?.let { add("bud_pct", "Budget used, ${monthName(current)}", "$it%") }
+            plan.percentUsed?.let { percent("bud_pct", "Budget used, ${monthName(current)}", it) }
             plan.allocatedLines.take(20).forEachIndexed { i, line ->
                 line.limit?.let { money("bud${i}_limit", "${line.category.name} budget", it) }
                 money("bud${i}_spent", "${line.category.name} spent this month", line.spent)
@@ -201,11 +238,19 @@ object AskSnapshotBuilder {
             }
         }
 
-        // Debts.
+        // Debts: what's owed, the rate and its monthly interest, a card's amount due, a loan's instalments.
         inputs.wallets.filter { it.type.isLiability && it.currencyCode == currency }.take(10).forEachIndexed { i, w ->
-            w.debt?.interestRateBps?.let { add("debt${i}_rate", "${w.name} interest rate", "${DebtMath.formatRate(it)} a year") }
+            money("debt${i}_owed", "${w.name} owed now", w.balance)
+            w.debt?.interestRateBps?.let { bps ->
+                add("debt${i}_rate", "${w.name} interest rate", "${DebtMath.formatRate(bps)} a year")
+                money("debt${i}_int", "${w.name} interest a month on what's owed now, at that rate (estimate)", DebtMath.monthlyInterest(w.balance, bps))
+            }
             CreditCardMath.cycle(w, inputs.transactions, today)?.takeIf { !it.amountDue.isZero }?.let {
                 money("debt${i}_due", "${w.name} amount due by ${shortDate(it.dueDate)}", it.amountDue)
+            }
+            w.debt?.installment?.takeIf { it.currencyCode == currency }?.let { money("debt${i}_inst", "${w.name} monthly instalment", it) }
+            LoanMath.progress(w, inputs.transactions)?.let { lp ->
+                count("debt${i}_inst_left", "${w.name} instalments left", (lp.installments - lp.installmentsPaid).coerceAtLeast(0).toLong())
             }
         }
 
@@ -231,6 +276,93 @@ object AskSnapshotBuilder {
                 money("sch$i", "$what ($kind) ${if (item.overdue) "overdue since" else "due"} ${shortDate(item.date)}", item.amount)
             }
         }
+
+        // Projections: this month's pace, safe to spend, averages over the last full months, money on hand.
+        val burn = CashflowCalculator.burnRate(currency, today, inputs.transactions)
+        money("pace_day", "Average daily spending, ${monthName(current)} so far", burn.dailyAverage)
+        money("proj_out", "Projected spending for all of ${monthName(current)} at this pace (estimate)", burn.projectedMonthSpend)
+        count("days_gone", "Days of ${monthName(current)} so far, today included", today.dayOfMonth.toLong())
+        count("days_left", "Days left in ${monthName(current)}, today included", (current.lengthOfMonth() - today.dayOfMonth + 1).toLong())
+        CashflowCalculator.safeToSpend(currency, today, inputs.transactions, inputs.wallets, inputs.budgets, inputs.schedules, inputs.categories)?.let { safe ->
+            money("safe", "Safe to spend for the rest of ${monthName(current)} (as on Home)", safe.amount)
+            safe.perDay?.let { money("safe_day", "Safe to spend a day for the rest of ${monthName(current)}", it) }
+        }
+        val firstRecord = inputs.transactions.filter { it.currencyCode == currency && !it.isTransfer && !it.isAdjustment }.minOfOrNull { it.date }
+        val fullMonths = if (firstRecord == null) emptyList() else
+            (1..AVERAGE_MONTHS).map { current.minusMonths(it.toLong()) }.filter { !it.isBefore(YearMonth.from(firstRecord)) }
+        if (fullMonths.isNotEmpty()) {
+            val n = fullMonths.size
+            val trend = Insights.incomeExpenseTrend(inputs.transactions, currency, current.minusMonths(1), n)
+            val income = Money.sum(currency, trend.map { it.income })
+            val expense = Money.sum(currency, trend.map { it.expense })
+            val over = if (n == 1) "in ${monthName(fullMonths.first())}" else "a month, over the last $n full months"
+            money("avg_in", "Average income $over", CashflowCalculator.divide(income, n.toLong()))
+            money("avg_out", "Average expenses $over", CashflowCalculator.divide(expense, n.toLong()))
+            money("avg_net", "Average net flow (income − expenses) $over", CashflowCalculator.divide(income - expense, n.toLong()))
+            if (income.amountMinor > 0L) {
+                val kept = BigDecimal.valueOf((income - expense).amountMinor).multiply(BigDecimal(100))
+                    .divide(BigDecimal.valueOf(income.amountMinor), 0, java.math.RoundingMode.HALF_UP).toInt()
+                percent("save_rate", "Share of income kept (net flow ÷ income), last $n full ${if (n == 1) "month" else "months"}", kept)
+            }
+            val range = com.lucento.app.domain.DateRange(fullMonths.last().atDay(1), fullMonths.first().atEndOfMonth())
+            Insights.categoryBreakdown(inputs.transactions, currency, range).take(10).forEachIndexed { i, s ->
+                money("avgcat$i", "Average a month on ${s.categoryId?.let(names::get) ?: "Uncategorized"}, last $n full ${if (n == 1) "month" else "months"}", CashflowCalculator.divide(s.amount, n.toLong()))
+            }
+        }
+        val spendable = inputs.wallets.filter { it.type.isSpendable && it.currencyCode == currency }
+        if (spendable.isNotEmpty()) money("on_hand", "Cash, bank and e-wallet balances together", Money.sum(currency, spendable.map { it.balance }))
+        val savings = inputs.wallets.filter { it.type == com.lucento.app.domain.WalletType.SAVINGS && it.currencyCode == currency }
+        if (savings.isNotEmpty()) money("savings", "Savings account balances together", Money.sum(currency, savings.map { it.balance }))
+
+        // Goals.
+        inputs.goals.filter { it.currencyCode == currency }.take(10).forEachIndexed { i, goal ->
+            val p = GoalCalculator.progress(goal, inputs.contributions, today)
+            val name = "Goal “${goal.name.trim().take(30)}”"
+            money("g${i}_target", "$name: target", goal.target)
+            money("g${i}_saved", "$name: saved so far", p.saved)
+            money("g${i}_left", "$name: still to save", p.remaining)
+            percent("g${i}_pct", "$name: share saved", p.percent)
+            goal.targetDate?.let { add("g${i}_date", "$name: target date", it.toString()) }
+            p.requiredPerMonth?.let { money("g${i}_need", "$name: needed a month to reach it by the target date", it) }
+            p.projectedCompletion?.let { add("g${i}_eta", "$name: reached around this date at the pace so far (estimate)", it.toString()) }
+        }
+
+        // Transaction patterns.
+        TransactionSignals.topPayees(inputs.transactions, currency, today.minusDays(89), today).forEachIndexed { i, payee ->
+            money("p$i", "Spent on “${payee.name}”, last 90 days (${payee.count} ${if (payee.count == 1) "time" else "times"})", payee.total)
+        }
+        TransactionSignals.repeating(inputs.transactions, currency, today).forEachIndexed { i, r ->
+            money("r$i", "Repeats monthly: “${r.name}”, latest ${r.latest.date} (seen in ${r.months} months)", r.latest.amount)
+        }
+        TransactionSignals.unusual(inputs.transactions, currency, today).forEachIndexed { i, u ->
+            val category = u.transaction.categoryId?.let(names::get) ?: "Uncategorized"
+            money("u$i", "Unusually large $category expense: “${u.transaction.note.trim().take(30)}” on ${u.transaction.date}", u.transaction.amount)
+            money("u${i}_usual", "Typical $category expense (median of the 90 days before this month)", u.typical)
+        }
+        TransactionSignals.duplicates(inputs.transactions, currency, today).forEachIndexed { i, d ->
+            money("d$i", "Possible duplicate: “${d.first.note.trim().take(30)}” twice on ${d.first.date} in ${walletNames[d.first.walletId] ?: "one account"}", d.first.amount)
+        }
+
+        // Recent transactions, newest first, while there is room. A transfer is listed once, as "from A to B".
+        val legs = inputs.transactions.filter { it.transferGroup != null }.groupBy { it.transferGroup }
+        val recent = inputs.transactions
+            .filter { it.currencyCode == currency && !it.isAdjustment && it.type != TransactionType.TRANSFER_IN }
+            .filter { !it.date.isAfter(today) && !it.date.isBefore(today.minusDays(TRANSACTION_DAYS - 1)) }
+            .sortedWith(compareByDescending<com.lucento.app.domain.Transaction> { it.date }.thenByDescending { it.createdAtEpochMillis })
+        val room = (MAX_FIGURES - out.size - 1).coerceAtLeast(0)
+        count("t_count", "Transactions in the last $TRANSACTION_DAYS days (ids t0, t1, … list the newest ${minOf(room, recent.size)})", recent.size.toLong())
+        recent.take(room).forEachIndexed { i, t ->
+            val what = when (t.type) {
+                TransactionType.EXPENSE -> "expense · ${t.categoryId?.let(names::get) ?: "uncategorized"} · ${walletNames[t.walletId] ?: "?"}"
+                TransactionType.INCOME -> "income · ${t.categoryId?.let(names::get) ?: "uncategorized"} · ${walletNames[t.walletId] ?: "?"}"
+                else -> {
+                    val to = legs[t.transferGroup]?.firstOrNull { it.type == TransactionType.TRANSFER_IN }?.walletId
+                    "transfer · from ${walletNames[t.walletId] ?: "?"} to ${to?.let(walletNames::get) ?: "?"}"
+                }
+            }
+            val note = t.note.trim().replace(Regex("\\s+"), " ").take(36)
+            money("t$i", "${t.date} · $what" + if (note.isNotEmpty()) " · “$note”" else "", t.amount)
+        }
         return AskSnapshot(currency, today, out)
     }
 }
@@ -253,8 +385,8 @@ data class CheckedAnswer(
  */
 object AnswerCheck {
 
-    const val MAX_ANSWER = 1_500
-    private val TOKEN = Regex("\\[\\[([A-Za-z0-9_]{1,40})]]")
+    const val MAX_ANSWER = 2_500
+    private val TOKEN = Regex("\\[\\[\\s*(=[^\\[\\]]{1,${AskCalc.MAX_EXPRESSION}}|[A-Za-z0-9_]{1,40})\\s*]]")
     private val LINK = Regex("(?i)\\b(?:https?://|www\\.)\\S+")
     private val MONEY_LIKE = Regex("\\p{Sc}\\s?\\d|\\b[A-Z]{3}\\s?\\d|\\d{1,3}(?:[,.\\u00A0]\\d{3})+|\\d+[.,]\\d{2}\\b")
 
@@ -267,8 +399,10 @@ object AnswerCheck {
             val before = cleaned.substring(last, match.range.first)
             if (MONEY_LIKE.containsMatchIn(before)) unverified = true
             if (before.isNotEmpty()) parts.add(CheckedAnswer.Part(before, isFigure = false))
-            val figure = snapshot.byId[match.groupValues[1]]
-            parts.add(CheckedAnswer.Part(figure?.value ?: "—", isFigure = figure != null))
+            val ref = match.groupValues[1]
+            // A figure by its id, or a calculation the phone does with its own figures.
+            val shown = if (ref.startsWith("=")) AskCalc.evaluate(ref.drop(1), snapshot)?.let { AskCalc.format(it) } else snapshot.byId[ref]?.value
+            parts.add(CheckedAnswer.Part(shown ?: "—", isFigure = shown != null))
             last = match.range.last + 1
         }
         val tail = cleaned.substring(last)
