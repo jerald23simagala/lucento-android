@@ -478,3 +478,41 @@ Designs: canvas https://claude.ai/artifact/MocjXVBtQG5uW38yUQm9kE. Spec with fil
    screens that use `CardHeader` only if they are touched anyway.
 7. Validation: 320dp and 430dp widths, font scale 1.3 and 2.0, night theme, TalkBack labels on the new tiles and charts,
    `ScreenshotTourTest` update, unit tests for any new pure helper (trend points, filter predicates).
+
+## Owner review round 6 (2026-11-04, uncommitted on `feature/core-screens-refinement`)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 6"; `docs/CALCULATIONS.md` (Spent, Focus currency);
+`docs/SYNC.md` (nothing can hang, while Lucento is open, what the user sees).
+
+| Next | Why |
+|---|---|
+| **Owner: install the new APK, open Lucento, check the chip** — it should read "Synced · now" within seconds, or "N to sync" / "Needs attention" with the reason | The account's last upload was 2026-11-03 21:17 UTC and last download 2026-11-04 05:13 UTC; anything entered since is only on the phone until a sync completes |
+| If the chip shows Needs attention, send the sheet's message | The stall's cause wasn't reproducible from logs (no failed requests reached the server) |
+| Optional: hide amounts on Wallets / Transactions / Budget too | Round 6 hides the Dashboard only, as asked |
+| Optional: Home's budget card and "See all" could carry the month shown on Home into Budget / Transactions | Today they open the current month (each page names its month, so nothing reads wrong) |
+
+| Check | Result |
+|---|---|
+| Unit tests | **899/899** (+13) |
+| `ReconciliationTest` (API 28 emulator) | PASS: Home Spent = Transactions Expenses = Budget Spent = ₱6,567.00 on the owner-shaped ledger; Hide masks the dashboard; Show on a phone without a screen lock asks first |
+| `ScreenshotTourTest` (API 28) | PASS, 45 shots in `artifacts/core-screens/review7/` |
+| Lint | 0 errors, 9 warnings (same types) |
+| CI | `ReconciliationTest` added to the emulator job (blocking) |
+| APK | `artifacts/apk/lucento-debug-review7.apk`; device screenshots in `artifacts/financial-integrity/` |
+
+## Owner review round 7 (2026-11-04, uncommitted on `feature/core-screens-refinement`)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 7".
+
+| Next | Why |
+|---|---|
+| **Owner: test the production-type build** `artifacts/apk/lucento-release-TEST-SIGNED-round7.apk` (test-only signing, never distribute): sign in, compare Home Spent with Transactions (This month) and Budget, check the sync chip, try Hide / Show | Round 6 was verified on debug builds, which use the test Supabase project; release uses production |
+| **Last stage — Account & sync password:** show New / Confirm password only for email accounts, never for Google (OAuth) sign-ins, and ask for the current password first | Owner, 2026-11-04: revisit at the end of development |
+| Optional: a Hide / Show switch on other pages too | Today it lives on the Dashboard; it applies everywhere |
+
+| Check | Result |
+|---|---|
+| Unit tests | **900/900** (+1: amounts in an answer are hidden, dates, counts and percentages are not); lint 0 errors, 9 warnings |
+| `ReconciliationTest` (API 28) | PASS: figures agree; Hide masks Home, Transactions, Budget and Wallets |
+| `ScreenshotTourTest` (API 28) | PASS, 54 shots in `artifacts/core-screens/review8/`, including the hidden pass (23–23i) over Home, Transactions, a transaction, Budget, a wallet, Insights, Goals, Debts and Scheduled |
+| Release build | `assembleRelease` with `LUCENTO_REQUIRE_RELEASE_CONFIG=true`: package `com.lucento.app`, signer SHA-1 `49:AF:14:81:…:8C:75` (debug key), dex references the production project only; launches on the emulator without a crash |

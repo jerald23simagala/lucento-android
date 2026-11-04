@@ -1,5 +1,7 @@
 package com.lucento.app.feature.wallets
 
+import com.lucento.app.core.designsystem.component.AmountFormat
+import com.lucento.app.core.designsystem.component.amountFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -85,6 +87,7 @@ fun WalletDetailScreen(
     viewModel: WalletDetailViewModel = viewModel(key = "wallet-$walletId", factory = WalletDetailViewModel.factory(walletId)),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
+    val fmt = amountFormat()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val walletsState by walletsViewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
@@ -196,8 +199,8 @@ fun WalletDetailScreen(
                             "Repayments are transfers from your bank or cash, so they’re not counted as spending again. " +
                                 "Record interest and fees as expenses on this loan. Money you borrowed is not income."
                         cycle != null ->
-                            "Amount due ${MoneyFormatter.format(cycle.amountDue)} by ${shortDate(cycle.dueDate)}: you owed " +
-                                "${MoneyFormatter.format(cycle.statementBalance)} on the ${shortDate(cycle.statementDate)} statement, less payments since. " +
+                            "Amount due ${fmt.format(cycle.amountDue)} by ${shortDate(cycle.dueDate)}: you owed " +
+                                "${fmt.format(cycle.statementBalance)} on the ${shortDate(cycle.statementDate)} statement, less payments since. " +
                                 "It’s a reminder, not a bill in Safe to spend — the card’s purchases were already counted as spending."
                         else ->
                             "Add card purchases with + — they’re spending. Paying the card from another account is a transfer, " +
@@ -209,7 +212,7 @@ fun WalletDetailScreen(
         }
 
         if (liability && state.history.isNotEmpty()) {
-            debtHistory(wallet = wallet, state = state, onOpen = onEditTransaction)
+            debtHistory(wallet = wallet, state = state, onOpen = onEditTransaction, fmt = fmt)
             return@LazyColumn
         }
 
@@ -256,7 +259,7 @@ fun WalletDetailScreen(
         }
         item(key = "note") {
             Text(
-                "Balance = ${if (liability) "owed at start" else "opening balance"} ${MoneyFormatter.format(wallet.openingBalance)} " +
+                "Balance = ${if (liability) "owed at start" else "opening balance"} ${fmt.format(wallet.openingBalance)} " +
                     "adjusted by everything above.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -364,6 +367,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
     wallet: com.lucento.app.domain.Wallet,
     state: WalletDetailUiState,
     onOpen: (Transaction) -> Unit,
+    fmt: AmountFormat,
 ) {
     val loan = wallet.type == WalletType.LOAN
     val code = wallet.currencyCode
@@ -396,7 +400,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
         item(key = "section-$title") {
             SectionHeader(title, Modifier.padding(top = Spacing.lg)) {
                 Text(
-                    MoneyFormatter.formatSigned(if (owed) owedChange(rows) else com.lucento.app.core.money.Money.sum(code, rows.map { it.signedAmount })),
+                    fmt.signed(if (owed) owedChange(rows) else com.lucento.app.core.money.Money.sum(code, rows.map { it.signedAmount })),
                     style = AmountStyles.small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -425,21 +429,21 @@ private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
     }
     val paidInterest = com.lucento.app.core.money.Money.sum(code, interestByPayment.values.toList())
     item(key = "note") {
-        val start = MoneyFormatter.format(wallet.openingBalance)
-        val now = MoneyFormatter.format(wallet.balance)
+        val start = fmt.format(wallet.openingBalance)
+        val now = fmt.format(wallet.balance)
         val text = if (loan) {
             val repaid = wallet.openingBalance - wallet.balance
             buildString {
                 append("Owed = $start at start ")
-                append(if (repaid.isNegative) "+ ${MoneyFormatter.format(-repaid)} added" else "− ${MoneyFormatter.format(repaid)} principal repaid")
+                append(if (repaid.isNegative) "+ ${fmt.format(-repaid)} added" else "− ${fmt.format(repaid)} principal repaid")
                 append(" = $now.")
                 if (!paidInterest.isZero) {
-                    append(" Your payments also covered ${MoneyFormatter.format(paidInterest)} of interest, paid on top of the principal, so it doesn’t change what you owe.")
+                    append(" Your payments also covered ${fmt.format(paidInterest)} of interest, paid on top of the principal, so it doesn’t change what you owe.")
                 }
             }
         } else {
-            "Owed = $start at start + charges ${MoneyFormatter.format(owedChange(sections[1].second))} − payments " +
-                "${MoneyFormatter.format(-owedChange(sections[0].second))} = $now."
+            "Owed = $start at start + charges ${fmt.format(owedChange(sections[1].second))} − payments " +
+                "${fmt.format(-owedChange(sections[0].second))} = $now."
         }
         Text(
             text,

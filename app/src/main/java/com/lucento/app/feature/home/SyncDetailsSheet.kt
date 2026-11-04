@@ -77,16 +77,24 @@ fun syncSheetCopy(status: CloudStatus, details: SyncDetails, nowMillis: Long): S
     CloudStatus.PENDING -> SyncSheetCopy(
         headline = "Waiting to sync",
         body = syncStatusText(details.lastSyncedAtMillis, nowMillis, details.pendingChanges, null) +
-            ". Changes upload by themselves shortly after you save them.",
+            ". " + SYNC_CADENCE,
         action = if (details.everSynced) "Sync now" else "Finish setting up sync",
         actionOpensSettings = !details.everSynced,
     )
     CloudStatus.SYNCED -> SyncSheetCopy(
         headline = "Synced",
-        body = syncStatusText(details.lastSyncedAtMillis, nowMillis, 0, null) + ". Your other devices pick up changes when they sync.",
+        body = syncStatusText(details.lastSyncedAtMillis, nowMillis, 0, null) + ", nothing waiting. " + SYNC_CADENCE,
         action = "Sync now",
     )
 }
+
+/**
+ * When syncs happen, in plain words, so "Synced" is never mistaken for live (owner, 2026-11-04). True to
+ * [com.lucento.app.data.sync.ForegroundSync] and the 30-minute background schedule ([com.lucento.app.data.sync.SyncScheduler]).
+ */
+internal const val SYNC_CADENCE =
+    "Lucento syncs when you open it and a few seconds after each change while it’s open. In the background it syncs " +
+        "about every 30 minutes, though your phone may delay that to save battery. Other devices see your changes after their next sync."
 
 private fun pendingSuffix(pending: Int): String = when {
     pending <= 0 -> ""

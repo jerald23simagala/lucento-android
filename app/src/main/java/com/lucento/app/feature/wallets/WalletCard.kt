@@ -1,5 +1,7 @@
 package com.lucento.app.feature.wallets
 
+import com.lucento.app.core.designsystem.component.AmountFormat
+import com.lucento.app.core.designsystem.component.amountFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -175,6 +177,7 @@ fun WalletCard(
  */
 @Composable
 private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color, cycle: CardCycle?, loan: LoanProgress?, today: LocalDate) {
+    val fmt = amountFormat()
     if (wallet.type.isValuedManually) {
         CardField("Valued", "By you, not by transactions", muted, ink)
         return
@@ -210,7 +213,7 @@ private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color,
     Row(verticalAlignment = Alignment.Bottom) {
         CardField(
             if (wallet.type.isLiability) "Owed at start" else "Opening balance",
-            MoneyFormatter.format(wallet.openingBalance),
+            fmt.format(wallet.openingBalance),
             muted,
             ink,
             Modifier.weight(1f),
@@ -218,7 +221,7 @@ private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color,
         if (installment != null) {
             CardField(
                 "Monthly",
-                MoneyFormatter.format(installment) + (debt?.termMonths?.let { " × $it" } ?: ""),
+                fmt.format(installment) + (debt?.termMonths?.let { " × $it" } ?: ""),
                 muted,
                 ink,
                 alignEnd = true,
@@ -323,6 +326,7 @@ private fun InstitutionWalletCard(
     loan: LoanProgress?,
     today: LocalDate,
 ) {
+    val fmt = amountFormat()
     val card = institution.card
     val ink = registryColor(card.ink)
     val muted = ink.copy(alpha = card.mutedAlpha.coerceIn(0.74f, 1f))
@@ -337,7 +341,7 @@ private fun InstitutionWalletCard(
         else -> "Current balance"
     }
     val spoken = "${institution.name}, ${wallet.type.label}, ${wallet.name}${wallet.rateSuffix()}, ${label.lowercase()} " +
-        MoneyFormatter.formatSigned(wallet.cardAmount, showPlus = false) + cardDetailsSpoken(wallet, cycle, loan, today)
+        fmt.spokenSigned(wallet.cardAmount, showPlus = false) + cardDetailsSpoken(wallet, cycle, loan, today, fmt)
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val minHeight = maxWidth / CardRatio
         Box(
@@ -490,6 +494,7 @@ private fun TypeMark(type: WalletType, ink: Color) {
  */
 @Composable
 fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val fmt = amountFormat()
     val institution = wallet.institution()
     val face = LucentoTheme.extendedColors.walletCard(wallet.type)
     val ink = institution?.let { registryColor(it.card.ink) } ?: face.content
@@ -506,7 +511,7 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
         institution?.name,
         wallet.type.label,
         wallet.name,
-        (if (liability) "amount owed " else "balance ") + MoneyFormatter.formatSigned(wallet.cardAmount, showPlus = false),
+        (if (liability) "amount owed " else "balance ") + fmt.signed(wallet.cardAmount, showPlus = false),
     ).joinToString(", ")
     Box(
         modifier
@@ -564,17 +569,17 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
 }
 
 /** What an institution card's single spoken sentence adds for a loan's progress or a card's limit and amount due. */
-private fun cardDetailsSpoken(wallet: Wallet, cycle: CardCycle?, loan: LoanProgress?, today: LocalDate): String = buildString {
+private fun cardDetailsSpoken(wallet: Wallet, cycle: CardCycle?, loan: LoanProgress?, today: LocalDate, fmt: AmountFormat): String = buildString {
     if (loan != null) {
-        append(", principal ${MoneyFormatter.format(loan.principal)}, paid ${MoneyFormatter.format(loan.paid)}")
+        append(", principal ${fmt.spoken(loan.principal)}, paid ${fmt.spoken(loan.paid)}")
         append(", ${loan.installmentsPaid} of ${loan.installments} installments paid")
     }
     val limit = wallet.debt?.creditLimit
     val available = CreditCardMath.available(wallet)
     if (limit != null && available != null) {
-        append(", credit limit ${MoneyFormatter.format(limit)}, available ${MoneyFormatter.formatSigned(available, showPlus = false)}")
+        append(", credit limit ${fmt.spoken(limit)}, available ${fmt.spokenSigned(available, showPlus = false)}")
     }
-    if (cycle != null) append(", amount due ${MoneyFormatter.format(cycle.amountDue)} ${dueCaption(cycle, today)}")
+    if (cycle != null) append(", amount due ${fmt.spoken(cycle.amountDue)} ${dueCaption(cycle, today)}")
 }
 
 /** One labelled amount on a card's bottom edge; [caption] goes under the amount ("by Nov 8"). */

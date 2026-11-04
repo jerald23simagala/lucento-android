@@ -1,6 +1,10 @@
 package com.lucento.app.feature.transactions
 
-import androidx.compose.foundation.horizontalScroll
+import com.lucento.app.core.designsystem.component.Hairline
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.foundation.layout.Box
+import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -42,13 +45,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
-import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
-import com.lucento.app.core.designsystem.component.FieldHeader
-import com.lucento.app.core.designsystem.component.icon
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.MoneyFormatter
@@ -58,11 +58,27 @@ import com.lucento.app.domain.Wallet
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneOffset
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material.icons.filled.SouthWest
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.automirrored.outlined.Notes
+import com.lucento.app.core.designsystem.component.IconFieldHeader
+import com.lucento.app.core.designsystem.component.LucentoFields
+import com.lucento.app.core.designsystem.component.WalletChoicePill
 
 /**
  * Moves money between two of the user's own wallets. Saved as two linked legs in one database
  * transaction; never counted as income or spending. Both wallets must share a currency — Lucento does
  * not convert with guessed rates.
+ *
+ * Laid out like the other sheets (owner, 2026-11-04, round 7): sections under icon headers (From, To, Date, Note),
+ * wallets as wrapping pills with their identity tiles, a filled note field with its icon, compact spacing, and a round
+ * swap button between From and To.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +89,7 @@ fun TransferEditorSheet(
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
     sourceNote: String? = null,
-) {
+) = AmountsShown {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
@@ -104,6 +120,7 @@ fun TransferEditorSheet(
                 .padding(horizontal = Spacing.gutter)
                 .navigationBarsPadding()
                 .imePadding(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             SheetHeader(
                 title = if (isNew) "Transfer" else "Edit transfer",
@@ -119,12 +136,8 @@ fun TransferEditorSheet(
                     null
                 },
             )
-            if (sourceNote != null) {
-                Spacer(Modifier.height(Spacing.md))
-                InfoNote(sourceNote)
-            }
+            if (sourceNote != null) InfoNote(sourceNote)
 
-            Spacer(Modifier.height(Spacing.xl))
             AmountEntry(
                 text = draft.amountText,
                 currencyCode = from?.currencyCode,
@@ -136,26 +149,29 @@ fun TransferEditorSheet(
                     if (amountError) error = null
                 },
             )
-            Text(
-                when (val e = error) {
-                    TransferDraftError.AmountInvalid -> "Enter an amount, like 100${decimalSeparator}00."
-                    TransferDraftError.AmountZero -> "The amount must be greater than zero."
-                    is TransferDraftError.AmountTooPrecise ->
-                        if (e.digits == 0) "${from?.currencyCode.orEmpty()} has no decimal places."
-                        else "${from?.currencyCode.orEmpty()} allows up to ${e.digits} decimal places."
-                    TransferDraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
-                    is TransferDraftError.AmountUnclear -> e.message
-                    else -> "Moving money between your accounts isn’t income or spending."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = if (amountError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
-            )
+            // Only a problem with the amount shows here; what a transfer is, the header already says.
+            when (val e = error) {
+                TransferDraftError.AmountInvalid -> "Enter an amount, like 100${decimalSeparator}00."
+                TransferDraftError.AmountZero -> "The amount must be greater than zero."
+                is TransferDraftError.AmountTooPrecise ->
+                    if (e.digits == 0) "${from?.currencyCode.orEmpty()} has no decimal places."
+                    else "${from?.currencyCode.orEmpty()} allows up to ${e.digits} decimal places."
+                TransferDraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
+                is TransferDraftError.AmountUnclear -> e.message
+                else -> null
+            }?.let { message ->
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
-            Spacer(Modifier.height(Spacing.lg))
-            FieldHeader("From")
-            WalletPills(wallets, draft.fromWalletId) { id ->
+            val mixedCurrencies = wallets.map { it.currencyCode }.distinct().size > 1
+            IconFieldHeader(Icons.Filled.NorthEast, "From", Modifier.padding(top = Spacing.xs))
+            WalletPills(wallets, draft.fromWalletId, mixedCurrencies) { id ->
                 haptics.tick()
                 val newFrom = wallets.firstOrNull { it.id == id }
                 val keepTo = wallets.firstOrNull { it.id == draft.toWalletId }
@@ -165,8 +181,22 @@ fun TransferEditorSheet(
             }
             if (error is TransferDraftError.FromRequired) ErrorText("Choose where the money comes from.")
 
-            Spacer(Modifier.height(Spacing.md))
-            FieldHeader("To")
+            // Between the two: a round button that swaps From and To (once both are chosen), on a hairline.
+            val canSwap = draft.fromWalletId != null && draft.toWalletId != null
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Hairline()
+                FilledTonalIconButton(
+                    onClick = {
+                        haptics.tick()
+                        draft = draft.copy(fromWalletId = draft.toWalletId, toWalletId = draft.fromWalletId)
+                        error = null
+                    },
+                    enabled = canSwap,
+                ) {
+                    Icon(Icons.Filled.SwapVert, contentDescription = "Swap From and To")
+                }
+            }
+            IconFieldHeader(Icons.Filled.SouthWest, "To")
             if (destinations.isEmpty()) {
                 Text(
                     if (from == null) "Choose the source account first." else "No other ${from.currencyCode} account. Add one in Wallets to transfer.",
@@ -174,7 +204,7 @@ fun TransferEditorSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                WalletPills(destinations, draft.toWalletId) { id ->
+                WalletPills(destinations, draft.toWalletId, mixedCurrencies) { id ->
                     haptics.tick()
                     draft = draft.copy(toWalletId = id)
                     error = null
@@ -187,31 +217,27 @@ fun TransferEditorSheet(
                 else -> Unit
             }
 
-            Spacer(Modifier.height(Spacing.md))
-            FieldHeader("Date")
+            IconFieldHeader(Icons.Outlined.CalendarMonth, "Date", Modifier.padding(top = Spacing.xs))
             DateChoices(date = draft.date, onDate = { draft = draft.copy(date = it) }, onPick = { pickingDate = true })
 
-            Spacer(Modifier.height(Spacing.lg))
+            IconFieldHeader(Icons.Outlined.EditNote, "Note (optional)", Modifier.padding(top = Spacing.xs))
             OutlinedTextField(
                 value = draft.note,
                 onValueChange = { draft = draft.copy(note = it.take(TransactionRepository.MAX_NOTE)) },
                 label = { Text("Note") },
                 placeholder = { Text("e.g. Card payment, ATM withdrawal") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Notes, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-                shape = MaterialTheme.shapes.small,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                ),
+                shape = LucentoFields.shape,
+                colors = LucentoFields.filledColors(),
                 modifier = Modifier.fillMaxWidth(),
             )
             if (error is TransferDraftError.Rejected) {
-                Spacer(Modifier.height(Spacing.sm))
                 ErrorText("This transfer couldn’t be saved. Check both accounts, then try again.")
             }
 
-            Spacer(Modifier.height(Spacing.xl))
+            Spacer(Modifier.height(Spacing.xs))
             LucentoPrimaryButton(
                 text = if (isNew) "Transfer" else "Save changes",
                 onClick = {
@@ -263,19 +289,17 @@ fun TransferEditorSheet(
     }
 }
 
+/** The wallets to pick from, wrapping onto more lines: each with its identity tile; the currency only when it varies. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WalletPills(wallets: List<Wallet>, selectedId: Long?, onSelect: (Long) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+private fun WalletPills(wallets: List<Wallet>, selectedId: Long?, showCurrency: Boolean, onSelect: (Long) -> Unit) {
+    FlowRow(
+        Modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
         wallets.forEach { w ->
-            ChoicePill(
-                label = "${w.name} · ${w.currencyCode}",
-                selected = selectedId == w.id,
-                leadingIcon = w.type.icon,
-                onClick = { onSelect(w.id) },
-            )
+            WalletChoicePill(w, selected = selectedId == w.id, onClick = { onSelect(w.id) }, detail = w.currencyCode.takeIf { showCurrency })
         }
     }
 }

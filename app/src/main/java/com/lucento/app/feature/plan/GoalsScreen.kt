@@ -1,5 +1,9 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.WalletChoicePill
+import com.lucento.app.core.designsystem.component.AmountsShown
+import com.lucento.app.core.designsystem.component.AmountFormat
+import com.lucento.app.core.designsystem.component.amountFormat
 import com.lucento.app.core.designsystem.component.icon
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.HeroTones
@@ -401,6 +405,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
  */
 @Composable
 private fun GoalsHero(progress: List<GoalProgress>, primaryCurrency: String) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val code = progress.firstOrNull { it.goal.currencyCode == primaryCurrency }?.goal?.currencyCode ?: progress.first().goal.currencyCode
     val mine = progress.filter { it.goal.currencyCode == code }
@@ -417,7 +422,7 @@ private fun GoalsHero(progress: List<GoalProgress>, primaryCurrency: String) {
                 Spacer(Modifier.height(Spacing.xs))
                 MoneyText(money = saved, style = AmountStyles.hero, color = ext.onHero, minScale = 0.5f)
                 Text(
-                    "of ${MoneyFormatter.format(target)} · ${mine.size} ${if (mine.size == 1) "goal" else "goals"}",
+                    "of ${fmt.format(target)} · ${mine.size} ${if (mine.size == 1) "goal" else "goals"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = ext.onHeroMuted,
                     maxLines = 1,
@@ -437,7 +442,7 @@ private fun GoalsHero(progress: List<GoalProgress>, primaryCurrency: String) {
         }
         Spacer(Modifier.height(Spacing.md))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            HeroStatTile("Still to save", Icons.Outlined.Flag, "Still to save ${MoneyFormatter.format(left)}", Modifier.weight(1f)) {
+            HeroStatTile("Still to save", Icons.Outlined.Flag, "Still to save ${fmt.format(left)}", Modifier.weight(1f)) {
                 MoneyText(money = left, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f, minScale = 0.6f)
             }
             HeroStatTile("Reached", Icons.Outlined.EmojiEvents, "Reached $reached of ${mine.size}", Modifier.weight(1f)) {
@@ -472,6 +477,7 @@ private fun GoalCard(
     archived: Boolean = false,
     onArchive: (() -> Unit)? = null,
 ) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     LucentoCard(modifier.fillMaxWidth(), onClick = onClick, contentPadding = Spacing.md) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -485,7 +491,7 @@ private fun GoalCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${MoneyFormatter.format(p.saved)} of ${MoneyFormatter.format(p.goal.target)}",
+                    "${fmt.format(p.saved)} of ${fmt.format(p.goal.target)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -503,7 +509,7 @@ private fun GoalCard(
         }
         Spacer(Modifier.height(Spacing.sm))
         ShareBar(fraction = p.fraction, color = if (archived) MaterialTheme.colorScheme.outline else ext.success, height = 8.dp)
-        val facts = goalFacts(p, walletName)
+        val facts = goalFacts(p, walletName, amountFormat())
         if (facts.isNotEmpty() || onArchive != null) {
             Spacer(Modifier.height(Spacing.sm))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -546,12 +552,12 @@ private fun ArchiveChip(goalName: String, onClick: () -> Unit) {
 }
 
 /** What a goal's card and sheet say about getting there, each with its icon. */
-private fun goalFacts(p: GoalProgress, walletName: String?): List<Pair<ImageVector, String>> = buildList {
+private fun goalFacts(p: GoalProgress, walletName: String?, fmt: AmountFormat): List<Pair<ImageVector, String>> = buildList {
     if (p.reached) {
         add(Icons.Outlined.CheckCircle to "Target reached")
     } else {
         p.goal.targetDate?.let { add(Icons.Outlined.CalendarMonth to "By ${formatDate(it)}") }
-        p.requiredPerMonth?.let { add(Icons.Outlined.Payments to "${MoneyFormatter.format(it)} a month") }
+        p.requiredPerMonth?.let { add(Icons.Outlined.Payments to "${fmt.format(it)} a month") }
         add(Icons.Outlined.Schedule to (p.projectedCompletion?.let { "At your pace: ${formatDate(it)}" } ?: "Add money to see when"))
     }
     walletName?.let { add(Icons.Outlined.AccountBalanceWallet to it) }
@@ -676,7 +682,7 @@ private fun GoalDetailSheet(
             }
             Spacer(Modifier.height(Spacing.md))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                goalFacts(progress, null).forEach { (icon, text) -> FactChip(icon, text) }
+                goalFacts(progress, null, amountFormat()).forEach { (icon, text) -> FactChip(icon, text) }
             }
 
             if (archived) {
@@ -773,6 +779,7 @@ private fun ContributionForm(
     onContribute: (Money, (GoalRepository.ContributionResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val fmt = amountFormat()
     val goal = progress.goal
     val separator = remember { MoneyFormatter.decimalSeparator() }
     var amountText by remember { mutableStateOf("") }
@@ -810,7 +817,7 @@ private fun ContributionForm(
                             amountText = ""
                             error = null
                         }
-                        GoalRepository.ContributionResult.ExceedsSaved -> error = "That’s more than you’ve set aside (${MoneyFormatter.format(progress.saved)})."
+                        GoalRepository.ContributionResult.ExceedsSaved -> error = "That’s more than you’ve set aside (${fmt.format(progress.saved)})."
                         GoalRepository.ContributionResult.AmountZero -> error = "The amount must be greater than zero."
                         GoalRepository.ContributionResult.CurrencyMismatch -> error = "This goal is in ${goal.currencyCode}."
                         GoalRepository.ContributionResult.GoalNotFound -> onDismiss()
@@ -843,7 +850,7 @@ private fun GoalEditorSheet(
     onSave: (GoalDraft, Money, (GoalRepository.SaveResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
-) {
+) = AmountsShown {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val separator = remember { MoneyFormatter.decimalSeparator() }
@@ -960,7 +967,7 @@ private fun GoalEditorSheet(
             ) {
                 ChoicePill(label = "Not linked", selected = draft.walletId == null, leadingIcon = Icons.Outlined.LinkOff, onClick = { draft = draft.copy(walletId = null) })
                 keptIn.forEach { w ->
-                    WalletChoice(w, selected = draft.walletId == w.id, onClick = { draft = draft.copy(walletId = w.id) })
+                    WalletChoicePill(w, selected = draft.walletId == w.id, onClick = { draft = draft.copy(walletId = w.id) })
                 }
                 ChoicePill(
                     label = "Add wallet",
@@ -1034,28 +1041,6 @@ private fun GoalEditorSheet(
 }
 
 /** A wallet as a selectable chip with its own tile, like the composer's. */
-@Composable
-private fun WalletChoice(wallet: com.lucento.app.domain.Wallet, selected: Boolean, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(50),
-        color = if (selected) colors.primaryContainer else colors.surfaceContainerLowest,
-        border = BorderStroke(if (selected) 1.5.dp else 1.dp, if (selected) colors.primary else LucentoTheme.extendedColors.borderDefault),
-        modifier = Modifier
-            .minimumInteractiveComponentSize()
-            .semantics {
-                role = Role.RadioButton
-                this.selected = selected
-            },
-    ) {
-        Row(Modifier.padding(start = 5.dp, end = Spacing.md, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            WalletIdentityTile(wallet, size = 24.dp)
-            Spacer(Modifier.width(Spacing.xs + 2.dp))
-            Text(wallet.name, style = MaterialTheme.typography.labelLarge, color = if (selected) colors.primary else colors.onSurface, maxLines = 1)
-        }
-    }
-}
 
 /**
  * The goal's look: the user's photo first, then a square tile per preset icon on its tone. With no choice yet the icon

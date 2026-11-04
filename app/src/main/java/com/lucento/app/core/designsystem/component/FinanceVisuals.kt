@@ -119,6 +119,7 @@ fun IncomeExpenseChart(
     modifier: Modifier = Modifier,
     height: Dp = 168.dp,
 ) {
+    val fmt = amountFormat()
     if (months.isEmpty()) return
     val colors = LucentoTheme.extendedColors
     val reducedMotion = LucentoTheme.reducedMotion
@@ -136,15 +137,17 @@ fun IncomeExpenseChart(
     }
     val locale = Locale.getDefault()
     val spoken = months.joinToString("; ") {
-        "${it.month.month.getDisplayName(TextStyle.FULL, locale)}: income ${MoneyFormatter.format(it.income)}, " +
-            "expenses ${MoneyFormatter.format(it.expense)}"
+        "${it.month.month.getDisplayName(TextStyle.FULL, locale)}: income ${fmt.spoken(it.income)}, " +
+            "expenses ${fmt.spoken(it.expense)}"
     }
     val grid = colors.track
     val incomeColor = colors.positive
     val expenseColor = colors.negative
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-    val labels = remember(ticks, locale) { ticks.map { axisLabel(it, locale) } }
+    // Hidden amounts hide the scale too: gridlines stay, their numbers would give the size away.
+    val hidden = LocalAmountsHidden.current
+    val labels = remember(ticks, locale, hidden) { ticks.map { if (hidden) "" else axisLabel(it, locale) } }
     val axisWidth = 44.dp
     Column(modifier.clearAndSetSemantics { contentDescription = "Income and expenses by month. $spoken" }) {
         Canvas(Modifier.fillMaxWidth().height(height)) {
@@ -333,18 +336,19 @@ fun FlowStatTiles(
     netLabel: String,
     modifier: Modifier = Modifier,
 ) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val spent = -expenses
     val incomeTile: @Composable (Modifier) -> Unit = { m ->
         StatTile(
             "Income", Icons.Filled.SouthWest, TonePair(ext.positiveContainer, ext.success),
-            description = "Income ${MoneyFormatter.formatSigned(income, showPlus = true)}", modifier = m,
+            description = "Income ${fmt.spokenSigned(income, showPlus = true)}", modifier = m,
         ) { MoneyText(money = income, style = StatFigureStyle, showPlus = true, color = ext.positive, fractionScale = 1f) }
     }
     val spentTile: @Composable (Modifier) -> Unit = { m ->
         StatTile(
             "Expenses", Icons.Filled.NorthEast, TonePair(ext.negativeContainer, ext.negativeIndicator),
-            description = "Expenses ${MoneyFormatter.formatSigned(spent)}", modifier = m,
+            description = "Expenses ${fmt.spokenSigned(spent)}", modifier = m,
         ) { MoneyText(money = spent, style = StatFigureStyle, color = ext.negative, fractionScale = 1f) }
     }
     val netTile: @Composable (Modifier) -> Unit = { m ->
@@ -352,7 +356,7 @@ fun FlowStatTiles(
             netLabel,
             if (net.isNegative) Icons.AutoMirrored.Filled.TrendingDown else Icons.AutoMirrored.Filled.TrendingUp,
             TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary),
-            description = "$netLabel ${MoneyFormatter.formatSigned(net, showPlus = true)}",
+            description = "$netLabel ${fmt.spokenSigned(net, showPlus = true)}",
             modifier = m,
         ) { MoneyText(money = net, style = StatFigureStyle, showPlus = true, color = MaterialTheme.colorScheme.onSurface, fractionScale = 1f) }
     }

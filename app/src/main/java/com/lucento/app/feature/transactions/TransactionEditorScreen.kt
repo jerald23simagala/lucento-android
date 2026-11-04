@@ -1,5 +1,6 @@
 package com.lucento.app.feature.transactions
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -125,7 +126,7 @@ fun TransactionEditorScreen(
     onClose: () -> Unit,
     /** False when the user tracks a single account (Multiple wallets off) and it is the only choice. */
     showWalletPicker: Boolean = true,
-) {
+) = AmountsShown {
     val haptics = rememberHaptics()
     val decimalSeparator = remember { MoneyFormatter.decimalSeparator() }
 

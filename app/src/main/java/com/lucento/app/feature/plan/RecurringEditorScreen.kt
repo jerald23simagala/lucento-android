@@ -1,5 +1,6 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import com.lucento.app.core.designsystem.component.icon
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -122,7 +123,7 @@ fun RecurringEditorScreen(
     prefillDebt: Pair<Long, LocalDate>? = null,
     onSaved: () -> Unit = onBack,
     viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
-) {
+) = AmountsShown {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
     var draft by remember { mutableStateOf<ScheduleDraft?>(null) }

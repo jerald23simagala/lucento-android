@@ -284,6 +284,17 @@ fun TransactionsScreen(
                     )
                 }
 
+                // The page opens on this month: early in a month that can be empty while older history exists.
+                state.sections.isEmpty() && state.filter.isDefault -> item(key = "no-matches") {
+                    EmptyState(
+                        title = "Nothing this month yet",
+                        body = "Transactions you add this month appear here. Earlier ones are under Any date.",
+                        action = {
+                            LucentoSecondaryButton(text = "Show any date", onClick = { viewModel.setPreset(RangePreset.ALL) })
+                        },
+                    )
+                }
+
                 state.sections.isEmpty() -> item(key = "no-matches") {
                     EmptyState(
                         title = "Nothing matches",
@@ -557,10 +568,7 @@ internal fun netFlowLabel(net: Money): String = if (net.amountMinor >= 0L) "Net 
 private fun ShownSummary(state: TransactionsUiState) {
     val primary: PeriodTotals = state.shownTotals.firstOrNull() ?: return
     val others = state.shownTotals.drop(1)
-    val scope = when {
-        state.filter.isActive -> "${state.matchCount} of ${state.totalCount} " + if (state.totalCount == 1) "transaction" else "transactions"
-        else -> "${state.totalCount} ${if (state.totalCount == 1) "transaction" else "transactions"}"
-    }
+    val scope = "${state.matchCount} ${if (state.matchCount == 1) "transaction" else "transactions"}"
     val range = state.filter.month?.let { m -> m.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) + " ${m.year}" }
         ?: state.filter.preset.takeIf { it != RangePreset.ALL }?.let(::rangeLabel)
     Column {

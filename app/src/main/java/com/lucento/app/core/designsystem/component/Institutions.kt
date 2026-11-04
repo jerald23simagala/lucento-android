@@ -1,5 +1,17 @@
 package com.lucento.app.core.designsystem.component
 
+import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.designsystem.theme.LucentoTheme
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -149,5 +161,36 @@ fun InstitutionCardMark(institution: Institution, modifier: Modifier = Modifier)
         ) { image(markModifier) }
     } else {
         image(modifier.then(markModifier))
+    }
+}
+
+/**
+ * A wallet to choose in a form (a goal's "Kept in", a transfer's From and To): its identity tile and name in a pill,
+ * the selected one in brand colours, at least 48dp to touch. [detail] adds a short second part ("PHP") where wallets
+ * could otherwise be confused.
+ */
+@Composable
+fun WalletChoicePill(wallet: Wallet, selected: Boolean, onClick: () -> Unit, detail: String? = null) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (selected) colors.primaryContainer else colors.surfaceContainerLowest,
+        border = BorderStroke(if (selected) 1.5.dp else 1.dp, if (selected) colors.primary else LucentoTheme.extendedColors.borderDefault),
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .semantics {
+                role = Role.RadioButton
+                this.selected = selected
+            },
+    ) {
+        Row(Modifier.padding(start = 5.dp, end = Spacing.md, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            WalletIdentityTile(wallet, size = 24.dp)
+            Spacer(Modifier.width(Spacing.xs + 2.dp))
+            Text(wallet.name, style = MaterialTheme.typography.labelLarge, color = if (selected) colors.primary else colors.onSurface, maxLines = 1)
+            if (detail != null) {
+                Text(" · $detail", style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant, maxLines = 1)
+            }
+        }
     }
 }

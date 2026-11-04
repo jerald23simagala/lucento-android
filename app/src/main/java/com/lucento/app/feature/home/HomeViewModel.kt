@@ -127,6 +127,7 @@ class HomeViewModel(
                 showLocalDataNotice = showLocalDataNotice(prefs.onboardingComplete, prefs.localDataNoticeSeen),
                 syncDetails = syncDetails,
                 moduleOffersHidden = prefs.moduleOffersHidden,
+                hideAmounts = prefs.hideAmounts,
                 milestoneToShow = com.lucento.app.domain.Achievements.toAcknowledge(built.earned, prefs.achievementsSeen),
                 needsMilestoneBaseline = prefs.achievementsSeen == null,
                 showAddSpotlight = showAddSpotlight(prefs.addSpotlightSeen, prefs.guideStep != null, built.recordedCount),
@@ -195,6 +196,11 @@ class HomeViewModel(
         viewModelScope.launch { preferences.setLocalDataNoticeSeen() }
     }
 
+    /** Hides or shows the Dashboard's amounts. Showing is called only after the phone's lock confirmed it's the owner. */
+    fun setHideAmounts(hidden: Boolean) {
+        viewModelScope.launch { preferences.setHideAmounts(hidden) }
+    }
+
     /** Shows [month] on the budget card; the current month follows the calendar (null). */
     fun selectMonth(month: YearMonth) {
         selectedMonth.value = if (month >= YearMonth.from(LocalDate.now())) null else month
@@ -211,9 +217,8 @@ class HomeViewModel(
                 syncConfigured = SupabaseModule.isConfigured,
                 usage = c.usageCounts,
                 running = c.syncRepository.running,
-                requestSync = {
-                    if (!c.syncRepository.running.value) com.lucento.app.data.sync.SyncScheduler.retryNow(application)
-                },
+                // Run in the app now: WorkManager may hold a queued sync back for a long time (owner, 2026-11-04).
+                requestSync = { c.foregroundSync.request(forced = true) },
                 clearOverridden = { seen -> c.syncPreferences.clearOverriddenChanges(seen) },
             )
         }

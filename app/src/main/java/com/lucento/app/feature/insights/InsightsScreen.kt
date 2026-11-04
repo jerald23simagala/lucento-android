@@ -1,5 +1,6 @@
 package com.lucento.app.feature.insights
 
+import com.lucento.app.core.designsystem.component.amountFormat
 import com.lucento.app.core.designsystem.component.HeroTones
 import com.lucento.app.core.designsystem.component.HeroPill
 import com.lucento.app.core.designsystem.component.HeroFigure
@@ -213,6 +214,7 @@ private fun TrendSection(data: InsightsData, currency: String, period: TrendPeri
  */
 @Composable
 private fun TrendSummary(months: List<FlowMonth>) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val current = months.last()
     val previous = months.getOrNull(months.size - 2)
@@ -235,12 +237,12 @@ private fun TrendSummary(months: List<FlowMonth>) {
             Spacer(Modifier.width(Spacing.sm))
             Column(Modifier.weight(1f)) {
                 Text(
-                    "${monthLabel(current.month)} so far: ${MoneyFormatter.format(current.income)} in, ${MoneyFormatter.format(current.expense)} out.",
+                    "${monthLabel(current.month)} so far: ${fmt.format(current.income)} in, ${fmt.format(current.expense)} out.",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                 )
                 if (previous != null && (!previous.income.isZero || !previous.expense.isZero)) {
                     Text(
-                        "${monthLabel(previous.month)}: ${MoneyFormatter.format(previous.income)} in, ${MoneyFormatter.format(previous.expense)} out.",
+                        "${monthLabel(previous.month)}: ${fmt.format(previous.income)} in, ${fmt.format(previous.expense)} out.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -356,6 +358,7 @@ private fun CompositionGroup(
     scale: Long,
     composition: NetWorthComposition,
 ) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val colors: List<Color> = components.map { ext.tone(it.type).content }
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -375,8 +378,8 @@ private fun CompositionGroup(
         weights = components.map { it.amount.amountMinor.coerceAtLeast(0L) },
         colors = colors,
         scaleTo = scale,
-        description = "$title ${MoneyFormatter.format(total)}: " +
-            components.joinToString("; ") { "${it.type.groupLabel} ${MoneyFormatter.format(it.amount)}" },
+        description = "$title ${fmt.spoken(total)}: " +
+            components.joinToString("; ") { "${it.type.groupLabel} ${fmt.spoken(it.amount)}" },
     )
     Spacer(Modifier.height(Spacing.sm))
     components.forEachIndexed { i, c ->

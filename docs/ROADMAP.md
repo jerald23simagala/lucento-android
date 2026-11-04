@@ -119,6 +119,14 @@ recurring-schedule sync, syncing preferences.
   without the hero and projection, transfers apart from net flow; transaction view and editor redesigned (wallet
   dropdown with real wallet icons); wallet editor in onboarding's field style; wallet page reconcile card and month
   cards; Insights restyled; composer chat restyled with shared chat components.
+- Owner review round 5 (2026-11-04): sheets keep a fast scroll inside; bars and rings grow in; the composer needs a
+  category on income and expenses; Wallets opens in card view; compact Budget rows; Goals redesigned with preset icons
+  and archiving of reached goals (Active / Archived toggle).
+- Owner review rounds 6–7 (2026-11-04), **financial integrity milestone**: a month's spending is one figure on Home,
+  Transactions (which now opens on This month) and Budget, all in one focus currency (`MonthSpendingReconciliationTest`,
+  device `ReconciliationTest` in CI); the sync chip says how fresh it is and what's waiting, syncs run in the app while
+  it's open and can't hang; Hide amounts (phone unlock to show) masks money on every read/view page, editors excepted;
+  the Transfer sheet follows the other sheets' style.
 - Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
   email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
   Insights adopt the brand hero and carded sections.

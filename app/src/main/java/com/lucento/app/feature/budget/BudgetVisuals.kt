@@ -1,5 +1,7 @@
 package com.lucento.app.feature.budget
 
+import com.lucento.app.core.designsystem.component.AmountFormat
+import com.lucento.app.core.designsystem.component.amountFormat
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -88,14 +90,14 @@ fun verdictTone(verdict: PaceVerdict): TonePair = when (verdict) {
 }
 
 /** One encouraging sentence for the month, from the plan's real figures. */
-fun encouragement(plan: BudgetPlan): String = when (plan.health) {
+fun encouragement(plan: BudgetPlan, fmt: AmountFormat): String = when (plan.health) {
     BudgetHealth.NOT_SET -> "Give your categories an amount and Lucento adds them up into your monthly budget."
     BudgetHealth.ON_TRACK -> "Comfortably within budget — nice and steady."
     BudgetHealth.APPROACHING -> "You’ve used most of this month’s budget. A little care keeps you on track."
-    BudgetHealth.LOW -> "Only ${MoneyFormatter.format(plan.remaining)} left this month — small choices add up."
+    BudgetHealth.LOW -> "Only ${fmt.format(plan.remaining)} left this month — small choices add up."
     BudgetHealth.EXCEEDED -> if (plan.remaining.isZero) {
         "This month’s budget is fully used. Every month is a fresh start."
     } else {
-        "${MoneyFormatter.format(-plan.remaining)} over this month. It happens — next month is a fresh start."
+        "${fmt.format(-plan.remaining)} over this month. It happens — next month is a fresh start."
     }
 }

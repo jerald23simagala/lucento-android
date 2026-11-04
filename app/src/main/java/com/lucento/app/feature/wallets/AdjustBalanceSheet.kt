@@ -1,5 +1,6 @@
 package com.lucento.app.feature.wallets
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -73,7 +74,7 @@ fun AdjustBalanceSheet(
     onAdjust: (actualText: String, decimalSeparator: Char, date: LocalDate, clientUuid: String, (AdjustError?) -> Unit) -> Unit,
     onAdjusted: () -> Unit,
     onDismiss: () -> Unit,
-) {
+) = AmountsShown {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()

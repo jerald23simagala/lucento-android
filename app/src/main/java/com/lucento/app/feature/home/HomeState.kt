@@ -109,6 +109,39 @@ enum class CloudStatus(val label: String) {
 }
 
 /** What the sync details sheet says (P2-2). All local: preferences, Room counts and this process's sync state. */
+/**
+ * The header chip's words (owner, 2026-11-04: "it always says Synced — is it real time, or is something pending?").
+ * Synced says how long ago, Waiting how many changes, so the chip is never a bare "Synced"; [syncChipDescription] is
+ * the same in full words for TalkBack.
+ */
+fun syncChipLabel(status: CloudStatus, details: SyncDetails, nowMillis: Long): String = when (status) {
+    CloudStatus.SYNCED -> details.lastSyncedAtMillis?.let { "Synced · ${shortAgo(nowMillis - it)}" } ?: status.label
+    CloudStatus.PENDING -> when {
+        !details.everSynced -> "Not synced yet"
+        details.pendingChanges == 1 -> "1 to sync"
+        details.pendingChanges > 1 -> "${details.pendingChanges} to sync"
+        else -> status.label
+    }
+    else -> status.label
+}
+
+fun syncChipDescription(status: CloudStatus, details: SyncDetails, nowMillis: Long): String = "Sync status: " + when (status) {
+    CloudStatus.SYNCED, CloudStatus.PENDING ->
+        com.lucento.app.feature.settings.syncStatusText(details.lastSyncedAtMillis, nowMillis, details.pendingChanges, null)
+    else -> status.label
+}
+
+/** "now", "5m", "3h", "2d": how long ago, short enough for the header chip. Never negative (a clock moved back). */
+fun shortAgo(elapsedMillis: Long): String {
+    val minutes = elapsedMillis.coerceAtLeast(0L) / 60_000
+    return when {
+        minutes < 1 -> "now"
+        minutes < 60 -> "${minutes}m"
+        minutes < 24 * 60 -> "${minutes / 60}h"
+        else -> "${minutes / (24 * 60)}d"
+    }
+}
+
 data class SyncDetails(
     val email: String? = null,
     val lastSyncedAtMillis: Long? = null,
@@ -303,6 +336,8 @@ data class HomeUiState(
     val hasAnySchedules: Boolean = false,
     val categoriesById: Map<Long, Category> = emptyMap(),
     val cloudStatus: CloudStatus = CloudStatus.LOCAL,
+    /** The user hid the Dashboard's amounts (shown as "₱••••"); showing them again asks for the phone's lock. */
+    val hideAmounts: Boolean = false,
     val syncDetails: SyncDetails = SyncDetails(),
     /** P2-5: the user hid the offers for modules that are off. */
     val moduleOffersHidden: Boolean = false,
@@ -392,11 +427,7 @@ object HomeStateBuilder {
         cloudStatus: CloudStatus = CloudStatus.LOCAL,
         visitedInsights: Boolean = false,
     ): HomeUiState {
-        val focus = when {
-            wallets.any { it.currencyCode == primaryCurrency } -> primaryCurrency
-            all.any { it.currencyCode == primaryCurrency } -> primaryCurrency
-            else -> wallets.firstOrNull()?.currencyCode ?: primaryCurrency
-        }
+        val focus = com.lucento.app.domain.FocusCurrency.of(primaryCurrency, wallets, all)
         val current = YearMonth.from(today)
         val earliest = all.minOfOrNull { it.date }?.let { YearMonth.from(it) }?.coerceAtMost(current) ?: current
         val shown = month.coerceIn(earliest, current)

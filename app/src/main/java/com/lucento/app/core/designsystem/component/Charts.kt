@@ -58,6 +58,7 @@ fun MonthlyBarChart(
     modifier: Modifier = Modifier,
     height: Dp = 112.dp,
 ) {
+    val fmt = amountFormat()
     if (months.isEmpty()) return
     val colors = LucentoTheme.extendedColors
     val reducedMotion = LucentoTheme.reducedMotion
@@ -72,7 +73,7 @@ fun MonthlyBarChart(
 
     val locale = Locale.getDefault()
     val description = months.joinToString(separator = "; ") {
-        "${it.month.month.getDisplayName(TextStyle.FULL, locale)}: ${MoneyFormatter.format(it.amount)}"
+        "${it.month.month.getDisplayName(TextStyle.FULL, locale)}: ${fmt.spoken(it.amount)}"
     }
 
     Column(modifier.clearAndSetSemantics { contentDescription = "Spending by month. $description" }) {

@@ -503,5 +503,62 @@ class ScreenshotTourTest {
         )
         runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
         shot("22-home-budget-almost-used-dark")
+
+        // ---------------------------------------------------------------- hidden amounts on every page (round 7)
+        // Hide on the dashboard hides money everywhere it's shown: no figure as text, none in what TalkBack reads.
+        compose.onNodeWithContentDescription("Hide amounts").performClick()
+        compose.waitForIdle()
+        val figures = listOf(money(4_200), money(212, 40), money(1_500), money(5_000), money(3_250)).map { MoneyFormatter.format(it) }
+        fun noFigures(page: String) {
+            compose.waitForIdle()
+            figures.forEach { figure ->
+                val leaks = compose.onAllNodes(hasText(figure, substring = true) or hasContentDescription(figure, substring = true), useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                check(leaks.isEmpty()) { "$page shows $figure with amounts hidden" }
+            }
+        }
+        waitForText("Show")
+        noFigures("Home")
+        shot("23-hidden-home")
+        tab("Transactions")
+        scrollToText("Weekly shop")
+        noFigures("Transactions")
+        shot("23b-hidden-transactions")
+        openRow("Weekly shop")
+        waitForDescription("Edit")
+        noFigures("Transaction view")
+        shot("23c-hidden-transaction-view")
+        back()
+        openBudgets()
+        noFigures("Budget")
+        shot("23d-hidden-budget")
+        tab("Wallets")
+        waitForText("Assets")
+        noFigures("Wallets")
+        openRow("Everyday bank")
+        noFigures("Wallet")
+        shot("23e-hidden-wallet")
+        back()
+        tab("Home")
+        compose.onNodeWithContentDescription("Insights").performScrollTo().performClick()
+        compose.waitForIdle()
+        noFigures("Insights")
+        shot("23f-hidden-insights")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Savings goals").performScrollTo().performClick()
+        waitForText("In progress")
+        noFigures("Goals")
+        shot("23g-hidden-goals")
+        back()
+        compose.onNodeWithContentDescription("Debts and loans").performScrollTo().performClick()
+        compose.waitForIdle()
+        noFigures("Debts")
+        shot("23h-hidden-debts")
+        back()
+        compose.onNodeWithContentDescription("Scheduled transactions").performScrollTo().performClick()
+        waitForText("overdue included", substring = true)
+        noFigures("Scheduled")
+        shot("23i-hidden-scheduled")
     }
 }

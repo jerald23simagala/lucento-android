@@ -92,6 +92,11 @@ data class UserPreferences(
     val appLock: Boolean = false,
     /** Hides Lucento's screen in the recent-apps view (P2-10). A device choice like [appLock]. */
     val hideInRecents: Boolean = false,
+    /**
+     * The Dashboard shows amounts as dots (owner, 2026-11-04). Hiding is one tap; showing them again asks for the
+     * phone's fingerprint, face or screen lock. A device choice like [appLock]: never in backups.
+     */
+    val hideAmounts: Boolean = false,
     /** P2-5: the user hid Home's "turn on" offers for modules that are off; Settings › Enabled features still has them. */
     val moduleOffersHidden: Boolean = false,
     /** How the user said they pay (onboarding); the guided setup suggests these account types first. Empty = not asked. */
@@ -149,6 +154,7 @@ class UserPreferencesRepository(
         val setupGeneration = intPreferencesKey("setup_generation")
         val appLock = booleanPreferencesKey("app_lock")
         val hideInRecents = booleanPreferencesKey("hide_in_recents")
+        val hideAmounts = booleanPreferencesKey("hide_amounts")
         val moduleOffersHidden = booleanPreferencesKey("module_offers_hidden")
         val spendTypes = stringSetPreferencesKey("spend_types")
         val achievementsSeen = stringSetPreferencesKey("achievements_seen")
@@ -186,6 +192,7 @@ class UserPreferencesRepository(
                 setupGeneration = p[Keys.setupGeneration] ?: 0,
                 appLock = p[Keys.appLock] ?: false,
                 hideInRecents = p[Keys.hideInRecents] ?: false,
+                hideAmounts = p[Keys.hideAmounts] ?: false,
                 moduleOffersHidden = p[Keys.moduleOffersHidden] ?: false,
                 spendTypes = com.lucento.app.domain.SpendType.fromKeys(p[Keys.spendTypes].orEmpty()),
                 achievementsSeen = p[Keys.achievementsSeen]?.mapNotNull(com.lucento.app.domain.Achievement::fromKey)?.toSet(),
@@ -306,6 +313,10 @@ class UserPreferencesRepository(
 
     suspend fun setHideInRecents(enabled: Boolean) {
         context.dataStore.edit { it[Keys.hideInRecents] = enabled }
+    }
+
+    suspend fun setHideAmounts(hidden: Boolean) {
+        context.dataStore.edit { it[Keys.hideAmounts] = hidden }
     }
 
     suspend fun setModuleOffersHidden(hidden: Boolean) {

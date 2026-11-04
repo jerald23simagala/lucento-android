@@ -403,8 +403,11 @@ private fun AnswerItem(
 @Composable
 private fun annotated(parts: List<CheckedAnswer.Part>): AnnotatedString {
     val figure = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    // With amounts hidden (round 7) answers hide them too: quoted figures and any amount the AI wrote itself.
+    val hidden = com.lucento.app.core.designsystem.component.LocalAmountsHidden.current
+    fun shown(text: String) = if (hidden) com.lucento.app.core.money.MoneyFormatter.maskAmountsIn(text) else text
     return buildAnnotatedString {
-        parts.forEach { part -> if (part.isFigure) withStyle(figure) { append(part.text) } else append(part.text) }
+        parts.forEach { part -> if (part.isFigure) withStyle(figure) { append(shown(part.text)) } else append(shown(part.text)) }
     }
 }
 

@@ -1,5 +1,6 @@
 package com.lucento.app.feature.wallets
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -183,7 +184,7 @@ fun WalletEditorSheet(
      * reminder comes from its due day instead (CreditCardMath), so it never opens one.
      */
     onPlanPayment: ((Long, LocalDate) -> Unit)? = null,
-) {
+) = AmountsShown {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()

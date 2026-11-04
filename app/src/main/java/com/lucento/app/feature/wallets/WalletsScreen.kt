@@ -1,5 +1,7 @@
 package com.lucento.app.feature.wallets
 
+import com.lucento.app.core.designsystem.component.AmountFormat
+import com.lucento.app.core.designsystem.component.amountFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -116,6 +118,7 @@ fun WalletsScreen(
     onPlanDebtPayment: ((Long, java.time.LocalDate) -> Unit)? = null,
     viewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
+    val fmt = amountFormat()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
     val newDraft = { WalletDraft(currencyCode = state.primaryCurrency) }
@@ -179,6 +182,7 @@ fun WalletsScreen(
             primaryCurrency = state.primaryCurrency,
             cards = cards,
             onOpen = { onOpenWallet(it.id) },
+            fmt = fmt,
         )
         walletSection(
             key = "liabilities",
@@ -188,6 +192,7 @@ fun WalletsScreen(
             primaryCurrency = state.primaryCurrency,
             cards = cards,
             onOpen = { onOpenWallet(it.id) },
+            fmt = fmt,
             // Payoff progress, payments and interest live in Debts & loans.
             link = onOpenDebts?.let { "Debts & loans" to it },
             footnote = "Cards and loans reduce your net worth; they’re never counted as money you have.",
@@ -242,6 +247,7 @@ fun WalletsScreen(
  */
 @Composable
 private fun NetWorthCard(net: Money, summary: NetWorthCalculator.Summary, trend: NetWorthTrend?) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val code = net.currencyCode
     val history = trend?.history.orEmpty()
@@ -270,7 +276,7 @@ private fun NetWorthCard(net: Money, summary: NetWorthCalculator.Summary, trend:
         val others = summary.totals.filter { it.currencyCode != code }
         if (others.isNotEmpty()) {
             Text(
-                "Also: " + others.joinToString(" · ") { MoneyFormatter.formatSigned(it, showPlus = false) },
+                "Also: " + others.joinToString(" · ") { fmt.signed(it, showPlus = false) },
                 style = MaterialTheme.typography.bodySmall,
                 color = ext.onHeroMuted,
             )
@@ -339,14 +345,15 @@ private fun ChangePill(percent: Int, previousMonth: String) {
 /** The last months of net worth: a caps caption, then a sunlight [TrendLine] with month names under it. */
 @Composable
 private fun TrendBlock(history: List<com.lucento.app.domain.MonthBalance>, fontScale: Float, modifier: Modifier = Modifier) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val locale = Locale.getDefault()
     // Three letters fit six months in 150dp; at large text only the initial does.
     val nameStyle = if (fontScale >= 1.3f) TextStyle.NARROW_STANDALONE else TextStyle.SHORT_STANDALONE
     val first = history.first()
     val last = history.last()
-    val description = "Net worth over ${history.size} months, from ${MoneyFormatter.formatSigned(first.netWorth)} at the end of " +
-        "${first.month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)} to ${MoneyFormatter.formatSigned(last.netWorth)} now"
+    val description = "Net worth over ${history.size} months, from ${fmt.spokenSigned(first.netWorth)} at the end of " +
+        "${first.month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)} to ${fmt.spokenSigned(last.netWorth)} now"
     Column(modifier, horizontalAlignment = Alignment.End) {
         Text(
             "${history.size} MONTHS",
@@ -374,6 +381,7 @@ private fun TrendBlock(history: List<com.lucento.app.domain.MonthBalance>, fontS
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Summary) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val assets = summary.assets[code] ?: Money.zero(code)
     val owed = summary.liabilities[code] ?: Money.zero(code)
@@ -383,7 +391,7 @@ private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Sum
             "Assets",
             Icons.Outlined.AccountBalanceWallet,
             TonePair(ext.positiveContainer, ext.success),
-            description = "Assets ${MoneyFormatter.formatSigned(assets, showPlus = false)}",
+            description = "Assets ${fmt.spokenSigned(assets, showPlus = false)}",
             layout = StatTileLayout.Inline,
             modifier = m,
         ) { MoneyText(money = assets, style = figureStyle, color = ext.positive, fractionScale = 1f) }
@@ -393,7 +401,7 @@ private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Sum
             "Liabilities",
             Icons.Outlined.CreditCard,
             TonePair(ext.negativeContainer, ext.negativeIndicator),
-            description = "Liabilities ${MoneyFormatter.formatSigned(-owed)}",
+            description = "Liabilities ${fmt.spokenSigned(-owed)}",
             layout = StatTileLayout.Inline,
             modifier = m,
         ) { MoneyText(money = -owed, style = figureStyle, color = ext.negative, fractionScale = 1f) }
@@ -559,6 +567,7 @@ private fun LazyListScope.walletSection(
     primaryCurrency: String,
     cards: Boolean,
     onOpen: (Wallet) -> Unit,
+    fmt: AmountFormat,
     /** A destination shown beside the title in place of the caption, e.g. Debts & loans. */
     link: Pair<String, () -> Unit>? = null,
     footnote: String? = null,
@@ -572,7 +581,7 @@ private fun LazyListScope.walletSection(
         ListSectionHeader(
             title,
             caption = "$caption · ${wallets.size}",
-            subtotal = subtotals.joinToString(" · ") { MoneyFormatter.formatSigned(it, showPlus = false) },
+            subtotal = subtotals.joinToString(" · ") { fmt.signed(it, showPlus = false) },
             action = link?.let { (label, open) ->
                 {
                     Row(

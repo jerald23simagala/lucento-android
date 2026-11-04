@@ -73,7 +73,9 @@ class LucentoApplication : Application() {
             // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now".
             uploadRequests(container.syncRepository.observePendingChanges()).collect {
                 if (backgroundSyncAllowed(container.syncPreferences.isEnabled(), container.onboardingComplete())) {
-                    SyncScheduler.enqueueAfterLocalWrite(this@LucentoApplication)
+                    // Open: send it now. In the background (or if the app is closed before it runs): WorkManager.
+                    if (container.inForeground.get()) container.foregroundSync.request(forced = true)
+                    else SyncScheduler.enqueueAfterLocalWrite(this@LucentoApplication)
                 }
             }
         }
@@ -83,7 +85,11 @@ class LucentoApplication : Application() {
             // A sign-out wipe killed halfway is finished first (QA O-1).
             // Normally already finished synchronously in onCreate (see finishInterruptedWipeBeforeUi); this is the
             // fallback if that attempt threw.
-            com.lucento.app.data.sync.SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
+            try {
+                com.lucento.app.data.sync.SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
+            } catch (e: com.lucento.app.data.sync.SyncFlight.Busy) {
+                return@launch // another process is mid-sync; the next launch finishes the wipe
+            }
             val boundary = container.accountBoundary.afterSignIn()
             // An unfinished onboarding never syncs from here (P0-2): it checks the account itself and turns sync on
             // when it finishes. The account-boundary wipe above still applies.
@@ -234,6 +240,23 @@ class AppContainer(application: Application) {
             recurring = database.recurringDao(),
             debtTerms = database.debtTermsDao(),
             transact = { block -> runner.run { block() } },
+        )
+    }
+
+    /** True while Lucento's screen is in front (MainActivity onStart / onStop); syncs then run in the app. */
+    val inForeground = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Syncs straight away while the app is open (see [com.lucento.app.data.sync.ForegroundSync]). */
+    internal val foregroundSync: com.lucento.app.data.sync.ForegroundSync by lazy {
+        com.lucento.app.data.sync.ForegroundSync(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            allowed = { backgroundSyncAllowed(syncPreferences.isEnabled(), onboardingComplete()) },
+            upToDate = {
+                val last = syncPreferences.lastSyncedAtMillis()
+                last != null && System.currentTimeMillis() - last < com.lucento.app.data.sync.ForegroundSync.FRESH_MILLIS &&
+                    syncRepository.pendingChangeCount() == 0
+            },
+            sync = { syncRepository.sync() },
         )
     }
 

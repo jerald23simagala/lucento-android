@@ -353,8 +353,14 @@ internal fun safeFailureDescription(e: Throwable): String = when (e) {
     is io.github.jan.supabase.exceptions.RestException ->
         (e.description?.takeIf { it.isNotBlank() } ?: e.error).take(MAX_FAILURE_DESCRIPTION)
     is io.github.jan.supabase.exceptions.HttpRequestException -> "Couldn't reach the server"
+    is SyncRepository.SyncTimedOut -> "Sync took too long and stopped"
+    is AuthNotReady -> "Couldn't confirm your sign-in"
+    is SyncFlight.Busy -> "Another sync is still running"
     else -> e::class.simpleName ?: "Unexpected error"
 }
+
+/** The stored session didn't finish loading in time (see [SupabaseSyncRemote.currentUserId]). */
+internal class AuthNotReady : Exception("Sign-in not ready")
 
 private const val MAX_FAILURE_DESCRIPTION = 160
 

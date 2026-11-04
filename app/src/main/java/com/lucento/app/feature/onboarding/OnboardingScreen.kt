@@ -1,5 +1,6 @@
 package com.lucento.app.feature.onboarding
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import com.lucento.app.core.designsystem.component.SheetHeader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.width
@@ -121,7 +122,7 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModel.Factory),
     /** The profile photo actions, so a Google sign-in on the sync step can offer the account's picture. */
     photo: com.lucento.app.feature.profile.ProfilePhotoState = com.lucento.app.feature.profile.ProfilePhotoState(),
-) {
+) = AmountsShown {
     val step by viewModel.step.collectAsStateWithLifecycle()
     val furthestStep by viewModel.furthestStep.collectAsStateWithLifecycle()
     val currency by viewModel.currency.collectAsStateWithLifecycle()
@@ -222,7 +223,7 @@ fun OnboardingScreen(
             holdsAccountData = holdsAccountData,
             onLeaveAccount = onLeaveAccount,
         )
-        return
+        return@AmountsShown
     }
 
     Column(

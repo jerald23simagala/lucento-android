@@ -121,7 +121,17 @@ Any exception aborts the cycle with `Retryable`; the cursor does not move, nothi
 stay dirty, so the next cycle repeats the work. `SyncWorker` retries with WorkManager backoff (up to 5 attempts).
 
 "Sync now" and the 30-minute worker share one in-process lock (`SyncFlight`) and, on a device, one file lock under
-the app's files directory. A second cycle waits; it does not run beside the first. The file lock is released by the
+the app's files directory. A second cycle waits; it does not run beside the first. **Nothing can hang (2026-11-04):**
+each request times out after 30 s (`SupabaseModule`), waiting for the stored sign-in after 20 s (`AuthNotReady`), the
+file lock is polled so a wait can be cancelled (`SyncFlight.Busy` after 30 s), and a whole cycle stops after 10 minutes
+(`SyncRepository.CYCLE_TIMEOUT_MILLIS`, generous because progress is saved only when a cycle completes). Each ends as a
+retryable failure, so "Syncing" never spins forever and the next sync is never blocked.
+
+**While Lucento is open (2026-11-04)** syncs run in the app straight away instead of queueing in WorkManager
+(`ForegroundSync`): when it opens or returns to the front (skipped when a sync finished in the last minute with nothing
+waiting), a moment after each saved change, and on Sync now / Try again. Requests during a sync collapse into one more
+run after it. In the background, changes are still handed to WorkManager and the periodic worker runs about every 30
+minutes — Android and some phones' battery savers may delay those. The file lock is released by the
 operating system if the process is killed, and the cursor moves only after a cycle finishes, so a killed cycle retries
 without a stuck lock or a half-applied cursor. The manual worker is unique work with `KEEP` (a second tap does not
 cancel the running one). The periodic worker has its own unique name; the lock is what keeps the two from overlapping.
@@ -185,10 +195,12 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   `20261103180000_credit_card_billing.sql` must reach a project before any v11 build syncs against it, or wallet uploads
   fail (`PGRST204`, rows stay pending, nothing is lost). Older builds never send the columns, so an upsert from them
   leaves them unchanged. The card's payment reminder is derived on each phone and never synced.
-- **What the user sees (P2-2).** The Home chip shows On device · Offline · Syncing · Needs attention · Waiting to sync ·
-  Synced and opens a sheet with the state, Sync now / Try again (a phone that never synced is sent to Settings ›
-  Account & sync, which asks before combining data), and the notice above. The other device picks changes up on Sync
-  now, at launch, after its own saves, or on the 30-minute periodic sync — there is no live push.
+- **What the user sees (P2-2, 2026-11-04).** The Home chip shows On device · Offline · Syncing (the icon turns) · Needs
+  attention · "3 to sync" / "Not synced yet" · "Synced · 5m" — never a bare "Synced", so it says how fresh it is and
+  what is waiting (`syncChipLabel`; TalkBack hears it in full words). It opens a sheet with the state, when syncs happen
+  (`SYNC_CADENCE`), Sync now / Try again (a phone that never synced is sent to Settings › Account & sync, which asks
+  before combining data), and the notice above. The other device picks changes up when it opens or syncs — there is
+  no live push.
 - Why not server arrival order alone: it would let an edit made offline yesterday overwrite one made online today.
   Revisions keep offline editing correct without trusting arrival order or device clocks for sequential edits.
 

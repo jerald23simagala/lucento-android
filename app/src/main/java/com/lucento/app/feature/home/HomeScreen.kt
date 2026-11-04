@@ -203,6 +203,17 @@ import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import com.lucento.app.core.designsystem.component.LocalAmountsHidden
+import com.lucento.app.core.designsystem.component.shownAmount
+import com.lucento.app.core.designsystem.component.spokenAmount
+import com.lucento.app.core.security.DeviceAuth
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.LocalContext
+import com.lucento.app.core.designsystem.component.ConfirmDialog
 
 /** Callbacks Home needs from the app shell. Adding transactions happens through the dock's central + button. */
 data class HomeActions(
@@ -235,12 +246,25 @@ data class HomeActions(
  * the net wallet balance card; the month's budget with its top two categories; shortcuts; getting started (only until
  * the basics are in place); upcoming scheduled transactions; recent transactions. Every month-dependent section follows
  * the one selected month. Every figure comes from [HomeUiState].
+ *
+ * With amounts hidden (owner, 2026-11-04) every amount shows as "₱••••" ([LocalAmountsHidden], provided app-wide); the
+ * Hide / Show switch lives here. Percentages and words stay, so the dashboard still reads.
  */
 @Composable
 fun HomeScreen(
     actions: HomeActions,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
+) {
+    // The app's root provides LocalAmountsHidden from the same saved choice; the dashboard is where it's switched.
+    HomeDashboard(actions, viewModel, walletsViewModel)
+}
+
+@Composable
+private fun HomeDashboard(
+    actions: HomeActions,
+    viewModel: HomeViewModel,
+    walletsViewModel: WalletsViewModel,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
@@ -271,6 +295,7 @@ fun HomeScreen(
         // Pinned: the brand, sync status, notifications and profile stay put while the dashboard scrolls beneath.
         HomeHeader(
             status = state.cloudStatus,
+            syncDetails = state.syncDetails,
             onOpenSyncSettings = { showSync = true },
             bell = if (state.features.isEnabled(Feature.RECURRING) || state.cardDuesSoon.isNotEmpty()) {
                 { PaymentsBell(state, actions.onOpenRecurring, actions.onOpenWallet) }
@@ -287,6 +312,8 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 MonthPill(state, viewModel::selectMonth)
+                Spacer(Modifier.weight(1f))
+                AmountsToggle(hidden = state.hideAmounts, onHide = { viewModel.setHideAmounts(true) }, onShow = { viewModel.setHideAmounts(false) })
             }
         }
         if (scroll.value > 0) Hairline()
@@ -367,6 +394,7 @@ private enum class HomeContent { Loading, Welcome, Overview }
 @Composable
 private fun HomeHeader(
     status: CloudStatus,
+    syncDetails: SyncDetails,
     onOpenSyncSettings: () -> Unit,
     bell: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
@@ -387,7 +415,7 @@ private fun HomeHeader(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
-            SyncStatusChip(status, onClick = onOpenSyncSettings)
+            SyncStatusChip(status, syncDetails, onClick = onOpenSyncSettings)
             bell?.invoke()
             ProfileButton()
         }
@@ -650,9 +678,22 @@ private fun dueLabel(dueDate: LocalDate, overdue: Boolean, today: LocalDate): St
     }
 }
 
-/** A compact chip: icon plus a short state, so the meaning never relies on colour. Opens the sync details sheet (P2-2). */
+/**
+ * A compact chip: icon plus a short state, so the meaning never relies on colour. Opens the sync details sheet (P2-2).
+ * Synced says how long ago and Waiting how many changes (owner, 2026-11-04); the time is refreshed every half minute.
+ * While syncing the icon turns (still with reduced motion).
+ */
 @Composable
-private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
+private fun SyncStatusChip(status: CloudStatus, details: SyncDetails, onClick: () -> Unit) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val label = syncChipLabel(status, details, now)
+    val description = syncChipDescription(status, details, now)
     val open = onClick
     val tone: TonePair
     val icon: ImageVector
@@ -670,7 +711,7 @@ private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
             .clip(MaterialTheme.shapes.small)
             .clickable(role = Role.Button, onClickLabel = "Show sync details", onClick = onClick)
             .clearAndSetSemantics {
-                contentDescription = "Sync status: ${status.label}"
+                contentDescription = description
                 role = Role.Button
                 onClick(label = "Show sync details") { open(); true }
             },
@@ -683,14 +724,117 @@ private fun SyncStatusChip(status: CloudStatus, onClick: () -> Unit) {
                 .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(16.dp))
+            val turning = status == CloudStatus.SYNCING && !LucentoTheme.reducedMotion
+            val angle = if (turning) {
+                val spin = androidx.compose.animation.core.rememberInfiniteTransition(label = "sync")
+                spin.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                        androidx.compose.animation.core.tween(1_100, easing = androidx.compose.animation.core.LinearEasing),
+                    ),
+                    label = "sync-angle",
+                ).value
+            } else {
+                0f
+            }
+            Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = angle })
             // At large text sizes the icon alone keeps the header readable; the status is still announced in full.
             if (!largeText()) {
                 Spacer(Modifier.width(Spacing.xs))
-                Text(status.label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
+                Text(label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
             }
         }
     }
+}
+
+/**
+ * Hide or show the dashboard's amounts (owner, 2026-11-04). Hiding is one tap. Showing them again asks for the phone's
+ * own unlock — fingerprint, face, PIN, pattern or password, whatever it has (BiometricPrompt via [DeviceAuth]); a
+ * cancelled prompt keeps them hidden. A phone without any screen lock can't check who's asking, so it says so and lets
+ * the owner choose.
+ */
+@Composable
+private fun AmountsToggle(hidden: Boolean, onHide: () -> Unit, onShow: () -> Unit) {
+    val context = LocalContext.current
+    val haptics = rememberHaptics()
+    var noScreenLock by remember { mutableStateOf(false) }
+    val label = if (hidden) "Show amounts" else "Hide amounts"
+    Box(
+        Modifier
+            .heightIn(min = Sizes.minTouch)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(role = Role.Switch, onClickLabel = label) {
+                if (!hidden) {
+                    haptics.tick()
+                    onHide()
+                    return@clickable
+                }
+                val activity = context.findFragmentActivity() ?: return@clickable
+                val lock = (context.applicationContext as com.lucento.app.LucentoApplication).container.appLock
+                // The prompt's own screen must not count as leaving the app (which could re-lock it).
+                lock.beginAuthentication()
+                DeviceAuth.authenticate(activity, title = "Show amounts", subtitle = "Use your fingerprint, face or screen lock") { outcome ->
+                    lock.endAuthentication()
+                    when (outcome) {
+                        DeviceAuth.Outcome.SUCCESS -> {
+                            haptics.confirm()
+                            onShow()
+                        }
+                        DeviceAuth.Outcome.CANCELLED -> Unit
+                        DeviceAuth.Outcome.UNAVAILABLE -> noScreenLock = true
+                    }
+                }
+            }
+            .semantics {
+                stateDescription = if (hidden) "Amounts hidden" else "Amounts shown"
+                contentDescription = if (hidden) "Show amounts. Asks for your fingerprint, face or screen lock" else "Hide amounts"
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier
+                .clip(CircleShape)
+                .background(if (hidden) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(horizontal = Spacing.sm + Spacing.xxs, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val tint = if (hidden) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            Icon(
+                if (hidden) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(18.dp),
+            )
+            if (!largeText()) {
+                Spacer(Modifier.width(Spacing.xs))
+                Text(if (hidden) "Show" else "Hide", style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
+            }
+        }
+    }
+    if (noScreenLock) {
+        ConfirmDialog(
+            title = "This phone has no screen lock",
+            text = "Lucento asks for your fingerprint, face or screen lock before showing hidden amounts, but this phone " +
+                "has none set up. Add one in your phone’s Settings to protect them. Show the amounts now?",
+            confirmLabel = "Show amounts",
+            onConfirm = {
+                noScreenLock = false
+                onShow()
+            },
+            onDismiss = { noScreenLock = false },
+        )
+    }
+}
+
+/** The FragmentActivity hosting [this] context (BiometricPrompt needs one), or null. */
+private fun android.content.Context.findFragmentActivity(): androidx.fragment.app.FragmentActivity? {
+    var current: android.content.Context? = this
+    while (current is android.content.ContextWrapper) {
+        if (current is androidx.fragment.app.FragmentActivity) return current
+        current = current.baseContext
+    }
+    return null
 }
 
 /** The month selector: a compact white pill (calendar · month · chevron) with a menu of the months that have data. */
@@ -1010,13 +1154,17 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
     val owed = -composition.totalLiabilities
     val label = if (state.isCurrentMonth) "Net Wallet Balance" else "Net Wallet Balance · end of ${monthLabel(state.month)}"
     val history = state.balanceHistory
+    val netWorthSpoken = spokenAmount(composition.netWorth, signed = true)
+    val assetsSpoken = spokenAmount(composition.totalAssets, signed = true)
+    val owedSpoken = spokenAmount(owed, signed = true)
+    val changeSpoken = if (history.size > 1) spokenAmount(history.last().netWorth - history.first().netWorth, signed = true, showPlus = true) else ""
     val spoken = buildString {
-        append("$label ${MoneyFormatter.formatSigned(composition.netWorth)}. ")
-        append("Wallets ${MoneyFormatter.formatSigned(composition.totalAssets)}. ")
-        append("Debt and loans ${MoneyFormatter.formatSigned(owed)}. ")
+        append("$label $netWorthSpoken. ")
+        append("Wallets $assetsSpoken. ")
+        append("Debt and loans $owedSpoken. ")
         if (history.size > 1) {
             append("Compared with the end of ${monthLabel(history.first().month)}: ")
-            append(MoneyFormatter.formatSigned(history.last().netWorth - history.first().netWorth, showPlus = true))
+            append(changeSpoken)
             state.balanceTrend?.let { append(", ${if (it >= 0) "up" else "down"} ${kotlin.math.abs(it)} percent") }
         }
     }
@@ -1354,7 +1502,7 @@ private fun MatchedHeightPair(
 
 /**
  * The budget card's left half: the share used as a ring exactly [ringSize] wide, then the month's formula as a short
- * statement — Budget, Used (budgeted + unbudgeted), Remaining (or Overspent), Bills due, and Safe to spend on a tinted
+ * statement — Budget, Spent (budgeted + unbudgeted), Remaining (or Overspent), Bills due, and Safe to spend on a tinted
  * line (0 in red once nothing is left). A past month closes on Remaining. Every figure is from [BudgetFormula].
  */
 @Composable
@@ -1363,7 +1511,7 @@ private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn, formula: BudgetFor
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         ProgressRing(
             fraction = burn.consumedFraction,
-            description = "$used percent of the ${monthLabel(plan.month)} budget used",
+            description = "$used percent of the ${monthLabel(plan.month)} budget spent",
             size = ringSize,
             strokeWidth = 12.dp,
             color = healthColor(plan.health),
@@ -1371,7 +1519,7 @@ private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn, formula: BudgetFor
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("$used%", style = AmountStyles.hero.copy(fontSize = 30.sp, lineHeight = 34.sp), maxLines = 1)
-                Text("used", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("spent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         BudgetFormulaLines(formula)
@@ -1388,8 +1536,8 @@ private fun BudgetFormulaLines(formula: BudgetFormula) {
     val remainingInk = if (formula.overspent) ext.negative else ext.positive
     Column(Modifier.fillMaxWidth()) {
         FormulaLine("Budget", formula.budget)
-        FormulaLine("Used", formula.used)
-        // Used is every expense: the part in budgeted categories plus the part outside them.
+        FormulaLine("Spent", formula.used)
+        // Spent is every expense: the part in budgeted categories plus the part outside them (as on the Budget page).
         Column(Modifier.padding(start = Spacing.sm, top = Spacing.xxs, bottom = Spacing.xs)) {
             FormulaLine("Budgeted", formula.budgeted, minor = true)
             FormulaLine("Unbudgeted", formula.unbudgeted, minor = true)
@@ -1533,7 +1681,11 @@ private fun WatchRow(line: CategoryBudgetLine, onOpen: (Long) -> Unit) {
     val percent = line.percentUsed ?: 0
     val name = line.category.name
     val left = line.remaining
-    val leftText = left?.let { if (it.isNegative) "${MoneyFormatter.format(-it)} over" else "${MoneyFormatter.format(it)} left" }
+    val leftShown = left?.let { shownAmount(if (it.isNegative) -it else it) }
+    val leftText = left?.let { if (it.isNegative) "$leftShown over" else "$leftShown left" }
+    val spentSpoken = spokenAmount(line.spent)
+    val limitSpoken = line.limit?.let { spokenAmount(it) }.orEmpty()
+    val leftSpoken = left?.let { val m = spokenAmount(if (it.isNegative) -it else it); if (it.isNegative) "$m over" else "$m left" }
     Column(
         Modifier
             .fillMaxWidth()
@@ -1542,8 +1694,8 @@ private fun WatchRow(line: CategoryBudgetLine, onOpen: (Long) -> Unit) {
             .clickable(role = Role.Button, onClickLabel = "Show $name transactions") { onOpen(line.category.id) }
             .clearAndSetSemantics {
                 contentDescription = "$name, $percent percent of its budget used, " +
-                    "${MoneyFormatter.format(line.spent)} of ${line.limit?.let(MoneyFormatter::format).orEmpty()}" +
-                    leftText?.let { ", $it" }.orEmpty()
+                    "$spentSpoken of $limitSpoken" +
+                    leftSpoken?.let { ", $it" }.orEmpty()
                 role = Role.Button
                 onClick(label = "Show $name transactions") { onOpen(line.category.id); true }
             }

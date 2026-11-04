@@ -29,6 +29,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 import java.util.UUID
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 /**
  * The whole optional cloud sync engine (see docs/SYNC.md). Room is always the local source of truth — nothing
@@ -91,10 +93,21 @@ class SyncRepository(
     /** True while this process is syncing (P2-2: the "Syncing" state). Not persisted; another process's sync isn't shown. */
     val running: kotlinx.coroutines.flow.StateFlow<Boolean> = _running
 
-    suspend fun sync(): SyncResult = SyncFlight.exclusive {
+    suspend fun sync(): SyncResult = try {
+        cycle()
+    } catch (e: SyncFlight.Busy) {
+        fail(e)
+    }
+
+    private suspend fun cycle(): SyncResult = SyncFlight.exclusive {
         _running.value = true
         try {
-            syncBody()
+            // Owner, 2026-11-04: a cycle that never ended kept "Syncing" spinning and held the lock every later sync
+            // waits for. Each request already times out (SupabaseModule); this caps everything else as a last resort.
+            // It is generous because progress is saved only when a cycle completes: a large first pull must still fit.
+            withTimeout(CYCLE_TIMEOUT_MILLIS) { syncBody() }
+        } catch (e: TimeoutCancellationException) {
+            fail(SyncTimedOut())
         } finally {
             _running.value = false
         }
@@ -183,6 +196,9 @@ class SyncRepository(
             fail(e)
         }
     }
+
+    /** The whole cycle ran past [CYCLE_TIMEOUT_MILLIS]; reported as a retryable failure, never as a hang. */
+    internal class SyncTimedOut : Exception("Sync took too long and stopped")
 
     private suspend fun fail(e: Exception): SyncResult.Retryable {
         // Stored and shown in Settings: never the raw message, which can carry request headers (see safeFailureDescription).
@@ -997,6 +1013,9 @@ class SyncRepository(
     private fun <T> decode(serializer: KSerializer<T>, json: JsonObject): T = SyncJson.decodeFromJsonElement(serializer, json)
 
     companion object {
+        /** Last-resort cap on one sync cycle (see [sync]). */
+        const val CYCLE_TIMEOUT_MILLIS = 10 * 60_000L
+
         const val PULL_PAGE_SIZE = 500L
         /** Covers writes stamped by the server before a pull's read but committed after it. */
         const val CURSOR_OVERLAP_MS = 60_000L

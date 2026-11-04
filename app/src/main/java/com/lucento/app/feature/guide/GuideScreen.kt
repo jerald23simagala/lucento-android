@@ -1,5 +1,6 @@
 package com.lucento.app.feature.guide
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Circle
@@ -102,7 +103,7 @@ fun GuideScreen(
     onFinished: () -> Unit,
     viewModel: GuideViewModel = viewModel(factory = GuideViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
-) {
+) = AmountsShown {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     // Same as onboarding: one count each time a page comes on screen, keyed on the page.
     if (!state.loading) LaunchedEffect(state.step) { viewModel.onStepShown(state.step) }
@@ -119,7 +120,7 @@ fun GuideScreen(
     // Back walks the story backwards; on the first page it stays (the setup resumes here on the next launch anyway).
     BackHandler(enabled = !state.loading) { viewModel.back() }
 
-    if (state.loading) return
+    if (state.loading) return@AmountsShown
     val steps = state.steps
 
     Column(Modifier.fillMaxSize().padding(horizontal = Spacing.gutter).imePadding()) {

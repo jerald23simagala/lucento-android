@@ -1,5 +1,6 @@
 package com.lucento.app.feature.capture
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import com.lucento.app.core.designsystem.component.SheetHeader
 import android.app.Activity
@@ -141,7 +142,7 @@ fun TransactionComposerScreen(
     walletId: Long? = null,
     typeHint: TransactionType? = null,
     viewModel: ComposerViewModel = viewModel(factory = ComposerViewModel.Factory),
-) {
+) = AmountsShown {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptics = rememberHaptics()

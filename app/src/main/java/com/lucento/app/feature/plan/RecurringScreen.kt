@@ -1,5 +1,7 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.AmountsShown
+import com.lucento.app.core.designsystem.component.amountFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -607,10 +609,11 @@ private fun AgendaSummary(totals: FlowTotals, agenda: List<ScheduledItem>, range
 /** Scheduled transfers on their own card: neutral ink, and said plainly that they stay out of net flow. */
 @Composable
 private fun TransfersLine(transfers: Money) {
+    val fmt = amountFormat()
     val shown = -transfers
     LucentoCard(
         Modifier.fillMaxWidth().clearAndSetSemantics {
-            contentDescription = "Transfers ${MoneyFormatter.formatSigned(shown)}, card and loan payments from your own money, not in net flow"
+            contentDescription = "Transfers ${fmt.spokenSigned(shown)}, card and loan payments from your own money, not in net flow"
         },
         contentPadding = Spacing.md,
         shape = RoundedCornerShape(16.dp),
@@ -801,6 +804,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.scheduleItems(state: 
 
 @Composable
 private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick: () -> Unit) {
+    val fmt = amountFormat()
     val due = schedule.nextDue
     val overdue = due != null && due.isBefore(state.today)
     val debt = schedule.toWalletId?.let { state.walletsById[it] }
@@ -836,7 +840,7 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
             )
             if (schedule.isDebtPayment && !schedule.interest.isZero) {
                 Text(
-                    "${MoneyFormatter.format(schedule.amount)} principal · ${MoneyFormatter.format(schedule.interest)} interest",
+                    "${fmt.format(schedule.amount)} principal · ${fmt.format(schedule.interest)} interest",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -890,6 +894,7 @@ private fun PaymentSplitFields(
     onInterest: (String) -> Unit,
     error: String?,
 ) {
+    val fmt = amountFormat()
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         MoneyField(paymentText, onPayment, label = "Payment", currencyCode = currencyCode, modifier = Modifier.weight(1f))
         MoneyField(interestText, onInterest, label = "Of which interest", currencyCode = currencyCode, modifier = Modifier.weight(1f))
@@ -902,7 +907,7 @@ private fun PaymentSplitFields(
         error ?: when {
             principal == null -> "Enter the payment and the interest your statement shows (0 if none)."
             principal.isNegative -> "The interest can’t be more than the payment."
-            else -> "${MoneyFormatter.format(principal)} goes against $debtName; ${MoneyFormatter.format(interest!!)} is recorded as interest spending."
+            else -> "${fmt.format(principal)} goes against $debtName; ${fmt.format(interest!!)} is recorded as interest spending."
         },
         style = MaterialTheme.typography.bodySmall,
         color = if (error != null || principal?.isNegative == true) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -921,7 +926,7 @@ private fun ScheduleActionsSheet(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
-) {
+) = AmountsShown {
     val separator = remember { MoneyFormatter.decimalSeparator() }
     val due = schedule.nextDue
     val debt = schedule.toWalletId?.let { state.walletsById[it] }

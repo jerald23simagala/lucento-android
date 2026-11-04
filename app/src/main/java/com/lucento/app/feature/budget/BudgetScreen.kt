@@ -1,5 +1,7 @@
 package com.lucento.app.feature.budget
 
+import com.lucento.app.core.designsystem.component.AmountsShown
+import com.lucento.app.core.designsystem.component.amountFormat
 import com.lucento.app.core.designsystem.component.StatusTones
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -141,14 +143,19 @@ fun BudgetScreen(
     onManageCategories: () -> Unit,
     viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.Factory),
 ) {
+    val fmt = amountFormat()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var monthOffset by rememberSaveable { mutableIntStateOf(0) }
     val month = YearMonth.from(state.today).minusMonths(monthOffset.toLong())
-    val currencies = remember(state.budgets, state.categories, state.primaryCurrency, month) {
-        BudgetPlanner.currencies(state.budgets, state.categories, state.primaryCurrency, month)
+    // The same currency as Home's budget card and the Transactions totals (FocusCurrency), so all three agree.
+    val focus = remember(state.primaryCurrency, state.wallets, state.transactions) {
+        com.lucento.app.domain.FocusCurrency.of(state.primaryCurrency, state.wallets, state.transactions)
+    }
+    val currencies = remember(state.budgets, state.categories, focus, month) {
+        BudgetPlanner.currencies(state.budgets, state.categories, focus, month)
     }
     var currency by rememberSaveable { mutableStateOf<String?>(null) }
-    val shownCurrency = currency?.takeIf { it in currencies } ?: state.primaryCurrency
+    val shownCurrency = currency?.takeIf { it in currencies } ?: focus
     val plan = remember(state.categories, state.budgets, state.transactions, shownCurrency, month) {
         BudgetPlanner.plan(state.categories, state.budgets, state.transactions, shownCurrency, month)
     }
@@ -264,9 +271,9 @@ fun BudgetScreen(
                 item(key = "unbudgeted") {
                     InfoNote(
                         buildString {
-                            append("${MoneyFormatter.format(plan.unbudgetedSpending)} unbudgeted: spent outside your budget categories this month")
+                            append("${fmt.format(plan.unbudgetedSpending)} unbudgeted: spent outside your budget categories this month")
                             if (!plan.uncategorizedSpending.isZero) {
-                                append(" (${MoneyFormatter.format(plan.uncategorizedSpending)} has no category)")
+                                append(" (${fmt.format(plan.uncategorizedSpending)} has no category)")
                             }
                             append(". It still counts in Spent — give those categories an amount, or categorise the expenses, to plan for it.")
                         },
@@ -281,7 +288,7 @@ fun BudgetScreen(
                     ListSectionHeader(
                         "Budgeted",
                         caption = categoryCount(lines.size),
-                        subtotal = "${MoneyFormatter.format(plan.budgetedSpending)} of ${MoneyFormatter.format(plan.total)}",
+                        subtotal = "${fmt.format(plan.budgetedSpending)} of ${fmt.format(plan.total)}",
                     )
                 }
                 item(key = "budgeted-card") {
@@ -403,6 +410,7 @@ private fun MonthSwitcher(month: YearMonth, canGoForward: Boolean, onPrevious: (
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth: Boolean, daily: DailyFigure?) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     HeroCard {
         Spacer(Modifier.height(Spacing.xs))
@@ -420,7 +428,7 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
         }
         val over = plan.remaining.isNegative
         val used = plan.percentUsed ?: 0
-        val total = MoneyFormatter.format(plan.total)
+        val total = fmt.format(plan.total)
         CardOverline("${monthLabel(plan.month)} budget", color = ext.onHeroMuted) {
             Text(
                 "$used% SPENT",
@@ -472,7 +480,7 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
             HeroStatTile(
                 "Spent",
                 Icons.Outlined.ShoppingBag,
-                description = "Spent ${MoneyFormatter.format(plan.spent)}",
+                description = "Spent ${fmt.spoken(plan.spent)}",
                 modifier = m,
             ) {
                 MoneyText(money = plan.spent, style = HeroFigureStyle, color = ext.onHero, fractionScale = 1f)
@@ -482,12 +490,12 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
             // Large text: each sub-card takes the full width so its label and caption are never cut off.
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 spentTile(Modifier.fillMaxWidth())
-                if (daily != null) DailyTile(daily, Modifier.fillMaxWidth())
+                if (daily != null) DailyTile(daily, overspent = over, modifier = Modifier.fillMaxWidth())
             }
         } else {
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 spentTile(Modifier.weight(1f).fillMaxHeight())
-                if (daily != null) DailyTile(daily, Modifier.weight(1f).fillMaxHeight())
+                if (daily != null) DailyTile(daily, overspent = over, modifier = Modifier.weight(1f).fillMaxHeight())
             }
         }
         val setAside = when (daily) {
@@ -498,7 +506,7 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
         if (setAside != null && !setAside.isZero) {
             Spacer(Modifier.height(Spacing.sm))
             Text(
-                "${MoneyFormatter.format(setAside)} of bills due by the end of ${monthLabel(plan.month)} is set aside first.",
+                "${fmt.format(setAside)} of bills due by the end of ${monthLabel(plan.month)} is set aside first.",
                 style = MaterialTheme.typography.bodySmall,
                 color = ext.onHeroMuted,
             )
@@ -507,8 +515,8 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
         // Same words and order as the Home budget card's formula.
         Spacer(Modifier.height(Spacing.xs))
         Text(
-            "Spent = ${MoneyFormatter.format(plan.budgetedSpending)} budgeted + " +
-                "${MoneyFormatter.format(plan.unbudgetedSpending)} unbudgeted",
+            "Spent = ${fmt.format(plan.budgetedSpending)} budgeted + " +
+                "${fmt.format(plan.unbudgetedSpending)} unbudgeted",
             style = MaterialTheme.typography.bodySmall,
             color = ext.onHero,
         )
@@ -534,7 +542,8 @@ private fun HeroIndicator(figure: String, what: String, modifier: Modifier = Mod
 /** The hero's per-day sub-card: Safe per day this month, Safe to spend when nothing is left to spread, or a past month's daily average. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DailyTile(daily: DailyFigure, modifier: Modifier) {
+private fun DailyTile(daily: DailyFigure, overspent: Boolean, modifier: Modifier) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val (label, money, caption) = when (daily) {
         is DailyFigure.SafePerDay -> Triple("Safe per day", daily.perDay, "${daysLeftLabel(daily.daysLeft)} left")
@@ -542,14 +551,15 @@ private fun DailyTile(daily: DailyFigure, modifier: Modifier) {
         is DailyFigure.NothingLeft -> Triple(
             "Safe to spend",
             if (daily.safe.isNegative) com.lucento.app.core.money.Money.zero(daily.safe.currencyCode) else daily.safe,
-            "Nothing left this month",
+            // The same reason Home's card gives (round 6): with budget still remaining, the bills due took the rest.
+            if (overspent) "You’re over budget this month" else "Bills due take what’s left",
         )
         is DailyFigure.DailyAverage -> Triple("Daily average", daily.perDay, "over ${daysLeftLabel(daily.days)}")
     }
     HeroStatTile(
         label,
         Icons.Outlined.CalendarToday,
-        description = "$label ${MoneyFormatter.formatSigned(money)}, $caption",
+        description = "$label ${fmt.spokenSigned(money)}, $caption",
         modifier = modifier,
     ) {
         // Figure, then its caption beneath: a wrapping row mis-measured short figures and left the caption undrawn.
@@ -576,6 +586,7 @@ private fun categoryCount(n: Int): String = "$n ${if (n == 1) "category" else "c
 
 @Composable
 private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
+    val fmt = amountFormat()
     val limit = line.limit ?: return
     val remaining = line.remaining ?: return
     Column(
@@ -590,7 +601,7 @@ private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(line.category.name, style = Hierarchy.cardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    "${MoneyFormatter.format(line.spent)} of ${MoneyFormatter.format(limit)}",
+                    "${fmt.format(line.spent)} of ${fmt.format(limit)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -598,7 +609,7 @@ private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
             Spacer(Modifier.width(Spacing.sm))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    if (remaining.isNegative) "${MoneyFormatter.format(-remaining)} over" else "${MoneyFormatter.format(remaining)} left",
+                    if (remaining.isNegative) "${fmt.format(-remaining)} over" else "${fmt.format(remaining)} left",
                     style = AmountStyles.row.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
                     color = if (remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -620,6 +631,7 @@ private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
 
 @Composable
 private fun UnallocatedRow(line: CategoryBudgetLine, onClick: () -> Unit) {
+    val fmt = amountFormat()
     Row(
         Modifier
             .fillMaxWidth()
@@ -633,7 +645,7 @@ private fun UnallocatedRow(line: CategoryBudgetLine, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(line.category.name, style = Hierarchy.cardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                if (line.spent.isZero) "No amount set" else "${MoneyFormatter.format(line.spent)} spent · no amount set",
+                if (line.spent.isZero) "No amount set" else "${fmt.format(line.spent)} spent · no amount set",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -661,12 +673,13 @@ private fun PersonaliseCard(onChoose: () -> Unit, onKeep: () -> Unit) {
 
 @Composable
 private fun LegacyOverallCard(oldLimit: Money, plan: BudgetPlan, onRemove: () -> Unit) {
+    val fmt = amountFormat()
     LucentoCard(Modifier.fillMaxWidth()) {
         Text("Your budget now adds up by category", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(Spacing.xs))
         Text(
-            "Your earlier “everything” limit of ${MoneyFormatter.format(oldLimit)} is no longer used. Your monthly budget is " +
-                "the sum of your category amounts (${MoneyFormatter.format(plan.total)} now), so the two can never disagree. " +
+            "Your earlier “everything” limit of ${fmt.format(oldLimit)} is no longer used. Your monthly budget is " +
+                "the sum of your category amounts (${fmt.format(plan.total)} now), so the two can never disagree. " +
                 "Your transactions are unaffected.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -688,7 +701,8 @@ private fun AllocationSheet(
     onSave: (Money?, BudgetScope, (BudgetRepository.SaveResult) -> Unit) -> Unit,
     onUseUsual: ((BudgetRepository.SaveResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
-) {
+) = AmountsShown {
+    val fmt = amountFormat()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val separator = remember { MoneyFormatter.decimalSeparator() }
@@ -732,7 +746,7 @@ private fun AllocationSheet(
         ) {
             SheetHeader(
                 title = line.category.name,
-                subtitle = "${MoneyFormatter.format(line.spent)} spent in ${monthLabel(plan.month)}.",
+                subtitle = "${fmt.format(line.spent)} spent in ${monthLabel(plan.month)}.",
                 leading = { CategoryTile(category = line.category, type = TransactionType.EXPENSE) },
             )
             change.status?.let {
@@ -748,7 +762,7 @@ private fun AllocationSheet(
                 label = "Amount",
                 currencyCode = currency,
                 error = error,
-                supporting = newTotal?.let { "${monthLabel(plan.month)}’s budget becomes ${MoneyFormatter.format(it)}." },
+                supporting = newTotal?.let { "${monthLabel(plan.month)}’s budget becomes ${fmt.format(it)}." },
             )
             if (change.scopes.size > 1) {
                 Text(
@@ -782,7 +796,7 @@ private fun AllocationSheet(
             val usual = change.usual
             if (change.hasOwnAmount && usual != null) {
                 LucentoTextButton(
-                    text = "Use the usual ${MoneyFormatter.format(usual)}",
+                    text = "Use the usual ${fmt.format(usual)}",
                     onClick = { onUseUsual(::handle) },
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )

@@ -53,10 +53,15 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         super.onStart()
         lock.onForeground(SystemClock.elapsedRealtime())
+        // Opening Lucento (or coming back to it) brings in changes from other devices and sends any waiting here.
+        val container = (application as LucentoApplication).container
+        container.inForeground.set(true)
+        container.foregroundSync.request(forced = false)
     }
 
     override fun onStop() {
         super.onStop()
+        (application as LucentoApplication).container.inForeground.set(false)
         // A rotation is not leaving the app.
         if (!isChangingConfigurations) lock.onBackground(SystemClock.elapsedRealtime())
     }
@@ -136,7 +141,11 @@ class MainActivity : FragmentActivity() {
                     if (ready != null) {
                         // Kept composed while locked so nothing in progress is lost, but hidden from TalkBack.
                         Box(if (locked) Modifier.fillMaxSize().clearAndSetSemantics {} else Modifier.fillMaxSize()) {
-                            CompositionLocalProvider(LocalInstitutions provides institutions) {
+                            // Hidden amounts apply on every page that shows money (owner, 2026-11-04, round 7).
+                            CompositionLocalProvider(
+                                LocalInstitutions provides institutions,
+                                com.lucento.app.core.designsystem.component.LocalAmountsHidden provides ready.preferences.hideAmounts,
+                            ) {
                                 LucentoRoot(preferences = ready.preferences)
                             }
                         }
