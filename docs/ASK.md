@@ -83,12 +83,16 @@ and rates, and what's still scheduled this month.
 
 ## Setting it up (owner)
 
-1. The proxy uses the same environment as `/api/interpret` (`GEMINI_API_KEY`, `SUPABASE_URL`,
-   `SUPABASE_PUBLISHABLE_KEY`, optional `AI_DAILY_LIMIT` / `GEMINI_MODEL`); see `CAPTURE.md` "Setting it up". There is
-   nothing new to configure.
+1. The proxy uses the same environment as `/api/interpret` (`GEMINI_API_KEY`, `SUPABASE_URL` or
+   `LUCENTO_SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` or `LUCENTO_SUPABASE_PUBLISHABLE_KEY`, optional `AI_DAILY_LIMIT` /
+   `GEMINI_MODEL`); see `CAPTURE.md` "Setting it up". There is nothing new to configure (Vercel production already has
+   `GEMINI_API_KEY` and the `LUCENTO_`-prefixed Supabase names, checked 2026-11-03).
 2. Merge `lucento-website` branch `feature/ask-lucento` and deploy. Check it with
    `curl -i -X POST -H "Content-Type: application/json" -d "{}" https://www.lucentoapp.com/api/ask`, which should answer
    `401 sign_in_required`.
 3. The quota migration `20261027090000_ai_usage_quota.sql` must already be applied (Smarter reading needs it too).
-4. In the app: sign in to a sync account, open Insights › Ask Lucento, ask a question of your own, and accept the
-   consent sheet.
+4. In the app (a release build — debug builds have no proxy): sign in to a sync account, open Insights › Ask Lucento,
+   ask a question of your own, and accept the consent sheet. Until release signing exists, a test-only release can be
+   built locally with the debug key (`LUCENTO_KEYSTORE_FILE=~/.android/debug.keystore`, password `android`, alias
+   `androiddebugkey`, then `./gradlew assembleRelease`); sign in with an email account, as Google sign-in needs the
+   signing key registered for `com.lucento.app`.
