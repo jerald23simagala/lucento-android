@@ -13,7 +13,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 ## What works today (0.5.0)
 - **Navigation**: a persistent dock — **Home · Transactions · (+) · Budget · Wallets** — whose central **+** opens the
   **transaction composer**; Insights, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
-  links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name, appearance, Settings, Enabled features).
+  links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation. On a new phone,
   **I already have an account** (when sync is available) reminds you to sync the old phone first, signs in, downloads
@@ -33,9 +33,13 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
   assets and liabilities in separate cards (Debts & loans linked from Liabilities), each wallet shown as a bank-style card, warnings for balances that can't be right, and
   **Adjust balance** (the gap is recorded as a visible Balance adjustment, never income or spending); account detail with history.
-- **Savings goals**, **Debts & loans** (optional interest rate, one-time or monthly amortization, payment reminders),
-  **Recurring payments** (bills, income and debt payments split into principal and interest; mark paid / skip /
-  pause — never auto-posted).
+- **Savings goals**, **Debts & loans** (optional interest rate; loans: one-time or monthly amortization with an
+  instalment bar and payment reminders; credit cards: credit limit, available credit, statement and due days with an
+  amount-due reminder that is never counted in Safe to spend),
+  **Scheduled transactions** (bills, income and debt payments split into principal and interest; every bill and income
+  has a category; mark paid / skip / pause — never auto-posted). The Scheduled page opens on this month's income,
+  expenses and transfers, projects the next three months, and lists every dated occurrence with Transactions-style
+  filters and a From–To range.
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,

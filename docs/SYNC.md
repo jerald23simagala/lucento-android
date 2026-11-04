@@ -42,7 +42,7 @@ UI (Settings → Cloud sync) ──► SettingsViewModel ──► AuthRepositor
 | `recurring` | `public.recurring` | v9: `client_uuid`, `dirty`, `synced_at`, `base_revision` + triggers (MIGRATION_8_9); debt payments carry `to_wallet_id`, `interest_minor` |
 | `debt_terms` | columns of `public.wallets` | v9: `interest_rate_bps`, `repayment`, `term_months`, `installment_minor`, sent with the wallet (a terms edit bumps the wallet's `updated_at`); pre-v9 builds never send them, so the server keeps them |
 
-Not synced: DataStore preferences (theme, currency, enabled modules, display name) and goal photos. A JSON backup
+Not synced: DataStore preferences (theme, currency, enabled modules, display name), goal photos and the profile photo. A JSON backup
 does include those preferences (not crash reports, and not the sync cursor or account id). See docs/BACKUP.md. See "Known
 limitations".
 
@@ -178,6 +178,13 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   (display only); v10 always sends it, null included, so removing an institution syncs. A pulled id that isn't
   lowercase snake_case (≤ 128) is read as none, so the wallet still arrives; an id the bundled registry doesn't know
   falls back to the per-type look.
+- **Credit card billing (v11).** `wallets.credit_limit_minor`, `statement_day` and `due_day` carry a card's limit and
+  billing days with its other terms (local `debt_terms`). v11 always sends them, nulls included, so clearing syncs; a
+  pulled card keeps them, any other type drops them, and out-of-range values (limit ≤ 0, a day outside 1–31) are
+  refused on pull (`PulledRowRules`) and by server CHECKs on live rows. **Rollout order:** migration
+  `20261103180000_credit_card_billing.sql` must reach a project before any v11 build syncs against it, or wallet uploads
+  fail (`PGRST204`, rows stay pending, nothing is lost). Older builds never send the columns, so an upsert from them
+  leaves them unchanged. The card's payment reminder is derived on each phone and never synced.
 - **What the user sees (P2-2).** The Home chip shows On device · Offline · Syncing · Needs attention · Waiting to sync ·
   Synced and opens a sheet with the state, Sync now / Try again (a phone that never synced is sent to Settings ›
   Account & sync, which asks before combining data), and the notice above. The other device picks changes up on Sync
@@ -229,7 +236,7 @@ Main currency, theme and enabled modules are device preferences (DataStore), nev
 
 "Disconnect" asks first, then cancels background sync, turns sync off, clears the Supabase session, and **wipes**
 the local ledger (wallets, categories, transactions, budgets, goals, contributions, schedules, debt terms, goal
-photos) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
+photos, the profile photo) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
 again, as on a fresh install, and the account's setup is reset in one preference edit (F-7,
 `UserPreferencesRepository.resetAccountSetup`): onboarding and the category setup are marked not done, and the guided
 setup step, default wallet, display name, acknowledged budget month and Smarter reading are cleared. So Lucento goes
@@ -268,6 +275,12 @@ The device is no longer permanently tied to the first account. Signing back in t
 - The APK contains only the Supabase URL and the **publishable** key — no service-role key, database password or
   Google client secret exists in the repository or the app. Values come from `local.properties` / CI env.
 - Network: HTTPS only (`res/xml/network_security_config.xml`). No tokens, emails or financial values are logged.
+- **Profile photo from Google** (owner request, 2026-11-03): only when signed in with Google and only when the user taps
+  "Use my Google photo" (profile menu, or the offer on setup's sync step after a Google sign-in). The URL comes from the
+  session's user metadata (`avatar_url` / `picture`, filled by Supabase from Google); `ProfilePhotos` fetches it once over
+  HTTPS from Google's image host (`*.googleusercontent.com` only, redirects included; image types only; 5 MB cap) and
+  keeps a 384 px JPEG in app-private files. Nothing is sent but the request. Never synced, never in a backup, removed by
+  the sign-out wipe. A photo chosen from the phone uses the system photo picker (no storage permission) and never leaves it.
 - **Passwords.** Email sign-up and password change require at least 8 characters on the device, then a Have I Been
   Pwned range check: only the first 5 hex characters of the SHA-1 are sent to `api.pwnedpasswords.com`. The password
   is not sent and is not logged. If that request fails, the password is accepted (fail open) so a network problem

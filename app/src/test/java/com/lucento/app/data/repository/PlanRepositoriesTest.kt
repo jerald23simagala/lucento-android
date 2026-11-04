@@ -148,6 +148,9 @@ class PlanRepositoriesTest {
         assertEquals(RecurringRepository.SaveResult.InvalidInterval, recurring.save(input(interval = 0)))
         assertEquals(RecurringRepository.SaveResult.EndBeforeStart, recurring.save(input(end = start.minusDays(1))))
         assertEquals(RecurringRepository.SaveResult.CategoryMismatch, recurring.save(input(type = TransactionType.INCOME)))
+        // No uncategorised scheduled bills or income (owner, 2026-11-03).
+        assertEquals(RecurringRepository.SaveResult.CategoryRequired, recurring.save(input(category = null)))
+        assertEquals(RecurringRepository.SaveResult.CategoryRequired, recurring.save(input(type = TransactionType.INCOME, category = null)))
     }
 
     @Test fun goalPictureChoiceIsStoredAndEditable() = runTest {

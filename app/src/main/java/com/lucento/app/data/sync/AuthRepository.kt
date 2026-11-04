@@ -93,6 +93,23 @@ class AuthRepository(
     }
 
     /**
+     * The signed-in Google account's own picture (the session's user metadata, which Supabase fills from Google at
+     * sign-in), or null: signed out, an email account, or no picture. Only a URL — nothing is downloaded here; the
+     * photo is fetched only when the user asks ([com.lucento.app.data.media.ProfilePhotos.importFromGoogle]).
+     */
+    fun observeAccountPhotoUrl(): Flow<String?> {
+        val auth = client?.auth ?: return flowOf(null)
+        return auth.sessionStatus.map { status ->
+            val user = when (status) {
+                is SessionStatus.Authenticated -> status.session.user
+                is SessionStatus.RefreshFailure -> auth.currentUserOrNull()
+                else -> null
+            }
+            accountPhotoUrl(user?.userMetadata)
+        }.distinctUntilChanged()
+    }
+
+    /**
      * Shows Google's account picker and exchanges the chosen account's ID token for a Supabase session (a new
      * Supabase user is created on first sign-in). [activity] must be an Activity: Credential Manager launches its
      * account sheet from it. It is used only for this call and not retained.
@@ -328,6 +345,12 @@ internal fun isTimeout(e: Throwable): Boolean =
     generateSequence(e) { it.cause }.take(5).any {
         it is HttpRequestTimeoutException || it is ConnectTimeoutException || it is SocketTimeoutException
     }
+
+/** Google's picture URL from a session's user metadata ("avatar_url", or "picture"), only when it is Google's image host. */
+internal fun accountPhotoUrl(metadata: kotlinx.serialization.json.JsonObject?): String? =
+    listOf("avatar_url", "picture")
+        .firstNotNullOfOrNull { key -> (metadata?.get(key) as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content }
+        ?.takeIf { com.lucento.app.data.media.ProfilePhotos.isGooglePhotoUrl(it) }
 
 internal fun signInFailureMessage(e: Throwable, debug: Boolean): String {
     val message = when {

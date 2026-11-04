@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
+import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
@@ -115,8 +116,11 @@ fun AdjustBalanceSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Text("Adjust balance", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            Spacer(Modifier.height(Spacing.xs))
+            SheetHeader(
+                title = "Adjust balance",
+                subtitle = wallet.name,
+                leading = { com.lucento.app.core.designsystem.component.WalletIdentityTile(wallet) },
+            )
             Text(
                 "Can’t find what’s missing? Enter what ${if (liability) "you really owe on" else "is really in"} " +
                     "“${wallet.name}” and Lucento records the difference as a Balance adjustment.",

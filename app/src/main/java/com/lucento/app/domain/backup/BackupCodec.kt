@@ -262,7 +262,9 @@ object BackupCodec {
     }
 
     private fun debt(row: JsonValue.Obj): BackupDebtTerms {
-        requireKeys(row, setOf("walletId", "interestRateBps", "repayment", "termMonths", "installmentMinor", "updatedAt"))
+        // Backups written before v11 have no card billing keys; newer ones always write all three.
+        val legacy = setOf("walletId", "interestRateBps", "repayment", "termMonths", "installmentMinor", "updatedAt")
+        if (row.fields.keys != legacy) requireKeys(row, legacy + setOf("creditLimitMinor", "statementDay", "dueDay"))
         return BackupDebtTerms(
             walletId = row.id("walletId"),
             interestRateBps = row.intOrNull("interestRateBps"),
@@ -270,6 +272,10 @@ object BackupCodec {
             termMonths = row.intOrNull("termMonths"),
             installmentMinor = row.longOrNull("installmentMinor"),
             updatedAt = row.instant("updatedAt"),
+            // Absent from a legacy row: no limit, no billing cycle.
+            creditLimitMinor = if ("creditLimitMinor" in row.fields) row.longOrNull("creditLimitMinor") else null,
+            statementDay = if ("statementDay" in row.fields) row.intOrNull("statementDay") else null,
+            dueDay = if ("dueDay" in row.fields) row.intOrNull("dueDay") else null,
         )
     }
 
@@ -377,6 +383,12 @@ object BackupCodec {
                         if (minor <= 0L) invalid()
                         Money(minor, wallet.currency)
                     },
+                    creditLimit = debt.creditLimitMinor?.let { minor ->
+                        if (minor <= 0L) invalid()
+                        Money(minor, wallet.currency)
+                    },
+                    statementDay = debt.statementDay,
+                    dueDay = debt.dueDay,
                 )
             } catch (_: IllegalArgumentException) {
                 invalid()
@@ -498,6 +510,9 @@ object BackupCodec {
         "termMonths" to jsonNullableLong(row.termMonths?.toLong()),
         "installmentMinor" to jsonNullableLong(row.installmentMinor),
         "updatedAt" to jsonInstant(row.updatedAt),
+        "creditLimitMinor" to jsonNullableLong(row.creditLimitMinor),
+        "statementDay" to jsonNullableLong(row.statementDay?.toLong()),
+        "dueDay" to jsonNullableLong(row.dueDay?.toLong()),
     )
 
     private fun deletionJson(row: BackupDeletion) = jsonObject(

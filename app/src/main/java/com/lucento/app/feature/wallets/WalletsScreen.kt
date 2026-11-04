@@ -51,7 +51,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -420,18 +423,43 @@ private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Sum
                 modifier = Modifier.padding(horizontal = Spacing.xxs),
             )
             Spacer(Modifier.height(Spacing.sm))
-            FlowRow(
-                Modifier.fillMaxWidth().padding(horizontal = Spacing.xxs),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                LegendKey("Assets $share%", ext.success)
-                LegendKey("Liabilities ${100 - share}%", ext.negativeIndicator)
-                // Flows onto its own line when the row is full (and wraps there only at very large text).
-                Text(
-                    "Net worth = assets − liabilities",
+            if (LocalDensity.current.fontScale >= 1.5f) {
+                // Very large text: one line would have to shrink below the user's own text size, so it may wrap here.
+                FlowRow(
+                    Modifier.fillMaxWidth().padding(horizontal = Spacing.xxs),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    LegendKey("Assets $share%", ext.success)
+                    LegendKey("Liabilities ${100 - share}%", ext.negativeIndicator)
+                    Text("Net worth = assets − liabilities", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                // Always one row (owner, 2026-11-03): both shares and the formula, shrinking to fit rather than wrapping.
+                val muted = MaterialTheme.colorScheme.onSurfaceVariant
+                val ink = MaterialTheme.colorScheme.onSurface
+                val legend = remember(share, ext.success, ext.negativeIndicator, muted, ink) {
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = ext.success)) { append("●") }
+                        withStyle(SpanStyle(color = ink)) { append(" Assets $share%") }
+                        append("   ")
+                        withStyle(SpanStyle(color = ext.negativeIndicator)) { append("●") }
+                        withStyle(SpanStyle(color = ink)) { append(" Liabilities ${100 - share}%") }
+                        append("   ")
+                        withStyle(SpanStyle(color = muted)) { append("Net worth = assets − liabilities") }
+                    }
+                }
+                com.lucento.app.core.designsystem.component.FittingText(
+                    text = legend,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = muted,
+                    minScale = 0.7f,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.xxs)
+                        .clearAndSetSemantics {
+                            contentDescription = "Assets $share percent, liabilities ${100 - share} percent. Net worth is assets minus liabilities."
+                        },
                 )
             }
         }

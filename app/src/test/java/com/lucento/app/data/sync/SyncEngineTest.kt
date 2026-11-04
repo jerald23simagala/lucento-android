@@ -1098,6 +1098,38 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `a card's limit and billing days reach a second device, and clearing them syncs too`() = runTest {
+        val a = Device()
+        val cardId = a.wallets.insert(
+            WalletEntity(name = "Visa", type = "CREDIT_CARD", currencyCode = "USD", openingBalanceMinor = 64_000, createdAt = a.now, updatedAt = a.now, clientUuid = UUID.randomUUID().toString())
+        )
+        a.debtTerms.upsert(
+            DebtTermsEntity(cardId, interestRateBps = 2400, repayment = "ONE_TIME", termMonths = null, installmentMinor = null, updatedAt = a.now,
+                creditLimitMinor = 500_000, statementDay = 15, dueDay = 5)
+        )
+        assertTrue(a.sync() is SyncResult.Success)
+
+        val b = Device(now = a.now + 1_000)
+        assertTrue(b.sync() is SyncResult.Success)
+        val bCard = b.wallets.findByClientUuid(a.wallets.getById(cardId)!!.clientUuid!!)!!
+        val terms = b.debtTerms.get(bCard.id)!!
+        assertEquals(500_000L, terms.creditLimitMinor)
+        assertEquals(15, terms.statementDay)
+        assertEquals(5, terms.dueDay)
+
+        // Clearing them on A (the wallet's updated_at moves with its terms) clears them on B.
+        a.debtTerms.upsert(a.debtTerms.get(cardId)!!.copy(creditLimitMinor = null, statementDay = null, dueDay = null, updatedAt = a.now + 2_000))
+        a.wallets.update(a.wallets.getById(cardId)!!.copy(updatedAt = a.now + 2_000, dirty = true))
+        assertTrue(a.sync() is SyncResult.Success)
+        assertTrue(b.sync() is SyncResult.Success)
+        val cleared = b.debtTerms.get(bCard.id)!!
+        assertNull(cleared.creditLimitMinor)
+        assertNull(cleared.statementDay)
+        assertNull(cleared.dueDay)
+        assertEquals(2400, cleared.interestRateBps)
+    }
+
+    @Test
     fun `marking a payment paid on one device advances the schedule on the other, and deletes travel`() = runTest {
         val a = Device()
         val bank = a.addWallet("Bank")

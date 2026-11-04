@@ -217,3 +217,41 @@ night; screenshots in `artifacts/core-screens/`):
   icon headings, and each row shows the symbol on a tile, the name, "code · symbol", and a radio mark; the chosen row is
   tinted and outlined. It is now one scrolling list: the step's title and appearance scroll away above the search, which
   stays pinned once reached (at 360dp / font 1.5 the old fixed header left no room for a single currency row).
+
+### Owner review round 2 (2026-11-03, same branch)
+
+- Monthly budget formula: no operator column (more room for the figures). It reads Budget, Used (Budgeted, Unbudgeted
+  indented), then **Remaining** in green, or **Overspent** in red with its minus sign; **Bills due** in red as a
+  deduction (−); **Safe to spend** on its green line only while above zero, otherwise left out. "To watch" lists up to
+  5 categories and ends on "See all" in its bottom-right corner (the Budget tab).
+- Inline empty states share one component, `MascotMessage` (curious Lucento + one line): Home's cards, the Scheduled
+  screen's empty tabs and the bell's "Upcoming payments" menu.
+- Wallet page: cash, bank, e-wallet, savings and credit cards drop Expense / Income / Purchase / Interest (the dock's +
+  records those) and show **Transfer** (or **Payment** for a card) and **Adjust balance**, which left the Edit wallet
+  sheet. Loans keep Repay loan, Adjust loan, Interest/fee.
+- Wallet card: the yearly rate joins the title, "Car loan (24% / yr)" (the name ellipsizes, never the rate). An
+  instalment loan shows Remaining over a segmented bar (one segment per instalment, paid ones green — mint on dark
+  faces), "3 of 24 installments paid", and Principal · Paid · Monthly along the bottom. A credit card shows Credit
+  limit · Available · Amount due ("by Nov 5" / "Overdue · Nov 5").
+- Credit card editor: no One time / Monthly and no reminder date; Credit limit (optional) and Statement day + Due day
+  (1–31, side by side, stacked at font ≥ 1.5). The due day becomes a derived payment reminder — Home's Upcoming card and
+  the bell list "<card> payment" with the amount due and "not in Safe to spend"; a tap opens the card. Rules and
+  formulas: docs/CALCULATIONS.md "Credit cards (v11)" and "Instalment loan progress". Schema v11 adds the three
+  columns to `debt_terms`; sync, backup (format 3) and the Supabase migration carry them.
+
+## Owner review round 3 (2026-11-03)
+
+Owner comments, as built:
+
+| Comment | What changed |
+|---|---|
+| Safe to spend sticky, 0 and red when over | Always the last line of this month's formula. Above zero: green. At or below: **0** in red plus a caption saying why ("Bills due take what’s left" / "You’re over budget this month"). `BudgetFormula.nothingSafe`, `safeToSpendShown` |
+| Bills due always zero | Root cause: only scheduled expenses in categories *with a budget amount* counted, so bills in unbudgeted categories (or none) were ignored; loan instalments count only their interest, which is entered at Mark paid. Now every scheduled bill counts whatever its category (`CashflowCalculator.safeToSpend`); transfers still don't |
+| Assets % / Liabilities % / Net worth formula in one row | Wallets page legend is one line that shrinks to fit (`FittingText`, now internal). Exception: at 150 %+ system text it may wrap rather than shrink below the user's own text size |
+| Upcoming coloured by kind | Income green, expenses red, transfers (loan instalments, card payments) neutral ink — Home's Upcoming, the bell, the Scheduled page and the schedule sheet (`scheduledFlowColor`). Loan instalments show the loan's tile and "Transfer to …" |
+| Scheduled page refactor | New page: hero "<Month> · still scheduled" (net, then Income · Expenses · Transfers, overdue count); "Next 3 months" projection (bars per flow, net per month); Upcoming / All schedules; Transactions-style filters (kind, wallet, category) plus a date range (This month default, Next 30 days, Next 3 months, From–To picker); agenda grouped Overdue → months with calendar date badges; card payments listed and open the card. `ScheduleOutlook` |
+| Mandatory category for scheduled transactions | Editor: category pills without "None", error "Choose a category."; repository refuses `CategoryRequired` for bills and income |
+| Notification bell more alive | Rounded panel: Lucento (concerned / happy / all clear) with a one-line summary, a tinted "To pay by <date>" total, Overdue and This week sections with tiles and flow-coloured amounts, and a "See all scheduled" button |
+| Dialogs aligned, less skeletal | Shared `SheetHeader` (tile, title, subtitle, actions) on every sheet — wallet editor, transfer, adjust balance, goal editor and goal, budget category, sync details, milestones, module offer, welcome back, bank picker, composer wallet choice, schedule sheet, profile; sheet content rises into place (skipped with reduced motion); `ConfirmDialog` has a tonal icon and a filled (red when destructive) confirm button; the remaining raw dialogs (category name, restore, onward budget change) match |
+| Add Wallet: card = the wallet being built | The editor draws the wallet page's own `WalletCard` from the draft (`WalletDraft.previewWallet`): bank face, rate in the title, credit limit / available / amount due for a card, instalment bar for a loan; type or bank changes swap it in with a short fade. The old `WalletCardPreview` strip is gone |
+| Profile picture from Google, or upload | Profile menu: tap the avatar → Choose from photos (system photo picker, no permission), Use my Google photo (only when signed in with Google), Remove photo. Setup's sync step offers "Use your Google photo?" after a Google sign-in. The Google picture is downloaded once, on that tap, from Google's HTTPS image host only (`ProfilePhotos`), kept as a private file, never synced or backed up, and removed with the ledger wipe on sign-out / account switch |

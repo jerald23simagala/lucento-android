@@ -457,6 +457,7 @@ class SyncRepository(
                 createdAt = SyncTime.toIso(it.createdAt), updatedAt = SyncTime.toIso(it.updatedAt), baseRevision = it.baseRevision,
                 interestRateBps = t?.interestRateBps, repayment = t?.repayment, termMonths = t?.termMonths,
                 installmentMinor = t?.installmentMinor, institutionId = it.institutionId,
+                creditLimitMinor = t?.creditLimitMinor, statementDay = t?.statementDay, dueDay = t?.dueDay,
             ))
         }, { row, rev -> wallets.markPushed(row.clientUuid!!, row.updatedAt, rev, clock()) }, rejected)
     }
@@ -876,6 +877,9 @@ class SyncRepository(
             DebtTermsEntity(
                 walletId = walletId, interestRateBps = row.interestRateBps, repayment = repayment,
                 termMonths = row.termMonths, installmentMinor = row.installmentMinor, updatedAt = SyncTime.fromIso(row.updatedAt),
+                creditLimitMinor = row.creditLimitMinor.takeIf { row.type == "CREDIT_CARD" },
+                statementDay = row.statementDay.takeIf { row.type == "CREDIT_CARD" },
+                dueDay = row.dueDay.takeIf { row.type == "CREDIT_CARD" },
             )
         )
     }

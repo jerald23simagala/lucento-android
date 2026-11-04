@@ -13,8 +13,10 @@ import java.time.temporal.ChronoUnit
  * Two bases, chosen by the data that exists, and always disclosed to the user:
  *
  * - [Basis.BUDGET] (category allocations exist in this currency; their sum is the budget, see [BudgetPlanner]):
- *   `budget − spent this month − unpaid recurring expenses in budgeted categories due by month end`, where spent is
- *   every expense in the currency, budgeted or not ([BudgetPlan.spent], owner decision D1).
+ *   `budget − spent this month − unpaid scheduled bills due by month end`, where spent is every expense in the
+ *   currency, budgeted or not ([BudgetPlan.spent], owner decision D1), and so are the bills: once paid, each one is
+ *   spending whatever its category, so it is subtracted before it is paid too (owner, 2026-11-03 — counting only
+ *   budgeted categories left Bills due at zero). A debt payment counts only its interest: the rest is a transfer.
  * - [Basis.BALANCES] (no allocations): `spendable balances − unpaid recurring expenses due by month end`
  *   that are paid from a spendable account. Spendable balances are cash, bank and e-wallet only; savings and
  *   liabilities are excluded, and a bill paid from one of those is not subtracted again. This is an estimate
@@ -99,13 +101,12 @@ object CashflowCalculator {
         val spendableWallets = wallets.filter { it.type.isSpendable && it.currencyCode == currencyCode }
         val spendable = if (spendableWallets.isEmpty()) null else Money.sum(currencyCode, spendableWallets.map { it.balance })
 
-        val budgeted = plan.allocatedLines.map { it.category.id }.toSet()
         val spent: Money
         val committed: Money
         val (basis, amount) = when {
             plan.hasBudget -> {
                 spent = plan.spent
-                committed = RecurringMath.committedExpenses(schedules.filter { it.categoryId in budgeted }, currencyCode, monthEnd, spendingOnly = true)
+                committed = RecurringMath.committedExpenses(schedules, currencyCode, monthEnd, spendingOnly = true)
                 SafeToSpend.Basis.BUDGET to (plan.total - spent - committed)
             }
             spendable != null -> {

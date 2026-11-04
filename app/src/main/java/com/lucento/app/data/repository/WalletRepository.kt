@@ -151,6 +151,8 @@ class WalletRepository(
             return
         }
         val monthly = debt.repayment == DebtRepayment.MONTHLY
+        // A limit and billing days mean something only on a card; a card switched to a loan drops them.
+        val card = type == WalletType.CREDIT_CARD
         terms.upsert(
             DebtTermsEntity(
                 walletId = id,
@@ -159,6 +161,9 @@ class WalletRepository(
                 termMonths = debt.termMonths.takeIf { monthly },
                 installmentMinor = debt.installment?.amountMinor.takeIf { monthly },
                 updatedAt = now,
+                creditLimitMinor = debt.creditLimit?.amountMinor.takeIf { card },
+                statementDay = debt.statementDay.takeIf { card },
+                dueDay = debt.dueDay.takeIf { card },
             )
         )
     }
@@ -216,6 +221,9 @@ internal fun DebtTermsEntity.toDomain(currencyCode: String): DebtTerms? = runCat
         repayment = DebtRepayment.valueOf(repayment),
         termMonths = termMonths,
         installment = installmentMinor?.let { Money(it, currencyCode) },
+        creditLimit = creditLimitMinor?.let { Money(it, currencyCode) },
+        statementDay = statementDay,
+        dueDay = dueDay,
     )
 }.getOrNull()
 

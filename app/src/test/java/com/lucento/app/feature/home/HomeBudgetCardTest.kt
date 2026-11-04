@@ -15,6 +15,7 @@ import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -98,6 +99,40 @@ class HomeBudgetCardTest {
         assertEquals(listOf("Transport", "Groceries", "Housing"), watch.map { it.category.name })
         assertEquals(listOf(90, 60, 20), watch.map { it.percentUsed })
         assertTrue(watch.size <= HomeStateBuilder.WATCH_LIMIT)
+    }
+
+    @Test fun remainingReadsOverspentBelowZeroAndSafeToSpendStaysAtZeroWhenNothingIsLeft() {
+        fun formula(remaining: Long, safe: Long?) = BudgetFormula(
+            budget = Money(10_000, "USD"), used = Money(10_000 - remaining, "USD"), budgeted = Money(10_000 - remaining, "USD"),
+            unbudgeted = Money(0, "USD"), remaining = Money(remaining, "USD"),
+            billsDue = safe?.let { Money(remaining - it, "USD") }, safeToSpend = safe?.let { Money(it, "USD") },
+        )
+        assertFalse(formula(remaining = 3_201, safe = 1_000).overspent)
+        assertTrue(formula(remaining = -1_220, safe = -3_000).overspent)
+        assertTrue(formula(remaining = 3_201, safe = 1_000).showsSafeToSpend)
+        assertFalse(formula(remaining = 3_201, safe = 1_000).nothingSafe)
+        assertEquals(Money(1_000, "USD"), formula(remaining = 3_201, safe = 1_000).safeToSpendShown)
+        // Always shown this month (owner: "sticky"); at or below zero it reads 0 and is flagged, never a negative figure.
+        val bills = formula(remaining = 3_201, safe = -146_799)
+        assertTrue(bills.showsSafeToSpend)
+        assertTrue(bills.nothingSafe)
+        assertEquals(Money.zero("USD"), bills.safeToSpendShown)
+        assertTrue(formula(remaining = 3_201, safe = 0).nothingSafe)
+        // A past month has no safe to spend at all.
+        assertFalse(formula(remaining = 3_201, safe = null).showsSafeToSpend)
+        assertNull(formula(remaining = 3_201, safe = null).safeToSpendShown)
+    }
+
+    @Test fun billsDueCountsEveryScheduledBillWhateverItsCategory() {
+        // Travel has no amount and the gym bill has no category at all; once paid, both are spending (Used counts every
+        // expense), so both are due against the budget before they're paid (owner, 2026-11-03).
+        val travel = bill.copy(id = 2, name = "Flight", amount = Money(1_000, "USD"), categoryId = 14L)
+        val gym = bill.copy(id = 3, name = "Gym", amount = Money(500, "USD"), categoryId = null)
+        val state = HomeStateBuilder.build(spending, wallets, categories, "USD", today, budgets, listOf(bill, travel, gym))
+        assertEquals(Money(2_000 + 1_000 + 500, "USD"), state.safeToSpend!!.committed)
+        val f = HomeStateBuilder.budgetFormula(state.budget!!, state.safeToSpend)
+        assertEquals(Money(3_500, "USD"), f.billsDue)
+        assertEquals(f.remaining - f.billsDue!!, f.safeToSpend)
     }
 
     @Test fun formulaAddsUpFromBudgetToSafeToSpend() {

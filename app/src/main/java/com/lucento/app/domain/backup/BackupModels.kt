@@ -139,6 +139,10 @@ data class BackupDebtTerms(
     val termMonths: Int?,
     val installmentMinor: Long?,
     val updatedAt: Long,
+    /** v11, credit cards: the limit (minor units) and the statement and due days; absent from version 1–2 files. */
+    val creditLimitMinor: Long? = null,
+    val statementDay: Int? = null,
+    val dueDay: Int? = null,
 )
 
 /** A row that was deleted, so a later sync can tell the server. [table] is a [BackupTables] name. */

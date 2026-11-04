@@ -93,6 +93,7 @@ import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoAnimation
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
+import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.HeroCard
 import com.lucento.app.core.designsystem.component.HeroFigure
@@ -718,15 +719,10 @@ private fun AllocationSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CategoryTile(category = line.category, type = TransactionType.EXPENSE)
-                Spacer(Modifier.width(Spacing.md))
-                Text(line.category.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            }
-            Text(
-                "${MoneyFormatter.format(line.spent)} spent in ${monthLabel(plan.month)}.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SheetHeader(
+                title = line.category.name,
+                subtitle = "${MoneyFormatter.format(line.spent)} spent in ${monthLabel(plan.month)}.",
+                leading = { CategoryTile(category = line.category, type = TransactionType.EXPENSE) },
             )
             change.status?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -795,22 +791,16 @@ private fun AllocationSheet(
 
     confirming?.let { pending ->
         val removing = pending.amount == null
-        AlertDialog(
-            onDismissRequest = { confirming = null },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-            title = { Text(change.confirmTitle(removing), style = MaterialTheme.typography.headlineSmall) },
-            text = { Text(change.confirmBody(pending.amount, removing), style = MaterialTheme.typography.bodyMedium) },
-            confirmButton = {
-                LucentoTextButton(
-                    text = if (removing) "Stop budgeting" else "Update",
-                    color = if (removing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    onClick = {
-                        confirming = null
-                        onSave(pending.amount, BudgetScope.ONWARD, ::handle)
-                    },
-                )
+        com.lucento.app.core.designsystem.component.ConfirmDialog(
+            title = change.confirmTitle(removing),
+            text = change.confirmBody(pending.amount, removing),
+            confirmLabel = if (removing) "Stop budgeting" else "Update",
+            destructive = removing,
+            onConfirm = {
+                confirming = null
+                onSave(pending.amount, BudgetScope.ONWARD, ::handle)
             },
-            dismissButton = { LucentoTextButton(text = "Cancel", onClick = { confirming = null }) },
+            onDismiss = { confirming = null },
         )
     }
 }

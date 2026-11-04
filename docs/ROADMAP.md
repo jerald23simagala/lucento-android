@@ -106,6 +106,14 @@ recurring-schedule sync, syncing preferences.
   payment reminder that opens a prefilled recurring debt payment; payments split (user input) into principal (transfer)
   and interest (expense under the auto-created "Debt interest"); Recurring payments redesigned (brand hero, carded rows,
   Bill / Income / Debt payment). DB v8 (`debt_terms`, `recurring.to_wallet_id` / `interest_minor`), not synced yet.
+- Credit card billing (DB v11, 2026-11-03): credit limit, statement day and due day per card (`debt_terms`, synced on
+  the wallet row, backup format 3); available credit and amount due on the card; a derived payment reminder on Home
+  (excluded from Safe to spend). Instalment loans show Principal / Paid / Remaining and paid instalments.
+- Owner review round 3 (2026-11-03): Scheduled page rebuilt (`ScheduleOutlook`: month hero, 3-month projection,
+  filtered agenda with a From–To range); Bills due counts every scheduled bill whatever its category; Safe to spend
+  always shown (0 in red when nothing is left); scheduled amounts coloured by flow; category required on scheduled bills
+  and income; one sheet header and confirm dialog style across the app; New wallet draws the real wallet card live;
+  profile photo (photo picker, or the Google picture on request).
 - Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
   email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
   Insights adopt the brand hero and carded sections.

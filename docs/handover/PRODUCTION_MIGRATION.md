@@ -1,5 +1,24 @@
 # Production migration runbook — 2026-11-03
 
+## Pending: credit card billing (app schema v11, branch `feature/core-screens-refinement`)
+
+**Status: not applied anywhere** (neither `lucento-test` nor production). Owner-run, like the migrations below.
+
+| Migration | Effect | Data risk |
+|---|---|---|
+| `20261103180000_credit_card_billing` | `wallets.credit_limit_minor` (bigint), `statement_day`, `due_day` (smallint), all nullable, + 3 range CHECKs on live rows (`NOT VALID`) | None: the new columns are null on every existing row |
+
+- **Apply to `lucento-test` before signing a v11 debug build in against it, and to production before any v11 release.**
+  v11 sends the three columns on every wallet row; without them PostgREST rejects the push (`PGRST204`) and wallet
+  sync stalls (rows stay pending; nothing is lost).
+- Apply: paste the file into the SQL editor as one `begin … commit` block. Verify with
+  `select column_name, data_type, is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'wallets' and column_name in ('credit_limit_minor','statement_day','due_day');`
+  (3 rows, nullable) and record history with `supabase migration repair --status applied 20261103180000`.
+- Smoke test: on a v11 build, give a credit card a limit and billing days, sync, and check the wallet row.
+
+---
+
+
 **Status: applied to production by the owner on 2026-11-03.** Confirm STEP 4 (history repair) was done.
 
 **Owner-run.** Claude does not apply production migrations. Everything to paste is in

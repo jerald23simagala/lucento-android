@@ -161,6 +161,7 @@ import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.MascotMessage
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoWordmark
 import com.lucento.app.core.designsystem.component.MascotMood
@@ -185,6 +186,11 @@ import com.lucento.app.domain.GoalsOverview
 import com.lucento.app.domain.NetWorthComposition
 import com.lucento.app.domain.PacePosition
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.CardDue
+import com.lucento.app.domain.ScheduledFlow
+import com.lucento.app.domain.flow
+import com.lucento.app.core.designsystem.component.scheduledFlowColor
+import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.domain.UpcomingPayment
 import com.lucento.app.domain.RecurringMath
 import java.time.LocalDate
@@ -210,6 +216,8 @@ data class HomeActions(
     /** Opens Recurring payments; with a schedule id, straight to that payment's review / mark-paid sheet. */
     val onOpenRecurring: (Long?) -> Unit,
     val onOpenWallets: () -> Unit = {},
+    /** One wallet's page (a card's payment reminder opens its card, where Payment is). */
+    val onOpenWallet: (Long) -> Unit = {},
     val onOpenDebts: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     /** Settings › Account & sync, from the sync details sheet (P2-2). */
@@ -267,7 +275,11 @@ fun HomeScreen(
         HomeHeader(
             status = state.cloudStatus,
             onOpenSyncSettings = { showSync = true },
-            bell = if (state.features.isEnabled(Feature.RECURRING)) ({ PaymentsBell(state, actions.onOpenRecurring) }) else null,
+            bell = if (state.features.isEnabled(Feature.RECURRING) || state.cardDuesSoon.isNotEmpty()) {
+                { PaymentsBell(state, actions.onOpenRecurring, actions.onOpenWallet) }
+            } else {
+                null
+            },
             modifier = Modifier.padding(horizontal = gutter),
         )
         if (!state.loading && state.hasWallets) {
@@ -386,83 +398,66 @@ private fun HomeHeader(
 }
 
 /**
- * The bell: scheduled payments that need attention (overdue, or due within a week) with a count badge, so they're
- * noticed without scrolling to the Scheduled card. Opens a short list; each item opens its review / mark-paid sheet.
+ * The bell: scheduled items and card payments that need attention (overdue, or due within a week) with a count badge,
+ * so they're noticed without scrolling. Opens a small panel — Lucento with a one-line summary, what's still to pay,
+ * then Overdue and This week sections — where each row opens its review sheet (or the card).
  */
 @Composable
-private fun PaymentsBell(state: HomeUiState, onOpenRecurring: (Long?) -> Unit) {
+private fun PaymentsBell(state: HomeUiState, onOpenRecurring: (Long?) -> Unit, onOpenWallet: (Long) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val due = state.dueSoon
-    val overdue = due.count { it.overdue }
+    val cards = state.cardDuesSoon
+    val count = due.size + cards.size
+    val overdue = due.count { it.overdue } + cards.count { it.overdue }
+    val haptics = rememberHaptics()
     Box {
         IconButton(
-            onClick = { open = true },
+            onClick = {
+                haptics.tick()
+                open = true
+            },
             modifier = Modifier.semantics {
                 contentDescription = when {
-                    due.isEmpty() -> "Upcoming payments: nothing due this week"
-                    overdue > 0 -> "Upcoming payments: ${due.size} due, $overdue overdue"
-                    else -> "Upcoming payments: ${due.size} due this week"
+                    count == 0 -> "Upcoming payments: nothing due this week"
+                    overdue > 0 -> "Upcoming payments: $count due, $overdue overdue"
+                    else -> "Upcoming payments: $count due this week"
                 }
             },
         ) {
             BadgedBox(
                 badge = {
-                    if (due.isNotEmpty()) {
+                    if (count > 0) {
                         Badge(
                             containerColor = if (overdue > 0) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.primary,
                             contentColor = if (overdue > 0) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onPrimary,
-                        ) { Text(if (due.size > 9) "9+" else "${due.size}") }
+                        ) { Text(if (count > 9) "9+" else "$count") }
                     }
                 },
             ) {
-                Icon(if (due.isEmpty()) Icons.Outlined.Notifications else Icons.Filled.Notifications, contentDescription = null)
+                Icon(if (count == 0) Icons.Outlined.Notifications else Icons.Filled.Notifications, contentDescription = null)
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(min = 260.dp, max = 320.dp)) {
-            Text(
-                "Upcoming payments",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm).semantics { heading() },
-            )
-            if (due.isEmpty()) {
-                Text(
-                    "Nothing due in the next ${RecurringMath.DUE_SOON_DAYS} days.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.md).padding(bottom = Spacing.sm),
-                )
-            }
-            due.forEach { item ->
-                val income = item.schedule.type == TransactionType.INCOME
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(item.schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                dueLabel(item, state.today),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (item.overdue) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    trailingIcon = {
-                        AmountText(
-                            money = if (income) item.schedule.amount else -item.schedule.total,
-                            showPlus = true,
-                            style = AmountStyles.small,
-                            color = if (income) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
-                        )
-                    },
-                    onClick = {
-                        open = false
-                        onOpenRecurring(item.schedule.id)
-                    },
-                )
-            }
-            Hairline()
-            DropdownMenuItem(
-                text = { Text("See all scheduled", color = MaterialTheme.colorScheme.primary) },
-                onClick = {
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+            shadowElevation = 10.dp,
+            modifier = Modifier.widthIn(min = 288.dp, max = 340.dp),
+        ) {
+            BellPanel(
+                state = state,
+                count = count,
+                overdue = overdue,
+                onOpenSchedule = { id ->
+                    open = false
+                    onOpenRecurring(id)
+                },
+                onOpenWallet = { id ->
+                    open = false
+                    onOpenWallet(id)
+                },
+                onSeeAll = {
                     open = false
                     onOpenRecurring(null)
                 },
@@ -471,12 +466,187 @@ private fun PaymentsBell(state: HomeUiState, onOpenRecurring: (Long?) -> Unit) {
     }
 }
 
+/** One entry in the bell: a scheduled occurrence or a card payment, with what the panel needs to draw it. */
+private data class BellEntry(
+    val date: LocalDate,
+    val overdue: Boolean,
+    val title: String,
+    val amount: Money,
+    val flow: ScheduledFlow,
+    val payment: UpcomingPayment? = null,
+    val card: CardDue? = null,
+)
+
+@Composable
+private fun BellPanel(
+    state: HomeUiState,
+    count: Int,
+    overdue: Int,
+    onOpenSchedule: (Long) -> Unit,
+    onOpenWallet: (Long) -> Unit,
+    onSeeAll: () -> Unit,
+) {
+    val ext = LucentoTheme.extendedColors
+    val entries = (
+        state.dueSoon.map { p ->
+            val flow = p.schedule.flow
+            BellEntry(p.dueDate, p.overdue, p.schedule.name, if (flow == ScheduledFlow.INCOME) p.schedule.amount else -p.schedule.total, flow, payment = p)
+        } + state.cardDuesSoon.map { c ->
+            BellEntry(c.cycle.dueDate, c.overdue, "${c.wallet.name} payment", -c.cycle.amountDue, ScheduledFlow.TRANSFER, card = c)
+        }
+        ).sortedBy { it.date }
+    // What leaves your accounts this week (overdue included), in the main currency: bills and transfers together.
+    val code = state.focusCurrency
+    val outgoing = Money.sum(code, entries.filter { it.flow != ScheduledFlow.INCOME && it.amount.currencyCode == code }.map { -it.amount })
+    Column(Modifier.padding(bottom = Spacing.xs)) {
+        // Header: Lucento and the week in one line.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = Spacing.md, end = Spacing.md, top = Spacing.xs, bottom = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            com.lucento.app.core.designsystem.component.LucentoMascot(
+                size = 46.dp,
+                mood = when {
+                    overdue > 0 -> com.lucento.app.core.designsystem.component.MascotMood.Concerned
+                    count == 0 -> com.lucento.app.core.designsystem.component.MascotMood.Success
+                    else -> com.lucento.app.core.designsystem.component.MascotMood.Happy
+                },
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Column(Modifier.weight(1f)) {
+                Text("Upcoming payments", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                Text(
+                    when {
+                        count == 0 -> "You’re all clear for the next ${RecurringMath.DUE_SOON_DAYS} days."
+                        overdue > 0 && overdue == count -> if (overdue == 1) "1 payment is overdue." else "$overdue payments are overdue."
+                        overdue > 0 -> "$overdue overdue · ${count - overdue} due this week"
+                        count == 1 -> "1 payment due this week"
+                        else -> "$count payments due this week"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (overdue > 0) ext.negative else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (entries.isNotEmpty() && !outgoing.isZero) {
+            // The week's total going out, on a soft tinted strip.
+            Row(
+                Modifier
+                    .padding(horizontal = Spacing.md)
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.small)
+                    .background(if (overdue > 0) ext.negativeContainer else MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
+                    .semantics(mergeDescendants = true) {},
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "To pay by ${state.today.plusDays(RecurringMath.DUE_SOON_DAYS).format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()))}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (overdue > 0) ext.negative else MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                MoneyText(
+                    money = -outgoing,
+                    style = AmountStyles.row,
+                    color = if (overdue > 0) ext.negative else MaterialTheme.colorScheme.onPrimaryContainer,
+                    fractionScale = 1f,
+                    minScale = 0.6f,
+                )
+            }
+            Spacer(Modifier.height(Spacing.xs))
+        }
+        val sections = listOf("Overdue" to entries.filter { it.overdue }, "This week" to entries.filterNot { it.overdue })
+        sections.filter { it.second.isNotEmpty() }.forEach { (title, list) ->
+            Text(
+                title.uppercase(Locale.getDefault()),
+                style = Hierarchy.cardOverline,
+                color = if (title == "Overdue") ext.negative else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = Spacing.md, end = Spacing.md, top = Spacing.sm, bottom = Spacing.xxs).semantics { heading() },
+            )
+            list.forEach { entry ->
+                BellRow(entry, state, onClick = {
+                    when {
+                        entry.payment != null -> onOpenSchedule(entry.payment.schedule.id)
+                        entry.card != null -> onOpenWallet(entry.card.wallet.id)
+                    }
+                })
+            }
+        }
+        if (entries.isEmpty()) {
+            Text(
+                "Scheduled bills, income and card payments show up here a week before they’re due.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+            )
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        // A clear way on, rather than a bare menu item.
+        Row(
+            Modifier
+                .padding(horizontal = Spacing.md)
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clickable(role = Role.Button, onClick = onSeeAll)
+                .padding(horizontal = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            Text("See all scheduled", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** A bell row: the item's tile, its name and when it's due, and the signed amount in its flow's colour. */
+@Composable
+private fun BellRow(entry: BellEntry, state: HomeUiState, onClick: () -> Unit) {
+    val ext = LucentoTheme.extendedColors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(role = Role.Button, onClickLabel = "Open ${entry.title}", onClick = onClick)
+            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val schedule = entry.payment?.schedule
+        val debt = schedule?.toWalletId?.let { state.walletsById[it] }
+        when {
+            entry.card != null -> com.lucento.app.core.designsystem.component.WalletIdentityTile(entry.card.wallet, size = 36.dp)
+            debt != null -> com.lucento.app.core.designsystem.component.WalletIdentityTile(debt, size = 36.dp)
+            schedule != null -> CategoryTile(category = schedule.categoryId?.let { state.categoriesById[it] }, type = schedule.type, size = 36.dp)
+        }
+        Spacer(Modifier.width(Spacing.sm + Spacing.xxs))
+        Column(Modifier.weight(1f)) {
+            Text(entry.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                dueLabel(entry.date, entry.overdue, state.today) + if (entry.flow == ScheduledFlow.TRANSFER) " · transfer" else "",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (entry.overdue) ext.negative else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        AmountText(money = entry.amount, showPlus = true, style = AmountStyles.small, color = scheduledFlowColor(entry.flow))
+    }
+}
+
 /** "Overdue · Oct 1", "Due today", "Due tomorrow", "Due in 3 days". */
-private fun dueLabel(item: UpcomingPayment, today: LocalDate): String {
-    val days = ChronoUnit.DAYS.between(today, item.dueDate)
-    val date = item.dueDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()))
+private fun dueLabel(item: UpcomingPayment, today: LocalDate): String = dueLabel(item.dueDate, item.overdue, today)
+
+private fun dueLabel(dueDate: LocalDate, overdue: Boolean, today: LocalDate): String {
+    val days = ChronoUnit.DAYS.between(today, dueDate)
+    val date = dueDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()))
     return when {
-        item.overdue -> "Overdue · $date"
+        overdue -> "Overdue · $date"
         days == 0L -> "Due today"
         days == 1L -> "Due tomorrow"
         else -> "Due in $days days · $date"
@@ -663,7 +833,10 @@ private fun Overview(
             )
         }
 
-        if (f.isEnabled(Feature.RECURRING) && state.isCurrentMonth) UpcomingScheduledCard(state, actions.onOpenRecurring)
+        val recurringOn = f.isEnabled(Feature.RECURRING)
+        if (state.isCurrentMonth && (recurringOn || state.cardDues.isNotEmpty())) {
+            UpcomingScheduledCard(state, onOpen = if (recurringOn) actions.onOpenRecurring else null, onOpenWallet = actions.onOpenWallet)
+        }
 
         RecentTransactionsCard(state, actions)
     }
@@ -1090,11 +1263,11 @@ private fun MonthlyBudgetCard(
         Spacer(Modifier.height(14.dp))
         when {
             setupNeeded -> {
-                EmptyCardMessage("Choose the categories you spend on — your budget is built from them.")
+                MascotMessage("Choose the categories you spend on — your budget is built from them.")
                 LucentoTextButton(text = "Choose categories", onClick = open)
             }
             !plan.hasBudget -> {
-                EmptyCardMessage("No budget for ${monthLabel(plan.month)} yet. Give your categories an amount to see your pace.")
+                MascotMessage("No budget for ${monthLabel(plan.month)} yet. Give your categories an amount to see your pace.")
                 LucentoTextButton(text = "Set amounts", onClick = open)
             }
             else -> {
@@ -1109,14 +1282,14 @@ private fun MonthlyBudgetCard(
                             firstWidth = left,
                             gap = Spacing.lg,
                             first = { BudgetFigures(plan, burn, formula, ringSize = left) },
-                            second = { WatchPanel(state, onOpenCategory, fillHeight = true) },
+                            second = { WatchPanel(state, onOpenCategory, onSeeAll = open, fillHeight = true) },
                         )
                     } else {
                         // The ring grows with the text inside it, so "100%" never spills over the stroke.
                         val ring = (140.dp * textScale.coerceIn(1f, 1.4f)).coerceAtMost(maxWidth)
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
                             BudgetFigures(plan, burn, formula, ringSize = ring)
-                            WatchPanel(state, onOpenCategory, fillHeight = false)
+                            WatchPanel(state, onOpenCategory, onSeeAll = open, fillHeight = false)
                         }
                     }
                 }
@@ -1130,16 +1303,6 @@ private fun MonthlyBudgetCard(
                 modifier = Modifier.padding(top = Spacing.sm),
             )
         }
-    }
-}
-
-/** A card with nothing to show yet: Lucento on the left, one line of what to do on the right. */
-@Composable
-private fun EmptyCardMessage(text: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-        LucentoMascot(size = 56.dp, mood = MascotMood.Curious)
-        Spacer(Modifier.width(Spacing.md))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
     }
 }
 
@@ -1192,9 +1355,9 @@ private fun MatchedHeightPair(
 }
 
 /**
- * The budget card's left half: the share used as a ring exactly [ringSize] wide, then the month's formula —
- * Budget − Used (budgeted + unbudgeted) = Remaining, and this month − Bills due = Safe to spend, which closes the
- * card on a tinted line. A past month closes on Remaining. Every figure is from [BudgetFormula].
+ * The budget card's left half: the share used as a ring exactly [ringSize] wide, then the month's formula as a short
+ * statement — Budget, Used (budgeted + unbudgeted), Remaining (or Overspent), Bills due, and Safe to spend on a tinted
+ * line (0 in red once nothing is left). A past month closes on Remaining. Every figure is from [BudgetFormula].
  */
 @Composable
 private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn, formula: BudgetFormula, ringSize: Dp) {
@@ -1217,49 +1380,55 @@ private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn, formula: BudgetFor
     }
 }
 
-/** Width of the formula's operator column (−, +, =), so labels and figures line up; it grows with the text. */
-@Composable
-private fun operatorColumn(): Dp = with(LocalDensity.current) { 16.sp.toDp() }
-
 @Composable
 private fun BudgetFormulaLines(formula: BudgetFormula) {
+    val ext = LucentoTheme.extendedColors
     val safe = formula.safeToSpend
     val bills = formula.billsDue
+    // "Overspent" in red once spending passes the budget; "Remaining" in green otherwise. The word says it, not the colour.
+    val remainingLabel = if (formula.overspent) "Overspent" else "Remaining"
+    val remainingInk = if (formula.overspent) ext.negative else ext.positive
     Column(Modifier.fillMaxWidth()) {
-        FormulaLine(null, "Budget", formula.budget)
-        FormulaLine("−", "Used", formula.used)
+        FormulaLine("Budget", formula.budget)
+        FormulaLine("Used", formula.used)
         // Used is every expense: the part in budgeted categories plus the part outside them.
-        Column(Modifier.padding(start = operatorColumn(), top = Spacing.xxs, bottom = Spacing.xs)) {
-            FormulaLine(null, "Budgeted", formula.budgeted, minor = true)
-            FormulaLine("+", "Unbudgeted", formula.unbudgeted, minor = true)
+        Column(Modifier.padding(start = Spacing.sm, top = Spacing.xxs, bottom = Spacing.xs)) {
+            FormulaLine("Budgeted", formula.budgeted, minor = true)
+            FormulaLine("Unbudgeted", formula.unbudgeted, minor = true)
         }
         Hairline(Modifier.padding(vertical = Spacing.xs))
         if (safe != null && bills != null) {
-            FormulaLine("=", "Remaining", formula.remaining, signed = true)
-            FormulaLine("−", "Bills due", bills)
+            FormulaLine(remainingLabel, formula.remaining, ink = remainingInk)
+            // A deduction, so it carries its minus sign as well as the red.
+            FormulaLine("Bills due", -bills, ink = if (bills.isZero) null else ext.negative)
             Spacer(Modifier.height(Spacing.sm))
-            FormulaResult("Safe to spend", safe)
+            // Always here for this month: 0 in red once bills or overspending take the rest, and the caption says why.
+            FormulaResult(
+                "Safe to spend",
+                formula.safeToSpendShown ?: safe,
+                warning = formula.nothingSafe,
+                caption = when {
+                    !formula.nothingSafe -> null
+                    formula.overspent -> "You’re over budget this month"
+                    else -> "Bills due take what’s left"
+                },
+            )
         } else {
             Spacer(Modifier.height(Spacing.xxs))
-            FormulaResult("Remaining", formula.remaining)
+            FormulaResult(remainingLabel, formula.remaining, warning = formula.overspent)
         }
     }
 }
 
 /**
- * One line of the formula: the operator, the label and the figure, right-aligned and shrinking before it would wrap.
- * [minor] lines (the parts of Used) are smaller; [signed] lines take the positive / negative ink, the sign is always
- * in the figure itself.
+ * One line of the formula: the label and the figure, right-aligned and shrinking before it would wrap. [minor] lines
+ * (the parts of Used) are smaller and muted; [ink] colours a line's label and figure (Remaining, Overspent, Bills due).
+ * The sign is always in the figure itself.
  */
 @Composable
-private fun FormulaLine(operator: String?, label: String, money: Money, minor: Boolean = false, signed: Boolean = false) {
-    val ext = LucentoTheme.extendedColors
+private fun FormulaLine(label: String, money: Money, minor: Boolean = false, ink: Color? = null) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val color = when {
-        signed && money.isNegative -> ext.negative
-        minor -> muted
-        else -> MaterialTheme.colorScheme.onSurface
-    }
+    val color = ink ?: if (minor) muted else MaterialTheme.colorScheme.onSurface
     Row(
         Modifier
             .fillMaxWidth()
@@ -1267,17 +1436,11 @@ private fun FormulaLine(operator: String?, label: String, money: Money, minor: B
             .semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The operators are visual; TalkBack reads each line as "label, amount".
-        Text(
-            operator.orEmpty(),
-            style = if (minor) AmountStyles.small else AmountStyles.row,
-            color = muted,
-            modifier = Modifier.width(operatorColumn()).clearAndSetSemantics {},
-        )
         Text(
             label,
             style = if (minor) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
-            color = muted,
+            color = ink ?: muted,
+            fontWeight = if (ink != null) FontWeight.SemiBold else null,
             maxLines = 1,
         )
         Spacer(Modifier.width(Spacing.sm))
@@ -1293,11 +1456,14 @@ private fun FormulaLine(operator: String?, label: String, money: Money, minor: B
     }
 }
 
-/** The formula's answer on a tinted line: the label over the figure, green while there's money left, red when not. */
+/**
+ * The formula's answer on a tinted line: the label over the figure, green while there's money left, red when not
+ * ([warning]); [caption] says why in words, so the state never rests on colour.
+ */
 @Composable
-private fun FormulaResult(label: String, money: Money) {
+private fun FormulaResult(label: String, money: Money, warning: Boolean = money.isNegative, caption: String? = null) {
     val ext = LucentoTheme.extendedColors
-    val negative = money.isNegative
+    val negative = warning
     val ink = if (negative) ext.negative else ext.positive
     Column(
         Modifier
@@ -1307,28 +1473,26 @@ private fun FormulaResult(label: String, money: Money) {
             .padding(horizontal = Spacing.sm, vertical = Spacing.sm)
             .semantics(mergeDescendants = true) {},
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("=", style = AmountStyles.row, color = ink, modifier = Modifier.width(operatorColumn()).clearAndSetSemantics {})
-            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = ink, maxLines = 1)
-        }
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = ink, maxLines = 1)
         MoneyText(
             money = money,
             style = AmountStyles.large,
             color = ink,
             fractionScale = 1f,
             minScale = 0.6f,
-            modifier = Modifier.padding(start = operatorColumn()),
         )
+        if (caption != null) Text(caption, style = MaterialTheme.typography.labelSmall, color = ink, maxLines = 2)
     }
 }
 
 /**
- * The budget card's right half, "To watch": the budgeted categories closest to their limit, each with its share used
- * (coloured by its own status, and always in words), a compact bar and what's left. A tap opens that category's
- * transactions for the month. [fillHeight]: beside the formula, the rows spread over the panel's full height.
+ * The budget card's right half, "To watch": up to five budgeted categories closest to their limit, each with its share
+ * used (coloured by its own status, and always in words), a compact bar and what's left, then "See all" in the bottom
+ * right corner (the Budget tab). A tap on a row opens that category's transactions for the month. [fillHeight]: beside
+ * the formula, the rows spread over the panel's full height.
  */
 @Composable
-private fun WatchPanel(state: HomeUiState, onOpen: (Long) -> Unit, fillHeight: Boolean) {
+private fun WatchPanel(state: HomeUiState, onOpen: (Long) -> Unit, onSeeAll: () -> Unit, fillHeight: Boolean) {
     val panel = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow
     Column(
         Modifier
@@ -1358,6 +1522,11 @@ private fun WatchPanel(state: HomeUiState, onOpen: (Long) -> Unit, fillHeight: B
                 state.watchLines.forEach { line -> WatchRow(line, onOpen) }
             }
         }
+        LucentoTextButton(
+            text = "See all",
+            onClick = onSeeAll,
+            modifier = Modifier.align(Alignment.End).semantics { contentDescription = "See all budget categories" },
+        )
     }
 }
 
@@ -1581,9 +1750,7 @@ private fun OffModuleTile(icon: ImageVector) {
 private fun OffModuleSheet(feature: Feature, onTurnOn: () -> Unit, onHide: () -> Unit, onDismiss: () -> Unit) {
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.xl)) {
-            Text("${feature.title} is off", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-            Spacer(Modifier.height(Spacing.xs))
-            Text(feature.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SheetHeader(title = "${feature.title} is off", subtitle = feature.description, icon = shortcutIcon(feature))
             Spacer(Modifier.height(Spacing.lg))
             LucentoPrimaryButton(text = "Turn on ${quickLinkName(feature).lowercase(Locale.getDefault())}", onClick = onTurnOn)
             Spacer(Modifier.height(Spacing.xs))
@@ -1606,21 +1773,88 @@ private fun OffModuleSheet(feature: Feature, onTurnOn: () -> Unit, onHide: () ->
 
 // ------------------------------------------------------------------ Dashboard: scheduled and recent
 
-/** What's still due this month (overdue first, then by date). Empty months say so; past months don't show the section. */
+/**
+ * What's still due this month (overdue first, then by date): scheduled items and credit card payments (from each card's
+ * billing days; they open the card). Empty months say so; past months don't show the section. [onOpen] is null when
+ * Recurring is off and only card payments are listed.
+ */
 @Composable
-private fun UpcomingScheduledCard(state: HomeUiState, onOpen: (Long?) -> Unit) {
+private fun UpcomingScheduledCard(state: HomeUiState, onOpen: ((Long?) -> Unit)?, onOpenWallet: (Long) -> Unit) {
     LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
-        CardHeaderWithSeeAll("Upcoming", "scheduled transactions", Icons.Outlined.CalendarMonth, onSeeAll = { onOpen(null) })
-        if (state.scheduledThisMonth.isEmpty()) {
-            EmptyCardMessage(
+        if (onOpen != null) {
+            CardHeaderWithSeeAll("Upcoming", "scheduled transactions", Icons.Outlined.CalendarMonth, onSeeAll = { onOpen(null) })
+        } else {
+            CardOverline("Upcoming", icon = Icons.Outlined.CalendarMonth)
+            Spacer(Modifier.height(Spacing.sm))
+        }
+        val rows: List<Pair<LocalDate, Any>> = (state.scheduledThisMonth.map { it.dueDate to it } + state.cardDues.map { it.cycle.dueDate to it })
+            .sortedBy { it.first }
+        if (rows.isEmpty()) {
+            MascotMessage(
                 if (state.hasAnySchedules) "Nothing else due in ${monthLabel(state.month)}." else "Add rent, bills, subscriptions or salary and they show up here before they’re due.",
             )
-            if (!state.hasAnySchedules) LucentoTextButton(text = "Schedule a transaction", onClick = { onOpen(null) })
+            if (!state.hasAnySchedules && onOpen != null) LucentoTextButton(text = "Schedule a transaction", onClick = { onOpen(null) })
             return@LucentoCard
         }
-        state.scheduledThisMonth.forEachIndexed { index, item ->
-            ScheduledRow(item, state, onClick = { onOpen(item.schedule.id) })
-            if (index < state.scheduledThisMonth.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
+        rows.forEachIndexed { index, (_, item) ->
+            when (item) {
+                is UpcomingPayment -> ScheduledRow(item, state, onClick = { onOpen?.invoke(item.schedule.id) })
+                is CardDue -> CardDueRow(item, state.today, onClick = { onOpenWallet(item.wallet.id) })
+            }
+            if (index < rows.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
+        }
+    }
+}
+
+/**
+ * A credit card's payment reminder in the scheduled-row layout: the card and its amount due, then the due date and
+ * "Not in Safe to spend". It's derived from the card, so a tap opens the card, where Payment is.
+ */
+@Composable
+private fun CardDueRow(item: CardDue, today: LocalDate, onClick: () -> Unit) {
+    val days = ChronoUnit.DAYS.between(today, item.cycle.dueDate)
+    val relative = when {
+        item.overdue -> "Overdue"
+        days == 0L -> "Today"
+        days == 1L -> "Tomorrow"
+        else -> "In $days days"
+    }
+    val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clickable(role = Role.Button, onClickLabel = "Open ${item.wallet.name}", onClick = onClick)
+            .padding(vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        com.lucento.app.core.designsystem.component.WalletIdentityTile(item.wallet, size = 38.dp)
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${item.wallet.name} payment",
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                AmountText(money = -item.cycle.amountDue, showPlus = true, color = scheduledFlowColor(ScheduledFlow.TRANSFER))
+            }
+            Spacer(Modifier.height(Spacing.xs))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${item.cycle.dueDate.format(dateFormat)} · Not in Safe to spend",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                StatusPill(relative, if (item.overdue) StatusTones.negative else StatusTones.brand)
+            }
         }
     }
 }
@@ -1631,7 +1865,7 @@ private fun RecentTransactionsCard(state: HomeUiState, actions: HomeActions) {
     LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
         CardHeaderWithSeeAll("Recent transactions", "transactions", Icons.Outlined.History, onSeeAll = actions.onOpenTransactions)
         if (state.recentInMonth.isEmpty()) {
-            EmptyCardMessage(
+            MascotMessage(
                 if (state.isCurrentMonth) "Nothing recorded in ${monthLabel(state.month)} yet. Tap + to add what you spend."
                 else "Nothing was recorded in ${monthLabel(state.month)}.",
             )
@@ -1746,12 +1980,12 @@ private fun AddSpotlightCard(onRecord: () -> Unit, onDismiss: () -> Unit) {
 private fun MilestonesSheet(earned: Set<com.lucento.app.domain.Achievement>, onDismiss: () -> Unit) {
     com.lucento.app.core.designsystem.component.LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = Spacing.gutter).padding(bottom = Spacing.xl).verticalScroll(rememberScrollState())) {
-            Text("Milestones", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            Text(
-                "${earned.size} of ${com.lucento.app.domain.Achievement.entries.size} · from your own records. No streaks, nothing to lose.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.xxs, bottom = Spacing.md),
+            SheetHeader(
+                title = "Milestones",
+                subtitle = "${earned.size} of ${com.lucento.app.domain.Achievement.entries.size} · from your own records. No streaks, nothing to lose.",
+                icon = Icons.Filled.EmojiEvents,
+                tone = com.lucento.app.core.designsystem.component.StatusTones.warning,
+                modifier = Modifier.padding(bottom = Spacing.xs),
             )
             com.lucento.app.domain.Achievement.entries.forEach { a ->
                 val done = a in earned
@@ -1821,7 +2055,11 @@ private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () 
     }
     val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()) }
     val income = schedule.type == TransactionType.INCOME
-    val kind = category?.name ?: if (income) "Recurring income" else "Recurring expense"
+    val debt = schedule.toWalletId?.let { state.walletsById[it] }
+    val kind = when {
+        debt != null -> "Transfer to ${debt.name}"
+        else -> category?.name ?: if (income) "Scheduled income" else "Scheduled expense"
+    }
     Row(
         Modifier
             .fillMaxWidth()
@@ -1830,16 +2068,21 @@ private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () 
             .padding(vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryTile(category = category, type = schedule.type, size = 38.dp)
+        if (debt != null) {
+            com.lucento.app.core.designsystem.component.WalletIdentityTile(debt, size = 38.dp)
+        } else {
+            CategoryTile(category = category, type = schedule.type, size = 38.dp)
+        }
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(Spacing.sm))
+                // Income green, expenses red, transfers to a card or loan in neutral ink (owner, 2026-11-03).
                 AmountText(
                     money = if (income) schedule.amount else -schedule.total,
                     showPlus = true,
-                    color = if (income) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
+                    color = scheduledFlowColor(schedule.flow),
                 )
             }
             Spacer(Modifier.height(Spacing.xs))

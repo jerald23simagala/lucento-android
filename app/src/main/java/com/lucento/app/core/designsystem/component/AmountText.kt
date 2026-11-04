@@ -57,7 +57,7 @@ fun AmountText(
  * restarts whenever the available width changes, so a figure grows back when there is room again.
  */
 @Composable
-private fun FittingText(
+internal fun FittingText(
     text: AnnotatedString,
     style: TextStyle,
     color: Color,

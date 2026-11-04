@@ -1,5 +1,7 @@
 package com.lucento.app.feature.wallets
 
+import androidx.compose.material.icons.outlined.AccountBalance
+import com.lucento.app.core.designsystem.component.SheetHeader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,16 +74,11 @@ fun InstitutionPickerSheet(
     val haptics = rememberHaptics()
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = Spacing.gutter).fillMaxHeight(0.9f)) {
-            Text(
-                "Choose bank or provider",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() },
-            )
-            Text(
-                "Shows its logo and colours on this wallet. Lucento doesn’t connect to it.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.xxs, bottom = Spacing.md),
+            SheetHeader(
+                title = "Choose bank or provider",
+                subtitle = "Shows its logo and colours on this wallet. Lucento doesn’t connect to it.",
+                icon = Icons.Outlined.AccountBalance,
+                modifier = Modifier.padding(bottom = Spacing.xs),
             )
             SearchField(
                 value = query,

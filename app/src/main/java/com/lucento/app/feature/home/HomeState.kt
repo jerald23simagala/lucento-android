@@ -47,10 +47,22 @@ data class BudgetFormula(
     val budgeted: Money,
     val unbudgeted: Money,
     val remaining: Money,
-    /** Unpaid bills in budgeted categories due by month end; null outside the current month. */
+    /** Unpaid scheduled bills (any category; a debt payment's interest only) due by month end; null outside the current month. */
     val billsDue: Money?,
     val safeToSpend: Money?,
-)
+) {
+    /** Remaining reads "Overspent" (red) once spending passes the budget, "Remaining" (green) otherwise. */
+    val overspent: Boolean get() = remaining.isNegative
+
+    /** Safe to spend always closes this month's card (owner, 2026-11-03: "sticky"); a past month ends at Remaining. */
+    val showsSafeToSpend: Boolean get() = safeToSpend != null
+
+    /** Nothing is left to spend safely: bills due or overspending have taken the rest. The card then reads 0, in red. */
+    val nothingSafe: Boolean get() = safeToSpend != null && safeToSpend.amountMinor <= 0L
+
+    /** The figure the card shows: what is safe to spend, never below zero (owner, 2026-11-03). Null for a past month. */
+    val safeToSpendShown: Money? get() = safeToSpend?.let { if (it.amountMinor < 0L) Money.zero(it.currencyCode) else it }
+}
 
 /** The net-flow state that picks the indicator animation and colour. Zero is neutral, never "good" or "bad". */
 enum class FlowDirection { POSITIVE, NEGATIVE, NEUTRAL }
@@ -317,10 +329,17 @@ data class HomeUiState(
      * only). Null for past months, without a budget, or when Budgets is off — the card then shows what's left instead.
      */
     val safeToSpend: SafeToSpend? = null,
-    /** Budget card ("To watch"): up to three budgeted categories with spending in [month], closest to their limit first. */
+    /** Budget card ("To watch"): up to five budgeted categories with spending in [month], closest to their limit first. */
     val watchLines: List<CategoryBudgetLine> = emptyList(),
     /** Upcoming scheduled items due by the end of [month] (overdue included); empty for past months. */
     val scheduledThisMonth: List<UpcomingPayment> = emptyList(),
+    /**
+     * Credit card payments due by the end of [month] (overdue included), from each card's billing days — reminders only,
+     * never part of [safeToSpend] (CreditCardMath). Empty for past months.
+     */
+    val cardDues: List<com.lucento.app.domain.CardDue> = emptyList(),
+    /** Card payments overdue or due within a week, for the header bell beside [dueSoon]. */
+    val cardDuesSoon: List<com.lucento.app.domain.CardDue> = emptyList(),
     /** The newest entries dated in [month], newest first (a transfer once). */
     val recentInMonth: List<Transaction> = emptyList(),
 ) {
@@ -448,6 +467,8 @@ object HomeStateBuilder {
                 limit = SCHEDULED_LIMIT,
             ),
             recentInMonth = recentInMonth,
+            cardDues = if (shown != current) emptyList() else com.lucento.app.domain.CreditCardMath.dues(wallets, all, today, shown.atEndOfMonth()),
+            cardDuesSoon = com.lucento.app.domain.CreditCardMath.dues(wallets, all, today, today.plusDays(RecurringMath.DUE_SOON_DAYS)),
             recentTransfers = (recentActivity(all, limit = RECENT_LIMIT) + recentInMonth).mapNotNull { it.transferGroup }.toSet().let { groups ->
                 if (groups.isEmpty()) emptyMap() else com.lucento.app.domain.Transfer.pair(all.filter { it.transferGroup in groups })
             },
@@ -462,7 +483,7 @@ object HomeStateBuilder {
     fun watchList(plan: BudgetPlan?): List<CategoryBudgetLine> =
         plan?.allocatedLines.orEmpty().filter { it.spent.amountMinor > 0L }.take(WATCH_LIMIT)
 
-    const val WATCH_LIMIT = 4
+    const val WATCH_LIMIT = 5
 
     /**
      * The budget card's formula. [safe] is [HomeUiState.safeToSpend]: present only for this month's budget, so a past

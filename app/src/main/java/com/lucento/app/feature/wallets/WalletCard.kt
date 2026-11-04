@@ -59,24 +59,47 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.Role
 import com.lucento.app.core.money.MoneyFormatter
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import com.lucento.app.domain.CardCycle
+import com.lucento.app.domain.CreditCardMath
 import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.DebtRepayment
+import com.lucento.app.domain.LoanProgress
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletType
+import java.time.LocalDate
 
 /** ISO/IEC 7810 ID-1, the shape of a bank card. The card grows taller if large text needs the room. */
 private const val CardRatio = 1.586f
 
 /**
- * A wallet as a bank card: its name and currency where the issuer sits, the type mark top-right where a card network's
- * logo would be, a chip, the balance as the card's main line, and the opening balance and movement count along the
- * bottom edge. Each type has its own solid brand face ([com.lucento.app.core.designsystem.theme.LucentoExtendedColors.walletCard]);
- * two faint circles in the card's ink are the only decoration — flat, no gradients.
+ * A wallet as a bank card: its name (with a debt's yearly rate) and currency where the issuer sits, the type mark
+ * top-right where a card network's logo would be, a chip, the balance as the card's main line, and the opening balance
+ * and movement count along the bottom edge. Each type has its own solid brand face
+ * ([com.lucento.app.core.designsystem.theme.LucentoExtendedColors.walletCard]); two faint circles in the card's ink are
+ * the only decoration — flat, no gradients.
+ *
+ * An instalment loan ([loan]) reads Remaining over a bar of its instalments, with Principal, Paid and the monthly
+ * amortization along the bottom. A credit card shows its Credit limit, Available credit and the Amount due on its
+ * current statement ([cycle]) along the bottom, when the user entered them.
  */
 @Composable
-fun WalletCard(wallet: Wallet, movements: Int, modifier: Modifier = Modifier, institution: Institution? = wallet.institution()) {
+fun WalletCard(
+    wallet: Wallet,
+    movements: Int,
+    modifier: Modifier = Modifier,
+    institution: Institution? = wallet.institution(),
+    cycle: CardCycle? = null,
+    loan: LoanProgress? = null,
+    today: LocalDate = LocalDate.now(),
+) {
     if (institution != null) {
-        InstitutionWalletCard(wallet, institution, movements, modifier)
+        InstitutionWalletCard(wallet, institution, movements, modifier, cycle, loan, today)
         return
     }
     val face = LucentoTheme.extendedColors.walletCard(wallet.type)
@@ -98,13 +121,11 @@ fun WalletCard(wallet: Wallet, movements: Int, modifier: Modifier = Modifier, in
                 ) {
                     Row(verticalAlignment = Alignment.Top) {
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                wallet.name,
+                            NameWithRate(
+                                wallet,
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 color = ink,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.semantics { heading() },
+                                modifier = Modifier.semantics(mergeDescendants = true) { heading() },
                             )
                             Text(
                                 "${wallet.currencyCode} · ${MoneyFormatter.currencyName(wallet.currencyCode)}",
@@ -120,58 +141,162 @@ fun WalletCard(wallet: Wallet, movements: Int, modifier: Modifier = Modifier, in
 
                     Column {
                         Spacer(Modifier.size(Spacing.sm))
-                        CardChip()
-                        Spacer(Modifier.size(Spacing.sm))
-                        Text(
-                            when {
+                        // An instalment loan gives the chip's room to its repayment bar.
+                        if (loan == null) {
+                            CardChip()
+                            Spacer(Modifier.size(Spacing.sm))
+                        }
+                        BalanceBlock(
+                            wallet,
+                            label = when {
+                                loan != null -> "Remaining"
                                 liability -> "Amount owed"
                                 valued -> "Estimated value"
                                 else -> "Current balance"
                             },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = muted,
+                            loan = loan,
+                            muted = muted,
+                            ink = ink,
                         )
-                        MoneyText(money = wallet.cardAmount, style = AmountStyles.large, color = ink, fractionScale = 1f)
+                        Spacer(Modifier.size(Spacing.sm))
                     }
 
-                    CardFooter(wallet, movements, muted, ink)
+                    CardFooter(wallet, movements, muted, ink, cycle, loan, today)
                 }
             }
         }
     }
 }
 
-/** Opening balance (or amount owed at start), then a debt's terms or the movement count, along the card's bottom edge. */
+/**
+ * Along the card's bottom edge: an instalment loan's Principal, Paid and monthly amortization; a credit card's Credit
+ * limit, Available credit and Amount due (when entered); otherwise the opening balance (or amount owed at start), then
+ * a debt's monthly amortization or the movement count. The yearly rate sits in the title ([NameWithRate]).
+ */
 @Composable
-private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color) {
+private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color, cycle: CardCycle?, loan: LoanProgress?, today: LocalDate) {
+    if (wallet.type.isValuedManually) {
+        CardField("Valued", "By you, not by transactions", muted, ink)
+        return
+    }
+    val debt = wallet.debt
+    val installment = debt?.installment?.takeIf { debt.repayment == DebtRepayment.MONTHLY }
+    if (loan != null) {
+        CardFigures(
+            listOfNotNull(
+                CardFigure("Principal", loan.principal),
+                CardFigure("Paid", loan.paid),
+                installment?.let { CardFigure("Monthly", it) },
+            ),
+            muted,
+            ink,
+        )
+        return
+    }
+    val limit = debt?.creditLimit
+    val available = CreditCardMath.available(wallet)
+    if (wallet.type == WalletType.CREDIT_CARD && (available != null || cycle != null)) {
+        CardFigures(
+            listOfNotNull(
+                limit?.let { CardFigure("Credit limit", it) },
+                available?.let { CardFigure("Available", it) },
+                cycle?.let { CardFigure("Amount due", it.amountDue, caption = dueCaption(it, today)) },
+            ),
+            muted,
+            ink,
+        )
+        return
+    }
     Row(verticalAlignment = Alignment.Bottom) {
-        if (wallet.type.isValuedManually) {
-            CardField("Valued", "By you, not by transactions", muted, ink, Modifier.weight(1f))
-        } else {
+        CardField(
+            if (wallet.type.isLiability) "Owed at start" else "Opening balance",
+            MoneyFormatter.format(wallet.openingBalance),
+            muted,
+            ink,
+            Modifier.weight(1f),
+        )
+        if (installment != null) {
             CardField(
-                if (wallet.type.isLiability) "Owed at start" else "Opening balance",
-                MoneyFormatter.format(wallet.openingBalance),
+                "Monthly",
+                MoneyFormatter.format(installment) + (debt?.termMonths?.let { " × $it" } ?: ""),
                 muted,
                 ink,
-                Modifier.weight(1f),
+                alignEnd = true,
             )
-            val debt = wallet.debt
-            val rate = debt?.interestRateBps
-            val installment = debt?.installment?.takeIf { debt.repayment == DebtRepayment.MONTHLY }
-            // A debt's terms take the movements' place: rate, then the monthly amortization and term.
-            if (rate != null) {
-                CardField("Interest", DebtMath.formatRate(rate) + " / yr", muted, ink, Modifier.padding(end = Spacing.md))
-            }
-            when {
-                installment != null -> CardField(
-                    "Monthly",
-                    MoneyFormatter.format(installment) + (debt?.termMonths?.let { " × $it" } ?: ""),
-                    muted,
-                    ink,
-                    alignEnd = true,
-                )
-                rate == null -> CardField("Movements", "$movements", muted, ink, alignEnd = true)
-            }
+        } else {
+            CardField("Movements", "$movements", muted, ink, alignEnd = true)
+        }
+    }
+}
+
+/** "by Nov 5", or "Overdue · Nov 5" once the due day has passed with something still to pay. */
+private fun dueCaption(cycle: CardCycle, today: LocalDate): String =
+    if (cycle.isOverdue(today)) "Overdue · ${shortDate(cycle.dueDate)}" else "by ${shortDate(cycle.dueDate)}"
+
+/** " (24% / yr)" for a debt with a rate; empty otherwise. */
+private fun Wallet.rateSuffix(): String = debt?.interestRateBps?.let { " (${DebtMath.formatRate(it)} / yr)" }.orEmpty()
+
+/**
+ * The wallet's name with its yearly rate appended in a lighter weight — "Car loan (24% / yr)". It wraps onto a second
+ * line rather than cutting the name when the type mark and large text leave little room.
+ */
+@Composable
+private fun NameWithRate(wallet: Wallet, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
+    val rate = wallet.rateSuffix()
+    Text(
+        buildAnnotatedString {
+            append(wallet.name)
+            if (rate.isNotEmpty()) withStyle(SpanStyle(fontWeight = FontWeight.Normal)) { append(rate) }
+        },
+        style = style,
+        color = color,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
+
+/**
+ * The card's main figure: [label] over the balance; an instalment loan adds its repayment bar — one segment per
+ * instalment, the paid ones green — and "8 of 36 instalments paid" in words, so the bar's colour is never the only cue.
+ */
+@Composable
+private fun BalanceBlock(wallet: Wallet, label: String, loan: LoanProgress?, muted: Color, ink: Color) {
+    Text(label, style = MaterialTheme.typography.labelMedium, color = muted)
+    MoneyText(money = wallet.cardAmount, style = AmountStyles.large, color = ink, fractionScale = 1f, minScale = 0.6f)
+    if (loan != null) {
+        Spacer(Modifier.size(Spacing.sm))
+        InstallmentBar(paid = loan.installmentsPaid, total = loan.installments, paidColor = LucentoTheme.extendedColors.paidOnCard(ink), track = ink.copy(alpha = 0.26f))
+        Spacer(Modifier.size(Spacing.xs))
+        Text(
+            "${loan.installmentsPaid} of ${loan.installments} ${if (loan.installments == 1) "installment" else "installments"} paid",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = ink,
+        )
+    }
+}
+
+/**
+ * One segment per instalment with a small cut between them, the first [paid] in [paidColor]. When the term is so long
+ * that segments would be thinner than the cuts, it draws one continuous bar instead.
+ */
+@Composable
+private fun InstallmentBar(paid: Int, total: Int, paidColor: Color, track: Color) {
+    Canvas(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50))) {
+        if (total <= 0) return@Canvas
+        val cut = 2.dp.toPx()
+        val segment = (size.width - cut * (total - 1)) / total
+        if (segment < 3.dp.toPx()) {
+            drawRect(track)
+            drawRect(paidColor, size = Size(size.width * paid.coerceIn(0, total) / total, size.height))
+            return@Canvas
+        }
+        for (i in 0 until total) {
+            drawRect(
+                if (i < paid) paidColor else track,
+                topLeft = Offset(i * (segment + cut), 0f),
+                size = Size(segment, size.height),
+            )
         }
     }
 }
@@ -184,7 +309,15 @@ private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun InstitutionWalletCard(wallet: Wallet, institution: Institution, movements: Int, modifier: Modifier) {
+private fun InstitutionWalletCard(
+    wallet: Wallet,
+    institution: Institution,
+    movements: Int,
+    modifier: Modifier,
+    cycle: CardCycle?,
+    loan: LoanProgress?,
+    today: LocalDate,
+) {
     val card = institution.card
     val ink = registryColor(card.ink)
     val muted = ink.copy(alpha = card.mutedAlpha.coerceIn(0.74f, 1f))
@@ -193,11 +326,13 @@ private fun InstitutionWalletCard(wallet: Wallet, institution: Institution, move
     val brush = if (stops.size == 1) SolidColor(stops.first()) else Brush.linearGradient(stops)
     val liability = wallet.type.isLiability
     val label = when {
+        loan != null -> "Remaining"
         liability -> "Amount owed"
         wallet.type.isValuedManually -> "Estimated value"
         else -> "Current balance"
     }
-    val spoken = "${institution.name}, ${wallet.type.label}, ${wallet.name}, ${label.lowercase()} ${MoneyFormatter.formatSigned(wallet.cardAmount, showPlus = false)}"
+    val spoken = "${institution.name}, ${wallet.type.label}, ${wallet.name}${wallet.rateSuffix()}, ${label.lowercase()} " +
+        MoneyFormatter.formatSigned(wallet.cardAmount, showPlus = false) + cardDetailsSpoken(wallet, cycle, loan, today)
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val minHeight = maxWidth / CardRatio
         Box(
@@ -239,21 +374,16 @@ private fun InstitutionWalletCard(wallet: Wallet, institution: Institution, move
                 }
                 Column {
                     Spacer(Modifier.size(Spacing.md))
-                    CardChip()
-                    Spacer(Modifier.size(Spacing.md))
-                    Text(
-                        wallet.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = muted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (loan == null) {
+                        CardChip()
+                        Spacer(Modifier.size(Spacing.md))
+                    }
+                    NameWithRate(wallet, style = MaterialTheme.typography.bodyMedium, color = muted)
                     Spacer(Modifier.size(Spacing.xs))
-                    Text(label, style = MaterialTheme.typography.labelMedium, color = muted)
-                    MoneyText(money = wallet.cardAmount, style = AmountStyles.large, color = ink, fractionScale = 1f)
+                    BalanceBlock(wallet, label = label, loan = loan, muted = muted, ink = ink)
                     Spacer(Modifier.size(Spacing.md))
                 }
-                CardFooter(wallet, movements, muted, ink)
+                CardFooter(wallet, movements, muted, ink, cycle, loan, today)
             }
         }
     }
@@ -324,74 +454,6 @@ private fun TypeChip(type: WalletType, ink: Color, label: String = type.label) {
         overflow = TextOverflow.Ellipsis,
         modifier = chip,
     )
-}
-
-/**
- * The New wallet sheet's live preview: the same face, type mark and ink as [WalletCard], in a short strip that
- * follows the type, name, currency and amount as they are typed. [amount] is null while the field is empty or invalid.
- */
-@Composable
-fun WalletCardPreview(
-    type: WalletType,
-    name: String,
-    currencyCode: String,
-    amount: com.lucento.app.core.money.Money?,
-    amountLabel: String,
-    modifier: Modifier = Modifier,
-    institution: Institution? = null,
-) {
-    val face = LucentoTheme.extendedColors.walletCard(type)
-    val ink = institution?.let { registryColor(it.card.ink) } ?: face.content
-    val muted = ink.copy(alpha = 0.74f)
-    val stops = institution?.card?.stops?.map(::registryColor).orEmpty()
-    val background = when {
-        stops.size > 1 -> Brush.linearGradient(stops)
-        stops.size == 1 -> SolidColor(stops.first())
-        else -> SolidColor(face.container)
-    }
-    Box(modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(background)) {
-        Box {
-            Canvas(Modifier.matchParentSize()) {
-                drawCircle(ink.copy(alpha = 0.07f), radius = size.height * 0.9f, center = Offset(size.width * 1.0f, size.height * 1.15f))
-            }
-            Row(Modifier.fillMaxWidth().padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        name.ifBlank { "Your ${type.label.lowercase()}" },
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = if (name.isBlank()) muted else ink,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "$currencyCode · ${MoneyFormatter.currencyName(currencyCode)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = muted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.size(Spacing.sm))
-                    Text(amountLabel, style = MaterialTheme.typography.labelMedium, color = muted, maxLines = 1)
-                    MoneyText(
-                        money = amount ?: com.lucento.app.core.money.Money(0, currencyCode),
-                        style = AmountStyles.large,
-                        color = ink,
-                        fractionScale = 1f,
-                    )
-                }
-                Spacer(Modifier.width(Spacing.sm))
-                if (institution != null) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        InstitutionCardMark(institution)
-                        Spacer(Modifier.size(Spacing.xs))
-                        TypeChip(type, ink)
-                    }
-                } else {
-                    TypeMark(type, ink)
-                }
-            }
-        }
-    }
 }
 
 /** The card network's place: the wallet type's glyph above its name in small capitals. */
@@ -492,6 +554,58 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
                 }
             }
             }
+        }
+    }
+}
+
+/** What an institution card's single spoken sentence adds for a loan's progress or a card's limit and amount due. */
+private fun cardDetailsSpoken(wallet: Wallet, cycle: CardCycle?, loan: LoanProgress?, today: LocalDate): String = buildString {
+    if (loan != null) {
+        append(", principal ${MoneyFormatter.format(loan.principal)}, paid ${MoneyFormatter.format(loan.paid)}")
+        append(", ${loan.installmentsPaid} of ${loan.installments} installments paid")
+    }
+    val limit = wallet.debt?.creditLimit
+    val available = CreditCardMath.available(wallet)
+    if (limit != null && available != null) {
+        append(", credit limit ${MoneyFormatter.format(limit)}, available ${MoneyFormatter.formatSigned(available, showPlus = false)}")
+    }
+    if (cycle != null) append(", amount due ${MoneyFormatter.format(cycle.amountDue)} ${dueCaption(cycle, today)}")
+}
+
+/** One labelled amount on a card's bottom edge; [caption] goes under the amount ("by Nov 8"). */
+private data class CardFigure(val label: String, val money: com.lucento.app.core.money.Money, val caption: String? = null)
+
+/**
+ * Up to three labelled amounts across the card's bottom edge, as a small grid: the labels in one row (bottom-aligned,
+ * so a label that wraps at large text grows upwards), the amounts in the next — always on one line, shrinking rather
+ * than being cut — and any caption under its amount. The last figure is right-aligned like a card's expiry.
+ */
+@Composable
+private fun CardFigures(figures: List<CardFigure>, muted: Color, ink: Color) {
+    if (figures.isEmpty()) return
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp)
+    @Composable
+    fun Cells(content: @Composable (CardFigure, Modifier, Boolean) -> Unit, alignment: Alignment.Vertical) {
+        Row(verticalAlignment = alignment, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            figures.forEachIndexed { index, figure ->
+                val end = figures.size > 1 && index == figures.lastIndex
+                content(figure, Modifier.weight(1f), end)
+            }
+        }
+    }
+    Column {
+        Cells({ figure, modifier, end ->
+            Text(figure.label.uppercase(), style = labelStyle, color = muted, maxLines = 2, textAlign = if (end) TextAlign.End else TextAlign.Start, modifier = modifier)
+        }, Alignment.Bottom)
+        Cells({ figure, modifier, end ->
+            Box(modifier, contentAlignment = if (end) Alignment.CenterEnd else Alignment.CenterStart) {
+                MoneyText(money = figure.money, style = AmountStyles.row, color = ink, fractionScale = 1f, minScale = 0.6f)
+            }
+        }, Alignment.Top)
+        if (figures.any { it.caption != null }) {
+            Cells({ figure, modifier, end ->
+                Text(figure.caption.orEmpty(), style = MaterialTheme.typography.labelSmall, color = muted, maxLines = 1, textAlign = if (end) TextAlign.End else TextAlign.Start, modifier = modifier)
+            }, Alignment.Top)
         }
     }
 }

@@ -229,6 +229,9 @@ class AppContainer(application: Application) {
         )
     }
 
+    /** The profile picture (private file; from the photo picker, or the Google account's picture on request). */
+    val profilePhotos: com.lucento.app.data.media.ProfilePhotos by lazy { com.lucento.app.data.media.ProfilePhotos(application) }
+
     val ledgerReset: LocalLedgerReset by lazy {
         val photos = GoalPhotos(application)
         LocalLedgerReset(
@@ -237,7 +240,10 @@ class AppContainer(application: Application) {
             ),
             clearBinding = { syncPreferences.clearBinding() },
             clearTables = { com.lucento.app.data.local.clearLedgerTables(database) },
-            deleteGoalPhotos = { photos.deleteAll() },
+            deletePhotos = {
+                photos.deleteAll()
+                profilePhotos.delete()
+            },
             accountSetup = preferences,
         )
     }

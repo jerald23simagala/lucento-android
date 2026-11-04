@@ -1,5 +1,6 @@
 package com.lucento.app.feature.onboarding
 
+import com.lucento.app.core.designsystem.component.SheetHeader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
@@ -115,7 +116,11 @@ import com.lucento.app.feature.budget.CategoryPresetPicker
 import com.lucento.app.feature.budget.CategoryReview
 
 @Composable
-fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModel.Factory)) {
+fun OnboardingScreen(
+    viewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModel.Factory),
+    /** The profile photo actions, so a Google sign-in on the sync step can offer the account's picture. */
+    photo: com.lucento.app.feature.profile.ProfilePhotoState = com.lucento.app.feature.profile.ProfilePhotoState(),
+) {
     val step by viewModel.step.collectAsStateWithLifecycle()
     val furthestStep by viewModel.furthestStep.collectAsStateWithLifecycle()
     val currency by viewModel.currency.collectAsStateWithLifecycle()
@@ -286,6 +291,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = viewModel(factory = Onboar
                     onContinue = viewModel::next,
                     path = backupPath,
                     onPath = viewModel::selectBackupPath,
+                    photo = photo,
                 )
                 else -> ConfirmStep(
                     currency, theme, features, picks.count, error, signedInEmail,
@@ -404,12 +410,11 @@ private fun WelcomeStep(
 private fun ReturningUserSheet(onSignIn: (() -> Unit)?, onRestoreFile: (() -> Unit)?, onDismiss: () -> Unit) {
     com.lucento.app.core.designsystem.component.LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = Spacing.gutter).padding(bottom = Spacing.xl)) {
-            Text("Welcome back", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            Text(
-                "Bring your money in with you. Nothing is combined with a new setup.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.xxs, bottom = Spacing.md),
+            SheetHeader(
+                title = "Welcome back",
+                subtitle = "Bring your money in with you. Nothing is combined with a new setup.",
+                leading = { com.lucento.app.core.designsystem.component.LucentoMascot(size = 52.dp, mood = com.lucento.app.core.designsystem.component.MascotMood.Greeting) },
+                modifier = Modifier.padding(bottom = Spacing.xs),
             )
             if (onSignIn != null) {
                 ChoiceCard(
@@ -897,6 +902,48 @@ private fun ThemeChoices(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
 }
 
 /**
+ * After a Google sign-in: "Use your Google photo?" — one tap downloads the account's picture once and keeps it on this
+ * phone for the profile button; "Not now" leaves it (it can be added later from the profile menu). Never automatic.
+ */
+@Composable
+private fun GooglePhotoOffer(photo: com.lucento.app.feature.profile.ProfilePhotoState) {
+    var dismissed by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val done = photo.image != null
+    if (dismissed && !done) return
+    com.lucento.app.core.designsystem.component.LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(contentAlignment = Alignment.Center) {
+                com.lucento.app.core.designsystem.component.ProfileAvatar(null, size = 56.dp, photo = photo.image)
+                if (photo.busy) androidx.compose.material3.CircularProgressIndicator(Modifier.size(56.dp), strokeWidth = 2.5.dp)
+            }
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (done) "Your Google photo is on your profile" else "Use your Google photo?",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    if (done) "Change or remove it any time from the profile menu."
+                    else "Lucento downloads your Google profile picture once and keeps it only on this phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        photo.message?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = Spacing.xs))
+        }
+        if (!done) {
+            Spacer(Modifier.height(Spacing.sm))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                LucentoTextButton(text = "Not now", onClick = { dismissed = true }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LucentoTextButton(text = if (photo.busy) "Getting photo…" else "Use photo", onClick = { if (!photo.busy) photo.onUseGoogle() })
+            }
+        }
+    }
+}
+
+/**
  * Optional cloud sync: back up and sync across devices by connecting Google or an email account. Turning it on needs
  * an account; "Not now" keeps everything on this phone (sync can be turned on later in Settings).
  */
@@ -917,6 +964,7 @@ private fun SyncStep(
     onContinue: () -> Unit,
     path: BackupPath,
     onPath: (BackupPath) -> Unit,
+    photo: com.lucento.app.feature.profile.ProfilePhotoState = com.lucento.app.feature.profile.ProfilePhotoState(),
 ) {
     val ext = LucentoTheme.extendedColors
     // Without cloud sync in this build, the account path isn't offered.
@@ -977,12 +1025,18 @@ private fun SyncStep(
                     container = ext.warningContainer,
                     content = ext.warning,
                 )
-                signedInEmail != null -> InfoNote(
-                    "Connected as ${signedInEmail.ifEmpty { "your account" }}. Sync starts when you finish setting up.",
-                    icon = Icons.Outlined.CloudDone,
-                    container = MaterialTheme.colorScheme.primaryContainer,
-                    content = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                signedInEmail != null -> {
+                    InfoNote(
+                        "Connected as ${signedInEmail.ifEmpty { "your account" }}. Sync starts when you finish setting up.",
+                        icon = Icons.Outlined.CloudDone,
+                        container = MaterialTheme.colorScheme.primaryContainer,
+                        content = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    if (photo.googleAvailable) {
+                        Spacer(Modifier.height(Spacing.md))
+                        GooglePhotoOffer(photo)
+                    }
+                }
                 shownPath != BackupPath.ACCOUNT -> Unit
                 else -> {
                     InfoNote(

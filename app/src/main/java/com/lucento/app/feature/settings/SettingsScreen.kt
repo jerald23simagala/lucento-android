@@ -1,5 +1,6 @@
 package com.lucento.app.feature.settings
 
+import androidx.compose.material.icons.outlined.Restore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -675,6 +676,15 @@ private fun RestorePreviewDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        icon = {
+            com.lucento.app.core.designsystem.component.IconTile(
+                icon = androidx.compose.material.icons.Icons.Outlined.Restore,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                content = MaterialTheme.colorScheme.onPrimaryContainer,
+                size = 52.dp,
+                shape = androidx.compose.foundation.shape.CircleShape,
+            )
+        },
         title = { Text("Restore this backup?", style = MaterialTheme.typography.headlineSmall) },
         text = {
             Column {

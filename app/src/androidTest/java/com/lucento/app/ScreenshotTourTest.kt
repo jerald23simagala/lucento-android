@@ -17,6 +17,8 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -27,6 +29,8 @@ import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.CategoryKind
+import com.lucento.app.domain.DebtRepayment
+import com.lucento.app.domain.DebtTerms
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.WalletType
@@ -85,6 +89,30 @@ class ScreenshotTourTest {
     /** Budget is a dock tab. */
     private fun openBudgets() {
         tab("Budget")
+    }
+
+    /**
+     * Opens a row of a lazy list by its text: scrolls whichever list holds it into view, then runs the row's click
+     * action directly, so a row that ends up under the floating dock is still opened rather than the dock.
+     */
+    private fun openRow(text: String) {
+        val lists = compose.onAllNodes(hasScrollToNodeAction())
+        val count = lists.fetchSemanticsNodes().size
+        for (i in 0 until count) {
+            if (runCatching { lists[i].performScrollToNode(hasText(text)) }.isSuccess) break
+        }
+        compose.onNodeWithText(text).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitForIdle()
+    }
+
+    /** Scrolls whichever lazy list holds [text] until it is on screen (rows off screen aren't composed yet). */
+    private fun scrollToText(text: String) {
+        val lists = compose.onAllNodes(hasScrollToNodeAction())
+        val count = lists.fetchSemanticsNodes().size
+        for (i in 0 until count) {
+            if (runCatching { lists[i].performScrollToNode(hasText(text)) }.isSuccess) break
+        }
+        compose.waitForIdle()
     }
 
     private fun tab(label: String) {
@@ -191,7 +219,26 @@ class ScreenshotTourTest {
             val bank = id(wallets.create("Everyday bank", WalletType.BANK, money(3_250)))
             val cash = id(wallets.create("Cash", WalletType.CASH, money(1_200)))
             val savings = id(wallets.create("Savings", WalletType.SAVINGS, money(8_400)))
-            id(wallets.create("Visa card", WalletType.CREDIT_CARD, money(640)))
+            // A card with a limit and billing days: its statement closed ten days ago and its payment is due in five, so
+            // Home lists the payment and the card shows its credit limit, available credit and amount due.
+            id(
+                wallets.create(
+                    "Visa card", WalletType.CREDIT_CARD, money(640),
+                    DebtTerms(
+                        interestRateBps = 2400,
+                        creditLimit = money(5_000),
+                        statementDay = today.minusDays(10).dayOfMonth,
+                        dueDay = today.plusDays(5).dayOfMonth,
+                    ),
+                ),
+            )
+            // An instalment loan with three repayments recorded in earlier months (3 of 24 paid).
+            val loan = id(
+                wallets.create(
+                    "Car loan", WalletType.LOAN, money(12_000),
+                    DebtTerms(interestRateBps = 2400, repayment = DebtRepayment.MONTHLY, termMonths = 24, installment = money(634, 44)),
+                ),
+            )
             // The composer's wallet bar starts on the default, so it opens without asking which wallet to use.
             container.preferences.setDefaultWallet(bank)
 
@@ -235,20 +282,40 @@ class ScreenshotTourTest {
             goals.contribute(emergency, money(2_100), today.minusMonths(2), "", UUID.randomUUID().toString())
             goals.contribute(trip, money(1_650), today.minusMonths(1), "", UUID.randomUUID().toString())
 
+            (1..3).forEach { n ->
+                container.transactions.saveTransfer(
+                    TransactionRepository.TransferInput(
+                        group = null, clientUuid = UUID.randomUUID().toString(), fromWalletId = bank, toWalletId = loan,
+                        amount = money(400), date = today.minusMonths(n.toLong()).withDayOfMonth(1), note = "",
+                    ),
+                )
+            }
+
             val recurring = container.recurring
             fun schedule(name: String, amount: Money, start: LocalDate, category: Long?) = RecurringRepository.Input(
                 null, name, TransactionType.EXPENSE, amount, bank, category, Frequency.MONTHLY, 1, start, null,
             )
-            recurring.save(schedule("Gym membership", money(29, 99), today.minusDays(3), null))
+            // Every scheduled bill has a category now (owner, 2026-11-03); the internet bill is overdue.
+            recurring.save(schedule("Fibre internet", money(29, 99), today.minusDays(3), cat("Internet")))
             recurring.save(schedule("Phone plan", money(35), today.plusDays(5), cat("Mobile phone")))
             recurring.save(schedule("Rent", money(1_500), today.plusDays(12), cat("Rent")))
+            // A loan instalment: a transfer from the bank to the loan, shown in neutral ink and never in Bills due.
+            recurring.save(
+                RecurringRepository.Input(
+                    null, "Car loan instalment", TransactionType.EXPENSE, money(634, 44), bank, null, Frequency.MONTHLY, 1,
+                    today.plusDays(8), null, toWalletId = loan,
+                ),
+            )
         }
 
         // ---------------------------------------------------------------- dashboard: within budget (happy sun)
         val total = MoneyFormatter.format(money(2_590))
         waitForText("Monthly budget")
         waitForText(total) // the pace card's budget figure is the sum of the category amounts
-        waitForText("Safe to spend") // the budget card's third figure this month: budget − spent − bills due
+        // Bills due counts every scheduled bill, whatever its category; Safe to spend always closes the card (0 in red
+        // once the bills take what's left).
+        waitForText("Bills due")
+        waitForText("Safe to spend")
         shot("06-home-within-budget")
         // The bell lists scheduled payments due this week (the seeded gym membership is overdue).
         compose.onNode(hasContentDescription("Upcoming payments", substring = true)).performClick()
@@ -306,12 +373,37 @@ class ScreenshotTourTest {
         tab("Wallets")
         waitForText("Assets")
         shot("12-wallets")
+        // New wallet: the card being built is the wallet page's own card, live (the Add button is in the list's header,
+        // so this runs while the list is still at the top).
+        compose.onNodeWithContentDescription("Add wallet").performClick()
+        waitForText("Build it below and watch it take shape.")
+        shot("12g-new-wallet")
+        backUntilGone("Build it below and watch it take shape.")
         // Card view: wallet faces two to a row. The choice is a device preference, so switch back for later shots.
         compose.onNodeWithContentDescription("Card view").performScrollTo().performClick()
         compose.waitForIdle()
         shot("12b-wallets-cards")
         compose.onNodeWithContentDescription("Row view").performScrollTo().performClick()
         compose.waitForIdle()
+        // Account pages: an instalment loan (Principal, Paid, Remaining and its instalments), a credit card (limit,
+        // available, amount due) and its editor's card details, and an everyday account (Transfer and Adjust balance).
+        openRow("Car loan")
+        waitForText("3 of 24 installments paid")
+        shot("12c-wallet-loan")
+        back()
+        openRow("Visa card")
+        waitForText("Amount due")
+        shot("12d-wallet-card")
+        compose.onNodeWithContentDescription("Edit account").performClick()
+        waitForText("Card details")
+        runCatching { compose.onNodeWithText("Statement day").performScrollTo() }
+        shot("12e-card-editor")
+        backUntilGone("Card details")
+        back()
+        openRow("Everyday bank")
+        waitForText("Adjust balance")
+        shot("12f-wallet-bank")
+        back()
         tab("Home")
         compose.onNodeWithContentDescription("Insights").performScrollTo().performClick()
         waitForText("Income and expenses")
@@ -336,10 +428,19 @@ class ScreenshotTourTest {
         shot("17-quick-links")
         // Scroll to the tile itself: after scrolling to Debts, the row above can sit under the pinned header.
         compose.onNodeWithContentDescription("Scheduled transactions").performScrollTo().performClick()
-        waitForText("Gym membership")
+        // The hero is one spoken summary for TalkBack, so wait for the projection card under it.
+        waitForText("Next 3 months")
         shot("18-recurring")
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.waitForIdle()
+        // The agenda: overdue first, then this month's dates; then each plan once under All schedules.
+        scrollToText("Fibre internet")
+        shot("18b-recurring-agenda")
+        scrollToText("All schedules")
+        click("All schedules")
+        scrollToText("Car loan instalment")
+        waitForText("Car loan instalment")
+        shot("18c-recurring-schedules")
+        // The top bar scrolled away with the list: leave with the system back.
+        back()
         tab("Home")
         waitForText("Monthly budget")
         // The Home header is pinned, so the profile button is always on screen.

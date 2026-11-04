@@ -8,6 +8,14 @@
 > Production writes, production deploys, production env changes, merges and destructive Git operations need explicit
 > owner approval.
 
+## Owner to-dos (open, for the owner to run)
+
+| # | To-do | Status | Why it matters |
+|---|---|---|---|
+| OT-1 | Apply `supabase/migrations/20261103180000_credit_card_billing.sql` to **`lucento-test`** (SQL editor, one `begin … commit` block; verify query in `PRODUCTION_MIGRATION.md`, top section) | **Not done** (owner confirmed 2026-11-03) | A v11 build sends `credit_limit_minor`, `statement_day`, `due_day` on every wallet row; until the project has them, wallet sync from a v11 build stalls (rows stay pending, nothing is lost) |
+| OT-2 | Apply the same migration to **production** before any v11 release | **Not done** | Same as OT-1, for release builds |
+| OT-3 | Re-check sync on a phone after OT-1 (add a card with a limit and billing days, sync, see it on a second device) | Waits on OT-1 | The only end-to-end check of the v11 sync columns; not possible here until the migration is applied |
+
 ## Stabilization cycle (2026-11-02, uncommitted on `main` from 01cfd04)
 
 | Item | Status | Evidence |
@@ -319,7 +327,56 @@ validation and rate limiting (N-09); toolchain alignment (N-19); dependency upgr
 Main session implements. Architect and QA agents review P0-2, P0-4, P1-2 and P1-5 before merging. One coherent
 change per branch, tests with every change, exact reporting of what ran, no production writes without approval.
 
-## Core screens — owner review round (done 2026-11-03, uncommitted on `feature/core-screens-refinement`)
+## Core screens — owner review round 3 (2026-11-03, uncommitted on `feature/core-screens-refinement`)
+
+Owner comments: dialogs aligned and livelier (Add Wallet's card = the wallet being built), category required on scheduled
+transactions, a livelier bell; budget card Safe to spend sticky (0 and red when over), Bills due always zero, Assets % /
+Liabilities % / net worth formula on one row, Upcoming coloured by kind; Scheduled page refactor (month hero, filters with
+From–To, 3-month projection, default to due today and this month); profile picture from Google or uploaded. As built:
+`docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 3"; rules in `docs/CALCULATIONS.md` ("Safe to spend",
+"Scheduled outlook"); privacy in `docs/SYNC.md`.
+
+| Next | Why |
+|---|---|
+| **Owner: OT-1 / OT-2** (credit card billing migration, top of this file) | Still not applied; a v11 build's wallet sync stalls without it |
+| Owner: try "Use my Google photo" on a phone signed in with Google (CS-11) | The only path not exercised here (no Google sign-in on this machine's debug key) |
+| Owner review on a real phone: Scheduled page, bell, New wallet, budget card | Visual sign-off; API 36 still blocked here (CS-7) |
+| Optional: a one-time prompt to give pre-round-3 schedules a category (CS-12) | They keep working; editing asks for one |
+
+| Check | Result |
+|---|---|
+| Unit tests | **855/855** (+12: `ScheduleOutlookTest` ×7 flows, occurrences, overdue, paused / ended / paid, card payments, totals per currency, projection; `HomeBudgetCardTest` bills in any category + Safe to spend at 0; `CashflowCalculatorTest` updated; `PlanRepositoriesTest` category required; `ProfilePhotosTest` ×4 host check, size suffix, metadata, sampling; `AccountSetupResetTest` photo cleared) |
+| Lint | 0 errors, 10 warnings — the same set as earlier runs (round 2's handover said 9: miscount) |
+| Build | `assembleDebug`, `assembleDebugAndroidTest`; APK `artifacts/apk/lucento-debug-review4.apk` |
+| `ScreenshotTourTest` | **PASS** on API 28, final code (39 shots in `artifacts/core-screens/review4/`); new: 12g new wallet, 18 / 18b / 18c Scheduled; seeds now give every scheduled bill a category and add a loan instalment |
+| Device checks (API 28) | Budget card (Bills due −$1,594.98 = the Scheduled page's expenses; Safe to spend $0.00 red, "Bills due take what’s left"), Upcoming colours, bell, Scheduled hero / projection / agenda / All schedules, From–To picker applied (Nov 8 – Nov 29: summary and list follow), schedule editor refuses a bill without a category, profile photo picked from files and removed, Wallets legend one line at 411dp and 360dp @ 1.3, light + dark. Fixed on the way: a picked photo was refused (bounds-only decode returns null), hero pills cut at 360dp @ 1.3 (now wrap / one line per flow), kind filter clipped at 1.3 (pills), a later occurrence's "projected" note cut off, projection card too tall |
+| Not run | Google photo download (CS-11); API 36 (CS-7) |
+
+## Core screens — owner review round 2 (2026-11-03, uncommitted on `feature/core-screens-refinement`)
+
+Owner comments: budget formula without + − = (Remaining green / Overspent red, Bills due red, Safe to spend green only
+above zero, else hidden), To watch top 5 with "See all" bottom right; mascot on empty upcoming lists; wallet page
+Transfer / Payment + Adjust balance (out of Edit wallet) for assets and cards; instalment loan card (Principal, Paid,
+Remaining, segmented bar, "x of N installments paid"); rate in the card title; credit card editor with credit limit,
+statement day and due day (no One time / Monthly); due day as a payment reminder excluded from Safe to spend; card
+shows Credit limit, Amount due, Available. As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 2".
+
+| Next | Why |
+|---|---|
+| **Owner: apply `20261103180000_credit_card_billing.sql` to `lucento-test`, then production** (`PRODUCTION_MIGRATION.md`, top section) — tracked as OT-1 / OT-2 | A v11 build sends the new wallet columns; until a project has them, wallet sync from v11 stalls (rows stay pending) |
+| Owner review of the new wallet faces and Home formula on a real phone | Visual sign-off; API 36 still blocked here (CS-7) |
+| ~~Optional: list card payments on the Scheduled screen's Upcoming tab too~~ | Done in round 3 (the agenda lists them and they open the card) |
+
+| Check | Result |
+|---|---|
+| Unit tests | **843/843** (+14: `DebtProgressTest` ×10 cycle, dues, available, loan progress, terms; card terms round trip in `DebtPaymentTest`; formula rules in `HomeBudgetCardTest`; card billing + v2 files in `BackupTest`; card fields across two devices in `SyncEngineTest`) |
+| Lint | 0 errors, 10 warnings (pre-existing; recorded as 9 at the time — miscount, same set) |
+| Build | `assembleDebug`, `assembleDebugAndroidTest`; schema `11.json` exported; `tools/check_migrations.py` 10 → 11 matches |
+| `ScreenshotTourTest` | **PASS** on API 28; seeds a card with limit and billing days and a 24-instalment loan with 3 repayments; new shots 12c–12f; Home asserts "Bills due" (this month's Safe to spend is negative, so hidden) |
+| Device checks (API 28) | Card, loan and bank pages, card editor, Home budget card, Upcoming with the card payment, bell — 411dp day/night and 360dp @ 1.3. Fixed on the way: card title cut to "Vis…" (now wraps), footer amounts misaligned when labels wrap (now a label/amount grid), card-due caption cut, bell listed card payments before overdue items, a v2 backup's debt rows were refused (codec now treats the new keys as optional) |
+| Not run | `MigrationTest.migrate10To11` (instrumented; CI's emulator migration job runs it); API 36 (CS-7); sync against a real project (migration not applied) |
+
+## Core screens — owner review round (done 2026-11-03, committed `b139646`)
 
 Owner comments: guide budget rows (icon + category left, amount right); onboarding "alive" (icons on texts, styled rows,
 e.g. currency); Home: shortcuts right after the Net Wallet Balance card, budget card resized (ring = formula width, To

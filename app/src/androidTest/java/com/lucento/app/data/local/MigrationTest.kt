@@ -404,6 +404,41 @@ class MigrationTest {
     }
 
     /**
+     * Credit card billing: existing cards and loans keep their terms exactly, with no limit and no billing days (so
+     * nothing changes and nothing re-uploads); new terms rows can carry them and still follow their wallet.
+     */
+    @Test
+    fun migrate10To11_keepsDebtTermsAndAddsCardBillingWithoutChangingAnything() {
+        helper.createDatabase(TEST_DB, 10).apply {
+            execSQL(
+                "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, dirty) " +
+                    "VALUES (1, 'Visa', 'CREDIT_CARD', 'USD', 64000, 0, 0, 1, 1, 'w-1', 0), (2, 'Car loan', 'LOAN', 'USD', 500000, 1, 0, 1, 1, 'w-2', 0)"
+            )
+            execSQL(
+                "INSERT INTO debt_terms (wallet_id, interest_rate_bps, repayment, term_months, installment_minor, updated_at) " +
+                    "VALUES (1, 2400, 'ONE_TIME', NULL, NULL, 1), (2, 1250, 'MONTHLY', 24, 23654, 1)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 11, true, Migrations.MIGRATION_10_11)
+
+        db.query("SELECT interest_rate_bps, repayment, term_months, installment_minor, credit_limit_minor, statement_day, due_day FROM debt_terms WHERE wallet_id = 2").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(1250, c.getInt(0)); assertEquals("MONTHLY", c.getString(1)); assertEquals(24, c.getInt(2)); assertEquals(23654L, c.getLong(3))
+            assertTrue(c.isNull(4)); assertTrue(c.isNull(5)); assertTrue(c.isNull(6))
+        }
+        assertEquals(2L, db.long("SELECT COUNT(*) FROM debt_terms WHERE credit_limit_minor IS NULL AND statement_day IS NULL AND due_day IS NULL"))
+        assertEquals("a migrated card is unchanged, so it does not re-upload", 0L, db.long("SELECT SUM(dirty) FROM wallets"))
+
+        db.execSQL("PRAGMA foreign_keys = ON")
+        db.execSQL("UPDATE debt_terms SET credit_limit_minor = 500000, statement_day = 15, due_day = 5 WHERE wallet_id = 1")
+        assertEquals(500000L, db.long("SELECT credit_limit_minor FROM debt_terms WHERE wallet_id = 1"))
+        db.execSQL("DELETE FROM wallets WHERE id = 1")
+        assertEquals(1L, db.long("SELECT COUNT(*) FROM debt_terms"))
+        db.assertNoForeignKeyViolations()
+    }
+
+    /**
      * A fresh install never runs a migration — Room creates the tables from the entities — so the sync triggers must
      * come from the open callback. Before SyncTriggers, a new install had none: deletes never reached other devices and
      * edits after the first sync were never pushed.

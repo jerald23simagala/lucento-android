@@ -1,13 +1,21 @@
 package com.lucento.app.feature.plan
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,49 +23,70 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.CategoryTile
+import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.Confirmation
 import com.lucento.app.core.designsystem.component.ConfirmationHost
 import com.lucento.app.core.designsystem.component.EmptyIllustration
 import com.lucento.app.core.designsystem.component.EmptyState
+import com.lucento.app.core.designsystem.component.MascotMessage
 import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.HeroCard
 import com.lucento.app.core.designsystem.component.HeroPill
 import com.lucento.app.core.designsystem.component.HeroTones
 import com.lucento.app.core.designsystem.component.InfoNote
+import com.lucento.app.core.designsystem.component.LegendKey
 import com.lucento.app.core.designsystem.component.LucentoAnimation
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoCard
@@ -67,10 +96,13 @@ import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.SegmentedToggle
+import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.StatusTones
+import com.lucento.app.core.designsystem.component.ToneSectionHeader
 import com.lucento.app.core.designsystem.component.WalletIdentityTile
-import com.lucento.app.core.designsystem.component.WalletTypeTile
+import com.lucento.app.core.designsystem.component.icon
+import com.lucento.app.core.designsystem.component.scheduledFlowColor
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
@@ -79,24 +111,70 @@ import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.core.money.MoneyParser
 import com.lucento.app.data.repository.RecurringRepository
-import com.lucento.app.domain.CategoryKind
-import com.lucento.app.domain.DebtMath
-import com.lucento.app.domain.DebtRepayment
+import com.lucento.app.domain.CreditCardMath
+import com.lucento.app.domain.FlowTotals
 import com.lucento.app.domain.Frequency
-import com.lucento.app.domain.RecurringMath
+import com.lucento.app.domain.MonthOutlook
 import com.lucento.app.domain.RecurringSchedule
-import com.lucento.app.domain.RecurringState
+import com.lucento.app.domain.ScheduleOutlook
+import com.lucento.app.domain.ScheduledFlow
+import com.lucento.app.domain.ScheduledItem
 import com.lucento.app.domain.TransactionType
-import com.lucento.app.domain.Wallet
-import com.lucento.app.feature.transactions.shortDayLabel
-import kotlinx.coroutines.launch
+import com.lucento.app.domain.flow
+import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
+import java.util.Locale
 
-private enum class RecurringTab(val label: String) { UPCOMING("Upcoming"), ACTIVE("Active"), PAUSED("Paused") }
+/** The page's two ways in: dated occurrences to act on, or each schedule once to manage. */
+private enum class ScheduledView(val label: String) { AGENDA("Upcoming"), SCHEDULES("All schedules") }
+
+/** The agenda's date range. [THIS_MONTH] is the default: overdue items, then today to the month's end. */
+internal enum class ScheduledRange(val label: String) {
+    THIS_MONTH("This month"),
+    NEXT_30_DAYS("Next 30 days"),
+    NEXT_3_MONTHS("Next 3 months"),
+    CUSTOM("Custom range"),
+}
+
+/** [from]..[to] for [range]; a custom range is ordered and at most [ScheduleOutlook.MAX_RANGE_DAYS] long. */
+internal fun scheduledRange(range: ScheduledRange, today: LocalDate, customFrom: LocalDate?, customTo: LocalDate?): Pair<LocalDate, LocalDate> =
+    when (range) {
+        ScheduledRange.THIS_MONTH -> today to YearMonth.from(today).atEndOfMonth()
+        ScheduledRange.NEXT_30_DAYS -> today to today.plusDays(29)
+        ScheduledRange.NEXT_3_MONTHS -> today to YearMonth.from(today).plusMonths(2).atEndOfMonth()
+        ScheduledRange.CUSTOM -> {
+            val from = customFrom ?: today
+            val to = (customTo ?: from).let { if (it.isBefore(from)) from else it }
+            from to minOf(to, from.plusDays(ScheduleOutlook.MAX_RANGE_DAYS - 1))
+        }
+    }
+
+/** The agenda filters, as on Transactions: what kind, which wallet, which category. Null is "all". */
+internal data class ScheduledFilter(val flow: ScheduledFlow? = null, val walletId: Long? = null, val categoryId: Long? = null) {
+    val isActive: Boolean get() = flow != null || walletId != null || categoryId != null
+
+    fun matches(item: ScheduledItem): Boolean = when (item) {
+        is ScheduledItem.Occurrence -> matches(item.schedule)
+        is ScheduledItem.CardPayment -> (flow == null || flow == ScheduledFlow.TRANSFER) &&
+            (walletId == null || walletId == item.due.wallet.id) && categoryId == null
+    }
+
+    fun matches(schedule: RecurringSchedule): Boolean =
+        (flow == null || flow == schedule.flow) &&
+            (walletId == null || walletId == schedule.walletId || walletId == schedule.toWalletId) &&
+            (categoryId == null || categoryId == schedule.categoryId)
+}
 
 /**
- * Recurring payments are plans you confirm: "Mark paid" records a real transaction (once, never twice),
- * "Skip" moves to the next date. Nothing is posted automatically.
+ * Scheduled transactions: plans you confirm. "Mark paid" records a real transaction (once, never twice), "Skip" moves to
+ * the next date; nothing is posted automatically. The page opens on this month — what's still to come in income,
+ * expenses and transfers — then a three-month projection, and an agenda of every dated occurrence (overdue first, then
+ * today to the month's end by default) that the filters and a From–To range reshape. "All schedules" lists each plan once.
  */
 @Composable
 fun RecurringScreen(
@@ -107,22 +185,38 @@ fun RecurringScreen(
     onAddSchedule: () -> Unit = {},
     /** Opens the full-page editor for this schedule. */
     onEditSchedule: (Long) -> Unit = {},
+    /** Opens a card's page from its payment reminder (where Payment is). */
+    onOpenWallet: (Long) -> Unit = {},
     viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableStateOf(RecurringTab.UPCOMING) }
+    var view by rememberSaveable { mutableStateOf(ScheduledView.AGENDA) }
+    var range by rememberSaveable { mutableStateOf(ScheduledRange.THIS_MONTH) }
+    var customFrom by rememberSaveable { mutableStateOf<LocalDate?>(null) }
+    var customTo by rememberSaveable { mutableStateOf<LocalDate?>(null) }
+    var flowFilter by rememberSaveable { mutableStateOf<ScheduledFlow?>(null) }
+    var walletFilter by rememberSaveable { mutableStateOf<Long?>(null) }
+    var categoryFilter by rememberSaveable { mutableStateOf<Long?>(null) }
     var actingOn by rememberSaveable { mutableStateOf(openScheduleId) }
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
-    val shown = state.schedules
-        .filter { s ->
-            when (tab) {
-                RecurringTab.UPCOMING -> RecurringMath.state(s, state.today) == RecurringState.UPCOMING
-                RecurringTab.ACTIVE -> !s.paused && !s.isFinished
-                RecurringTab.PAUSED -> s.paused
-            }
-        }
-        .sortedBy { it.nextDue ?: LocalDate.MAX }
+    val filter = ScheduledFilter(flowFilter, walletFilter, categoryFilter)
+    val today = state.today
+    val code = state.primaryCurrency
+    val active = remember(state.schedules) { state.schedules.filter { !it.paused && !it.isFinished } }
+    // Card payments for the current statement of each card, as far ahead as the projection looks.
+    val cardDues = remember(state.wallets, state.transactions, today) {
+        CreditCardMath.dues(state.wallets, state.transactions, today, YearMonth.from(today).plusMonths(ScheduleOutlook.PROJECTION_MONTHS - 1L).atEndOfMonth())
+    }
+    val thisMonth = remember(active, cardDues, today, code) { ScheduleOutlook.projection(active, cardDues, today, code, months = 1).first() }
+    val projection = remember(active, cardDues, today, code, filter) {
+        ScheduleOutlook.projection(active.filter(filter::matches), cardDues.filter { filter.matches(ScheduledItem.CardPayment(it)) }, today, code)
+    }
+    val (from, to) = scheduledRange(range, today, customFrom, customTo)
+    val agenda = remember(active, cardDues, today, from, to, filter) {
+        ScheduleOutlook.items(active, cardDues, today, from, to).filter(filter::matches)
+    }
+    val hasAnything = state.schedules.isNotEmpty() || cardDues.isNotEmpty()
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -132,16 +226,16 @@ fun RecurringScreen(
             item(key = "bar") {
                 LucentoTopBar(title = "Scheduled", onBack = onBack, actions = {
                     if (state.schedules.isNotEmpty() && state.wallets.isNotEmpty()) {
-                        com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = onAddSchedule, contentDescription = "Add recurring payment")
+                        com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = onAddSchedule, contentDescription = "Add scheduled transaction")
                     }
                 })
             }
-            if (!state.loading && state.schedules.isEmpty()) {
+            if (!state.loading && !hasAnything) {
                 item(key = "empty") {
                     EmptyState(
-                        title = "Nothing recurring yet",
+                        title = "Nothing scheduled yet",
                         body = if (state.wallets.isEmpty()) {
-                            "Add a wallet first — every recurring payment is paid from (or into) one."
+                            "Add a wallet first — every scheduled transaction is paid from (or into) one."
                         } else {
                             "Add rent, subscriptions, loan payments or your salary. Lucento reminds you here and on Home, and you confirm each one."
                         },
@@ -149,50 +243,70 @@ fun RecurringScreen(
                         action = if (state.wallets.isEmpty()) {
                             null
                         } else {
-                            { LucentoPrimaryButton(text = "Add recurring payment", onClick = onAddSchedule) }
+                            { LucentoPrimaryButton(text = "Schedule a transaction", onClick = onAddSchedule) }
                         },
                     )
                 }
-            } else if (state.schedules.isNotEmpty()) {
-                item(key = "hero") { DueSoonCard(state) }
-                item(key = "tabs") {
+            } else if (hasAnything) {
+                item(key = "hero") { MonthHero(thisMonth, today) }
+                item(key = "projection") { ProjectionCard(projection, filter.isActive) }
+                item(key = "view") {
                     val colors = MaterialTheme.colorScheme
                     SegmentedToggle(
-                        options = RecurringTab.entries.map { it to it.label },
-                        selected = tab,
-                        onSelect = { tab = it },
+                        options = ScheduledView.entries.map { it to it.label },
+                        selected = view,
+                        onSelect = { view = it },
                         compact = true,
                         selectedTone = { TonePair(colors.primary, colors.onPrimary) },
-                        modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.sm),
+                        modifier = Modifier.padding(top = Spacing.lg),
                     )
                 }
-                if (shown.isEmpty()) {
-                    item(key = "none") {
-                        Text(
-                            when (tab) {
-                                RecurringTab.UPCOMING -> "Nothing due in the next two weeks."
-                                RecurringTab.ACTIVE -> "No active schedules."
-                                RecurringTab.PAUSED -> "Nothing is paused."
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = Spacing.lg),
-                        )
-                    }
-                } else {
-                    item(key = "card-$tab") {
-                        // One card for the list, rows split by hairlines: the Transactions and Wallets treatment.
-                        LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
-                            shown.forEachIndexed { index, schedule ->
-                                ScheduleRow(schedule, state, onClick = { actingOn = schedule.id })
-                                if (index < shown.lastIndex) Hairline(strong = true)
+                item(key = "filters") {
+                    ScheduledFilters(
+                        state = state,
+                        filter = filter,
+                        showRange = view == ScheduledView.AGENDA,
+                        range = range,
+                        from = from,
+                        to = to,
+                        onFlow = { flowFilter = it },
+                        onWallet = { walletFilter = it },
+                        onCategory = { categoryFilter = it },
+                        onRange = { range = it },
+                        onCustomRange = { start, end ->
+                            customFrom = start
+                            customTo = end
+                            range = ScheduledRange.CUSTOM
+                        },
+                        onClear = {
+                            flowFilter = null
+                            walletFilter = null
+                            categoryFilter = null
+                            range = ScheduledRange.THIS_MONTH
+                        },
+                    )
+                }
+                when (view) {
+                    ScheduledView.AGENDA -> agendaItems(
+                        agenda = agenda,
+                        state = state,
+                        range = range,
+                        from = from,
+                        to = to,
+                        currency = code,
+                        onOpen = { item ->
+                            when (item) {
+                                is ScheduledItem.Occurrence -> actingOn = item.schedule.id
+                                is ScheduledItem.CardPayment -> onOpenWallet(item.due.wallet.id)
                             }
-                        }
-                    }
+                        },
+                    )
+                    ScheduledView.SCHEDULES -> scheduleItems(state, filter, onOpen = { actingOn = it })
                 }
                 item(key = "rule") {
                     InfoNote(
-                        "Scheduled items aren’t transactions until you mark them paid, so balances only change when money really moves.",
+                        "Scheduled items aren’t transactions until you mark them paid, so balances only change when money really moves. " +
+                            "Transfers pay a card or loan from your own money: they lower what you owe and aren’t spending.",
                         modifier = Modifier.padding(top = Spacing.md),
                     )
                 }
@@ -227,7 +341,6 @@ fun RecurringScreen(
             onDismiss = { actingOn = null },
         )
     }
-
 }
 
 internal fun frequencyLabel(frequency: Frequency, interval: Int): String = when (frequency) {
@@ -240,69 +353,592 @@ internal fun frequencyLabel(frequency: Frequency, interval: Int): String = when 
 private fun RecurringSchedule.repeatLabel(): String =
     if (endDate == startDate) "Once" else frequencyLabel(frequency, interval)
 
+/** The word for each flow, as on the filters, the hero and the chart legend. */
+internal fun ScheduledFlow.label(): String = when (this) {
+    ScheduledFlow.INCOME -> "Income"
+    ScheduledFlow.EXPENSE -> "Expenses"
+    ScheduledFlow.TRANSFER -> "Transfers"
+}
+
+/** An item's signed amount: income comes in (+), expenses and transfers go out (−). */
+private fun signed(flow: ScheduledFlow, amount: Money): Money = if (flow == ScheduledFlow.INCOME) amount else -amount
+
+private fun monthName(month: YearMonth, locale: Locale = Locale.getDefault()): String =
+    month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)
+
+private val shortDate: DateTimeFormatter get() = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+
 /**
- * The page's statement, on brand blue, for the main currency and the next 30 days: what you'll pay (left), with how
- * many payments and how many are overdue; then stacked on the right what is already overdue (tangerine) and — only
- * when income is scheduled — the income expected, otherwise when the next payment is due (sunlight).
+ * The page's statement on brand blue: what this month still holds — the net (income less expenses and transfers) as
+ * the figure, then income, expenses and transfers side by side, and how many items are overdue. Main currency only.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun MonthHero(outlook: MonthOutlook, today: LocalDate) {
+    val ext = LucentoTheme.extendedColors
+    val t = outlook.totals
+    val spoken = "${monthName(outlook.month)}, still scheduled: net ${MoneyFormatter.formatSigned(t.net, showPlus = true)}. " +
+        "Income ${MoneyFormatter.formatSigned(t.income, showPlus = true)}, expenses ${MoneyFormatter.formatSigned(-t.expenses)}, " +
+        "transfers ${MoneyFormatter.formatSigned(-t.transfers)}" + if (t.overdueCount > 0) ". ${t.overdueCount} overdue" else ""
+    HeroCard(Modifier.padding(top = Spacing.xs).clearAndSetSemantics { contentDescription = spoken }) {
+        // The overdue pill follows the title, or takes the next line when both don't fit (narrow screens, large text).
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            HeroPill("${monthName(outlook.month)} · still scheduled", HeroTones.main, Modifier.semantics { heading() })
+            if (t.overdueCount > 0) HeroPill("${t.overdueCount} overdue", HeroTones.tangerine)
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text("Net after everything scheduled", style = MaterialTheme.typography.bodySmall, color = ext.onHeroMuted, maxLines = 1)
+        MoneyText(money = t.net, style = AmountStyles.hero, color = ext.onHero, showPlus = true, minScale = 0.5f)
+        Text(
+            when {
+                t.isEmpty -> "Nothing else due by ${YearMonth.from(today).atEndOfMonth().format(shortDate)}."
+                t.count == 1 -> "1 item until ${outlook.month.atEndOfMonth().format(shortDate)}"
+                else -> "${t.count} items until ${outlook.month.atEndOfMonth().format(shortDate)}"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = ext.onHeroMuted,
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        // Three across from normal text; at large text each flow is one line — its pill, then the amount at the end.
+        val stacked = LocalDensity.current.fontScale >= 1.3f
+        if (stacked) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                HeroFlowLine(ScheduledFlow.INCOME, t.income, HeroTones.sunlight)
+                HeroFlowLine(ScheduledFlow.EXPENSE, t.expenses, HeroTones.tangerine)
+                HeroFlowLine(ScheduledFlow.TRANSFER, t.transfers, HeroTones.main)
+            }
+        } else {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                HeroFlow(ScheduledFlow.INCOME, t.income, HeroTones.sunlight, Modifier.weight(1f))
+                VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.sm))
+                HeroFlow(ScheduledFlow.EXPENSE, t.expenses, HeroTones.tangerine, Modifier.weight(1f))
+                VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.sm))
+                HeroFlow(ScheduledFlow.TRANSFER, t.transfers, HeroTones.main, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroFlowLine(flow: ScheduledFlow, amount: Money, tone: TonePair) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        HeroPill(flow.label(), tone)
+        Spacer(Modifier.width(Spacing.sm))
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            MoneyText(
+                money = signed(flow, amount),
+                style = AmountStyles.row,
+                color = LucentoTheme.extendedColors.onHero,
+                showPlus = flow == ScheduledFlow.INCOME,
+                fractionScale = 1f,
+                minScale = 0.55f,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeroFlow(flow: ScheduledFlow, amount: Money, tone: TonePair, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        HeroPill(flow.label(), tone)
+        Spacer(Modifier.height(Spacing.xxs))
+        MoneyText(
+            money = signed(flow, amount),
+            style = AmountStyles.row,
+            color = LucentoTheme.extendedColors.onHero,
+            showPlus = flow == ScheduledFlow.INCOME,
+            fractionScale = 1f,
+            minScale = 0.55f,
+        )
+    }
+}
+
+/**
+ * Three months ahead: income, expenses and transfers as bars for each month (scaled to the largest), with the month's
+ * net under it. Follows the kind, wallet and category filters; the first month includes what is overdue (as the hero
+ * says). Kept compact so the agenda starts within the first screen.
  */
 @Composable
-private fun DueSoonCard(state: PlanUiState) {
+private fun ProjectionCard(months: List<MonthOutlook>, filtered: Boolean) {
     val ext = LucentoTheme.extendedColors
-    val code = state.primaryCurrency
-    val window = RecurringMath.upcoming(state.schedules, state.today.plusDays(RecurringMath.DASHBOARD_HORIZON_DAYS))
-        .filter { (s, _) -> s.currencyCode == code }
-    val outgoing = window.filter { (s, _) -> s.type == TransactionType.EXPENSE }
-    val overdue = outgoing.filter { (_, date) -> date.isBefore(state.today) }
-    val comingUp = outgoing.filterNot { (_, date) -> date.isBefore(state.today) }
-    val income = window.filter { (s, _) -> s.type == TransactionType.INCOME }
-    val dueTotal = Money.sum(code, outgoing.map { (s, _) -> s.total })
-    val overdueTotal = Money.sum(code, overdue.map { (s, _) -> s.total })
-    val schedulesIncome = state.schedules.any { it.type == TransactionType.INCOME && !it.paused && !it.isFinished }
-    HeroCard(Modifier.padding(top = Spacing.xs)) {
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1.15f)) {
-                HeroPill("To pay · next 30 days", HeroTones.main, Modifier.semantics { heading() })
-                Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = -dueTotal, style = AmountStyles.hero, color = ext.onHero)
+    val colors = listOf(ext.positive, ext.negative, transferInk())
+    val reducedMotion = LucentoTheme.reducedMotion
+    val progress = remember(months) { Animatable(if (reducedMotion) 1f else 0f) }
+    LaunchedEffect(months) { if (!reducedMotion) progress.animateTo(1f, tween(650, easing = FastOutSlowInEasing)) }
+    val max = months.maxOfOrNull { m -> maxOf(m.totals.income.amountMinor, m.totals.expenses.amountMinor, m.totals.transfers.amountMinor) } ?: 0L
+    val spoken = months.joinToString("; ") { m ->
+        "${monthName(m.month)}: income ${MoneyFormatter.format(m.totals.income)}, expenses ${MoneyFormatter.format(m.totals.expenses)}, " +
+            "transfers ${MoneyFormatter.format(m.totals.transfers)}, net ${MoneyFormatter.formatSigned(m.totals.net, showPlus = true)}"
+    }
+    LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.md), contentPadding = Spacing.md) {
+        com.lucento.app.core.designsystem.component.CardOverline(
+            "Next ${months.size} months",
+            icon = Icons.Outlined.CalendarMonth,
+            trailing = {
                 Text(
-                    buildString {
-                        append(if (outgoing.size == 1) "1 payment" else "${outgoing.size} payments")
-                        if (overdue.isNotEmpty()) append(" · ${overdue.size} overdue")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ext.onHeroMuted,
+                    if (filtered) "Filtered · net per month" else "Net per month",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
-            }
-            VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                HeroLine("Overdue", HeroTones.tangerine) {
-                    MoneyText(money = -overdueTotal, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f)
+            },
+        )
+        Spacer(Modifier.height(Spacing.md))
+        val track = ext.track
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(92.dp)
+                .clearAndSetSemantics { contentDescription = "Scheduled by month. $spoken" },
+        ) {
+            val count = months.size.coerceAtLeast(1)
+            val groupGap = 20.dp.toPx()
+            val barGap = 4.dp.toPx()
+            val groupWidth = (size.width - groupGap * (count - 1)) / count
+            val barWidth = ((groupWidth - barGap * 2) / 3f).coerceIn(2f, 22.dp.toPx())
+            val inner = barWidth * 3 + barGap * 2
+            val radius = CornerRadius(4.dp.toPx())
+            val stub = 2.dp.toPx()
+            drawRect(track, topLeft = Offset(0f, size.height - 1.dp.toPx()), size = Size(size.width, 1.dp.toPx()))
+            months.forEachIndexed { i, m ->
+                val left = i * (groupWidth + groupGap) + (groupWidth - inner) / 2f
+                listOf(m.totals.income, m.totals.expenses, m.totals.transfers).forEachIndexed { j, amount ->
+                    val f = if (max <= 0L) 0f else (amount.amountMinor.toDouble() / max).toFloat()
+                    val h = if (f <= 0f) stub else (size.height * f * progress.value).coerceAtLeast(stub)
+                    drawRoundRect(
+                        color = if (f <= 0f) track else colors[j],
+                        topLeft = Offset(left + j * (barWidth + barGap), size.height - h),
+                        size = Size(barWidth, h),
+                        cornerRadius = radius,
+                    )
                 }
-                if (schedulesIncome) {
-                    HeroLine("Income expected", HeroTones.sunlight) {
-                        MoneyText(
-                            money = Money.sum(code, income.map { (s, _) -> s.amount }),
-                            style = AmountStyles.row,
-                            color = ext.onHero,
-                            showPlus = true,
-                            fractionScale = 1f,
-                        )
+            }
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Row(Modifier.fillMaxWidth().clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            months.forEachIndexed { i, m ->
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        m.month.month.getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault()),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (i == 0) FontWeight.Bold else null,
+                        color = if (i == 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    MoneyText(
+                        money = m.totals.net,
+                        style = AmountStyles.small,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        showPlus = true,
+                        fractionScale = 1f,
+                        minScale = 0.5f,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Row(Modifier.fillMaxWidth().clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            LegendKey("Income", colors[0])
+            LegendKey("Expenses", colors[1])
+            LegendKey("Transfers", colors[2])
+        }
+    }
+}
+
+/** Transfers are neither income nor spending: neutral ink, a touch lighter so the bars still read as three. */
+@Composable
+private fun transferInk(): Color = MaterialTheme.colorScheme.onSurfaceVariant
+
+/**
+ * The Transactions-style filters: kind as a segmented control, then pills for the date range (the agenda only), the
+ * wallet and the category, and Clear once anything is set. The range menu has quick ranges and a From–To picker.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScheduledFilters(
+    state: PlanUiState,
+    filter: ScheduledFilter,
+    showRange: Boolean,
+    range: ScheduledRange,
+    from: LocalDate,
+    to: LocalDate,
+    onFlow: (ScheduledFlow?) -> Unit,
+    onWallet: (Long?) -> Unit,
+    onCategory: (Long?) -> Unit,
+    onRange: (ScheduledRange) -> Unit,
+    onCustomRange: (LocalDate, LocalDate) -> Unit,
+    onClear: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    var picking by remember { mutableStateOf(false) }
+    Column(Modifier.padding(top = Spacing.sm)) {
+        val kinds = listOf<Pair<ScheduledFlow?, String>>(null to "All") + ScheduledFlow.entries.map { it to it.label() }
+        // Large text: four equal segments can't hold "Expenses" and "Transfers"; pills size to their words and scroll.
+        if (LocalDensity.current.fontScale >= 1.3f) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                kinds.forEach { (flow, label) -> ChoicePill(label = label, selected = flow == filter.flow, onClick = { onFlow(flow) }) }
+            }
+        } else {
+            SegmentedToggle(
+                options = kinds,
+                selected = filter.flow,
+                onSelect = onFlow,
+                compact = true,
+                selectedTone = { TonePair(colors.primary, colors.onPrimary) },
+            )
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            if (showRange) {
+                FilterMenuPill(
+                    label = if (range == ScheduledRange.CUSTOM) "${from.format(shortDate)} – ${to.format(shortDate)}" else range.label,
+                    active = range != ScheduledRange.THIS_MONTH,
+                    icon = Icons.Outlined.CalendarMonth,
+                    tonal = true,
+                    options = ScheduledRange.entries.map { r ->
+                        (if (r == ScheduledRange.CUSTOM) "From – To…" else r.label) to {
+                            if (r == ScheduledRange.CUSTOM) picking = true else onRange(r)
+                        }
+                    },
+                )
+            }
+            val wallets = state.wallets
+            FilterMenuPill(
+                label = filter.walletId?.let { state.walletsById[it]?.name } ?: "All wallets",
+                active = filter.walletId != null,
+                icon = filter.walletId?.let { state.walletsById[it]?.type?.icon } ?: Icons.Outlined.AccountBalanceWallet,
+                options = listOf<Pair<String, () -> Unit>>("All wallets" to { onWallet(null) }) + wallets.map { w -> w.name to { onWallet(w.id) } },
+            )
+            // Only categories that some schedule uses: the menu answers "which plans are groceries?", not every category.
+            val used = state.schedules.mapNotNull { it.categoryId }.toSet()
+            val categories = state.categories.filter { it.id in used }.sortedBy { it.name }
+            if (categories.isNotEmpty()) {
+                FilterMenuPill(
+                    label = filter.categoryId?.let { state.categoriesById[it]?.name } ?: "All categories",
+                    active = filter.categoryId != null,
+                    icon = Icons.Outlined.Category,
+                    options = listOf<Pair<String, () -> Unit>>("All categories" to { onCategory(null) }) + categories.map { c -> c.name to { onCategory(c.id) } },
+                )
+            }
+            if (filter.isActive || range != ScheduledRange.THIS_MONTH) LucentoTextButton(text = "Clear", onClick = onClear)
+        }
+    }
+    if (picking) {
+        val zone = ZoneOffset.UTC
+        val pickerState = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = from.atStartOfDay(zone).toInstant().toEpochMilli(),
+            initialSelectedEndDateMillis = to.atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(
+                    enabled = pickerState.selectedStartDateMillis != null,
+                    onClick = {
+                        val start = pickerState.selectedStartDateMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
+                        val end = pickerState.selectedEndDateMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: start
+                        if (start != null && end != null) onCustomRange(start, end)
+                        picking = false
+                    },
+                ) { Text("Apply") }
+            },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
+        ) {
+            DateRangePicker(
+                state = pickerState,
+                title = { Text("Scheduled between", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) },
+                showModeToggle = true,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/** A filter pill that opens a short menu (the Transactions page's filter pills). */
+@Composable
+private fun FilterMenuPill(
+    label: String,
+    active: Boolean,
+    options: List<Pair<String, () -> Unit>>,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    tonal: Boolean = false,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        ChoicePill(
+            label = label,
+            selected = active,
+            leadingIcon = icon,
+            trailingIcon = Icons.Filled.ArrowDropDown,
+            role = Role.DropdownList,
+            onClick = { expanded = true },
+            tonal = tonal,
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { (text, action) ->
+                DropdownMenuItem(text = { Text(text) }, onClick = {
+                    expanded = false
+                    action()
+                })
+            }
+        }
+    }
+}
+
+/**
+ * The agenda: a summary of the range when it isn't the default view, then overdue items, then one card per month with
+ * a row for every dated occurrence (and card payment). Empty ranges say so with the mascot.
+ */
+private fun androidx.compose.foundation.lazy.LazyListScope.agendaItems(
+    agenda: List<ScheduledItem>,
+    state: PlanUiState,
+    range: ScheduledRange,
+    from: LocalDate,
+    to: LocalDate,
+    currency: String,
+    onOpen: (ScheduledItem) -> Unit,
+) {
+    val today = state.today
+    item(key = "range-summary") { RangeSummary(ScheduleOutlook.totals(agenda, currency), agenda, range, from, to, currency) }
+    if (agenda.isEmpty()) {
+        item(key = "agenda-empty") {
+            LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.md) {
+                MascotMessage(
+                    if (range == ScheduledRange.THIS_MONTH) "Nothing else due this month. New occurrences show up here before they’re due."
+                    else "Nothing scheduled between ${from.format(shortDate)} and ${to.format(shortDate)}.",
+                )
+            }
+        }
+        return
+    }
+    val overdue = agenda.filter { it.overdue }
+    val ahead = agenda.filterNot { it.overdue }.groupBy { YearMonth.from(it.date) }
+    if (overdue.isNotEmpty()) {
+        item(key = "overdue-head") {
+            ToneSectionHeader(
+                "Overdue",
+                StatusTones.negative,
+                caption = if (overdue.size == 1) "1 item · still owed" else "${overdue.size} items · still owed",
+            )
+        }
+        item(key = "overdue") { AgendaCard(overdue, state, today, onOpen) }
+    }
+    ahead.forEach { (month, items) ->
+        item(key = "head-$month") {
+            val net = ScheduleOutlook.totals(items, currency).net
+            ToneSectionHeader(
+                monthName(month) + if (month.year != today.year) " ${month.year}" else "",
+                StatusTones.brand,
+                caption = if (items.size == 1) "1 item" else "${items.size} items",
+                trailing = { MoneyText(money = net, style = AmountStyles.small, color = MaterialTheme.colorScheme.onSurfaceVariant, showPlus = true, fractionScale = 1f) },
+            )
+        }
+        item(key = "month-$month") { AgendaCard(items, state, today, onOpen) }
+    }
+}
+
+/**
+ * What the chosen range holds, as on Transactions: income, expenses and transfers with the net, and how many items.
+ * The default (this month) skips it — the hero says the same.
+ */
+@Composable
+private fun RangeSummary(totals: FlowTotals, agenda: List<ScheduledItem>, range: ScheduledRange, from: LocalDate, to: LocalDate, currency: String) {
+    if (range == ScheduledRange.THIS_MONTH) {
+        Spacer(Modifier.height(Spacing.xs))
+        return
+    }
+    val others = ScheduleOutlook.otherCurrencies(agenda, currency)
+    LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.md) {
+        Text(
+            "${from.format(shortDate)} – ${to.format(shortDate)} · " + if (totals.count == 1) "1 item" else "${totals.count} items",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            listOf(
+                ScheduledFlow.INCOME to totals.income,
+                ScheduledFlow.EXPENSE to totals.expenses,
+                ScheduledFlow.TRANSFER to totals.transfers,
+            ).forEach { (flow, amount) ->
+                Column(Modifier.weight(1f)) {
+                    Text(flow.label(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    MoneyText(money = signed(flow, amount), style = AmountStyles.row, color = scheduledFlowColor(flow), showPlus = flow == ScheduledFlow.INCOME, fractionScale = 1f, minScale = 0.55f)
+                }
+            }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                Text("Net", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                MoneyText(money = totals.net, style = AmountStyles.row.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface, showPlus = true, fractionScale = 1f, minScale = 0.55f)
+            }
+        }
+        if (others.isNotEmpty()) {
+            Text(
+                "Also scheduled in ${others.joinToString()} (listed below, not added in).",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.xs),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AgendaCard(items: List<ScheduledItem>, state: PlanUiState, today: LocalDate, onOpen: (ScheduledItem) -> Unit) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+        items.forEachIndexed { index, item ->
+            AgendaRow(item, state, today, onClick = { onOpen(item) })
+            if (index < items.lastIndex) Hairline(strong = true)
+        }
+    }
+}
+
+/**
+ * One dated occurrence: a calendar badge (red when overdue, blue today), the item's tile when there's room, its name
+ * and what it is, then the signed amount — income green, expenses red, transfers in neutral ink — and when it's due.
+ */
+@Composable
+private fun AgendaRow(item: ScheduledItem, state: PlanUiState, today: LocalDate, onClick: () -> Unit) {
+    val days = ChronoUnit.DAYS.between(today, item.date)
+    val relative = when {
+        item.overdue -> "Overdue"
+        days == 0L -> "Today"
+        days == 1L -> "Tomorrow"
+        else -> "In $days days"
+    }
+    val (title, detail) = when (item) {
+        is ScheduledItem.Occurrence -> {
+            val s = item.schedule
+            val from = state.walletsById[s.walletId]?.name
+            val debt = s.toWalletId?.let { state.walletsById[it] }
+            s.name to buildString {
+                // A later date of the same plan is a projection (only the next one can be marked paid); say so first,
+                // where it can't be cut off.
+                append(if (item.isNext) s.repeatLabel() else "Projected")
+                when {
+                    debt != null -> append(" · ").append(from ?: "Account").append(" → ").append(debt.name)
+                    else -> {
+                        s.categoryId?.let { state.categoriesById[it]?.name }?.let { append(" · ").append(it) }
+                        from?.let { append(" · ").append(it) }
                     }
-                } else {
-                    // The next payment still ahead (today or later), however far off; overdue ones are counted above.
-                    val nextAhead = state.schedules
-                        .filter { !it.paused && it.type == TransactionType.EXPENSE }
-                        .mapNotNull { s -> s.nextDue?.takeIf { !it.isBefore(state.today) } }
-                        .minOrNull()
-                    HeroLine("Next due", HeroTones.sunlight) {
-                        Text(
-                            nextAhead?.let { shortDayLabel(it, state.today) } ?: "Nothing planned",
-                            style = AmountStyles.row,
-                            color = ext.onHero,
-                            maxLines = 1,
-                        )
+                }
+            }
+        }
+        is ScheduledItem.CardPayment -> "${item.due.wallet.name} payment" to "Statement amount due"
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val roomForTile = maxWidth >= 340.dp && LocalDensity.current.fontScale < 1.3f
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+                .clickable(role = Role.Button, onClickLabel = if (item is ScheduledItem.CardPayment) "Open card" else "Open $title", onClick = onClick)
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DateBadge(item.date, today, item.overdue)
+            Spacer(Modifier.width(Spacing.sm + Spacing.xxs))
+            if (roomForTile) {
+                when (item) {
+                    is ScheduledItem.Occurrence -> {
+                        val debt = item.schedule.toWalletId?.let { state.walletsById[it] }
+                        if (debt != null) WalletIdentityTile(debt, size = 34.dp)
+                        else CategoryTile(category = item.schedule.categoryId?.let { state.categoriesById[it] }, type = item.schedule.type, size = 34.dp)
                     }
+                    is ScheduledItem.CardPayment -> WalletIdentityTile(item.due.wallet, size = 34.dp)
+                }
+                Spacer(Modifier.width(Spacing.sm + Spacing.xxs))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(Spacing.sm))
+            Column(horizontalAlignment = Alignment.End) {
+                AmountText(money = signed(item.flow, item.amount), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
+                if (item.overdue) StatusPill(relative, StatusTones.negative)
+                else Text(relative, style = MaterialTheme.typography.labelMedium, color = if (days == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** A small calendar leaf: weekday over the day number; tinted red when overdue and brand blue today. */
+@Composable
+private fun DateBadge(date: LocalDate, today: LocalDate, overdue: Boolean) {
+    val ext = LucentoTheme.extendedColors
+    val colors = MaterialTheme.colorScheme
+    val (container, content) = when {
+        overdue -> ext.negativeContainer to ext.negative
+        date == today -> colors.primary to colors.onPrimary
+        else -> colors.surfaceContainerHigh to colors.onSurface
+    }
+    Column(
+        Modifier
+            .width(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(container)
+            .padding(vertical = Spacing.xs)
+            .clearAndSetSemantics { },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase(Locale.getDefault()),
+            style = MaterialTheme.typography.labelSmall,
+            color = content.copy(alpha = 0.8f),
+            maxLines = 1,
+        )
+        Text("${date.dayOfMonth}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = content, maxLines = 1, textAlign = TextAlign.Center)
+        if (YearMonth.from(date) != YearMonth.from(today)) {
+            Text(
+                date.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                style = MaterialTheme.typography.labelSmall,
+                color = content.copy(alpha = 0.8f),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** Each schedule once, filtered by kind, wallet and category, in Active, Paused and Ended groups. */
+private fun androidx.compose.foundation.lazy.LazyListScope.scheduleItems(state: PlanUiState, filter: ScheduledFilter, onOpen: (Long) -> Unit) {
+    val shown = state.schedules.filter(filter::matches)
+    val groups = listOf(
+        "Active" to shown.filter { !it.paused && !it.isFinished },
+        "Paused" to shown.filter { it.paused && !it.isFinished },
+        "Ended" to shown.filter { it.isFinished },
+    ).filter { it.second.isNotEmpty() }
+    if (groups.isEmpty()) {
+        item(key = "schedules-empty") {
+            LucentoCard(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentPadding = Spacing.md) {
+                MascotMessage(if (filter.isActive) "No schedules match these filters." else "No schedules yet.")
+            }
+        }
+        return
+    }
+    groups.forEach { (title, list) ->
+        item(key = "group-$title") {
+            ToneSectionHeader(
+                title,
+                when (title) {
+                    "Active" -> StatusTones.brand
+                    else -> StatusTones.neutral
+                },
+                caption = if (list.size == 1) "1 schedule" else "${list.size} schedules",
+            )
+        }
+        item(key = "list-$title") {
+            LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+                list.sortedBy { it.nextDue ?: LocalDate.MAX }.forEachIndexed { index, schedule ->
+                    ScheduleRow(schedule, state, onClick = { onOpen(schedule.id) })
+                    if (index < list.lastIndex) Hairline(strong = true)
                 }
             }
         }
@@ -310,19 +946,9 @@ private fun DueSoonCard(state: PlanUiState) {
 }
 
 @Composable
-private fun HeroLine(label: String, tone: TonePair, value: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        HeroPill(label, tone)
-        Spacer(Modifier.height(Spacing.xxs))
-        value()
-    }
-}
-
-@Composable
 private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick: () -> Unit) {
     val due = schedule.nextDue
     val overdue = due != null && due.isBefore(state.today)
-    val income = schedule.type == TransactionType.INCOME
     val debt = schedule.toWalletId?.let { state.walletsById[it] }
     Row(
         Modifier
@@ -367,16 +993,16 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
         Spacer(Modifier.width(Spacing.sm))
         Column(horizontalAlignment = Alignment.End) {
             AmountText(
-                money = if (income) schedule.amount else -schedule.total,
+                money = signed(schedule.flow, if (schedule.type == TransactionType.INCOME) schedule.amount else schedule.total),
                 style = AmountStyles.row,
                 showPlus = true,
-                color = if (income) LucentoTheme.extendedColors.positive else MaterialTheme.colorScheme.onSurface,
+                color = scheduledFlowColor(schedule.flow),
             )
             when {
                 schedule.paused -> StatusPill("Paused", StatusTones.neutral)
                 due == null -> StatusPill("Ended", StatusTones.neutral)
                 overdue -> StatusPill("Overdue", StatusTones.negative)
-                else -> Text(shortDayLabel(due, state.today), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else -> Text(com.lucento.app.feature.transactions.shortDayLabel(due, state.today), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -462,20 +1088,42 @@ private fun ScheduleActionsSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
+            SheetHeader(
+                title = schedule.name,
+                subtitle = schedule.repeatLabel() + (due?.let { " · next on ${formatDate(it)}" } ?: " · no more dates"),
+                leading = {
+                    if (debt != null) {
+                        WalletIdentityTile(debt)
+                    } else {
+                        CategoryTile(category = schedule.categoryId?.let { state.categoriesById[it] }, type = schedule.type)
+                    }
+                },
+            )
+            // The plan at a glance: the signed amount in its flow's colour, and where the money goes.
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (debt != null) {
-                    WalletIdentityTile(debt)
-                } else {
-                    CategoryTile(category = schedule.categoryId?.let { state.categoriesById[it] }, type = schedule.type)
-                }
-                Spacer(Modifier.width(Spacing.md))
                 Column(Modifier.weight(1f)) {
-                    Text(schedule.name, style = MaterialTheme.typography.headlineSmall, maxLines = 2, modifier = Modifier.semantics { heading() })
                     Text(
-                        schedule.repeatLabel() + (due?.let { " · next on ${formatDate(it)}" } ?: " · no more dates"),
-                        style = MaterialTheme.typography.bodyMedium,
+                        when (schedule.flow) {
+                            ScheduledFlow.INCOME -> "Expected into ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
+                            ScheduledFlow.EXPENSE -> "Paid from ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
+                            ScheduledFlow.TRANSFER -> "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "the debt"}"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    AmountText(
+                        money = signed(schedule.flow, if (schedule.type == TransactionType.INCOME) schedule.amount else schedule.total),
+                        style = AmountStyles.large,
+                        showPlus = true,
+                        color = scheduledFlowColor(schedule.flow),
+                    )
+                }
+                when {
+                    schedule.paused -> StatusPill("Paused", StatusTones.neutral)
+                    due == null -> StatusPill("Ended", StatusTones.neutral)
+                    due.isBefore(state.today) -> StatusPill("Overdue", StatusTones.negative)
+                    due == state.today -> StatusPill("Due today", StatusTones.brand)
+                    else -> StatusPill(com.lucento.app.feature.transactions.shortDayLabel(due, state.today), StatusTones.neutral)
                 }
             }
             if (due != null && !schedule.paused) {

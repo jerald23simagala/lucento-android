@@ -216,6 +216,9 @@ class RoomBackupStore(
                     termMonths = row.termMonths,
                     installmentMinor = row.installmentMinor,
                     updatedAt = row.updatedAt,
+                    creditLimitMinor = row.creditLimitMinor,
+                    statementDay = row.statementDay,
+                    dueDay = row.dueDay,
                 ),
             )
         }
@@ -365,6 +368,9 @@ class RoomBackupStore(
                     termMonths = row.termMonths,
                     installmentMinor = row.installmentMinor,
                     updatedAt = row.updatedAt,
+                    creditLimitMinor = row.creditLimitMinor,
+                    statementDay = row.statementDay,
+                    dueDay = row.dueDay,
                 ),
             )
             val wallet = database.walletDao().getById(walletLocal) ?: continue
@@ -611,6 +617,9 @@ private fun DebtTermsEntity.toBackup(wallets: Map<Long, String>): BackupDebtTerm
         termMonths = termMonths,
         installmentMinor = installmentMinor,
         updatedAt = updatedAt,
+        creditLimitMinor = creditLimitMinor,
+        statementDay = statementDay,
+        dueDay = dueDay,
     )
 }
 

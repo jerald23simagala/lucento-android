@@ -386,6 +386,20 @@ object Migrations {
     }
 
     /**
+     * v11 — credit card billing. Additive only: `debt_terms` gains the card's credit limit and the days of the month its
+     * statement closes and its payment is due. Every existing card and loan keeps null (no limit, no cycle), so nothing
+     * changes for the user and nothing re-uploads. The wallet dirty/tombstone triggers already cover terms changes
+     * (WalletRepository bumps the wallet's updated_at with them).
+     */
+    val MIGRATION_10_11: Migration = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `debt_terms` ADD COLUMN `credit_limit_minor` INTEGER")
+            db.execSQL("ALTER TABLE `debt_terms` ADD COLUMN `statement_day` INTEGER")
+            db.execSQL("ALTER TABLE `debt_terms` ADD COLUMN `due_day` INTEGER")
+        }
+    }
+
+    /**
      * v9 — recurring schedules join cloud sync (docs/SYNC.md): `recurring` gains the same bookkeeping as every synced
      * table — a stable random `client_uuid` (backfilled for existing schedules), `dirty` (existing rows start dirty so
      * the first sync uploads them), `synced_at` and `base_revision` — plus the tombstone and dirty-on-edit triggers.
@@ -419,7 +433,7 @@ object Migrations {
 
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-        MIGRATION_9_10,
+        MIGRATION_9_10, MIGRATION_10_11,
     )
 }
 

@@ -27,9 +27,10 @@ class AccountSetupResetTest {
     private val crash = booleanPreferencesKey("crash_reports")
     private val usage = booleanPreferencesKey("usage_counts")
     private val notice = booleanPreferencesKey("local_data_notice_seen")
+    private val photo = longPreferencesKey("profile_photo_version")
 
     private fun accountASetUp() = mutablePreferencesOf(
-        onboarding to true, categorySetup to true, guide to "budget", defaultWallet to 7L, name to "Alex",
+        onboarding to true, categorySetup to true, guide to "budget", defaultWallet to 7L, name to "Alex", photo to 1_762_000_000_000L,
         budgetMonth to "2026-10", smart to true,
         theme to "DARK", currency to "EUR", features to setOf("budgets", "goals"), crash to true, usage to true, notice to true,
     )
@@ -44,6 +45,8 @@ class AccountSetupResetTest {
         assertNull(p[guide])
         assertNull(p[defaultWallet])
         assertNull(p[name])
+        // The photo belongs to the account like the name (its file goes with the ledger wipe).
+        assertNull(p[photo])
         assertNull(p[budgetMonth])
     }
 

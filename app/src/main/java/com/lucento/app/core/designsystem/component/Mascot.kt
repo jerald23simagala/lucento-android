@@ -9,6 +9,15 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import com.lucento.app.core.designsystem.theme.Spacing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -225,5 +234,24 @@ private fun spriteFor(tier: WellnessTier, pose: MascotPose): Int = when (tier) {
         MascotPose.Success -> R.drawable.mascot_over_plan_success
         MascotPose.Caution -> R.drawable.mascot_over_plan_caution
         MascotPose.Sleeping -> R.drawable.mascot_over_plan_sleeping
+    }
+}
+
+/**
+ * Nothing to show yet, said inline: Lucento (curious) on the left and one line of what happens next on the right. For
+ * cards, lists and menus whose empty state sits among other content — Home's cards, the Scheduled tabs, the bell.
+ * Full-screen empty states use [EmptyState] with a larger mascot instead.
+ */
+@Composable
+fun MascotMessage(text: String, modifier: Modifier = Modifier, mascotSize: Dp = 56.dp) {
+    Row(modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+        LucentoMascot(size = mascotSize, mood = MascotMood.Curious)
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
     }
 }

@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -66,6 +67,7 @@ import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
+import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
@@ -414,13 +416,17 @@ private fun GoalDetailSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(goal.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).semantics { heading() })
-                IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Edit goal") }
-                IconButton(onClick = { confirmingDelete = true }) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "Delete goal", tint = MaterialTheme.colorScheme.error)
-                }
-            }
+            SheetHeader(
+                title = goal.name,
+                icon = Icons.Outlined.Savings,
+                tone = StatusTones.positive,
+                trailing = {
+                    IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Edit goal") }
+                    IconButton(onClick = { confirmingDelete = true }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Delete goal", tint = MaterialTheme.colorScheme.error)
+                    }
+                },
+            )
             Text(
                 "${MoneyFormatter.format(progress.saved)} saved of ${MoneyFormatter.format(goal.target)} · ${progress.percent}%",
                 style = MaterialTheme.typography.bodyMedium,
@@ -578,10 +584,11 @@ private fun GoalEditorSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text(
-                if (initial.id == null) "New savings goal" else "Edit goal",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() },
+            SheetHeader(
+                title = if (initial.id == null) "New savings goal" else "Edit goal",
+                subtitle = if (initial.id == null) "Name it, give it a target, and Lucento keeps count." else null,
+                icon = Icons.Outlined.Savings,
+                tone = StatusTones.positive,
             )
             if (initial.id == null) {
                 // Optional starting points: a tap fills in the name and picture only; the user still sets the amount.

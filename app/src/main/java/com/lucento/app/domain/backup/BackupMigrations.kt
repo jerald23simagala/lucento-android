@@ -14,11 +14,12 @@ fun interface BackupMigrationStep {
 }
 
 object BackupMigrations {
-    const val CURRENT = 2
+    const val CURRENT = 3
 
     private val steps: Map<Int, BackupMigrationStep> = mapOf(
         0 to Migrate0To1,
         1 to Migrate1To2,
+        2 to Migrate2To3,
     )
 
     fun toCurrent(document: JsonValue.Obj): JsonValue.Obj {
@@ -42,6 +43,16 @@ object BackupMigrations {
         }
         return current
     }
+}
+
+/**
+ * Version 3 (app v11) adds `creditLimitMinor`, `statementDay` and `dueDay` to debt terms. A version 2 file has none;
+ * its rows keep the original key set, which the codec reads as "no limit, no billing cycle". The bump makes an older
+ * app refuse a version 3 file as "from a newer Lucento" instead of calling it invalid.
+ */
+private object Migrate2To3 : BackupMigrationStep {
+    override fun migrate(document: JsonValue.Obj): JsonValue.Obj =
+        JsonValue.Obj(LinkedHashMap(document.fields).apply { put("schemaVersion", JsonValue.Num("3")) })
 }
 
 /**

@@ -42,6 +42,11 @@ internal data class WalletRow(
     /** v10: bundled institution registry id (display only). Always sent by v10+, so clearing it syncs; older builds
      *  never send it and the server keeps what it has. */
     @EncodeDefault @SerialName("institution_id") val institutionId: String? = null,
+    /** v11: a credit card's limit and billing days (local `debt_terms`). Always sent by v11+, nulls included, so clearing
+     *  them syncs; older builds never send them and the server keeps what it has. */
+    @EncodeDefault @SerialName("credit_limit_minor") val creditLimitMinor: Long? = null,
+    @EncodeDefault @SerialName("statement_day") val statementDay: Int? = null,
+    @EncodeDefault @SerialName("due_day") val dueDay: Int? = null,
 )
 
 @Serializable

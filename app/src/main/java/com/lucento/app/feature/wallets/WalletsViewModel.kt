@@ -67,8 +67,12 @@ data class WalletDraft(
     val repayment: DebtRepayment = DebtRepayment.ONE_TIME,
     val termMonthsText: String = "",
     val installmentText: String = "",
-    /** When set, saving opens a prefilled recurring payment starting on this day. */
+    /** When set, saving opens a prefilled recurring payment starting on this day (loans). */
     val reminderDate: LocalDate? = null,
+    // Credit cards only: the limit and the billing days (day of the month, 1–31), as typed.
+    val creditLimitText: String = "",
+    val statementDayText: String = "",
+    val dueDayText: String = "",
     /** Bank or provider from the bundled registry (display only); never kept for cash. */
     val institutionId: String? = null,
 )
@@ -89,6 +93,11 @@ sealed interface DraftError {
     data object InstallmentInvalid : DraftError
     /** The instalment is ambiguous or carries another currency's symbol (MoneyParser.clarification). */
     data class InstallmentUnclear(val message: String) : DraftError
+    data object CreditLimitInvalid : DraftError
+    /** The credit limit is ambiguous or carries another currency's symbol (MoneyParser.clarification). */
+    data class CreditLimitUnclear(val message: String) : DraftError
+    /** A billing day outside 1–31, or only one of the statement and due days. */
+    data object BillingDaysInvalid : DraftError
 }
 
 /** Plain-language explanation of what still uses a wallet, e.g. "3 transactions and 1 recurring payment". */
@@ -212,8 +221,39 @@ class WalletsViewModel(
         data class Error(val error: DraftError) : DebtParse
     }
 
-    /** The draft's debt details: an optional rate, and for monthly repayment the term and instalment (both required). */
+    /**
+     * The draft's debt details: an optional rate, and for monthly repayment the term and instalment (both required).
+     * A credit card adds an optional limit and optional billing days, which come as a pair.
+     */
     private fun debtTerms(draft: WalletDraft, decimalSeparator: Char): DebtParse {
+        val base = when (val terms = repaymentTerms(draft, decimalSeparator)) {
+            is DebtParse.Valid -> terms.terms
+            is DebtParse.Error -> return terms
+        }
+        if (draft.type != WalletType.CREDIT_CARD) return DebtParse.Valid(base)
+        val parsedLimit = MoneyParser.parse(draft.creditLimitText, draft.currencyCode, decimalSeparator)
+        MoneyParser.clarification(parsedLimit, decimalSeparator)?.let { return DebtParse.Error(DraftError.CreditLimitUnclear(it)) }
+        val limit = when (parsedLimit) {
+            MoneyParser.Result.Empty -> null
+            is MoneyParser.Result.Success -> parsedLimit.money.takeIf { it.amountMinor > 0 } ?: return DebtParse.Error(DraftError.CreditLimitInvalid)
+            else -> return DebtParse.Error(DraftError.CreditLimitInvalid)
+        }
+        val statement = draft.statementDayText.trim()
+        val due = draft.dueDayText.trim()
+        val days = when {
+            statement.isEmpty() && due.isEmpty() -> null to null
+            else -> {
+                val s = statement.toIntOrNull()?.takeIf { it in 1..31 }
+                val d = due.toIntOrNull()?.takeIf { it in 1..31 }
+                if (s == null || d == null) return DebtParse.Error(DraftError.BillingDaysInvalid)
+                s to d
+            }
+        }
+        return DebtParse.Valid(base.copy(creditLimit = limit, statementDay = days.first, dueDay = days.second))
+    }
+
+    /** The rate and the repayment plan; a card keeps whatever plan it already had (cards no longer choose one). */
+    private fun repaymentTerms(draft: WalletDraft, decimalSeparator: Char): DebtParse {
         val rate = when (val r = DebtMath.parseRate(draft.interestText)) {
             DebtMath.RateResult.Empty -> null
             is DebtMath.RateResult.Valid -> r.bps

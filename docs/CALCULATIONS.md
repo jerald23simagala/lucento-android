@@ -26,8 +26,8 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 | Net worth composition | assets and liabilities grouped by wallet type, per currency; totals equal `NetWorthCalculator` | `NetWorthComposer.compose` |
 | Income/expense trend | INCOME and EXPENSE per month (zero-filled); transfers never appear | `Insights.incomeExpenseTrend` |
 | Upcoming payments | next unpaid occurrence of each active schedule due within 30 days (overdue flagged), date order, max 4. Listing never records anything | `RecurringMath.upcomingPayments` |
-| Safe to spend — with category allocations | budget − spent (**every** expense this month in the currency — budgeted + unbudgeted, as "Spent / Used (budget)" above; corrected 2026-11-03, the code always did this) − unpaid recurring expenses in budgeted categories due by month end (overdue included). Current month only; the Recurring module switched off means no bills are subtracted. Home's Monthly budget card shows it (only this basis) | `CashflowCalculator.safeToSpend` |
-| Home budget card formula | Budget − Used (= Budgeted + Unbudgeted) = Remaining; this month only, Remaining − Bills due = **Safe to spend** (the tinted last line, signed, never clamped). A past month ends at Remaining. Every figure is read from `BudgetPlan` / `SafeToSpend`, nothing is recomputed, so the lines always add up (2026-11-03) | `HomeStateBuilder.budgetFormula` |
+| Safe to spend — with category allocations | budget − spent (**every** expense this month in the currency — budgeted + unbudgeted, as "Spent / Used (budget)" above; corrected 2026-11-03, the code always did this) − **bills due**: unpaid scheduled expenses due by month end (overdue included), **whatever their category** — budgeted, unbudgeted or none — because once paid each one is spending and lands in Used (owner, 2026-11-03; until then only budgeted categories counted, which left Bills due at zero for most people). A debt payment counts only its interest (the rest is a transfer); credit card payments never count. Current month only; the Recurring module switched off means no bills are subtracted. Home's Monthly budget card shows it (only this basis) | `CashflowCalculator.safeToSpend` |
+| Home budget card formula | Read as a short statement, no operator symbols: Budget, Used (Budgeted, Unbudgeted), then **Remaining** = budget − used in green, or **Overspent** in red with its minus sign once below zero; this month only, **Bills due** in red as a deduction (−), and **Safe to spend** = remaining − bills due on the tinted last line, **always shown** this month: green above zero, and at or below zero it reads **0** in red with a caption ("Bills due take what’s left" / "You’re over budget this month") — the display never goes negative, the deficit is visible in Overspent and Bills due above it (owner, 2026-11-03, round 3; round 2 had hidden it). A past month ends at Remaining / Overspent. Every figure is read from `BudgetPlan` / `SafeToSpend`, nothing is recomputed | `HomeStateBuilder.budgetFormula`, `BudgetFormula.overspent / showsSafeToSpend / nothingSafe / safeToSpendShown` |
 | Safe to spend — without a budget (estimate, labelled) | cash + bank + e-wallet balances − unpaid recurring expenses due by month end that are paid from those accounts. Savings, liabilities, and bills paid from them are excluded | same |
 | Safe per day | safe to spend ÷ days left incl. today, rounded down; shown only when positive. The Budget hero's "Safe per day" (decision D1, 2026-11-03), so it always equals Home's safe to spend ÷ days left; with nothing left it shows safe to spend itself; a past month shows its daily average instead | same; `budgetDailyFigure` |
 | Net worth trend (Wallets) | net worth at the end of each of the last 6 months (`BalanceHistory.lastMonths`; the last point is today's net worth); the change pill compares last month with this one only, and only when both measure the same wallets and last month was above zero (`comparableTrendPercent`) | `WalletsOverview.trend` |
@@ -147,6 +147,55 @@ and the monthly amortization. The rate and amortization are shown on the wallet 
 - Creating a card or loan creates (or restores) the expense category "Debt interest" (`CategoryRepository.ensure`).
 - A payment reminder date opens a prefilled recurring debt payment: "Monthly Payment - <debt>" for the amortization,
   first due on that date and ending after the term; "One-time Payment - <debt>" for what is owed, one date only.
+
+- v11: for a **credit card** the editor no longer offers one-time / monthly or a reminder date; it asks for the credit
+  limit and billing days instead (next section). A card that already had a monthly plan keeps it. Loans are unchanged.
+- The yearly rate is appended to the wallet card's title: "Car loan (24% / yr)".
+
+## Credit cards (v11)
+Optional per card (`debt_terms.credit_limit_minor`, `statement_day`, `due_day`; synced on the wallet row).
+- **Billing days** are days of the month, 1–31, entered together; a shorter month uses its last day (31 → Feb 28/29).
+  The current statement closed on the latest statement day on or before today; its payment is due on the first due
+  day after that (`CreditCardMath.lastStatementDate / dueDateAfter`).
+- **Statement balance** = owed now − charges dated after the statement + payments and credits dated after it (what was
+  owed at the end of the statement day). **Amount due** = statement balance − payments and credits since = owed now −
+  charges since, never below zero. Charges after the statement belong to the next one. Only the card's own recorded
+  transactions count: Lucento has no bank access (`CreditCardMath.cycle`).
+- **Available credit** = credit limit − owed now; negative when over the limit (`CreditCardMath.available`).
+- **Payment reminder**: with billing days set, the due date becomes a reminder on Home (Upcoming card and the bell)
+  showing the amount due, while there is something to pay. It is derived every time, never stored as a recurring
+  payment, and **never counted in Safe to spend**: the card's purchases were already counted as spending, and paying the
+  card is a transfer (Debt rules above). A tap opens the card, where Payment records the transfer (`CreditCardMath.dues`).
+- The wallet card shows Credit limit, Available and Amount due ("by Nov 5", or "Overdue · Nov 5").
+
+## Instalment loan progress (v11 display)
+For a loan repaid monthly with a term (`LoanMath.progress`):
+- **Principal** = owed at start (the opening balance); **Remaining** = owed now; **Paid** = principal − remaining, never
+  below zero — the same "principal repaid" as the loan history's note, so the three always add up.
+- **Instalments paid** = recorded repayments (transfers into the loan), at most the term; a loan owed down to zero
+  counts as fully paid. Interest and fees (expenses on the loan) and balance adjustments are not instalments.
+- The card draws one segment per instalment, paid ones green, and says "3 of 24 installments paid" in words.
+
+## Scheduled outlook (Scheduled page, Home's Upcoming and the bell)
+`ScheduleOutlook` (pure, unit-tested). Nothing here is recorded: only "Mark paid" writes a transaction.
+- **Flow** of a scheduled item: **income**; **expense** (a bill: spending); **transfer** — a debt payment (to a card or
+  loan) or a card's payment due (`CreditCardMath`). Amounts are signed: income +, expenses and transfers −. Ink: income
+  green, expenses red, transfers neutral (owner, 2026-11-03); the sign always carries the meaning too.
+- **Occurrences** in a range `from..to`: every unpaid occurrence of each active schedule dated in the range (a weekly
+  plan appears every week, not only once); paused and finished schedules have none. When the range starts on or before
+  today, every **overdue** occurrence is included and flagged — it is still owed. Card payments: each card's *current*
+  statement only (later statements aren't known yet). Ranges: This month (default: overdue, then today to the month's
+  end), Next 30 days, Next 3 months, or a custom From–To of at most 366 days.
+- **Totals** per flow are in one currency (the main one), never converted; other currencies are listed, not added.
+  **Net** = income − expenses − transfers: what the accounts are expected to gain or lose.
+- **This month** (the page's hero) = everything still scheduled up to the month's end, overdue included.
+- **Projection**: three months starting with this one, the first carrying the overdue items; each later month what falls
+  in it. Follows the kind / wallet / category filters.
+- A debt payment's total (principal + any planned interest) is the transfer; its interest part becomes spending only when
+  it is marked paid (see below), so Bills due counts just that interest.
+- **Category required**: a scheduled bill or income must have a category (`RecurringRepository.SaveResult.CategoryRequired`,
+  owner 2026-11-03); a debt payment gets the shared "Debt interest" category for its interest. Older schedules without
+  one keep working and ask for one when edited.
 
 ## Debt payments (recurring)
 A recurring schedule with `to_wallet_id` set pays a card or loan from a money account (same currency). It is planned

@@ -98,6 +98,11 @@ data class UserPreferences(
     val addSpotlightSeen: Boolean = false,
     /** Wallets screen: rows or card faces. A device choice, kept across sign-outs like the theme. */
     val walletsViewMode: WalletsViewMode = WalletsViewMode.ROWS,
+    /**
+     * When the profile photo was last set (epoch millis), or null for none: the avatar reloads the picture whenever it
+     * changes. The photo itself is a private file ([com.lucento.app.data.media.ProfilePhotos]).
+     */
+    val profilePhotoVersion: Long? = null,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
@@ -143,6 +148,7 @@ class UserPreferencesRepository(
         val insightsVisited = booleanPreferencesKey("insights_visited")
         val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
         val walletsViewMode = stringPreferencesKey("wallets_view_mode")
+        val profilePhotoVersion = longPreferencesKey("profile_photo_version")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -178,6 +184,7 @@ class UserPreferencesRepository(
                 insightsVisited = p[Keys.insightsVisited] ?: false,
                 addSpotlightSeen = p[Keys.addSpotlightSeen] ?: false,
                 walletsViewMode = WalletsViewMode.fromKey(p[Keys.walletsViewMode]),
+                profilePhotoVersion = p[Keys.profilePhotoVersion],
             )
         }
 
@@ -295,6 +302,11 @@ class UserPreferencesRepository(
 
     suspend fun setWalletsViewMode(mode: WalletsViewMode) {
         context.dataStore.edit { it[Keys.walletsViewMode] = mode.key }
+    }
+
+    /** A new profile photo was saved ([version] = when), or it was removed (null). */
+    suspend fun setProfilePhotoVersion(version: Long?) {
+        context.dataStore.edit { if (version == null) it.remove(Keys.profilePhotoVersion) else it[Keys.profilePhotoVersion] = version }
     }
 
 
@@ -415,6 +427,8 @@ class UserPreferencesRepository(
             p.remove(Keys.insightsVisited)
             p.remove(Keys.defaultWalletId)
             p.remove(Keys.displayName)
+            // The photo belongs to the account like the name; its file goes with the ledger wipe (LocalLedgerReset).
+            p.remove(Keys.profilePhotoVersion)
             p.remove(Keys.acknowledgedBudgetMonth)
             p[Keys.smartReading] = false
         }

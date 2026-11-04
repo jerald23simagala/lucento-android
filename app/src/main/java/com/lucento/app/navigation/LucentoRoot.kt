@@ -91,6 +91,7 @@ import com.lucento.app.feature.plan.GoalsScreen
 import com.lucento.app.feature.plan.RecurringScreen
 import com.lucento.app.feature.profile.ProfileDestination
 import com.lucento.app.feature.profile.ProfileSheet
+import com.lucento.app.feature.profile.ProfilePhotoState
 import com.lucento.app.feature.settings.EnabledFeaturesScreen
 import com.lucento.app.feature.settings.SettingsPage
 import com.lucento.app.feature.settings.SettingsScreen
@@ -206,10 +207,25 @@ fun LucentoRoot(preferences: UserPreferences) {
             // Keyed per setup generation: these ViewModels live as long as the Activity, so without the key a second
             // onboarding (after a sign-out wipe) would reuse the finished run's state (F-7).
             androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background) {
+                // The same profile photo actions as the profile menu, so a Google sign-in during setup can offer its picture.
+                val appViewModel: AppViewModel = viewModel(key = "app-${preferences.setupGeneration}", factory = AppViewModel.Factory)
+                val photo by appViewModel.profilePhoto.collectAsStateWithLifecycle()
+                val googlePhoto by appViewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+                val photoBusy by appViewModel.photoBusy.collectAsStateWithLifecycle()
+                val photoMessage by appViewModel.photoMessage.collectAsStateWithLifecycle()
                 OnboardingScreen(
                     viewModel(
                         key = "onboarding-${preferences.setupGeneration}",
                         factory = com.lucento.app.feature.onboarding.OnboardingViewModel.Factory,
+                    ),
+                    photo = ProfilePhotoState(
+                        image = photo,
+                        googleAvailable = googlePhoto != null,
+                        busy = photoBusy,
+                        message = photoMessage,
+                        onPick = appViewModel::setPhotoFromDevice,
+                        onUseGoogle = appViewModel::useGooglePhoto,
+                        onRemove = appViewModel::removePhoto,
                     ),
                 )
             }
@@ -376,7 +392,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             }
         },
     ) { innerPadding ->
-        CompositionLocalProvider(LocalProfileChrome provides ProfileChrome(preferences.displayName) { showProfile = true }) {
+        val profilePhoto by appViewModel.profilePhoto.collectAsStateWithLifecycle()
+        CompositionLocalProvider(LocalProfileChrome provides ProfileChrome(preferences.displayName, profilePhoto) { showProfile = true }) {
             Box(Modifier.fillMaxSize().padding(innerPadding)) {
                 NavHost(
                     navController = navController,
@@ -404,6 +421,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 onOpenGoals = { push(GoalsRoute) },
                                 onOpenRecurring = { id -> push(RecurringRoute(id ?: NO_SCHEDULE)) },
                                 onOpenWallets = { navigateTo(WalletsRoute) },
+                                onOpenWallet = { push(WalletDetailRoute(it)) },
                                 onOpenDebts = { push(DebtsRoute) },
                                 onOpenSettings = { push(SettingsRoute()) },
                                 onOpenAccountSettings = { push(SettingsRoute(SettingsPage.ACCOUNT.key)) },
@@ -496,6 +514,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 openScheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE },
                                 onAddSchedule = { push(RecurringEditRoute()) },
                                 onEditSchedule = { id -> push(RecurringEditRoute(scheduleId = id)) },
+                                onOpenWallet = { id -> push(WalletDetailRoute(id)) },
                             )
                         }
                     }
@@ -622,9 +641,22 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
 
     if (showProfile) {
         val profileEmail by appViewModel.signedInEmail.collectAsStateWithLifecycle()
+        val photo by appViewModel.profilePhoto.collectAsStateWithLifecycle()
+        val googlePhoto by appViewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+        val photoBusy by appViewModel.photoBusy.collectAsStateWithLifecycle()
+        val photoMessage by appViewModel.photoMessage.collectAsStateWithLifecycle()
         ProfileSheet(
             preferences = preferences,
             signedInEmail = profileEmail,
+            photo = ProfilePhotoState(
+                image = photo,
+                googleAvailable = googlePhoto != null,
+                busy = photoBusy,
+                message = photoMessage,
+                onPick = appViewModel::setPhotoFromDevice,
+                onUseGoogle = appViewModel::useGooglePhoto,
+                onRemove = appViewModel::removePhoto,
+            ),
             onSaveName = appViewModel::setDisplayName,
             onTheme = appViewModel::setThemeMode,
             onOpen = { destination ->

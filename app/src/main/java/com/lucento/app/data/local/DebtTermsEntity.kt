@@ -35,6 +35,11 @@ data class DebtTermsEntity(
     /** Monthly instalment in the wallet's currency, minor units. */
     @ColumnInfo(name = "installment_minor") val installmentMinor: Long?,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** v11, credit cards only: the credit limit in the wallet's currency, minor units. */
+    @ColumnInfo(name = "credit_limit_minor") val creditLimitMinor: Long? = null,
+    /** v11, credit cards only: day of the month the statement closes and the payment is due (1–31). */
+    @ColumnInfo(name = "statement_day") val statementDay: Int? = null,
+    @ColumnInfo(name = "due_day") val dueDay: Int? = null,
 )
 
 @Dao

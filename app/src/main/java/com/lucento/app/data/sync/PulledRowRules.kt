@@ -30,6 +30,9 @@ internal object PulledRowRules {
                 optionalRange(row, "interest_rate_bps", 0, 10_000),
                 optionalRange(row, "term_months", 1, Long.MAX_VALUE),
                 optionalRange(row, "installment_minor", 1, MAX_MINOR),
+                optionalRange(row, "credit_limit_minor", 1, MAX_MINOR),
+                optionalRange(row, "statement_day", 1, 31),
+                optionalRange(row, "due_day", 1, 31),
             )
             "categories" -> oneOf(row, "kind", setOf("EXPENSE", "INCOME"))
             "transactions" -> firstOf(currency(row), oneOf(row, "type", TRANSACTION_TYPES), range(row, "amount_minor", 0, MAX_MINOR))

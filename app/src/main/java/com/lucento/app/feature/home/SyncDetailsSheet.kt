@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,6 +23,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
+import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.theme.Spacing
@@ -113,15 +117,22 @@ fun SyncDetailsSheet(
                 .padding(horizontal = Spacing.gutter)
                 .navigationBarsPadding(),
         ) {
-            Text("Cloud sync", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                copy.headline,
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite },
+            SheetHeader(
+                title = copy.headline,
+                subtitle = details.email?.takeIf { status != CloudStatus.LOCAL }?.let { "Cloud sync · $it" } ?: "Cloud sync",
+                icon = when (status) {
+                    CloudStatus.ERROR -> Icons.Outlined.CloudOff
+                    CloudStatus.OFFLINE -> Icons.Outlined.CloudOff
+                    CloudStatus.LOCAL -> Icons.Outlined.PhoneAndroid
+                    else -> Icons.Outlined.CloudDone
+                },
+                tone = when (status) {
+                    CloudStatus.ERROR -> com.lucento.app.core.designsystem.component.StatusTones.negative
+                    CloudStatus.OFFLINE, CloudStatus.PENDING -> com.lucento.app.core.designsystem.component.StatusTones.warning
+                    else -> com.lucento.app.core.designsystem.component.StatusTones.brand
+                },
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
-            details.email?.takeIf { status != CloudStatus.LOCAL }?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             Spacer(Modifier.height(Spacing.sm))
             Text(copy.body, style = MaterialTheme.typography.bodyMedium)
             overriddenNotice(details.overriddenChanges)?.let { notice ->

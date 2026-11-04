@@ -46,6 +46,7 @@ import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.FlowMonth
 import com.lucento.app.domain.Insights
+import com.lucento.app.domain.ScheduledFlow
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -163,6 +164,17 @@ fun IncomeExpenseChart(
             }
         }
     }
+}
+
+/**
+ * A scheduled amount's ink (owner, 2026-11-03): income green, expenses red, and transfers to a card or loan in neutral
+ * ink — they move your own money and are neither. The amount is always signed too, so colour only reinforces.
+ */
+@Composable
+fun scheduledFlowColor(flow: ScheduledFlow): Color = when (flow) {
+    ScheduledFlow.INCOME -> LucentoTheme.extendedColors.positive
+    ScheduledFlow.EXPENSE -> LucentoTheme.extendedColors.negative
+    ScheduledFlow.TRANSFER -> MaterialTheme.colorScheme.onSurface
 }
 
 /** A small coloured dot and label, for chart legends. */

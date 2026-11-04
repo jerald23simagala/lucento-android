@@ -14,6 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SwapHoriz
+import com.lucento.app.core.designsystem.component.SheetHeader
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -103,18 +105,20 @@ fun TransferEditorSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (isNew) "Transfer" else "Edit transfer",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.weight(1f).semantics { heading() },
-                )
-                if (!isNew && onDelete != null) {
-                    IconButton(onClick = { confirmingDelete = true }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete transfer", tint = MaterialTheme.colorScheme.error)
+            SheetHeader(
+                title = if (isNew) "Transfer" else "Edit transfer",
+                subtitle = "Move money between your own wallets. It isn’t income or spending.",
+                icon = Icons.Filled.SwapHoriz,
+                trailing = if (!isNew && onDelete != null) {
+                    {
+                        IconButton(onClick = { confirmingDelete = true }) {
+                            Icon(Icons.Outlined.Delete, contentDescription = "Delete transfer", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
-                }
-            }
+                } else {
+                    null
+                },
+            )
             if (sourceNote != null) {
                 Spacer(Modifier.height(Spacing.md))
                 InfoNote(sourceNote)

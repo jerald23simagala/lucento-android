@@ -1,5 +1,7 @@
 package com.lucento.app.feature.capture
 
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import com.lucento.app.core.designsystem.component.SheetHeader
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -580,12 +582,10 @@ private fun WalletPickerSheet(wallets: List<Wallet>, onChoose: (Long, Boolean) -
     var remember by rememberSaveable { mutableStateOf(true) }
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter).navigationBarsPadding()) {
-            Text("Where should these go?", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            Text(
-                "New transactions go to this wallet unless you name another. You can switch any time from the wallet bar.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm),
+            SheetHeader(
+                title = "Where should these go?",
+                subtitle = "New transactions go to this wallet unless you name another. You can switch any time from the wallet bar.",
+                icon = Icons.Outlined.AccountBalanceWallet,
             )
             wallets.forEachIndexed { index, wallet ->
                 if (index > 0) Hairline(inset = 52.dp)

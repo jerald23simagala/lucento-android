@@ -22,7 +22,8 @@ class LocalLedgerReset(
     private val marker: WipeMarker,
     private val clearBinding: suspend () -> Unit,
     private val clearTables: suspend () -> Unit,
-    private val deleteGoalPhotos: suspend () -> Unit,
+    /** Goal pictures and the profile photo: both belong to the account being removed. */
+    private val deletePhotos: suspend () -> Unit,
     private val accountSetup: AccountSetupStore,
 ) {
     suspend fun wipe() = runWipe(
@@ -30,7 +31,7 @@ class LocalLedgerReset(
         clearBinding = clearBinding,
         clearTables = clearTables,
         clearRest = {
-            deleteGoalPhotos()
+            deletePhotos()
             // Last: this edit sends the app back to onboarding (F-7), which may end the screen that started the wipe.
             accountSetup.resetForNextAccount()
         },

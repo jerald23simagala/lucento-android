@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Percent
@@ -108,7 +106,14 @@ fun WalletDetailScreen(
         val valued = wallet.type.isValuedManually
 
         item(key = "balance") {
-            WalletCard(wallet = wallet, movements = state.history.size, modifier = Modifier.padding(top = Spacing.xs))
+            WalletCard(
+                wallet = wallet,
+                movements = state.history.size,
+                modifier = Modifier.padding(top = Spacing.xs),
+                cycle = state.cardCycle,
+                loan = state.loanProgress,
+                today = state.today,
+            )
             val ext = LucentoTheme.extendedColors
             val notes = Modifier.padding(top = Spacing.sm)
             when {
@@ -138,34 +143,39 @@ fun WalletDetailScreen(
 
         item(key = "actions") {
             Row(Modifier.fillMaxWidth().padding(top = Spacing.md), horizontalArrangement = Arrangement.SpaceBetween) {
-                if (liability) {
-                    val loan = wallet.type == WalletType.LOAN
+                if (wallet.type == WalletType.LOAN) {
                     if (transfersEnabled) {
-                        ActionTile(if (loan) "Repay loan" else "Payment", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(1f), primary = true)
+                        ActionTile("Repay loan", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(1f), primary = true)
                     }
-                    if (loan) {
-                        // A loan has no purchases: its balance is corrected with the as-of balance adjustment instead.
-                        ActionTile("Adjust loan", Icons.Filled.Tune, { adjusting = true }, Modifier.weight(1f))
-                    } else {
-                        ActionTile("Purchase", Icons.Filled.Remove, { onAddTransaction(TransactionType.EXPENSE, wallet.id) }, Modifier.weight(1f))
-                    }
+                    // A loan has no purchases: its balance is corrected with the as-of balance adjustment instead.
+                    ActionTile("Adjust loan", Icons.Filled.Tune, { adjusting = true }, Modifier.weight(1f))
                     ActionTile("Interest/fee", Icons.Outlined.Percent, { onAddTransaction(TransactionType.EXPENSE, wallet.id) }, Modifier.weight(1f))
                 } else {
-                    ActionTile("Expense", Icons.Filled.Remove, { onAddTransaction(TransactionType.EXPENSE, wallet.id) }, Modifier.weight(1f), primary = true)
-                    ActionTile("Income", Icons.Filled.Add, { onAddTransaction(TransactionType.INCOME, wallet.id) }, Modifier.weight(1f))
+                    // Spending and income are added with the dock's +; an account's own page moves money and corrects it.
                     if (transfersEnabled) {
-                        ActionTile("Transfer", Icons.Outlined.SwapHoriz, { onTransfer(wallet.id, null) }, Modifier.weight(1f))
+                        if (liability) {
+                            ActionTile("Payment", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(1f), primary = true)
+                        } else {
+                            ActionTile("Transfer", Icons.Outlined.SwapHoriz, { onTransfer(wallet.id, null) }, Modifier.weight(1f), primary = true)
+                        }
                     }
+                    ActionTile("Adjust balance", Icons.Filled.Tune, { adjusting = true }, Modifier.weight(1f), primary = !transfersEnabled)
                 }
             }
             if (liability) {
+                val cycle = state.cardCycle
                 InfoNote(
-                    if (wallet.type == WalletType.LOAN) {
-                        "Repayments are transfers from your bank or cash, so they’re not counted as spending again. " +
-                            "Record interest and fees as expenses on this loan. Money you borrowed is not income."
-                    } else {
-                        "Card purchases are spending. Paying the card from another account is a transfer, " +
-                            "so the same purchase is never counted twice."
+                    when {
+                        wallet.type == WalletType.LOAN ->
+                            "Repayments are transfers from your bank or cash, so they’re not counted as spending again. " +
+                                "Record interest and fees as expenses on this loan. Money you borrowed is not income."
+                        cycle != null ->
+                            "Amount due ${MoneyFormatter.format(cycle.amountDue)} by ${shortDate(cycle.dueDate)}: you owed " +
+                                "${MoneyFormatter.format(cycle.statementBalance)} on the ${shortDate(cycle.statementDate)} statement, less payments since. " +
+                                "It’s a reminder, not a bill in Safe to spend — the card’s purchases were already counted as spending."
+                        else ->
+                            "Add card purchases with + — they’re spending. Paying the card from another account is a transfer, " +
+                                "so the same purchase is never counted twice."
                     },
                     modifier = Modifier.padding(top = Spacing.sm),
                 )
@@ -218,10 +228,6 @@ fun WalletDetailScreen(
             onSave = walletsViewModel::save,
             onDelete = walletsViewModel::delete,
             onDismiss = { editing = null },
-            onAdjustBalance = {
-                editing = null
-                adjusting = true
-            },
             onPlanPayment = onPlanDebtPayment?.let { plan ->
                 { id, date ->
                     editing = null
@@ -244,6 +250,10 @@ fun WalletDetailScreen(
         )
     }
 }
+
+/** "Nov 5": a day in the user's locale, for billing dates. */
+internal fun shortDate(date: java.time.LocalDate): String =
+    date.format(java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.getDefault()))
 
 /**
  * A card's or loan's history, in sections and as changes in what is owed (a payment reads "−", interest "+"; display

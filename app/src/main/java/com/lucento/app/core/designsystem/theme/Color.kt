@@ -4,6 +4,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.lucento.app.domain.WalletType
 
 /*
@@ -41,6 +42,7 @@ internal object Palette {
     // Semantic
     val Positive = Color(0xFF16865C) // rings and bars
     val PositiveText = Color(0xFF137A53)
+    val PositiveNight = Color(0xFF3DD68C) // positive in the night theme; paid marks on dark card faces
     val Negative = Color(0xFFD64545) // indicators
     val NegativeText = Color(0xFFB83838)
     val Warning = Color(0xFFB86A08) // indicators
@@ -211,6 +213,12 @@ data class LucentoExtendedColors(
         WalletType.OTHER_ASSET -> TonePair(Palette.PaleSky, Palette.MidnightNavy)
     }
 
+    /**
+     * "Paid" on a wallet card face whose text is [ink]: mint on dark faces (4.4:1 on the loan blue), the positive green
+     * on light ones. Never the only cue — the card also says how many instalments are paid.
+     */
+    fun paidOnCard(ink: Color): Color = if (ink.luminance() > 0.5f) Palette.PositiveNight else Palette.Positive
+
     fun tone(type: WalletType): TonePair = when (type) {
         WalletType.CASH -> cash
         WalletType.BANK -> bank
@@ -307,7 +315,7 @@ internal val LightExtended = LucentoExtendedColors(
 )
 
 internal val DarkExtended = LucentoExtendedColors(
-    positive = Color(0xFF3DD68C),
+    positive = Palette.PositiveNight,
     positiveContainer = Color(0xFF123B2A),
     negative = Color(0xFFFF8A8A),
     negativeContainer = Color(0xFF4A1A1F),
