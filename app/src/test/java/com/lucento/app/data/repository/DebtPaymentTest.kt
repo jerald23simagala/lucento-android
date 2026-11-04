@@ -63,6 +63,19 @@ class DebtPaymentTest {
         assertNull(wallet(loan).debt)
     }
 
+    @Test fun aCardKeepsItsLimitAndBillingDaysAndALoanNeverStoresThem() = runTest {
+        val cardTerms = DebtTerms(interestRateBps = 2400, creditLimit = usd(500_000), statementDay = 15, dueDay = 5)
+        val card = (wallets.create("Visa", WalletType.CREDIT_CARD, usd(64_000), cardTerms) as WalletRepository.SaveResult.Saved).id
+        assertEquals(cardTerms, wallet(card).debt)
+        // Switching the card to a loan keeps the rate but drops what only a card has.
+        wallets.update(card, "Visa", WalletType.LOAN, usd(64_000), cardTerms)
+        assertEquals(DebtTerms(interestRateBps = 2400), wallet(card).debt)
+        val stored = termsDao.get(card)!!
+        assertNull(stored.creditLimitMinor)
+        assertNull(stored.statementDay)
+        assertNull(stored.dueDay)
+    }
+
     @Test fun theInterestCategoryIsCreatedOnceAndRestoredIfArchived() = runTest {
         assertEquals(interestCategory, categories.ensure(DebtMath.INTEREST_CATEGORY, CategoryKind.EXPENSE, DebtMath.INTEREST_ICON))
         categoryDao.update(categoryDao.getById(interestCategory)!!.copy(archived = true))

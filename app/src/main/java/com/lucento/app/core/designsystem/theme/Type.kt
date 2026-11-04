@@ -60,19 +60,23 @@ val LucentoTypography = Typography(
  * The hierarchy every screen shares, so a section's purpose, its main figure, the supporting detail and its action
  * read in the same order everywhere:
  *
- *   section title   [Hierarchy.sectionTitle] 18 SemiBold, on-surface — a block of a screen (SectionHeader)
- *   card title      [Hierarchy.cardTitle] 15 SemiBold, on-surface — what a card is about (CardHeader)
+ *   section title   [Hierarchy.sectionTitle] 18 Bold, on-surface — a block of a screen (SectionHeader, ListSectionHeader)
+ *   card overline   [Hierarchy.cardOverline] 12 SemiBold caps, muted — what a dashboard card is about (CardOverline)
+ *   card title      [Hierarchy.cardTitle] 15 SemiBold, on-surface — what a card is about in sheets and forms (CardHeader)
  *   context         [Hierarchy.context] 12 Medium, on-surface-variant — period, currency, scope ("October · USD")
- *   primary value   [AmountStyles.hero] / [AmountStyles.large] — the one figure the block exists for
+ *   primary value   [AmountStyles.headline] / [AmountStyles.hero] / [AmountStyles.large] — the figure the block exists for
  *   secondary value [AmountStyles.medium] / [AmountStyles.row] — figures that explain the primary one
  *   description     bodySmall, on-surface-variant — one or two lines of meaning, never a third heading
  *   action          LucentoTextButton (labelLarge, primary) — trailing the title it acts on
  *   field label     [Hierarchy.fieldLabel] 14 SemiBold, on-surface — inside forms and sheets (FieldHeader)
  *
- * Titles are sentence case; uppercase overlines are kept only for tiny chart/legend labels.
+ * Titles are sentence case. Uppercase is visual only (the caller keeps the sentence-case text for TalkBack): card
+ * overlines, stat-tile labels and tiny chart/legend labels.
  */
 object Hierarchy {
-    val sectionTitle = style(18, 24, FontWeight.SemiBold, tracking = -0.005)
+    val sectionTitle = style(18, 24, FontWeight.Bold, tracking = -0.005)
+    /** A quiet card label that leaves the card's figure as its loudest element. Uppercased by [CardOverline]. */
+    val cardOverline = style(12, 16, FontWeight.SemiBold, tracking = 0.06)
     val cardTitle = style(15, 20, FontWeight.SemiBold)
     val context = style(12, 16, FontWeight.Medium, tracking = 0.005)
     val fieldLabel = style(14, 20, FontWeight.SemiBold)
@@ -87,6 +91,8 @@ object AmountStyles {
     val display = style(40, 48, FontWeight.Bold, tracking = -0.02).copy(fontFeatureSettings = TabularFigures)
     /** Large amount entry in the transaction editor. */
     val entry = style(36, 44, FontWeight.SemiBold, tracking = -0.02).copy(fontFeatureSettings = TabularFigures)
+    /** A hero card's one figure when nothing shares its row (Budget's remaining amount). */
+    val headline = style(36, 44, FontWeight.Bold, tracking = -0.02).copy(fontFeatureSettings = TabularFigures)
     val hero = style(32, 40, FontWeight.Bold, tracking = -0.02).copy(fontFeatureSettings = TabularFigures)
     val large = style(22, 28, FontWeight.Bold, tracking = -0.01).copy(fontFeatureSettings = TabularFigures)
     val medium = style(16, 22, FontWeight.SemiBold).copy(fontFeatureSettings = TabularFigures)

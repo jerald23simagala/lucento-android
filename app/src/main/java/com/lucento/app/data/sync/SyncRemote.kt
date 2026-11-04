@@ -49,8 +49,8 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
 
     override suspend fun currentUserId(): String? {
         // The session is restored from storage asynchronously at startup; reading it before that completes would
-        // report "signed out" to a background SyncWorker running in a fresh process.
-        client.auth.awaitInitialization()
+        // report "signed out" to a background SyncWorker running in a fresh process. Bounded, so it can't hang a sync.
+        kotlinx.coroutines.withTimeoutOrNull(AUTH_READY_TIMEOUT_MILLIS) { client.auth.awaitInitialization() } ?: throw AuthNotReady()
         return client.auth.currentUserOrNull()?.id
     }
 
@@ -128,3 +128,6 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
         const val REVISION = "revision"
     }
 }
+
+/** How long a sync waits for the stored session to load before reporting a retryable failure. */
+private const val AUTH_READY_TIMEOUT_MILLIS = 20_000L

@@ -15,11 +15,20 @@ interface BudgetDao {
     @Query("SELECT * FROM budgets WHERE id = :id")
     suspend fun getById(id: Long): BudgetEntity?
 
+    /** Rows with the same scope: category, currency, override month and recurring start (nulls compared as equal). */
     @Query(
         "SELECT COUNT(*) FROM budgets WHERE currency_code = :currencyCode AND id != :excludeId " +
-            "AND ((:categoryId IS NULL AND category_id IS NULL) OR category_id = :categoryId)"
+            "AND ((:categoryId IS NULL AND category_id IS NULL) OR category_id = :categoryId) " +
+            "AND month IS :month AND effective_from IS :effectiveFrom"
     )
-    suspend fun countMatching(categoryId: Long?, currencyCode: String, excludeId: Long): Int
+    suspend fun countMatching(categoryId: Long?, currencyCode: String, excludeId: Long, month: String? = null, effectiveFrom: String? = null): Int
+
+    /** The row with exactly this scope (budget lifecycle): an override when [month] is set, else a recurring row. */
+    @Query(
+        "SELECT * FROM budgets WHERE category_id = :categoryId AND currency_code = :currencyCode " +
+            "AND month IS :month AND effective_from IS :effectiveFrom ORDER BY id ASC LIMIT 1"
+    )
+    suspend fun findScope(categoryId: Long, currencyCode: String, month: String?, effectiveFrom: String?): BudgetEntity?
 
     @Insert
     suspend fun insert(budget: BudgetEntity): Long

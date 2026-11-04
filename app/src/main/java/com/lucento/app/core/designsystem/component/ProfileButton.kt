@@ -1,5 +1,6 @@
 package com.lucento.app.core.designsystem.component
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,8 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -23,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 
 /** What the profile button shows and does; provided once by the app shell for every primary screen. */
-data class ProfileChrome(val displayName: String?, val onOpen: () -> Unit)
+data class ProfileChrome(val displayName: String?, val photo: ImageBitmap? = null, val onOpen: () -> Unit)
 
 val LocalProfileChrome = compositionLocalOf<ProfileChrome?> { null }
 
@@ -36,16 +39,18 @@ fun initialsOf(name: String?): String? {
     return letters.joinToString("").uppercase(Locale.getDefault()).ifEmpty { null }
 }
 
-/** Circular avatar with the user's initials (or a person glyph). Decorative; wrap it for semantics. */
+/** Circular avatar: the user's [photo] when they set one, else their initials (or a person glyph). Decorative; wrap it for semantics. */
 @Composable
-fun ProfileAvatar(name: String?, modifier: Modifier = Modifier, size: Dp = 36.dp) {
+fun ProfileAvatar(name: String?, modifier: Modifier = Modifier, size: Dp = 36.dp, photo: ImageBitmap? = null) {
     val colors = MaterialTheme.colorScheme
     Box(
         modifier.size(size).clip(CircleShape).background(colors.primaryContainer),
         contentAlignment = Alignment.Center,
     ) {
         val initials = initialsOf(name)
-        if (initials != null) {
+        if (photo != null) {
+            Image(photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+        } else if (initials != null) {
             Text(
                 initials,
                 style = if (size >= 56.dp) MaterialTheme.typography.titleLarge else MaterialTheme.typography.labelLarge,
@@ -77,6 +82,6 @@ fun ProfileButton(modifier: Modifier = Modifier) {
             .semantics { contentDescription = "Profile and settings" },
         contentAlignment = Alignment.Center,
     ) {
-        ProfileAvatar(chrome.displayName)
+        ProfileAvatar(chrome.displayName, photo = chrome.photo)
     }
 }

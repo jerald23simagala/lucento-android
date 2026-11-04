@@ -39,6 +39,14 @@ internal data class WalletRow(
     @EncodeDefault val repayment: String? = null,
     @EncodeDefault @SerialName("term_months") val termMonths: Int? = null,
     @EncodeDefault @SerialName("installment_minor") val installmentMinor: Long? = null,
+    /** v10: bundled institution registry id (display only). Always sent by v10+, so clearing it syncs; older builds
+     *  never send it and the server keeps what it has. */
+    @EncodeDefault @SerialName("institution_id") val institutionId: String? = null,
+    /** v11: a credit card's limit and billing days (local `debt_terms`). Always sent by v11+, nulls included, so clearing
+     *  them syncs; older builds never send them and the server keeps what it has. */
+    @EncodeDefault @SerialName("credit_limit_minor") val creditLimitMinor: Long? = null,
+    @EncodeDefault @SerialName("statement_day") val statementDay: Int? = null,
+    @EncodeDefault @SerialName("due_day") val dueDay: Int? = null,
 )
 
 @Serializable
@@ -130,6 +138,10 @@ internal data class BudgetRow(
     val revision: Long? = null,
     /** The revision this push was based on. Always sent, null included, so the server never reuses a stored value. */
     @EncodeDefault @SerialName("base_revision") val baseRevision: Long? = null,
+    /** Budget lifecycle (v10): "yyyy-MM" for a month-only override; null = recurring. Always sent by v10+ clients. */
+    @EncodeDefault val month: String? = null,
+    /** v10: first month of a recurring amount; null = every month. Always sent by v10+ clients. */
+    @EncodeDefault @SerialName("effective_from") val effectiveFrom: String? = null,
 )
 
 @Serializable
@@ -188,6 +200,12 @@ data class SyncReport(
     val pendingKept: Int = 0,
     /** Pulled rows that broke the record rules ([PulledRowRules]) and were skipped, not reinterpreted. */
     val invalidSkipped: Int = 0,
+    /**
+     * This phone's own unsynced change that lost to a newer change from another device (P2-6): a pending edit replaced,
+     * a delete undone by a newer edit, or a pending edit removed by a newer delete. Unlike [conflicts], which also counts
+     * this phone's edit winning, this is exactly what the user is told about.
+     */
+    val overridden: Int = 0,
 ) {
     operator fun plus(other: SyncReport) = SyncReport(
         pushed + other.pushed,
@@ -198,7 +216,40 @@ data class SyncReport(
         parentsRestored + other.parentsRestored,
         pendingKept + other.pendingKept,
         invalidSkipped + other.invalidSkipped,
+        overridden + other.overridden,
     )
+}
+
+/**
+ * Whether applying a pulled row replaces something this phone changed and hasn't synced (P2-6). [decision] UPDATE on a
+ * dirty row means the pending edit is overwritten (a dirty row the rule protects is never UPDATE). Under [serverWins],
+ * a row that no longer exists locally is a delete the server refused coming back. A local row that never synced (no
+ * base revision) meeting a server row by a deterministic id — a seed category being adopted — is not a lost change
+ * (same exclusion as [countsAsConflict], QA R6-07).
+ */
+/**
+ * P2-6 for the duplicate-budget fold (QA M5): true when the amount Budget was showing — the first stored row with an
+ * amount, for an active expense category (BudgetPlanner.activeAllocations) — holds an unsynced edit of this phone and
+ * the fold settles on a different amount. A 0 row is never what Budget showed.
+ */
+internal fun budgetFoldReplacesUnsynced(
+    rows: List<com.lucento.app.data.local.BudgetEntity>,
+    activeExpenseCategoryIds: Set<Long>,
+    wonMinor: Long,
+): Boolean {
+    val shown = rows.filter { it.limitMinor > 0 }.minByOrNull { it.id } ?: return false
+    return shown.categoryId in activeExpenseCategoryIds && shown.dirty && shown.limitMinor != wonMinor
+}
+
+internal fun overridesLocalChange(
+    decision: PullDecision,
+    serverWins: Boolean,
+    localExists: Boolean,
+    localDirty: Boolean,
+    localBaseRevision: Long? = 0,
+): Boolean {
+    if (localExists && localBaseRevision == null) return false
+    return (decision == PullDecision.UPDATE && localExists && localDirty) || (serverWins && !localExists)
 }
 
 /**
@@ -302,8 +353,14 @@ internal fun safeFailureDescription(e: Throwable): String = when (e) {
     is io.github.jan.supabase.exceptions.RestException ->
         (e.description?.takeIf { it.isNotBlank() } ?: e.error).take(MAX_FAILURE_DESCRIPTION)
     is io.github.jan.supabase.exceptions.HttpRequestException -> "Couldn't reach the server"
+    is SyncRepository.SyncTimedOut -> "Sync took too long and stopped"
+    is AuthNotReady -> "Couldn't confirm your sign-in"
+    is SyncFlight.Busy -> "Another sync is still running"
     else -> e::class.simpleName ?: "Unexpected error"
 }
+
+/** The stored session didn't finish loading in time (see [SupabaseSyncRemote.currentUserId]). */
+internal class AuthNotReady : Exception("Sign-in not ready")
 
 private const val MAX_FAILURE_DESCRIPTION = 160
 

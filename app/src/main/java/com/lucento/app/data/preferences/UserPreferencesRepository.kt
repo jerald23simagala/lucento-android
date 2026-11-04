@@ -29,6 +29,17 @@ import java.util.Locale
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** How the Wallets screen lists accounts: rows, or card faces two to a row. A device choice, never synced or backed up. */
+enum class WalletsViewMode(val key: String) {
+    ROWS("rows"),
+    CARDS("cards");
+
+    companion object {
+        /** Unknown or missing values fall back to cards, the default (owner, 2026-11-04: the gallery opens first). */
+        fun fromKey(key: String?): WalletsViewMode = entries.firstOrNull { it.key == key } ?: CARDS
+    }
+}
+
 data class UserPreferences(
     val onboardingComplete: Boolean,
     val themeMode: ThemeMode,
@@ -55,6 +66,12 @@ data class UserPreferences(
      * user after the consent dialog in Settings; nothing is sent to a model while it is off.
      */
     val smartReading: Boolean = false,
+    /**
+     * Ask Lucento's AI answers: a free-form question goes to Gemini through Lucento's proxy with a summary of the user's
+     * figures (never transactions, notes or payees). Off by default, set only from Ask Lucento's consent sheet or
+     * Settings; never restored from a backup, so a restore can't switch sharing on.
+     */
+    val askLucentoAi: Boolean = false,
     /** Crash reports. Off until the user turns them on in Settings. Nothing is sent while this is false. */
     val crashReports: Boolean = false,
     /** Anonymous usage counts. Off until the user opts in. Nothing is sent while this is false. */
@@ -75,6 +92,28 @@ data class UserPreferences(
     val appLock: Boolean = false,
     /** Hides Lucento's screen in the recent-apps view (P2-10). A device choice like [appLock]. */
     val hideInRecents: Boolean = false,
+    /**
+     * The Dashboard shows amounts as dots (owner, 2026-11-04). Hiding is one tap; showing them again asks for the
+     * phone's fingerprint, face or screen lock. A device choice like [appLock]: never in backups.
+     */
+    val hideAmounts: Boolean = false,
+    /** P2-5: the user hid Home's "turn on" offers for modules that are off; Settings › Enabled features still has them. */
+    val moduleOffersHidden: Boolean = false,
+    /** How the user said they pay (onboarding); the guided setup suggests these account types first. Empty = not asked. */
+    val spendTypes: Set<com.lucento.app.domain.SpendType> = emptySet(),
+    /** Milestones already acknowledged (Part D); null until first baselined, so older installs aren't congratulated in bulk. */
+    val achievementsSeen: Set<com.lucento.app.domain.Achievement>? = null,
+    /** The user has opened Insights at least once (the Financial Explorer milestone). Local only. */
+    val insightsVisited: Boolean = false,
+    /** The one-time "+" spotlight after setup was shown and dismissed (or + was used). A device choice. */
+    val addSpotlightSeen: Boolean = false,
+    /** Wallets screen: rows or card faces. A device choice, kept across sign-outs like the theme. */
+    val walletsViewMode: WalletsViewMode = WalletsViewMode.CARDS,
+    /**
+     * When the profile photo was last set (epoch millis), or null for none: the avatar reloads the picture whenever it
+     * changes. The photo itself is a private file ([com.lucento.app.data.media.ProfilePhotos]).
+     */
+    val profilePhotoVersion: Long? = null,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
@@ -100,6 +139,7 @@ class UserPreferencesRepository(
         val defaultWalletId = longPreferencesKey("default_wallet_id")
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
+        val askLucentoAi = booleanPreferencesKey("ask_lucento_ai")
         val crashReports = booleanPreferencesKey("crash_reports")
         val usageCounts = booleanPreferencesKey("usage_counts")
         val usageInstallId = stringPreferencesKey("usage_install_id")
@@ -114,6 +154,14 @@ class UserPreferencesRepository(
         val setupGeneration = intPreferencesKey("setup_generation")
         val appLock = booleanPreferencesKey("app_lock")
         val hideInRecents = booleanPreferencesKey("hide_in_recents")
+        val hideAmounts = booleanPreferencesKey("hide_amounts")
+        val moduleOffersHidden = booleanPreferencesKey("module_offers_hidden")
+        val spendTypes = stringSetPreferencesKey("spend_types")
+        val achievementsSeen = stringSetPreferencesKey("achievements_seen")
+        val insightsVisited = booleanPreferencesKey("insights_visited")
+        val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
+        val walletsViewMode = stringPreferencesKey("wallets_view_mode")
+        val profilePhotoVersion = longPreferencesKey("profile_photo_version")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -137,12 +185,21 @@ class UserPreferencesRepository(
                 defaultWalletId = p[Keys.defaultWalletId],
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
                 smartReading = p[Keys.smartReading] ?: false,
+                askLucentoAi = p[Keys.askLucentoAi] ?: false,
                 crashReports = p[Keys.crashReports] ?: false,
                 usageCounts = p[Keys.usageCounts] ?: false,
                 localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
                 setupGeneration = p[Keys.setupGeneration] ?: 0,
                 appLock = p[Keys.appLock] ?: false,
                 hideInRecents = p[Keys.hideInRecents] ?: false,
+                hideAmounts = p[Keys.hideAmounts] ?: false,
+                moduleOffersHidden = p[Keys.moduleOffersHidden] ?: false,
+                spendTypes = com.lucento.app.domain.SpendType.fromKeys(p[Keys.spendTypes].orEmpty()),
+                achievementsSeen = p[Keys.achievementsSeen]?.mapNotNull(com.lucento.app.domain.Achievement::fromKey)?.toSet(),
+                insightsVisited = p[Keys.insightsVisited] ?: false,
+                addSpotlightSeen = p[Keys.addSpotlightSeen] ?: false,
+                walletsViewMode = WalletsViewMode.fromKey(p[Keys.walletsViewMode]),
+                profilePhotoVersion = p[Keys.profilePhotoVersion],
             )
         }
 
@@ -155,8 +212,14 @@ class UserPreferencesRepository(
      * Saves the onboarding choices in one atomic edit, then marks onboarding complete. Called only after the chosen
      * categories were written to the database, so a completed onboarding always has the user's categories.
      */
-    suspend fun completeOnboarding(primaryCurrency: String, themeMode: ThemeMode, features: Set<Feature>) {
+    suspend fun completeOnboarding(
+        primaryCurrency: String,
+        themeMode: ThemeMode,
+        features: Set<Feature>,
+        spendTypes: Set<com.lucento.app.domain.SpendType> = emptySet(),
+    ) {
         context.dataStore.edit {
+            it[Keys.spendTypes] = spendTypes.map { type -> type.name }.toSet()
             it[Keys.primaryCurrency] = primaryCurrency
             it[Keys.themeMode] = themeMode.name
             it[Keys.enabledFeatures] = features.map(Feature::key).toSet()
@@ -187,6 +250,10 @@ class UserPreferencesRepository(
 
     suspend fun setSmartReading(enabled: Boolean) {
         context.dataStore.edit { it[Keys.smartReading] = enabled }
+    }
+
+    suspend fun setAskLucentoAi(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.askLucentoAi] = enabled }
     }
 
     /** DataStore copy of the crash-report choice. Written before the synchronous mirror. */
@@ -248,6 +315,23 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.hideInRecents] = enabled }
     }
 
+    suspend fun setHideAmounts(hidden: Boolean) {
+        context.dataStore.edit { it[Keys.hideAmounts] = hidden }
+    }
+
+    suspend fun setModuleOffersHidden(hidden: Boolean) {
+        context.dataStore.edit { it[Keys.moduleOffersHidden] = hidden }
+    }
+
+    suspend fun setWalletsViewMode(mode: WalletsViewMode) {
+        context.dataStore.edit { it[Keys.walletsViewMode] = mode.key }
+    }
+
+    /** A new profile photo was saved ([version] = when), or it was removed (null). */
+    suspend fun setProfilePhotoVersion(version: Long?) {
+        context.dataStore.edit { if (version == null) it.remove(Keys.profilePhotoVersion) else it[Keys.profilePhotoVersion] = version }
+    }
+
 
 
 
@@ -299,6 +383,21 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.themeMode] = mode.name }
     }
 
+    /** Adds [achievements] to the acknowledged set (and baselines it on first use). */
+    suspend fun acknowledgeAchievements(achievements: Set<com.lucento.app.domain.Achievement>) {
+        context.dataStore.edit {
+            it[Keys.achievementsSeen] = it[Keys.achievementsSeen].orEmpty() + achievements.map { a -> a.key }
+        }
+    }
+
+    suspend fun setInsightsVisited() {
+        context.dataStore.edit { if (it[Keys.insightsVisited] != true) it[Keys.insightsVisited] = true }
+    }
+
+    suspend fun setAddSpotlightSeen() {
+        context.dataStore.edit { it[Keys.addSpotlightSeen] = true }
+    }
+
     suspend fun setPrimaryCurrency(code: String) {
         require(CurrencyRules.isSupported(code))
         context.dataStore.edit { it[Keys.primaryCurrency] = code }
@@ -346,10 +445,16 @@ class UserPreferencesRepository(
             p[Keys.onboardingComplete] = false
             p[Keys.categorySetupDone] = false
             p.remove(Keys.guideStep)
+            p.remove(Keys.spendTypes)
+            p.remove(Keys.achievementsSeen)
+            p.remove(Keys.insightsVisited)
             p.remove(Keys.defaultWalletId)
             p.remove(Keys.displayName)
+            // The photo belongs to the account like the name; its file goes with the ledger wipe (LocalLedgerReset).
+            p.remove(Keys.profilePhotoVersion)
             p.remove(Keys.acknowledgedBudgetMonth)
             p[Keys.smartReading] = false
+            p[Keys.askLucentoAi] = false
         }
         const val MAX_DISPLAY_NAME = 40
 

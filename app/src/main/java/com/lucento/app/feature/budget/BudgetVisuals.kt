@@ -1,5 +1,7 @@
 package com.lucento.app.feature.budget
 
+import com.lucento.app.core.designsystem.component.AmountFormat
+import com.lucento.app.core.designsystem.component.amountFormat
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -11,6 +13,7 @@ import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.BudgetHealth
 import com.lucento.app.domain.BudgetPlan
 import com.lucento.app.domain.BurnLevel
+import com.lucento.app.domain.PacePosition
 
 /** One colour per budget state, shared by the hero card, the burn bar and the Budget screen. */
 @Composable
@@ -55,15 +58,46 @@ fun healthLabel(health: BudgetHealth, remaining: Money? = null): String = when (
     BudgetHealth.EXCEEDED -> if (remaining != null && remaining.isZero) "Fully used" else "Over budget"
 }
 
+/**
+ * The month's budget status in a word or two, the same on Home and Budget: Over budget, Ahead of pace (spending runs
+ * faster than the month but hasn't gone over yet — the early warning worth acting on), On track, or Under budget
+ * (spending slower than the month; also how a finished month within budget ends).
+ */
+enum class PaceVerdict(val label: String) {
+    OVER("Over budget"),
+    AHEAD("Ahead of pace"),
+    ON_TRACK("On track"),
+    UNDER("Under budget"),
+}
+
+fun paceVerdict(plan: BudgetPlan, position: PacePosition?, isCurrentMonth: Boolean): PaceVerdict = when {
+    plan.remaining.isNegative -> PaceVerdict.OVER
+    !isCurrentMonth -> PaceVerdict.UNDER
+    position == PacePosition.AHEAD -> PaceVerdict.AHEAD
+    position == PacePosition.BEHIND -> PaceVerdict.UNDER
+    else -> PaceVerdict.ON_TRACK
+}
+
+fun verdictLabel(plan: BudgetPlan, position: PacePosition?, isCurrentMonth: Boolean): String =
+    paceVerdict(plan, position, isCurrentMonth).label
+
+/** Text colours for a [PaceVerdict] chip; the words carry the meaning, colour only reinforces it. */
+@Composable
+fun verdictTone(verdict: PaceVerdict): TonePair = when (verdict) {
+    PaceVerdict.OVER -> StatusTones.negative
+    PaceVerdict.AHEAD -> StatusTones.warning
+    PaceVerdict.ON_TRACK, PaceVerdict.UNDER -> StatusTones.positive
+}
+
 /** One encouraging sentence for the month, from the plan's real figures. */
-fun encouragement(plan: BudgetPlan): String = when (plan.health) {
+fun encouragement(plan: BudgetPlan, fmt: AmountFormat): String = when (plan.health) {
     BudgetHealth.NOT_SET -> "Give your categories an amount and Lucento adds them up into your monthly budget."
     BudgetHealth.ON_TRACK -> "Comfortably within budget — nice and steady."
     BudgetHealth.APPROACHING -> "You’ve used most of this month’s budget. A little care keeps you on track."
-    BudgetHealth.LOW -> "Only ${MoneyFormatter.format(plan.remaining)} left this month — small choices add up."
+    BudgetHealth.LOW -> "Only ${fmt.format(plan.remaining)} left this month — small choices add up."
     BudgetHealth.EXCEEDED -> if (plan.remaining.isZero) {
         "This month’s budget is fully used. Every month is a fresh start."
     } else {
-        "${MoneyFormatter.format(-plan.remaining)} over this month. It happens — next month is a fresh start."
+        "${fmt.format(-plan.remaining)} over this month. It happens — next month is a fresh start."
     }
 }

@@ -1,0 +1,24 @@
+Accessibility pass — EMULATOR ONLY (emulator-5554, Medium_Phone_API_36.1, TalkBack 16.0). Not a physical-device result.
+Date 2026-11-02.
+
+1. Accessibility-tree audit (uiautomator dump; every clickable/checkable node checked for a spoken label and a 48 dp
+   target): Home (top and scrolled), Sync details sheet, Transactions, Budget, Wallets, Profile sheet, Settings hub,
+   Privacy & security, Account & sync, Composer.
+   Result: 0 unlabeled controls, 0 targets under 48 dp. Raw flags seen and dismissed after inspection:
+   - header controls "31 dp" tall: caused by the status shade during a swipe; real size 48x48 dp (re-measured);
+   - "unlabeled" Views at the top: slices of Net flow / Quick link cards clipped under the pinned header (their full
+     nodes carry labels);
+   - "Start a savings goal" 37 dp / "Electricity" row 35 dp: clipped by the screen edge or the dock; LucentoTextButton
+     enforces heightIn(min = 48dp).
+2. Announced values (content descriptions): sync chip "Sync status: Synced" (button, action "Show sync details");
+   net worth "Net worth −$1,089.35: assets … minus liabilities …"; budget bars "Budget used: N percent", "Month
+   elapsed: N percent"; payments bell "Upcoming payments: …"; module offers "Turn on Savings goals" etc.; recent
+   activity rows labelled by the shared TransactionRow. Fixed this session: net worth description mixed "−$" with an
+   ASCII "-$" for assets (now all formatSigned).
+3. Live TalkBack: enabled; TalkBack draws its focus outline on Lucento controls (sync chip, Back). Sequential traversal
+   could not be driven reliably from adb on this emulator (keyboard Alt+Right moved only once; injected swipes were
+   taken as taps), and TalkBack's speech log is only written while TTS is not ready. Full spoken focus order: NOT TESTED.
+   TalkBack's own notification-permission screen kept taking focus; POST_NOTIFICATIONS was granted to TalkBack on the
+   emulator to stop that. TalkBack turned off again afterwards.
+4. Font scaling / narrow screens: covered by P1-7 (artifacts/p1-7-accessibility/), unchanged layouts this session
+   except the new Home cards, which use the same components (FittingText amounts, wrapping labels).

@@ -91,7 +91,9 @@ import com.lucento.app.feature.plan.GoalsScreen
 import com.lucento.app.feature.plan.RecurringScreen
 import com.lucento.app.feature.profile.ProfileDestination
 import com.lucento.app.feature.profile.ProfileSheet
+import com.lucento.app.feature.profile.ProfilePhotoState
 import com.lucento.app.feature.settings.EnabledFeaturesScreen
+import com.lucento.app.feature.settings.SettingsPage
 import com.lucento.app.feature.settings.SettingsScreen
 import com.lucento.app.feature.transactions.TransactionDraft
 import com.lucento.app.feature.transactions.TransactionDetailScreen
@@ -106,12 +108,15 @@ import com.lucento.app.feature.wallets.WalletsScreen
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlin.reflect.KClass
+import androidx.compose.foundation.layout.consumeWindowInsets
 
 // Primary destinations: the five tabs of the navigation dock.
 @Serializable data object HomeRoute
 @Serializable data object TransactionsRoute
 @Serializable data object WalletsRoute
 @Serializable data object InsightsRoute
+/** Ask Lucento: questions about the user's money and the preset reports (opened from Insights' hero). */
+@Serializable data object AskRoute
 @Serializable data object BudgetRoute
 /** The guided setup after onboarding (wallets, debts, budget, goal, first transactions, welcome). */
 @Serializable data object GuideRoute
@@ -135,12 +140,15 @@ import kotlin.reflect.KClass
 
 // Focused workflows: full screen, the dock is hidden.
 @Serializable data object CategorySetupRoute
-@Serializable data object SettingsRoute
+/** Settings: the hub, or one of its pages ([com.lucento.app.feature.settings.SettingsPage] key; empty = hub). */
+@Serializable data class SettingsRoute(val page: String = "")
 @Serializable data object FeaturesRoute
 /** Full-page editor for the transaction held in LucentoRoot's editor draft (opened from Edit on a row). */
 @Serializable data object TransactionEditRoute
 /** Read-only View Transaction page; Edit there opens [TransactionEditRoute] (or the transfer sheet). */
 @Serializable data class TransactionViewRoute(val transactionId: Long)
+/** Dashboard "top spending" tile: Transactions filtered to one category in one month ("yyyy-MM"). */
+@Serializable data class CategoryTransactionsRoute(val categoryId: Long, val month: String)
 /** The transaction composer: [start] is a [ComposerStart] name; [typeHint] a TransactionType name or empty. */
 @Serializable data class ComposerRoute(val start: String = "TYPE", val walletId: Long = NO_WALLET, val typeHint: String = "")
 
@@ -178,6 +186,7 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     TransactionEditRoute::class,
     TransactionViewRoute::class,
     RecurringEditRoute::class,
+    AskRoute::class,
 )
 
 private fun NavDestination?.primaryKey(): String? =
@@ -202,10 +211,25 @@ fun LucentoRoot(preferences: UserPreferences) {
             // Keyed per setup generation: these ViewModels live as long as the Activity, so without the key a second
             // onboarding (after a sign-out wipe) would reuse the finished run's state (F-7).
             androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background) {
+                // The same profile photo actions as the profile menu, so a Google sign-in during setup can offer its picture.
+                val appViewModel: AppViewModel = viewModel(key = "app-${preferences.setupGeneration}", factory = AppViewModel.Factory)
+                val photo by appViewModel.profilePhoto.collectAsStateWithLifecycle()
+                val googlePhoto by appViewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+                val photoBusy by appViewModel.photoBusy.collectAsStateWithLifecycle()
+                val photoMessage by appViewModel.photoMessage.collectAsStateWithLifecycle()
                 OnboardingScreen(
                     viewModel(
                         key = "onboarding-${preferences.setupGeneration}",
                         factory = com.lucento.app.feature.onboarding.OnboardingViewModel.Factory,
+                    ),
+                    photo = ProfilePhotoState(
+                        image = photo,
+                        googleAvailable = googlePhoto != null,
+                        busy = photoBusy,
+                        message = photoMessage,
+                        onPick = appViewModel::setPhotoFromDevice,
+                        onUseGoogle = appViewModel::useGooglePhoto,
+                        onRemove = appViewModel::removePhoto,
                     ),
                 )
             }
@@ -323,6 +347,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
 
     // A new user's guided setup opens over Home and resumes there until it is finished.
     val guidePending = preferences.guideStep != null
+    // Part D: after setup, the dock's + is ringed until it is used (Home clears this once anything is recorded).
+    val spotlightAdd = !preferences.addSpotlightSeen && !guidePending && preferences.onboardingComplete
     // Keyed on the destination too: when a step's work (the composer) ends on a tab, the guide comes back over it.
     LaunchedEffect(guidePending, backStackEntry?.destination?.route) {
         val onGuide = navController.currentDestination?.hasRoute(GuideRoute::class) == true
@@ -362,14 +388,19 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     },
                     onAdd = {
                         haptics.tick()
+                        if (spotlightAdd) appViewModel.markAddSpotlightSeen()
                         openComposer()
                     },
+                    highlightAdd = spotlightAdd && selectedTab == "home",
                 )
             }
         },
     ) { innerPadding ->
-        CompositionLocalProvider(LocalProfileChrome provides ProfileChrome(preferences.displayName) { showProfile = true }) {
-            Box(Modifier.fillMaxSize().padding(innerPadding)) {
+        val profilePhoto by appViewModel.profilePhoto.collectAsStateWithLifecycle()
+        CompositionLocalProvider(LocalProfileChrome provides ProfileChrome(preferences.displayName, profilePhoto) { showProfile = true }) {
+            // The padding is consumed as insets too, so a screen's imePadding() adds only the keyboard above the navigation
+            // bar the Scaffold already cleared, not the bar a second time (a gap above the keyboard in the composer).
+            Box(Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding)) {
                 NavHost(
                     navController = navController,
                     startDestination = HomeRoute,
@@ -396,8 +427,16 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 onOpenGoals = { push(GoalsRoute) },
                                 onOpenRecurring = { id -> push(RecurringRoute(id ?: NO_SCHEDULE)) },
                                 onOpenWallets = { navigateTo(WalletsRoute) },
+                                onOpenWallet = { push(WalletDetailRoute(it)) },
                                 onOpenDebts = { push(DebtsRoute) },
-                                onOpenSettings = { push(SettingsRoute) },
+                                onOpenSettings = { push(SettingsRoute()) },
+                                onOpenAccountSettings = { push(SettingsRoute(SettingsPage.ACCOUNT.key)) },
+                                onOpenTransactions = { navigateTo(TransactionsRoute) },
+                                onViewTransaction = { view(it) },
+                                onAddTransaction = { type -> openComposer(typeHint = type) },
+                                onTransfer = { openTransfer() },
+                                onScanReceipt = { openComposer(ComposerStart.SCAN) },
+                                onOpenCategory = { id, month -> push(CategoryTransactionsRoute(id, month.toString())) },
                             ),
                         )
                     }
@@ -412,6 +451,21 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onAddWallet = { navigateTo(WalletsRoute) },
                             onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
                             onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ openComposer(ComposerStart.SPEAK) }) else null,
+                        )
+                    }
+                    composable<CategoryTransactionsRoute> { entry ->
+                        val route = entry.toRoute<CategoryTransactionsRoute>()
+                        TransactionsScreen(
+                            onAddTransaction = { openComposer() },
+                            onViewTransaction = { view(it) },
+                            onEditTransaction = { edit(it) },
+                            onDeleteTransaction = { t ->
+                                editorViewModel.delete(t.id) { notify(if (t.isTransfer) "Transfer deleted" else "Transaction deleted") }
+                            },
+                            onAddWallet = { navigateTo(WalletsRoute) },
+                            onBack = { navController.popBackStack() },
+                            initialCategoryId = route.categoryId,
+                            initialMonth = runCatching { java.time.YearMonth.parse(route.month) }.getOrNull(),
                         )
                     }
                     composable<WalletsRoute> {
@@ -434,7 +488,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         }
                     }
                     pushed<InsightsRoute>(reducedMotion) {
-                        Gated(Feature.INSIGHTS, features, enableFeature, back) { InsightsScreen(onBack = back) }
+                        Gated(Feature.INSIGHTS, features, enableFeature, back) { InsightsScreen(onBack = back, onAsk = { push(AskRoute) }) }
+                    }
+                    pushed<AskRoute>(reducedMotion) {
+                        Gated(Feature.INSIGHTS, features, enableFeature, back) { com.lucento.app.feature.ask.AskLucentoScreen(onBack = back) }
                     }
 
                     pushed<WalletDetailRoute>(reducedMotion) { entry ->
@@ -466,6 +523,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 openScheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE },
                                 onAddSchedule = { push(RecurringEditRoute()) },
                                 onEditSchedule = { id -> push(RecurringEditRoute(scheduleId = id)) },
+                                onOpenWallet = { id -> push(WalletDetailRoute(id)) },
                             )
                         }
                     }
@@ -488,7 +546,30 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         ManageCategoriesScreen(onBack = back, onChooseFromPresets = { push(CategorySetupRoute) })
                     }
                     pushed<CategorySetupRoute>(reducedMotion) { CategorySetupScreen(onDone = back) }
-                    pushed<SettingsRoute>(reducedMotion) { SettingsScreen(onBack = back) }
+                    pushed<SettingsRoute>(reducedMotion) { entry ->
+                        // A page opened from the hub uses the hub's ViewModel (one account check, one prompt).
+                        // Pages open straight from the hub, so the hub is the entry underneath (public API only).
+                        val hub = remember(entry) {
+                            navController.previousBackStackEntry?.takeIf {
+                                entry.toRoute<SettingsRoute>().page.isNotEmpty() &&
+                                    it.destination.hasRoute<SettingsRoute>() && it.toRoute<SettingsRoute>().page.isEmpty()
+                            }
+                        }
+                        SettingsScreen(
+                            onBack = back,
+                            viewModelOwner = hub,
+                            page = SettingsPage.fromKey(entry.toRoute<SettingsRoute>().page),
+                            onOpenPage = { page ->
+                                when {
+                                    page == SettingsPage.FEATURES -> push(FeaturesRoute)
+                                    // Not push(): launchSingleTop would replace the hub (same route type), so Back would skip
+                                    // it. A repeated tap on the same row is ignored instead.
+                                    navController.currentBackStackEntry?.arguments?.getString("page") != page.key ->
+                                        navController.navigate(SettingsRoute(page.key))
+                                }
+                            },
+                        )
+                    }
                     pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
                     pushed<TransactionViewRoute>(reducedMotion) { entry ->
                         val route = entry.toRoute<TransactionViewRoute>()
@@ -569,14 +650,27 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
 
     if (showProfile) {
         val profileEmail by appViewModel.signedInEmail.collectAsStateWithLifecycle()
+        val photo by appViewModel.profilePhoto.collectAsStateWithLifecycle()
+        val googlePhoto by appViewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+        val photoBusy by appViewModel.photoBusy.collectAsStateWithLifecycle()
+        val photoMessage by appViewModel.photoMessage.collectAsStateWithLifecycle()
         ProfileSheet(
             preferences = preferences,
             signedInEmail = profileEmail,
+            photo = ProfilePhotoState(
+                image = photo,
+                googleAvailable = googlePhoto != null,
+                busy = photoBusy,
+                message = photoMessage,
+                onPick = appViewModel::setPhotoFromDevice,
+                onUseGoogle = appViewModel::useGooglePhoto,
+                onRemove = appViewModel::removePhoto,
+            ),
             onSaveName = appViewModel::setDisplayName,
             onTheme = appViewModel::setThemeMode,
             onOpen = { destination ->
                 when (destination) {
-                    ProfileDestination.SETTINGS -> push(SettingsRoute)
+                    ProfileDestination.SETTINGS -> push(SettingsRoute())
                     ProfileDestination.FEATURES -> push(FeaturesRoute)
                 }
             },

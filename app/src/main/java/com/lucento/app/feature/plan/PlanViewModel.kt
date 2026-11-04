@@ -45,6 +45,8 @@ data class PlanUiState(
     val transactions: List<Transaction> = emptyList(),
     val budgets: List<Budget> = emptyList(),
     val goals: List<Goal> = emptyList(),
+    /** Reached goals the user archived; listed on their own and counted nowhere else. */
+    val archivedGoals: List<Goal> = emptyList(),
     val contributions: List<GoalContribution> = emptyList(),
     val schedules: List<RecurringSchedule> = emptyList(),
     val acknowledgedBudgetMonth: java.time.YearMonth? = null,
@@ -105,6 +107,7 @@ class PlanViewModel(
 
     private data class Plans(
         val goals: List<Goal>,
+        val archivedGoals: List<Goal>,
         val contributions: List<GoalContribution>,
         val schedules: List<RecurringSchedule>,
     )
@@ -116,7 +119,9 @@ class PlanViewModel(
             categories.observeCategories(),
             budgets.observeBudgets(),
         ) { t, w, c, b -> Base(t, w, c, b) },
-        combine(goals.observeGoals(), goals.observeContributions(), recurring.observeSchedules()) { g, c, s -> Plans(g, c, s) },
+        combine(goals.observeGoals(), goals.observeArchivedGoals(), goals.observeContributions(), recurring.observeSchedules()) { g, a, c, s ->
+            Plans(g, a, c, s)
+        },
         preferences.preferences,
     ) { base, plans, prefs ->
         PlanUiState(
@@ -129,6 +134,7 @@ class PlanViewModel(
             transactions = base.transactions,
             budgets = base.budgets,
             goals = plans.goals,
+            archivedGoals = plans.archivedGoals,
             contributions = plans.contributions,
             schedules = plans.schedules,
             acknowledgedBudgetMonth = prefs.acknowledgedBudgetMonth,
@@ -203,6 +209,11 @@ class PlanViewModel(
     fun deleteContribution(id: Long) = write({ goals.deleteContribution(id) }) {}
 
     fun deleteGoal(id: Long) = write({ goals.delete(id) }) {}
+
+    /** Archives a reached goal; [onResult] runs after the write. */
+    fun archiveGoal(id: Long, onResult: (GoalRepository.ArchiveResult) -> Unit) = write({ goals.archive(id) }, onResult)
+
+    fun restoreGoal(id: Long, onDone: () -> Unit) = write({ goals.restore(id) }) { onDone() }
 
     // ---------------------------------------------------------------- recurring
 

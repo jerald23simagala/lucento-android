@@ -45,4 +45,10 @@ class FakeSyncPreferences(
     override suspend fun setInitialPullDoneFor(userId: String) {
         initialPullDone = userId
     }
+
+    var overriddenChanges = 0
+
+    override suspend fun addOverriddenChanges(count: Int) {
+        overriddenChanges += count
+    }
 }

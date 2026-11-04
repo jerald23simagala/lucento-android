@@ -19,6 +19,7 @@ import com.lucento.app.data.local.TransactionDao
 import com.lucento.app.data.local.TransactionEntity
 import com.lucento.app.data.local.WalletDao
 import com.lucento.app.data.local.WalletEntity
+import com.lucento.app.data.repository.isInstitutionId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -28,6 +29,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 import java.util.UUID
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 /**
  * The whole optional cloud sync engine (see docs/SYNC.md). Room is always the local source of truth — nothing
@@ -85,7 +88,30 @@ class SyncRepository(
     /** True when a sign-out or account switch would drop changes that have not reached the server. */
     suspend fun hasUnsyncedChanges(): Boolean = pendingChangeCount() > 0
 
-    suspend fun sync(): SyncResult = SyncFlight.exclusive { syncBody() }
+    private val _running = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** True while this process is syncing (P2-2: the "Syncing" state). Not persisted; another process's sync isn't shown. */
+    val running: kotlinx.coroutines.flow.StateFlow<Boolean> = _running
+
+    suspend fun sync(): SyncResult = try {
+        cycle()
+    } catch (e: SyncFlight.Busy) {
+        fail(e)
+    }
+
+    private suspend fun cycle(): SyncResult = SyncFlight.exclusive {
+        _running.value = true
+        try {
+            // Owner, 2026-11-04: a cycle that never ended kept "Syncing" spinning and held the lock every later sync
+            // waits for. Each request already times out (SupabaseModule); this caps everything else as a last resort.
+            // It is generous because progress is saved only when a cycle completes: a large first pull must still fit.
+            withTimeout(CYCLE_TIMEOUT_MILLIS) { syncBody() }
+        } catch (e: TimeoutCancellationException) {
+            fail(SyncTimedOut())
+        } finally {
+            _running.value = false
+        }
+    }
 
     private suspend fun syncBody(): SyncResult {
         val r = remote ?: return SyncResult.NotConfigured
@@ -152,8 +178,17 @@ class SyncRepository(
                 report += pushTransactions(r, userId, again)
                 report += pushRecurring(r, userId, again)
             }
+            // Two phones that each set an amount for the same category and currency: one row is kept everywhere.
+            val budgetFold = mergeDuplicateBudgets()
+            if (budgetFold.removed > 0) {
+                report += SyncReport(overridden = budgetFold.changedHere)
+                val again = Rejected()
+                report += pushTombstones(r, userId, again)
+                report += pushBudgets(r, userId, again)
+            }
             preferences.setLastSyncedAtMillis(clock())
             preferences.clearLastError()
+            preferences.addOverriddenChanges(report.overridden)
             SyncResult.Success(report)
         } catch (e: CancellationException) {
             throw e
@@ -161,6 +196,9 @@ class SyncRepository(
             fail(e)
         }
     }
+
+    /** The whole cycle ran past [CYCLE_TIMEOUT_MILLIS]; reported as a retryable failure, never as a hang. */
+    internal class SyncTimedOut : Exception("Sync took too long and stopped")
 
     private suspend fun fail(e: Exception): SyncResult.Retryable {
         // Stored and shown in Settings: never the raw message, which can carry request headers (see safeFailureDescription).
@@ -296,16 +334,17 @@ class SyncRepository(
         val plan = CategoryDedup.plan(categories.getAll().map { CategoryDedup.Candidate(it.id, it.kind, it.name, it.archived, it.clientUuid) })
         if (plan.isEmpty()) return 0
         val now = clock()
-        // The winning amount per (keeper, currency) with its original edit time: once a merge rewrites the keeper's row
-        // (updatedAt = now), the next copy must still be compared with the edit that won, or three copies end on the
-        // second one instead of the latest (QA note 1).
-        val winning = mutableMapOf<Pair<Long, String>, CategoryDedup.Limit>()
+        // The winning amount per (keeper, currency, scope) with its original edit time: once a merge rewrites the keeper's
+        // row (updatedAt = now), the next copy must still be compared with the edit that won, or three copies end on the
+        // second one instead of the latest (QA note 1). The scope is part of the key: a month-only amount and an every-month
+        // amount are different budgets and never compete.
+        val winning = mutableMapOf<List<Any?>, CategoryDedup.Limit>()
         plan.forEach { (copy, keeper) ->
             categories.moveTransactions(copy, keeper, now)
             categories.moveRecurring(copy, keeper, now)
             budgets.getForCategory(copy).forEach { moved ->
-                val key = keeper to moved.currencyCode
-                val existing = budgets.findAllocation(keeper, moved.currencyCode)
+                val key = listOf(keeper, moved.currencyCode, moved.month, moved.effectiveFrom)
+                val existing = budgets.findScope(keeper, moved.currencyCode, moved.month, moved.effectiveFrom)
                 val incoming = CategoryDedup.Limit(moved.limitMinor, moved.updatedAt, moved.clientUuid)
                 if (existing == null) {
                     budgets.update(moved.copy(categoryId = keeper, updatedAt = now))
@@ -323,6 +362,44 @@ class SyncRepository(
         return plan.size
     }
 
+    private class BudgetFold(val removed: Int, val changedHere: Int)
+
+    /**
+     * Two phones that each set a monthly amount for the same category and currency create two budget rows (device sync
+     * QA C-3). Budget shows the row this phone stored first, so two devices could show different budgets. They fold
+     * into one: every device keeps the row with the smallest sync id, with the amount [CategoryDedup.winner] picks (a set
+     * amount beats 0, then the latest edit wins: the P1-8 rule), and deletes the others (their tombstones go up).
+     * [BudgetFold.changedHere] counts, for the P2-6 notice, categories where the amount Budget was showing came from a row
+     * holding an unsynced edit of this phone and the fold settles on a different amount. The keeper is written with the
+     * winning edit's own time, not the fold's, so a later fold elsewhere still compares real edit times (QA M6).
+     */
+    private suspend fun mergeDuplicateBudgets(): BudgetFold {
+        val groups = budgets.getAll()
+            .filter { it.categoryId != null }
+            // One row per scope: an override for a month and a recurring row starting in some month are different budgets.
+            .groupBy { listOf(it.categoryId, it.currencyCode, it.month, it.effectiveFrom) }
+            .values
+            .filter { it.size > 1 }
+        if (groups.isEmpty()) return BudgetFold(0, 0)
+        var removed = 0
+        var changedHere = 0
+        val activeExpense = categories.getAll().filter { it.kind == "EXPENSE" && !it.archived }.map { it.id }.toSet()
+        groups.forEach { rows ->
+            val keeper = rows.minWith(compareBy(nullsLast()) { it.clientUuid })
+            val won = rows.map { CategoryDedup.Limit(it.limitMinor, it.updatedAt, it.clientUuid) }.reduce(CategoryDedup::winner)
+            if (budgetFoldReplacesUnsynced(rows, activeExpense, won.minor)) changedHere++
+            // dirty = true explicitly: the Room trigger marks a row dirty only when updated_at changes, and here it may not.
+            if (keeper.limitMinor != won.minor) {
+                budgets.update(keeper.copy(limitMinor = won.minor, updatedAt = maxOf(won.updatedAt, keeper.updatedAt), dirty = true))
+            }
+            rows.filter { it.id != keeper.id }.forEach {
+                budgets.deleteById(it.id)
+                removed++
+            }
+        }
+        return BudgetFold(removed, changedHere)
+    }
+
     // --- push ---
 
     private suspend fun pushTombstones(r: SyncRemote, userId: String, rejected: Rejected): SyncReport {
@@ -333,7 +410,9 @@ class SyncRepository(
         var accepted = 0
         CHILD_FIRST.forEach { table ->
             byTable[table].orEmpty().forEach { t ->
-                if (r.softDelete(table, userId, t.clientUuid, t.baseRevision, SyncTime.toIso(clock()))) {
+                // The delete's time is when the user deleted, not when it is uploaded: an offline delete pushed later must
+                // still lose to an edit made elsewhere after it (D3 "newer action wins"; device sync QA C-2).
+                if (r.softDelete(table, userId, t.clientUuid, t.baseRevision, SyncTime.toIso(t.deletedAt))) {
                     accepted++
                 } else {
                     // A newer concurrent edit exists remotely (or the row never reached the server). The pull fetches
@@ -393,7 +472,8 @@ class SyncRepository(
                 sortOrder = it.sortOrder, archived = it.archived,
                 createdAt = SyncTime.toIso(it.createdAt), updatedAt = SyncTime.toIso(it.updatedAt), baseRevision = it.baseRevision,
                 interestRateBps = t?.interestRateBps, repayment = t?.repayment, termMonths = t?.termMonths,
-                installmentMinor = t?.installmentMinor,
+                installmentMinor = t?.installmentMinor, institutionId = it.institutionId,
+                creditLimitMinor = t?.creditLimitMinor, statementDay = t?.statementDay, dueDay = t?.dueDay,
             ))
         }, { row, rev -> wallets.markPushed(row.clientUuid!!, row.updatedAt, rev, clock()) }, rejected)
     }
@@ -419,6 +499,7 @@ class SyncRepository(
                 id = it.clientUuid!!, userId = userId, categoryId = it.categoryId?.let(categoryUuid::get),
                 currencyCode = it.currencyCode, limitMinor = it.limitMinor,
                 createdAt = SyncTime.toIso(it.createdAt), updatedAt = SyncTime.toIso(it.updatedAt), baseRevision = it.baseRevision,
+                month = it.month, effectiveFrom = it.effectiveFrom,
             ))
         }, { row, rev -> budgets.markPushed(row.clientUuid!!, row.updatedAt, rev, clock()) }, rejected)
     }
@@ -503,6 +584,8 @@ class SyncRepository(
         val clientUuid: String?,
         val queuedUpdatedAt: Long? = null,
         val currentUpdatedAt: suspend () -> Long? = { null },
+        /** The local row held an unsynced edit when the delete was queued: applying it discards that edit (P2-6). */
+        val discardsLocalEdit: Boolean = false,
         val delete: suspend () -> Unit,
     )
 
@@ -514,6 +597,7 @@ class SyncRepository(
         var parentsRestored = 0
         var pendingKept = 0
         var invalidSkipped = 0
+        var overridden = 0
         val deletes = mutableListOf<PendingDelete>()
         /** Soft-deleted parents seen in this pull, including ones this phone never stored. */
         val deletedWallets = mutableMapOf<String, WalletRow>()
@@ -573,7 +657,10 @@ class SyncRepository(
                         editedSince -> state.conflicts++
                         // A delete the local schema still refuses (e.g. this device added a transaction to a wallet
                         // another device deleted) is kept: the data survives here and the conflict is reported.
-                        runCatching { pending.delete() }.isSuccess -> deletedLocally++
+                        runCatching { pending.delete() }.isSuccess -> {
+                            deletedLocally++
+                            if (pending.discardsLocalEdit) state.overridden++
+                        }
                         else -> state.conflicts++
                     }
                 }
@@ -590,6 +677,7 @@ class SyncRepository(
             parentsRestored = state.parentsRestored,
             pendingKept = state.pendingKept,
             invalidSkipped = state.invalidSkipped,
+            overridden = state.overridden,
         )
     }
 
@@ -612,6 +700,7 @@ class SyncRepository(
                 else -> pullDecision(localExists, dirty, base, updatedAt, revision, remoteAt)
             }
             if (countsAsConflict(decision, serverWins, localExists, dirty, base, revision)) s.conflicts++
+            if (overridesLocalChange(decision, serverWins, localExists, dirty, base)) s.overridden++
             return decision
         }
         when (table) {
@@ -804,6 +893,9 @@ class SyncRepository(
             DebtTermsEntity(
                 walletId = walletId, interestRateBps = row.interestRateBps, repayment = repayment,
                 termMonths = row.termMonths, installmentMinor = row.installmentMinor, updatedAt = SyncTime.fromIso(row.updatedAt),
+                creditLimitMinor = row.creditLimitMinor.takeIf { row.type == "CREDIT_CARD" },
+                statementDay = row.statementDay.takeIf { row.type == "CREDIT_CARD" },
+                dueDay = row.dueDay.takeIf { row.type == "CREDIT_CARD" },
             )
         )
     }
@@ -905,7 +997,7 @@ class SyncRepository(
             s.conflicts++ // a newer local edit survives; it is pushed and the server applies the same rule
         } else {
             if (serverWins && localDirty && localBaseRevision != null) s.conflicts++
-            s.deletes += PendingDelete(table, clientUuid, localUpdatedAt, currentUpdatedAt, delete)
+            s.deletes += PendingDelete(table, clientUuid, localUpdatedAt, currentUpdatedAt, discardsLocalEdit = localDirty, delete = delete)
         }
     }
 
@@ -921,6 +1013,9 @@ class SyncRepository(
     private fun <T> decode(serializer: KSerializer<T>, json: JsonObject): T = SyncJson.decodeFromJsonElement(serializer, json)
 
     companion object {
+        /** Last-resort cap on one sync cycle (see [sync]). */
+        const val CYCLE_TIMEOUT_MILLIS = 10 * 60_000L
+
         const val PULL_PAGE_SIZE = 500L
         /** Covers writes stamped by the server before a pull's read but committed after it. */
         const val CURSOR_OVERLAP_MS = 60_000L
@@ -945,6 +1040,9 @@ private fun WalletRow.toEntity(syncedAt: Long, id: Long = 0): WalletEntity = Wal
     id = id, name = name, type = type, currencyCode = currencyCode, openingBalanceMinor = openingBalanceMinor,
     sortOrder = sortOrder, archived = archived, createdAt = SyncTime.fromIso(createdAt), updatedAt = SyncTime.fromIso(updatedAt),
     clientUuid = this.id, dirty = false, syncedAt = syncedAt, baseRevision = revision,
+    // Display only: an id this build can't read (another client, a future format) shows the wallet type's look instead
+    // of hiding the whole wallet and leaving its transactions without one.
+    institutionId = institutionId?.takeIf(::isInstitutionId),
 )
 
 private fun CategoryRow.toEntity(syncedAt: Long, id: Long = 0): CategoryEntity = CategoryEntity(
@@ -956,7 +1054,7 @@ private fun CategoryRow.toEntity(syncedAt: Long, id: Long = 0): CategoryEntity =
 private fun BudgetRow.toEntity(localCategoryId: Long?, syncedAt: Long, id: Long = 0): BudgetEntity = BudgetEntity(
     id = id, categoryId = localCategoryId, currencyCode = currencyCode, limitMinor = limitMinor,
     createdAt = SyncTime.fromIso(createdAt), updatedAt = SyncTime.fromIso(updatedAt), clientUuid = this.id,
-    dirty = false, syncedAt = syncedAt, baseRevision = revision,
+    dirty = false, syncedAt = syncedAt, baseRevision = revision, month = month, effectiveFrom = effectiveFrom,
 )
 
 private fun TransactionRow.toEntity(localWalletId: Long, localCategoryId: Long?, syncedAt: Long, id: Long = 0): TransactionEntity =

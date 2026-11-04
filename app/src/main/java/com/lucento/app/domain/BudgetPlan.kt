@@ -185,21 +185,48 @@ object BudgetPlanner {
         return BudgetHealth.ON_TRACK
     }
 
-    /** Allocations that count: a category budget for an active expense category, with a positive amount. */
-    fun activeAllocations(budgets: List<Budget>, categories: List<Category>): List<Budget> {
+    /**
+     * The allocations that count in [month]: for each active expense category and currency, the row that applies
+     * ([effectiveAllocation]), when its amount is positive. See docs/CALCULATIONS.md "Budget lifecycle".
+     */
+    fun activeAllocations(budgets: List<Budget>, categories: List<Category>, month: YearMonth): List<Budget> {
         val active = categories.filter { it.kind == CategoryKind.EXPENSE && !it.archived }.map { it.id }.toSet()
         return budgets
-            .filter { b -> b.categoryId != null && b.categoryId in active && b.limit.amountMinor > 0L }
+            .filter { b -> b.categoryId != null && b.categoryId in active }
             .groupBy { it.categoryId to it.currencyCode }
-            .map { (_, list) -> list.minBy { it.id } }
+            .mapNotNull { (_, rows) -> effectiveAllocation(rows, month) }
+            .filter { it.limit.amountMinor > 0L }
     }
 
     /**
-     * Currencies a plan can be shown in, [preferred] first: every currency with an allocation, plus [preferred]
-     * itself (so a user without allocations still sees an empty plan in their main currency).
+     * Which of one category's rows (one currency) applies in [month] (owner requirement C4):
+     * 1. a month-only override for [month], if any (a 0 override means no amount this month);
+     * 2. otherwise the recurring row with the latest start month on or before [month] (no start = every month).
+     * Rows in the same tier (duplicates from before sync folded them) resolve as they always did: the first stored row
+     * with an amount, else the first stored row.
      */
-    fun currencies(budgets: List<Budget>, categories: List<Category>, preferred: String): List<String> =
-        (listOf(preferred) + activeAllocations(budgets, categories).map { it.currencyCode }.sorted()).distinct()
+    fun effectiveAllocation(rows: List<Budget>, month: YearMonth): Budget? {
+        fun pick(tier: List<Budget>): Budget? =
+            tier.filter { it.limit.amountMinor > 0L }.minByOrNull { it.id } ?: tier.minByOrNull { it.id }
+        pick(rows.filter { it.month == month })?.let { return it }
+        val recurring = rows.filter { it.month == null && (it.effectiveFrom == null || it.effectiveFrom <= month) }
+        if (recurring.isEmpty()) return null
+        val latestStart = recurring.maxOf { it.effectiveFrom ?: EARLIEST }
+        return pick(recurring.filter { (it.effectiveFrom ?: EARLIEST) == latestStart })
+    }
+
+    /** The recurring amount that applies in [month], ignoring any month-only override (the "every month" figure). */
+    fun recurringAllocation(rows: List<Budget>, month: YearMonth): Budget? =
+        effectiveAllocation(rows.filter { it.month == null }, month)
+
+    private val EARLIEST: YearMonth = YearMonth.of(1, 1)
+
+    /**
+     * Currencies a plan can be shown in, [preferred] first: every currency with an allocation in [month], plus
+     * [preferred] itself (so a user without allocations still sees an empty plan in their main currency).
+     */
+    fun currencies(budgets: List<Budget>, categories: List<Category>, preferred: String, month: YearMonth): List<String> =
+        (listOf(preferred) + activeAllocations(budgets, categories, month).map { it.currencyCode }.sorted()).distinct()
 
     fun plan(
         categories: List<Category>,
@@ -214,7 +241,7 @@ object BudgetPlanner {
         val spentByCategory: Map<Long?, Money> = expenses.groupBy { it.categoryId }
             .mapValues { (_, list) -> Money.sum(currencyCode, list.map { it.amount }) }
         val zero = Money.zero(currencyCode)
-        val allocations = activeAllocations(budgets, categories)
+        val allocations = activeAllocations(budgets, categories, month)
             .filter { it.currencyCode == currencyCode }
             .associateBy { it.categoryId!! }
         val active = categories.filter { it.kind == CategoryKind.EXPENSE && !it.archived }

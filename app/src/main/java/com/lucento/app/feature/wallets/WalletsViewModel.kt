@@ -3,10 +3,19 @@ package com.lucento.app.feature.wallets
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lucento.app.core.containerFactory
+import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyParser
 import com.lucento.app.data.preferences.UserPreferencesRepository
+import com.lucento.app.data.preferences.WalletsViewMode
 import com.lucento.app.data.repository.CategoryRepository
+import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import com.lucento.app.domain.CategoryKind
 import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.DebtRepayment
@@ -29,7 +38,19 @@ data class WalletsUiState(
     val primaryCurrency: String = "USD",
     val summary: NetWorthCalculator.Summary? = null,
     val defaultWalletId: Long? = null,
-)
+    /** The hero's net worth over the last months and its month-on-month change, in the hero's currency. */
+    val trend: NetWorthTrend? = null,
+    val viewMode: WalletsViewMode = WalletsViewMode.ROWS,
+    val side: WalletSide = WalletSide.ALL,
+    /** The type chip in use; null for all types. Always one the user has on [side]. */
+    val typeFilter: WalletType? = null,
+) {
+    /** The currency the hero shows: the main currency when held, otherwise the first one with wallets. Never converted. */
+    val heroTotal: Money? get() = summary?.let { it.totalFor(primaryCurrency) ?: it.totals.firstOrNull() }
+
+    /** What the list shows after the side and type filters. */
+    val shown: List<Wallet> get() = WalletsOverview.filter(wallets, side, typeFilter)
+}
 
 /** Editable form state for creating or updating a wallet. */
 data class WalletDraft(
@@ -46,8 +67,14 @@ data class WalletDraft(
     val repayment: DebtRepayment = DebtRepayment.ONE_TIME,
     val termMonthsText: String = "",
     val installmentText: String = "",
-    /** When set, saving opens a prefilled recurring payment starting on this day. */
+    /** When set, saving opens a prefilled recurring payment starting on this day (loans). */
     val reminderDate: LocalDate? = null,
+    // Credit cards only: the limit and the billing days (day of the month, 1–31), as typed.
+    val creditLimitText: String = "",
+    val statementDayText: String = "",
+    val dueDayText: String = "",
+    /** Bank or provider from the bundled registry (display only); never kept for cash. */
+    val institutionId: String? = null,
 )
 
 sealed interface DraftError {
@@ -66,6 +93,11 @@ sealed interface DraftError {
     data object InstallmentInvalid : DraftError
     /** The instalment is ambiguous or carries another currency's symbol (MoneyParser.clarification). */
     data class InstallmentUnclear(val message: String) : DraftError
+    data object CreditLimitInvalid : DraftError
+    /** The credit limit is ambiguous or carries another currency's symbol (MoneyParser.clarification). */
+    data class CreditLimitUnclear(val message: String) : DraftError
+    /** A billing day outside 1–31, or only one of the statement and due days. */
+    data object BillingDaysInvalid : DraftError
 }
 
 /** Plain-language explanation of what still uses a wallet, e.g. "3 transactions and 1 recurring payment". */
@@ -78,18 +110,52 @@ class WalletsViewModel(
     private val wallets: WalletRepository,
     private val preferences: UserPreferencesRepository,
     private val categories: CategoryRepository? = null,
+    /** For the hero's balance history; the app shares one transactions query across screens. */
+    transactions: TransactionRepository? = null,
 ) : ViewModel() {
 
+    private val side = MutableStateFlow(WalletSide.ALL)
+    private val typeFilter = MutableStateFlow<WalletType?>(null)
+
+    /** Balances, net worth and the trend: rebuilt only when wallets, transactions or the main currency change. */
+    private val overview = combine(
+        wallets.observeWallets(),
+        transactions?.observeTransactions() ?: flowOf(emptyList()),
+        preferences.preferences.map { it.primaryCurrency }.distinctUntilChanged(),
+    ) { list, all, primary ->
+        val summary = if (list.isEmpty()) null else NetWorthCalculator.summarize(list, primary)
+        val currency = summary?.let { (it.totalFor(primary) ?: it.totals.first()).currencyCode }
+        Triple(list, summary, currency?.let { WalletsOverview.trend(list, all, it, LocalDate.now()) })
+    }.flowOn(Dispatchers.Default)
+
     val uiState: StateFlow<WalletsUiState> =
-        combine(wallets.observeWallets(), preferences.preferences) { list, prefs ->
+        combine(overview, preferences.preferences, side, typeFilter) { (list, summary, trend), prefs, side, type ->
             WalletsUiState(
                 loading = false,
                 wallets = list,
                 primaryCurrency = prefs.primaryCurrency,
-                summary = if (list.isEmpty()) null else NetWorthCalculator.summarize(list, prefs.primaryCurrency),
+                summary = summary,
                 defaultWalletId = prefs.defaultWalletId,
+                trend = trend,
+                viewMode = prefs.walletsViewMode,
+                side = side,
+                // A type the user no longer has on this side (or never had) quietly falls back to all types.
+                typeFilter = type?.takeIf { it in WalletsOverview.typesOn(list, side) },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WalletsUiState())
+
+    fun setSide(value: WalletSide) {
+        side.value = value
+    }
+
+    fun setTypeFilter(value: WalletType?) {
+        typeFilter.value = value
+    }
+
+    /** Remembered on this device (DataStore `wallets_view_mode`), so Wallets opens the way it was left. */
+    fun setViewMode(mode: WalletsViewMode) {
+        viewModelScope.launch { runCatching { preferences.setWalletsViewMode(mode) } }
+    }
 
     private var saving = false
 
@@ -123,8 +189,9 @@ class WalletsViewModel(
         saving = true
         viewModelScope.launch {
             val result = try {
-                if (draft.id == null) wallets.create(draft.name, draft.type, amount, debt)
-                else wallets.update(draft.id, draft.name, draft.type, amount, debt)
+                val institution = draft.institutionId.takeIf { draft.type != WalletType.CASH }
+                if (draft.id == null) wallets.create(draft.name, draft.type, amount, debt, institution)
+                else wallets.update(draft.id, draft.name, draft.type, amount, debt, institution)
             } finally {
                 saving = false
             }
@@ -154,8 +221,39 @@ class WalletsViewModel(
         data class Error(val error: DraftError) : DebtParse
     }
 
-    /** The draft's debt details: an optional rate, and for monthly repayment the term and instalment (both required). */
+    /**
+     * The draft's debt details: an optional rate, and for monthly repayment the term and instalment (both required).
+     * A credit card adds an optional limit and optional billing days, which come as a pair.
+     */
     private fun debtTerms(draft: WalletDraft, decimalSeparator: Char): DebtParse {
+        val base = when (val terms = repaymentTerms(draft, decimalSeparator)) {
+            is DebtParse.Valid -> terms.terms
+            is DebtParse.Error -> return terms
+        }
+        if (draft.type != WalletType.CREDIT_CARD) return DebtParse.Valid(base)
+        val parsedLimit = MoneyParser.parse(draft.creditLimitText, draft.currencyCode, decimalSeparator)
+        MoneyParser.clarification(parsedLimit, decimalSeparator)?.let { return DebtParse.Error(DraftError.CreditLimitUnclear(it)) }
+        val limit = when (parsedLimit) {
+            MoneyParser.Result.Empty -> null
+            is MoneyParser.Result.Success -> parsedLimit.money.takeIf { it.amountMinor > 0 } ?: return DebtParse.Error(DraftError.CreditLimitInvalid)
+            else -> return DebtParse.Error(DraftError.CreditLimitInvalid)
+        }
+        val statement = draft.statementDayText.trim()
+        val due = draft.dueDayText.trim()
+        val days = when {
+            statement.isEmpty() && due.isEmpty() -> null to null
+            else -> {
+                val s = statement.toIntOrNull()?.takeIf { it in 1..31 }
+                val d = due.toIntOrNull()?.takeIf { it in 1..31 }
+                if (s == null || d == null) return DebtParse.Error(DraftError.BillingDaysInvalid)
+                s to d
+            }
+        }
+        return DebtParse.Valid(base.copy(creditLimit = limit, statementDay = days.first, dueDay = days.second))
+    }
+
+    /** The rate and the repayment plan; a card keeps whatever plan it already had (cards no longer choose one). */
+    private fun repaymentTerms(draft: WalletDraft, decimalSeparator: Char): DebtParse {
         val rate = when (val r = DebtMath.parseRate(draft.interestText)) {
             DebtMath.RateResult.Empty -> null
             is DebtMath.RateResult.Valid -> r.bps
@@ -187,6 +285,6 @@ class WalletsViewModel(
     }
 
     companion object {
-        val Factory = containerFactory { WalletsViewModel(it.wallets, it.preferences, it.categories) }
+        val Factory = containerFactory { WalletsViewModel(it.wallets, it.preferences, it.categories, it.transactions) }
     }
 }

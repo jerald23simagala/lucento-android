@@ -13,7 +13,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 ## What works today (0.5.0)
 - **Navigation**: a persistent dock — **Home · Transactions · (+) · Budget · Wallets** — whose central **+** opens the
   **transaction composer**; Insights, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
-  links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name, appearance, Settings, Enabled features).
+  links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation. On a new phone,
   **I already have an account** (when sync is available) reminds you to sync the old phone first, signs in, downloads
@@ -27,15 +27,24 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
   the budget shown transparently; amounts per month and currency; manage categories (add, rename, reorder,
   deactivate, restore). Existing users keep their categories and can personalise them from presets.
-- **Insights**: income and expenses over 3/6/12 months (transfers excluded) and net-worth composition by account type.
+- **Insights**: income and expenses over 3/6/12 months (transfers excluded, with the change against the period before)
+  and net-worth composition by account type.
+- **Ask Lucento** (from Insights): questions about your money and four statements — net worth, cash flow, budget vs
+  actual, debts & loans — calculated on the phone, saved or shared as PDFs. Optional AI answers (Gemini through
+  Lucento's proxy) only with consent, sending summaries of your figures, never transactions or notes. See
+  [docs/ASK.md](docs/ASK.md).
 - **Transactions**: search, filters (date, type incl. transfers, wallet, category), day groups, edit/delete.
 - **Transfers** between your own accounts (two linked legs, atomic, never income or spending).
 - **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
   assets and liabilities in separate cards (Debts & loans linked from Liabilities), each wallet shown as a bank-style card, warnings for balances that can't be right, and
   **Adjust balance** (the gap is recorded as a visible Balance adjustment, never income or spending); account detail with history.
-- **Savings goals**, **Debts & loans** (optional interest rate, one-time or monthly amortization, payment reminders),
-  **Recurring payments** (bills, income and debt payments split into principal and interest; mark paid / skip /
-  pause — never auto-posted).
+- **Savings goals**, **Debts & loans** (optional interest rate; loans: one-time or monthly amortization with an
+  instalment bar and payment reminders; credit cards: credit limit, available credit, statement and due days with an
+  amount-due reminder that is never counted in Safe to spend),
+  **Scheduled transactions** (bills, income and debt payments split into principal and interest; every bill and income
+  has a category; mark paid / skip / pause — never auto-posted). The Scheduled page lists every dated occurrence with
+  Transactions-style filters and a From–To range, summed up in the Transactions page's cards (income, expenses and net
+  flow, with card and loan transfers apart).
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,
@@ -71,6 +80,11 @@ JDK 17, compileSdk 35, minSdk 26 (Android 8.0+). Application ID `com.lucento.app
 
 ## Build locally (Android Studio on Windows/macOS/Linux)
 1. `git clone` the repo and open the folder in Android Studio (Ladybug or newer). Let Gradle sync.
+   Gradle must run on **JDK 17–21** (CI uses 17). Recent Android Studio versions bundle JDK 25, which Kotlin 2.0.21 and
+   Gradle 8.11 can't run on, so set *Settings › Build Tools › Gradle › Gradle JDK* to a 17 or 21 JDK (or `JAVA_HOME` on the
+   command line). On JDK 25 the build fails at once with only `25.0.3` as the error — that message means this. Optionally
+   `./gradlew updateDaemonJvm
+   --jvm-version=21` writes a per-machine `gradle/gradle-daemon-jvm.properties` (gitignored) that picks an installed 21.
 2. Run the `app` configuration on a device/emulator, or:
    ```bash
    ./gradlew testDebugUnitTest   # unit tests

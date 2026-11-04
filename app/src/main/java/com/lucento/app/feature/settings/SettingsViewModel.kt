@@ -113,7 +113,7 @@ class SettingsViewModel(
         combine(
             preferences.preferences,
             wallets.observeWallets(),
-            transactions.observeTransactions(),
+            transactions.observeCount(),
             syncPreferences.status,
             syncing,
             syncMessage,
@@ -123,7 +123,7 @@ class SettingsViewModel(
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
-            val t = values[2] as List<*>
+            val transactionTotal = values[2] as Int
             val syncStatus = values[3] as SyncStatus
             val isSyncing = values[4] as Boolean
             val message = values[5] as String?
@@ -133,7 +133,7 @@ class SettingsViewModel(
             SettingsUiState(
                 preferences = prefs,
                 walletCount = w.size,
-                transactionCount = t.size,
+                transactionCount = transactionTotal,
                 cloudSync = CloudSyncUiState(
                     configured = SupabaseModule.isConfigured,
                     googleSignInConfigured = SupabaseModule.isGoogleSignInConfigured,
@@ -366,6 +366,10 @@ class SettingsViewModel(
     /** Smarter reading; turned on only from the consent dialog in Settings. */
     fun setSmartReading(enabled: Boolean) {
         viewModelScope.launch { preferences.setSmartReading(enabled) }
+    }
+
+    fun setAskLucentoAi(enabled: Boolean) {
+        viewModelScope.launch { preferences.setAskLucentoAi(enabled) }
     }
 
     /**

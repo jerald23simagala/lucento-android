@@ -60,6 +60,10 @@ listOf("LUCENTO_SUPABASE_PUBLISHABLE_KEY" to releaseSupabaseKey, "LUCENTO_DEBUG_
 val productionAiInterpretUrl = "https://www.lucentoapp.com/api/interpret"
 val releaseAiInterpretUrl = lucentoConfig("LUCENTO_AI_INTERPRET_URL").ifBlank { productionAiInterpretUrl }
 val debugAiInterpretUrl = lucentoConfig("LUCENTO_DEBUG_AI_INTERPRET_URL")
+// Ask Lucento's AI answers live beside Smarter reading on the same proxy (/api/ask next to /api/interpret), with the same
+// rules: debug only talks to a test proxy, and a build without one simply has no AI answers (reports still work).
+fun askUrlFor(interpretUrl: String): String =
+    if (interpretUrl.isBlank()) "" else interpretUrl.trimEnd('/').replace(Regex("/interpret$"), "") + "/ask"
 if (debugAiInterpretUrl.trimEnd('/').equals(releaseAiInterpretUrl.trimEnd('/'), ignoreCase = true)) {
     throw GradleException("LUCENTO_DEBUG_AI_INTERPRET_URL is the production proxy. Debug builds must use a test proxy or none.")
 }
@@ -118,11 +122,13 @@ android {
             buildConfigField("String", "SUPABASE_URL", "\"$debugSupabaseUrl\"")
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"$debugSupabaseKey\"")
             buildConfigField("String", "AI_INTERPRET_URL", "\"$debugAiInterpretUrl\"")
+            buildConfigField("String", "AI_ASK_URL", "\"${askUrlFor(debugAiInterpretUrl)}\"")
         }
         release {
             buildConfigField("String", "SUPABASE_URL", "\"$releaseSupabaseUrl\"")
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"$releaseSupabaseKey\"")
             buildConfigField("String", "AI_INTERPRET_URL", "\"$releaseAiInterpretUrl\"")
+            buildConfigField("String", "AI_ASK_URL", "\"${askUrlFor(releaseAiInterpretUrl)}\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

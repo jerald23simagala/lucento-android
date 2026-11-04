@@ -57,6 +57,8 @@ class RecurringRepository(
         data object WalletNotFound : SaveResult
         data object CurrencyMismatch : SaveResult
         data object CategoryMismatch : SaveResult
+        /** A bill or income needs a category (owner, 2026-11-03: no uncategorised scheduled expenses). */
+        data object CategoryRequired : SaveResult
         /** A debt payment must go from a money account to a card or loan in the same currency, with interest >= 0. */
         data object InvalidDebt : SaveResult
         data object NotFound : SaveResult
@@ -87,6 +89,8 @@ class RecurringRepository(
         val wallet = wallets.getById(input.walletId)
         if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
         if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
+        // A debt payment's category is only for its interest, filled in for the user (PlanViewModel.saveSchedule).
+        if (input.categoryId == null && input.toWalletId == null) return SaveResult.CategoryRequired
         if (input.categoryId != null) {
             val category = categories.getById(input.categoryId) ?: return SaveResult.CategoryMismatch
             if (category.kind != input.type.name) return SaveResult.CategoryMismatch

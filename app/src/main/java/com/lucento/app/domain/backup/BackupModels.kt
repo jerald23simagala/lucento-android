@@ -46,6 +46,8 @@ data class BackupWallet(
     val archived: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    /** Institution registry id (v10), or null. Absent in backups written before v10. */
+    val institutionId: String? = null,
 )
 
 data class BackupCategory(
@@ -80,6 +82,10 @@ data class BackupBudget(
     val limitMinor: Long,
     val createdAt: Long,
     val updatedAt: Long,
+    /** Budget lifecycle: "yyyy-MM" month-only override, or null. Absent in backups written before v10. */
+    val month: String? = null,
+    /** Budget lifecycle: first month of a recurring amount, or null (every month). */
+    val effectiveFrom: String? = null,
 )
 
 data class BackupGoal(
@@ -133,6 +139,10 @@ data class BackupDebtTerms(
     val termMonths: Int?,
     val installmentMinor: Long?,
     val updatedAt: Long,
+    /** v11, credit cards: the limit (minor units) and the statement and due days; absent from version 1–2 files. */
+    val creditLimitMinor: Long? = null,
+    val statementDay: Int? = null,
+    val dueDay: Int? = null,
 )
 
 /** A row that was deleted, so a later sync can tell the server. [table] is a [BackupTables] name. */

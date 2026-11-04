@@ -1,5 +1,6 @@
 package com.lucento.app.feature.settings
 
+import androidx.compose.material.icons.outlined.Restore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -35,7 +36,6 @@ import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -72,7 +72,6 @@ import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.SectionHeader
-import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
@@ -85,10 +84,37 @@ import com.lucento.app.domain.backup.BackupPreview
 import com.lucento.app.domain.backup.RestoreMode
 import java.time.LocalDate
 
+/**
+ * P2-4: Settings is a short list of pages instead of one long scroll. [SettingsPage.FEATURES] has its own route
+ * (EnabledFeaturesScreen); the rest render here.
+ */
+enum class SettingsPage(val key: String, val title: String) {
+    ACCOUNT("account", "Account & sync"),
+    MONEY("money", "Money"),
+    DATA("data", "Your data"),
+    PRIVACY("privacy", "Privacy & security"),
+    FEATURES("features", "Enabled features"),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): SettingsPage? = entries.firstOrNull { it.key == key }
+    }
+}
+
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
+    page: SettingsPage? = null,
+    onOpenPage: (SettingsPage) -> Unit = {},
+    /**
+     * Whose ViewModel to use: the hub's, for a page opened from it, so the hub and its pages share one account check and
+     * one account prompt (QA M3). Null uses this screen's own.
+     */
+    viewModelOwner: androidx.lifecycle.ViewModelStoreOwner? = null,
+    viewModel: SettingsViewModel = viewModel(
+        viewModelStoreOwner = viewModelOwner ?: checkNotNull(androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner.current),
+        factory = SettingsViewModel.Factory,
+    ),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var pickingCurrency by remember { mutableStateOf(false) }
@@ -96,7 +122,6 @@ fun SettingsScreen(
     var backupPreview by remember { mutableStateOf<BackupPreview?>(null) }
     var confirmReplace by remember { mutableStateOf(false) }
     var lockNotice by remember { mutableStateOf<String?>(null) }
-    val haptics = rememberHaptics()
     val context = LocalContext.current
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) viewModel.exportCsv(context.contentResolver, uri) { exportMessage = it }
@@ -121,17 +146,16 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.gutter),
     ) {
-        LucentoTopBar(title = "Settings", onBack = onBack)
+        LucentoTopBar(title = page?.title ?: "Settings", onBack = onBack)
         state?.let { current ->
             SettingsContent(
                 current = current,
-                onThemeMode = { mode ->
-                    haptics.tick()
-                    viewModel.setThemeMode(mode)
-                },
+                page = page,
+                onOpenPage = onOpenPage,
                 onPickCurrency = { pickingCurrency = true },
                 onFeature = viewModel::setFeatureEnabled,
                 onSmartReading = viewModel::setSmartReading,
+                onAskLucentoAi = viewModel::setAskLucentoAi,
                 onCrashReports = viewModel::setCrashReports,
                 onExport = {
                     exportMessage = null
@@ -326,10 +350,12 @@ fun EnabledFeaturesSection(state: SettingsUiState, onFeature: (Feature, Boolean)
 @Composable
 private fun SettingsContent(
     current: SettingsUiState,
-    onThemeMode: (ThemeMode) -> Unit,
+    page: SettingsPage?,
+    onOpenPage: (SettingsPage) -> Unit,
     onPickCurrency: () -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
     onSmartReading: (Boolean) -> Unit,
+    onAskLucentoAi: (Boolean) -> Unit,
     onCrashReports: (Boolean) -> Unit,
     onExport: () -> Unit,
     onExportBackup: () -> Unit,
@@ -347,22 +373,9 @@ private fun SettingsContent(
 ) {
     val prefs = current.preferences
     Column {
-        SectionHeader("Appearance", Modifier.padding(top = Spacing.sm))
-        Row(
-            Modifier.fillMaxWidth().selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            ThemeMode.entries.forEach { mode ->
-                ThemeOption(
-                    mode = mode,
-                    selected = prefs.themeMode == mode,
-                    onSelect = { if (prefs.themeMode != mode) onThemeMode(mode) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-
-        SectionHeader("Money", Modifier.padding(top = Spacing.section))
+      when (page) {
+      null -> SettingsHub(current, onOpenPage)
+      SettingsPage.MONEY -> {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -403,24 +416,14 @@ private fun SettingsContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        EnabledFeaturesSection(current, onFeature)
-
-        CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword)
-
-        // Debug builds without a test proxy have no Smarter reading (P0-1): nothing to switch on.
-        if (current.cloudSync.configured && current.cloudSync.signedInEmail != null && com.lucento.app.BuildConfig.AI_INTERPRET_URL.isNotBlank()) {
-            SmartReadingSection(
-                on = prefs.smartReading,
-                signedIn = true,
-                onChange = onSmartReading,
-            )
-        }
-
-        SectionHeader("Your data", Modifier.padding(top = Spacing.section))
+      }
+      SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
+      SettingsPage.ACCOUNT -> CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword, showHeader = false)
+      SettingsPage.DATA -> {
         NavRow(
             icon = Icons.Outlined.FileDownload,
             title = "Export transactions (CSV)",
-            summary = "${current.transactionCount} rows · opens in any spreadsheet app",
+            summary = (if (current.transactionCount == 1) "1 row" else "${current.transactionCount} rows") + " · opens in any spreadsheet app",
             onClick = onExport,
         )
         BackupExportNotice()
@@ -447,21 +450,10 @@ private fun SettingsContent(
                 "the file never includes sign-in or crash reports. Uninstalling Lucento or clearing its storage erases " +
                 "anything that isn’t in a backup or in cloud sync.",
         )
-
-        SectionHeader("Privacy", Modifier.padding(top = Spacing.section))
-        SwitchRow(
-            title = "Send crash reports",
-            checked = prefs.crashReports,
-            onCheckedChange = onCrashReports,
-            description = "Off unless you turn this on. A report is the stack and the kind of error — never an amount, a note, or what you typed.",
-        )
-        SwitchRow(
-            title = "Share anonymous usage counts",
-            checked = prefs.usageCounts,
-            onCheckedChange = onUsageCounts,
-            description = "Off unless you turn this on. Event names and timings only, with a random install id. Never amounts or what you type. Kept 90 days. Turning this off deletes the counts for this install.",
-        )
+      }
+      SettingsPage.PRIVACY -> {
         // P2-10 (D8): both optional, both off by default, both only on this phone.
+        SectionHeader("On this phone", Modifier.padding(top = Spacing.sm))
         SwitchRow(
             title = "Lock Lucento",
             checked = prefs.appLock,
@@ -475,111 +467,46 @@ private fun SettingsContent(
             onCheckedChange = onHideInRecents,
             description = "Shows a blank preview instead of your balances when you switch apps. This also blocks screenshots and screen recording of Lucento.",
         )
+        SectionHeader("What leaves this phone", Modifier.padding(top = Spacing.section))
+        // Said once (N-22): nothing is sent unless cloud sync or one of the switches below is on.
         Fact(
-            Icons.Outlined.PhoneAndroid,
-            if (current.cloudSync.status.enabled) "Kept on this device, copied to your account" else "Stored only on this device",
+            if (current.cloudSync.status.enabled) Icons.Filled.CloudDone else Icons.Outlined.PhoneAndroid,
+            if (current.cloudSync.status.enabled) "Cloud sync is on" else "Nothing, unless you turn something on",
             if (current.cloudSync.status.enabled)
-                "Wallets, transactions, budgets and goals stay in Lucento’s private storage; cloud sync keeps a copy in your account, readable only by you. Crash reports and Smarter reading are separate and stay off until you turn them on."
+                "Wallets, transactions, budgets and goals are copied to your account, readable only by you. Everything below stays off until you switch it on."
             else
-                "Wallets, transactions, budgets and goals stay on this phone unless you turn on cloud sync. Crash reports and Smarter reading stay off until you turn those on too.",
+                "Your data stays in Lucento’s private storage on this phone. Cloud sync, crash reports, usage counts and Smarter reading each send something only after you turn them on.",
         )
-        Hairline(inset = Sizes.iconTile + Spacing.md)
-        Fact(
-            Icons.Outlined.WifiOff,
-            "Offline unless you turn sync on",
-            if (current.cloudSync.status.enabled)
-                "Cloud sync is on for this account. Crash reports and Smarter reading still wait for their own switches. Receipt reading runs on the phone either way."
-            else
-                "Nothing is sent unless you turn on cloud sync, crash reports, Smarter reading, or anonymous usage counts. Receipt reading runs on the phone.",
+        SwitchRow(
+            title = "Send crash reports",
+            checked = prefs.crashReports,
+            onCheckedChange = onCrashReports,
+            description = "Off unless you turn this on. A report is the stack and the kind of error — never an amount, a note, or what you typed.",
         )
+        SwitchRow(
+            title = "Share anonymous usage counts",
+            checked = prefs.usageCounts,
+            onCheckedChange = onUsageCounts,
+            description = "Off unless you turn this on. Event names and timings only, with a random install id. Never amounts or what you type. Kept 90 days. Turning this off deletes the counts for this install.",
+        )
+        // Debug builds without a test proxy have no Smarter reading (P0-1): nothing to switch on.
+        if (current.cloudSync.configured && current.cloudSync.signedInEmail != null && com.lucento.app.BuildConfig.AI_INTERPRET_URL.isNotBlank()) {
+            SmartReadingSection(
+                on = prefs.smartReading,
+                signedIn = true,
+                onChange = onSmartReading,
+            )
+        }
+        if (current.cloudSync.configured && current.cloudSync.signedInEmail != null && com.lucento.app.BuildConfig.AI_ASK_URL.isNotBlank()) {
+            AskLucentoAiSection(on = prefs.askLucentoAi, onChange = onAskLucentoAi)
+        }
         Hairline(inset = Sizes.iconTile + Spacing.md)
-        Fact(Icons.Outlined.KeyboardVoice, "Voice uses your phone’s recogniser", "Speech is converted to text by your device’s speech service; Lucento interprets it offline.")
+        Fact(Icons.Outlined.KeyboardVoice, "Voice and receipts are read on this phone", "Speech is turned into text by your phone’s own speech service and receipts by on-device text recognition; Lucento reads both offline.")
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.CloudOff, "Not in cloud backups", "Your financial data is excluded from Android’s automatic cloud backup.")
 
-        SectionHeader("About", Modifier.padding(top = Spacing.section))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LucentoMark(size = 40.dp, animate = false)
-            Spacer(Modifier.width(Spacing.md))
-            Column {
-                Text("Lucento ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Financial clarity without the complexity.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Spacer(Modifier.height(Spacing.md))
-        Text(
-            "Set in Plus Jakarta Sans, licensed under the SIL Open Font License 1.1. Text recognition by Google ML Kit (on-device). " +
-                "Animations play with Airbnb Lottie (Apache License 2.0); the Sun and Moon, illustrations and motion are original to Lucento.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-/** Theme choice with a miniature preview of the palette it selects. */
-@Composable
-private fun ThemeOption(mode: ThemeMode, selected: Boolean, onSelect: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    val border by animateColorAsState(if (selected) colors.primary else colors.outlineVariant, tween(160), label = "theme-border")
-    // Literal previews of each theme (not tokens), so they look the same whichever theme is active.
-    val light = Color(0xFFFFFDF5) to Color(0xFF3563F5)
-    val dark = Color(0xFF10182B) to Color(0xFF7C9AFF)
-    Column(
-        modifier
-            .clip(MaterialTheme.shapes.medium)
-            .border(BorderStroke(if (selected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
-            .padding(Spacing.sm),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clip(MaterialTheme.shapes.small)
-                .border(BorderStroke(1.dp, colors.outlineVariant), MaterialTheme.shapes.small),
-        ) {
-            when (mode) {
-                ThemeMode.LIGHT -> Swatch(light, Modifier.weight(1f))
-                ThemeMode.DARK -> Swatch(dark, Modifier.weight(1f))
-                ThemeMode.SYSTEM -> {
-                    Swatch(light, Modifier.weight(1f))
-                    Swatch(dark, Modifier.weight(1f))
-                }
-            }
-        }
-        Spacer(Modifier.height(Spacing.sm))
-        Text(
-            when (mode) {
-                ThemeMode.SYSTEM -> "System"
-                ThemeMode.LIGHT -> "Light"
-                ThemeMode.DARK -> "Dark"
-            },
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) colors.onSurface else colors.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun Swatch(colors: Pair<Color, Color>, modifier: Modifier) {
-    Box(
-        modifier
-            .fillMaxHeight()
-            .background(colors.first)
-            .padding(8.dp),
-        contentAlignment = Alignment.BottomStart,
-    ) {
-        Box(
-            Modifier
-                .width(22.dp)
-                .height(6.dp)
-                .background(colors.second, RoundedCornerShape(3.dp)),
-        )
+      }
+      }
     }
 }
 
@@ -595,9 +522,10 @@ internal fun CloudSyncSection(
     onSyncNow: () -> Unit,
     onConnectEmail: (String, String, EmailMode) -> Unit = { _, _, _ -> },
     onChangePassword: (String) -> Unit = {},
+    showHeader: Boolean = true,
 ) {
     Column {
-        SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
+        if (showHeader) SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
         when {
             !state.configured -> {
                 InfoNote("Cloud sync isn’t available in this version of Lucento yet. Everything else works fully offline.")
@@ -723,6 +651,38 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
 }
 
 /**
+ * Ask Lucento's AI answers (docs/ASK.md): off until the user agrees to what is sent. Reports are always calculated on
+ * this phone, with or without it.
+ */
+@Composable
+private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
+    var asking by remember { mutableStateOf(false) }
+    SectionHeader("Ask Lucento", Modifier.padding(top = Spacing.section))
+    SwitchRow(
+        title = "AI answers with Gemini",
+        checked = on,
+        onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
+        description = "Ask anything about your money. Off, Ask Lucento still prepares your reports on this phone.",
+    )
+    if (asking) {
+        ConfirmDialog(
+            title = "Turn on AI answers?",
+            text = "When you ask Ask Lucento a question of your own, Lucento sends it, with a summary of your figures — " +
+                "monthly totals, totals by category, balances by wallet, budgets, debts and upcoming bills — to Lucento’s " +
+                "server, which asks Google’s Gemini. Your transactions, notes, payees, receipts and photos are never sent. " +
+                "Answers quote figures calculated on this phone. It isn’t financial advice. Each account has a daily " +
+                "allowance, shared with Smarter reading, and you can turn this off at any time.",
+            confirmLabel = "Turn on",
+            onConfirm = {
+                asking = false
+                onChange(true)
+            },
+            onDismiss = { asking = false },
+        )
+    }
+}
+
+/**
  * Shown before a backup is written. The lines wrap with the font size; the Settings screen scrolls,
  * so nothing is clipped at a large font scale.
  */
@@ -753,6 +713,15 @@ private fun RestorePreviewDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        icon = {
+            com.lucento.app.core.designsystem.component.IconTile(
+                icon = androidx.compose.material.icons.Icons.Outlined.Restore,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                content = MaterialTheme.colorScheme.onPrimaryContainer,
+                size = 52.dp,
+                shape = androidx.compose.foundation.shape.CircleShape,
+            )
+        },
         title = { Text("Restore this backup?", style = MaterialTheme.typography.headlineSmall) },
         text = {
             Column {

@@ -224,9 +224,10 @@ private fun foldCategories(
         return FoldedCategories(categories, transactions, budgets, recurring)
     }
     fun remap(id: String?): String? = id?.let { plan.remap[it] ?: it }
-    val foldedBudgets = LinkedHashMap<Pair<String?, String>, BackupBudget>()
+    // Keyed by the whole scope: a month-only override and a recurring row are different budgets, never duplicates.
+    val foldedBudgets = LinkedHashMap<List<String?>, BackupBudget>()
     for (budget in budgets.map { it.copy(categoryId = remap(it.categoryId)) }) {
-        val key = budget.categoryId to budget.currency
+        val key = listOf(budget.categoryId, budget.currency, budget.month, budget.effectiveFrom)
         val existing = foldedBudgets[key]
         foldedBudgets[key] = when {
             existing == null -> budget

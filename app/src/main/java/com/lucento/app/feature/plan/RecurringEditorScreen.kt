@@ -1,5 +1,6 @@
 package com.lucento.app.feature.plan
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import com.lucento.app.core.designsystem.component.icon
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -122,7 +123,7 @@ fun RecurringEditorScreen(
     prefillDebt: Pair<Long, LocalDate>? = null,
     onSaved: () -> Unit = onBack,
     viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
-) {
+) = AmountsShown {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
     var draft by remember { mutableStateOf<ScheduleDraft?>(null) }
@@ -282,12 +283,21 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
             LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
                 FieldHeader(if (draft.kind == ScheduleKind.INCOME) "Into" else "Paid from")
                 PillRow(state.wallets.map { it.id to "${it.name} · ${it.currencyCode}" }, draft.walletId, onSelect = { update(draft.copy(walletId = it)) }, icon = walletIcon)
-                if (categories.isNotEmpty()) {
-                    FieldHeader("Category")
+                // Required: every scheduled bill and income lands in a category, so budgets and Bills due see it.
+                FieldHeader("Category")
+                if (categories.isEmpty()) {
+                    Text(
+                        if (draft.kind == ScheduleKind.INCOME) "Add an income category first (Budget → Categories)."
+                        else "Add an expense category first (Budget → Categories).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                } else {
                     PillRow(
-                        options = listOf<Pair<Long?, String>>(null to "None") + categories.map { it.id to it.name },
-                        selected = draft.categoryId,
+                        options = categories.map { it.id to it.name },
+                        selected = draft.categoryId?.takeIf { id -> categories.any { it.id == id } },
                         onSelect = { update(draft.copy(categoryId = it)) },
+                        icon = { id -> categories.firstOrNull { it.id == id }?.icon },
                     )
                 }
             }
@@ -329,6 +339,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                     w == null -> if (isDebt) "Choose the account it’s paid from." else "Choose an account."
                     isDebt && debt == null -> "Choose the card or loan it pays."
                     draft.name.isBlank() -> "Give it a name."
+                    !isDebt && categories.none { it.id == draft.categoryId } -> "Choose a category."
                     else -> null
                 }
                 if (problem != null || w == null) {
@@ -368,6 +379,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                         RecurringRepository.SaveResult.WalletNotFound -> "That account no longer exists."
                         RecurringRepository.SaveResult.CurrencyMismatch -> "The amount must be in the account’s currency."
                         RecurringRepository.SaveResult.CategoryMismatch -> "That category doesn’t match the type."
+                        RecurringRepository.SaveResult.CategoryRequired -> "Choose a category."
                         RecurringRepository.SaveResult.InvalidDebt -> "Pay a card or loan from a money account in the same currency."
                         RecurringRepository.SaveResult.InvalidInterval,
                         RecurringRepository.SaveResult.InvalidType,

@@ -54,8 +54,9 @@ class CashflowCalculatorTest {
         assertEquals(Money(30_000_00, "PHP"), result.budgetLimit)
     }
 
-    @Test fun legacyOverallBudgetIsIgnoredAndBillsOutsideBudgetedCategoriesDoNotCount() {
-        // Only food is allocated; rent (housing) is not budgeted, so its bill does not reduce the budget figure.
+    @Test fun legacyOverallBudgetIsIgnoredAndBillsOutsideBudgetedCategoriesStillCount() {
+        // Only food is allocated. Rent (housing) has no amount, but paying it will be spending all the same (Used counts
+        // every expense), so its bill is still due against the budget (owner, 2026-11-03).
         val result = CashflowCalculator.safeToSpend(
             "PHP", today, txs, emptyList(),
             budgets = listOf(Budget(9, null, Money(99_000_00, "PHP")), Budget(2, 6, Money(10_000_00, "PHP"))),
@@ -64,8 +65,8 @@ class CashflowCalculatorTest {
         )!!
         assertEquals(SafeToSpend.Basis.BUDGET, result.basis)
         assertEquals(Money(10_000_00, "PHP"), result.budgetLimit)
-        assertEquals(Money.zero("PHP"), result.committed)
-        assertEquals(Money(3_000_00, "PHP"), result.amount)
+        assertEquals(Money(10_000_00, "PHP"), result.committed)
+        assertEquals(Money(-7_000_00, "PHP"), result.amount)
     }
 
     @Test fun withoutBudgetUsesOnlySpendableBalancesAndSaysSo() {
@@ -113,6 +114,21 @@ class CashflowCalculatorTest {
         assertEquals(Money(1_000_00, "USD"), result.spendableBalance)
         assertEquals(Money.zero("USD"), result.committed)
         assertEquals(Money(1_000_00, "USD"), result.amount)
+    }
+
+    /**
+     * Pins the documented rule (docs/CALCULATIONS.md, corrected 2026-11-03): with a budget, safe to spend subtracts every
+     * expense this month, as Spent does (decision D1) — an expense in a category without an amount still counts.
+     */
+    @Test fun safeToSpendFromBudgetCountsSpendingOutsideBudgetedCategories() {
+        val onlyFood = listOf(Budget(1, 6, Money(10_000_00, "PHP"))) // housing has no amount
+        val withHousingExpense = txs + tx(TransactionType.EXPENSE, 1_500_00, "2026-10-21", category = 5)
+        val result = CashflowCalculator.safeToSpend(
+            "PHP", today, withHousingExpense, listOf(wallet(1, WalletType.BANK, 50_000_00)), onlyFood, emptyList(), categories,
+        )!!
+        assertEquals(SafeToSpend.Basis.BUDGET, result.basis)
+        assertEquals(Money(8_500_00, "PHP"), result.spentThisMonth) // 7,000 food + 1,500 housing
+        assertEquals(Money(1_500_00, "PHP"), result.amount) // 10,000 − 8,500
     }
 
     @Test fun noBudgetAndNoSpendableAccountGivesNoFigure() {

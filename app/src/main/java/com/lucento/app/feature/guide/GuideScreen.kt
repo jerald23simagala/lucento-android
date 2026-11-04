@@ -1,5 +1,15 @@
 package com.lucento.app.feature.guide
 
+import com.lucento.app.core.designsystem.component.AmountsShown
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import com.lucento.app.core.designsystem.theme.Sizes
+import com.lucento.app.core.designsystem.component.StageIndicator
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -24,7 +34,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DonutLarge
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import com.lucento.app.core.designsystem.component.CategoryTile
+import com.lucento.app.core.money.MoneyParser
+import com.lucento.app.domain.Category
+import com.lucento.app.domain.TransactionType
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -59,6 +76,7 @@ import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.MoneyText
+import com.lucento.app.core.designsystem.component.WalletIdentityTile
 import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
@@ -85,7 +103,7 @@ fun GuideScreen(
     onFinished: () -> Unit,
     viewModel: GuideViewModel = viewModel(factory = GuideViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
-) {
+) = AmountsShown {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     // Same as onboarding: one count each time a page comes on screen, keyed on the page.
     if (!state.loading) LaunchedEffect(state.step) { viewModel.onStepShown(state.step) }
@@ -102,14 +120,14 @@ fun GuideScreen(
     // Back walks the story backwards; on the first page it stays (the setup resumes here on the next launch anyway).
     BackHandler(enabled = !state.loading) { viewModel.back() }
 
-    if (state.loading) return
+    if (state.loading) return@AmountsShown
     val steps = state.steps
-    val index = steps.indexOf(state.step).coerceAtLeast(0)
 
     Column(Modifier.fillMaxSize().padding(horizontal = Spacing.gutter).imePadding()) {
-        if (state.step != GuideStep.WELCOME) {
-            GuideProgress(index, steps.size - 1, Modifier.padding(top = Spacing.md))
-        }
+        StageIndicator(
+            com.lucento.app.domain.SetupProgress(guideStage(state.step), state.furthestStage, guideStageProgress(state.step, steps)),
+            modifier = Modifier.padding(top = Spacing.md),
+        )
         AnimatedContent(
             targetState = state.step,
             transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) },
@@ -123,14 +141,14 @@ fun GuideScreen(
                         body = "Start with the cash, bank accounts and e-wallets you use, with today’s balance. No bank connection needed.",
                         wallets = state.assets,
                         addLabel = if (state.assets.isEmpty()) "Add your first account" else "Add another account",
-                        onAdd = { editingWallet = WalletDraft(type = WalletType.BANK, currencyCode = state.currency, isDefault = state.assets.isEmpty()) },
+                        onAdd = { editingWallet = WalletDraft(type = state.firstAssetType, currencyCode = state.currency, isDefault = state.assets.isEmpty()) },
                     )
                     GuideStep.DEBTS -> WalletsStep(
                         title = "Any cards or loans?",
                         body = "Add credit cards and loans so your net worth is honest. Skip this if you have none — you can add them later.",
                         wallets = state.debts,
                         addLabel = "Add a card or loan",
-                        onAdd = { editingWallet = WalletDraft(type = WalletType.CREDIT_CARD, currencyCode = state.currency) },
+                        onAdd = { editingWallet = WalletDraft(type = state.firstDebtType, currencyCode = state.currency) },
                     )
                     GuideStep.BUDGETS -> BudgetsStep(
                         state = state,
@@ -190,23 +208,6 @@ fun GuideScreen(
 }
 
 @Composable
-private fun GuideProgress(current: Int, count: Int, modifier: Modifier = Modifier) {
-    Row(
-        modifier.fillMaxWidth().padding(bottom = Spacing.lg).semantics { contentDescription = "Setup step ${current + 1} of $count" },
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        repeat(count) { i ->
-            Box(
-                Modifier.weight(1f).height(4.dp).background(
-                    if (i <= current) LucentoTheme.extendedColors.accent else MaterialTheme.colorScheme.outlineVariant,
-                    RoundedCornerShape(2.dp),
-                ),
-            )
-        }
-    }
-}
-
-@Composable
 private fun StepHeader(title: String, body: String) {
     Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
     Spacer(Modifier.height(Spacing.sm))
@@ -221,10 +222,11 @@ private fun WalletsStep(title: String, body: String, wallets: List<Wallet>, addL
         LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
             wallets.forEachIndexed { i, w ->
                 Row(Modifier.fillMaxWidth().padding(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
-                    WalletTypeTile(w.type)
+                    WalletIdentityTile(w)
                     Spacer(Modifier.width(Spacing.md))
                     Text(w.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    MoneyText(money = w.balance, style = AmountStyles.row)
+                    // A card or loan shows what it does to net worth (−300.00), never an unsigned owed amount.
+                    MoneyText(money = if (w.type.isLiability) w.netWorthContribution else w.balance, style = AmountStyles.row)
                 }
                 if (i < wallets.lastIndex) Hairline()
             }
@@ -245,32 +247,113 @@ private fun BudgetsStep(
     val required = GuidedSetup.budgetsRequired(state.expenseCategories.size)
     StepHeader(
         "Set your monthly budget",
-        "Give at least $required ${if (required == 1) "category" else "categories"} an amount for ${state.currency}. The rest can wait — your total budget is always the sum of these.",
+        "Give at least $required ${if (required == 1) "category" else "categories"} an amount for ${state.currency}. The rest can wait — your total budget is always the sum of these. They repeat every month; later you can change one month alone or every month from then on.",
     )
+    val total = GuidedSetup.draftTotal(state.expenseCategories.map { text(it.id) }, state.currency, separator)
+    // At large text the field moves under the category name, so neither has to squeeze.
+    val stacked = LocalDensity.current.fontScale >= 1.5f
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+        state.expenseCategories.forEachIndexed { i, category ->
+            BudgetAmountRow(
+                category = category,
+                currency = state.currency,
+                value = text(category.id),
+                error = if (category.id in invalid) {
+                    // An ambiguous amount or another currency's symbol says what to type instead (P0-3).
+                    val parsed = MoneyParser.parse(text(category.id), state.currency, separator)
+                    MoneyParser.clarification(parsed, separator) ?: "Enter an amount above zero, like 250${separator}00."
+                } else null,
+                stacked = stacked,
+                onChange = { onChange(category.id, it) },
+            )
+            if (i < state.expenseCategories.lastIndex) Hairline(inset = RowTextInset)
+        }
+        // The total is never typed: it is always the sum of the rows above, as the budget will be.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f))
+                .padding(horizontal = Spacing.md, vertical = Spacing.md)
+                .semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconTile(
+                icon = Icons.Outlined.DonutLarge,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                content = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text("Monthly budget", style = MaterialTheme.typography.titleSmall)
+                Text("The sum of these amounts", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(Spacing.sm))
+            MoneyText(money = total, style = AmountStyles.medium.copy(fontWeight = FontWeight.Bold), fractionScale = 1f)
+        }
+    }
+}
+
+/** Where a row's text starts: past the card's padding, the 40dp category tile and the gap after it. */
+private val RowTextInset = Spacing.md + Sizes.iconTile + Spacing.md
+
+/** One category: its tile and name on the left, the monthly amount typed on the right (below it at large text). */
+@Composable
+private fun BudgetAmountRow(
+    category: Category,
+    currency: String,
+    value: String,
+    error: String?,
+    stacked: Boolean,
+    onChange: (String) -> Unit,
+) {
     val colors = OutlinedTextFieldDefaults.colors(
         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
     )
-    state.expenseCategories.forEach { category ->
+    val field: @Composable (Modifier) -> Unit = { m ->
         AmountTextField(
-            value = text(category.id),
-            onValueChange = { onChange(category.id, it) },
+            value = value,
+            onValueChange = onChange,
             filter = { it.take(20) },
-            label = { Text(category.name) },
-            prefix = { Text(MoneyFormatter.currencySymbol(state.currency) + " ") },
-            placeholder = { Text("Not set") },
-            isError = category.id in invalid,
-            supportingText = if (category.id in invalid) ({
-                // An ambiguous amount or another currency's symbol says what to type instead (P0-3).
-                val parsed = com.lucento.app.core.money.MoneyParser.parse(text(category.id), state.currency, separator)
-                Text(com.lucento.app.core.money.MoneyParser.clarification(parsed, separator) ?: "Enter an amount above zero, like 250${separator}00.")
-            }) else null,
-            textStyle = AmountStyles.row,
+            prefix = { Text(MoneyFormatter.currencySymbol(currency) + " ") },
+            placeholder = { Text("Not set", textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth()) },
+            isError = error != null,
+            textStyle = AmountStyles.row.copy(textAlign = TextAlign.End),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
             shape = MaterialTheme.shapes.small,
             colors = colors,
-            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.sm),
+            // The field has no visible label: the category name beside it is the label, so TalkBack hears it too.
+            modifier = m.semantics { contentDescription = "${category.name} monthly budget" },
         )
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CategoryTile(category, TransactionType.EXPENSE)
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                category.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (!stacked) {
+                Spacer(Modifier.width(Spacing.md))
+                field(Modifier.width(144.dp))
+            }
+        }
+        if (stacked) {
+            Spacer(Modifier.height(Spacing.sm))
+            field(Modifier.fillMaxWidth())
+        }
+        if (error != null) {
+            Text(
+                error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = if (stacked) 0.dp else Sizes.iconTile + Spacing.md, top = Spacing.xs),
+            )
+        }
     }
 }
 
@@ -313,24 +396,86 @@ private fun TransactionsStep(state: GuideUiState, onRecord: () -> Unit) {
     LucentoSecondaryButton(text = if (state.transactionCount > 0) "Record more" else "Open the composer", onClick = onRecord, icon = Icons.Outlined.Edit)
 }
 
+/**
+ * Part D completion: what's in place (each line ticked or still open, in words), the milestones already earned, and
+ * the one next thing — the + button. Shown after the writes it describes, so nothing here is premature.
+ */
 @Composable
 private fun WelcomeStep(state: GuideUiState) {
-    Column(Modifier.fillMaxWidth().padding(top = Spacing.xxl), horizontalAlignment = Alignment.CenterHorizontally) {
-        LucentoMascot(size = 140.dp, mood = MascotMood.Happy, contentDescription = "Lucento, waving hello")
-        Spacer(Modifier.height(Spacing.lg))
-        Text("Welcome to Lucento", style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center, modifier = Modifier.semantics { heading() })
-        Spacer(Modifier.height(Spacing.sm))
-        val parts = buildList {
-            add("${state.wallets.size} ${if (state.wallets.size == 1) "account" else "accounts"}")
-            if (state.budgetedCount > 0) add("${state.budgetedCount} budgeted ${if (state.budgetedCount == 1) "category" else "categories"}")
-            if (state.goals.isNotEmpty()) add("${state.goals.size} ${if (state.goals.size == 1) "goal" else "goals"}")
-            if (state.transactionCount > 0) add("${state.transactionCount} ${if (state.transactionCount == 1) "transaction" else "transactions"}")
+    Column(Modifier.fillMaxWidth().padding(top = Spacing.lg)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "You’re ready",
+                style = MaterialTheme.typography.headlineLarge,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+            LucentoMascot(size = 72.dp, mood = MascotMood.Happy, contentDescription = "Lucento, pleased")
         }
         Text(
-            "You’re set up: ${parts.joinToString(", ")}. This stays only on this phone unless cloud sync is on.",
-            style = MaterialTheme.typography.bodyLarge,
+            "Here’s what’s in place. It’s kept on this phone, and copied to your account when cloud sync is on.",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
         )
+        Spacer(Modifier.height(Spacing.md))
+        DoneRow(state.assets.isNotEmpty(), "Accounts", plural(state.wallets.size, "account", "accounts"))
+        if (state.features.isEnabled(com.lucento.app.domain.Feature.BUDGETS)) {
+            DoneRow(
+                state.budgetedCount > 0,
+                "Budget",
+                if (state.budgetedCount > 0) plural(state.budgetedCount, "category with an amount", "categories with an amount") else "Not set yet",
+            )
+        }
+        if (state.features.isEnabled(com.lucento.app.domain.Feature.SAVINGS_GOALS)) {
+            DoneRow(
+                state.goals.isNotEmpty(),
+                "Savings goal",
+                if (state.goals.isNotEmpty()) plural(state.goals.size, "goal", "goals") else "Optional — add one any time",
+            )
+        }
+        DoneRow(
+            state.transactionCount > 0,
+            "First transaction",
+            if (state.transactionCount > 0) "${state.transactionCount} recorded" else "Tap + on Home to record one",
+        )
+        if (state.earned.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.lg))
+            Text("Milestones earned", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+            Spacer(Modifier.height(Spacing.xs))
+            com.lucento.app.domain.Achievement.entries.filter { it in state.earned }.forEach { a ->
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = Spacing.xxs).semantics(mergeDescendants = true) {},
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = LucentoTheme.extendedColors.accent, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text("${a.title} · ${a.description}", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+}
+
+private fun plural(n: Int, one: String, many: String) = "$n ${if (n == 1) one else many}"
+
+/** One line of the completion checklist: done or still open, said in words as well as with the mark. */
+@Composable
+private fun DoneRow(done: Boolean, title: String, detail: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = Sizes.minTouch)
+            .semantics(mergeDescendants = true) { contentDescription = "$title: ${if (done) "done" else "not yet"}, $detail" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (done) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+            contentDescription = null,
+            tint = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

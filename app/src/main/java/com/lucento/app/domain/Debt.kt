@@ -13,18 +13,30 @@ enum class DebtRepayment { ONE_TIME, MONTHLY }
  * Optional terms of a liability wallet (credit card or loan). Every field is entered by the user; Lucento never
  * fetches rates. [interestRateBps] is the yearly rate in basis points (12.5 % = 1250). [termMonths] and
  * [installment] only apply to [DebtRepayment.MONTHLY].
+ *
+ * Credit cards only (v11): [creditLimit], and the day of the month the statement closes ([statementDay]) and its payment
+ * is due ([dueDay]), 1–31 — a shorter month uses its last day. The billing days work only as a pair ([hasBillingCycle]).
  */
 data class DebtTerms(
     val interestRateBps: Int? = null,
     val repayment: DebtRepayment = DebtRepayment.ONE_TIME,
     val termMonths: Int? = null,
     val installment: Money? = null,
+    val creditLimit: Money? = null,
+    val statementDay: Int? = null,
+    val dueDay: Int? = null,
 ) {
     init {
         require(interestRateBps == null || interestRateBps in 0..MAX_RATE_BPS) { "Rate out of range" }
         require(termMonths == null || termMonths in 1..MAX_TERM_MONTHS) { "Term out of range" }
         require(installment == null || installment.amountMinor > 0) { "Instalment must be positive" }
+        require(creditLimit == null || creditLimit.amountMinor > 0) { "Credit limit must be positive" }
+        require(statementDay == null || statementDay in 1..31) { "Statement day out of range" }
+        require(dueDay == null || dueDay in 1..31) { "Due day out of range" }
     }
+
+    /** Both billing days are set, so the card has a statement cycle ([CreditCardMath.cycle]). */
+    val hasBillingCycle: Boolean get() = statementDay != null && dueDay != null
 
     companion object {
         /** 100 % a year: anything higher is almost certainly a typo. */

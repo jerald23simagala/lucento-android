@@ -1,5 +1,6 @@
 package com.lucento.app.feature.transactions
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -23,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectableGroup
 import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -84,7 +84,6 @@ import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.SegmentedToggle
-import com.lucento.app.core.designsystem.component.WalletPill
 import com.lucento.app.core.designsystem.component.icon
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
@@ -103,6 +102,12 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import androidx.compose.material.icons.automirrored.outlined.Notes
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import com.lucento.app.core.designsystem.component.WalletIdentityTile
+import com.lucento.app.core.designsystem.component.IconTile
+import com.lucento.app.core.designsystem.component.label
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
  * Full-page editor for an existing transaction, opened from history (Edit on a row) and wallet screens. New
@@ -121,7 +126,7 @@ fun TransactionEditorScreen(
     onClose: () -> Unit,
     /** False when the user tracks a single account (Multiple wallets off) and it is the only choice. */
     showWalletPicker: Boolean = true,
-) {
+) = AmountsShown {
     val haptics = rememberHaptics()
     val decimalSeparator = remember { MoneyFormatter.decimalSeparator() }
 
@@ -244,36 +249,19 @@ fun TransactionEditorScreen(
             // ---- Details: wallet, category, date, note
             LucentoCard(modifier = Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
                 if (showWalletPicker || wallets.size > 1) {
-                    FieldLabel(if (draft.type == TransactionType.INCOME) "Into wallet" else "From wallet")
-                    // Wraps onto new lines so every wallet stays inside the card.
-                    FlowRow(
-                        Modifier
-                            .fillMaxWidth()
-                            .selectableGroup(),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        // The currency is only worth repeating on every pill when wallets differ in it.
-                        val mixedCurrencies = wallets.map { it.currencyCode }.distinct().size > 1
-                        wallets.forEach { w ->
-                            val selected = draft.walletId == w.id
-                            WalletPill(
-                                label = if (mixedCurrencies) "${w.name} · ${w.currencyCode}" else w.name,
-                                icon = if (selected) Icons.Filled.Check else w.type.icon,
-                                iconTint = if (selected) null else ext.tone(w.type).content,
-                                selected = selected,
-                                isDefault = false,
-                                role = Role.RadioButton,
-                                description = if (selected) "${w.name}, selected" else "Use ${w.name}",
-                                onClick = {
-                                    if (!selected) {
-                                        haptics.tick()
-                                        draft = draft.copy(walletId = w.id)
-                                        if (error is TransactionDraftError.WalletRequired || amountError) error = null
-                                    }
-                                },
-                            )
-                        }
-                    }
+                    WalletDropdown(
+                        wallets = wallets,
+                        selectedId = draft.walletId,
+                        label = if (draft.type == TransactionType.INCOME) "Into wallet" else "From wallet",
+                        isError = error is TransactionDraftError.WalletRequired,
+                        onSelect = { id ->
+                            if (id != draft.walletId) {
+                                haptics.tick()
+                                draft = draft.copy(walletId = id)
+                                if (error is TransactionDraftError.WalletRequired || amountError) error = null
+                            }
+                        },
+                    )
                     if (error is TransactionDraftError.WalletRequired) {
                         Text("Choose a wallet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
@@ -291,7 +279,11 @@ fun TransactionEditorScreen(
                 )
 
                 SectionDivider()
-                FieldLabel("Date")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(Spacing.xs))
+                    FieldLabel("Date")
+                }
                 DateChoices(
                     date = draft.date,
                     onDate = { draft = draft.copy(date = it) },
@@ -304,6 +296,7 @@ fun TransactionEditorScreen(
                     onValueChange = { draft = draft.copy(note = it.take(TransactionRepository.MAX_NOTE)) },
                     label = { Text("Note") },
                     placeholder = { Text(if (draft.type == TransactionType.INCOME) "e.g. October salary" else "e.g. Weekly shop") },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Notes, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
@@ -379,7 +372,7 @@ fun TransactionEditorScreen(
     if (confirmingDelete && initial.id != null && onDelete != null) {
         ConfirmDialog(
             title = "Delete this transaction?",
-            text = "It will be permanently deleted from this device and the wallet balance will update. " +
+            text = "It will be permanently deleted — on your other devices too when cloud sync is on — and the wallet balance will update. " +
                 "This can’t be undone.",
             confirmLabel = "Delete permanently",
             destructive = true,
@@ -485,6 +478,103 @@ private fun CategoryDropdown(
                     onClick = {
                         expanded = false
                         onSelect(category.id)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The wallet as a full-width dropdown, like the category field: the chosen wallet's own tile (its bank's mark, or its
+ * type's icon), the label riding inside, its name and type. The menu lists every wallet the same way, with its currency
+ * when wallets differ in it, and matches the field's width.
+ */
+@Composable
+private fun WalletDropdown(
+    wallets: List<Wallet>,
+    selectedId: Long?,
+    label: String,
+    isError: Boolean,
+    onSelect: (Long) -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val density = LocalDensity.current
+    var expanded by remember { mutableStateOf(false) }
+    var fieldWidth by remember { mutableStateOf(0.dp) }
+    val selected = wallets.firstOrNull { it.id == selectedId }
+    val mixedCurrencies = wallets.map { it.currencyCode }.distinct().size > 1
+    val border by animateColorAsState(
+        when {
+            isError -> colors.error
+            expanded -> colors.primary
+            else -> colors.outlineVariant
+        },
+        tween(160),
+        label = "wallet-field",
+    )
+    fun detail(w: Wallet) = if (mixedCurrencies) "${w.type.label} · ${w.currencyCode}" else w.type.label
+
+    Box(Modifier.fillMaxWidth()) {
+        Surface(
+            onClick = { expanded = true },
+            shape = MaterialTheme.shapes.small,
+            color = colors.surfaceContainerLowest,
+            border = BorderStroke(if (expanded || isError) 1.5.dp else 1.dp, border),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
+                .semantics {
+                    role = Role.DropdownList
+                    contentDescription = "$label, ${selected?.name ?: "none chosen"}"
+                },
+        ) {
+            Row(
+                Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (selected != null) {
+                    WalletIdentityTile(selected, size = 32.dp)
+                } else {
+                    IconTile(Icons.Outlined.AccountBalanceWallet, size = 32.dp, content = colors.onSurfaceVariant, shape = RoundedCornerShape(8.dp))
+                }
+                Spacer(Modifier.width(Spacing.md))
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
+                    Text(
+                        selected?.name ?: "Choose a wallet",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (selected != null) colors.onSurface else colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                selected?.let {
+                    Text(detail(it), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant, maxLines = 1)
+                    Spacer(Modifier.width(Spacing.xs))
+                }
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = colors.onSurfaceVariant)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.width(fieldWidth).heightIn(max = 360.dp),
+        ) {
+            wallets.forEach { w ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(w.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(detail(w), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
+                        }
+                    },
+                    leadingIcon = { WalletIdentityTile(w, size = 28.dp) },
+                    trailingIcon = if (w.id == selectedId) ({ Icon(Icons.Filled.Check, contentDescription = "Selected", tint = colors.primary) }) else null,
+                    onClick = {
+                        expanded = false
+                        onSelect(w.id)
                     },
                 )
             }

@@ -35,11 +35,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.selection.selectableGroup
+import com.lucento.app.core.designsystem.component.FlowStatTiles
+import com.lucento.app.core.money.MoneyFormatter
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SouthWest
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DocumentScanner
@@ -127,8 +130,13 @@ fun TransactionsScreen(
     onScanReceipt: (() -> Unit)? = null,
     /** Shown on the empty state when voice entry is switched on. */
     onSpeak: (() -> Unit)? = null,
+    /** Opened from the dashboard for one category and month: a back arrow, and those filters applied once. */
+    onBack: (() -> Unit)? = null,
+    initialCategoryId: Long? = null,
+    initialMonth: java.time.YearMonth? = null,
     viewModel: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Factory),
 ) {
+    LaunchedEffect(Unit) { viewModel.applyInitial(initialCategoryId, initialMonth) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val hasHistory = !state.loading && state.wallets.isNotEmpty() && state.totalCount > 0
     // Local text state keeps typing responsive; the ViewModel receives every change.
@@ -145,15 +153,26 @@ fun TransactionsScreen(
         viewModel.clearFilters()
     }
 
+    // At large text the stat cards are tall; they scroll away with the history so it keeps most of the screen.
+    val summaryPinned = LocalDensity.current.fontScale < 1.3f
+    val gutter = com.lucento.app.core.designsystem.component.screenGutter()
+
     // A different set of rows (filters, search) or a scroll closes whatever row was open.
     LaunchedEffect(state.filter) { revealedId = null }
     LaunchedEffect(listState.isScrollInProgress) { if (listState.isScrollInProgress) revealedId = null }
 
     Column(Modifier.fillMaxSize()) {
         // Pinned: the title, filters and totals stay put while only the history scrolls beneath them.
-        Column(Modifier.padding(horizontal = Spacing.gutter)) {
+        Column(Modifier.padding(horizontal = gutter)) {
             LucentoTopBar(
                 title = "Transactions",
+                onBack = onBack,
+                subtitle = state.filter.month?.let { m ->
+                    listOfNotNull(
+                        state.filter.categoryId?.let { id -> state.categoriesById[id]?.name },
+                        m.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) + " ${m.year}",
+                    ).joinToString(" · ")
+                },
                 actions = {
                     if (hasHistory) {
                         IconButton(onClick = {
@@ -173,18 +192,32 @@ fun TransactionsScreen(
                 },
             )
             if (hasHistory) {
-                SegmentedToggle(
-                    options = listOf<Pair<TransactionType?, String>>(
-                        null to "All",
-                        TransactionType.INCOME to "Income",
-                        TransactionType.EXPENSE to "Expenses",
-                        TransactionType.TRANSFER_OUT to "Transfers",
-                    ),
-                    selected = state.filter.type?.let { if (it.isTransfer) TransactionType.TRANSFER_OUT else it },
-                    onSelect = { viewModel.setType(it) },
-                    compact = true,
-                    selectedTone = brandTone(),
+                val typeOptions = listOf<Pair<TransactionType?, String>>(
+                    null to "All",
+                    TransactionType.INCOME to "Income",
+                    TransactionType.EXPENSE to "Expenses",
+                    TransactionType.TRANSFER_OUT to "Transfers",
                 )
+                val selectedType = state.filter.type?.let { if (it.isTransfer) TransactionType.TRANSFER_OUT else it }
+                if (LocalDensity.current.fontScale >= 1.5f) {
+                    // Very large text: four equal tabs can't hold "Transfers"; pills size to their words and scroll.
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        typeOptions.forEach { (type, label) ->
+                            ChoicePill(label = label, selected = type == selectedType, onClick = { viewModel.setType(type) })
+                        }
+                    }
+                } else {
+                    SegmentedToggle(
+                        options = typeOptions,
+                        selected = selectedType,
+                        onSelect = { viewModel.setType(it) },
+                        compact = true,
+                        selectedTone = brandTone(),
+                    )
+                }
                 AnimatedVisibility(
                     visible = searching,
                     enter = expandVertically(tween(180)) + fadeIn(tween(180)),
@@ -203,8 +236,10 @@ fun TransactionsScreen(
                 Spacer(Modifier.height(Spacing.xs))
                 FilterRow(state = state, viewModel = viewModel, onClear = clearFilters)
                 Spacer(Modifier.height(Spacing.xs))
-                ShownSummary(state)
-                Spacer(Modifier.height(Spacing.sm))
+                if (summaryPinned) {
+                    ShownSummary(state)
+                    Spacer(Modifier.height(Spacing.sm))
+                }
             }
         }
         if (hasHistory && scrolled) Hairline()
@@ -212,8 +247,11 @@ fun TransactionsScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
+            contentPadding = PaddingValues(start = gutter, end = gutter, bottom = Spacing.fabClearance),
         ) {
+            if (hasHistory && !summaryPinned) {
+                item(key = "summary") { ShownSummary(state) }
+            }
             when {
                 state.loading -> Unit
 
@@ -242,6 +280,17 @@ fun TransactionsScreen(
                                     LucentoSecondaryButton(text = "Speak transaction", icon = Icons.Outlined.KeyboardVoice, onClick = onSpeak)
                                 }
                             }
+                        },
+                    )
+                }
+
+                // The page opens on this month: early in a month that can be empty while older history exists.
+                state.sections.isEmpty() && state.filter.isDefault -> item(key = "no-matches") {
+                    EmptyState(
+                        title = "Nothing this month yet",
+                        body = "Transactions you add this month appear here. Earlier ones are under Any date.",
+                        action = {
+                            LucentoSecondaryButton(text = "Show any date", onClick = { viewModel.setPreset(RangePreset.ALL) })
                         },
                     )
                 }
@@ -298,7 +347,8 @@ fun TransactionsScreen(
                                         modifier = rowModifier,
                                     )
                                 }
-                                if (index < section.group.items.lastIndex) Hairline(strong = true)
+                                // Inset to the row text (12dp padding + 36dp tile + 10dp gap), not under the tile.
+                                if (index < section.group.items.lastIndex) Hairline(inset = 58.dp)
                             }
                         }
                         Spacer(Modifier.height(Spacing.xs))
@@ -314,10 +364,10 @@ fun TransactionsScreen(
         ConfirmDialog(
             title = if (transfer) "Delete this transfer?" else "Delete this transaction?",
             text = if (transfer) {
-                "Both sides of the transfer will be permanently deleted from this device, and both wallet balances " +
+                "Both sides of the transfer will be permanently deleted — on your other devices too when cloud sync is on — and both wallet balances " +
                     "will update. This can’t be undone."
             } else {
-                "It will be permanently deleted from this device and the wallet balance will update. " +
+                "It will be permanently deleted — on your other devices too when cloud sync is on — and the wallet balance will update. " +
                     "This can’t be undone."
             },
             confirmLabel = "Delete permanently",
@@ -467,28 +517,38 @@ private fun RowAction(label: String, icon: ImageVector, container: Color, conten
     }
 }
 
+/** A day of history: the day in words ("Today", "Monday"), its date beside it, and the day's net at the end. */
 @Composable
 private fun DayHeader(section: DaySection) {
+    val date = section.group.date
     Row(
         Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .heightIn(min = 36.dp)
-            .padding(top = Spacing.sm, bottom = Spacing.xs, start = Spacing.xs, end = Spacing.xs),
+            .heightIn(min = 40.dp)
+            .padding(top = Spacing.md, bottom = Spacing.sm, start = Spacing.xxs, end = Spacing.xxs)
+            .semantics(mergeDescendants = true) { heading() },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            dayLabel(section.group.date),
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.weight(1f).semantics { heading() },
+            dayTitle(date),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            dayCaption(date),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
         section.net.forEachIndexed { index, money ->
-            if (index > 0) Spacer(Modifier.width(Spacing.sm))
+            Spacer(Modifier.width(if (index > 0) Spacing.sm else Spacing.xs))
             AmountText(
                 money = money,
-                style = AmountStyles.small,
+                style = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold),
                 showPlus = true,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -496,61 +556,34 @@ private fun DayHeader(section: DaySection) {
     }
 }
 
+/** "Net inflow" when what came in covers what went out, "Net outflow" when it doesn't. */
+internal fun netFlowLabel(net: Money): String = if (net.amountMinor >= 0L) "Net inflow" else "Net outflow"
+
 /**
- * In / out / net for whatever is currently shown, so filters answer "how much did I spend on X?". In is the positive
- * tone, Out the negative one, and Net follows its own sign; every figure is also signed, so colour only reinforces.
+ * Income, expenses and their net for whatever is currently shown, so filters answer "how much did I spend on X?" —
+ * three stat cards, then what they cover. Income is the positive tone and expenses the negative one; the net stays in
+ * ink with its own sign. Every figure is signed, so colour only reinforces. At large text the net takes its own row.
  */
 @Composable
 private fun ShownSummary(state: TransactionsUiState) {
     val primary: PeriodTotals = state.shownTotals.firstOrNull() ?: return
     val others = state.shownTotals.drop(1)
-    val ext = LucentoTheme.extendedColors
-    val positive = TonePair(ext.positiveContainer, ext.positive)
-    val negative = TonePair(ext.negativeContainer, ext.negative)
-    val net = primary.net
-    val netTone = when {
-        net.amountMinor > 0 -> positive
-        net.amountMinor < 0 -> negative
-        else -> TonePair(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface)
-    }
-    val scope = when {
-        state.filter.isActive -> "${state.matchCount} of ${state.totalCount} transactions"
-        else -> "${state.totalCount} ${if (state.totalCount == 1) "transaction" else "transactions"}"
-    }
-    LucentoCard(modifier = Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            SummaryFigure("In", Icons.Filled.SouthWest, positive, primary.income, showPlus = true, Modifier.weight(1f))
-            VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(horizontal = Spacing.sm))
-            SummaryFigure("Out", Icons.Filled.NorthEast, negative, -primary.expense, showPlus = false, Modifier.weight(1f))
-            VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(horizontal = Spacing.sm))
-            SummaryFigure("Net", Icons.Outlined.AccountBalanceWallet, netTone, net, showPlus = true, Modifier.weight(1f))
-        }
+    val scope = "${state.matchCount} ${if (state.matchCount == 1) "transaction" else "transactions"}"
+    val range = state.filter.month?.let { m -> m.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) + " ${m.year}" }
+        ?: state.filter.preset.takeIf { it != RangePreset.ALL }?.let(::rangeLabel)
+    Column {
+        FlowStatTiles(income = primary.income, expenses = primary.expense, net = primary.net, netLabel = netFlowLabel(primary.net))
         Spacer(Modifier.height(Spacing.sm))
         Text(
             buildString {
                 append(scope)
+                if (range != null) append(" · ").append(range)
+                append(" · transfers excluded from totals")
                 if (others.isNotEmpty()) append(" · also in ").append(others.joinToString(", ") { it.currencyCode })
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun SummaryFigure(
-    label: String,
-    icon: ImageVector,
-    tone: TonePair,
-    money: Money,
-    showPlus: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        // A tinted label chip, so In / Out / Net read at a glance rather than as faint captions.
-        ToneChip(label, tone, icon = icon)
-        Spacer(Modifier.height(Spacing.xs + Spacing.xxs))
-        MoneyText(money = money, style = AmountStyles.medium, showPlus = showPlus, color = tone.content, fractionScale = 1f)
     }
 }
 
@@ -563,9 +596,13 @@ private fun FilterRow(state: TransactionsUiState, viewModel: TransactionsViewMod
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         MenuPill(
-            label = rangeLabel(f.preset),
-            active = f.preset != RangePreset.ALL,
+            // A month from the dashboard shows as that month until the user picks another range.
+            label = f.month?.let { m -> m.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) + " ${m.year}" }
+                ?: rangeLabel(f.preset),
+            active = f.preset != RangePreset.ALL || f.month != null,
             options = RangePreset.entries.map { preset -> rangeLabel(preset) to { viewModel.setPreset(preset) } },
+            icon = Icons.Outlined.CalendarMonth,
+            tonal = true,
         )
         MenuPill(
             label = f.walletId?.let { state.walletsById[it]?.name } ?: "All wallets",
@@ -594,6 +631,7 @@ private fun MenuPill(
     options: List<Pair<String, () -> Unit>>,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     optionIcons: List<androidx.compose.ui.graphics.vector.ImageVector>? = null,
+    tonal: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -604,6 +642,7 @@ private fun MenuPill(
             trailingIcon = Icons.Filled.ArrowDropDown,
             role = Role.DropdownList,
             onClick = { expanded = true },
+            tonal = tonal,
         )
         DropdownMenu(
             expanded = expanded,

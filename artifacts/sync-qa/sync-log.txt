@@ -1,0 +1,79 @@
+Two-emulator sync QA — lucento-test only (2026-11-02)
+Devices: D1 = emulator-5554 (Medium_Phone_API_36.1), D2 = emulator-5556 (Lucento_P0_QA_ReturningUser). Separate installs and
+Room databases, independent network controls. Same debug build (main 01cfd04 code). Account for cross-device tests: QA
+account B (ae2e7a97). Account A (211a8bb2) used only for the isolation test; its data must not change.
+No credentials or tokens are recorded here.
+
+SETUP
+- D1: previous local-only test data cleared (pm clear), onboarding > I already have an account > email > account B > restored. PASS
+  (Google One Tap: NOT TESTED — neither emulator has a Google account; [28433] NoCredential is expected without one.)
+- Account A server fingerprint before any test (A0): budgets 4 0fe743ce, categories 22 27678611, goals 1 98940256,
+  recurring 1 b3a10a00, transactions 6 bf329d92, wallets 4 85ab02cd.
+
+ACCOUNT ISOLATION
+- I-1 D2 was signed in to account A (4 wallets, 6 transactions incl. QA-Cash). Settings > Disconnect > confirm:
+  local ledger wiped (0 wallets/transactions; only the 6 fresh-install income seeds), synced_user_id cleared, onboarding
+  restarted. RevokeWorker SUCCESS, 0 pending revoke records; account A live server sessions 13 -> 12. PASS
+- I-2 D2 then signed in to account B (restore path): 18 categories, 0 wallets/transactions/goals; no "QA-" wallets,
+  no goals, no QA/P29 transactions on D2. Server: account A fingerprint identical to A0 (nothing changed, nothing
+  uploaded); account B unchanged (18 categories, 0 others). PASS
+
+BASIC (account B on both devices; "Sync now" from Settings; rows compared from each device's own Room database)
+- B-1 D1 created wallet "Sync Cash" ($100.00) + 3 transactions -> D2 received all 4 (0 sent, 4 received). PASS
+  (Test-data note: a QA helper tapped the composer's example chip, so the 3 rows are the example "Lunch 250,
+  groceries 800, salary 35000"; used for the edit/delete tests below.)
+- B-2 D2 edited Lunch 250.00 -> 260.00 -> D1 shows 26000 minor. PASS
+- B-3 D2 deleted Salary -> gone on D1. PASS
+- B-4 D2 created "D2 coffee 4.50" -> D1 received 450. PASS
+  Note: the other device only picks changes up on Sync now, at launch or on the periodic worker (by design).
+
+OFFLINE (D1 airplane mode + wifi/data off; verified no default network)
+- O-1 D1 offline: chip shows "Offline"; created "Offline taxi 15.75" and edited Groceries -> 810.00; 2 dirty rows
+  queued. Reconnected: both uploaded, D2 received both, no duplicates (each note once on both devices). PASS
+
+CONFLICTS
+- C-1 Concurrent edit: D2 (online) Lunch -> 270.00 at ~06:07Z; D1 (offline) Lunch -> 280.00 later. After reconnect
+  both devices hold 28000 (later edit wins, owner decision D2). Deterministic. PASS (no user-facing notice yet: P2-6)
+- C-2 Edit vs delete: D1 offline deleted "D2 coffee" at ~06:09Z; D2 edited it to 5.00 at 06:10Z and synced. After D1
+  reconnected the row was DELETED on both devices. FAIL — violates D3 "newer action wins": the tombstone was pushed
+  with the upload time (clock()) instead of the time of the delete, so a later-uploaded old delete beat a newer edit.
+  FIX: SyncRepository.pushTombstones sends SyncTombstoneEntity.deletedAt. Unit tests added (SyncEngineTest "D3 ..."
+  x2); the old code fails the first one (mutation-checked).
+  RETEST on device with the fix: D1 offline deleted "Offline taxi" at 06:23:37Z; D2 edited it to 16.00 at ~06:24Z;
+  D1 reconnected: taxi present as 1600 on both devices. PASS
+
+P2-6 "CHANGED ON ANOTHER DEVICE" (new build with the override count)
+- D1 offline edited Groceries 840 -> 860 at 06:56Z (pending); D2 edited it to 870 at 06:57Z and synced; D1 reconnected:
+  D1 shows 87000 (newer edit kept, D2), stored overridden_changes key present, Home shows "A change you made on this
+  phone was replaced by a newer change from another device. The newest version is kept everywhere." with Got it.
+  D2 (whose edit won) shows no notice. Got it removes it on D1. PASS (artifacts/p2-ux/P2-6-home-notice.png)
+- C-3 Budget conflict: D1 offline set Groceries budget 300 at 07:11Z; D2 set 400 later and synced; D1 reconnected.
+  FAIL — each phone had created its own budget row for the same category+currency; both rows synced, so each device
+  held two rows and Budget showed the one stored first locally: D1 would show 300, D2 400 (devices disagree).
+  FIX: SyncRepository.mergeDuplicateBudgets — every device keeps the row with the smallest sync id, with the amount
+  CategoryDedup.winner picks (set beats 0, later edit wins; P1-8 rule), deletes the copies (tombstones pushed) and counts a
+  change shown on this phone for the P2-6 notice. Unit tests: SyncEngineTest "C-3 ..." x2.
+  RETEST: both devices one Groceries budget 40000; server: 9439ed9a live 40000, e3f974d8 soft-deleted. PASS
+- C-4 Category conflict: D1 (offline) and D2 each added "Pets" (different sync ids). After D1 reconnected both devices
+  hold exactly one "Pets" with the same sync id (4d63c2b1...). PASS. (The budget-on-both-copies part didn't run: the
+  category was below the visible list; budget folding is covered by C-3 above and the P1-8 unit tests.)
+- C-5 Wallet change: D1 offline renamed "Sync Cash" -> "Cash D1"; D2 renamed it "Cash D2" later and synced. After
+  reconnect both show "Cash D2" (later edit, D2). Opening balance unchanged (10000). PASS
+
+FAILURE RECOVERY
+- F-1 Interrupted sync: saved 2 rows, tapped Sync now and cut the network at once. The upload-on-save (~1.5 s) had
+  already sent both; after reconnecting: 0 queued, server has each once (111 and 222 minor, distinct ids), no
+  duplicates. PASS WITH NOTES — a true mid-request cut could not be timed by hand; the "reply lost after the write"
+  case is covered by SyncEngineTest (dropNextUpsertResponse).
+- F-2 Restart: offline, saved "Restart test 7.77" (1 queued), force-stopped the app, restarted the system UI; the queued
+  row survived (still 1 dirty). Online and launched: uploaded (0 dirty); server holds it once; D2 received it. PASS
+  (Note: a force-stopped app does not upload until it is opened again — Android cancels its scheduled jobs; expected.)
+- F-3 Expired session: NOT TESTED on device — revoking one device's server session only takes effect when its access
+  token expires (~1 h), and the test account is shared by both devices. Covered by unit tests (SessionRevocationTest,
+  SyncResult.NotSignedIn paths).
+- F-4 One invalid row must not block valid ones: with the app stopped, D1's database was edited to give "D2 online bus"
+  an amount above the 1e15 bound (simulating a corrupt/legacy row) and Groceries a valid 880.00 edit. Relaunched:
+  Groceries uploaded (server 88000); the invalid row was held back (server still 225; still queued locally); sync did not
+  fail. PASS. Then restored to 2.25 through the app's editor.
+  Follow-up (P2-2): the sheet then says "1 change waiting to sync … upload by themselves shortly", although that row can
+  never upload until fixed. Logged in KNOWN_ISSUES.

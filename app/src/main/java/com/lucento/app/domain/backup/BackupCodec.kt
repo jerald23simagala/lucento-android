@@ -102,9 +102,16 @@ object BackupCodec {
     }
 
     private fun wallet(row: JsonValue.Obj): BackupWallet {
-        requireKeys(row, setOf("id", "name", "type", "currency", "openingBalanceMinor", "sortOrder", "archived", "createdAt", "updatedAt"))
+        // Backups written before v10 have no institutionId key; newer ones always write it.
+        val legacy = setOf("id", "name", "type", "currency", "openingBalanceMinor", "sortOrder", "archived", "createdAt", "updatedAt")
+        if (row.fields.keys != legacy) requireKeys(row, legacy + "institutionId")
         val opening = row.long("openingBalanceMinor")
         if (opening < 0L) invalid()
+        val institution = when (val value = row.fields["institutionId"]) {
+            null, JsonValue.Null -> null
+            is JsonValue.Str -> value.value.takeIf { it.isNotEmpty() && it.length <= 128 && it.all { c -> c in 'a'..'z' || c in '0'..'9' || c == '_' } } ?: invalid()
+            else -> invalid()
+        }
         return BackupWallet(
             id = row.id("id"),
             name = row.name("name"),
@@ -115,6 +122,7 @@ object BackupCodec {
             archived = row.bool("archived"),
             createdAt = row.instant("createdAt"),
             updatedAt = row.instant("updatedAt"),
+            institutionId = institution,
         )
     }
 
@@ -158,9 +166,15 @@ object BackupCodec {
     }
 
     private fun budget(row: JsonValue.Obj): BackupBudget {
-        requireKeys(row, setOf("id", "categoryId", "currency", "limitMinor", "createdAt", "updatedAt"))
+        // Backups written before the budget lifecycle have the six original keys; newer ones add month and effectiveFrom.
+        val legacy = setOf("id", "categoryId", "currency", "limitMinor", "createdAt", "updatedAt")
+        if (row.fields.keys != legacy) requireKeys(row, legacy + setOf("month", "effectiveFrom"))
         val limit = row.long("limitMinor")
-        if (limit <= 0L) invalid()
+        val month = row.yearMonthOrNull("month")
+        val effectiveFrom = row.yearMonthOrNull("effectiveFrom")
+        if (month != null && effectiveFrom != null) invalid()
+        // 0 is meaningful only for a lifecycle row ("no amount this month" / "stopped from this month").
+        if (limit < 0L || (limit == 0L && month == null && effectiveFrom == null)) invalid()
         return BackupBudget(
             id = row.id("id"),
             categoryId = row.idOrNull("categoryId"),
@@ -168,6 +182,8 @@ object BackupCodec {
             limitMinor = limit,
             createdAt = row.instant("createdAt"),
             updatedAt = row.instant("updatedAt"),
+            month = month,
+            effectiveFrom = effectiveFrom,
         )
     }
 
@@ -246,7 +262,9 @@ object BackupCodec {
     }
 
     private fun debt(row: JsonValue.Obj): BackupDebtTerms {
-        requireKeys(row, setOf("walletId", "interestRateBps", "repayment", "termMonths", "installmentMinor", "updatedAt"))
+        // Backups written before v11 have no card billing keys; newer ones always write all three.
+        val legacy = setOf("walletId", "interestRateBps", "repayment", "termMonths", "installmentMinor", "updatedAt")
+        if (row.fields.keys != legacy) requireKeys(row, legacy + setOf("creditLimitMinor", "statementDay", "dueDay"))
         return BackupDebtTerms(
             walletId = row.id("walletId"),
             interestRateBps = row.intOrNull("interestRateBps"),
@@ -254,6 +272,10 @@ object BackupCodec {
             termMonths = row.intOrNull("termMonths"),
             installmentMinor = row.longOrNull("installmentMinor"),
             updatedAt = row.instant("updatedAt"),
+            // Absent from a legacy row: no limit, no billing cycle.
+            creditLimitMinor = if ("creditLimitMinor" in row.fields) row.longOrNull("creditLimitMinor") else null,
+            statementDay = if ("statementDay" in row.fields) row.intOrNull("statementDay") else null,
+            dueDay = if ("dueDay" in row.fields) row.intOrNull("dueDay") else null,
         )
     }
 
@@ -361,6 +383,12 @@ object BackupCodec {
                         if (minor <= 0L) invalid()
                         Money(minor, wallet.currency)
                     },
+                    creditLimit = debt.creditLimitMinor?.let { minor ->
+                        if (minor <= 0L) invalid()
+                        Money(minor, wallet.currency)
+                    },
+                    statementDay = debt.statementDay,
+                    dueDay = debt.dueDay,
                 )
             } catch (_: IllegalArgumentException) {
                 invalid()
@@ -394,6 +422,7 @@ object BackupCodec {
         "archived" to JsonValue.Bool(row.archived),
         "createdAt" to jsonInstant(row.createdAt),
         "updatedAt" to jsonInstant(row.updatedAt),
+        "institutionId" to jsonNullable(row.institutionId),
     )
 
     private fun categoryJson(row: BackupCategory) = jsonObject(
@@ -428,6 +457,8 @@ object BackupCodec {
         "limitMinor" to jsonLong(row.limitMinor),
         "createdAt" to jsonInstant(row.createdAt),
         "updatedAt" to jsonInstant(row.updatedAt),
+        "month" to jsonNullable(row.month),
+        "effectiveFrom" to jsonNullable(row.effectiveFrom),
     )
 
     private fun goalJson(row: BackupGoal) = jsonObject(
@@ -479,6 +510,9 @@ object BackupCodec {
         "termMonths" to jsonNullableLong(row.termMonths?.toLong()),
         "installmentMinor" to jsonNullableLong(row.installmentMinor),
         "updatedAt" to jsonInstant(row.updatedAt),
+        "creditLimitMinor" to jsonNullableLong(row.creditLimitMinor),
+        "statementDay" to jsonNullableLong(row.statementDay?.toLong()),
+        "dueDay" to jsonNullableLong(row.dueDay?.toLong()),
     )
 
     private fun deletionJson(row: BackupDeletion) = jsonObject(
@@ -530,6 +564,13 @@ private fun jsonInstant(millis: Long): JsonValue.Str = try {
 private fun jsonNullable(value: String?): JsonValue = if (value == null) JsonValue.Null else JsonValue.Str(value)
 
 private fun jsonNullableLong(value: Long?): JsonValue = if (value == null) JsonValue.Null else jsonLong(value)
+
+/** A "yyyy-MM" month, or null when absent or JSON null; anything else makes the file invalid. */
+private fun JsonValue.Obj.yearMonthOrNull(key: String): String? = when (val value = fields[key]) {
+    null, JsonValue.Null -> null
+    is JsonValue.Str -> value.value.takeIf { runCatching { java.time.YearMonth.parse(it) }.isSuccess && it.length == 7 } ?: invalid()
+    else -> invalid()
+}
 
 private fun requireKeys(obj: JsonValue.Obj, allowed: Set<String>) {
     if (obj.fields.keys != allowed || obj.fields.keys.any(::forbiddenKey)) invalid()

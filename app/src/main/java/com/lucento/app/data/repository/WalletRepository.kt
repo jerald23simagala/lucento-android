@@ -62,7 +62,13 @@ class WalletRepository(
     /**
      * Creates a wallet. [debt] is kept only for a card or loan; it is written in the same database transaction.
      */
-    suspend fun create(name: String, type: WalletType, openingBalance: Money, debt: DebtTerms? = null): SaveResult {
+    suspend fun create(
+        name: String,
+        type: WalletType,
+        openingBalance: Money,
+        debt: DebtTerms? = null,
+        institutionId: String? = null,
+    ): SaveResult {
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = 0)?.let { return it }
         val now = clock()
@@ -77,6 +83,7 @@ class WalletRepository(
                     createdAt = now,
                     updatedAt = now,
                     clientUuid = UUID.randomUUID().toString(),
+                    institutionId = institutionId?.takeIf(::isInstitutionId),
                 )
             )
             writeTerms(id, type, debt, now)
@@ -84,8 +91,22 @@ class WalletRepository(
         }
     }
 
-    /** Updates a wallet; [debt] replaces its terms (null, or a non-liability type, removes them). */
-    suspend fun update(id: Long, name: String, type: WalletType, openingBalance: Money, debt: DebtTerms? = null): SaveResult {
+    /** Updates a wallet and keeps its institution as it is (callers that don't edit it). */
+    suspend fun update(id: Long, name: String, type: WalletType, openingBalance: Money, debt: DebtTerms? = null): SaveResult =
+        update(id, name, type, openingBalance, debt, institutionId = dao.getById(id)?.institutionId)
+
+    /**
+     * Updates a wallet; [debt] replaces its terms (null, or a non-liability type, removes them). [institutionId] is the
+     * wallet's institution after the edit (null = none).
+     */
+    suspend fun update(
+        id: Long,
+        name: String,
+        type: WalletType,
+        openingBalance: Money,
+        debt: DebtTerms?,
+        institutionId: String?,
+    ): SaveResult {
         val existing = dao.getById(id) ?: return SaveResult.NotFound
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = id)?.let { return it }
@@ -114,6 +135,7 @@ class WalletRepository(
                     type = type.name,
                     currencyCode = openingBalance.currencyCode,
                     openingBalanceMinor = openingBalance.amountMinor,
+                    institutionId = institutionId?.takeIf(::isInstitutionId),
                     updatedAt = now,
                 )
             )
@@ -129,6 +151,8 @@ class WalletRepository(
             return
         }
         val monthly = debt.repayment == DebtRepayment.MONTHLY
+        // A limit and billing days mean something only on a card; a card switched to a loan drops them.
+        val card = type == WalletType.CREDIT_CARD
         terms.upsert(
             DebtTermsEntity(
                 walletId = id,
@@ -137,6 +161,9 @@ class WalletRepository(
                 termMonths = debt.termMonths.takeIf { monthly },
                 installmentMinor = debt.installment?.amountMinor.takeIf { monthly },
                 updatedAt = now,
+                creditLimitMinor = debt.creditLimit?.amountMinor.takeIf { card },
+                statementDay = debt.statementDay.takeIf { card },
+                dueDay = debt.dueDay.takeIf { card },
             )
         )
     }
@@ -182,6 +209,7 @@ internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null, terms: DebtTerms
         ),
         createdAtEpochMillis = createdAt,
         openingBalance = opening,
+        institutionId = institutionId,
         debt = terms?.takeIf { walletType.isLiability }?.toDomain(currencyCode),
     )
 }
@@ -193,5 +221,11 @@ internal fun DebtTermsEntity.toDomain(currencyCode: String): DebtTerms? = runCat
         repayment = DebtRepayment.valueOf(repayment),
         termMonths = termMonths,
         installment = installmentMinor?.let { Money(it, currencyCode) },
+        creditLimit = creditLimitMinor?.let { Money(it, currencyCode) },
+        statementDay = statementDay,
+        dueDay = dueDay,
     )
 }.getOrNull()
+
+/** Registry ids are lowercase snake_case ("ph_bdo"); anything else is not stored (the server also caps the length). */
+internal fun isInstitutionId(value: String): Boolean = value.length in 1..128 && value.all { it in 'a'..'z' || it in '0'..'9' || it == '_' }

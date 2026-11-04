@@ -3,8 +3,8 @@ package com.lucento.app.domain
 import java.util.Locale
 
 /**
- * The picture a savings goal's card shows. Purely presentational: it never affects amounts, progress or ordering.
- * The user may choose one (stored as [key] on the goal); with no choice, [of] picks one from the goal's name.
+ * The picture a savings goal's card used to show (until 2026-11-04; [GoalIcon] replaced the pictures). Kept so goals
+ * saved with these keys — on this phone, in backups, or synced from an older version — map to the closest icon.
  */
 enum class GoalScene(val key: String) {
     /** Mount Fuji — a Japan trip. */
@@ -41,16 +41,4 @@ enum class GoalScene(val key: String) {
         /** The user's choice wins; without one (or with an unknown key) the name decides. */
         fun forGoal(goalName: String, sceneKey: String?): GoalScene = fromKey(sceneKey) ?: of(goalName)
     }
-}
-
-/** An optional starting point for a new goal: it only fills in the name and picture; nothing is created by itself. */
-data class GoalPreset(val name: String, val scene: GoalScene)
-
-object GoalPresets {
-    val all: List<GoalPreset> = listOf(
-        GoalPreset("Trip to Japan", GoalScene.JAPAN),
-        GoalPreset("Holiday", GoalScene.TRAVEL),
-        GoalPreset("Emergency fund", GoalScene.MOUNTAINS),
-        GoalPreset("New laptop", GoalScene.NONE),
-    )
 }

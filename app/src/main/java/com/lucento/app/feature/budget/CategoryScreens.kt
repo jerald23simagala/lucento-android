@@ -1,5 +1,6 @@
 package com.lucento.app.feature.budget
 
+import androidx.compose.material.icons.outlined.Category
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -245,6 +246,15 @@ private fun NameDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        icon = {
+            com.lucento.app.core.designsystem.component.IconTile(
+                icon = androidx.compose.material.icons.Icons.Outlined.Category,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                content = MaterialTheme.colorScheme.onPrimaryContainer,
+                size = 52.dp,
+                shape = androidx.compose.foundation.shape.CircleShape,
+            )
+        },
         title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
         text = {
             OutlinedTextField(
@@ -264,7 +274,9 @@ private fun NameDialog(
                 shape = MaterialTheme.shapes.small,
             )
         },
-        confirmButton = { TextButton(onClick = { onConfirm(name) { error = it } }) { Text(confirmLabel) } },
+        confirmButton = {
+            androidx.compose.material3.Button(onClick = { onConfirm(name) { error = it } }, shape = MaterialTheme.shapes.small) { Text(confirmLabel) }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

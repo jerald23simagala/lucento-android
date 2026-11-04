@@ -30,6 +30,72 @@ import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+
+/**
+ * True while the user has hidden their amounts (owner, 2026-11-04: the Dashboard's Hide; round 7: every page that
+ * shows money). Provided at the app's root from the saved choice; editors and the composer set it back to false, since
+ * nobody can type an amount they can't see. [AmountText], [MoneyText] and [AmountFormat] then show "₱••••" instead of
+ * the figure, and TalkBack hears "Amount hidden".
+ */
+val LocalAmountsHidden = staticCompositionLocalOf { false }
+
+/** What screen readers hear for a hidden amount. */
+const val HIDDEN_AMOUNT_DESCRIPTION = "Amount hidden"
+
+/**
+ * Money as words on a page, hidden or not ([LocalAmountsHidden]). A plain object, so it also works inside lambdas and
+ * helper functions that build sentences: get it once with [amountFormat] and use it wherever an amount is written out.
+ * [spoken] is for content descriptions, where a hidden amount is "Amount hidden" rather than read-out dots.
+ */
+class AmountFormat internal constructor(val hidden: Boolean) {
+    fun format(money: Money): String = if (hidden) MoneyFormatter.masked(money.currencyCode) else MoneyFormatter.format(money)
+
+    fun signed(money: Money, showPlus: Boolean = true): String =
+        if (hidden) MoneyFormatter.masked(money.currencyCode) else MoneyFormatter.formatSigned(money, showPlus)
+
+    fun spoken(money: Money): String = if (hidden) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.format(money)
+
+    fun spokenSigned(money: Money, showPlus: Boolean = true): String =
+        if (hidden) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.formatSigned(money, showPlus)
+
+    companion object {
+        val Shown = AmountFormat(false)
+        val Hidden = AmountFormat(true)
+    }
+}
+
+/** The [AmountFormat] for this place in the UI. */
+@Composable
+@ReadOnlyComposable
+fun amountFormat(): AmountFormat = if (LocalAmountsHidden.current) AmountFormat.Hidden else AmountFormat.Shown
+
+/** Shows real amounts inside [content] whatever the user chose: editors, the composer, anything that takes input. */
+@Composable
+fun AmountsShown(content: @Composable () -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalAmountsHidden provides false, content = content)
+}
+
+/** [money] as words on screen — or its hidden form where amounts are hidden ([LocalAmountsHidden]). */
+@Composable
+@ReadOnlyComposable
+fun shownAmount(money: Money, signed: Boolean = false, showPlus: Boolean = false): String = when {
+    LocalAmountsHidden.current -> MoneyFormatter.masked(money.currencyCode)
+    signed -> MoneyFormatter.formatSigned(money, showPlus)
+    else -> MoneyFormatter.format(money)
+}
+
+/** [money] for a content description: "Amount hidden" where amounts are hidden, so TalkBack never reads them out. */
+@Composable
+@ReadOnlyComposable
+fun spokenAmount(money: Money, signed: Boolean = false, showPlus: Boolean = false): String =
+    if (LocalAmountsHidden.current) HIDDEN_AMOUNT_DESCRIPTION else shownAmount(money, signed, showPlus)
+
+private fun Modifier.hiddenAmountSemantics(hidden: Boolean): Modifier =
+    if (hidden) clearAndSetSemantics { contentDescription = HIDDEN_AMOUNT_DESCRIPTION } else this
 
 /**
  * Renders a [Money] value with tabular figures. Colour is neutral by default: Lucento only tints
@@ -46,8 +112,15 @@ fun AmountText(
     signed: Boolean = true,
     showPlus: Boolean = false,
 ) {
-    val formatted = if (signed) MoneyFormatter.formatSigned(money, showPlus) else MoneyFormatter.format(money)
-    FittingText(remember(formatted) { AnnotatedString(formatted) }, style, color, minScale = 0.6f, modifier = modifier)
+    val hidden = LocalAmountsHidden.current
+    val formatted = shownAmount(money, signed, showPlus)
+    FittingText(
+        remember(formatted) { AnnotatedString(formatted) },
+        style,
+        color,
+        minScale = 0.6f,
+        modifier = modifier.hiddenAmountSemantics(hidden),
+    )
 }
 
 /**
@@ -57,7 +130,7 @@ fun AmountText(
  * restarts whenever the available width changes, so a figure grows back when there is room again.
  */
 @Composable
-private fun FittingText(
+internal fun FittingText(
     text: AnnotatedString,
     style: TextStyle,
     color: Color,
@@ -157,9 +230,12 @@ private fun ShrinkingMoney(
     minScale: Float,
     modifier: Modifier,
 ) {
-    val formatted = MoneyFormatter.formatSigned(money, showPlus)
-    val text = remember(formatted, style, fractionScale) { typeset(formatted, money.fractionDigits, style, fractionScale) }
-    FittingText(text, style, color, minScale, modifier)
+    val hidden = LocalAmountsHidden.current
+    val formatted = shownAmount(money, signed = true, showPlus = showPlus)
+    val text = remember(formatted, style, fractionScale) {
+        if (hidden) AnnotatedString(formatted) else typeset(formatted, money.fractionDigits, style, fractionScale)
+    }
+    FittingText(text, style, color, minScale, modifier.hiddenAmountSemantics(hidden))
 }
 
 private fun typeset(formatted: String, fractionDigits: Int, style: TextStyle, fractionScale: Float): AnnotatedString {

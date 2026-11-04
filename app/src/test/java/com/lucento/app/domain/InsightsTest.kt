@@ -3,6 +3,7 @@ package com.lucento.app.domain
 import com.lucento.app.core.money.Money
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
@@ -131,5 +132,28 @@ class InsightsTest {
         val totals = TransactionQueries.totalsByCurrency(list, primaryCurrency = "USD")
         assertEquals(listOf("USD", "EUR"), totals.map { it.currencyCode })
         assertEquals(usd(60), totals.first().net)
+    }
+
+    // ---- change and chart axis ----------------------------------------------------------------
+
+    @Test fun changePercentIsAgainstThePreviousAmountsSize() {
+        assertEquals(8, Insights.changePercent(usd(108_000), usd(100_000)))
+        assertEquals(-50, Insights.changePercent(usd(50_000), usd(100_000)))
+        // From a negative net flow to a smaller loss is an improvement.
+        assertEquals(50, Insights.changePercent(usd(-50_000), usd(-100_000)))
+        assertNull(Insights.changePercent(usd(10_000), usd(0)))
+    }
+
+    @Test fun axisTicksAreRoundAndCoverTheLargestBar() {
+        // 4,300.00 → 0, 1,000 … 5,000 (the reference chart's scale).
+        assertEquals(listOf(0L, 1_000L, 2_000L, 3_000L, 4_000L, 5_000L), Insights.axisTicks(430_000, 2))
+        // 300.00 → 0, 100, 200, 300.
+        assertEquals(listOf(0L, 100L, 200L, 300L), Insights.axisTicks(30_000, 2))
+        // A zero-decimal currency reads the amount as whole units.
+        assertEquals(20_000L, Insights.axisTicks(98_000, 0).let { it[1] - it[0] })
+        assertEquals(listOf(0L), Insights.axisTicks(0, 2))
+        val ticks = Insights.axisTicks(1_234_567_89, 2)
+        assertTrue(ticks.last() * 100 >= 1_234_567_89)
+        assertTrue(ticks.size in 3..6)
     }
 }

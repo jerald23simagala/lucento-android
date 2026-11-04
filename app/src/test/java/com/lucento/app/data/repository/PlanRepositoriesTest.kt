@@ -89,6 +89,34 @@ class PlanRepositoriesTest {
         assertEquals(GoalRepository.SaveResult.BlankName, goals.save(null, "  ", Money(1, "USD"), null, null))
     }
 
+    @Test fun onlyAReachedGoalCanBeArchived() = runTest {
+        val id = (goals.save(null, "Laptop", Money(100_000, "USD"), null, null) as GoalRepository.SaveResult.Saved).id
+        goals.contribute(id, Money(99_999, "USD"), start, "", "a")
+        assertEquals(GoalRepository.ArchiveResult.NotReached, goals.archive(id))
+        assertEquals(1, goals.observeGoals().first().size)
+        goals.contribute(id, Money(1, "USD"), start, "", "b")
+        assertEquals(GoalRepository.ArchiveResult.Archived, goals.archive(id))
+        assertEquals(GoalRepository.ArchiveResult.NotFound, goals.archive(999))
+    }
+
+    @Test fun archivedGoalsLeaveTheActiveListKeepTheirHistoryAndCanBeRestored() = runTest {
+        val id = (goals.save(null, "Trip", Money(50_000, "USD"), null, null) as GoalRepository.SaveResult.Saved).id
+        goals.contribute(id, Money(60_000, "USD"), start, "", "a")
+        assertEquals(GoalRepository.ArchiveResult.Archived, goals.archive(id))
+        assertEquals(GoalRepository.ArchiveResult.Archived, goals.archive(id)) // again: no-op
+        assertTrue(goals.observeGoals().first().isEmpty())
+        assertEquals(listOf(id), goals.observeArchivedGoals().first().map { it.id })
+        assertEquals(1, goals.observeContributions().first().size)
+        // Read-only while archived: no money in or out.
+        assertEquals(GoalRepository.ContributionResult.GoalNotFound, goals.contribute(id, Money(1, "USD"), start, "", "b"))
+        assertEquals(GoalRepository.ContributionResult.GoalNotFound, goals.contribute(id, Money(-1, "USD"), start, "", "c"))
+
+        goals.restore(id)
+        assertEquals(listOf(id), goals.observeGoals().first().map { it.id })
+        assertTrue(goals.observeArchivedGoals().first().isEmpty())
+        assertEquals(GoalRepository.ContributionResult.Saved, goals.contribute(id, Money(1, "USD"), start, "", "d"))
+    }
+
     // ---- recurring
 
     private suspend fun rentSchedule(): Long = (
@@ -148,6 +176,9 @@ class PlanRepositoriesTest {
         assertEquals(RecurringRepository.SaveResult.InvalidInterval, recurring.save(input(interval = 0)))
         assertEquals(RecurringRepository.SaveResult.EndBeforeStart, recurring.save(input(end = start.minusDays(1))))
         assertEquals(RecurringRepository.SaveResult.CategoryMismatch, recurring.save(input(type = TransactionType.INCOME)))
+        // No uncategorised scheduled bills or income (owner, 2026-11-03).
+        assertEquals(RecurringRepository.SaveResult.CategoryRequired, recurring.save(input(category = null)))
+        assertEquals(RecurringRepository.SaveResult.CategoryRequired, recurring.save(input(type = TransactionType.INCOME, category = null)))
     }
 
     @Test fun goalPictureChoiceIsStoredAndEditable() = runTest {
@@ -155,7 +186,12 @@ class PlanRepositoriesTest {
         assertEquals("japan_fuji", goals.observeGoals().first().single { it.id == id }.sceneKey)
         goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "none")
         assertEquals("none", goals.observeGoals().first().single { it.id == id }.sceneKey)
+        // Icon keys (owner, 2026-11-04) are stored as they are.
+        goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "icon_travel")
+        assertEquals("icon_travel", goals.observeGoals().first().single { it.id == id }.sceneKey)
         goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "not-a-scene")
+        assertEquals(null, goals.observeGoals().first().single { it.id == id }.sceneKey)
+        goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "icon_unknown")
         assertEquals(null, goals.observeGoals().first().single { it.id == id }.sceneKey)
         val plain = (goals.save(null, "Laptop", Money(100_000, "USD"), null, null) as GoalRepository.SaveResult.Saved).id
         assertEquals(null, goals.observeGoals().first().single { it.id == plain }.sceneKey)

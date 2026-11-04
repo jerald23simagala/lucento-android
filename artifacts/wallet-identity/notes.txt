@@ -1,0 +1,25 @@
+Wallet & banking identity (redesign Part A) - emulator-5556, debug v10 build, lucento-test, QA account B, 2026-11-02
+
+1 picker-default   New wallet > Bank account > "Bank or provider": device country (US) first, "No bank or provider"
+                   selected by default; official app icons / vector marks / monograms as 32dp rounded squares.
+2 picker-search    "bdo" -> BDO Unibank (Bank · Philippines).
+3 editor-preview   Live card preview follows the institution (BDO face, logo on a white plate, type chip).
+4 wallets-list     Rows show the institution icon; subtitle "BDO Unibank · Bank account · USD"; Chase card "−$1,250.00 owed".
+5 detail-card      BDO premium_dark face, wordmark plate, filled type chip, accent rule. Server row institution_id = ph_bdo
+                   after Sync now (verified read-only SQL).
+6 liability-card   Chase credit card: dashed type chip, hatched trailing band, "Amount owed". Captured on the build
+                   BEFORE the sign fix: the balance then lacked the minus sign; fixed (cards show −$1,250.00, see 7).
+7 liability-font200  200% font scale after the fixes: −$1,250.00; chip wraps under the logo instead of clipping;
+                   "OWED AT START" wraps to two lines.
+8 wallets-list-font200  200%: rows truncate long names/subtitles (pre-existing row layout; follow-up in KNOWN_ISSUES).
+
+Not captured: dark theme (card faces are theme-independent by design; the avatar hairline's dark variant was not
+checked on device), TalkBack reading of the merged card description (text verified in the UI dump:
+"BDO Unibank, Bank account, QA BDO Savings, current balance $0.00").
+Environment: emulator-5554 was shut down to relieve host memory (ENV-1); phone 2 showed launcher/app ANRs after the
+font-scale change at load ~34; recovered by waiting.
+Test data added on lucento-test: wallets "QA BDO Savings" (ph_bdo) and "QA Chase Card" (us_chase, 1,250.00 owed).
+QA-Cash untouched.
+
+9 card-chip-chase / card-chip-cash (owner direction 2026-11-02): drawn EMV-style gold chip on every card face; balance 22sp
+  (AmountStyles.large) instead of 40sp. Still no number, expiry, cardholder or network mark.

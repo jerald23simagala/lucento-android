@@ -1,6 +1,37 @@
 package com.lucento.app.feature.budget
 
+import com.lucento.app.core.designsystem.component.AmountsShown
+import com.lucento.app.core.designsystem.component.amountFormat
 import com.lucento.app.core.designsystem.component.StatusTones
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalDensity
+import com.lucento.app.core.designsystem.component.CardOverline
+import com.lucento.app.core.designsystem.component.ChoicePill
+import com.lucento.app.core.designsystem.component.HeroStatTile
+import com.lucento.app.core.designsystem.component.ListSectionHeader
+import com.lucento.app.core.designsystem.theme.Hierarchy
+import com.lucento.app.domain.BudgetBurn
+import com.lucento.app.feature.home.daysLeftLabel
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.foundation.layout.IntrinsicSize
 import com.lucento.app.core.designsystem.component.CardHeader
@@ -41,6 +72,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.AlertDialog
+import com.lucento.app.core.designsystem.component.SegmentedToggle
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +95,7 @@ import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoAnimation
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
+import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.HeroCard
 import com.lucento.app.core.designsystem.component.HeroFigure
@@ -109,19 +143,25 @@ fun BudgetScreen(
     onManageCategories: () -> Unit,
     viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.Factory),
 ) {
+    val fmt = amountFormat()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var monthOffset by rememberSaveable { mutableIntStateOf(0) }
     val month = YearMonth.from(state.today).minusMonths(monthOffset.toLong())
-    val currencies = remember(state.budgets, state.categories, state.primaryCurrency) {
-        BudgetPlanner.currencies(state.budgets, state.categories, state.primaryCurrency)
+    // The same currency as Home's budget card and the Transactions totals (FocusCurrency), so all three agree.
+    val focus = remember(state.primaryCurrency, state.wallets, state.transactions) {
+        com.lucento.app.domain.FocusCurrency.of(state.primaryCurrency, state.wallets, state.transactions)
+    }
+    val currencies = remember(state.budgets, state.categories, focus, month) {
+        BudgetPlanner.currencies(state.budgets, state.categories, focus, month)
     }
     var currency by rememberSaveable { mutableStateOf<String?>(null) }
-    val shownCurrency = currency?.takeIf { it in currencies } ?: state.primaryCurrency
+    val shownCurrency = currency?.takeIf { it in currencies } ?: focus
     val plan = remember(state.categories, state.budgets, state.transactions, shownCurrency, month) {
         BudgetPlanner.plan(state.categories, state.budgets, state.transactions, shownCurrency, month)
     }
     val isCurrentMonth = monthOffset == 0
     var editing by remember { mutableStateOf<CategoryBudgetLine?>(null) }
+    var showAllBudgeted by rememberSaveable { mutableStateOf(false) }
 
     // A finished month kept within the category-based budget is acknowledged once (persisted), never for overspending.
     var celebration by remember { mutableStateOf<Confirmation?>(null) }
@@ -144,7 +184,11 @@ fun BudgetScreen(
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
+            contentPadding = PaddingValues(
+                start = com.lucento.app.core.designsystem.component.screenGutter(),
+                end = com.lucento.app.core.designsystem.component.screenGutter(),
+                bottom = Spacing.fabClearance,
+            ),
         ) {
             item(key = "bar") {
                 LucentoTopBar(
@@ -179,17 +223,25 @@ fun BudgetScreen(
             }
 
             item(key = "month") {
-                MonthSwitcher(
-                    month = month,
-                    canGoForward = monthOffset > 0,
-                    onPrevious = { monthOffset += 1 },
-                    onNext = { if (monthOffset > 0) monthOffset -= 1 },
-                )
-            }
-            if (currencies.size > 1) {
-                item(key = "currencies") {
-                    PillRow(currencies.map { it to it }, shownCurrency, onSelect = { currency = it })
-                    Spacer(Modifier.height(Spacing.md))
+                Row(Modifier.fillMaxWidth().padding(top = Spacing.xs, bottom = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                    MonthSwitcher(
+                        month = month,
+                        canGoForward = monthOffset > 0,
+                        onPrevious = { monthOffset += 1 },
+                        onNext = { if (monthOffset > 0) monthOffset -= 1 },
+                    )
+                    // Each currency has its own budget; the choice sits beside the month only when there is one to make.
+                    if (currencies.size > 1) {
+                        Spacer(Modifier.width(Spacing.sm))
+                        Row(
+                            Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.End),
+                        ) {
+                            currencies.forEach { code ->
+                                ChoicePill(label = code, selected = code == shownCurrency, onClick = { currency = code })
+                            }
+                        }
+                    }
                 }
             }
 
@@ -208,16 +260,20 @@ fun BudgetScreen(
             }
 
             item(key = "summary") {
-                BudgetSummaryCard(plan, today = state.today, isCurrentMonth = isCurrentMonth)
+                val burn = remember(plan, state.today) { BudgetPlanner.burn(plan, state.today) }
+                val daily = remember(plan, burn, state.transactions, state.wallets, state.budgets, state.schedules, state.categories) {
+                    budgetDailyFigure(plan, burn, state.today, state.transactions, state.wallets, state.budgets, state.schedules, state.categories)
+                }
+                BudgetSummaryCard(plan, burn, isCurrentMonth = isCurrentMonth, daily = daily)
             }
 
             if (!plan.unbudgetedSpending.isZero) {
                 item(key = "unbudgeted") {
                     InfoNote(
                         buildString {
-                            append("${MoneyFormatter.format(plan.unbudgetedSpending)} spent outside your budget categories this month")
+                            append("${fmt.format(plan.unbudgetedSpending)} unbudgeted: spent outside your budget categories this month")
                             if (!plan.uncategorizedSpending.isZero) {
-                                append(" (${MoneyFormatter.format(plan.uncategorizedSpending)} has no category)")
+                                append(" (${fmt.format(plan.uncategorizedSpending)} has no category)")
                             }
                             append(". It still counts in Spent — give those categories an amount, or categorise the expenses, to plan for it.")
                         },
@@ -229,24 +285,29 @@ fun BudgetScreen(
             if (plan.allocatedLines.isNotEmpty()) {
                 item(key = "budgeted-header") {
                     val lines = plan.allocatedLines
-                    ToneSectionHeader(
+                    ListSectionHeader(
                         "Budgeted",
-                        StatusTones.brand,
-                        caption = "${lines.size} ${if (lines.size == 1) "category" else "categories"}",
-                    ) {
-                        Text(
-                            "${MoneyFormatter.format(plan.budgetedSpending)} of ${MoneyFormatter.format(plan.total)}",
-                            style = AmountStyles.small,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
+                        caption = categoryCount(lines.size),
+                        subtotal = "${fmt.format(plan.budgetedSpending)} of ${fmt.format(plan.total)}",
+                    )
                 }
                 item(key = "budgeted-card") {
+                    // Most-used first, so the categories closest to their limit are never the ones folded away.
+                    val lines = plan.allocatedLines
+                    val folded = !showAllBudgeted && lines.size > BUDGETED_FOLD + 1
+                    val shown = if (folded) lines.take(BUDGETED_FOLD) else lines
                     LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
-                        plan.allocatedLines.forEachIndexed { index, line ->
+                        shown.forEachIndexed { index, line ->
                             AllocationRow(line, onClick = { editing = line })
-                            if (index < plan.allocatedLines.lastIndex) Hairline(strong = true)
+                            if (index < shown.lastIndex) Hairline(inset = RowTextInset)
+                        }
+                        if (lines.size > BUDGETED_FOLD + 1) {
+                            Hairline(inset = RowTextInset)
+                            LucentoTextButton(
+                                text = if (folded) "Show ${categoryCount(lines.size - BUDGETED_FOLD)} more" else "Show fewer",
+                                onClick = { showAllBudgeted = !showAllBudgeted },
+                                modifier = Modifier.align(Alignment.CenterHorizontally),
+                            )
                         }
                     }
                 }
@@ -254,10 +315,9 @@ fun BudgetScreen(
 
             if (plan.unallocatedLines.isNotEmpty()) {
                 item(key = "unallocated-header") {
-                    ToneSectionHeader(
+                    ListSectionHeader(
                         if (plan.allocatedLines.isEmpty()) "Your categories" else "Not budgeted",
-                        StatusTones.neutral,
-                        caption = "${plan.unallocatedLines.size} without an amount",
+                        caption = "${categoryCount(plan.unallocatedLines.size)} without an amount",
                     )
                     if (plan.allocatedLines.isEmpty()) {
                         Text(
@@ -272,7 +332,7 @@ fun BudgetScreen(
                     LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
                         plan.unallocatedLines.forEachIndexed { index, line ->
                             UnallocatedRow(line, onClick = { editing = line })
-                            if (index < plan.unallocatedLines.lastIndex) Hairline(strong = true)
+                            if (index < plan.unallocatedLines.lastIndex) Hairline(inset = RowTextInset)
                         }
                     }
                 }
@@ -282,7 +342,9 @@ fun BudgetScreen(
                 Spacer(Modifier.height(Spacing.lg))
                 LucentoSecondaryButton(text = "Manage categories", icon = Icons.Outlined.Category, onClick = onManageCategories)
                 InfoNote(
-                    "Budgets run from the 1st to the last day of each month and don’t roll over. Only expenses count — " +
+                    "Changing an amount affects the month you’re viewing; choose “onward” to change the months after it " +
+                        "too. Earlier months always keep their amounts. " +
+                        "Budgets run from the 1st to the last day of each month and don’t roll over. Only expenses count — " +
                         "transfers between your accounts, savings-goal contributions and income never do. Each currency " +
                         "has its own budget; nothing is converted.",
                     modifier = Modifier.padding(top = Spacing.lg),
@@ -293,26 +355,46 @@ fun BudgetScreen(
     }
 
     editing?.let { line ->
+        val change = remember(line, state.budgets, plan.currencyCode, month, state.today) {
+            BudgetChangeContext.of(state.budgets, line.category.id, line.category.name, plan.currencyCode, month, YearMonth.from(state.today))
+        }
         AllocationSheet(
             line = line,
             plan = plan,
-            onSave = { limit, done -> viewModel.setAllocation(line.category.id, plan.currencyCode, limit, done) },
+            change = change,
+            onSave = { limit, scope, done -> viewModel.saveAmount(line.category.id, plan.currencyCode, month, limit, scope, done) },
+            onUseUsual = { done -> viewModel.useUsualAmount(line.category.id, plan.currencyCode, month, done) },
             onDismiss = { editing = null },
         )
     }
 }
 
+/** A compact white pill: previous · month · next. The chevrons are 48dp touch targets around the 40dp pill. */
 @Composable
 private fun MonthSwitcher(month: YearMonth, canGoForward: Boolean, onPrevious: () -> Unit, onNext: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    val fill = MaterialTheme.colorScheme.surfaceContainerLowest
+    val edge = LucentoTheme.extendedColors.borderDefault
+    Row(
+        Modifier
+            .heightIn(min = Sizes.minTouch)
+            .drawBehind {
+                val inset = 4.dp.toPx()
+                val radius = CornerRadius(14.dp.toPx())
+                val box = Size(size.width, size.height - inset * 2)
+                drawRoundRect(fill, topLeft = Offset(0f, inset), size = box, cornerRadius = radius)
+                drawRoundRect(edge, topLeft = Offset(0f, inset), size = box, cornerRadius = radius, style = Stroke(1.dp.toPx()))
+            },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         IconButton(onClick = onPrevious) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
         }
         Text(
             "${monthLabel(month)} ${month.year}",
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            modifier = Modifier.widthIn(min = 112.dp),
         )
         IconButton(onClick = onNext, enabled = canGoForward) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
@@ -321,16 +403,19 @@ private fun MonthSwitcher(month: YearMonth, canGoForward: Boolean, onPrevious: (
 }
 
 /**
- * The month's budget as the page's statement, on brand blue: what is left (or how much over) on the left; spent and the
- * daily allowance stacked on the right; the burn bar with the month-elapsed marker underneath.
+ * The month's budget as the page's statement, on brand blue (navy at night): what is left is the largest figure, with
+ * the share spent beside the title; the utilisation bar with a white marker for today; the elapsed and spent shares in
+ * words with the pace verdict; then Spent and the per-day figure ([DailyFigure]) as two translucent sub-cards.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BudgetSummaryCard(plan: BudgetPlan, today: java.time.LocalDate, isCurrentMonth: Boolean) {
-    val burn = remember(plan, today) { BudgetPlanner.burn(plan, today) }
+private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth: Boolean, daily: DailyFigure?) {
+    val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     HeroCard {
+        Spacer(Modifier.height(Spacing.xs))
         if (!plan.hasBudget) {
-            HeroPill("Monthly budget · ${plan.currencyCode}", HeroTones.main, Modifier.semantics { heading() })
+            CardOverline("Monthly budget · ${plan.currencyCode}", color = ext.onHeroMuted)
             Spacer(Modifier.height(Spacing.xs))
             MoneyText(money = plan.total, style = AmountStyles.hero, color = ext.onHero)
             Text(
@@ -338,133 +423,229 @@ private fun BudgetSummaryCard(plan: BudgetPlan, today: java.time.LocalDate, isCu
                 style = MaterialTheme.typography.bodySmall,
                 color = ext.onHeroMuted,
             )
+            Spacer(Modifier.height(Spacing.xs))
             return@HeroCard
         }
         val over = plan.remaining.isNegative
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1.15f)) {
-                HeroPill(
-                    if (over) "Over budget · ${plan.currencyCode}" else "Left · ${monthLabel(plan.month)}",
-                    if (over) HeroTones.tangerine else HeroTones.main,
-                    Modifier.semantics { heading() },
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = if (over) -plan.remaining else plan.remaining, style = AmountStyles.hero, color = ext.onHero)
-                Text(
-                    if (over) "over your ${MoneyFormatter.format(plan.total)} budget" else "left of ${MoneyFormatter.format(plan.total)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ext.onHeroMuted,
-                    maxLines = 1,
-                )
-            }
-            VerticalDivider(color = ext.onHeroMuted.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = Spacing.md))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                HeroFigure("Spent · ${plan.percentUsed ?: 0}%", HeroTones.sunlight) {
-                    MoneyText(money = plan.spent, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f)
-                }
-                val allowance = burn.dailyAllowance.takeIf { isCurrentMonth }
-                HeroFigure(if (allowance != null) "Per day" else if (isCurrentMonth) "Days left" else "Month", HeroTones.sunlight) {
-                    if (allowance != null) {
-                        MoneyText(money = allowance, style = AmountStyles.row, color = ext.onHero, fractionScale = 1f)
-                    } else {
-                        Text(
-                            if (isCurrentMonth) "${burn.daysLeft} of ${burn.daysInMonth}" else "Closed",
-                            style = AmountStyles.row,
-                            color = ext.onHero,
-                        )
-                    }
-                }
-            }
+        val used = plan.percentUsed ?: 0
+        val total = fmt.format(plan.total)
+        CardOverline("${monthLabel(plan.month)} budget", color = ext.onHeroMuted) {
+            Text(
+                "$used% SPENT",
+                style = Hierarchy.cardOverline,
+                color = ext.onHeroMuted,
+                maxLines = 1,
+                modifier = Modifier.clearAndSetSemantics { contentDescription = "$used% spent" },
+            )
         }
-        Spacer(Modifier.height(Spacing.md))
+        Spacer(Modifier.height(6.dp))
+        // Signed: a negative remaining is the amount over budget.
+        MoneyText(money = plan.remaining, style = AmountStyles.headline, color = ext.onHero, fractionScale = 1f, minScale = 0.5f)
+        Text(
+            if (over) "Over your $total budget" else "Remaining of $total budget",
+            style = MaterialTheme.typography.bodyMedium,
+            color = ext.onHeroMuted,
+        )
+        Spacer(Modifier.height(14.dp))
         ConsumptionBar(
             fraction = plan.fraction,
             color = if (over) ext.warmAccent else ext.accent,
-            trackColor = ext.onHeroMuted.copy(alpha = 0.3f),
+            trackColor = ext.onHero.copy(alpha = 0.25f),
             markerFraction = if (isCurrentMonth) burn.elapsedPercent / 100f else null,
-            description = "${plan.percentUsed ?: 0}% of the ${plan.currencyCode} budget used" +
-                if (isCurrentMonth) ", ${burn.elapsedPercent}% of the month gone" else "",
+            markerColor = ext.onHero,
+            markerGap = null,
+            description = "$used% of the ${plan.currencyCode} budget spent" +
+                if (isCurrentMonth) ", ${burn.elapsedPercent}% of the month elapsed" else "",
         )
-        if (isCurrentMonth) {
-            Spacer(Modifier.height(Spacing.xs))
+        Spacer(Modifier.height(Spacing.sm))
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            if (isCurrentMonth) {
+                HeroIndicator("${burn.elapsedPercent}%", "days elapsed", Modifier.align(Alignment.CenterVertically)) {
+                    Box(Modifier.size(width = 2.dp, height = 12.dp).clip(RoundedCornerShape(1.dp)).background(ext.onHero))
+                }
+            }
+            HeroIndicator("$used%", "budget spent", Modifier.align(Alignment.CenterVertically)) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(if (over) ext.warmAccent else ext.accent))
+            }
+            Spacer(Modifier.weight(1f))
+            val verdict = paceVerdict(plan, burn.pace, isCurrentMonth)
+            StatusPill(verdict.label, verdictTone(verdict), Modifier.align(Alignment.CenterVertically))
+        }
+        Spacer(Modifier.height(14.dp))
+        val spentTile: @Composable (Modifier) -> Unit = { m ->
+            HeroStatTile(
+                "Spent",
+                Icons.Outlined.ShoppingBag,
+                description = "Spent ${fmt.spoken(plan.spent)}",
+                modifier = m,
+            ) {
+                MoneyText(money = plan.spent, style = HeroFigureStyle, color = ext.onHero, fractionScale = 1f)
+            }
+        }
+        if (LocalDensity.current.fontScale >= 1.3f) {
+            // Large text: each sub-card takes the full width so its label and caption are never cut off.
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                spentTile(Modifier.fillMaxWidth())
+                if (daily != null) DailyTile(daily, overspent = over, modifier = Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                spentTile(Modifier.weight(1f).fillMaxHeight())
+                if (daily != null) DailyTile(daily, overspent = over, modifier = Modifier.weight(1f).fillMaxHeight())
+            }
+        }
+        val setAside = when (daily) {
+            is DailyFigure.SafePerDay -> daily.committed
+            is DailyFigure.NothingLeft -> daily.committed
+            else -> null
+        }
+        if (setAside != null && !setAside.isZero) {
+            Spacer(Modifier.height(Spacing.sm))
             Text(
-                "The line marks today: ${burn.elapsedPercent}% of the month has gone.",
+                "${fmt.format(setAside)} of bills due by the end of ${monthLabel(plan.month)} is set aside first.",
                 style = MaterialTheme.typography.bodySmall,
                 color = ext.onHeroMuted,
             )
         }
-        // D1 / P2-3: Spent is every expense; when some fell outside the plan, say how it splits so the figure adds up.
-        if (!plan.unbudgetedSpending.isZero) {
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                "Spent = ${MoneyFormatter.format(plan.budgetedSpending)} in your plan + " +
-                    "${MoneyFormatter.format(plan.unbudgetedSpending)} outside it",
-                style = MaterialTheme.typography.bodySmall,
-                color = ext.onHero,
-            )
+        // D1 / P2-3: Spent is every expense, so say how it splits — budgeted + unbudgeted — and the figure adds up.
+        // Same words and order as the Home budget card's formula.
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            "Spent = ${fmt.format(plan.budgetedSpending)} budgeted + " +
+                "${fmt.format(plan.unbudgetedSpending)} unbudgeted",
+            style = MaterialTheme.typography.bodySmall,
+            color = ext.onHero,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+    }
+}
+
+private val HeroFigureStyle = AmountStyles.medium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
+
+/** One reading under the hero's bar: its key (marker or dot), the figure in white, what it measures in muted text. */
+@Composable
+private fun HeroIndicator(figure: String, what: String, modifier: Modifier = Modifier, key: @Composable () -> Unit) {
+    val ext = LucentoTheme.extendedColors
+    Row(modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
+        key()
+        Spacer(Modifier.width(5.dp))
+        Text(figure, style = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold), color = ext.onHero, maxLines = 1)
+        Spacer(Modifier.width(Spacing.xs))
+        Text(what, style = MaterialTheme.typography.bodySmall, color = ext.onHeroMuted, maxLines = 1)
+    }
+}
+
+/** The hero's per-day sub-card: Safe per day this month, Safe to spend when nothing is left to spread, or a past month's daily average. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DailyTile(daily: DailyFigure, overspent: Boolean, modifier: Modifier) {
+    val fmt = amountFormat()
+    val ext = LucentoTheme.extendedColors
+    val (label, money, caption) = when (daily) {
+        is DailyFigure.SafePerDay -> Triple("Safe per day", daily.perDay, "${daysLeftLabel(daily.daysLeft)} left")
+        // As on Home (owner, 2026-11-03): never below zero; the bills set aside are explained under the tiles.
+        is DailyFigure.NothingLeft -> Triple(
+            "Safe to spend",
+            if (daily.safe.isNegative) com.lucento.app.core.money.Money.zero(daily.safe.currencyCode) else daily.safe,
+            // The same reason Home's card gives (round 6): with budget still remaining, the bills due took the rest.
+            if (overspent) "You’re over budget this month" else "Bills due take what’s left",
+        )
+        is DailyFigure.DailyAverage -> Triple("Daily average", daily.perDay, "over ${daysLeftLabel(daily.days)}")
+    }
+    HeroStatTile(
+        label,
+        Icons.Outlined.CalendarToday,
+        description = "$label ${fmt.spokenSigned(money)}, $caption",
+        modifier = modifier,
+    ) {
+        // Figure, then its caption beneath: a wrapping row mis-measured short figures and left the caption undrawn.
+        Column {
+            MoneyText(money = money, style = HeroFigureStyle, color = ext.onHero, fractionScale = 1f)
+            Text(caption, style = MaterialTheme.typography.labelSmall, color = ext.onHeroMuted)
         }
     }
 }
 
+/**
+ * Category rows, compact (owner, 2026-11-04): 16dp side padding, a 34dp tile and a 12dp gap; hairlines and bars line up
+ * with the text after them.
+ */
+private val RowTile = 34.dp
+private val RowPadding = Spacing.md
+private val RowGap = Spacing.sm + Spacing.xxs
+private val RowTextInset = RowPadding + RowTile + RowGap
+
+/** The Budgeted card shows this many rows, then "Show n more", unless only one more would be hidden. */
+private const val BUDGETED_FOLD = 5
+
+private fun categoryCount(n: Int): String = "$n ${if (n == 1) "category" else "categories"}"
+
 @Composable
 private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
+    val fmt = amountFormat()
     val limit = line.limit ?: return
     val remaining = line.remaining ?: return
     Column(
         Modifier
             .fillMaxWidth()
             .clickable(role = Role.Button, onClickLabel = "Change ${line.category.name} amount", onClick = onClick)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm + Spacing.xxs),
+            .padding(horizontal = RowPadding, vertical = Spacing.sm + Spacing.xxs),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CategoryTile(category = line.category, type = TransactionType.EXPENSE)
-            Spacer(Modifier.width(Spacing.md))
+            CategoryTile(category = line.category, type = TransactionType.EXPENSE, size = RowTile)
+            Spacer(Modifier.width(RowGap))
             Column(Modifier.weight(1f)) {
-                Text(line.category.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(line.category.name, style = Hierarchy.cardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    "${MoneyFormatter.format(line.spent)} of ${MoneyFormatter.format(limit)}",
+                    "${fmt.format(line.spent)} of ${fmt.format(limit)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.width(Spacing.sm))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    if (remaining.isNegative) "${MoneyFormatter.format(-remaining)} over" else "${MoneyFormatter.format(remaining)} left",
-                    style = AmountStyles.row,
+                    if (remaining.isNegative) "${fmt.format(-remaining)} over" else "${fmt.format(remaining)} left",
+                    style = AmountStyles.row.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
                     color = if (remaining.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
                 )
-                if (line.health != BudgetHealth.ON_TRACK) {
-                    StatusPill(healthLabel(line.health, remaining), healthTone(line.health), Modifier.padding(top = 2.dp))
-                }
+                // Every row says its status in words, "On track" included, so the column reads consistently.
+                StatusPill(healthLabel(line.health, remaining), healthTone(line.health), Modifier.padding(top = 2.dp))
             }
         }
-        Spacer(Modifier.height(Spacing.sm))
+        Spacer(Modifier.height(Spacing.xs + Spacing.xxs))
         ConsumptionBar(
             fraction = line.fraction,
             color = healthColor(line.health),
             description = "${line.category.name}: ${line.percentUsed ?: 0}% used",
             height = 6.dp,
-            modifier = Modifier.padding(start = Sizes.iconTile + Spacing.md),
+            modifier = Modifier.padding(start = RowTile + RowGap),
         )
     }
 }
 
 @Composable
 private fun UnallocatedRow(line: CategoryBudgetLine, onClick: () -> Unit) {
+    val fmt = amountFormat()
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
+            .heightIn(min = 52.dp)
             .clickable(role = Role.Button, onClickLabel = "Set ${line.category.name} amount", onClick = onClick)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            .padding(horizontal = RowPadding, vertical = Spacing.xs + Spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryTile(category = line.category, type = TransactionType.EXPENSE)
-        Spacer(Modifier.width(Spacing.md))
+        CategoryTile(category = line.category, type = TransactionType.EXPENSE, size = RowTile)
+        Spacer(Modifier.width(RowGap))
         Column(Modifier.weight(1f)) {
-            Text(line.category.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(line.category.name, style = Hierarchy.cardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                if (line.spent.isZero) "No amount set" else "${MoneyFormatter.format(line.spent)} spent · no amount set",
+                if (line.spent.isZero) "No amount set" else "${fmt.format(line.spent)} spent · no amount set",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -492,12 +673,13 @@ private fun PersonaliseCard(onChoose: () -> Unit, onKeep: () -> Unit) {
 
 @Composable
 private fun LegacyOverallCard(oldLimit: Money, plan: BudgetPlan, onRemove: () -> Unit) {
+    val fmt = amountFormat()
     LucentoCard(Modifier.fillMaxWidth()) {
         Text("Your budget now adds up by category", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(Spacing.xs))
         Text(
-            "Your earlier “everything” limit of ${MoneyFormatter.format(oldLimit)} is no longer used. Your monthly budget is " +
-                "the sum of your category amounts (${MoneyFormatter.format(plan.total)} now), so the two can never disagree. " +
+            "Your earlier “everything” limit of ${fmt.format(oldLimit)} is no longer used. Your monthly budget is " +
+                "the sum of your category amounts (${fmt.format(plan.total)} now), so the two can never disagree. " +
                 "Your transactions are unaffected.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -506,24 +688,47 @@ private fun LegacyOverallCard(oldLimit: Money, plan: BudgetPlan, onRemove: () ->
     }
 }
 
-/** Sets, changes or removes one category's monthly amount, showing what the total becomes. */
+/**
+ * Sets, changes or removes one category's amount, showing what the month's total becomes. A change applies to the month
+ * being viewed unless "onward" is chosen; earlier months are never touched (docs/CALCULATIONS.md, "Budget lifecycle").
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AllocationSheet(
     line: CategoryBudgetLine,
     plan: BudgetPlan,
-    onSave: (Money?, (BudgetRepository.SaveResult) -> Unit) -> Unit,
+    change: BudgetChangeContext,
+    onSave: (Money?, BudgetScope, (BudgetRepository.SaveResult) -> Unit) -> Unit,
+    onUseUsual: ((BudgetRepository.SaveResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
-) {
+) = AmountsShown {
+    val fmt = amountFormat()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val separator = remember { MoneyFormatter.decimalSeparator() }
     val currency = plan.currencyCode
-    var text by remember { mutableStateOf(line.limit?.let { MoneyFormatter.formatPlain(it) }.orEmpty()) }
+    var text by rememberSaveable { mutableStateOf(line.limit?.let { MoneyFormatter.formatPlain(it) }.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var budgetScope by rememberSaveable { mutableStateOf(change.defaultScope) }
+    /** An "onward" change waiting for confirmation: the amount (null when removing). */
+    var confirming by remember { mutableStateOf<OnwardChange?>(null) }
 
     fun close() {
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    }
+
+    fun handle(result: BudgetRepository.SaveResult) {
+        when (result) {
+            is BudgetRepository.SaveResult.Saved -> close()
+            BudgetRepository.SaveResult.LimitNotPositive -> error = "The amount must be greater than zero."
+            BudgetRepository.SaveResult.InvalidCategory -> error = "This category is archived. Restore it in Manage categories first."
+            BudgetRepository.SaveResult.Duplicate, BudgetRepository.SaveResult.NotFound -> close()
+        }
+    }
+
+    fun submit(amount: Money?) {
+        if (change.needsConfirmation(budgetScope, removing = amount == null)) confirming = OnwardChange(amount)
+        else onSave(amount, budgetScope, ::handle)
     }
 
     val parsed = parsePositive(text, currency, separator).first
@@ -539,16 +744,14 @@ private fun AllocationSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CategoryTile(category = line.category, type = TransactionType.EXPENSE)
-                Spacer(Modifier.width(Spacing.md))
-                Text(line.category.name, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            }
-            Text(
-                "${MoneyFormatter.format(line.spent)} spent in ${monthLabel(plan.month)}.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            SheetHeader(
+                title = line.category.name,
+                subtitle = "${fmt.format(line.spent)} spent in ${monthLabel(plan.month)}.",
+                leading = { CategoryTile(category = line.category, type = TransactionType.EXPENSE) },
             )
+            change.status?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(Spacing.xs))
             MoneyField(
                 value = text,
@@ -556,10 +759,27 @@ private fun AllocationSheet(
                     text = it
                     error = null
                 },
-                label = "Monthly amount",
+                label = "Amount",
                 currencyCode = currency,
                 error = error,
-                supporting = newTotal?.let { "Your monthly budget becomes ${MoneyFormatter.format(it)}." },
+                supporting = newTotal?.let { "${monthLabel(plan.month)}’s budget becomes ${fmt.format(it)}." },
+            )
+            if (change.scopes.size > 1) {
+                Text(
+                    "Apply to",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = Spacing.xs).semantics { heading() },
+                )
+                SegmentedToggle(
+                    options = change.scopes.map { it to change.scopeLabel(it) },
+                    selected = budgetScope,
+                    onSelect = { budgetScope = it },
+                )
+            }
+            Text(
+                change.scopeExplanation(budgetScope),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(Spacing.sm))
             LucentoPrimaryButton(
@@ -570,25 +790,44 @@ private fun AllocationSheet(
                         error = amountError?.message(currency, separator)
                         return@LucentoPrimaryButton
                     }
-                    onSave(money) { result ->
-                        when (result) {
-                            is BudgetRepository.SaveResult.Saved -> close()
-                            BudgetRepository.SaveResult.LimitNotPositive -> error = "The amount must be greater than zero."
-                            BudgetRepository.SaveResult.InvalidCategory -> error = "This category is archived. Restore it in Manage categories first."
-                            BudgetRepository.SaveResult.Duplicate, BudgetRepository.SaveResult.NotFound -> close()
-                        }
-                    }
+                    submit(money)
                 },
             )
-            if (line.isAllocated) {
+            val usual = change.usual
+            if (change.hasOwnAmount && usual != null) {
                 LucentoTextButton(
-                    text = "Remove amount",
+                    text = "Use the usual ${fmt.format(usual)}",
+                    onClick = { onUseUsual(::handle) },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+            }
+            // A month removed on its own still has a usual amount that can be stopped from that month on.
+            if (line.isAllocated || (budgetScope == BudgetScope.ONWARD && usual != null)) {
+                LucentoTextButton(
+                    text = change.removeLabel(budgetScope),
                     color = MaterialTheme.colorScheme.error,
-                    onClick = { onSave(null) { close() } },
+                    onClick = { submit(null) },
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             }
             Spacer(Modifier.height(Spacing.lg))
         }
     }
+
+    confirming?.let { pending ->
+        val removing = pending.amount == null
+        com.lucento.app.core.designsystem.component.ConfirmDialog(
+            title = change.confirmTitle(removing),
+            text = change.confirmBody(pending.amount, removing),
+            confirmLabel = if (removing) "Stop budgeting" else "Update",
+            destructive = removing,
+            onConfirm = {
+                confirming = null
+                onSave(pending.amount, BudgetScope.ONWARD, ::handle)
+            },
+            onDismiss = { confirming = null },
+        )
+    }
 }
+
+private data class OnwardChange(val amount: Money?)

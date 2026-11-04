@@ -1,5 +1,6 @@
 package com.lucento.app.feature.wallets
 
+import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
+import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.AmountStyles
@@ -72,7 +74,7 @@ fun AdjustBalanceSheet(
     onAdjust: (actualText: String, decimalSeparator: Char, date: LocalDate, clientUuid: String, (AdjustError?) -> Unit) -> Unit,
     onAdjusted: () -> Unit,
     onDismiss: () -> Unit,
-) {
+) = AmountsShown {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
@@ -115,8 +117,11 @@ fun AdjustBalanceSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Text("Adjust balance", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            Spacer(Modifier.height(Spacing.xs))
+            SheetHeader(
+                title = "Adjust balance",
+                subtitle = wallet.name,
+                leading = { com.lucento.app.core.designsystem.component.WalletIdentityTile(wallet) },
+            )
             Text(
                 "Can’t find what’s missing? Enter what ${if (liability) "you really owe on" else "is really in"} " +
                     "“${wallet.name}” and Lucento records the difference as a Balance adjustment.",

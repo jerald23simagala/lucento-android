@@ -1,6 +1,28 @@
 package com.lucento.app.feature.profile
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import com.lucento.app.core.designsystem.component.SheetHeader
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -58,6 +80,20 @@ import kotlinx.coroutines.launch
 enum class ProfileDestination { SETTINGS, FEATURES }
 
 /**
+ * The profile photo and what can be done with it: pick one from the phone, use the signed-in Google account's picture
+ * ([googleAvailable] only then — it is downloaded once, on this tap), or remove it. [busy] while one is being saved.
+ */
+data class ProfilePhotoState(
+    val image: ImageBitmap? = null,
+    val googleAvailable: Boolean = false,
+    val busy: Boolean = false,
+    val message: String? = null,
+    val onPick: (Uri) -> Unit = {},
+    val onUseGoogle: () -> Unit = {},
+    val onRemove: () -> Unit = {},
+)
+
+/**
  * Profile and account menu, opened from the avatar on every primary screen. Lucento has no account: the "profile"
  * is an optional name and the user's preferences, all stored on this device. Settings lives here rather than in the
  * navigation dock.
@@ -71,6 +107,7 @@ fun ProfileSheet(
     onOpen: (ProfileDestination) -> Unit,
     onDismiss: () -> Unit,
     signedInEmail: String? = null,
+    photo: ProfilePhotoState = ProfilePhotoState(),
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -99,26 +136,22 @@ fun ProfileSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ProfileAvatar(preferences.displayName, size = 56.dp)
-                Spacer(Modifier.width(Spacing.md))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        preferences.displayName ?: "Your Lucento",
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.semantics { heading() },
-                    )
-                    Text(
-                        profileAccountLine(signedInEmail),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (!editingName) {
-                    IconButton(onClick = { editingName = true }) {
-                        Icon(Icons.Outlined.Edit, contentDescription = if (preferences.displayName == null) "Add your name" else "Edit your name")
+            SheetHeader(
+                title = preferences.displayName ?: "Your Lucento",
+                subtitle = profileAccountLine(signedInEmail),
+                leading = { PhotoAvatar(preferences.displayName, photo) },
+                trailing = if (!editingName) {
+                    {
+                        IconButton(onClick = { editingName = true }) {
+                            Icon(Icons.Outlined.Edit, contentDescription = if (preferences.displayName == null) "Add your name" else "Edit your name")
+                        }
                     }
-                }
+                } else {
+                    null
+                },
+            )
+            photo.message?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = Spacing.xs))
             }
             if (editingName) {
                 Spacer(Modifier.height(Spacing.md))
@@ -170,6 +203,86 @@ fun ProfileSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(Spacing.xl))
+        }
+    }
+}
+
+/**
+ * The profile avatar with a small camera badge. A tap opens the photo menu: choose from the phone's photos (the system
+ * picker, no permission needed), use the Google account's picture when signed in with Google (downloaded once, now), or
+ * remove the photo. Shows progress while a photo is being saved.
+ */
+@Composable
+private fun PhotoAvatar(name: String?, photo: ProfilePhotoState) {
+    var menu by remember { mutableStateOf(false) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(photo.onPick) }
+    val colors = MaterialTheme.colorScheme
+    Box {
+        Box(
+            Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .clickable(role = Role.Button, onClickLabel = "Change profile photo", enabled = !photo.busy) { menu = true }
+                .semantics { contentDescription = if (photo.image != null) "Profile photo. Change it" else "Add a profile photo" },
+            contentAlignment = Alignment.Center,
+        ) {
+            ProfileAvatar(name, size = 64.dp, photo = photo.image)
+            if (photo.busy) {
+                Box(Modifier.matchParentSize().background(colors.scrim.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(24.dp), color = colors.onPrimary, strokeWidth = 2.5.dp)
+                }
+            }
+        }
+        // The badge says the picture can be changed; the whole avatar is the touch target.
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(colors.primary)
+                .border(2.dp, colors.surfaceContainerLow, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(13.dp))
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(
+                text = { Text("Choose from photos") },
+                leadingIcon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null) },
+                onClick = {
+                    menu = false
+                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+            )
+            if (photo.googleAvailable) {
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("Use my Google photo")
+                            Text(
+                                "Downloaded once from Google, kept on this phone",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    leadingIcon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
+                    onClick = {
+                        menu = false
+                        photo.onUseGoogle()
+                    },
+                )
+            }
+            if (photo.image != null) {
+                DropdownMenuItem(
+                    text = { Text("Remove photo", color = colors.error) },
+                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = colors.error) },
+                    onClick = {
+                        menu = false
+                        photo.onRemove()
+                    },
+                )
+            }
         }
     }
 }

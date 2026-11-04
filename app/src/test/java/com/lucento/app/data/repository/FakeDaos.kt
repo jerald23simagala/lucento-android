@@ -175,6 +175,15 @@ class FakeTransactionDao : TransactionDao {
     override fun observeAll(): Flow<List<TransactionEntity>> =
         rows.map { list -> list.sortedWith(compareByDescending<TransactionEntity> { it.occurredOn }.thenByDescending { it.id }) }
 
+    override fun observeCount(): Flow<Int> = rows.map { it.size }
+
+    override fun observeCashFlowCount(): Flow<Int> = rows.map { list -> list.count { it.type == "INCOME" || it.type == "EXPENSE" } }
+
+    override fun observeWithTransferLegs(id: Long): Flow<List<TransactionEntity>> = rows.map { list ->
+        val group = list.firstOrNull { it.id == id }?.transferGroup
+        list.filter { it.id == id || (group != null && it.transferGroup == group) }
+    }
+
     override fun observeWalletFlows(): Flow<List<WalletFlowRow>> = rows.map { list ->
         list.groupBy { it.walletId }.map { (walletId, items) ->
             WalletFlowRow(
@@ -244,8 +253,12 @@ class FakeBudgetDao : BudgetDao {
 
     override suspend fun getById(id: Long) = rows.value.firstOrNull { it.id == id }
 
-    override suspend fun countMatching(categoryId: Long?, currencyCode: String, excludeId: Long) =
-        rows.value.count { it.currencyCode == currencyCode && it.id != excludeId && it.categoryId == categoryId }
+    override suspend fun findScope(categoryId: Long, currencyCode: String, month: String?, effectiveFrom: String?) =
+        rows.value.filter { it.categoryId == categoryId && it.currencyCode == currencyCode && it.month == month && it.effectiveFrom == effectiveFrom }
+            .minByOrNull { it.id }
+
+    override suspend fun countMatching(categoryId: Long?, currencyCode: String, excludeId: Long, month: String?, effectiveFrom: String?) =
+        rows.value.count { it.currencyCode == currencyCode && it.id != excludeId && it.categoryId == categoryId && it.month == month && it.effectiveFrom == effectiveFrom }
 
     override suspend fun insert(budget: BudgetEntity): Long {
         val id = nextId++
@@ -306,6 +319,9 @@ class FakeGoalDao : GoalDao {
     private var nextContributionId = 1L
 
     override fun observeActive(): Flow<List<GoalEntity>> = goals.map { list -> list.filter { !it.archived } }
+
+    override fun observeArchived(): Flow<List<GoalEntity>> =
+        goals.map { list -> list.filter { it.archived }.sortedWith(compareByDescending<GoalEntity> { it.updatedAt }.thenByDescending { it.id }) }
 
     override fun observeContributions(): Flow<List<GoalContributionRow>> =
         combine(goals, contributions) { g, c ->

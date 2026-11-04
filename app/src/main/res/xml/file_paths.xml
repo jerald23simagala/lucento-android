@@ -2,4 +2,6 @@
 <!-- Receipt photos are written to private cache only, shared with the camera app for capture, and deleted after reading. -->
 <paths>
     <cache-path name="receipts" path="receipts/" />
+    <!-- Ask Lucento's PDF reports, written to private cache only to hand to the share sheet, and replaced each time. -->
+    <cache-path name="reports" path="reports/" />
 </paths>

@@ -8,6 +8,66 @@
 > Production writes, production deploys, production env changes, merges and destructive Git operations need explicit
 > owner approval.
 
+## Owner to-dos (open, for the owner to run)
+
+| # | To-do | Status | Why it matters |
+|---|---|---|---|
+| OT-1 | Apply `supabase/migrations/20261103180000_credit_card_billing.sql` to **`lucento-test`** (SQL editor, one `begin … commit` block; verify query in `PRODUCTION_MIGRATION.md`, top section) | **Done** (owner, 2026-11-03) | A v11 build sends `credit_limit_minor`, `statement_day`, `due_day` on every wallet row; until the project has them, wallet sync from a v11 build stalls (rows stay pending, nothing is lost) |
+| OT-2 | Apply the same migration to **production** before any v11 release | **Done** (owner, 2026-11-03) | Same as OT-1, for release builds |
+| OT-3 | Re-check sync on a phone after OT-1 (add a card with a limit and billing days, sync, see it on a second device) | **Done** (owner, 2026-11-03) | The only end-to-end check of the v11 sync columns |
+| OT-4 | Deploy Ask Lucento's `/api/ask` | **Done** (2026-11-04): owner confirmed `consume_ai_quota` exists in production; PR lucento-website#6 (`280a905` endpoint, `9471726` env-name fix) merged as `e90326c` and deployed. Verified on production: `POST /api/ask` and `/api/interpret` → `401 sign_in_required` (settings resolve from the `LUCENTO_` names), a fake token → 401, `GET /api/ask` → 405, canonical URL and sitemap present again | Release builds now get AI answers once the user consents |
+| OT-5 | Try AI answers on a phone: install `artifacts/apk/lucento-release-TEST-SIGNED-ot5.apk` (a **test-only** release build: production Supabase and proxy, signed with this machine's Android debug key, SHA-1 `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75`; never distribute it). Sign in with an **email** account (Google sign-in likely fails: that key isn't registered for `com.lucento.app`), Insights › Ask Lucento › ask a question of your own (e.g. "How did October compare with September?") › Turn on AI answers › check the bold figures and "Answered by Gemini". Uninstall afterwards | Waits on OT-4 | The AI path can't run here; no signing secrets exist (`gh secret list` empty), so CI's release APK is unsigned |
+
+## Stabilization cycle (2026-11-02, uncommitted on `main` from 01cfd04)
+
+| Item | Status | Evidence |
+|---|---|---|
+| GitHub Actions #108 (01cfd04) | **PASS** — all four repository variables reached the release step, enforcement on, the CI release APK embeds the exact URL / publishable key / Web client id (production project, no test project, no server-only keys) | run logs + downloaded artifact |
+| Toolchain (N-19) | **PASS** — foojay removed (not needed), JDK 17–21 documented, daemon file per machine (gitignored); CI on 17 | local builds |
+| Two-emulator sync QA | **PASS WITH NOTES** — basic, offline, conflicts, isolation, restart, invalid row PASS; two defects found and fixed (offline delete beating a newer edit; duplicate budgets per device); F-3 expired session NOT TESTED | `artifacts/sync-qa/sync-log.txt` |
+| P2-1 Home "Am I on track?" | **PASS WITH NOTES** — Recent activity, Spendable now, loading skeleton; pace card kept; Quick links enriched by P2-5 | `artifacts/p2-ux/`, unit |
+| P2-2 Sync transparency | **PASS** — chip states incl. Syncing / Needs attention, details sheet with Sync now / Try again, account-mismatch route; follow-up SQ-F4 (held-back rows) | device + unit |
+| P2-4 Settings IA | **PASS** — hub + pages, one theme control, privacy said once, Back to hub, shared ViewModel | device + unit |
+| P2-5 Module rediscovery | **PASS** — offers with Turn on (with requirements) and Hide | unit, device (partial) |
+| P2-6 "Changed on another device" | **PASS** — notice only when this phone's unsynced change lost | device + unit |
+| P2-7 Strings / plurals | **PARTIAL** — plural defects fixed; strings not moved to resources | code audit |
+| P2-8 Scoped queries / paging | **PARTIAL** — shared whole-table query + 3 scoped queries; paging and startup profile not done | unit, device |
+| P2-11 RLS suite | **PASS WITH NOTES** — read-only cross-user REST probe PASS on test; pgTAP suite written (54 assertions) but not executed (no Docker); write probe declined by the permission system | `artifacts/security/rls-verification.txt` |
+| TalkBack / accessibility | **PASS WITH NOTES (emulator only)** — 10-screen label/target audit clean; live spoken traversal not driven | `artifacts/accessibility/talkback-emulator.txt` |
+| P3 | **Partly done** — N-15 last-day copy, F-3 copy, delete-dialog copy, stale sign-in error, N-26 closed (by design), N-19 resolved. Not done: undo after save, N-09 usage-events limits (needs a server change), unused-index cleanup (production decision), visual/motion polish | — |
+| Independent QA | Done (read-only). Critical: none. H1, M1–M7 and L1–L4, L9 fixed; others in KNOWN_ISSUES | — |
+| Owner-confirmed (physical Samsung) | Hide in recent apps **PASS**, App lock **PASS** (owner) | owner |
+| Deferred by the owner | release keystore, signing secrets, release OAuth client, production migrations, N-07 | — |
+
+## Next programme — Unified product experience redesign (requested 2026-11-02)
+Wallet and banking identity (institution registry, BankCard, InstitutionAvatar, picker), onboarding and account lifecycle,
+budget education and month-specific budgets (a budget change applies to the selected month only), first-transaction
+activation with light achievements, dashboard cognitive-load redesign. Started after this cycle; see its own section.
+
+| Part | Status (2026-11-02) |
+|---|---|
+| C — month-specific budgets | **Implemented, uncommitted.** DB v10 (`MIGRATION_9_10`, schema `10.json` exported, `check_migrations.py` OK, instrumented `migrate9To10` PASS on emulator), `BudgetPlanner.effectiveAllocation`, `BudgetRepository.setMonthAmount/clearMonth/setFrom/setRecurring` (atomic), sync DTO + pull validation + scope-keyed folds, backup codec/merge (older files still restore), Budget sheet "Only <month>" / "<month> onward" with confirmation, past months month-only, guide + Budget copy. Docs: CALCULATIONS.md "Budget lifecycle", SYNC.md. Tests: BudgetLifecycleTest, BudgetChangeTest, SyncEngineTest (2), BackupTest (2). Two-emulator check PASS on `lucento-test` (`artifacts/budget-lifecycle/`). Production migration pending (RD-C1) |
+| A — wallet/banking identity | **Implemented, uncommitted.** Pipeline `tools/institutions/build_institutions.py` (Android's own Svg2Vector from the Gradle cache + svgo pre-pass; WebP 144px app icons; identical icons shared) → `assets/banks/institutions.json` (380 institutions; card networks excluded), 305 card logos + 70 vector icons + 302 WebP icons, generated `InstitutionArt.kt`, report `docs/design/INSTITUTION_ASSETS.md` (16 fallbacks with reasons). `Wallet.institutionId` through repository, sync (always sent; pull-validated), backup (older files restore). `InstitutionRegistry`/`InstitutionRepository`, `LocalInstitutions`, `InstitutionAvatar`, `WalletIdentityTile` (rows, guide, schedules, composer), institution card face in `WalletCard` (templates, plates, dashed chip + hatch for debts, signed amounts), picker sheet + editor field + live preview. APK +1.47 MB compressed (measured). Decision: official app icon over recoloured glyph (44 incl. Chase, N26, Robinhood). Not done: CardNetworkIndicator (needs a stored network; deferred), dark-theme device check |
+| B — onboarding | **Implemented, uncommitted.** Welcome = workspace choice (Start fresh · I already use Lucento → sign in to an account, or restore a backup file offline; never combined with a new setup). Three visible stages (`SetupStage`, `StageIndicator`) across onboarding and the guided setup. Focus: tracking spending and budgeting always included. "How do you pay?" (`SpendType`) replaces the feature switches (cards/loans turn on Debts & loans; the guide suggests those account types first, stored as `spend_types`). Backups step with three paths (account / file / this phone only); summary "Lucento is personalized" → "Continue to set up". The guide reuses the production New wallet sheet (now with the bank picker) and reads budget amounts with the lifecycle rules. Offline-workspace reconciliation: unchanged `FirstSync.ASK_MERGE` (asks before joining). Device: fresh path + returning sign-in path on emulator (`artifacts/onboarding-redesign/`). Not on device: backup-file restore end to end |
+| D — activation & milestones | **Implemented, uncommitted.** Guide completion "You’re ready" (checklist in words + milestones earned). One-time + spotlight after setup (Home card + ringed dock +, static under reduced motion), cleared by the first entry or "Not now". Six light milestones (`Achievement`, `Achievements.earned/facts/toAcknowledge`) from records only — no streaks, points or nags; baselined silently on first run; each acknowledged once after the committed write (Milestone confirmation); Milestones sheet from Shortcuts. Local prefs: `achievements_seen`, `insights_visited`, `add_spotlight_seen` |
+| E2 — dashboard to owner reference + Figma (`MhsrRL6KNILGrMzH1bYdmr`, frame 3:1366) | **Implemented, uncommitted, branch `feature/unified-redesign`.** Header "Dashboard" (+ sync, bell, profile); pinned second row "Overview" + month pill; every month-dependent section follows the one selected month. Net Wallet Balance card (Figma gradient #2768ED→#162D88, texture disc, (i) tooltip, Lucento symbol + white wordmark, 40sp balance, 3-bar month-end history + trend % only from a positive start, Wallets / Debt & Loans with the Figma icons — downloaded and converted to VectorDrawables `ic_dash_*`, `bg_dash_card_texture`). Past months show end-of-month balances (`BalanceHistory`). Monthly Budget card: spent of budget, % used, 7dp bar, status (Under budget / On track / Ahead of pace / Over budget), top two categories → Transactions filtered to that category and month (`CategoryTransactionsRoute`, month filter in Transactions). Shortcuts Goals · Insights · Milestones · Debts · Scheduled (icon squares + labels). Upcoming Scheduled Transactions (current month: due by month end, overdue first; two-line rows with due pill). Recent Transactions (the month's newest, shared transaction rows). Removed from Home: quick actions (still on +), "Where it went", top-goal card. Figma MCP Starter-plan limit hit after 2 design-context calls: budget, shortcuts and lists follow the file's metadata (sizes/structure) and the owner's reference image, not a full Figma render |
+| E3 — owner refinements (2026-11-02) | **Implemented, uncommitted.** Card amounts never shrink their decimals (`fractionScale = 1f` on dashboard and wallet cards). Net Wallet Balance card as a physical card: ID-1 proportions, drop shadow, light edge, top sheen, faint guilloché lines, chip + contactless mark in the chip position; balance 32sp (−20%) directly under its label; header raised to match the bottom inset; trend is "vs last month" (2 points). Monthly Budget: subtle italic "Top 2 spending categories" note. Empty cards (scheduled, recent, budget setup) show Lucento on the left. Screens: `artifacts/dashboard-figma/card-v2-*` |
+| E — dashboard (first pass) | **Superseded by E2;** Home order: total balance hero → compact budget pace card (word verdict, spent of total, used vs month bars, left/over + days; mascot narration and advice banner removed) → quick actions (Expense, Income, Transfer, Scan receipt) → "Where it went" (top 4 + Other) → recent (5) → Getting started (until the basics exist) → Shortcuts (+ Milestones, module offers) → top goal / scheduled only when present. Device: `artifacts/dashboard-redesign/` |
+
+### Redesign close-out (2026-11-03) and what comes next
+Done: fresh-install pass (PASS, `artifacts/fresh-install-2026-11-03/`), read-only QA review (fixes RD-QA-1…5, 9),
+production runbook (`PRODUCTION_MIGRATION.md`), final report (`REDESIGN_FINAL_REPORT.md`). Owner decision: RD-C2 is
+documented (every phone on v10 before month-only/onward amounts), no server guard.
+
+| Priority | Task | Owner |
+|---|---|---|
+| 1 | ~~Apply the three pending migrations to production~~ **Done by the owner 2026-11-03**; confirm `supabase migration repair` recorded the history | Owner |
+| 2 | ~~Commit `feature/unified-redesign`~~ **Committed 2026-11-03** (owner-authorized). Next: push and open a PR so CI runs schema drift, emulator migration tests and the screenshot tour (needs authorization) | Owner → Claude |
+| 3 | Release v10 with a note that every phone on an account must update before using "Only <month>" / "<month> onward" | Owner |
+| 4 | Device checks still open: dark theme on wallet/dashboard cards (RD-A3), live TalkBack traversal, guide signed owed amount (RD-QA-9); backup-file restore done by the owner (RD-B1) | Claude |
+| 5 | Milestone baseline after first pull (RD-QA-6); recurring-stop fold rule (RD-QA-8) | Claude |
+| 6 | ~~Trademark/licensing review of bundled logos (RD-QA-7)~~ Skipped by owner decision 2026-11-03 | — |
+
 ## Execution status — master backlog run (2026-11-01, uncommitted on `feature/ai-development-workflow`)
 
 Statuses below were verified against the code, tests and devices, not copied from older notes.
@@ -46,6 +106,7 @@ Statuses below were verified against the code, tests and devices, not copied fro
 | P1-8 | Budget amount when categories combine | **Keep the latest edit** (set beats unset; tie → smaller sync id) | 2026-11-01 |
 | D1 | Budget "Spent" | **All expenses, shown as in-plan + outside-plan** (P2-3) | 2026-11-01 |
 | D2 | Conflict policy | **Whole-row latest wins**, plus a "changed on another device" notice (P2-6) | 2026-11-01 |
+| D3 | Wallet card look | **Real-card feel**: drawn EMV-style chip on every face (overrides the design system's "no chip"); balance at 22sp, never oversized. Still no number, expiry, cardholder or network mark | 2026-11-02 |
 | D3 | Delete vs. later edit | **Newer action wins** (current) | 2026-11-01 |
 | D4 | Wallet dedup on first sign-in | **Never merge; keep the warning** (current behaviour) | 2026-11-01 |
 | D5 | R10-01 / offline revoke before beta | **Required before beta**, done locally (session coordinator) | 2026-11-01 |
@@ -267,3 +328,191 @@ validation and rate limiting (N-09); toolchain alignment (N-19); dependency upgr
 
 Main session implements. Architect and QA agents review P0-2, P0-4, P1-2 and P1-5 before merging. One coherent
 change per branch, tests with every change, exact reporting of what ran, no production writes without approval.
+
+## Core screens — owner review round 5 (2026-11-04, `feature/core-screens-refinement`: `d4ff162` + goal archive)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 5"; composer rule in `docs/CAPTURE.md`.
+
+| Next | Why |
+|---|---|
+| **Owner: retry OT-5** (Ask Lucento on the phone) | PR #8 (fallback to another Flash model on 503) is merged and deployed (`50c8379`); a real answer still needs a signed-in phone. If it fails, check Vercel runtime logs within the hour (Hobby keeps ~1 h) |
+| Optional: add goal archive / restore to `ScreenshotTourTest` | Verified by unit tests and by hand on the emulator (`artifacts/goal-archive/`), not yet in the tour |
+| Optional: delete the `com.lucento.app` Android OAuth client made for the OT-5 test once testing is done | It authorises this machine's debug key for the release package |
+
+| Check | Result |
+|---|---|
+| Unit tests | **886/886** after goal archive (+3: `PlanRepositoriesTest` only a reached goal archives; archived goals leave the active list, keep history, refuse money, restore; `DashboardRedesignTest` an archived goal keeps Goal Setter but not Home's savings). Before it, **883/883** (+7: `GoalIconTest` ×6 keys, older scenes, normalising, names, choice, suggestions; `BatchReviewTest` category now blocks; `PlanRepositoriesTest` icon keys stored; `WalletsOverviewTest` card default) |
+| Lint | 0 errors, 9 warnings (same types) |
+| `ScreenshotTourTest` | **PASS** on API 28 (45 shots, `artifacts/core-screens/review6/`); wallets shot now in card view, 12b rows; new 17a Goals, 17b–c New savings goal |
+| Device checks (API 28) | New wallet: 4 fast up-flings and a fast flick back to the top keep the sheet open (a deliberate pull down still closes it); goal icon picker, Kept in (asset wallets + Add wallet); compact Budget rows; Safe to spend $0.00 with its caption; Wallets opens on cards |
+| Website | PR #7 merged / deployed (`fc5d5fe`): model chosen from the key's list — production then logged 503 for gemini-3.8-flash; PR #8 (fallback) open, mocked checks pass, preview READY |
+
+## Core screens — owner review round 4 (2026-11-03, committed `38e11a6`)
+
+Owner comments: Scheduled without projection or hero, transfers apart from net flow, summary in Transactions' style;
+transaction view with icons and an editor wallet dropdown; wallet editor in onboarding's style, wallet page action row
+with a reconcile note, "View wallet"; Insights restyled after a reference, an Ask Lucento hero and the new Ask Lucento
+page (AI over the user's records, preset reports as PDFs, safeguards; owner answers: Gemini proxy, summaries only, all
+four reports); composer chat styled after a reference with real wallet icons. As built:
+`docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 4"; `docs/ASK.md`; `docs/CALCULATIONS.md` ("Scheduled
+outlook", "Ask Lucento reports").
+
+| Next | Why |
+|---|---|
+| **Owner: OT-4 / OT-5** (deploy `/api/ask`, then try AI answers on a signed-in phone; top of this file) | AI answers can't run until the proxy endpoint is live; reports and PDFs work without it |
+| Owner review on a real phone: Ask Lucento, Insights, composer, transaction view, wallet page | Visual sign-off; API 36 still blocked here (CS-7) |
+| Optional: a Settings shortcut to Ask Lucento's reports, and a Home entry point | Today it opens from Insights only |
+| Optional: compact the Insights hero's "Net · last N months" pill at large text (CS-17) | It truncates at 360dp @ 1.3 (predates round 4) |
+
+| Check | Result |
+|---|---|
+| Unit tests | **877/877** (+22: `ReportBuilderTest` ×8 net worth incl. change and empty months, cash flow, budget vs actual, debts, top categories, answer sentences; `AskTest` ×9 routing, months, snapshot never carries notes or other currencies, figure fill-in, unknown ids, unverified amounts, links, follow-ups; `AskRequestTest` ×2; `AskHeroTypingTest`; `InsightsTest` +2 change percent and axis; `ScheduleOutlookTest` net without transfers; `AccountSetupResetTest` AI consent cleared) |
+| Lint | 0 errors, 9 warnings — same types as before (AutoboxingStateCreation is now reported as information) |
+| Build | `assembleDebug`, `assembleDebugAndroidTest`; APK `artifacts/apk/lucento-debug-review5.apk` |
+| `ScreenshotTourTest` | **PASS** on API 28, final code (42 shots in `artifacts/core-screens/review5/`); new: 13a Ask Lucento, 13b preset answer, 13c report sheet |
+| Device checks (API 28) | Ask: preset answer with report card; free question without AI → honest "what I can do"; report month stepper (an empty month now says no wallets existed); Save as PDF via the system picker → `Download/Lucento-Net-worth-statement-2026-11.pdf` and `…Budget-vs-actual…` rendered and inspected (fixed: right-aligned figures, word spacing via scaled text). Composer with keyboard (fixed: double nav-bar gap at the root; compact save bar while typing; greeting scrolls with the conversation); transfer view Route card; 360dp @ 1.3 (fixed: report card title, Transfers caption); light + dark |
+| Website | `lucento-website/src/pages/api/ask.ts`: eslint clean, `astro check` no errors in it (the repo's 29 existing errors are in the e2e Playwright files) |
+| Not run | AI answers end to end (no proxy in debug; OT-4 / OT-5); sharing to another app; API 36 (CS-7) |
+
+## Core screens — owner review round 3 (2026-11-03, committed in `9021ed0`)
+
+Owner comments: dialogs aligned and livelier (Add Wallet's card = the wallet being built), category required on scheduled
+transactions, a livelier bell; budget card Safe to spend sticky (0 and red when over), Bills due always zero, Assets % /
+Liabilities % / net worth formula on one row, Upcoming coloured by kind; Scheduled page refactor (month hero, filters with
+From–To, 3-month projection, default to due today and this month); profile picture from Google or uploaded. As built:
+`docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 3"; rules in `docs/CALCULATIONS.md` ("Safe to spend",
+"Scheduled outlook"); privacy in `docs/SYNC.md`.
+
+| Next | Why |
+|---|---|
+| ~~Owner: OT-1 / OT-2~~ (credit card billing migration) | Done by the owner 2026-11-03, with OT-3 (sync checked on a phone) |
+| Owner: try "Use my Google photo" on a phone signed in with Google (CS-11) | The only path not exercised here (no Google sign-in on this machine's debug key) |
+| Owner review on a real phone: Scheduled page, bell, New wallet, budget card | Visual sign-off; API 36 still blocked here (CS-7) |
+| Optional: a one-time prompt to give pre-round-3 schedules a category (CS-12) | They keep working; editing asks for one |
+
+| Check | Result |
+|---|---|
+| Unit tests | **855/855** (+12: `ScheduleOutlookTest` ×7 flows, occurrences, overdue, paused / ended / paid, card payments, totals per currency, projection; `HomeBudgetCardTest` bills in any category + Safe to spend at 0; `CashflowCalculatorTest` updated; `PlanRepositoriesTest` category required; `ProfilePhotosTest` ×4 host check, size suffix, metadata, sampling; `AccountSetupResetTest` photo cleared) |
+| Lint | 0 errors, 10 warnings — the same set as earlier runs (round 2's handover said 9: miscount) |
+| Build | `assembleDebug`, `assembleDebugAndroidTest`; APK `artifacts/apk/lucento-debug-review4.apk` |
+| `ScreenshotTourTest` | **PASS** on API 28, final code (39 shots in `artifacts/core-screens/review4/`); new: 12g new wallet, 18 / 18b / 18c Scheduled; seeds now give every scheduled bill a category and add a loan instalment |
+| Device checks (API 28) | Budget card (Bills due −$1,594.98 = the Scheduled page's expenses; Safe to spend $0.00 red, "Bills due take what’s left"), Upcoming colours, bell, Scheduled hero / projection / agenda / All schedules, From–To picker applied (Nov 8 – Nov 29: summary and list follow), schedule editor refuses a bill without a category, profile photo picked from files and removed, Wallets legend one line at 411dp and 360dp @ 1.3, light + dark. Fixed on the way: a picked photo was refused (bounds-only decode returns null), hero pills cut at 360dp @ 1.3 (now wrap / one line per flow), kind filter clipped at 1.3 (pills), a later occurrence's "projected" note cut off, projection card too tall |
+| Not run | Google photo download (CS-11); API 36 (CS-7) |
+
+## Core screens — owner review round 2 (2026-11-03, uncommitted on `feature/core-screens-refinement`)
+
+Owner comments: budget formula without + − = (Remaining green / Overspent red, Bills due red, Safe to spend green only
+above zero, else hidden), To watch top 5 with "See all" bottom right; mascot on empty upcoming lists; wallet page
+Transfer / Payment + Adjust balance (out of Edit wallet) for assets and cards; instalment loan card (Principal, Paid,
+Remaining, segmented bar, "x of N installments paid"); rate in the card title; credit card editor with credit limit,
+statement day and due day (no One time / Monthly); due day as a payment reminder excluded from Safe to spend; card
+shows Credit limit, Amount due, Available. As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 2".
+
+| Next | Why |
+|---|---|
+| **Owner: apply `20261103180000_credit_card_billing.sql` to `lucento-test`, then production** (`PRODUCTION_MIGRATION.md`, top section) — tracked as OT-1 / OT-2 | A v11 build sends the new wallet columns; until a project has them, wallet sync from v11 stalls (rows stay pending) |
+| Owner review of the new wallet faces and Home formula on a real phone | Visual sign-off; API 36 still blocked here (CS-7) |
+| ~~Optional: list card payments on the Scheduled screen's Upcoming tab too~~ | Done in round 3 (the agenda lists them and they open the card) |
+
+| Check | Result |
+|---|---|
+| Unit tests | **843/843** (+14: `DebtProgressTest` ×10 cycle, dues, available, loan progress, terms; card terms round trip in `DebtPaymentTest`; formula rules in `HomeBudgetCardTest`; card billing + v2 files in `BackupTest`; card fields across two devices in `SyncEngineTest`) |
+| Lint | 0 errors, 10 warnings (pre-existing; recorded as 9 at the time — miscount, same set) |
+| Build | `assembleDebug`, `assembleDebugAndroidTest`; schema `11.json` exported; `tools/check_migrations.py` 10 → 11 matches |
+| `ScreenshotTourTest` | **PASS** on API 28; seeds a card with limit and billing days and a 24-instalment loan with 3 repayments; new shots 12c–12f; Home asserts "Bills due" (this month's Safe to spend is negative, so hidden) |
+| Device checks (API 28) | Card, loan and bank pages, card editor, Home budget card, Upcoming with the card payment, bell — 411dp day/night and 360dp @ 1.3. Fixed on the way: card title cut to "Vis…" (now wraps), footer amounts misaligned when labels wrap (now a label/amount grid), card-due caption cut, bell listed card payments before overdue items, a v2 backup's debt rows were refused (codec now treats the new keys as optional) |
+| Not run | `MigrationTest.migrate10To11` (instrumented; CI's emulator migration job runs it); API 36 (CS-7); sync against a real project (migration not applied) |
+
+## Core screens — owner review round (done 2026-11-03, committed `b139646`)
+
+Owner comments: guide budget rows (icon + category left, amount right); onboarding "alive" (icons on texts, styled rows,
+e.g. currency); Home: shortcuts right after the Net Wallet Balance card, budget card resized (ring = formula width, To
+watch as tall as the left half), formula Budget − Used = Remaining − Bills due = Safe to spend, and Used/Spent shown as
+budgeted + unbudgeted in the formula and the docs. As built: `docs/design/CORE_SCREENS_REFINEMENT.md` §6 "Owner review round".
+
+| Check | Result |
+|---|---|
+| Unit tests | **829/829** (825 before + 4: `HomeBudgetCardTest` formula adds up / past month / overspent signed; `GuidedSetupTest` draft total) |
+| Lint | 0 errors, 9 warnings (pre-existing) |
+| Build | `assembleDebug` and `assembleDebugAndroidTest` pass |
+| `ScreenshotTourTest` | **PASS** on API 28 (`Lucento_CoreScreens_API28`), with two new shots: 03b currency step, 04c guide budget step with typed amounts |
+| Device checks (API 28) | Home card 411dp and 360dp (side by side), 360dp @ 1.3 (stacked); currency step and guide budget step 360dp @ 1.5; day and night. Fixed on the way: watch names cut at 360dp (percent moved beside the bar), operator column now grows with text, currency step had no room for a single row at 360dp @ 1.5 (now one scrolling list) |
+| Not done | API 36 (CS-7), TalkBack traversal, ≥ 600dp, physical phone |
+
+Next: owner review of `artifacts/core-screens/review2/` and `r2-*.png`; authorize a commit.
+
+## Core screens refinement — implementation (done 2026-11-03, uncommitted on `feature/core-screens-refinement`)
+
+Owner decisions 2026-11-03: **D1** Budget's per-day figure is "Safe per day" (`CashflowCalculator.safeToSpend.perDay`),
+**D2** Bold section titles app-wide, **D3** Google "G" button in scope. What was built, the spec corrections and every
+deviation: `docs/design/CORE_SCREENS_REFINEMENT.md` §6.
+
+| Check | Result |
+|---|---|
+| Unit tests | **818/818** (784 before + 34 new: `HomeBudgetCardTest`, `BudgetDailyFigureTest`, `WalletsOverviewTest`, `HistoryLabelsTest`, `TrendHeightsTest`, a `CashflowCalculatorTest` pin) |
+| Lint | 0 errors, 9 warnings (all pre-existing, none in touched files) |
+| Build | `assembleDebug` and the androidTest compile pass |
+| `ScreenshotTourTest` | **PASS** end to end on API 28 emulator `Lucento_CoreScreens_API28` (repaired: it had been failing since Part B); 30 shots in `artifacts/core-screens/tour-411dp/` |
+| Device checks (API 28, 411dp) | Day and night on all four screens; card view; **view mode survives a force-stop** (Card view `checked=true` after relaunch); off-module tile → sheet → Turn on restores Scheduled; with Recurring off, safe to spend = remaining (no bills); trend line + "0% vs Dec" pill with a 3-month history (clock moved on the test AVD) |
+| Responsive | 360dp @ 1.3 and 320dp @ 2.0 on all four screens; seven layout defects found and fixed (§6) |
+| Not done | ≥ 600dp window, live TalkBack traversal, a physical phone, CI run (see KNOWN_ISSUES CS-5) |
+
+Next: owner review of the screens in `artifacts/core-screens/`; authorize a commit (and a push so CI runs the repaired
+tour). Original plan kept below for the record.
+
+Designs: canvas https://claude.ai/artifact/MocjXVBtQG5uW38yUQm9kE. Spec with file-level guidance:
+`docs/design/CORE_SCREENS_REFINEMENT.md`. No calculation changes; UI only. Suggested order, each step shippable alone:
+
+1. Design-system additions: `Hierarchy.cardOverline`, Bold `sectionTitle`, `CardOverline`, `StatTile`, `TrendLine`,
+   `ViewToggle`, `ProgressRing` centre content, `CompositionBar` segment gap. Update `ThemeContrastTest` if a token pair is added.
+2. Transactions: three stat cards (Income / Expenses / Net inflow or Net outflow), 16sp Bold day headers, day groups as
+   cards, red expense amounts. Screenshot light + night.
+3. Dashboard: drop "Overview", left month pill, two-half Monthly Budget card (donut + top-3 watch list, safe to spend),
+   dashed off-module tiles with a Turn on / Hide sheet, caps card headers. `HomeState.spendingBreakdown(top = 3)`.
+4. Budget: hero (remaining, % spent, utilisation with today marker, pace chip, Spent / Safe daily spend sub-cards),
+   compact month switcher, 18sp Bold section titles, refined allocation rows.
+5. Wallets: six-month trend in the hero (`BalanceHistory.lastMonths(count = 6)` in `WalletsViewModel`), Assets /
+   Liabilities stat cards, distribution bar, All / Assets / Liabilities + type filters, row / card view (persist
+   `wallets_view_mode` in DataStore), compact wallet faces (2 per row, 3 at ≥ 600dp).
+6. Global: official Google "G" mark on "Continue with Google" (`ConnectAccount.kt`), caps card headers on the other
+   screens that use `CardHeader` only if they are touched anyway.
+7. Validation: 320dp and 430dp widths, font scale 1.3 and 2.0, night theme, TalkBack labels on the new tiles and charts,
+   `ScreenshotTourTest` update, unit tests for any new pure helper (trend points, filter predicates).
+
+## Owner review round 6 (2026-11-04, uncommitted on `feature/core-screens-refinement`)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 6"; `docs/CALCULATIONS.md` (Spent, Focus currency);
+`docs/SYNC.md` (nothing can hang, while Lucento is open, what the user sees).
+
+| Next | Why |
+|---|---|
+| **Owner: install the new APK, open Lucento, check the chip** — it should read "Synced · now" within seconds, or "N to sync" / "Needs attention" with the reason | The account's last upload was 2026-11-03 21:17 UTC and last download 2026-11-04 05:13 UTC; anything entered since is only on the phone until a sync completes |
+| If the chip shows Needs attention, send the sheet's message | The stall's cause wasn't reproducible from logs (no failed requests reached the server) |
+| Optional: hide amounts on Wallets / Transactions / Budget too | Round 6 hides the Dashboard only, as asked |
+| Optional: Home's budget card and "See all" could carry the month shown on Home into Budget / Transactions | Today they open the current month (each page names its month, so nothing reads wrong) |
+
+| Check | Result |
+|---|---|
+| Unit tests | **899/899** (+13) |
+| `ReconciliationTest` (API 28 emulator) | PASS: Home Spent = Transactions Expenses = Budget Spent = ₱6,567.00 on the owner-shaped ledger; Hide masks the dashboard; Show on a phone without a screen lock asks first |
+| `ScreenshotTourTest` (API 28) | PASS, 45 shots in `artifacts/core-screens/review7/` |
+| Lint | 0 errors, 9 warnings (same types) |
+| CI | `ReconciliationTest` added to the emulator job (blocking) |
+| APK | `artifacts/apk/lucento-debug-review7.apk`; device screenshots in `artifacts/financial-integrity/` |
+
+## Owner review round 7 (2026-11-04, uncommitted on `feature/core-screens-refinement`)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 7".
+
+| Next | Why |
+|---|---|
+| **Owner: test the production-type build** `artifacts/apk/lucento-release-TEST-SIGNED-round7.apk` (test-only signing, never distribute): sign in, compare Home Spent with Transactions (This month) and Budget, check the sync chip, try Hide / Show | Round 6 was verified on debug builds, which use the test Supabase project; release uses production |
+| **Last stage — Account & sync password:** show New / Confirm password only for email accounts, never for Google (OAuth) sign-ins, and ask for the current password first | Owner, 2026-11-04: revisit at the end of development |
+| Optional: a Hide / Show switch on other pages too | Today it lives on the Dashboard; it applies everywhere |
+
+| Check | Result |
+|---|---|
+| Unit tests | **900/900** (+1: amounts in an answer are hidden, dates, counts and percentages are not); lint 0 errors, 9 warnings |
+| `ReconciliationTest` (API 28) | PASS: figures agree; Hide masks Home, Transactions, Budget and Wallets |
+| `ScreenshotTourTest` (API 28) | PASS, 54 shots in `artifacts/core-screens/review8/`, including the hidden pass (23–23i) over Home, Transactions, a transaction, Budget, a wallet, Insights, Goals, Debts and Scheduled |
+| Release build | `assembleRelease` with `LUCENTO_REQUIRE_RELEASE_CONFIG=true`: package `com.lucento.app`, signer SHA-1 `49:AF:14:81:…:8C:75` (debug key), dex references the production project only; launches on the emulator without a crash |

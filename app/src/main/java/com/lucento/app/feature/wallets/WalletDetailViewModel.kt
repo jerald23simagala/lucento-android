@@ -8,7 +8,11 @@ import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.data.repository.adjustBalanceOrNull
+import com.lucento.app.domain.CardCycle
 import com.lucento.app.domain.Category
+import com.lucento.app.domain.CreditCardMath
+import com.lucento.app.domain.LoanMath
+import com.lucento.app.domain.LoanProgress
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.Transfer
 import com.lucento.app.domain.Wallet
@@ -28,6 +32,11 @@ data class WalletDetailUiState(
     val history: List<Transaction> = emptyList(),
     val transfers: Map<String, Transfer> = emptyMap(),
     val categoriesById: Map<Long, Category> = emptyMap(),
+    /** A credit card's current statement and amount due; null without billing days (CreditCardMath.cycle). */
+    val cardCycle: CardCycle? = null,
+    /** An instalment loan's principal, repaid and remaining, and instalments paid (LoanMath.progress). */
+    val loanProgress: LoanProgress? = null,
+    val today: LocalDate = LocalDate.now(),
 ) {
     val walletNames: Map<Long, String> = wallets.associate { it.id to it.name }
 }
@@ -58,13 +67,19 @@ class WalletDetailViewModel(
         transactions.observeTransactions(),
         categories.observeCategories(),
     ) { walletList, all, categoryList ->
+        val wallet = walletList.firstOrNull { it.id == walletId }
+        val history = all.filter { it.walletId == walletId }
+        val today = LocalDate.now()
         WalletDetailUiState(
             loading = false,
-            wallet = walletList.firstOrNull { it.id == walletId },
+            wallet = wallet,
             wallets = walletList,
-            history = all.filter { it.walletId == walletId },
+            history = history,
             transfers = Transfer.pair(all),
             categoriesById = categoryList.associateBy { it.id },
+            cardCycle = wallet?.let { CreditCardMath.cycle(it, history, today) },
+            loanProgress = wallet?.let { LoanMath.progress(it, history) },
+            today = today,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WalletDetailUiState())
 

@@ -42,7 +42,7 @@ UI (Settings → Cloud sync) ──► SettingsViewModel ──► AuthRepositor
 | `recurring` | `public.recurring` | v9: `client_uuid`, `dirty`, `synced_at`, `base_revision` + triggers (MIGRATION_8_9); debt payments carry `to_wallet_id`, `interest_minor` |
 | `debt_terms` | columns of `public.wallets` | v9: `interest_rate_bps`, `repayment`, `term_months`, `installment_minor`, sent with the wallet (a terms edit bumps the wallet's `updated_at`); pre-v9 builds never send them, so the server keeps them |
 
-Not synced: DataStore preferences (theme, currency, enabled modules, display name) and goal photos. A JSON backup
+Not synced: DataStore preferences (theme, currency, enabled modules, display name), goal photos and the profile photo. A JSON backup
 does include those preferences (not crash reports, and not the sync cursor or account id). See docs/BACKUP.md. See "Known
 limitations".
 
@@ -121,7 +121,17 @@ Any exception aborts the cycle with `Retryable`; the cursor does not move, nothi
 stay dirty, so the next cycle repeats the work. `SyncWorker` retries with WorkManager backoff (up to 5 attempts).
 
 "Sync now" and the 30-minute worker share one in-process lock (`SyncFlight`) and, on a device, one file lock under
-the app's files directory. A second cycle waits; it does not run beside the first. The file lock is released by the
+the app's files directory. A second cycle waits; it does not run beside the first. **Nothing can hang (2026-11-04):**
+each request times out after 30 s (`SupabaseModule`), waiting for the stored sign-in after 20 s (`AuthNotReady`), the
+file lock is polled so a wait can be cancelled (`SyncFlight.Busy` after 30 s), and a whole cycle stops after 10 minutes
+(`SyncRepository.CYCLE_TIMEOUT_MILLIS`, generous because progress is saved only when a cycle completes). Each ends as a
+retryable failure, so "Syncing" never spins forever and the next sync is never blocked.
+
+**While Lucento is open (2026-11-04)** syncs run in the app straight away instead of queueing in WorkManager
+(`ForegroundSync`): when it opens or returns to the front (skipped when a sync finished in the last minute with nothing
+waiting), a moment after each saved change, and on Sync now / Try again. Requests during a sync collapse into one more
+run after it. In the background, changes are still handed to WorkManager and the periodic worker runs about every 30
+minutes — Android and some phones' battery savers may delay those. The file lock is released by the
 operating system if the process is killed, and the cursor moves only after a cycle finishes, so a killed cycle retries
 without a stuck lock or a half-applied cursor. The manual worker is unique work with `KEEP` (a second tap does not
 cancel the running one). The periodic worker has its own unique name; the lock is what keeps the two from overlapping.
@@ -153,8 +163,44 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
 - Deletes follow the same rule: a delete based on the current revision applies even from a slow clock; a delete that
   lost to a newer concurrent edit is rejected and the edited row comes back on the deleting device. On the receiving
   side a remote delete is skipped only if this device holds a newer unpushed edit (`localWinsOverRemoteDelete`).
+- A delete's time is **when the user deleted** (the tombstone's `deleted_at`), not when it is uploaded. Until
+  2026-11-02 the upload time was sent, so a delete made offline and uploaded later beat an edit another device made
+  after it (device QA C-2); `SyncEngineTest` "D3 …" covers both directions.
 - Retries are idempotent: a push whose reply was lost is refused the second time (same edit, stale base) and resolved
   from the identical server copy — no duplicate, no lost edit.
+- **Telling the user (P2-6).** Only when this phone's own unsynced change lost — a pending edit replaced, a delete undone
+  by a newer edit, a pending edit removed by a newer delete, or a duplicate budget folded to another amount — sync adds
+  to `SyncReport.overridden`, stored as `overridden_changes` in the sync preferences until dismissed. Home and the sync
+  sheet then say "A change you made on this phone was replaced by a newer change from another device. The newest
+  version is kept everywhere." This phone's edit winning is not reported (the other phone hears about it instead).
+- **Duplicate budgets** for one category and currency (two phones each set an amount) fold into one row on every device;
+  see docs/CALCULATIONS.md "Two budgets for one category".
+- **Budget lifecycle (v10).** `budgets.month` and `budgets.effective_from` ("yyyy-MM") sync like any other column and
+  are validated on pull (`PulledRowRules`) and on the server (format CHECKs, at most one set). v10 clients always send
+  both keys (null included), so a mixed bulk upsert can never drop one. **Rollout order:** migration
+  `20261102120000_budget_lifecycle_and_institutions.sql` must reach a project before any v10 build syncs against it,
+  or budget uploads fail because the columns are unknown (rows stay pending, nothing is lost). Older clients do not
+  know these columns: an upsert from them leaves the columns unchanged, but they treat every budget row of a category
+  as one budget. They show the oldest row (possibly a month-only or "from a month" amount) as the monthly amount, an
+  edit there changes that row's amount, and their duplicate-category fold can merge rows of different scopes. **Every
+  phone on an account must run v10 before month-only or "from a month" amounts are used** (owner decision 2026-11-03:
+  documented, no server guard). `wallets.institution_id` (same migration) carries the wallet's bundled institution id
+  (display only); v10 always sends it, null included, so removing an institution syncs. A pulled id that isn't
+  lowercase snake_case (≤ 128) is read as none, so the wallet still arrives; an id the bundled registry doesn't know
+  falls back to the per-type look.
+- **Credit card billing (v11).** `wallets.credit_limit_minor`, `statement_day` and `due_day` carry a card's limit and
+  billing days with its other terms (local `debt_terms`). v11 always sends them, nulls included, so clearing syncs; a
+  pulled card keeps them, any other type drops them, and out-of-range values (limit ≤ 0, a day outside 1–31) are
+  refused on pull (`PulledRowRules`) and by server CHECKs on live rows. **Rollout order:** migration
+  `20261103180000_credit_card_billing.sql` must reach a project before any v11 build syncs against it, or wallet uploads
+  fail (`PGRST204`, rows stay pending, nothing is lost). Older builds never send the columns, so an upsert from them
+  leaves them unchanged. The card's payment reminder is derived on each phone and never synced.
+- **What the user sees (P2-2, 2026-11-04).** The Home chip shows On device · Offline · Syncing (the icon turns) · Needs
+  attention · "3 to sync" / "Not synced yet" · "Synced · 5m" — never a bare "Synced", so it says how fresh it is and
+  what is waiting (`syncChipLabel`; TalkBack hears it in full words). It opens a sheet with the state, when syncs happen
+  (`SYNC_CADENCE`), Sync now / Try again (a phone that never synced is sent to Settings › Account & sync, which asks
+  before combining data), and the notice above. The other device picks changes up when it opens or syncs — there is
+  no live push.
 - Why not server arrival order alone: it would let an edit made offline yesterday overwrite one made online today.
   Revisions keep offline editing correct without trusting arrival order or device clocks for sequential edits.
 
@@ -202,10 +248,11 @@ Main currency, theme and enabled modules are device preferences (DataStore), nev
 
 "Disconnect" asks first, then cancels background sync, turns sync off, clears the Supabase session, and **wipes**
 the local ledger (wallets, categories, transactions, budgets, goals, contributions, schedules, debt terms, goal
-photos) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
+photos, the profile photo) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
 again, as on a fresh install, and the account's setup is reset in one preference edit (F-7,
 `UserPreferencesRepository.resetAccountSetup`): onboarding and the category setup are marked not done, and the guided
-setup step, default wallet, display name, acknowledged budget month and Smarter reading are cleared. So Lucento goes
+setup step, default wallet, display name, acknowledged budget month, Smarter reading and Ask Lucento's AI answers are
+cleared. So Lucento goes
 back to onboarding, and the next account is checked there: one with data is restored, an empty one is set up
 (including the spending categories), and a failed check sets nothing up. Theme, currency, modules, crash-report and
 usage-count consent and notices already seen stay. Each wipe also bumps `setup_generation`, which keys onboarding's
@@ -241,6 +288,12 @@ The device is no longer permanently tied to the first account. Signing back in t
 - The APK contains only the Supabase URL and the **publishable** key — no service-role key, database password or
   Google client secret exists in the repository or the app. Values come from `local.properties` / CI env.
 - Network: HTTPS only (`res/xml/network_security_config.xml`). No tokens, emails or financial values are logged.
+- **Profile photo from Google** (owner request, 2026-11-03): only when signed in with Google and only when the user taps
+  "Use my Google photo" (profile menu, or the offer on setup's sync step after a Google sign-in). The URL comes from the
+  session's user metadata (`avatar_url` / `picture`, filled by Supabase from Google); `ProfilePhotos` fetches it once over
+  HTTPS from Google's image host (`*.googleusercontent.com` only, redirects included; image types only; 5 MB cap) and
+  keeps a 384 px JPEG in app-private files. Nothing is sent but the request. Never synced, never in a backup, removed by
+  the sign-out wipe. A photo chosen from the phone uses the system photo picker (no storage permission) and never leaves it.
 - **Passwords.** Email sign-up and password change require at least 8 characters on the device, then a Have I Been
   Pwned range check: only the first 5 hex characters of the SHA-1 are sent to `api.pwnedpasswords.com`. The password
   is not sent and is not logged. If that request fails, the password is accepted (fail open) so a network problem

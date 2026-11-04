@@ -119,4 +119,42 @@ object Insights {
             .divide(BigDecimal.valueOf(whole.amountMinor), 4, RoundingMode.HALF_UP)
             .toFloat()
     }
+
+    /**
+     * How [current] compares with [previous], as a whole percentage of the previous amount's size (rounded half-up):
+     * +8 when net flow grew from 1,000 to 1,080, −50 when it halved. Null when [previous] is zero (no base to compare).
+     */
+    fun changePercent(current: Money, previous: Money): Int? {
+        require(current.currencyCode == previous.currencyCode) { "Currency mismatch" }
+        if (previous.amountMinor == 0L) return null
+        return BigDecimal.valueOf(Math.subtractExact(current.amountMinor, previous.amountMinor))
+            .multiply(BigDecimal(100))
+            .divide(BigDecimal.valueOf(previous.amountMinor).abs(), 0, RoundingMode.HALF_UP)
+            .toInt()
+    }
+
+    /**
+     * Round gridline values (in major units) for a chart whose largest bar is [maxMinor]: zero, then equal steps of 1, 2,
+     * 2.5 or 5 × a power of ten — the largest step that still gives at most [steps] + 1 intervals — the last at or above
+     * the largest bar. Only zero when there is nothing to draw.
+     */
+    fun axisTicks(maxMinor: Long, fractionDigits: Int, steps: Int = 4): List<Long> {
+        if (maxMinor <= 0L) return listOf(0L)
+        var unit = 1L
+        repeat(fractionDigits) { unit *= 10 }
+        val maxMajor = (maxMinor + unit - 1) / unit
+        var magnitude = 1L
+        while (magnitude * 10 <= maxMajor / steps) magnitude *= 10
+        val candidates = buildList {
+            add(magnitude)
+            add(2 * magnitude)
+            if (magnitude >= 10) add(magnitude / 10 * 25)
+            add(5 * magnitude)
+            add(10 * magnitude)
+            add(20 * magnitude)
+        }
+        val step = candidates.first { (maxMajor + it - 1) / it <= steps + 1 }
+        val count = ((maxMajor + step - 1) / step).coerceAtLeast(1)
+        return (0..count).map { it * step }
+    }
 }

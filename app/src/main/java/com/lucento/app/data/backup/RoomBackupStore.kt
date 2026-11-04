@@ -193,6 +193,7 @@ class RoomBackupStore(
                 WalletEntity(
                     name = row.name,
                     type = row.type.name,
+                    institutionId = row.institutionId,
                     currencyCode = row.currency,
                     openingBalanceMinor = row.openingBalanceMinor,
                     sortOrder = row.sortOrder,
@@ -215,6 +216,9 @@ class RoomBackupStore(
                     termMonths = row.termMonths,
                     installmentMinor = row.installmentMinor,
                     updatedAt = row.updatedAt,
+                    creditLimitMinor = row.creditLimitMinor,
+                    statementDay = row.statementDay,
+                    dueDay = row.dueDay,
                 ),
             )
         }
@@ -227,6 +231,8 @@ class RoomBackupStore(
                     createdAt = row.createdAt,
                     updatedAt = row.updatedAt,
                     clientUuid = row.id,
+                    month = row.month,
+                    effectiveFrom = row.effectiveFrom,
                     dirty = RestoredSync.DIRTY,
                     syncedAt = RestoredSync.syncedAt,
                     baseRevision = RestoredSync.baseRevision,
@@ -362,6 +368,9 @@ class RoomBackupStore(
                     termMonths = row.termMonths,
                     installmentMinor = row.installmentMinor,
                     updatedAt = row.updatedAt,
+                    creditLimitMinor = row.creditLimitMinor,
+                    statementDay = row.statementDay,
+                    dueDay = row.dueDay,
                 ),
             )
             val wallet = database.walletDao().getById(walletLocal) ?: continue
@@ -509,6 +518,7 @@ class RoomBackupStore(
 
 private fun WalletEntity.toBackup() = BackupWallet(
     id = requireNotNull(clientUuid),
+    institutionId = institutionId,
     name = name,
     type = enumValueOf(type),
     currency = currencyCode,
@@ -551,6 +561,8 @@ private fun BudgetEntity.toBackup(categories: Map<Long, String>) = BackupBudget(
     limitMinor = limitMinor,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    month = month,
+    effectiveFrom = effectiveFrom,
 )
 
 private fun GoalEntity.toBackup(wallets: Map<Long, String>) = BackupGoal(
@@ -605,6 +617,9 @@ private fun DebtTermsEntity.toBackup(wallets: Map<Long, String>): BackupDebtTerm
         termMonths = termMonths,
         installmentMinor = installmentMinor,
         updatedAt = updatedAt,
+        creditLimitMinor = creditLimitMinor,
+        statementDay = statementDay,
+        dueDay = dueDay,
     )
 }
 
@@ -642,6 +657,7 @@ private fun CategoryEntity.edited(row: BackupCategory) = copy(
 )
 
 private fun newWallet(row: BackupWallet) = WalletEntity(
+    institutionId = row.institutionId,
     name = row.name,
     type = row.type.name,
     currencyCode = row.currency,
@@ -657,6 +673,7 @@ private fun newWallet(row: BackupWallet) = WalletEntity(
 )
 
 private fun WalletEntity.edited(row: BackupWallet) = copy(
+    institutionId = row.institutionId,
     name = row.name,
     type = row.type.name,
     currencyCode = row.currency,
@@ -674,6 +691,8 @@ private fun newBudget(row: BackupBudget, categoryIds: Map<String, Long>) = Budge
     categoryId = row.categoryId?.let { categoryIds.getValue(it) },
     currencyCode = row.currency,
     limitMinor = row.limitMinor,
+    month = row.month,
+    effectiveFrom = row.effectiveFrom,
     createdAt = row.createdAt,
     updatedAt = row.updatedAt,
     clientUuid = row.id,
@@ -688,6 +707,8 @@ private fun BudgetEntity.edited(row: BackupBudget, categoryIds: Map<String, Long
     limitMinor = row.limitMinor,
     createdAt = row.createdAt,
     updatedAt = row.updatedAt,
+    month = row.month,
+    effectiveFrom = row.effectiveFrom,
     dirty = true,
     syncedAt = null,
     baseRevision = null,

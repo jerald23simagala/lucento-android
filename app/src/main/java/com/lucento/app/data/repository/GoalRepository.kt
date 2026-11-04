@@ -7,7 +7,7 @@ import com.lucento.app.data.local.GoalDao
 import com.lucento.app.data.local.GoalEntity
 import com.lucento.app.domain.Goal
 import com.lucento.app.domain.GoalContribution
-import com.lucento.app.domain.GoalScene
+import com.lucento.app.domain.GoalIcon
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -33,15 +33,26 @@ class GoalRepository(
         data object CurrencyMismatch : ContributionResult
         /** A withdrawal larger than what has been set aside. */
         data object ExceedsSaved : ContributionResult
+        /** The goal is gone, or archived (restore it to add or take out money). */
         data object GoalNotFound : ContributionResult
+    }
+
+    sealed interface ArchiveResult {
+        data object Archived : ArchiveResult
+        /** Only a goal that has reached its target can be archived. */
+        data object NotReached : ArchiveResult
+        data object NotFound : ArchiveResult
     }
 
     fun observeGoals(): Flow<List<Goal>> = dao.observeActive().map { list -> list.map { it.toDomain() } }
 
+    /** Archived goals, most recently archived first. They keep their history but count nowhere else. */
+    fun observeArchivedGoals(): Flow<List<Goal>> = dao.observeArchived().map { list -> list.map { it.toDomain() } }
+
     fun observeContributions(): Flow<List<GoalContribution>> =
         dao.observeContributions().map { list -> list.map { it.toDomain() } }
 
-    /** [sceneKey] is the chosen card picture (`GoalScene.key`), or null for automatic; unknown keys are stored as null. */
+    /** [sceneKey] is the chosen icon (`GoalIcon.key`, or an older `GoalScene.key`), or null for automatic; unknown keys are stored as null. */
     suspend fun save(
         id: Long?,
         name: String,
@@ -51,7 +62,7 @@ class GoalRepository(
         sceneKey: String? = null,
         photoPath: String? = null,
     ): SaveResult {
-        val scene = GoalScene.fromKey(sceneKey)?.key
+        val scene = GoalIcon.normalizeKey(sceneKey)
         val trimmed = name.trim().take(MAX_NAME)
         if (trimmed.isEmpty()) return SaveResult.BlankName
         if (target.amountMinor <= 0L) return SaveResult.TargetNotPositive
@@ -100,7 +111,7 @@ class GoalRepository(
         note: String,
         clientUuid: String,
     ): ContributionResult {
-        val goal = dao.getById(goalId) ?: return ContributionResult.GoalNotFound
+        val goal = dao.getById(goalId)?.takeUnless { it.archived } ?: return ContributionResult.GoalNotFound
         if (dao.findContributionByClientUuid(clientUuid) != null) return ContributionResult.Saved
         if (amount.isZero) return ContributionResult.AmountZero
         if (amount.currencyCode != goal.currencyCode) return ContributionResult.CurrencyMismatch
@@ -124,10 +135,21 @@ class GoalRepository(
     /** Deletes a goal and its contribution history. Wallet balances are unaffected (contributions are earmarks). */
     suspend fun delete(id: Long) = dao.deleteById(id)
 
-    /** Archiving keeps the goal and its history but removes it from the active list. */
-    suspend fun archive(id: Long) {
+    /**
+     * Archives a goal that has reached its target: it keeps its history (and syncs) but leaves the active list, the
+     * Goals totals and Home's savings card. Archiving an archived goal again is a no-op.
+     */
+    suspend fun archive(id: Long): ArchiveResult {
+        val existing = dao.getById(id) ?: return ArchiveResult.NotFound
+        if (dao.savedMinor(id) < existing.targetMinor) return ArchiveResult.NotReached
+        if (!existing.archived) dao.update(existing.copy(archived = true, updatedAt = clock()))
+        return ArchiveResult.Archived
+    }
+
+    /** Brings an archived goal back to the active list, history intact. */
+    suspend fun restore(id: Long) {
         val existing = dao.getById(id) ?: return
-        dao.update(existing.copy(archived = true, updatedAt = clock()))
+        if (existing.archived) dao.update(existing.copy(archived = false, updatedAt = clock()))
     }
 
     companion object {

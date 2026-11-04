@@ -39,7 +39,7 @@ class LocalLedgerResetTest {
         marker = marker,
         clearBinding = { steps += "binding" },
         clearTables = { steps += "tables"; if (failTables) error("killed") },
-        deleteGoalPhotos = { steps += "photos" },
+        deletePhotos = { steps += "photos" },
         accountSetup = store,
     )
 

@@ -44,3 +44,6 @@ replay_pid*.log
 .claude/settings.local.json
 # Local APK build artifacts
 /artifacts/apk/
+
+# Per-machine Gradle daemon JDK choice (./gradlew updateDaemonJvm); the project requires JDK 17-21, see README
+/gradle/gradle-daemon-jvm.properties

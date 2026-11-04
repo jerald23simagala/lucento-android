@@ -24,6 +24,20 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY occurred_on DESC, id DESC")
     fun observeAll(): Flow<List<TransactionEntity>>
 
+    // P2-8 (N-12): scoped reads for screens that don't need the whole table.
+    @Query("SELECT COUNT(*) FROM transactions")
+    fun observeCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE type IN ('INCOME', 'EXPENSE')")
+    fun observeCashFlowCount(): Flow<Int>
+
+    /** One transaction and, for a transfer, its other leg. */
+    @Query(
+        "SELECT * FROM transactions WHERE id = :id OR (transfer_group IS NOT NULL AND " +
+            "transfer_group = (SELECT transfer_group FROM transactions WHERE id = :id))"
+    )
+    fun observeWithTransferLegs(id: Long): Flow<List<TransactionEntity>>
+
     @Query(
         "SELECT wallet_id AS wallet_id, " +
             "COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount_minor ELSE 0 END), 0) AS income_minor, " +

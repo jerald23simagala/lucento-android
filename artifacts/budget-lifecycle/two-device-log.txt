@@ -1,0 +1,23 @@
+Budget lifecycle (redesign Part C) - two-emulator check, 2026-11-02
+Build: debug v10 (uncommitted main). Project: lucento-test (migration 20261102120000 applied by the owner; columns and
+4 CHECK constraints verified read-only). Account: QA account B on emulator-5554 (P1) and emulator-5556 (P2).
+Category: Groceries, USD. Starting state: one every-month row (pre-v10) = 400.00.
+
+1. P2: Budget > Groceries > "Only Nov" > 450 > Save > Sync now.        P2 Nov 450.00; Home budget 450.00.  PASS
+   Server: new row month=2026-11 limit 45000; every-month row 40000 untouched (revision 1).          PASS
+2. P1 (v10): Sync now.                                                   P1 Nov 450.00, Oct 400.00.            PASS
+3. P2: Groceries sheet shows "November has its own amount. Other months use $400.00." + "Use the usual $400.00".
+   "Nov onward" > 500 > Save > confirmation "Update future months? Groceries becomes $500.00 a month from November
+   on. October and earlier keep their amounts." > Update > Sync now.     P2 Nov 500.00.                      PASS
+   Server: row effective_from=2026-11 limit 50000 (new); month=2026-11 row deleted (tombstone, revision 2);
+   every-month 40000 row untouched.                                                                     PASS
+4. P1: Sync now.                                                         P1 Nov 500.00, Oct 400.00.            PASS
+No earlier month changed at any step. Nothing was saved from the sheet checks before step 1 (screens 1-4).
+
+Environment: P1 repeatedly showed "isn't responding" (startup / input dispatch) under host memory pressure
+(16 GB host, ~0.3 GB free: two emulators ~6.5 GB each + vmmem 4 GB); P2 at load 0.25 showed none for the same
+typing. P1 was rebooted once; Gradle daemons stopped. Edits were made on P2 and P1 was used to sync and read.
+P1 install needed a streamed install (6% free storage); a 76 MB stale debug APK copy in /data/local/tmp was removed.
+
+Screens: lifecycle-1..4 (sheet: month, onward, confirmation, past month - P2, unsaved), lifecycle-5/6 (P1 Nov 450 /
+Oct 400), lifecycle-7 (P1 Nov 500).

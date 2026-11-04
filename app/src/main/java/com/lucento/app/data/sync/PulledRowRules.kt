@@ -30,10 +30,20 @@ internal object PulledRowRules {
                 optionalRange(row, "interest_rate_bps", 0, 10_000),
                 optionalRange(row, "term_months", 1, Long.MAX_VALUE),
                 optionalRange(row, "installment_minor", 1, MAX_MINOR),
+                optionalRange(row, "credit_limit_minor", 1, MAX_MINOR),
+                optionalRange(row, "statement_day", 1, 31),
+                optionalRange(row, "due_day", 1, 31),
             )
             "categories" -> oneOf(row, "kind", setOf("EXPENSE", "INCOME"))
             "transactions" -> firstOf(currency(row), oneOf(row, "type", TRANSACTION_TYPES), range(row, "amount_minor", 0, MAX_MINOR))
-            "budgets" -> firstOf(currency(row), range(row, "limit_minor", 0, MAX_MINOR))
+            "budgets" -> firstOf(
+                currency(row),
+                range(row, "limit_minor", 0, MAX_MINOR),
+                optionalMatch(row, "month", YEAR_MONTH),
+                optionalMatch(row, "effective_from", YEAR_MONTH),
+                // A row is one month or a run from a month, never both (server check budgets_single_scope).
+                if (row.isSet("month") && row.isSet("effective_from")) "effective_from" else null,
+            )
             "goals" -> firstOf(currency(row), range(row, "target_minor", 0, MAX_MINOR))
             "recurring" -> firstOf(
                 currency(row),
@@ -69,4 +79,10 @@ internal object PulledRowRules {
 
     private fun optionalRange(row: JsonObject, key: String, min: Long, max: Long): String? =
         if (!row.isSet(key)) null else range(row, key, min, max)
+
+    private fun optionalMatch(row: JsonObject, key: String, pattern: Regex): String? =
+        if (!row.isSet(key)) null else if (text(row, key)?.let(pattern::matches) == true) null else key
+
+    /** "yyyy-MM" with a real month (budget lifecycle, v10). */
+    private val YEAR_MONTH = Regex("^\\d{4}-(0[1-9]|1[0-2])$")
 }

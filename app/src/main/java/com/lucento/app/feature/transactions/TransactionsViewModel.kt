@@ -26,16 +26,24 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import java.time.LocalDate
 
-/** User-chosen filter controls; resolved into a domain [TransactionFilter] at query time. */
+/**
+ * User-chosen filter controls; resolved into a domain [TransactionFilter] at query time. The page opens on this month
+ * (owner, 2026-11-04), so its Expenses total is the same month's spending as Home's and the Budget page's Spent.
+ */
 data class TransactionFilterState(
     val query: String = "",
     val type: TransactionType? = null,
     val walletId: Long? = null,
     val categoryId: Long? = null,
-    val preset: RangePreset = RangePreset.ALL,
+    val preset: RangePreset = RangePreset.THIS_MONTH,
+    /** One calendar month (from the dashboard's "top spending" tiles); replaces [preset] while set. */
+    val month: java.time.YearMonth? = null,
 ) {
-    val isActive: Boolean
-        get() = query.isNotBlank() || type != null || walletId != null || categoryId != null || preset != RangePreset.ALL
+    /** Anything other than the page's opening view (this month, nothing else narrowed); Clear goes back to it. */
+    val isActive: Boolean get() = this != TransactionFilterState()
+
+    /** The opening view: only the date range can be the reason a list is empty. */
+    val isDefault: Boolean get() = !isActive
 }
 
 /** A day of history with its net movement per currency (primary currency first). */
@@ -91,7 +99,7 @@ class TransactionsViewModel(
                 type = filter.type,
                 walletId = filter.walletId,
                 categoryId = filter.categoryId,
-                range = filter.preset.resolve(LocalDate.now()),
+                range = filter.month?.let { com.lucento.app.domain.DateRange.monthOf(it.atDay(1)) } ?: filter.preset.resolve(LocalDate.now()),
             ),
             categoryNames = categoryList.associate { it.id to it.name },
             walletNames = walletList.associate { it.id to it.name },
@@ -105,7 +113,10 @@ class TransactionsViewModel(
             sections = TransactionQueries.groupByDay(matches).map { group ->
                 DaySection(group, Insights.netByCurrency(group.items, prefs.primaryCurrency))
             },
-            shownTotals = TransactionQueries.totalsByCurrency(matches, prefs.primaryCurrency),
+            shownTotals = TransactionQueries.totalsByCurrency(
+                matches,
+                com.lucento.app.domain.FocusCurrency.of(prefs.primaryCurrency, walletList, all),
+            ),
             totalCount = visible.size,
             matchCount = matches.size,
             transfers = Transfer.pair(all),
@@ -116,7 +127,16 @@ class TransactionsViewModel(
     fun setType(type: TransactionType?) = filterState.update { it.copy(type = type) }
     fun setWallet(walletId: Long?) = filterState.update { it.copy(walletId = walletId) }
     fun setCategory(categoryId: Long?) = filterState.update { it.copy(categoryId = categoryId) }
-    fun setPreset(preset: RangePreset) = filterState.update { it.copy(preset = preset) }
+    fun setPreset(preset: RangePreset) = filterState.update { it.copy(preset = preset, month = null) }
+
+    private var initialApplied = false
+
+    /** Opened for one category and month (dashboard tile): applied once per screen, then the user's own filters win. */
+    fun applyInitial(categoryId: Long?, month: java.time.YearMonth?) {
+        if (initialApplied || (categoryId == null && month == null)) return
+        initialApplied = true
+        filterState.update { it.copy(categoryId = categoryId, month = month) }
+    }
     fun clearFilters() = filterState.update { TransactionFilterState() }
 
     companion object {

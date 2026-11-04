@@ -73,7 +73,9 @@ class LucentoApplication : Application() {
             // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now".
             uploadRequests(container.syncRepository.observePendingChanges()).collect {
                 if (backgroundSyncAllowed(container.syncPreferences.isEnabled(), container.onboardingComplete())) {
-                    SyncScheduler.enqueueAfterLocalWrite(this@LucentoApplication)
+                    // Open: send it now. In the background (or if the app is closed before it runs): WorkManager.
+                    if (container.inForeground.get()) container.foregroundSync.request(forced = true)
+                    else SyncScheduler.enqueueAfterLocalWrite(this@LucentoApplication)
                 }
             }
         }
@@ -83,7 +85,11 @@ class LucentoApplication : Application() {
             // A sign-out wipe killed halfway is finished first (QA O-1).
             // Normally already finished synchronously in onCreate (see finishInterruptedWipeBeforeUi); this is the
             // fallback if that attempt threw.
-            com.lucento.app.data.sync.SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
+            try {
+                com.lucento.app.data.sync.SyncFlight.exclusive { container.ledgerReset.resumeIfInterrupted() }
+            } catch (e: com.lucento.app.data.sync.SyncFlight.Busy) {
+                return@launch // another process is mid-sync; the next launch finishes the wipe
+            }
             val boundary = container.accountBoundary.afterSignIn()
             // An unfinished onboarding never syncs from here (P0-2): it checks the account itself and turns sync on
             // when it finishes. The account-boundary wipe above still applies.
@@ -155,11 +161,17 @@ class AppContainer(application: Application) {
             runner = runner,
         )
     }
+    val institutions: com.lucento.app.core.banks.InstitutionRepository by lazy {
+        com.lucento.app.core.banks.InstitutionRepository { application.assets.open("banks/institutions.json").bufferedReader().use { it.readText() } }
+    }
     val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao(), runner = runner) }
     val transactions: TransactionRepository by lazy {
-        TransactionRepository(database.transactionDao(), database.walletDao(), database.categoryDao(), runner = runner)
+        TransactionRepository(
+            database.transactionDao(), database.walletDao(), database.categoryDao(), runner = runner,
+            shareScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
     }
-    val budgets: BudgetRepository by lazy { BudgetRepository(database.budgetDao(), database.categoryDao()) }
+    val budgets: BudgetRepository by lazy { BudgetRepository(database.budgetDao(), database.categoryDao(), runner = runner) }
     val goals: GoalRepository by lazy { GoalRepository(database.goalDao()) }
     val recurring: RecurringRepository by lazy {
         RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner)
@@ -207,6 +219,14 @@ class AppContainer(application: Application) {
             currency = { preferences.preferences.first().primaryCurrency },
         )
     }
+
+    /** Ask Lucento's AI answers: only while the user's consent is on (docs/ASK.md). Reports never need it. */
+    val askClient: com.lucento.app.data.ai.AskLucentoClient by lazy {
+        com.lucento.app.data.ai.AskLucentoClient(accessToken = auth::accessToken)
+    }
+
+    /** Ask Lucento's reports as PDF files, written on the phone. */
+    val reportPdf: com.lucento.app.data.reports.ReportPdfWriter by lazy { com.lucento.app.data.reports.ReportPdfWriter(application) }
     val syncRepository: SyncRepository by lazy {
         SyncRepository(
             remote = supabaseClient?.let(::SupabaseSyncRemote),
@@ -223,6 +243,26 @@ class AppContainer(application: Application) {
         )
     }
 
+    /** True while Lucento's screen is in front (MainActivity onStart / onStop); syncs then run in the app. */
+    val inForeground = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Syncs straight away while the app is open (see [com.lucento.app.data.sync.ForegroundSync]). */
+    internal val foregroundSync: com.lucento.app.data.sync.ForegroundSync by lazy {
+        com.lucento.app.data.sync.ForegroundSync(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            allowed = { backgroundSyncAllowed(syncPreferences.isEnabled(), onboardingComplete()) },
+            upToDate = {
+                val last = syncPreferences.lastSyncedAtMillis()
+                last != null && System.currentTimeMillis() - last < com.lucento.app.data.sync.ForegroundSync.FRESH_MILLIS &&
+                    syncRepository.pendingChangeCount() == 0
+            },
+            sync = { syncRepository.sync() },
+        )
+    }
+
+    /** The profile picture (private file; from the photo picker, or the Google account's picture on request). */
+    val profilePhotos: com.lucento.app.data.media.ProfilePhotos by lazy { com.lucento.app.data.media.ProfilePhotos(application) }
+
     val ledgerReset: LocalLedgerReset by lazy {
         val photos = GoalPhotos(application)
         LocalLedgerReset(
@@ -231,7 +271,10 @@ class AppContainer(application: Application) {
             ),
             clearBinding = { syncPreferences.clearBinding() },
             clearTables = { com.lucento.app.data.local.clearLedgerTables(database) },
-            deleteGoalPhotos = { photos.deleteAll() },
+            deletePhotos = {
+                photos.deleteAll()
+                profilePhotos.delete()
+            },
             accountSetup = preferences,
         )
     }

@@ -1,10 +1,21 @@
 package com.lucento.app.feature.wallets
 
+import com.lucento.app.core.designsystem.component.AmountsShown
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import com.lucento.app.core.designsystem.component.SheetHeader
+import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.domain.CreditCardMath
+import com.lucento.app.domain.LoanMath
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,11 +37,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -39,7 +50,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -67,10 +77,7 @@ import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.SegmentedToggle
-import com.lucento.app.core.designsystem.component.NavRow
-import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.component.SwitchRow
-import com.lucento.app.core.designsystem.component.FieldHeader
 import com.lucento.app.core.designsystem.component.WalletTypeTile
 import com.lucento.app.core.designsystem.component.label
 import com.lucento.app.core.designsystem.component.rememberHaptics
@@ -86,7 +93,21 @@ import com.lucento.app.domain.Wallet
 import com.lucento.app.feature.plan.DateField
 import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.launch
+import com.lucento.app.core.banks.Institution
+import com.lucento.app.core.designsystem.component.InstitutionAvatar
+import com.lucento.app.core.designsystem.component.LocalInstitutions
+import androidx.compose.material.icons.outlined.Close
 import java.time.LocalDate
+import com.lucento.app.core.designsystem.component.LucentoFields
+import com.lucento.app.core.designsystem.component.filledField
+import com.lucento.app.core.designsystem.component.IconFieldHeader
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.automirrored.outlined.Label
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Percent
 
 fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     id = id,
@@ -100,7 +121,54 @@ fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     repayment = debt?.repayment ?: DebtRepayment.ONE_TIME,
     termMonthsText = debt?.termMonths?.toString().orEmpty(),
     installmentText = debt?.installment?.let { MoneyFormatter.formatPlain(it) }.orEmpty(),
+    institutionId = institutionId,
+    creditLimitText = debt?.creditLimit?.let { MoneyFormatter.formatPlain(it) }.orEmpty(),
+    statementDayText = debt?.statementDay?.toString().orEmpty(),
+    dueDayText = debt?.dueDay?.toString().orEmpty(),
 )
+
+/**
+ * The draft as the wallet it would become, for the editor's live card. Unfinished or invalid fields are simply left
+ * off (a rate that doesn't parse shows no rate); nothing here is saved — saving still goes through the ViewModel's
+ * full validation.
+ */
+internal fun WalletDraft.previewWallet(decimalSeparator: Char): Wallet {
+    fun positive(text: String) = (MoneyParser.parse(text, currencyCode, decimalSeparator) as? MoneyParser.Result.Success)
+        ?.money?.takeIf { it.amountMinor > 0 }
+    val amount = (MoneyParser.parse(amountText, currencyCode, decimalSeparator) as? MoneyParser.Result.Success)?.money
+        ?: com.lucento.app.core.money.Money.zero(currencyCode)
+    val terms = if (!type.isLiability) {
+        null
+    } else {
+        runCatching {
+            val rate = (DebtMath.parseRate(interestText) as? DebtMath.RateResult.Valid)?.bps
+            val months = termMonthsText.trim().toIntOrNull()?.takeIf { it in 1..DebtTerms.MAX_TERM_MONTHS }
+            val monthly = type == WalletType.LOAN && repayment == DebtRepayment.MONTHLY && months != null
+            val card = type == WalletType.CREDIT_CARD
+            val statement = statementDayText.trim().toIntOrNull()?.takeIf { it in 1..31 }
+            val due = dueDayText.trim().toIntOrNull()?.takeIf { it in 1..31 }
+            DebtTerms(
+                interestRateBps = rate,
+                repayment = if (monthly) DebtRepayment.MONTHLY else DebtRepayment.ONE_TIME,
+                termMonths = months.takeIf { monthly },
+                installment = positive(installmentText).takeIf { monthly },
+                creditLimit = positive(creditLimitText).takeIf { card },
+                statementDay = statement.takeIf { card && due != null },
+                dueDay = due.takeIf { card && statement != null },
+            )
+        }.getOrNull()
+    }
+    return Wallet(
+        id = 0,
+        name = name.trim().ifEmpty { "Your ${type.label.lowercase()}" },
+        type = type,
+        balance = amount,
+        createdAtEpochMillis = 0,
+        openingBalance = amount,
+        debt = terms,
+        institutionId = institutionId,
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,14 +178,13 @@ fun WalletEditorSheet(
     /** Deletes the wallet; the callback says whether it was deleted or what still uses it. */
     onDelete: ((Long, (WalletRepository.DeleteResult) -> Unit) -> Unit)?,
     onDismiss: () -> Unit,
-    /** Opens Adjust balance for an existing money wallet; null hides the option (new or manually valued wallets). */
-    onAdjustBalance: (() -> Unit)? = null,
     /**
-     * After a card or loan with a payment reminder date is saved: opens a prefilled recurring payment for it (wallet id,
-     * first due date). Null when recurring payments are switched off, which also hides the reminder field.
+     * After a loan with a payment reminder date is saved: opens a prefilled recurring payment for it (wallet id, first
+     * due date). Null when recurring payments are switched off, which also hides the reminder field. A credit card's
+     * reminder comes from its due day instead (CreditCardMath), so it never opens one.
      */
     onPlanPayment: ((Long, LocalDate) -> Unit)? = null,
-) {
+) = AmountsShown {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
@@ -126,13 +193,13 @@ fun WalletEditorSheet(
     var draft by remember { mutableStateOf(initial) }
     var error by remember { mutableStateOf<DraftError?>(null) }
     var pickingCurrency by remember { mutableStateOf(false) }
+    var pickingInstitution by remember { mutableStateOf(false) }
+    val institution = LocalInstitutions.current[draft.institutionId]
     var confirmingDelete by remember { mutableStateOf(false) }
     var blocked by remember { mutableStateOf<WalletRepository.DeleteResult?>(null) }
 
-    val fieldColors = OutlinedTextFieldDefaults.colors(
-        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-    )
+    // Onboarding's filled fields: tinted, rounded, outlined only while focused.
+    val fieldColors = LucentoFields.filledColors()
 
     fun close(then: () -> Unit = onDismiss) {
         scope.launch { sheetState.hide() }.invokeOnCompletion { then() }
@@ -147,18 +214,20 @@ fun WalletEditorSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (initial.id == null) "New wallet" else "Edit wallet",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.weight(1f).semantics { heading() },
-                )
-                if (initial.id != null && onDelete != null) {
-                    IconButton(onClick = { confirmingDelete = true }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete wallet", tint = MaterialTheme.colorScheme.error)
+            SheetHeader(
+                title = if (initial.id == null) "New wallet" else "Edit wallet",
+                subtitle = if (initial.id == null) "Build it below and watch it take shape." else initial.name,
+                leading = { WalletTypeTile(draft.type) },
+                trailing = if (initial.id != null && onDelete != null) {
+                    {
+                        IconButton(onClick = { confirmingDelete = true }) {
+                            Icon(Icons.Outlined.Delete, contentDescription = "Delete wallet", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
-                }
-            }
+                } else {
+                    null
+                },
+            )
 
             val amountLabel = when {
                 draft.type.isValuedManually -> "Estimated value"
@@ -168,19 +237,36 @@ fun WalletEditorSheet(
                 else -> "Current balance"
             }
             if (initial.id == null) {
-                // A live card: the wallet as it will look on Wallets, following every choice below.
-                Spacer(Modifier.height(Spacing.sm))
-                WalletCardPreview(
-                    type = draft.type,
-                    name = draft.name,
-                    currencyCode = draft.currencyCode,
-                    amount = MoneyParser.parseOrNull(draft.amountText, draft.currencyCode, decimalSeparator),
-                    amountLabel = amountLabel,
-                )
+                // The wallet being built, drawn by the same card as its own page — name, bank face, balance, rate,
+                // credit limit and amount due, or a loan's instalments — following every choice below. A new type or
+                // bank swaps the card in with a short fade (none when animations are off).
+                Spacer(Modifier.height(Spacing.xs))
+                val reducedMotion = LucentoTheme.reducedMotion
+                AnimatedContent(
+                    targetState = draft.type to draft.institutionId.takeIf { draft.type != WalletType.CASH },
+                    transitionSpec = {
+                        if (reducedMotion) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            (fadeIn(tween(260)) + scaleIn(tween(260), initialScale = 0.96f)) togetherWith fadeOut(tween(160))
+                        }.using(SizeTransform(clip = false))
+                    },
+                    label = "wallet preview",
+                ) { (type, institutionId) ->
+                    val preview = draft.copy(type = type, institutionId = institutionId).previewWallet(decimalSeparator)
+                    val today = remember { LocalDate.now() }
+                    WalletCard(
+                        wallet = preview,
+                        movements = 0,
+                        cycle = if (type == WalletType.CREDIT_CARD) CreditCardMath.cycle(preview, emptyList(), today) else null,
+                        loan = if (type == WalletType.LOAN && preview.balance.amountMinor > 0) LoanMath.progress(preview, emptyList()) else null,
+                        today = today,
+                    )
+                }
             }
 
-            Spacer(Modifier.height(Spacing.lg))
-            FieldHeader("Type")
+            Spacer(Modifier.height(Spacing.md))
+            IconFieldHeader(Icons.Outlined.Category, "Type")
             TypeDropdown(
                 selected = draft.type,
                 onSelect = {
@@ -200,8 +286,18 @@ fun WalletEditorSheet(
                 )
             }
 
-            Spacer(Modifier.height(Spacing.lg))
-            FieldHeader("Details")
+            if (draft.type != WalletType.CASH) {
+                Spacer(Modifier.height(Spacing.md))
+                IconFieldHeader(Icons.Outlined.AccountBalance, "Bank or provider (optional)")
+                InstitutionField(
+                    institution = institution,
+                    onClick = { pickingInstitution = true },
+                    onClear = { draft = draft.copy(institutionId = null) },
+                )
+            }
+
+            Spacer(Modifier.height(Spacing.md))
+            IconFieldHeader(Icons.Outlined.EditNote, "Details")
             val nameMessage = when (error) {
                 DraftError.NameRequired -> "Give this wallet a name."
                 DraftError.NameTaken -> "You already have a wallet with this name."
@@ -215,6 +311,7 @@ fun WalletEditorSheet(
                     if (error is DraftError.NameRequired || error is DraftError.NameTaken) error = null
                 },
                 label = { Text("Name") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 placeholder = {
                     Text(
                         when (draft.type) {
@@ -239,23 +336,23 @@ fun WalletEditorSheet(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Next,
                 ),
-                shape = MaterialTheme.shapes.small,
+                shape = LucentoFields.shape,
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.sm))
             Row(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 56.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), MaterialTheme.shapes.small)
+                    .filledField(isError = error is DraftError.CurrencyLocked)
                     .clickable(role = Role.Button, onClickLabel = "Change currency") { pickingCurrency = true }
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Icon(Icons.Outlined.Payments, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(Spacing.md))
                 Column(Modifier.weight(1f)) {
                     Text(
                         "Currency",
@@ -277,11 +374,11 @@ fun WalletEditorSheet(
                         "Amounts are never converted; create a wallet in the other currency instead.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = Spacing.xs, start = Spacing.lg),
+                    modifier = Modifier.padding(top = Spacing.xs, start = Spacing.md),
                 )
             }
 
-            Spacer(Modifier.height(Spacing.md))
+            Spacer(Modifier.height(Spacing.sm))
             val amountError = error is DraftError.AmountInvalid ||
                 error is DraftError.AmountTooPrecise || error is DraftError.AmountTooLarge || error is DraftError.AmountUnclear
             AmountTextField(
@@ -316,7 +413,7 @@ fun WalletEditorSheet(
                     )
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-                shape = MaterialTheme.shapes.small,
+                shape = LucentoFields.shape,
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -331,20 +428,10 @@ fun WalletEditorSheet(
                     onChange = {
                         draft = it
                         if (error is DraftError.InterestInvalid || error is DraftError.TermInvalid || error is DraftError.InstallmentInvalid ||
-                            error is DraftError.InstallmentUnclear
+                            error is DraftError.InstallmentUnclear || error is DraftError.CreditLimitInvalid ||
+                            error is DraftError.CreditLimitUnclear || error is DraftError.BillingDaysInvalid
                         ) error = null
                     },
-                )
-            }
-
-            if (onAdjustBalance != null && initial.id != null && !initial.type.isValuedManually) {
-                Spacer(Modifier.height(Spacing.xs))
-                NavRow(
-                    icon = Icons.Filled.Tune,
-                    title = "Adjust balance",
-                    summary = "Can’t reconcile? Set today’s real balance; the difference is recorded as a Balance adjustment.",
-                    tone = StatusTones.warning,
-                    onClick = { close(onAdjustBalance) },
                 )
             }
 
@@ -358,7 +445,7 @@ fun WalletEditorSheet(
                 )
             }
 
-            Spacer(Modifier.height(Spacing.xl))
+            Spacer(Modifier.height(Spacing.lg))
             LucentoPrimaryButton(
                 text = if (initial.id == null) "Add wallet" else "Save changes",
                 onClick = {
@@ -369,7 +456,7 @@ fun WalletEditorSheet(
                                 haptics.reject()
                                 error = result
                             }
-                            savedId != null && remind != null && draft.type.isLiability && onPlanPayment != null ->
+                            savedId != null && remind != null && draft.type == WalletType.LOAN && onPlanPayment != null ->
                                 close { onPlanPayment(savedId, remind) }
                             else -> close()
                         }
@@ -389,6 +476,16 @@ fun WalletEditorSheet(
                 pickingCurrency = false
             },
             onDismiss = { pickingCurrency = false },
+        )
+    }
+    if (pickingInstitution) {
+        InstitutionPickerSheet(
+            selectedId = draft.institutionId,
+            onSelect = {
+                draft = draft.copy(institutionId = it?.id)
+                pickingInstitution = false
+            },
+            onDismiss = { pickingInstitution = false },
         )
     }
 
@@ -430,9 +527,9 @@ fun WalletEditorSheet(
 }
 
 /**
- * A card's or loan's terms: an optional yearly interest rate, one-time or monthly repayment (months and the monthly
- * amortisation, with a suggestion from the amount owed), and an optional payment reminder date that opens a prefilled
- * recurring payment after saving.
+ * A card's or loan's terms: an optional yearly interest rate, then for a credit card its limit and billing days
+ * ([CardDetails]); for a loan one-time or monthly repayment (months and the monthly amortisation, with a suggestion
+ * from the amount owed), and an optional payment reminder date that opens a prefilled recurring payment after saving.
  */
 @Composable
 private fun DebtDetails(
@@ -443,8 +540,11 @@ private fun DebtDetails(
     fieldColors: androidx.compose.material3.TextFieldColors,
     onChange: (WalletDraft) -> Unit,
 ) {
-    Spacer(Modifier.height(Spacing.md))
-    FieldHeader("Debt details")
+    Spacer(Modifier.height(Spacing.sm))
+    IconFieldHeader(
+        if (draft.type == WalletType.CREDIT_CARD) Icons.Outlined.CreditCard else Icons.Outlined.Percent,
+        if (draft.type == WalletType.CREDIT_CARD) "Card details" else "Debt details",
+    )
     AmountTextField(
         value = draft.interestText,
         onValueChange = { input -> onChange(draft.copy(interestText = input)) },
@@ -457,10 +557,14 @@ private fun DebtDetails(
             Text(if (error == DraftError.InterestInvalid) "Enter a yearly rate from 0 to 100, like 12.5." else "Shown on the wallet card. Lucento never fetches rates.")
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-        shape = MaterialTheme.shapes.small,
+        shape = LucentoFields.shape,
         colors = fieldColors,
         modifier = Modifier.fillMaxWidth(),
     )
+    if (draft.type == WalletType.CREDIT_CARD) {
+        CardDetails(draft, error, fieldColors, onChange)
+        return
+    }
     Spacer(Modifier.height(Spacing.xs))
     SegmentedToggle(
         options = listOf(DebtRepayment.ONE_TIME to "One time", DebtRepayment.MONTHLY to "Monthly"),
@@ -479,7 +583,7 @@ private fun DebtDetails(
                 singleLine = true,
                 isError = error == DraftError.TermInvalid,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                shape = MaterialTheme.shapes.small,
+                shape = LucentoFields.shape,
                 colors = fieldColors,
                 modifier = Modifier.weight(0.8f),
             )
@@ -493,7 +597,7 @@ private fun DebtDetails(
                 isError = error == DraftError.InstallmentInvalid || error is DraftError.InstallmentUnclear,
                 textStyle = AmountStyles.medium,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-                shape = MaterialTheme.shapes.small,
+                shape = LucentoFields.shape,
                 colors = fieldColors,
                 modifier = Modifier.weight(1.4f),
             )
@@ -508,7 +612,7 @@ private fun DebtDetails(
             error is DraftError.InstallmentUnclear -> HintText((error as DraftError.InstallmentUnclear).message, isError = true)
             suggested != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                 HintText(
-                    "${MoneyFormatter.format(suggested)} a month repays ${MoneyFormatter.format(owed!!)} in $months months" +
+                    "${MoneyFormatter.format(suggested)} a month repays ${MoneyFormatter.format(owed!!)} in ${if (months == 1) "1 month" else "$months months"}" +
                         (rate?.let { " at ${DebtMath.formatRate(it)}" } ?: "") + ".",
                     modifier = Modifier.weight(1f),
                 )
@@ -534,17 +638,143 @@ private fun DebtDetails(
     }
 }
 
+/**
+ * A credit card's limit and billing days. With both days set, Lucento reminds the user on the due day with the amount
+ * due — what was owed on the statement day, less payments since (CreditCardMath) — and leaves it out of Safe to spend.
+ */
+@Composable
+private fun CardDetails(
+    draft: WalletDraft,
+    error: DraftError?,
+    fieldColors: androidx.compose.material3.TextFieldColors,
+    onChange: (WalletDraft) -> Unit,
+) {
+    val limitError = error is DraftError.CreditLimitInvalid || error is DraftError.CreditLimitUnclear
+    Spacer(Modifier.height(Spacing.sm))
+    AmountTextField(
+        value = draft.creditLimitText,
+        onValueChange = { onChange(draft.copy(creditLimitText = it)) },
+        filter = { it.take(20) },
+        label = { Text("Credit limit (optional)") },
+        prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
+        placeholder = { Text("0") },
+        isError = limitError,
+        textStyle = AmountStyles.medium,
+        supportingText = {
+            Text(
+                when (error) {
+                    DraftError.CreditLimitInvalid -> "Enter the card’s limit, more than zero."
+                    is DraftError.CreditLimitUnclear -> error.message
+                    else -> "Shows how much credit is still available."
+                }
+            )
+        },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+        shape = LucentoFields.shape,
+        colors = fieldColors,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(Spacing.xs))
+    val daysError = error == DraftError.BillingDaysInvalid
+    // Side by side at normal sizes; one under the other when large text would squeeze the labels.
+    if (LocalDensity.current.fontScale >= 1.5f) {
+        DayField(draft.statementDayText, "Statement day", "15", daysError, fieldColors, Modifier.fillMaxWidth()) { onChange(draft.copy(statementDayText = it)) }
+        Spacer(Modifier.height(Spacing.sm))
+        DayField(draft.dueDayText, "Due day", "5", daysError, fieldColors, Modifier.fillMaxWidth()) { onChange(draft.copy(dueDayText = it)) }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            DayField(draft.statementDayText, "Statement day", "15", daysError, fieldColors, Modifier.weight(1f)) { onChange(draft.copy(statementDayText = it)) }
+            DayField(draft.dueDayText, "Due day", "5", daysError, fieldColors, Modifier.weight(1f)) { onChange(draft.copy(dueDayText = it)) }
+        }
+    }
+    HintText(
+        if (daysError) {
+            "Enter both days, from 1 to 31, or leave both empty."
+        } else {
+            "Day of the month (a shorter month uses its last day). On the due day, Lucento reminds you of the amount due: " +
+                "what you owed on the statement day, less payments since. It isn’t counted in Safe to spend — your card " +
+                "purchases already are."
+        },
+        isError = daysError,
+    )
+}
+
+/** A day of the month, 1–31, typed as digits. */
+@Composable
+private fun DayField(
+    value: String,
+    label: String,
+    placeholder: String,
+    isError: Boolean,
+    colors: androidx.compose.material3.TextFieldColors,
+    modifier: Modifier,
+    onValue: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { input -> onValue(input.filter { it.isDigit() }.take(2)) },
+        label = { Text(label, maxLines = 1) },
+        placeholder = { Text(placeholder) },
+        singleLine = true,
+        isError = isError,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+        shape = LucentoFields.shape,
+        colors = colors,
+        modifier = modifier,
+    )
+}
+
+/** The wallet's bank or provider: its icon and name, or a prompt; a clear button removes it. */
+@Composable
+private fun InstitutionField(institution: Institution?, onClick: () -> Unit, onClear: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .filledField()
+            .clickable(role = Role.Button, onClickLabel = if (institution == null) "Choose bank or provider" else "Change bank or provider", onClick = onClick)
+            .padding(start = Spacing.md, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (institution != null) {
+            InstitutionAvatar(institution, size = 32.dp)
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(institution.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    "${institutionKind(institution.type)} · ${countryName(institution.country)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            IconButton(onClick = onClear) {
+                Icon(Icons.Outlined.Close, contentDescription = "Remove ${institution.name}")
+            }
+        } else {
+            Icon(Icons.Outlined.AccountBalance, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                "None — shows the wallet type’s look",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.padding(end = Spacing.sm))
+        }
+    }
+}
+
 @Composable
 private fun HintText(text: String, modifier: Modifier = Modifier, isError: Boolean = false) {
     Text(
         text,
         style = MaterialTheme.typography.bodySmall,
         color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = Spacing.lg, top = Spacing.xs),
+        modifier = modifier.padding(start = Spacing.md, top = Spacing.xs),
     )
 }
 
-/** Wallet kinds as recognisable tiles, four per row (seven kinds: two balanced rows). */
 /** The wallet type as one dropdown field (its icon and name), so the sheet stays short; the menu lists every type with its icon. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -557,9 +787,7 @@ private fun TypeDropdown(selected: WalletType, onSelect: (WalletType) -> Unit) {
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                .clip(MaterialTheme.shapes.small)
-                .background(colors.surfaceContainerLowest)
-                .border(BorderStroke(1.dp, if (expanded) colors.primary else colors.outline), MaterialTheme.shapes.small)
+                .filledField(active = expanded)
                 .semantics { contentDescription = "Wallet type: ${selected.label}" }
                 .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,

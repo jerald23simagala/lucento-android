@@ -35,8 +35,8 @@ import java.util.Locale
 
 /**
  * One line of history: category tile, what it was (note, or category when there is no note),
- * where it came from, and the signed amount. Income shows "+" and the positive tone; expenses show
- * "−" in ink — the sign carries the meaning, colour only reinforces it.
+ * where it came from, and the signed amount. Income shows "+" in the positive tone, expenses "−" in the negative tone
+ * ([amountInk]) — the sign carries the meaning, colour only reinforces it.
  *
  * Transfers show "From → To". In combined history they are neutral and unsigned (money only moved
  * between the user's own accounts); in a single account's history ([perspectiveOfWallet]) they are signed
@@ -63,7 +63,6 @@ fun TransactionRow(
      */
     owedPerspective: Boolean = false,
 ) {
-    val isIncome = transaction.type == TransactionType.INCOME
     val isTransfer = transaction.isTransfer
     val categoryName = category?.name ?: "Uncategorized"
     val title: String
@@ -135,11 +134,11 @@ fun TransactionRow(
                     money = if (owedPerspective) -transaction.signedAmount else transaction.signedAmount,
                     style = AmountStyles.row,
                     showPlus = true,
-                    color = when {
-                        owedPerspective -> MaterialTheme.colorScheme.onSurface
-                        isIncome -> LucentoTheme.extendedColors.positive
-                        isTransfer -> MaterialTheme.colorScheme.onSurfaceVariant
-                        else -> MaterialTheme.colorScheme.onSurface
+                    color = when (amountInk(transaction.type, owedPerspective)) {
+                        AmountInk.POSITIVE -> LucentoTheme.extendedColors.positive
+                        AmountInk.NEGATIVE -> LucentoTheme.extendedColors.negative
+                        AmountInk.MUTED -> MaterialTheme.colorScheme.onSurfaceVariant
+                        AmountInk.NEUTRAL -> MaterialTheme.colorScheme.onSurface
                     },
                 )
             }
@@ -153,6 +152,40 @@ fun TransactionRow(
             }
         }
     }
+}
+
+/** Which ink a history amount takes. Colour only reinforces the sign, which is always shown. */
+enum class AmountInk { POSITIVE, NEGATIVE, MUTED, NEUTRAL }
+
+/**
+ * Income is positive and expenses negative. Transfers are muted (money only moved between the user's own accounts).
+ * Balance adjustments stay neutral ink: a correction is neither earned nor spent, so it is never painted as either.
+ * On a card's or loan's own history ([owedPerspective]) amounts are changes in what is owed, also neutral.
+ */
+fun amountInk(type: TransactionType, owedPerspective: Boolean = false): AmountInk = when {
+    owedPerspective -> AmountInk.NEUTRAL
+    type == TransactionType.INCOME -> AmountInk.POSITIVE
+    type == TransactionType.EXPENSE -> AmountInk.NEGATIVE
+    type.isTransfer -> AmountInk.MUTED
+    else -> AmountInk.NEUTRAL
+}
+
+/** A day group's title in the history: "Today", "Yesterday", or the weekday ("Monday"); [dayCaption] gives the date. */
+fun dayTitle(date: LocalDate, today: LocalDate = LocalDate.now(), locale: Locale = Locale.getDefault()): String =
+    when (date) {
+        today -> "Today"
+        today.minusDays(1) -> "Yesterday"
+        else -> date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, locale).replaceFirstChar { it.titlecase(locale) }
+    }
+
+/** The date beside [dayTitle], locale-ordered: "Wed 18 Nov" under Today / Yesterday, "16 Nov" under a weekday. */
+fun dayCaption(date: LocalDate, today: LocalDate = LocalDate.now(), locale: Locale = Locale.getDefault()): String =
+    localizedDate(date, dayCaptionSkeleton(date, today), locale)
+
+/** The caption's date fields: the weekday only when the title doesn't already name it; the year only when it isn't this year. */
+internal fun dayCaptionSkeleton(date: LocalDate, today: LocalDate): String {
+    val relative = date == today || date == today.minusDays(1)
+    return (if (relative) "EEEdMMM" else "dMMM") + if (date.year == today.year) "" else "y"
 }
 
 /** "Today", "Yesterday", or a locale-ordered weekday + date (year only when it isn't this year). */

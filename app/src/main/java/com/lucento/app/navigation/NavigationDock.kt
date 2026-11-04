@@ -31,6 +31,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -69,6 +71,8 @@ fun NavigationDock(
     onSelect: (DockItem) -> Unit,
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Part D: rings the + once after setup, until the first entry (a static ring with reduced motion). */
+    highlightAdd: Boolean = false,
 ) {
     val haptics = rememberHaptics()
     val container = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLowest
@@ -128,7 +132,7 @@ fun NavigationDock(
                 }
             }
         }
-        AddButton(onClick = onAdd, modifier = Modifier.align(Alignment.TopCenter))
+        AddButton(onClick = onAdd, highlight = highlightAdd, modifier = Modifier.align(Alignment.TopCenter))
     }
 }
 
@@ -138,10 +142,35 @@ private val AddRise = 14.dp
 
 /** The raised central + with a soft brand-tinted shadow. */
 @Composable
-private fun AddButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun AddButton(onClick: () -> Unit, modifier: Modifier = Modifier, highlight: Boolean = false) {
     val (primary, onPrimary) = com.lucento.app.core.designsystem.component.addActionColors()
+    val ring = LucentoTheme.extendedColors.accent
+    val pulse = if (!highlight || LucentoTheme.reducedMotion) {
+        1f
+    } else {
+        val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "add-spotlight")
+        val value by transition.animateFloat(
+            initialValue = 0.45f,
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                androidx.compose.animation.core.tween(1100),
+                androidx.compose.animation.core.RepeatMode.Reverse,
+            ),
+            label = "add-spotlight-pulse",
+        )
+        value
+    }
     Box(
         modifier
+            .then(
+                if (highlight) {
+                    Modifier.drawBehind {
+                        drawCircle(ring.copy(alpha = pulse), radius = size.minDimension / 2 + 6.dp.toPx(), style = androidx.compose.ui.graphics.drawscope.Stroke(3.dp.toPx()))
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .size(AddSize)
             .shadow(elevation = 10.dp, shape = CircleShape, ambientColor = primary.copy(alpha = 0.35f), spotColor = primary.copy(alpha = 0.6f))
             .clip(CircleShape)

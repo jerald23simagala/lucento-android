@@ -29,6 +29,8 @@ import kotlinx.coroutines.launch
 data class GuideUiState(
     val loading: Boolean = true,
     val step: GuideStep = GuideStep.WALLETS,
+    /** The furthest getting-started stage reached in this run (never behind [step]'s own stage). */
+    val furthestStage: com.lucento.app.domain.SetupStage = com.lucento.app.domain.SetupStage.SET_UP,
     val features: FeatureSet = FeatureSet.ALL,
     val currency: String = "USD",
     val wallets: List<Wallet> = emptyList(),
@@ -36,7 +38,14 @@ data class GuideUiState(
     val budgets: List<Budget> = emptyList(),
     val goals: List<Goal> = emptyList(),
     val transactionCount: Int = 0,
+    /** How the user said they pay (onboarding); decides which account type "Add" suggests first. */
+    val spendTypes: Set<com.lucento.app.domain.SpendType> = emptySet(),
+    /** Milestones the user's records have already earned (shown on the last page). */
+    val earned: Set<com.lucento.app.domain.Achievement> = emptySet(),
 ) {
+    /** The account type the wallets step suggests first, and the debt type the cards step suggests. */
+    val firstAssetType get() = com.lucento.app.domain.SpendType.firstAssetType(spendTypes)
+    val firstDebtType get() = com.lucento.app.domain.SpendType.firstDebtType(spendTypes)
     val steps: List<GuideStep> get() = GuidedSetup.steps(features)
     val assets: List<Wallet> get() = wallets.filter { !it.type.isLiability }
     val debts: List<Wallet> get() = wallets.filter { it.type.isLiability }
@@ -44,9 +53,12 @@ data class GuideUiState(
     /** Active spending categories, the rows of the budget step. */
     val expenseCategories: List<Category> get() = categories.filter { it.kind == CategoryKind.EXPENSE && !it.archived }
 
-    /** The amount already set for [categoryId] in the main currency, if any. */
+    /** The amount that applies to [categoryId] this month in the main currency, if any (budget lifecycle rules). */
     fun allocation(categoryId: Long): Money? =
-        budgets.firstOrNull { it.categoryId == categoryId && it.limit.currencyCode == currency && it.limit.amountMinor > 0 }?.limit
+        com.lucento.app.domain.BudgetPlanner.effectiveAllocation(
+            budgets.filter { it.categoryId == categoryId && it.limit.currencyCode == currency },
+            java.time.YearMonth.now(),
+        )?.limit?.takeIf { it.amountMinor > 0 }
 
     val budgetedCount: Int get() = expenseCategories.count { allocation(it.id) != null }
 
@@ -74,16 +86,33 @@ class GuideViewModel(
         wallets.observeWallets(),
         categories.observeCategories(),
         budgets.observeBudgets(),
-        goals.observeGoals(),
+        combine(goals.observeGoals(), goals.observeArchivedGoals()) { active, archived -> active to archived },
         transactions.observeTransactions(),
-    ) { w, c, b, g, t -> Snapshot(w, c, b, g, t.count { !it.isTransfer || it.signedAmount.isNegative }) }
+    ) { w, c, b, g, t -> Snapshot(w, c, b, g.first, g.second, t.count { !it.isTransfer || it.signedAmount.isNegative }, t) }
 
-    private class Snapshot(val wallets: List<Wallet>, val categories: List<Category>, val budgets: List<Budget>, val goals: List<Goal>, val transactions: Int)
+    private class Snapshot(
+        val wallets: List<Wallet>,
+        val categories: List<Category>,
+        val budgets: List<Budget>,
+        val goals: List<Goal>,
+        val archivedGoals: List<Goal>,
+        val transactions: Int,
+        val all: List<com.lucento.app.domain.Transaction>,
+    )
+
+    /**
+     * The furthest stage reached since this screen opened, so going back from Get started to Set up keeps Get started
+     * shown as reached. Every step change is observed below, whichever action saved it.
+     */
+    private var furthestStage: com.lucento.app.domain.SetupStage? = null
 
     val uiState: StateFlow<GuideUiState> = combine(preferences.preferences, data) { p, d ->
+        val step = GuidedSetup.resume(p.guideStep ?: GuideStep.WELCOME, p.features)
+        val reached = maxOf(furthestStage ?: guideStage(step), guideStage(step)).also { furthestStage = it }
         GuideUiState(
             loading = false,
-            step = GuidedSetup.resume(p.guideStep ?: GuideStep.WELCOME, p.features),
+            step = step,
+            furthestStage = reached,
             features = p.features,
             currency = p.primaryCurrency,
             wallets = d.wallets,
@@ -91,6 +120,10 @@ class GuideViewModel(
             budgets = d.budgets,
             goals = d.goals,
             transactionCount = d.transactions,
+            spendTypes = p.spendTypes,
+            earned = com.lucento.app.domain.Achievements.earned(
+                com.lucento.app.domain.Achievements.facts(d.all, d.wallets, d.categories, d.budgets, d.goals + d.archivedGoals, java.time.LocalDate.now(), p.insightsVisited),
+            ),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuideUiState())
 
@@ -130,7 +163,9 @@ class GuideViewModel(
         viewModelScope.launch {
             try {
                 parsed.forEach { (categoryId, money) ->
-                    if (budgets.setAllocation(categoryId, currency, money!!) !is BudgetRepository.SaveResult.Saved) {
+                    // From this month on, replacing this month's own amount if it had one: the field showed the amount
+                    // that applies now, so the edit must be what applies now.
+                    if (budgets.setFrom(categoryId, currency, java.time.YearMonth.now(), money!!) !is BudgetRepository.SaveResult.Saved) {
                         onResult(setOf(categoryId))
                         return@launch
                     }
@@ -162,3 +197,22 @@ internal fun guideStepNumber(step: GuideStep): Int = GUIDE_FIRST_STEP_NUMBER + s
 
 /** Onboarding sends 1 to 8; the guided setup follows on from there. */
 internal const val GUIDE_FIRST_STEP_NUMBER = 9
+
+/** Guided-setup pages belong to the last two visible stages: adding accounts and amounts, then using Lucento. */
+internal fun guideStage(step: GuideStep): com.lucento.app.domain.SetupStage = when (step) {
+    GuideStep.TRANSACTIONS, GuideStep.WELCOME -> com.lucento.app.domain.SetupStage.GET_STARTED
+    else -> com.lucento.app.domain.SetupStage.SET_UP
+}
+
+/**
+ * How full the current stage's bar is. Set up began in onboarding (backups, summary: the first 30%), so the guide's
+ * set-up pages share the rest; Get started is the first transactions, then the last page.
+ */
+internal fun guideStageProgress(step: GuideStep, steps: List<GuideStep>): Float {
+    val inStage = steps.filter { guideStage(it) == guideStage(step) }
+    val position = inStage.indexOf(step).coerceAtLeast(0) + 1
+    return when (guideStage(step)) {
+        com.lucento.app.domain.SetupStage.SET_UP -> 0.3f + 0.7f * position / inStage.size
+        else -> position.toFloat() / inStage.size
+    }
+}

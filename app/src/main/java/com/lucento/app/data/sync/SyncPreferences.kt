@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -20,6 +21,8 @@ data class SyncStatus(
     val enabled: Boolean,
     val lastSyncedAtMillis: Long?,
     val lastError: String?,
+    /** P2-6: this phone's unsynced changes replaced by newer ones from another device, until the user dismisses it. */
+    val overriddenChanges: Int = 0,
 )
 
 private val Context.syncDataStore: DataStore<Preferences> by preferencesDataStore(name = "sync_preferences")
@@ -48,6 +51,8 @@ interface SyncPreferencesStore {
      */
     suspend fun initialPullDoneFor(): String?
     suspend fun setInitialPullDoneFor(userId: String)
+    /** P2-6: adds to the "changed on another device" count shown to the user (never decreased by sync). */
+    suspend fun addOverriddenChanges(count: Int)
 }
 
 /**
@@ -63,6 +68,7 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
         val pullCursor = stringPreferencesKey("pull_cursor_server_time")
         val syncedUserId = stringPreferencesKey("synced_user_id")
         val initialPullDoneFor = stringPreferencesKey("initial_pull_done_for")
+        val overridden = intPreferencesKey("overridden_changes")
     }
 
     val status: Flow<SyncStatus> = context.syncDataStore.data
@@ -72,6 +78,7 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
                 enabled = p[Keys.enabled] ?: false,
                 lastSyncedAtMillis = p[Keys.lastSyncedAt],
                 lastError = p[Keys.lastError],
+                overriddenChanges = p[Keys.overridden] ?: 0,
             )
         }
 
@@ -113,6 +120,19 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
         context.syncDataStore.edit { it[Keys.initialPullDoneFor] = userId }
     }
 
+    override suspend fun addOverriddenChanges(count: Int) {
+        if (count <= 0) return
+        context.syncDataStore.edit { it[Keys.overridden] = (it[Keys.overridden] ?: 0) + count }
+    }
+
+    /** The user has seen the "changed on another device" notice, which said [seen]; anything counted since stays. */
+    suspend fun clearOverriddenChanges(seen: Int) {
+        context.syncDataStore.edit {
+            val left = (it[Keys.overridden] ?: 0) - seen
+            if (left > 0) it[Keys.overridden] = left else it.remove(Keys.overridden)
+        }
+    }
+
     /** Forgets which account this phone synced and the pull cursor. Called when that ledger is wiped. */
     suspend fun clearBinding() {
         context.syncDataStore.edit {
@@ -122,6 +142,7 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
             it.remove(Keys.pullCursor)
             it.remove(Keys.syncedUserId)
             it.remove(Keys.initialPullDoneFor)
+            it.remove(Keys.overridden)
         }
     }
 
