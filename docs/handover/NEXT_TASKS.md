@@ -329,19 +329,19 @@ validation and rate limiting (N-09); toolchain alignment (N-19); dependency upgr
 Main session implements. Architect and QA agents review P0-2, P0-4, P1-2 and P1-5 before merging. One coherent
 change per branch, tests with every change, exact reporting of what ran, no production writes without approval.
 
-## Core screens — owner review round 5 (2026-11-04, uncommitted on `feature/core-screens-refinement`)
+## Core screens — owner review round 5 (2026-11-04, `feature/core-screens-refinement`: `d4ff162` + goal archive)
 
 As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 5"; composer rule in `docs/CAPTURE.md`.
 
 | Next | Why |
 |---|---|
-| **Owner: merge lucento-website PR #8**, then retry OT-5 (Ask Lucento on the phone) | Production's Gemini model answered 503; #8 falls back to another Flash model |
-| Optional: an "Ask Lucento" quick link on Home (not in the header) | See the round 5 report; not built |
+| **Owner: retry OT-5** (Ask Lucento on the phone) | PR #8 (fallback to another Flash model on 503) is merged and deployed (`50c8379`); a real answer still needs a signed-in phone. If it fails, check Vercel runtime logs within the hour (Hobby keeps ~1 h) |
+| Optional: add goal archive / restore to `ScreenshotTourTest` | Verified by unit tests and by hand on the emulator (`artifacts/goal-archive/`), not yet in the tour |
 | Optional: delete the `com.lucento.app` Android OAuth client made for the OT-5 test once testing is done | It authorises this machine's debug key for the release package |
 
 | Check | Result |
 |---|---|
-| Unit tests | **883/883** (+7: `GoalIconTest` ×6 keys, older scenes, normalising, names, choice, suggestions; `BatchReviewTest` category now blocks; `PlanRepositoriesTest` icon keys stored; `WalletsOverviewTest` card default) |
+| Unit tests | **886/886** after goal archive (+3: `PlanRepositoriesTest` only a reached goal archives; archived goals leave the active list, keep history, refuse money, restore; `DashboardRedesignTest` an archived goal keeps Goal Setter but not Home's savings). Before it, **883/883** (+7: `GoalIconTest` ×6 keys, older scenes, normalising, names, choice, suggestions; `BatchReviewTest` category now blocks; `PlanRepositoriesTest` icon keys stored; `WalletsOverviewTest` card default) |
 | Lint | 0 errors, 9 warnings (same types) |
 | `ScreenshotTourTest` | **PASS** on API 28 (45 shots, `artifacts/core-screens/review6/`); wallets shot now in card view, 12b rows; new 17a Goals, 17b–c New savings goal |
 | Device checks (API 28) | New wallet: 4 fast up-flings and a fast flick back to the top keep the sheet open (a deliberate pull down still closes it); goal icon picker, Kept in (asset wallets + Add wallet); compact Budget rows; Safe to spend $0.00 with its caption; Wallets opens on cards |

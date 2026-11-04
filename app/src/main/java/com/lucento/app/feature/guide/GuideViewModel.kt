@@ -86,15 +86,16 @@ class GuideViewModel(
         wallets.observeWallets(),
         categories.observeCategories(),
         budgets.observeBudgets(),
-        goals.observeGoals(),
+        combine(goals.observeGoals(), goals.observeArchivedGoals()) { active, archived -> active to archived },
         transactions.observeTransactions(),
-    ) { w, c, b, g, t -> Snapshot(w, c, b, g, t.count { !it.isTransfer || it.signedAmount.isNegative }, t) }
+    ) { w, c, b, g, t -> Snapshot(w, c, b, g.first, g.second, t.count { !it.isTransfer || it.signedAmount.isNegative }, t) }
 
     private class Snapshot(
         val wallets: List<Wallet>,
         val categories: List<Category>,
         val budgets: List<Budget>,
         val goals: List<Goal>,
+        val archivedGoals: List<Goal>,
         val transactions: Int,
         val all: List<com.lucento.app.domain.Transaction>,
     )
@@ -121,7 +122,7 @@ class GuideViewModel(
             transactionCount = d.transactions,
             spendTypes = p.spendTypes,
             earned = com.lucento.app.domain.Achievements.earned(
-                com.lucento.app.domain.Achievements.facts(d.all, d.wallets, d.categories, d.budgets, d.goals, java.time.LocalDate.now(), p.insightsVisited),
+                com.lucento.app.domain.Achievements.facts(d.all, d.wallets, d.categories, d.budgets, d.goals + d.archivedGoals, java.time.LocalDate.now(), p.insightsVisited),
             ),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuideUiState())

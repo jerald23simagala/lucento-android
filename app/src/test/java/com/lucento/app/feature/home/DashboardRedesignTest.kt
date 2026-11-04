@@ -50,6 +50,14 @@ class DashboardRedesignTest {
         assertTrue(Achievement.GOAL_SETTER in Achievements.earned(some.copy(goals = 1)))
     }
 
+    @Test fun `an archived goal still counts as a goal set, but not in Home's savings`() {
+        val reached = com.lucento.app.domain.Goal(7, "Trip", Money(50_000, "USD"), null, null, 0)
+        val home = HomeStateBuilder.build(emptyList(), emptyList(), categories.values.toList(), "USD", nov.atDay(10), archivedGoals = listOf(reached))
+        assertTrue(Achievement.GOAL_SETTER in home.earned)
+        assertNull(home.goals)
+        assertFalse(home.hasAnyGoals)
+    }
+
     @Test fun `only expenses and income count as recorded, on distinct days`() {
         val all = listOf(
             tx(TransactionType.EXPENSE, 100, 1, 1), tx(TransactionType.EXPENSE, 100, 1, 1), tx(TransactionType.INCOME, 100, null, 2),

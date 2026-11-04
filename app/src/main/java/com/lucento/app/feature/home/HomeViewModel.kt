@@ -64,7 +64,7 @@ class HomeViewModel(
         val schedules: List<RecurringSchedule>,
     )
 
-    private data class Savings(val goals: List<Goal>, val contributions: List<GoalContribution>)
+    private data class Savings(val goals: List<Goal>, val archived: List<Goal>, val contributions: List<GoalContribution>)
 
     /** The month the budget card describes; null follows the current month (so it rolls over at midnight). */
     private val selectedMonth = MutableStateFlow<YearMonth?>(null)
@@ -100,7 +100,7 @@ class HomeViewModel(
         ) { all, walletList, categoryList, budgetList, scheduleList ->
             Core(all, walletList, categoryList, budgetList, scheduleList)
         },
-        combine(goals.observeGoals(), goals.observeContributions()) { g, c -> Savings(g, c) },
+        combine(goals.observeGoals(), goals.observeArchivedGoals(), goals.observeContributions()) { g, a, c -> Savings(g, a, c) },
         preferences.preferences,
         selectedMonth,
         cloud,
@@ -116,6 +116,7 @@ class HomeViewModel(
             schedules = core.schedules,
             features = prefs.features,
             goals = savings.goals,
+            archivedGoals = savings.archived,
             contributions = savings.contributions,
             displayName = prefs.displayName,
             month = month ?: YearMonth.from(today),

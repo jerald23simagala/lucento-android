@@ -383,6 +383,8 @@ object HomeStateBuilder {
         schedules: List<RecurringSchedule> = emptyList(),
         features: FeatureSet = FeatureSet.ALL,
         goals: List<Goal> = emptyList(),
+        /** Archived goals only count toward milestones (setting a goal stays earned after archiving it). */
+        archivedGoals: List<Goal> = emptyList(),
         contributions: List<GoalContribution> = emptyList(),
         displayName: String? = null,
         /** The month to describe; clamped to [earliest month, current month]. */
@@ -447,7 +449,7 @@ object HomeStateBuilder {
             cloudStatus = cloudStatus,
             spending = spending,
             earned = com.lucento.app.domain.Achievements.earned(
-                com.lucento.app.domain.Achievements.facts(all, wallets, categories, budgets, goals, today, visitedInsights),
+                com.lucento.app.domain.Achievements.facts(all, wallets, categories, budgets, goals + archivedGoals, today, visitedInsights),
             ),
             recordedCount = all.count { com.lucento.app.domain.Achievements.countsAsRecorded(it.type) },
             monthComposition = if (wallets.isEmpty()) null else com.lucento.app.domain.BalanceHistory.compositionAt(wallets, all, focus, shown, today),

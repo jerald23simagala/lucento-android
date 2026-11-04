@@ -158,6 +158,10 @@ import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.AddAPhoto
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.lucento.app.core.designsystem.component.rememberHaptics
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.ui.semantics.contentDescription
 
 private data class GoalDraft(
     val id: Long? = null,
@@ -192,6 +196,9 @@ internal fun NewGoalSheet(currencyCode: String, onDismiss: () -> Unit, viewModel
  * share of all targets reached, then goals in progress and goals reached: each card shows its icon (or the user's
  * photo), the saved amount against the target, a progress bar that fills in, and what it takes to get there. Progress
  * comes from earmarked contributions; wallet balances never change.
+ *
+ * A reached goal can be archived (owner, 2026-11-04): it leaves the list and every total but keeps its history, and an
+ * Active / Archived toggle at the top, shown once something is archived, lists them, each restorable.
  */
 @Composable
 fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory)) {
@@ -205,6 +212,16 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
         state.goals.map { GoalCalculator.progress(it, state.contributions, state.today) }
     }
     val (reached, active) = remember(progress) { progress.partition { it.reached } }
+    val archived = remember(state.archivedGoals, state.contributions, state.today) {
+        state.archivedGoals.map { GoalCalculator.progress(it, state.contributions, state.today) }
+    }
+    var showArchived by rememberSaveable { mutableStateOf(false) }
+    // Restoring the last archived goal leaves nothing to show there: fall back to the active list.
+    val viewingArchived = showArchived && archived.isNotEmpty()
+    val haptics = rememberHaptics()
+    val archive: (Long) -> Unit = { id ->
+        viewModel.archiveGoal(id) { result -> if (result == GoalRepository.ArchiveResult.Archived) haptics.confirm() }
+    }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -213,7 +230,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
         ) {
             item(key = "bar") {
                 LucentoTopBar(title = "Goals", onBack = onBack, actions = {
-                    if (state.goals.isNotEmpty()) {
+                    if (state.goals.isNotEmpty() || archived.isNotEmpty()) {
                         com.lucento.app.core.designsystem.component.AddPillButton(
                             "Add",
                             onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
@@ -222,38 +239,85 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                     }
                 })
             }
-            if (!state.loading && state.goals.isEmpty()) {
+            if (archived.isNotEmpty()) {
+                item(key = "toggle") {
+                    SegmentedToggle(
+                        options = listOf(false to "Active", true to "Archived · ${archived.size}"),
+                        selected = viewingArchived,
+                        onSelect = { showArchived = it },
+                        modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm),
+                    )
+                }
+            }
+            if (!state.loading && state.goals.isEmpty() && !viewingArchived) {
                 item(key = "empty") {
                     EmptyState(
-                        title = "No goals yet",
-                        body = "An emergency fund, a trip, a new laptop — set a target and Lucento tracks progress and when you’ll get there.",
+                        title = if (archived.isEmpty()) "No goals yet" else "Every goal reached",
+                        body = if (archived.isEmpty()) {
+                            "An emergency fund, a trip, a new laptop — set a target and Lucento tracks progress and when you’ll get there."
+                        } else {
+                            "Your finished goals are under Archived. Set a new target whenever you’re ready."
+                        },
                         illustration = { EmptyIllustration(LucentoAnimation.EmptyGoals) },
                         action = { LucentoPrimaryButton(text = "Create a goal", onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) }) },
                     )
                 }
             }
-            if (progress.isNotEmpty()) {
+            if (viewingArchived) {
+                item(key = "archived-head") {
+                    ToneSectionHeader(
+                        "Archived",
+                        StatusTones.neutral,
+                        caption = if (archived.size == 1) "1 goal · history kept" else "${archived.size} goals · history kept",
+                    )
+                }
+                items(archived, key = { "goal-${it.goal.id}" }) { p ->
+                    GoalCard(
+                        p,
+                        walletName = p.goal.linkedWalletId?.let { state.walletsById[it]?.name },
+                        onClick = { openGoalId = p.goal.id },
+                        archived = true,
+                        modifier = Modifier.animateItem().padding(bottom = Spacing.sm),
+                    )
+                }
+                item(key = "archived-note") {
+                    InfoNote(
+                        "Archived goals keep their history but aren’t counted in your goal totals or on Home. Open one to restore it.",
+                        modifier = Modifier.padding(top = Spacing.sm),
+                    )
+                }
+            }
+            if (progress.isNotEmpty() && !viewingArchived) {
                 item(key = "hero") { GoalsHero(progress, state.primaryCurrency) }
             }
-            if (active.isNotEmpty()) {
+            if (active.isNotEmpty() && !viewingArchived) {
                 item(key = "active-head") {
                     ToneSectionHeader("In progress", StatusTones.brand, caption = if (active.size == 1) "1 goal" else "${active.size} goals")
                 }
                 items(active, key = { "goal-${it.goal.id}" }) { p ->
-                    GoalCard(p, walletName = p.goal.linkedWalletId?.let { state.walletsById[it]?.name }, onClick = { openGoalId = p.goal.id })
-                    Spacer(Modifier.height(Spacing.sm))
+                    GoalCard(
+                        p,
+                        walletName = p.goal.linkedWalletId?.let { state.walletsById[it]?.name },
+                        onClick = { openGoalId = p.goal.id },
+                        modifier = Modifier.animateItem().padding(bottom = Spacing.sm),
+                    )
                 }
             }
-            if (reached.isNotEmpty()) {
+            if (reached.isNotEmpty() && !viewingArchived) {
                 item(key = "reached-head") {
                     ToneSectionHeader("Reached", StatusTones.positive, caption = if (reached.size == 1) "1 goal · well done" else "${reached.size} goals · well done")
                 }
                 items(reached, key = { "goal-${it.goal.id}" }) { p ->
-                    GoalCard(p, walletName = p.goal.linkedWalletId?.let { state.walletsById[it]?.name }, onClick = { openGoalId = p.goal.id })
-                    Spacer(Modifier.height(Spacing.sm))
+                    GoalCard(
+                        p,
+                        walletName = p.goal.linkedWalletId?.let { state.walletsById[it]?.name },
+                        onClick = { openGoalId = p.goal.id },
+                        onArchive = { archive(p.goal.id) },
+                        modifier = Modifier.animateItem().padding(bottom = Spacing.sm),
+                    )
                 }
             }
-            if (state.goals.isNotEmpty()) {
+            if (state.goals.isNotEmpty() && !viewingArchived) {
                 item(key = "note") {
                     InfoNote(
                         "Adding money to a goal sets it aside on paper — your wallet balances and net worth don’t change, so savings are never counted twice.",
@@ -265,12 +329,24 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
         ConfirmationHost(confirmation = celebration, onDismissed = { celebration = null })
     }
 
-    val open = progress.firstOrNull { it.goal.id == openGoalId }
+    val open = progress.firstOrNull { it.goal.id == openGoalId } ?: archived.firstOrNull { it.goal.id == openGoalId }
     if (open != null) {
         GoalDetailSheet(
             progress = open,
             history = state.contributions.filter { it.goalId == open.goal.id },
             linkedWallet = open.goal.linkedWalletId?.let { state.walletsById[it]?.name },
+            archived = archived.any { it.goal.id == open.goal.id },
+            onArchive = {
+                archive(open.goal.id)
+                openGoalId = null
+            },
+            onRestore = {
+                viewModel.restoreGoal(open.goal.id) {
+                    haptics.confirm()
+                    openGoalId = null
+                    showArchived = false
+                }
+            },
             onContribute = { amount, done ->
                 val name = open.goal.name
                 viewModel.contribute(open.goal.id, amount, state.today, "", PlanViewModel.newKey(), done) { milestone ->
@@ -384,12 +460,20 @@ private fun Money.coerceNonNegative(): Money = if (isNegative) Money.zero(curren
 /**
  * A goal's card: its icon (or photo), name, saved against the target and the percentage; a progress bar that fills in;
  * then small facts — the target date, what a month takes, the estimate at the current pace, where the money is kept.
+ * A reached goal's card offers Archive ([onArchive]); an [archived] one says so.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GoalCard(p: GoalProgress, walletName: String?, onClick: () -> Unit) {
+private fun GoalCard(
+    p: GoalProgress,
+    walletName: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    archived: Boolean = false,
+    onArchive: (() -> Unit)? = null,
+) {
     val ext = LucentoTheme.extendedColors
-    LucentoCard(Modifier.fillMaxWidth(), onClick = onClick, contentPadding = Spacing.md) {
+    LucentoCard(modifier.fillMaxWidth(), onClick = onClick, contentPadding = Spacing.md) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             GoalBadge(p.goal, size = 48.dp)
             Spacer(Modifier.width(Spacing.md))
@@ -409,20 +493,54 @@ private fun GoalCard(p: GoalProgress, walletName: String?, onClick: () -> Unit) 
                 )
             }
             Spacer(Modifier.width(Spacing.sm))
-            if (p.reached) {
+            if (archived) {
+                StatusPill("Archived", StatusTones.neutral)
+            } else if (p.reached) {
                 StatusPill("Reached", StatusTones.positive)
             } else {
                 Text("${p.percent}%", style = AmountStyles.row.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
             }
         }
         Spacer(Modifier.height(Spacing.sm))
-        ShareBar(fraction = p.fraction, color = ext.success, height = 8.dp)
+        ShareBar(fraction = p.fraction, color = if (archived) MaterialTheme.colorScheme.outline else ext.success, height = 8.dp)
         val facts = goalFacts(p, walletName)
-        if (facts.isNotEmpty()) {
+        if (facts.isNotEmpty() || onArchive != null) {
             Spacer(Modifier.height(Spacing.sm))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                facts.forEach { (icon, text) -> FactChip(icon, text) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(
+                    Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    facts.forEach { (icon, text) -> FactChip(icon, text) }
+                }
+                if (onArchive != null) {
+                    Spacer(Modifier.width(Spacing.xs))
+                    ArchiveChip(goalName = p.goal.name, onClick = onArchive)
+                }
             }
+        }
+    }
+}
+
+/** A reached goal's one-tap archive: a quiet pill, at least 48dp tall to touch. */
+@Composable
+private fun ArchiveChip(goalName: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.minimumInteractiveComponentSize(),
+    ) {
+        Row(Modifier.padding(horizontal = Spacing.sm + Spacing.xxs, vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Archive, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(Spacing.xxs + 2.dp))
+            Text(
+                "Archive",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.semantics { contentDescription = "Archive $goalName" },
+            )
         }
     }
 }
@@ -504,6 +622,10 @@ private fun GoalDetailSheet(
     progress: GoalProgress,
     history: List<com.lucento.app.domain.GoalContribution>,
     linkedWallet: String?,
+    /** Archived goals are read-only here: no money in or out and no edits; Restore brings them back. */
+    archived: Boolean,
+    onArchive: () -> Unit,
+    onRestore: () -> Unit,
     onContribute: (Money, (GoalRepository.ContributionResult) -> Unit) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -512,10 +634,6 @@ private fun GoalDetailSheet(
 ) {
     val goal = progress.goal
     val ext = LucentoTheme.extendedColors
-    val separator = remember { MoneyFormatter.decimalSeparator() }
-    var amountText by remember { mutableStateOf("") }
-    var withdrawing by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
     var confirmingDelete by remember { mutableStateOf(false) }
     var confirmingContributionId by remember { mutableStateOf<Long?>(null) }
 
@@ -533,7 +651,7 @@ private fun GoalDetailSheet(
                 subtitle = linkedWallet?.let { "Kept in $it" },
                 leading = { GoalBadge(goal, size = 48.dp) },
                 trailing = {
-                    IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Edit goal") }
+                    if (!archived) IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Edit goal") }
                     IconButton(onClick = { confirmingDelete = true }) {
                         Icon(Icons.Outlined.Delete, contentDescription = "Delete goal", tint = MaterialTheme.colorScheme.error)
                     }
@@ -561,45 +679,28 @@ private fun GoalDetailSheet(
                 goalFacts(progress, null).forEach { (icon, text) -> FactChip(icon, text) }
             }
 
-            Spacer(Modifier.height(Spacing.lg))
-            SegmentedToggle(
-                options = listOf(false to "Add money", true to "Take out"),
-                selected = withdrawing,
-                onSelect = { withdrawing = it; error = null },
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            MoneyField(
-                value = amountText,
-                onValueChange = { amountText = it; error = null },
-                label = if (withdrawing) "Amount to take out" else "Amount to set aside",
-                currencyCode = goal.currencyCode,
-                error = error,
-                leadingIcon = if (withdrawing) Icons.Outlined.Remove else Icons.Outlined.Add,
-                filled = true,
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            LucentoPrimaryButton(
-                text = if (withdrawing) "Take out" else "Add to goal",
-                onClick = {
-                    val (money, amountError) = parsePositive(amountText, goal.currencyCode, separator)
-                    if (money == null) {
-                        error = amountError?.message(goal.currencyCode, separator)
-                        return@LucentoPrimaryButton
-                    }
-                    onContribute(if (withdrawing) -money else money) { result ->
-                        when (result) {
-                            GoalRepository.ContributionResult.Saved -> {
-                                amountText = ""
-                                error = null
-                            }
-                            GoalRepository.ContributionResult.ExceedsSaved -> error = "That’s more than you’ve set aside (${MoneyFormatter.format(progress.saved)})."
-                            GoalRepository.ContributionResult.AmountZero -> error = "The amount must be greater than zero."
-                            GoalRepository.ContributionResult.CurrencyMismatch -> error = "This goal is in ${goal.currencyCode}."
-                            GoalRepository.ContributionResult.GoalNotFound -> onDismiss()
-                        }
-                    }
-                },
-            )
+            if (archived) {
+                Spacer(Modifier.height(Spacing.lg))
+                InfoNote(
+                    "Archived — it isn’t counted in your goal totals or on Home. Restore it to add or take out money.",
+                    icon = Icons.Outlined.Archive,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                LucentoPrimaryButton(text = "Restore goal", onClick = onRestore)
+            } else {
+                if (progress.reached) {
+                    Spacer(Modifier.height(Spacing.md))
+                    InfoNote(
+                        "You reached this goal. Archive it to keep your list focused — its history stays, and you can restore it any time.",
+                        icon = Icons.Outlined.EmojiEvents,
+                        container = StatusTones.positive.container,
+                        content = StatusTones.positive.content,
+                        actionLabel = "Archive goal",
+                        onAction = onArchive,
+                    )
+                }
+                ContributionForm(progress, onContribute, onDismiss)
+            }
 
             if (history.isNotEmpty()) {
                 Spacer(Modifier.height(Spacing.lg))
@@ -624,8 +725,10 @@ private fun GoalDetailSheet(
                             showPlus = true,
                             color = if (c.amount.isNegative) MaterialTheme.colorScheme.onSurface else ext.positive,
                         )
-                        IconButton(onClick = { confirmingContributionId = c.id }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = "Remove this entry", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (!archived) {
+                            IconButton(onClick = { confirmingContributionId = c.id }) {
+                                Icon(Icons.Outlined.Delete, contentDescription = "Remove this entry", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                     if (index < history.lastIndex) Hairline(inset = 32.dp + Spacing.sm + Spacing.xxs)
@@ -659,6 +762,61 @@ private fun GoalDetailSheet(
                 onDeleteContribution(id)
             },
             onDismiss = { confirmingContributionId = null },
+        )
+    }
+}
+
+/** Add money to a goal or take some out, through MoneyParser; the goal's currency only. */
+@Composable
+private fun ContributionForm(
+    progress: GoalProgress,
+    onContribute: (Money, (GoalRepository.ContributionResult) -> Unit) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val goal = progress.goal
+    val separator = remember { MoneyFormatter.decimalSeparator() }
+    var amountText by remember { mutableStateOf("") }
+    var withdrawing by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Column {
+        Spacer(Modifier.height(Spacing.lg))
+        SegmentedToggle(
+            options = listOf(false to "Add money", true to "Take out"),
+            selected = withdrawing,
+            onSelect = { withdrawing = it; error = null },
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        MoneyField(
+            value = amountText,
+            onValueChange = { amountText = it; error = null },
+            label = if (withdrawing) "Amount to take out" else "Amount to set aside",
+            currencyCode = goal.currencyCode,
+            error = error,
+            leadingIcon = if (withdrawing) Icons.Outlined.Remove else Icons.Outlined.Add,
+            filled = true,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        LucentoPrimaryButton(
+            text = if (withdrawing) "Take out" else "Add to goal",
+            onClick = {
+                val (money, amountError) = parsePositive(amountText, goal.currencyCode, separator)
+                if (money == null) {
+                    error = amountError?.message(goal.currencyCode, separator)
+                    return@LucentoPrimaryButton
+                }
+                onContribute(if (withdrawing) -money else money) { result ->
+                    when (result) {
+                        GoalRepository.ContributionResult.Saved -> {
+                            amountText = ""
+                            error = null
+                        }
+                        GoalRepository.ContributionResult.ExceedsSaved -> error = "That’s more than you’ve set aside (${MoneyFormatter.format(progress.saved)})."
+                        GoalRepository.ContributionResult.AmountZero -> error = "The amount must be greater than zero."
+                        GoalRepository.ContributionResult.CurrencyMismatch -> error = "This goal is in ${goal.currencyCode}."
+                        GoalRepository.ContributionResult.GoalNotFound -> onDismiss()
+                    }
+                }
+            },
         )
     }
 }

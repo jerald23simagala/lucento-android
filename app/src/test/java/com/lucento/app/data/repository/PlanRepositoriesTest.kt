@@ -89,6 +89,34 @@ class PlanRepositoriesTest {
         assertEquals(GoalRepository.SaveResult.BlankName, goals.save(null, "  ", Money(1, "USD"), null, null))
     }
 
+    @Test fun onlyAReachedGoalCanBeArchived() = runTest {
+        val id = (goals.save(null, "Laptop", Money(100_000, "USD"), null, null) as GoalRepository.SaveResult.Saved).id
+        goals.contribute(id, Money(99_999, "USD"), start, "", "a")
+        assertEquals(GoalRepository.ArchiveResult.NotReached, goals.archive(id))
+        assertEquals(1, goals.observeGoals().first().size)
+        goals.contribute(id, Money(1, "USD"), start, "", "b")
+        assertEquals(GoalRepository.ArchiveResult.Archived, goals.archive(id))
+        assertEquals(GoalRepository.ArchiveResult.NotFound, goals.archive(999))
+    }
+
+    @Test fun archivedGoalsLeaveTheActiveListKeepTheirHistoryAndCanBeRestored() = runTest {
+        val id = (goals.save(null, "Trip", Money(50_000, "USD"), null, null) as GoalRepository.SaveResult.Saved).id
+        goals.contribute(id, Money(60_000, "USD"), start, "", "a")
+        assertEquals(GoalRepository.ArchiveResult.Archived, goals.archive(id))
+        assertEquals(GoalRepository.ArchiveResult.Archived, goals.archive(id)) // again: no-op
+        assertTrue(goals.observeGoals().first().isEmpty())
+        assertEquals(listOf(id), goals.observeArchivedGoals().first().map { it.id })
+        assertEquals(1, goals.observeContributions().first().size)
+        // Read-only while archived: no money in or out.
+        assertEquals(GoalRepository.ContributionResult.GoalNotFound, goals.contribute(id, Money(1, "USD"), start, "", "b"))
+        assertEquals(GoalRepository.ContributionResult.GoalNotFound, goals.contribute(id, Money(-1, "USD"), start, "", "c"))
+
+        goals.restore(id)
+        assertEquals(listOf(id), goals.observeGoals().first().map { it.id })
+        assertTrue(goals.observeArchivedGoals().first().isEmpty())
+        assertEquals(GoalRepository.ContributionResult.Saved, goals.contribute(id, Money(1, "USD"), start, "", "d"))
+    }
+
     // ---- recurring
 
     private suspend fun rentSchedule(): Long = (

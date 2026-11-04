@@ -23,6 +23,10 @@ interface GoalDao {
     @Query("SELECT * FROM goals WHERE archived = 0 ORDER BY created_at ASC, id ASC")
     fun observeActive(): Flow<List<GoalEntity>>
 
+    /** Goals the user archived (after reaching them), most recently archived first. */
+    @Query("SELECT * FROM goals WHERE archived = 1 ORDER BY updated_at DESC, id DESC")
+    fun observeArchived(): Flow<List<GoalEntity>>
+
     @Query(
         "SELECT c.id AS id, c.goal_id AS goal_id, c.amount_minor AS amount_minor, c.occurred_on AS occurred_on, " +
             "c.note AS note, g.currency_code AS currency_code " +

@@ -320,6 +320,9 @@ class FakeGoalDao : GoalDao {
 
     override fun observeActive(): Flow<List<GoalEntity>> = goals.map { list -> list.filter { !it.archived } }
 
+    override fun observeArchived(): Flow<List<GoalEntity>> =
+        goals.map { list -> list.filter { it.archived }.sortedWith(compareByDescending<GoalEntity> { it.updatedAt }.thenByDescending { it.id }) }
+
     override fun observeContributions(): Flow<List<GoalContributionRow>> =
         combine(goals, contributions) { g, c ->
             val codes = g.associate { it.id to it.currencyCode }

@@ -40,6 +40,7 @@ first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
 | Recurring occurrence *k* | start + k × interval × frequency (month-end anchors kept: Jan 31 → Feb 28 → Mar 31) | `RecurringMath` |
 | Recurring idempotency key | `recurring-<schedule id>-on-<due epoch day>` (v0.4). Keyed by due date, not index, so editing a schedule's timing (which restarts the index) never makes a new payment look like a duplicate of an old one. v0.3 keys (`recurring-<id>-<index>`) cannot collide | `RecurringSchedule.occurrenceKey` |
 | Goal milestone | halfway / reached, when saved × 100 crosses target × 50 / × 100 because of a contribution (never a withdrawal) | `GoalMilestones` |
+| Archived goal | only a reached goal (saved ≥ target) can be archived; it keeps its contributions but is left out of every goal total (Goals hero, Home's savings card, featured goal) and takes no money in or out until restored. It still counts for the Goal Setter milestone | `GoalRepository.archive` / `restore` |
 | Budget month kept | the previous calendar month: allocations that existed all month (created on/before its 1st) sum to a positive budget in the main currency, budgeted spending > 0 and ≤ that budget. Acknowledged once (persisted) | `BudgetMilestones` |
 
 ## Budget model (v0.5)
@@ -121,7 +122,7 @@ can only be corrected for themselves. Spending is counted by each transaction's 
 Worked out from stored records (`Achievements.earned`), never from counters: Money Keeper (an asset wallet), Budget
 Builder (a category with an amount this month, lifecycle rules), First Step (an expense or income recorded), Getting
 Consistent (expenses or income on 7 different days, any order — no streak), Financial Explorer (Insights opened; a
-local flag), Goal Setter (a savings goal). Each is acknowledged once, after the write that earned it; the first run with
+local flag), Goal Setter (a savings goal, archived ones included). Each is acknowledged once, after the write that earned it; the first run with
 milestones records what is already earned without showing anything.
 
 ### Spendable now (Home, P2-1)
