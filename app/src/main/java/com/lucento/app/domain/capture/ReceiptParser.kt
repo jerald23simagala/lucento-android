@@ -35,6 +35,8 @@ data class ReceiptSuggestion(
     val currencyCode: String? = null,
     /** Minor-unit digits used to read amounts (from [currencyCode], else the expected currency, else 2). */
     val fractionDigits: Int = 2,
+    /** Which printed line the total came from ("Amount due", "Total", "Amount paid less change"); null when unlabelled. */
+    val totalLabel: String? = null,
 )
 
 /**
@@ -69,8 +71,10 @@ object ReceiptParser {
         val detected = detectCurrency(clean)
         val digits = CurrencyRules.fractionDigits(detected ?: expectedCurrency ?: "XXX").let { if (it > 3) 2 else it }
         val amounts = clean.flatMap { amountsIn(it, digits, allowIntegers = false) }.distinct().sortedDescending()
-        val (total, confidence) = findTotal(clean, digits) ?: (amounts.firstOrNull()?.let { it to TotalConfidence.LARGEST_AMOUNT }
-            ?: (null to TotalConfidence.NONE))
+        val labelled = findTotal(clean, digits)
+        val (total, confidence) = labelled?.let { it.amount to TotalConfidence.LABELLED }
+            ?: amounts.firstOrNull()?.let { it to TotalConfidence.LARGEST_AMOUNT }
+            ?: (null to TotalConfidence.NONE)
         val (date, ambiguous) = findDate(clean, today)
         return ReceiptSuggestion(
             merchant = findMerchant(clean),
@@ -81,6 +85,7 @@ object ReceiptParser {
             amounts = (listOfNotNull(total) + amounts).distinct().sortedDescending().take(8),
             currencyCode = detected,
             fractionDigits = digits,
+            totalLabel = labelled?.label,
         )
     }
 
@@ -89,10 +94,10 @@ object ReceiptParser {
     // A number with optional grouping (`,` `.` `'`) and an optional 1–3 digit fraction.
     // A plain space is deliberately not a grouping separator: OCR rows like "2 150.00" (quantity, then price)
     // would otherwise read as 2,150.00. Non-breaking/thin spaces and apostrophes (Swiss style) are accepted.
-    private val NUMBER = Regex("(?<![\\d.,'])(\\d{1,3}(?:[,.'\\u00A0\\u202F]\\d{3})+(?:[.,]\\d{1,3})?|\\d+(?:[.,]\\d{1,3})?)(?![\\d]|[.,]\\d)")
+    internal val NUMBER = Regex("(?<![\\d.,'])(\\d{1,3}(?:[,.'\\u00A0\\u202F]\\d{3})+(?:[.,]\\d{1,3})?|\\d+(?:[.,]\\d{1,3})?)(?![\\d]|[.,]\\d)")
 
     /** Things that look numeric but are never a price: dates, times, percentages, phone/ID/reference numbers. */
-    private val NOT_MONEY = listOf(
+    internal val NOT_MONEY = listOf(
         Regex("(?<!\\d)(?:19|20)\\d{2}[-/.]\\d{1,2}[-/.]\\d{1,2}(?!\\d)"),
         Regex("(?<!\\d)\\d{1,2}[-/.]\\d{1,2}[-/.]\\d{2,4}(?!\\d)"),
         Regex("(?<!\\d)\\d{1,2}:\\d{2}(?::\\d{2})?(?:\\s*[ap]\\.?m\\.?)?", RegexOption.IGNORE_CASE),
@@ -107,13 +112,28 @@ object ReceiptParser {
      * 3 for BHD/KWD/OMR/JOD/TND). With [allowIntegers] false, plain integers without grouping ("450") are ignored
      * because on an unlabelled line they are more often quantities or codes than prices.
      */
-    internal fun amountsIn(line: String, fractionDigits: Int = 2, allowIntegers: Boolean = false): List<BigDecimal> {
-        var masked = line
-        NOT_MONEY.forEach { re -> masked = re.replace(masked) { m -> " ".repeat(m.value.length) } }
-        return NUMBER.findAll(masked).mapNotNull { m -> interpret(m.value, fractionDigits, allowIntegers) }
+    internal fun amountsIn(line: String, fractionDigits: Int = 2, allowIntegers: Boolean = false): List<BigDecimal> =
+        NUMBER.findAll(maskNonMoney(line)).mapNotNull { m -> interpret(m.value, fractionDigits, allowIntegers) }
             .filter { it.signum() > 0 && it <= MAX_AMOUNT }
             .toList()
+
+    /** [line] with dates, times, percentages, phone and reference numbers blanked out (same length, so positions hold). */
+    internal fun maskNonMoney(line: String): String {
+        var masked = line
+        NOT_MONEY.forEach { re -> masked = re.replace(masked) { m -> " ".repeat(m.value.length) } }
+        return masked
     }
+
+    /** A number in a line that can be money: where it is, its value, and whether it was written as a bare integer. */
+    internal data class NumberToken(val range: IntRange, val value: BigDecimal, val plainInteger: Boolean)
+
+    /** Every number in [masked] (see [maskNonMoney]) that can be an amount, bare integers included, left to right. */
+    internal fun numberTokens(masked: String, fractionDigits: Int): List<NumberToken> =
+        NUMBER.findAll(masked).mapNotNull { m ->
+            interpret(m.value, fractionDigits, allowIntegers = true)
+                ?.takeIf { it.signum() > 0 && it <= MAX_AMOUNT }
+                ?.let { NumberToken(m.range, it, plainInteger = m.value.none { c -> c == '.' || c == ',' || c == '\'' || c == '\u00A0' || c == '\u202F' }) }
+        }.toList()
 
     /** Converts one numeric token to a value with exactly [fractionDigits] decimals, or null when it isn't money. */
     internal fun interpret(token: String, fractionDigits: Int, allowIntegers: Boolean): BigDecimal? {
@@ -164,7 +184,7 @@ object ReceiptParser {
     ).map { (pattern, code) -> Regex(pattern) to code }
 
     /** ISO codes Lucento recognises on receipts; a curated list so words like "ALL" or "TOP" don't count. */
-    private val ISO_CODES = setOf(
+    internal val ISO_CODES = setOf(
         "PHP", "USD", "EUR", "GBP", "JPY", "CNY", "KRW", "INR", "IDR", "MYR", "SGD", "THB", "VND", "HKD", "TWD",
         "AUD", "NZD", "CAD", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "TRY", "ILS", "AED", "SAR", "QAR",
         "KWD", "BHD", "OMR", "JOD", "TND", "EGP", "ZAR", "NGN", "KES", "GHS", "BRL", "MXN", "ARS", "CLP", "COP", "PEN",
@@ -181,20 +201,36 @@ object ReceiptParser {
         return found.singleOrNull()
     }
 
+    /**
+     * Total labels, best first. What the customer owes ("Amount due") outranks a plain "Total"; "Amount paid" ranks last,
+     * because on a cash receipt it is the money handed over, and the change comes back out of it.
+     */
     private val totalLabels = listOf(
         Regex("grand\\s*total") to 0,
-        Regex("total\\s*(amount\\s*)?due|amount\\s*due|balance\\s*due|amount\\s*payable|total\\s*payable") to 1,
-        Regex("total\\s*amount|net\\s*total|total\\s*sales|\\btotal\\b") to 2,
+        Regex("total\\s*(amount\\s*)?due|amount\\s*due|balance\\s*due|amount\\s*payable|total\\s*payable|amount\\s*to\\s*pay") to 1,
+        Regex("total\\s*amount|net\\s*total|total\\s*sales|net\\s*amount|\\btotal\\b") to 2,
+        Regex("amount\\s*paid|total\\s*paid|you\\s*paid|paid\\s*amount|payment\\s*amount") to 3,
     )
-    private val notTotal = Regex("sub\\s*-?\\s*total|total\\s*(items?|qty|quantity|savings|discount|vat|tax)|\\bvat\\b|\\btax\\b|change|tender|cash\\s*paid|discount|points")
+    private val notTotal = Regex(
+        "sub\\s*-?\\s*total|total\\s*(items?|qty|quantity|savings|discount|vat|tax)|\\bvat\\b|\\btax\\b|change|tender|cash\\s*paid|discount|points|" +
+            "min(imum)?\\.?\\s*(amount\\s*)?due",
+    )
+    private val changeLine = Regex("\\bchange\\b")
 
-    /** The amount on (or right after) the best-ranked total line. */
-    private fun findTotal(lines: List<String>, fractionDigits: Int): Pair<BigDecimal, TotalConfidence>? {
+    /** A labelled total and the words that labelled it. */
+    private data class LabelledTotal(val amount: BigDecimal, val label: String)
+
+    /**
+     * The amount on (or right after) the best-ranked total line. When the only label is "Amount paid" and a change line
+     * is printed, the total is what was paid less the change.
+     */
+    private fun findTotal(lines: List<String>, fractionDigits: Int): LabelledTotal? {
         var best: Triple<Int, Int, BigDecimal>? = null // rank, line index, amount
+        var bestLabel = ""
         lines.forEachIndexed { index, line ->
             val lower = line.lowercase(Locale.ROOT)
             if (notTotal.containsMatchIn(lower)) return@forEachIndexed
-            val rank = totalLabels.firstOrNull { (re, _) -> re.containsMatchIn(lower) }?.second ?: return@forEachIndexed
+            val (re, rank) = totalLabels.firstOrNull { (re, _) -> re.containsMatchIn(lower) } ?: return@forEachIndexed
             // On a line labelled as the total, a plain integer ("TOTAL 250") is a legitimate amount.
             val amount = amountsIn(line, fractionDigits, allowIntegers = true).lastOrNull()
                 ?: lines.getOrNull(index + 1)?.let { amountsIn(it, fractionDigits, allowIntegers = true).lastOrNull() }
@@ -203,10 +239,20 @@ object ReceiptParser {
             // Better rank wins; for equal rank the later line wins (totals sit near the bottom).
             if (current == null || rank < current.first || (rank == current.first && index > current.second)) {
                 best = Triple(rank, index, amount)
+                bestLabel = re.find(lower)?.value.orEmpty()
             }
         }
-        return best?.let { it.third to TotalConfidence.LABELLED }
+        val found = best ?: return null
+        val label = bestLabel.replace(Regex("\\s+"), " ").trim().replaceFirstChar { it.titlecase(Locale.ROOT) }
+        if (found.first == PAID_RANK) {
+            val change = lines.firstOrNull { changeLine.containsMatchIn(it.lowercase(Locale.ROOT)) }
+                ?.let { amountsIn(it, fractionDigits, allowIntegers = true).lastOrNull() }
+            if (change != null && change.signum() > 0 && change < found.third) return LabelledTotal(found.third - change, "$label less change")
+        }
+        return LabelledTotal(found.third, label)
     }
+
+    private const val PAID_RANK = 3
 
     // ------------------------------------------------------------- items vs total
 

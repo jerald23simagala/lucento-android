@@ -169,8 +169,10 @@ object BatchReview {
      * A transfer has no category.
      */
     private fun retype(row: ReviewRow, type: TransactionType, categories: List<Category>): ReviewRow {
-        if (type == row.type) return row
+        // Choosing the type, even the one already shown, answers "money in or out?".
+        if (type == row.type) return if (CandidateFlag.DIRECTION_UNCERTAIN in row.flags) row.copy(flags = row.flags - CandidateFlag.DIRECTION_UNCERTAIN, edited = row.edited + RowField.TYPE) else row
         val edited = row.edited + RowField.TYPE
+        val row = row.copy(flags = row.flags - CandidateFlag.DIRECTION_UNCERTAIN)
         if (type.isTransfer) {
             return row.copy(type = type, categoryId = null, flags = row.flags - CandidateFlag.CATEGORY_UNMATCHED, edited = edited - RowField.CATEGORY)
         }
@@ -268,7 +270,14 @@ object BatchReview {
         }
 
         if (CandidateFlag.DATE_UNCERTAIN in row.flags) {
-            issues += RowIssue(RowField.DATE, "Check the date — the receipt’s date was missing or unclear", blocking = false)
+            issues += RowIssue(
+                RowField.DATE,
+                if (CandidateFlag.FROM_STATEMENT in row.flags) "Check the date — the statement’s date was missing or unclear" else "Check the date — the receipt’s date was missing or unclear",
+                blocking = false,
+            )
+        }
+        if (CandidateFlag.DIRECTION_UNCERTAIN in row.flags && RowField.TYPE !in row.edited) {
+            issues += RowIssue(RowField.TYPE, "Money in or out? The statement didn’t say — check the type", blocking = false)
         }
         if (CandidateFlag.AMOUNT_UNVERIFIED in row.flags && RowField.AMOUNT !in row.edited) {
             issues += RowIssue(RowField.AMOUNT, "Check the amount — make sure it was read the way you meant", blocking = false)
@@ -277,7 +286,12 @@ object BatchReview {
             issues += RowIssue(RowField.AMOUNT, "The items don’t add up to this total — check it", blocking = false)
         }
         if (money != null && wallet != null && looksSaved(row, money, setup.history)) {
-            issues += RowIssue(RowField.DESCRIPTION, "A matching transaction is already saved for this day", blocking = false)
+            issues += RowIssue(
+                RowField.DESCRIPTION,
+                if (CandidateFlag.FROM_STATEMENT in row.flags) "Looks already recorded: the same amount is saved within a few days — remove it if it’s the same one"
+                else "A matching transaction is already saved for this day",
+                blocking = false,
+            )
         }
         return RowStatus(issues, money)
     }
@@ -323,10 +337,24 @@ object BatchReview {
         }
     }
 
-    private fun looksSaved(row: ReviewRow, money: Money, history: List<Transaction>): Boolean = history.any { t ->
-        t.walletId == row.walletId && t.date == row.date && t.amount == money && t.type == row.type &&
-            (row.type.isTransfer || t.note.isBlank() || row.description.isBlank() || t.note.trim().equals(row.description.trim(), ignoreCase = true))
+    private fun looksSaved(row: ReviewRow, money: Money, history: List<Transaction>): Boolean {
+        // A statement's posting date can trail the day it was recorded, and its words are the bank's, not the user's.
+        if (CandidateFlag.FROM_STATEMENT in row.flags) {
+            val legs = if (row.type.isTransfer) setOf(TransactionType.TRANSFER_OUT, TransactionType.TRANSFER_IN) else setOf(row.type)
+            val accounts = setOfNotNull(row.walletId, row.toWalletId)
+            return history.any { t ->
+                t.walletId in accounts && t.amount == money && t.type in legs &&
+                    kotlin.math.abs(t.date.toEpochDay() - row.date.toEpochDay()) <= STATEMENT_DAYS
+            }
+        }
+        return history.any { t ->
+            t.walletId == row.walletId && t.date == row.date && t.amount == money && t.type == row.type &&
+                (row.type.isTransfer || t.note.isBlank() || row.description.isBlank() || t.note.trim().equals(row.description.trim(), ignoreCase = true))
+        }
     }
+
+    /** How far apart a statement line and a saved transaction can be dated and still look like the same one. */
+    private const val STATEMENT_DAYS = 3L
 
     fun summarize(rows: List<ReviewRow>, statuses: Map<String, RowStatus>): BatchSummary {
         val ready = rows.filter { statuses[it.key]?.ready == true }

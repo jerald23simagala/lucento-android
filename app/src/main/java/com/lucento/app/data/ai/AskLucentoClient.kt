@@ -11,9 +11,10 @@ import java.net.URL
 
 /**
  * Ask Lucento's AI answers, through Lucento's own proxy (lucento-website `api/ask`), which holds the Gemini key and the
- * per-user daily limit — the APK holds neither. Sent, and only once the user turned AI answers on: the question, the
- * last few turns of the conversation, today's date, the main currency and [AskSnapshot]'s labelled figures (totals and
- * balances; never transactions, notes, payees or receipts). The reply's figures are references the app fills in.
+ * per-user daily limit — the APK holds neither. Sent, and only once the user turned AI answers on (the v2 consent): the
+ * question, the last few turns of the conversation, today's date, the main currency and [AskSnapshot]'s labelled
+ * figures (summaries, projections, goals, transaction patterns and the last 60 days of transactions; never receipts or
+ * photos). The reply's figures and calculations are references the app fills in.
  */
 class AskLucentoClient(
     private val accessToken: suspend () -> String?,
@@ -34,7 +35,7 @@ class AskLucentoClient(
     suspend fun ask(question: String, history: List<Turn>, snapshot: AskSnapshot): Result = withContext(Dispatchers.IO) {
         if (!isConfigured) return@withContext Result.Failed("not configured")
         val token = accessToken() ?: return@withContext Result.NotSignedIn
-        val body = json.encodeToString(AskRequest.serializer(), AskRequest.from(question, history, snapshot))
+        val body = body(AskRequest.from(question, history, snapshot))
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 8_000
@@ -60,8 +61,11 @@ class AskLucentoClient(
         }
     }
 
-    private companion object {
+    internal companion object {
         val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+
+        /** The request body exactly as sent. */
+        fun body(request: AskRequest): String = json.encodeToString(AskRequest.serializer(), request)
     }
 }
 
@@ -72,11 +76,17 @@ internal data class AskRequest(
     val currency: String,
     val history: List<AskTurn>,
     val figures: List<AskFigure>,
+    /**
+     * 2: the app works out `[[= … ]]` calculations and sends transaction-level figures (the proxy's adviser prompt). No
+     * default value: the encoder leaves defaults out, and a missing version reads as 1 on the proxy.
+     */
+    val version: Int,
 ) {
     companion object {
         const val MAX_QUESTION = 500
         const val MAX_TURNS = 6
         const val MAX_TURN_TEXT = 1_500
+        const val VERSION = 2
 
         fun from(question: String, history: List<AskLucentoClient.Turn>, snapshot: AskSnapshot) = AskRequest(
             question = question.take(MAX_QUESTION),
@@ -84,6 +94,7 @@ internal data class AskRequest(
             currency = snapshot.currency,
             history = history.takeLast(MAX_TURNS).map { AskTurn(if (it.fromUser) "user" else "lucento", it.text.take(MAX_TURN_TEXT)) },
             figures = snapshot.figures.map { AskFigure(it.id, it.label, it.value) },
+            version = VERSION,
         )
     }
 }

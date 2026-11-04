@@ -94,6 +94,7 @@ class AskLucentoViewModel(
     categories: CategoryRepository,
     budgets: BudgetRepository,
     recurring: RecurringRepository,
+    goals: com.lucento.app.data.repository.GoalRepository?,
     private val preferences: UserPreferencesRepository,
     signedInEmail: Flow<String?>,
     private val client: AskLucentoClient,
@@ -110,12 +111,16 @@ class AskLucentoViewModel(
     )
 
     private val inputs: StateFlow<ReportInputs?> = combine(
-        transactions.observeTransactions(),
-        wallets.observeWallets(),
-        categories.observeCategories(),
-        budgets.observeBudgets(),
-        recurring.observeSchedules(),
-    ) { t, w, c, b, s -> ReportInputs(w, t, c, b, s, LocalDate.now()) }
+        combine(
+            transactions.observeTransactions(),
+            wallets.observeWallets(),
+            categories.observeCategories(),
+            budgets.observeBudgets(),
+            recurring.observeSchedules(),
+        ) { t, w, c, b, s -> ReportInputs(w, t, c, b, s, LocalDate.now()) },
+        goals?.observeGoals() ?: flowOf(emptyList()),
+        goals?.observeContributions() ?: flowOf(emptyList()),
+    ) { base, g, contributions -> base.copy(goals = g, contributions = contributions) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val uiState: StateFlow<AskUiState> = combine(inputs, preferences.preferences, signedInEmail, conversation) { data, prefs, email, chat ->
@@ -213,7 +218,7 @@ class AskLucentoViewModel(
             return local() ?: when {
                 state.aiAvailable -> AskMessage.Answer(
                     0,
-                    plain("I can answer that with AI. Turn on AI answers and I’ll send a summary of your figures — never your transactions or notes — to Gemini to work it out."),
+                    plain("I can answer that with AI. Turn on AI answers and I’ll send your figures and recent transactions to Gemini to work it out — you’ll see exactly what’s sent first."),
                     AnswerSource.PHONE,
                     offersAi = true,
                 )
@@ -295,7 +300,7 @@ class AskLucentoViewModel(
 
         val Factory = containerFactory {
             AskLucentoViewModel(
-                it.transactions, it.wallets, it.categories, it.budgets, it.recurring, it.preferences,
+                it.transactions, it.wallets, it.categories, it.budgets, it.recurring, it.goals, it.preferences,
                 signedInEmail = runCatching { it.auth.observeSignedInEmail() }.getOrElse { flowOf(null) },
                 client = it.askClient,
                 pdf = it.reportPdf,

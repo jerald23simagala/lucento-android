@@ -185,6 +185,22 @@ class TransactionEditorViewModel(
         return TransferDraft(fromWalletId = from, toWalletId = to)
     }
 
+    /**
+     * The transfer that pays a card's statement: from the account it's usually paid from ([CardDue.payFromWalletId]), to
+     * the card, for the amount due, dated today, noted "<card> payment". Every field stays editable before saving.
+     */
+    fun cardPaymentDraft(due: com.lucento.app.domain.CardDue, today: LocalDate = LocalDate.now()): TransferDraft {
+        val wallets = state.value.wallets
+        val from = due.payFromWalletId?.takeIf { id -> wallets.any { it.id == id && it.currencyCode == due.wallet.currencyCode } }
+        return TransferDraft(
+            fromWalletId = from,
+            toWalletId = due.wallet.id,
+            amountText = MoneyFormatter.formatPlain(due.cycle.amountDue),
+            date = today,
+            note = "${due.wallet.name} payment",
+        )
+    }
+
     private var savingTransfer = false
 
     /** Validates and saves a transfer; [onResult] receives null on success or the first error. */

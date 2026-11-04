@@ -23,7 +23,13 @@ data class CardCycle(
  * schedule, and never part of Safe to spend — the card's purchases were already counted as spending, so paying the card
  * is a transfer.
  */
-data class CardDue(val wallet: Wallet, val cycle: CardCycle, val overdue: Boolean)
+data class CardDue(
+    val wallet: Wallet,
+    val cycle: CardCycle,
+    val overdue: Boolean,
+    /** The account the payment most likely comes from ([CreditCardMath.payingWallet]); null when there is none. */
+    val payFromWalletId: Long? = null,
+)
 
 object CreditCardMath {
 
@@ -79,8 +85,26 @@ object CreditCardMath {
         wallets.mapNotNull { wallet ->
             cycle(wallet, transactions, today)
                 ?.takeIf { it.amountDue.amountMinor > 0L && !it.dueDate.isAfter(until) }
-                ?.let { CardDue(wallet, it, overdue = it.isOverdue(today)) }
+                ?.let { CardDue(wallet, it, overdue = it.isOverdue(today), payFromWalletId = payingWallet(wallet, wallets, transactions)?.id) }
         }.sortedBy { it.cycle.dueDate }
+
+    /**
+     * Where [card]'s payment most likely comes from, to pre-fill the payment transfer: the account that paid it last
+     * (the source of the latest transfer into the card), otherwise the cash, bank or e-wallet account in the card's
+     * currency with the most money. Only same-currency accounts that aren't cards or loans; null when there is none.
+     */
+    fun payingWallet(card: Wallet, wallets: List<Wallet>, transactions: List<Transaction>): Wallet? {
+        val candidates = wallets.filter { it.id != card.id && !it.type.isLiability && !it.type.isValuedManually && it.currencyCode == card.currencyCode }
+        if (candidates.isEmpty()) return null
+        val byId = candidates.associateBy { it.id }
+        val outLegs = transactions.filter { it.type == TransactionType.TRANSFER_OUT && it.transferGroup != null }.associateBy { it.transferGroup }
+        val lastPayer = transactions
+            .filter { it.walletId == card.id && it.type == TransactionType.TRANSFER_IN && it.transferGroup != null }
+            .sortedWith(compareByDescending<Transaction> { it.date }.thenByDescending { it.createdAtEpochMillis })
+            .firstNotNullOfOrNull { leg -> outLegs[leg.transferGroup]?.walletId?.let(byId::get) }
+        return lastPayer ?: candidates.filter { it.type.isSpendable }.maxByOrNull { it.balance.amountMinor }
+            ?: candidates.maxByOrNull { it.balance.amountMinor }
+    }
 }
 
 /**

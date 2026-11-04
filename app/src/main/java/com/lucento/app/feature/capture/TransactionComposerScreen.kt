@@ -408,7 +408,7 @@ fun TransactionComposerScreen(
         ChatInputBar(Modifier.background(MaterialTheme.colorScheme.background).padding(horizontal = Spacing.gutter, vertical = Spacing.sm)) {
             if (scanEnabled) {
                 Box {
-                    ChatToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt", onClick = { scanMenu = true })
+                    ChatToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt or statement", onClick = { scanMenu = true })
                     DropdownMenu(expanded = scanMenu, onDismissRequest = { scanMenu = false }) {
                         DropdownMenuItem(
                             text = { Text("Take a photo") },
@@ -479,7 +479,7 @@ fun TransactionComposerScreen(
             onDismiss = {
                 viewModel.dismissWalletPicker()?.let { (text, source) ->
                     if (source == CaptureSource.RECEIPT) {
-                        notice = "Receipt not added. Choose a wallet, then scan it again."
+                        notice = "Scan not added. Choose a wallet, then scan it again."
                     } else if (input.isBlank()) {
                         input = text
                     }
@@ -684,7 +684,7 @@ private fun UserBubble(message: ComposerMessage, editing: Boolean, canEdit: Bool
             text = message.text,
             top = when (message.source) {
                 CaptureSource.SPOKEN -> ({ SourceLabel(Icons.Outlined.KeyboardVoice, "Spoken") })
-                CaptureSource.RECEIPT -> ({ SourceLabel(Icons.Outlined.DocumentScanner, "Receipt") })
+                CaptureSource.RECEIPT -> ({ SourceLabel(Icons.Outlined.DocumentScanner, "Scan") })
                 CaptureSource.TYPED -> null
             },
         )
@@ -749,7 +749,7 @@ private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAtten
                 TypingDots(description = "Reading")
                 Spacer(Modifier.width(Spacing.sm))
                 Text(
-                    if (message.source == CaptureSource.RECEIPT) "Reading the receipt on this phone…" else "Reading…",
+                    if (message.source == CaptureSource.RECEIPT) "Reading the scan on this phone…" else "Reading…",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -763,6 +763,17 @@ private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAtten
                     else -> "Here are ${rows.size} transactions — $needsAttention need a look:"
                 }
                 Text(text, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), modifier = live)
+                // A scan says what it was read as (one receipt, or a statement's lines) and what to check.
+                if (rows.isNotEmpty()) {
+                    s.note?.let { note ->
+                        Text(
+                            note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = Spacing.xxs),
+                        )
+                    }
+                }
                 rowsContent()
                 // Who read it, whenever it isn't plain on-device reading: Gemini, or this phone with the reason.
                 s.engine?.takeIf { !it.onDevice || it.label.contains("·") }?.let { engine ->

@@ -127,6 +127,11 @@ recurring-schedule sync, syncing preferences.
   device `ReconciliationTest` in CI); the sync chip says how fresh it is and what's waiting, syncs run in the app while
   it's open and can't hang; Hide amounts (phone unlock to show) masks money on every read/view page, editors excepted;
   the Transfer sheet follows the other sheets' style.
+- Owner review round 8 (2026-11-04): a card's payment reminder (bell, Upcoming, the card's Payment) opens the transfer
+  that pays it, filled in from the statement; scans tell a receipt (one payment for its "Amount due" or total) from a
+  statement or an app's transaction history (one row per transaction, money in or out from the running balance,
+  CR/DR or +/− marks); Ask Lucento becomes an adviser — advice, projections and calculations worked out on the phone
+  (`[[= … ]]`), goals and transaction-level answers — under a new consent that covers recent transactions.
 - Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
   email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
   Insights adopt the brand hero and carded sections.

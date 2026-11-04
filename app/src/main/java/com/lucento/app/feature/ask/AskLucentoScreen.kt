@@ -185,7 +185,11 @@ fun AskLucentoScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     MascotSpeech(
                         title = "Ask me about your money",
-                        body = "I answer from your own records. Reports are worked out on this phone and can be saved as PDFs.",
+                        body = if (state.aiActive) {
+                            "I answer from your own records and suggest what to do next. Reports are worked out on this phone and can be saved as PDFs."
+                        } else {
+                            "I answer from your own records. Reports are worked out on this phone and can be saved as PDFs."
+                        },
                         mood = if (state.messages.isEmpty()) MascotMood.Greeting else MascotMood.Happy,
                         mascotSize = 64.dp,
                     )
@@ -193,6 +197,18 @@ fun AskLucentoScreen(
                 }
             }
             if (state.messages.isEmpty()) {
+                if (state.aiActive) {
+                    item(key = "advice") {
+                        Column {
+                            SmallLabel("Ask for advice")
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                                LocalAnswers.adviceSuggestions.forEach { q ->
+                                    ChoicePill(label = q, selected = false, onClick = { send(q) }, role = androidx.compose.ui.semantics.Role.Button)
+                                }
+                            }
+                        }
+                    }
+                }
                 item(key = "suggestions") {
                     Column {
                         SmallLabel("Try asking")
@@ -423,7 +439,7 @@ private fun SourceLine(source: AnswerSource) {
         )
         Spacer(Modifier.width(Spacing.xs))
         Text(
-            if (source == AnswerSource.GEMINI) "Answered by Gemini · bold figures from this phone" else "Calculated on this phone",
+            if (source == AnswerSource.GEMINI) "Answered by Gemini · bold figures worked out on this phone" else "Calculated on this phone",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -649,10 +665,10 @@ private fun TableLine(line: ReportLine, columns: List<String>) {
 private fun AiConsentSheet(onAccept: () -> Unit, onDismiss: () -> Unit) {
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.gutter).navigationBarsPadding()) {
-            SheetHeader(title = "Turn on AI answers?", subtitle = "Ask anything about your money, answered by Gemini.", icon = Icons.Outlined.AutoAwesome)
-            ConsentPoint("Sent", "Your question and a summary of your figures — monthly totals, totals by category, balances by wallet, budgets, debts and upcoming bills — to Lucento’s server, which asks Google’s Gemini.")
-            ConsentPoint("Never sent", "Your transactions, notes, payees, receipts or photos.")
-            ConsentPoint("Checked here", "Answers quote figures calculated on this phone, shown in bold. AI can still misread a question — check anything important. It isn’t financial advice.")
+            SheetHeader(title = "Turn on AI answers?", subtitle = "Ask anything about your money and get advice, answered by Gemini.", icon = Icons.Outlined.AutoAwesome)
+            ConsentPoint("Sent", AI_SENT)
+            ConsentPoint("Never sent", AI_NEVER_SENT)
+            ConsentPoint("Checked here", "Every amount in an answer is one of your figures, or a sum this phone worked out from them — shown in bold. AI can still misread a question, so check anything important. Advice is general guidance, not professional financial advice.")
             ConsentPoint("Limits", "Needs your sync account. Each account has a daily allowance, shared with Smarter reading. Turn this off any time from the menu or Settings.")
             Spacer(Modifier.height(Spacing.md))
             LucentoPrimaryButton(text = "Turn on AI answers", onClick = onAccept)
@@ -662,6 +678,13 @@ private fun AiConsentSheet(onAccept: () -> Unit, onDismiss: () -> Unit) {
         }
     }
 }
+
+/** What AI answers send (the consent sheet and Settings say the same). */
+internal const val AI_SENT =
+    "Your question; your figures — monthly totals, categories, balances, budgets, debts, goals and upcoming bills; projections " +
+        "worked out on this phone; and your transactions from the last 60 days in your main currency (date, amount, type, " +
+        "category, account and note) — to Lucento’s server, which asks Google’s Gemini. Nothing is kept there."
+internal const val AI_NEVER_SENT = "Receipts or photos, older transactions, accounts in other currencies, or your sign-in details."
 
 @Composable
 private fun ConsentPoint(title: String, body: String) {

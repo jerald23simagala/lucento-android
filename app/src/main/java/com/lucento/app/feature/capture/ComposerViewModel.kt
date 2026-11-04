@@ -58,7 +58,13 @@ data class ComposerMessage(
 sealed interface MessageState {
     data object Reading : MessageState
     /** Interpreted; [found] rows came from it, [saved] of them have been saved since. */
-    data class Read(val found: Int, val saved: Int = 0, val engine: com.lucento.app.domain.capture.InterpreterEngine? = null) : MessageState
+    data class Read(
+        val found: Int,
+        val saved: Int = 0,
+        val engine: com.lucento.app.domain.capture.InterpreterEngine? = null,
+        /** What kind of scan it was and what to check ("Read as a statement: 7 transactions…"); null for messages. */
+        val note: String? = null,
+    ) : MessageState
     data class NothingFound(val message: String) : MessageState
 }
 
@@ -252,14 +258,17 @@ class ComposerViewModel(
         }
     }
 
-    /** Reads a receipt image on this phone (ML Kit, bundled model) and adds its row. [cleanup] is deleted afterwards. */
+    /**
+     * Reads a scanned image on this phone (ML Kit, bundled model): a receipt adds one row, a statement or transaction
+     * history one row per line. [cleanup] is deleted afterwards.
+     */
     fun readReceipt(appContext: Context, uri: Uri, cleanup: File?) {
         val id = nextMessageId++
-        session.update { s -> s.copy(messages = s.messages + ComposerMessage(id, CaptureSource.RECEIPT, "Receipt photo", MessageState.Reading), saveError = null) }
+        session.update { s -> s.copy(messages = s.messages + ComposerMessage(id, CaptureSource.RECEIPT, SCAN_LABEL, MessageState.Reading), saveError = null) }
         viewModelScope.launch {
             val result = try {
                 val lines = ReceiptParser.mergeRows(ReceiptOcr.recognize(appContext, uri))
-                interpreter.interpretReceipt(lines, context())
+                interpreter.interpretScan(lines, context())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -274,7 +283,7 @@ class ComposerViewModel(
 
     fun receiptUnavailable(message: String) {
         val id = nextMessageId++
-        session.update { s -> s.copy(messages = s.messages + ComposerMessage(id, CaptureSource.RECEIPT, "Receipt photo", MessageState.NothingFound(message))) }
+        session.update { s -> s.copy(messages = s.messages + ComposerMessage(id, CaptureSource.RECEIPT, SCAN_LABEL, MessageState.NothingFound(message))) }
     }
 
     private suspend fun context(): InterpretationContext {
@@ -287,6 +296,7 @@ class ComposerViewModel(
             loaded.wallets, loaded.categories, today(), default, s.typeHint,
             decimalSeparator = separator,
             spaceGrouping = java.text.DecimalFormatSymbols.getInstance().groupingSeparator in setOf(' ', ' ', ' ', ' '),
+            dayFirst = phoneDayFirst(),
         )
     }
 
@@ -302,7 +312,7 @@ class ComposerViewModel(
             val (messageState, newRows) = when (result) {
                 is Interpretation.Candidates -> {
                     val rows = result.items.map { ReviewRow.from(it, UUID.randomUUID().toString(), id, source, separator) }
-                    MessageState.Read(rows.size, engine = result.engine) to rows
+                    MessageState.Read(rows.size, engine = result.engine, note = result.note) to rows
                 }
                 is Interpretation.NothingFound -> MessageState.NothingFound(result.message) to emptyList()
             }
@@ -401,8 +411,17 @@ class ComposerViewModel(
     }
 
     companion object {
+        /** The user's side of the chat for a scanned image (a receipt, a statement or an app's history). */
+        const val SCAN_LABEL = "Scanned image"
+
         val Factory = containerFactory {
             ComposerViewModel(it.transactions, it.wallets, it.categories, it.interpreter, it.preferences)
+        }
+
+        /** True when the phone writes short dates day first (03/11 for 3 November). */
+        fun phoneDayFirst(locale: java.util.Locale = java.util.Locale.getDefault()): Boolean {
+            val pattern = (java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT, locale) as? java.text.SimpleDateFormat)?.toPattern() ?: return false
+            return pattern.indexOf('d').let { d -> d >= 0 && d < pattern.indexOf('M').let { if (it < 0) Int.MAX_VALUE else it } }
         }
     }
 }

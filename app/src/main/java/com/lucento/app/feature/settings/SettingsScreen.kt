@@ -662,16 +662,18 @@ private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
         title = "AI answers with Gemini",
         checked = on,
         onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
-        description = "Ask anything about your money. Off, Ask Lucento still prepares your reports on this phone.",
+        description = "Ask anything about your money and get advice. Off, Ask Lucento still prepares your reports on this phone.",
     )
     if (asking) {
         ConfirmDialog(
             title = "Turn on AI answers?",
-            text = "When you ask Ask Lucento a question of your own, Lucento sends it, with a summary of your figures — " +
-                "monthly totals, totals by category, balances by wallet, budgets, debts and upcoming bills — to Lucento’s " +
-                "server, which asks Google’s Gemini. Your transactions, notes, payees, receipts and photos are never sent. " +
-                "Answers quote figures calculated on this phone. It isn’t financial advice. Each account has a daily " +
-                "allowance, shared with Smarter reading, and you can turn this off at any time.",
+            text = "When you ask Ask Lucento a question of your own, Lucento sends it, with your figures — monthly totals, " +
+                "categories, balances, budgets, debts, goals and upcoming bills — projections worked out on this phone, and " +
+                "your transactions from the last 60 days in your main currency (date, amount, type, category, account and " +
+                "note) to Lucento’s server, which asks Google’s Gemini. Receipts, photos, older transactions and other " +
+                "currencies are never sent. Every amount in an answer is worked out on this phone. Advice is general " +
+                "guidance, not professional financial advice. Each account has a daily allowance, shared with Smarter " +
+                "reading, and you can turn this off at any time.",
             confirmLabel = "Turn on",
             onConfirm = {
                 asking = false

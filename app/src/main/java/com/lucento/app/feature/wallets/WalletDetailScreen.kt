@@ -84,6 +84,8 @@ fun WalletDetailScreen(
     onAdjusted: () -> Unit = {},
     /** Opens a prefilled recurring payment after a debt is saved with a reminder; null when recurring is off. */
     onPlanDebtPayment: ((Long, java.time.LocalDate) -> Unit)? = null,
+    /** A card with an amount due: its payment transfer, filled in (the same as Home's reminder). */
+    onPayCard: (com.lucento.app.domain.CardDue) -> Unit = { onTransfer(it.payFromWalletId, it.wallet.id) },
     viewModel: WalletDetailViewModel = viewModel(key = "wallet-$walletId", factory = WalletDetailViewModel.factory(walletId)),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
@@ -167,8 +169,14 @@ fun WalletDetailScreen(
             ) {
                 if (transfersEnabled) {
                     when {
-                        loan -> MoveMoneyCard("Repay loan", "From your bank or cash", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(0.38f).fillMaxHeight())
-                        liability -> MoveMoneyCard("Payment", "Pay this card", Icons.Outlined.Payments, { onTransfer(null, wallet.id) }, Modifier.weight(0.38f).fillMaxHeight())
+                        loan -> MoveMoneyCard("Repay loan", "From your bank or cash", Icons.Outlined.Payments, { onTransfer(state.payFromWalletId, wallet.id) }, Modifier.weight(0.38f).fillMaxHeight())
+                        liability -> MoveMoneyCard(
+                            "Payment",
+                            "Pay this card",
+                            Icons.Outlined.Payments,
+                            { state.cardDue?.let(onPayCard) ?: onTransfer(state.payFromWalletId, wallet.id) },
+                            Modifier.weight(0.38f).fillMaxHeight(),
+                        )
                         else -> MoveMoneyCard("Transfer", "Between your wallets", Icons.Outlined.SwapHoriz, { onTransfer(wallet.id, null) }, Modifier.weight(0.38f).fillMaxHeight())
                     }
                 }

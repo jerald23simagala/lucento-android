@@ -224,8 +224,13 @@ data class HomeActions(
     /** Opens Recurring payments; with a schedule id, straight to that payment's review / mark-paid sheet. */
     val onOpenRecurring: (Long?) -> Unit,
     val onOpenWallets: () -> Unit = {},
-    /** One wallet's page (a card's payment reminder opens its card, where Payment is). */
+    /** One wallet's page. */
     val onOpenWallet: (Long) -> Unit = {},
+    /**
+     * A card's payment reminder (the bell, Upcoming): the transfer sheet, filled in with the amount due, the card and the
+     * account it's usually paid from, ready to check and save. Without transfers it opens the card instead.
+     */
+    val onPayCard: (CardDue) -> Unit = { onOpenWallet(it.wallet.id) },
     val onOpenDebts: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     /** Settings › Account & sync, from the sync details sheet (P2-2). */
@@ -298,7 +303,7 @@ private fun HomeDashboard(
             syncDetails = state.syncDetails,
             onOpenSyncSettings = { showSync = true },
             bell = if (state.features.isEnabled(Feature.RECURRING) || state.cardDuesSoon.isNotEmpty()) {
-                { PaymentsBell(state, actions.onOpenRecurring, actions.onOpenWallet) }
+                { PaymentsBell(state, actions.onOpenRecurring, actions.onPayCard) }
             } else {
                 null
             },
@@ -425,10 +430,11 @@ private fun HomeHeader(
 /**
  * The bell: scheduled items and card payments that need attention (overdue, or due within a week) with a count badge,
  * so they're noticed without scrolling. Opens a small panel — Lucento with a one-line summary, what's still to pay,
- * then Overdue and This week sections — where each row opens its review sheet (or the card).
+ * then Overdue and This week sections — where a schedule opens its review sheet and a card payment opens the transfer
+ * that pays it, already filled in.
  */
 @Composable
-private fun PaymentsBell(state: HomeUiState, onOpenRecurring: (Long?) -> Unit, onOpenWallet: (Long) -> Unit) {
+private fun PaymentsBell(state: HomeUiState, onOpenRecurring: (Long?) -> Unit, onPayCard: (CardDue) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val due = state.dueSoon
     val cards = state.cardDuesSoon
@@ -478,9 +484,9 @@ private fun PaymentsBell(state: HomeUiState, onOpenRecurring: (Long?) -> Unit, o
                     open = false
                     onOpenRecurring(id)
                 },
-                onOpenWallet = { id ->
+                onPayCard = { due ->
                     open = false
-                    onOpenWallet(id)
+                    onPayCard(due)
                 },
                 onSeeAll = {
                     open = false
@@ -508,7 +514,7 @@ private fun BellPanel(
     count: Int,
     overdue: Int,
     onOpenSchedule: (Long) -> Unit,
-    onOpenWallet: (Long) -> Unit,
+    onPayCard: (CardDue) -> Unit,
     onSeeAll: () -> Unit,
 ) {
     val ext = LucentoTheme.extendedColors
@@ -595,7 +601,7 @@ private fun BellPanel(
                 BellRow(entry, state, onClick = {
                     when {
                         entry.payment != null -> onOpenSchedule(entry.payment.schedule.id)
-                        entry.card != null -> onOpenWallet(entry.card.wallet.id)
+                        entry.card != null -> onPayCard(entry.card)
                     }
                 })
             }
@@ -637,7 +643,7 @@ private fun BellRow(entry: BellEntry, state: HomeUiState, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clickable(role = Role.Button, onClickLabel = "Open ${entry.title}", onClick = onClick)
+            .clickable(role = Role.Button, onClickLabel = if (entry.card != null) "Pay ${entry.card.wallet.name}" else "Open ${entry.title}", onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -976,7 +982,7 @@ private fun Overview(
 
         val recurringOn = f.isEnabled(Feature.RECURRING)
         if (state.isCurrentMonth && (recurringOn || state.cardDues.isNotEmpty())) {
-            UpcomingScheduledCard(state, onOpen = if (recurringOn) actions.onOpenRecurring else null, onOpenWallet = actions.onOpenWallet)
+            UpcomingScheduledCard(state, onOpen = if (recurringOn) actions.onOpenRecurring else null, onPayCard = actions.onPayCard)
         }
 
         RecentTransactionsCard(state, actions)
@@ -1925,11 +1931,11 @@ private fun OffModuleSheet(feature: Feature, onTurnOn: () -> Unit, onHide: () ->
 
 /**
  * What's still due this month (overdue first, then by date): scheduled items and credit card payments (from each card's
- * billing days; they open the card). Empty months say so; past months don't show the section. [onOpen] is null when
- * Recurring is off and only card payments are listed.
+ * billing days; a tap opens the payment transfer, filled in). Empty months say so; past months don't show the section.
+ * [onOpen] is null when Recurring is off and only card payments are listed.
  */
 @Composable
-private fun UpcomingScheduledCard(state: HomeUiState, onOpen: ((Long?) -> Unit)?, onOpenWallet: (Long) -> Unit) {
+private fun UpcomingScheduledCard(state: HomeUiState, onOpen: ((Long?) -> Unit)?, onPayCard: (CardDue) -> Unit) {
     LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
         if (onOpen != null) {
             CardHeaderWithSeeAll("Upcoming", "scheduled transactions", Icons.Outlined.CalendarMonth, onSeeAll = { onOpen(null) })
@@ -1949,7 +1955,7 @@ private fun UpcomingScheduledCard(state: HomeUiState, onOpen: ((Long?) -> Unit)?
         rows.forEachIndexed { index, (_, item) ->
             when (item) {
                 is UpcomingPayment -> ScheduledRow(item, state, onClick = { onOpen?.invoke(item.schedule.id) })
-                is CardDue -> CardDueRow(item, state.today, onClick = { onOpenWallet(item.wallet.id) })
+                is CardDue -> CardDueRow(item, state.today, onClick = { onPayCard(item) })
             }
             if (index < rows.lastIndex) Hairline(inset = Sizes.iconTile + Spacing.md)
         }
@@ -1958,7 +1964,7 @@ private fun UpcomingScheduledCard(state: HomeUiState, onOpen: ((Long?) -> Unit)?
 
 /**
  * A credit card's payment reminder in the scheduled-row layout: the card and its amount due, then the due date and
- * "Not in Safe to spend". It's derived from the card, so a tap opens the card, where Payment is.
+ * "Not in Safe to spend". A tap opens the payment transfer, filled in from the card's statement.
  */
 @Composable
 private fun CardDueRow(item: CardDue, today: LocalDate, onClick: () -> Unit) {
@@ -1974,7 +1980,7 @@ private fun CardDueRow(item: CardDue, today: LocalDate, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .clickable(role = Role.Button, onClickLabel = "Open ${item.wallet.name}", onClick = onClick)
+            .clickable(role = Role.Button, onClickLabel = "Pay ${item.wallet.name}", onClick = onClick)
             .padding(vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {

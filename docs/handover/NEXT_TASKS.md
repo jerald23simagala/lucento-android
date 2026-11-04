@@ -516,3 +516,27 @@ As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 7".
 | `ReconciliationTest` (API 28) | PASS: figures agree; Hide masks Home, Transactions, Budget and Wallets |
 | `ScreenshotTourTest` (API 28) | PASS, 54 shots in `artifacts/core-screens/review8/`, including the hidden pass (23–23i) over Home, Transactions, a transaction, Budget, a wallet, Insights, Goals, Debts and Scheduled |
 | Release build | `assembleRelease` with `LUCENTO_REQUIRE_RELEASE_CONFIG=true`: package `com.lucento.app`, signer SHA-1 `49:AF:14:81:…:8C:75` (debug key), dex references the production project only; launches on the emulator without a crash |
+
+## Owner review round 8 (2026-11-04, `feature/owner-round-8`, PR to `main`)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 8".
+
+| Next | Why |
+|---|---|
+| **Owner: review and merge the app PR** from `feature/owner-round-8` once CI is green | Committed and pushed, not merged |
+| **Owner: merge `lucento-website` PR #9** (`feature/ask-advisor`; merging deploys it to Vercel production) | The adviser prompt and `[[= … ]]` calculations live in the proxy. Until it's deployed, version 2 apps get the old prompt: transaction-level answers work, advice and calculations don't. Old apps are unaffected (version 1 → old prompt) |
+| **Owner: re-accept AI answers** after installing | The consent now covers transactions, goals and projections (v2); the summaries-only consent was reset on purpose |
+| Owner: try a real statement photo and an e-wallet screenshot | Only made-up images were read on a device (`ScanOcrTest`); real bank layouts vary (merged columns, two-line rows) |
+| Later: let Smarter reading (Gemini) read scans, with its own consent | Scans are read on the phone only; a model would handle messier layouts, but statements are sensitive |
+| **Last stage — Account & sync password** (unchanged) | Owner, 2026-11-04 |
+
+| Check | Result |
+|---|---|
+| Unit tests | **927/927** unit tests (new: `StatementScanTest` 16, `AdvisorTest` 7, `DebtProgressTest` +3; `AskRequestTest` +1: the body always says `"version":2`; `AskTest` and `AccountSetupResetTest` updated for consent v2) |
+| Lint | 0 errors / 10 warnings (none from this round: the AutoboxingStateCreation one is round 7's `AmountText.kt`) |
+| `ScanOcrTest` (API 28) | **3/3 PASS**: ML Kit reads the made-up statement, e-wallet and receipt images; the statement and history are read line by line (directions from the balance and the signs; "₱" comes back as "P", handled), the receipt as one 369.00 payment |
+| `ReconciliationTest` (API 28) | PASS |
+| `ScreenshotTourTest` (API 28) | PASS, 55 shots in `artifacts/core-screens/review9/`; 06c shows the bell's Visa payment as a transfer of $640.00 from Everyday bank, today |
+| Release build | `artifacts/apk/lucento-release-TEST-SIGNED-round8.apk`: `com.lucento.app`, signer SHA-1 `49:AF:14:81:…:8C:75` (debug key; test only, never distribute) |
+| Manual (API 28) | `artifacts/round8/`: statement scan reply and rows, receipt scan, bell, filled-in payment |
+| Website | `eslint` clean on `ask.ts`; `astro check` errors only in the Playwright files (unrelated, pre-existing); local `astro build` fails on a missing `@fontsource-variable/manrope` in local `node_modules` (environment; Vercel installs fresh); the Vercel preview build of PR #9 **passed** |

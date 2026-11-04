@@ -137,4 +137,48 @@ class DebtProgressTest {
         assertTrue(DebtTerms(statementDay = 31, dueDay = 1).hasBillingCycle)
         assertFalse(DebtTerms(statementDay = 31).hasBillingCycle)
     }
+
+    private fun account(id: Long, type: WalletType, minor: Long, currency: String = "USD") = Wallet(
+        id = id, name = "Account $id", type = type, balance = Money(minor, currency), createdAtEpochMillis = 0, openingBalance = Money(minor, currency),
+    )
+
+    private fun transferLegs(group: String, from: Long, to: Long, minor: Long, date: String, created: Long = 0) = listOf(
+        tx(TransactionType.TRANSFER_OUT, minor, date, wallet = from).copy(transferGroup = group, createdAtEpochMillis = created),
+        tx(TransactionType.TRANSFER_IN, minor, date, wallet = to).copy(transferGroup = group, createdAtEpochMillis = created),
+    )
+
+    @Test fun aCardIsPaidFromTheAccountThatPaidItLast() {
+        val visa = card(owed = 50_000)
+        val bank = account(2, WalletType.BANK, 900_000)
+        val cash = account(3, WalletType.CASH, 5_000)
+        val history = transferLegs("a", from = 2, to = 1, minor = 10_000, date = "2026-09-05") +
+            transferLegs("b", from = 3, to = 1, minor = 2_000, date = "2026-10-05") +
+            // A transfer between two other accounts says nothing about the card.
+            transferLegs("c", from = 2, to = 3, minor = 1_000, date = "2026-10-30")
+        assertEquals(3L, CreditCardMath.payingWallet(visa, listOf(visa, bank, cash), history)?.id)
+    }
+
+    @Test fun withoutPastPaymentsTheRichestEverydayAccountInTheCardsCurrencyPays() {
+        val visa = card(owed = 50_000)
+        val wallets = listOf(
+            visa,
+            account(2, WalletType.CASH, 5_000),
+            account(3, WalletType.BANK, 80_000),
+            account(4, WalletType.SAVINGS, 900_000), // not everyday money while an everyday account exists
+            account(5, WalletType.BANK, 990_000, currency = "EUR"), // another currency: never
+            card(owed = 1_000, id = 6), // another card: never
+        )
+        assertEquals(3L, CreditCardMath.payingWallet(visa, wallets, emptyList())?.id)
+        // Only savings in the currency: savings pays. Nothing in the currency: no suggestion.
+        assertEquals(4L, CreditCardMath.payingWallet(visa, listOf(visa, account(4, WalletType.SAVINGS, 1)), emptyList())?.id)
+        assertNull(CreditCardMath.payingWallet(visa, listOf(visa, account(5, WalletType.BANK, 1, "EUR")), emptyList()))
+    }
+
+    @Test fun cardDuesCarryTheSuggestedPayingAccount() {
+        val visa = card(owed = 100_000)
+        val bank = account(2, WalletType.BANK, 900_000)
+        val due = CreditCardMath.dues(listOf(visa, bank), emptyList(), today, today.plusDays(7)).single()
+        assertEquals(usd(100_000), due.cycle.amountDue)
+        assertEquals(2L, due.payFromWalletId)
+    }
 }

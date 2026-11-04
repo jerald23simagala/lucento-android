@@ -10,7 +10,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * The composer's interpreter: Gemini (through [remote]) when the user turned Smarter reading on, otherwise — and
  * whenever Gemini can't answer (offline, signed out, today's limit used, an error) — [local], on this phone. Each
- * result names who read it, so local rules are never presented as AI. Receipts are always read on this phone.
+ * result names who read it, so local rules are never presented as AI. Scans (receipts and statements) are always read
+ * on this phone.
  */
 class HybridTransactionInterpreter(
     private val local: TransactionInterpreter,
@@ -46,8 +47,8 @@ class HybridTransactionInterpreter(
         }
     }
 
-    override suspend fun interpretReceipt(lines: List<String>, context: InterpretationContext): Interpretation =
-        local.interpretReceipt(lines, context)
+    override suspend fun interpretScan(lines: List<String>, context: InterpretationContext): Interpretation =
+        local.interpretScan(lines, context)
 
     companion object {
         val GEMINI = InterpreterEngine(label = "Gemini", onDevice = false)
