@@ -524,7 +524,8 @@ As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 8".
 | Next | Why |
 |---|---|
 | **Owner: review and merge the app PR** from `feature/owner-round-8` once CI is green | Committed and pushed, not merged |
-| **Owner: merge `lucento-website` PR #9** (`feature/ask-advisor`; merging deploys it to Vercel production) | The adviser prompt and `[[= … ]]` calculations live in the proxy. Until it's deployed, version 2 apps get the old prompt: transaction-level answers work, advice and calculations don't. Old apps are unaffected (version 1 → old prompt) |
+| ~~Owner: merge `lucento-website` PR #9~~ **Done 2026-11-04** (`901acf8`, production deployment succeeded) | The adviser prompt and `[[= … ]]` calculations live in the proxy. Old apps are unaffected (version 1 → old prompt) |
+| **Owner: ask the adviser a few questions** on the test-signed release APK (signed in, AI answers re-accepted) | First live check of the adviser prompt: next steps, `[[= … ]]` results in bold, the closing guidance line |
 | **Owner: re-accept AI answers** after installing | The consent now covers transactions, goals and projections (v2); the summaries-only consent was reset on purpose |
 | Owner: try a real statement photo and an e-wallet screenshot | Only made-up images were read on a device (`ScanOcrTest`); real bank layouts vary (merged columns, two-line rows) |
 | Later: let Smarter reading (Gemini) read scans, with its own consent | Scans are read on the phone only; a model would handle messier layouts, but statements are sensitive |
@@ -539,4 +540,4 @@ As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 8".
 | `ScreenshotTourTest` (API 28) | PASS, 55 shots in `artifacts/core-screens/review9/`; 06c shows the bell's Visa payment as a transfer of $640.00 from Everyday bank, today |
 | Release build | `artifacts/apk/lucento-release-TEST-SIGNED-round8.apk`: `com.lucento.app`, signer SHA-1 `49:AF:14:81:…:8C:75` (debug key; test only, never distribute) |
 | Manual (API 28) | `artifacts/round8/`: statement scan reply and rows, receipt scan, bell, filled-in payment |
-| Website | `eslint` clean on `ask.ts`; `astro check` errors only in the Playwright files (unrelated, pre-existing); local `astro build` fails on a missing `@fontsource-variable/manrope` in local `node_modules` (environment; Vercel installs fresh); the Vercel preview build of PR #9 **passed** |
+| Website | `eslint` clean on `ask.ts`; `astro check` errors only in the Playwright files (unrelated, pre-existing); local `astro build` fails on a missing `@fontsource-variable/manrope` in local `node_modules` (environment; Vercel installs fresh); the Vercel preview build of PR #9 **passed**; merged as `901acf8`, production deployment **succeeded**, unsigned `POST /api/ask` → 401 |

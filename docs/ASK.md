@@ -103,7 +103,7 @@ sign-in details, the Gemini key.
 | Client | `data/ai/AskLucentoClient.kt` → `BuildConfig.AI_ASK_URL` (the Smarter reading URL with `/interpret` → `/ask`; debug builds only with a test proxy) |
 | PDF | `data/reports/ReportPdfWriter.kt` |
 | Consent | `UserPreferences.askLucentoAi` (`ask_lucento_ai_v2`); Settings › Privacy › Ask Lucento |
-| Proxy | `lucento-website/src/pages/api/ask.ts`: `SYSTEM` for version 1 apps, `SYSTEM_V2` (the adviser) for version 2 (`lucento-website` PR #9, `feature/ask-advisor`) |
+| Proxy | `lucento-website/src/pages/api/ask.ts`: `SYSTEM` for version 1 apps, `SYSTEM_V2` (the adviser) for version 2 (`lucento-website` PR #9, deployed 2026-11-04) |
 
 ## Setting it up (owner)
 
