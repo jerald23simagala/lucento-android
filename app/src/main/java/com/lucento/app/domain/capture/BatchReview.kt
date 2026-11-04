@@ -260,7 +260,8 @@ object BatchReview {
         } else {
             val category = row.categoryId?.let { id -> setup.categories.firstOrNull { it.id == id } }
             when {
-                row.categoryId == null -> issues += RowIssue(RowField.CATEGORY, "No category — it will be saved as uncategorized", blocking = false)
+                // Every income and expense needs a category (owner, 2026-11-04): an uncategorized row can't be saved.
+                row.categoryId == null -> issues += RowIssue(RowField.CATEGORY, "Choose a category", blocking = true)
                 category == null || category.archived || category.kind != kindOf(row.type) ->
                     issues += RowIssue(RowField.CATEGORY, "Choose a category", blocking = true)
             }

@@ -292,8 +292,8 @@ internal fun ReviewRowItem(
                         enabled = enabled,
                         fill = true,
                         modifier = Modifier.weight(1f),
-                        options = pool.map { c -> c.name to { onEdit(RowEdit.CategoryChoice(c.id)) } } +
-                            listOf("No category" to { onEdit(RowEdit.CategoryChoice(null)) }),
+                        // Every income and expense needs a category (owner, 2026-11-04), so there's no "No category" choice.
+                        options = pool.map { c -> c.name to { onEdit(RowEdit.CategoryChoice(c.id)) } },
                     )
                 }
             }

@@ -49,6 +49,9 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.lucento.app.core.designsystem.component.LucentoFields
+import com.lucento.app.core.designsystem.component.filledField
 
 @Composable
 internal fun fieldColors() = OutlinedTextFieldDefaults.colors(
@@ -56,7 +59,10 @@ internal fun fieldColors() = OutlinedTextFieldDefaults.colors(
     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
 )
 
-/** Amount input with the currency symbol as prefix. Text is parsed later, only through MoneyParser. */
+/**
+ * Amount input with the currency symbol as prefix. Text is parsed later, only through MoneyParser. [leadingIcon] and
+ * [filled] (onboarding's tinted field, [LucentoFields]) are for forms that use that look.
+ */
 @Composable
 internal fun MoneyField(
     value: String,
@@ -66,6 +72,8 @@ internal fun MoneyField(
     modifier: Modifier = Modifier,
     error: String? = null,
     supporting: String? = null,
+    leadingIcon: ImageVector? = null,
+    filled: Boolean = false,
 ) {
     AmountTextField(
         value = value,
@@ -83,8 +91,9 @@ internal fun MoneyField(
             null
         },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-        shape = MaterialTheme.shapes.small,
-        colors = fieldColors(),
+        shape = if (filled) LucentoFields.shape else MaterialTheme.shapes.small,
+        colors = if (filled) LucentoFields.filledColors() else fieldColors(),
+        leadingIcon = leadingIcon?.let { icon -> { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) } },
         modifier = modifier.fillMaxWidth(),
     )
 }
@@ -98,6 +107,8 @@ internal fun TextInput(
     placeholder: String? = null,
     error: String? = null,
     maxLength: Int = 40,
+    leadingIcon: ImageVector? = null,
+    filled: Boolean = false,
 ) {
     OutlinedTextField(
         value = value,
@@ -116,8 +127,9 @@ internal fun TextInput(
             null
         },
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
-        shape = MaterialTheme.shapes.small,
-        colors = fieldColors(),
+        shape = if (filled) LucentoFields.shape else MaterialTheme.shapes.small,
+        colors = if (filled) LucentoFields.filledColors() else fieldColors(),
+        leadingIcon = leadingIcon?.let { icon -> { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) } },
         modifier = modifier.fillMaxWidth(),
     )
 }
@@ -152,19 +164,30 @@ internal fun DateField(
     onDate: (LocalDate?) -> Unit,
     emptyText: String = "Not set",
     clearable: Boolean = true,
+    /** Onboarding's tinted field ([LucentoFields]) with the calendar in brand blue. */
+    filled: Boolean = false,
 ) {
     var picking by remember { mutableStateOf(false) }
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), MaterialTheme.shapes.medium)
+            .then(
+                if (filled) {
+                    Modifier.filledField()
+                } else {
+                    Modifier.clip(MaterialTheme.shapes.medium).border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), MaterialTheme.shapes.medium)
+                },
+            )
             .clickable(role = Role.Button, onClickLabel = "Choose $label") { picking = true }
-            .padding(start = Spacing.lg, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm),
+            .padding(start = if (filled) Spacing.md else Spacing.lg, end = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            Icons.Outlined.CalendarMonth,
+            contentDescription = null,
+            tint = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Column(Modifier.weight(1f).padding(start = Spacing.md)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(date?.let(::formatDate) ?: emptyText, style = MaterialTheme.typography.bodyLarge)

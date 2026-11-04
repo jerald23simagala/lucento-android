@@ -35,8 +35,8 @@ enum class WalletsViewMode(val key: String) {
     CARDS("cards");
 
     companion object {
-        /** Unknown or missing values fall back to rows, the default. */
-        fun fromKey(key: String?): WalletsViewMode = entries.firstOrNull { it.key == key } ?: ROWS
+        /** Unknown or missing values fall back to cards, the default (owner, 2026-11-04: the gallery opens first). */
+        fun fromKey(key: String?): WalletsViewMode = entries.firstOrNull { it.key == key } ?: CARDS
     }
 }
 
@@ -103,7 +103,7 @@ data class UserPreferences(
     /** The one-time "+" spotlight after setup was shown and dismissed (or + was used). A device choice. */
     val addSpotlightSeen: Boolean = false,
     /** Wallets screen: rows or card faces. A device choice, kept across sign-outs like the theme. */
-    val walletsViewMode: WalletsViewMode = WalletsViewMode.ROWS,
+    val walletsViewMode: WalletsViewMode = WalletsViewMode.CARDS,
     /**
      * When the profile photo was last set (epoch millis), or null for none: the avatar reloads the picture whenever it
      * changes. The photo itself is a private file ([com.lucento.app.data.media.ProfilePhotos]).

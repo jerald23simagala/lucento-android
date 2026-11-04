@@ -42,11 +42,18 @@ import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 
 /**
  * Lucento-styled modal sheet: warm low surface, default drag handle, fully expanded. Its content rises gently into place
  * as the sheet opens (a short fade and lift; none when the system asks to remove animations), so every sheet arrives
  * the same way.
+ *
+ * A fast fling through a long form keeps its leftover speed inside the sheet ([KeepFlingInSheet]): reaching the top
+ * mid-fling no longer carries on into dismissing the sheet, which closed the New wallet form while it was being scrolled
+ * (owner, 2026-11-04). Dragging the handle, or pulling down from the top, still closes it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,13 +76,21 @@ fun LucentoBottomSheet(
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
-            Modifier.fillMaxWidth().graphicsLayer {
-                alpha = 0.35f + 0.65f * appear.value
-                translationY = (1f - appear.value) * 20.dp.toPx()
-            },
+            Modifier
+                .fillMaxWidth()
+                .nestedScroll(KeepFlingInSheet)
+                .graphicsLayer {
+                    alpha = 0.35f + 0.65f * appear.value
+                    translationY = (1f - appear.value) * 20.dp.toPx()
+                },
             content = content,
         )
     }
+}
+
+/** Consumes what a content fling has left, so it never reaches the sheet; drags (and the sheet's own settling) pass. */
+private val KeepFlingInSheet = object : NestedScrollConnection {
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity = available
 }
 
 /**

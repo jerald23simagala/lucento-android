@@ -62,7 +62,13 @@ class BatchReviewTest {
 
     @Test fun batchSavesOnlyWhenEveryRowIsComplete() {
         val list = rows("Lunch 250, coffee 180, and paid the electricity bill")
-        val fixed = BatchReview.edit(list, "k2", RowEdit.Amount("1500"), categories, '.')
+        val amounts = BatchReview.edit(list, "k2", RowEdit.Amount("1500"), categories, '.')
+        // A row the words didn't categorise still blocks the save until it has a category (owner, 2026-11-04).
+        val expense = categories.first { it.kind == CategoryKind.EXPENSE && !it.archived }.id
+        val fixed = amounts.map { if (it.categoryId == null && !it.type.isTransfer) BatchReview.apply(it, RowEdit.CategoryChoice(expense), categories, '.') else it }
+        if (amounts.any { it.categoryId == null && !it.type.isTransfer }) {
+            assertFalse(BatchReview.summarize(amounts, amounts.associate { it.key to check(it) }).canSave)
+        }
         val summary = BatchReview.summarize(fixed, fixed.associate { it.key to check(it) })
         assertEquals(0, summary.needsAttention)
         assertTrue(summary.canSave)
@@ -87,7 +93,9 @@ class BatchReviewTest {
         val row = rows("12 eggs 95").single()
         assertEquals("Which amount?", check(row).issueFor(RowField.AMOUNT)?.message)
         val chosen = BatchReview.apply(row, RowEdit.ChooseAmount(BigDecimal("95")), categories, '.')
-        assertTrue(check(chosen).ready)
+        assertNull(check(chosen).issues.firstOrNull { it.field == RowField.AMOUNT && it.blocking })
+        val categorised = BatchReview.apply(chosen, RowEdit.CategoryChoice(categories.first { it.kind == CategoryKind.EXPENSE && !it.archived }.id), categories, '.')
+        assertTrue(check(categorised).ready)
         assertFalse(CandidateFlag.AMOUNT_AMBIGUOUS in chosen.flags)
     }
 
@@ -120,11 +128,14 @@ class BatchReviewTest {
         assertEquals(RowField.TO_WALLET, check(transfer).issues.first { it.blocking }.field)
     }
 
-    @Test fun missingCategoryIsAHintNotABlock() {
+    @Test fun missingCategoryBlocksUntilOneIsChosen() {
+        // Owner, 2026-11-04: no income or expense is saved without a category.
         val row = rows("spent 500 on a birthday cake").single()
         val status = check(row)
-        assertTrue(status.ready)
-        assertFalse(status.issueFor(RowField.CATEGORY)!!.blocking)
+        assertFalse(status.ready)
+        assertTrue(status.issueFor(RowField.CATEGORY)!!.blocking)
+        val chosen = BatchReview.apply(row, RowEdit.CategoryChoice(categories.first { it.kind == CategoryKind.EXPENSE }.id), categories, '.')
+        assertTrue(check(chosen).ready)
     }
 
     @Test fun mentionedCurrencyThatTheAccountDoesntUseBlocksUntilResolved() {

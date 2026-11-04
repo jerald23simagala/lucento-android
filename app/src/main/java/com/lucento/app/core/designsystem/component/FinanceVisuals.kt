@@ -2,7 +2,6 @@ package com.lucento.app.core.designsystem.component
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -30,7 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,12 +83,7 @@ fun ConsumptionBar(
     /** A thin band either side of the marker so it reads over the fill; null on a hero, where the marker is white. */
     markerGap: Color? = MaterialTheme.colorScheme.surfaceContainerLowest,
 ) {
-    val reducedMotion = LucentoTheme.reducedMotion
-    val animated by animateFloatAsState(
-        targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = if (reducedMotion) tween(0) else tween(700, easing = FastOutSlowInEasing),
-        label = "consumption",
-    )
+    val animated = animatedFraction(fraction.coerceIn(0f, 1f))
     Canvas(
         modifier
             .fillMaxWidth()

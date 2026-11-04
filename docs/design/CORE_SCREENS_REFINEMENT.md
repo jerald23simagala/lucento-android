@@ -275,3 +275,18 @@ Owner comments, as built:
 | Ask Lucento: AI about the user's records, preset reports (net worth, cash flow) and PDFs, safeguards | New page (docs/ASK.md). The preset questions and four report tiles are calculated on the phone. Free-form questions go to Gemini through the existing proxy only with consent (summaries only), with figures filled in by the phone and anything else flagged. Reports open as full statements with a month stepper, Save as PDF and Share |
 | Composer: chat styling after the reference; wallets with their real icons | Lucento's speech bubble at the top; "Into" with wallet chips showing each wallet's own tile and a star on the default; "Today" divider; pale-blue user bubbles with times; Lucento's reply card holding its rows as tinted panels; a raised input bar (scan, voice, field, send). Shared chat components in `Chat.kt`, also used by Ask Lucento |
 
+## Owner review round 5 (2026-11-04)
+
+| Comment | What changed |
+|---|---|
+| New wallet: a fast scroll closes the page | Every sheet keeps a content fling's leftover speed (`LucentoBottomSheet`, `KeepFlingInSheet`): reaching the top mid-fling no longer dismisses it; dragging the handle or pulling down from the top still does. Checked on the emulator with fast flings both ways |
+| Animate bars and charts | One helper, `animatedFraction`: bars and rings grow in from zero when first shown and follow changes smoothly (still with reduced motion). Applied to budget bars (`ConsumptionBar`), Home's budget bar, `ShareBar` (goals, top categories), `ProgressRing`, and a loan's instalment segments, which fill one after another; the charts and composition bars already grew in |
+| Add transactions: no saving without a category | A missing category on an income or expense is now a blocking issue ("Choose a category"); the row menu has no "No category". Transfers have none |
+| Dashboard: Ask Lucento beside the month filter? | Advice only, not built (see the report) |
+| Wallets: gallery view first | Cards are the default view (`WalletsViewMode`); a saved choice is kept |
+| Budget: compact rows | Category rows 16dp side padding (was 24), 10dp vertical (was 16), 34dp tiles, tighter bar gap; unbudgeted rows 52dp |
+| Goals page: enhance | Hero with an overall progress ring and Still to save / Reached tiles; "In progress" and "Reached" sections; cards with the goal's icon, saved of target, percentage, a thicker filling bar and fact chips (target date, a month's amount, the estimate at your pace, where it's kept); the goal sheet with a ring, Saved / Target / Still to save, fact chips and a history with direction tiles |
+| New savings goal | Preset icons (`GoalIcon`, 12, each on a wallet-palette tone) replace the sunrise pictures; the photo option stays; square tiles. Suggestions wrap, each with its icon. "Kept in" lists only wallets money can sit in (cash, bank, e-wallet, savings) plus **Add wallet** (opens the wallet editor; the new wallet is chosen). Onboarding-style fields with icons; tighter spacing. Icons are stored in the existing scene key (`icon_travel`), so nothing in the database, sync or backup changes; older scene keys map to the closest icon |
+| (Found on the way) Budget page Safe to spend showed a negative | Now $0.00 with "Nothing left this month", as on Home; the tile's caption is stacked so it always shows |
+| Ask Lucento still "couldn't be reached" | Production logs: Google answered 503 for gemini-3.8-flash (no capacity). lucento-website PR #8 falls back to the next Flash model on 503 / 429 / 5xx within each endpoint's time budget (awaiting the owner's merge) |
+

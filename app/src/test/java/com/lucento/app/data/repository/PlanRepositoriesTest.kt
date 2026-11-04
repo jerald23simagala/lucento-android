@@ -158,7 +158,12 @@ class PlanRepositoriesTest {
         assertEquals("japan_fuji", goals.observeGoals().first().single { it.id == id }.sceneKey)
         goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "none")
         assertEquals("none", goals.observeGoals().first().single { it.id == id }.sceneKey)
+        // Icon keys (owner, 2026-11-04) are stored as they are.
+        goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "icon_travel")
+        assertEquals("icon_travel", goals.observeGoals().first().single { it.id == id }.sceneKey)
         goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "not-a-scene")
+        assertEquals(null, goals.observeGoals().first().single { it.id == id }.sceneKey)
+        goals.save(id, "Trip to Japan", Money(300_000, "USD"), null, null, "icon_unknown")
         assertEquals(null, goals.observeGoals().first().single { it.id == id }.sceneKey)
         val plain = (goals.save(null, "Laptop", Money(100_000, "USD"), null, null) as GoalRepository.SaveResult.Saved).id
         assertEquals(null, goals.observeGoals().first().single { it.id == plain }.sceneKey)

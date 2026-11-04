@@ -379,12 +379,11 @@ class ScreenshotTourTest {
         waitForText("Build it below and watch it take shape.")
         shot("12g-new-wallet")
         backUntilGone("Build it below and watch it take shape.")
-        // Card view: wallet faces two to a row. The choice is a device preference, so switch back for later shots.
-        compose.onNodeWithContentDescription("Card view").performScrollTo().performClick()
-        compose.waitForIdle()
-        shot("12b-wallets-cards")
+        // Cards (the gallery) are the default view (owner, 2026-11-04); the rows view is one tap away and is kept for the
+        // account pages below.
         compose.onNodeWithContentDescription("Row view").performScrollTo().performClick()
         compose.waitForIdle()
+        shot("12b-wallets-rows")
         // Account pages: an instalment loan (Principal, Paid, Remaining and its instalments), a credit card (limit,
         // available, amount due) and its editor's card details, and an everyday account (Transfer and Adjust balance).
         openRow("Car loan")
@@ -441,6 +440,19 @@ class ScreenshotTourTest {
         tab("Home")
         compose.onNodeWithContentDescription("Debts and loans").performScrollTo()
         shot("17-quick-links")
+        // Goals (owner, 2026-11-04 redesign): hero with the overall ring, goals in progress, then the new-goal form with
+        // icon suggestions, onboarding-style fields, "Kept in" wallets and the square icon picker.
+        compose.onNodeWithContentDescription("Savings goals").performScrollTo().performClick()
+        waitForText("In progress")
+        shot("17a-goals")
+        compose.onNodeWithContentDescription("Add goal").performClick()
+        waitForText("New savings goal")
+        shot("17b-goal-new")
+        scrollToText("Add photo")
+        shot("17c-goal-icons")
+        backUntilGone("New savings goal")
+        back()
+        tab("Home")
         // Scroll to the tile itself: after scrolling to Debts, the row above can sit under the pinned header.
         compose.onNodeWithContentDescription("Scheduled transactions").performScrollTo().performClick()
         // The agenda's summary (Transactions' tiles, transfers apart) says what the range holds, overdue included.

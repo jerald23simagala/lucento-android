@@ -2,7 +2,6 @@ package com.lucento.app.core.designsystem.component
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -27,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -206,12 +204,7 @@ fun ShareBar(
     trackColor: Color = LucentoTheme.extendedColors.track,
     height: Dp = 6.dp,
 ) {
-    val reducedMotion = LucentoTheme.reducedMotion
-    val animated by animateFloatAsState(
-        targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = if (reducedMotion) tween(0) else tween(500, easing = FastOutSlowInEasing),
-        label = "share",
-    )
+    val animated = animatedFraction(fraction.coerceIn(0f, 1f), durationMillis = 600)
     Box(
         modifier
             .fillMaxWidth()

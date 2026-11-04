@@ -43,9 +43,7 @@ class GoalSceneChoiceTest {
     }
 
     @Test
-    fun `keys round-trip and presets fit the name limit`() {
+    fun `keys round-trip`() {
         GoalScene.entries.forEach { assertEquals(it, GoalScene.fromKey(it.key)) }
-        GoalPresets.all.forEach { assert(it.name.length <= 40) }
-        assertEquals(GoalScene.JAPAN, GoalPresets.all.first().scene)
     }
 }

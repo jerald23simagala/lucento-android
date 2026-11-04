@@ -181,7 +181,6 @@ import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.domain.BudgetBurn
 import com.lucento.app.domain.BudgetPlan
 import com.lucento.app.domain.Feature
-import com.lucento.app.domain.GoalScene
 import com.lucento.app.domain.GoalsOverview
 import com.lucento.app.domain.NetWorthComposition
 import com.lucento.app.domain.PacePosition
@@ -195,8 +194,6 @@ import com.lucento.app.domain.UpcomingPayment
 import com.lucento.app.domain.RecurringMath
 import java.time.LocalDate
 import com.lucento.app.domain.WellnessTier
-import com.lucento.app.feature.plan.illustration
-import com.lucento.app.feature.plan.rememberGoalPhoto
 import com.lucento.app.feature.wallets.WalletDraft
 import com.lucento.app.feature.wallets.WalletEditorSheet
 import com.lucento.app.feature.wallets.WalletsViewModel
@@ -1311,6 +1308,7 @@ private fun MonthlyBudgetCard(
 private fun BudgetBar(used: Float, monthGone: Float?, color: Color, description: String) {
     val track = LucentoTheme.extendedColors.track
     val marker = MaterialTheme.colorScheme.onSurface
+    val shown = com.lucento.app.core.designsystem.component.animatedFraction(used.coerceIn(0f, 1f))
     Canvas(
         Modifier
             .fillMaxWidth()
@@ -1319,7 +1317,7 @@ private fun BudgetBar(used: Float, monthGone: Float?, color: Color, description:
     ) {
         val r = CornerRadius(size.height / 2)
         drawRoundRect(track, cornerRadius = r)
-        val w = size.width * used.coerceIn(0f, 1f)
+        val w = size.width * shown
         if (w > 0f) drawRoundRect(color, size = Size(w.coerceAtLeast(size.height), size.height), cornerRadius = r)
         if (monthGone != null) {
             val x = size.width * monthGone.coerceIn(0f, 1f)

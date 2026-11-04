@@ -329,7 +329,25 @@ validation and rate limiting (N-09); toolchain alignment (N-19); dependency upgr
 Main session implements. Architect and QA agents review P0-2, P0-4, P1-2 and P1-5 before merging. One coherent
 change per branch, tests with every change, exact reporting of what ran, no production writes without approval.
 
-## Core screens — owner review round 4 (2026-11-03, uncommitted on `feature/core-screens-refinement`)
+## Core screens — owner review round 5 (2026-11-04, uncommitted on `feature/core-screens-refinement`)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 5"; composer rule in `docs/CAPTURE.md`.
+
+| Next | Why |
+|---|---|
+| **Owner: merge lucento-website PR #8**, then retry OT-5 (Ask Lucento on the phone) | Production's Gemini model answered 503; #8 falls back to another Flash model |
+| Optional: an "Ask Lucento" quick link on Home (not in the header) | See the round 5 report; not built |
+| Optional: delete the `com.lucento.app` Android OAuth client made for the OT-5 test once testing is done | It authorises this machine's debug key for the release package |
+
+| Check | Result |
+|---|---|
+| Unit tests | **883/883** (+7: `GoalIconTest` ×6 keys, older scenes, normalising, names, choice, suggestions; `BatchReviewTest` category now blocks; `PlanRepositoriesTest` icon keys stored; `WalletsOverviewTest` card default) |
+| Lint | 0 errors, 9 warnings (same types) |
+| `ScreenshotTourTest` | **PASS** on API 28 (45 shots, `artifacts/core-screens/review6/`); wallets shot now in card view, 12b rows; new 17a Goals, 17b–c New savings goal |
+| Device checks (API 28) | New wallet: 4 fast up-flings and a fast flick back to the top keep the sheet open (a deliberate pull down still closes it); goal icon picker, Kept in (asset wallets + Add wallet); compact Budget rows; Safe to spend $0.00 with its caption; Wallets opens on cards |
+| Website | PR #7 merged / deployed (`fc5d5fe`): model chosen from the key's list — production then logged 503 for gemini-3.8-flash; PR #8 (fallback) open, mocked checks pass, preview READY |
+
+## Core screens — owner review round 4 (2026-11-03, committed `38e11a6`)
 
 Owner comments: Scheduled without projection or hero, transfers apart from net flow, summary in Transactions' style;
 transaction view with icons and an editor wallet dropdown; wallet editor in onboarding's style, wallet page action row

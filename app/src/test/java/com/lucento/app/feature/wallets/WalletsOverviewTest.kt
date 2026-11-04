@@ -91,8 +91,9 @@ class WalletsOverviewTest {
     @Test fun viewModeReadsItsStoredKeyAndFallsBackToRows() {
         assertEquals(WalletsViewMode.CARDS, WalletsViewMode.fromKey("cards"))
         assertEquals(WalletsViewMode.ROWS, WalletsViewMode.fromKey("rows"))
-        assertEquals(WalletsViewMode.ROWS, WalletsViewMode.fromKey(null))
-        assertEquals(WalletsViewMode.ROWS, WalletsViewMode.fromKey("grid"))
+        // Cards (the gallery) are the default when nothing was chosen.
+        assertEquals(WalletsViewMode.CARDS, WalletsViewMode.fromKey(null))
+        assertEquals(WalletsViewMode.CARDS, WalletsViewMode.fromKey("grid"))
         WalletsViewMode.entries.forEach { assertEquals(it, WalletsViewMode.fromKey(it.key)) }
     }
 }

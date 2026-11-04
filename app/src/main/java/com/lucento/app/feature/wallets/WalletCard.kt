@@ -282,21 +282,26 @@ private fun BalanceBlock(wallet: Wallet, label: String, loan: LoanProgress?, mut
  */
 @Composable
 private fun InstallmentBar(paid: Int, total: Int, paidColor: Color, track: Color) {
+    // The paid segments fill in one after another when the card is first shown.
+    val filled = com.lucento.app.core.designsystem.component.animatedFraction(
+        if (total > 0) paid.coerceIn(0, total).toFloat() / total else 0f,
+        durationMillis = 900,
+    )
     Canvas(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50))) {
         if (total <= 0) return@Canvas
         val cut = 2.dp.toPx()
         val segment = (size.width - cut * (total - 1)) / total
         if (segment < 3.dp.toPx()) {
             drawRect(track)
-            drawRect(paidColor, size = Size(size.width * paid.coerceIn(0, total) / total, size.height))
+            drawRect(paidColor, size = Size(size.width * filled, size.height))
             return@Canvas
         }
+        val paidSoFar = filled * total
         for (i in 0 until total) {
-            drawRect(
-                if (i < paid) paidColor else track,
-                topLeft = Offset(i * (segment + cut), 0f),
-                size = Size(segment, size.height),
-            )
+            val left = i * (segment + cut)
+            drawRect(track, topLeft = Offset(left, 0f), size = Size(segment, size.height))
+            val part = (paidSoFar - i).coerceIn(0f, 1f)
+            if (part > 0f) drawRect(paidColor, topLeft = Offset(left, 0f), size = Size(segment * part, size.height))
         }
     }
 }

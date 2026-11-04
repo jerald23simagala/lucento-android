@@ -36,8 +36,9 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
   "paid my card" → transfer). Otherwise the matched category's kind, then the previous clause, then the type hint
   (e.g. opened from a wallet's "Income"), then expense. Transfers stay transfers (two linked legs, never spending).
 - **Category**: the user's own category names first, then keywords per icon key, specific before general ("coffee" →
-  "Cafes and coffee" if present, else "Restaurants"/"Dining"). No match → the row says so; it can still be saved
-  uncategorized. Categories are never created silently.
+  "Cafes and coffee" if present, else "Restaurants"/"Dining"). No match → the row asks for one ("Choose a category"):
+  every income and expense needs a category before the batch can be saved (owner, 2026-11-04); transfers have none.
+  Categories are never created silently.
 - **Date**: today, yesterday, N days ago, weekdays, "October 12", "12 Oct 2026". One date in a message applies to all
   its rows; several dates carry forward. Default is today.
 - **Account**: a named account or a type word that identifies one account; a named currency picks the only account in
@@ -67,8 +68,8 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
 
 - Blocking (outlined in red; the batch can't be saved until it is fixed or removed): missing/invalid amount, too many decimals for the account's currency, no account,
   a mentioned currency the account doesn't use (until the user changes the account or confirms the amount), transfer
-  without two distinct same-currency accounts, a category that no longer fits.
-- Hints (row can be saved): no category, receipt date to check, items vs total, "a matching transaction is already
+  without two distinct same-currency accounts, no category on an income or expense, a category that no longer fits.
+- Hints (row can be saved): receipt date to check, items vs total, "a matching transaction is already
   saved for this day".
 - The save button says exactly what happens: "Save 4 transactions", or — disabled — "Fix 1 highlighted to save"
   (`BatchSummary.canSave`). The whole batch saves at once, all-or-nothing; each row's key is its idempotency key, so a

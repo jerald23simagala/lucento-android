@@ -538,7 +538,12 @@ private fun DailyTile(daily: DailyFigure, modifier: Modifier) {
     val ext = LucentoTheme.extendedColors
     val (label, money, caption) = when (daily) {
         is DailyFigure.SafePerDay -> Triple("Safe per day", daily.perDay, "${daysLeftLabel(daily.daysLeft)} left")
-        is DailyFigure.NothingLeft -> Triple("Safe to spend", daily.safe, "Nothing left per day")
+        // As on Home (owner, 2026-11-03): never below zero; the bills set aside are explained under the tiles.
+        is DailyFigure.NothingLeft -> Triple(
+            "Safe to spend",
+            if (daily.safe.isNegative) com.lucento.app.core.money.Money.zero(daily.safe.currencyCode) else daily.safe,
+            "Nothing left this month",
+        )
         is DailyFigure.DailyAverage -> Triple("Daily average", daily.perDay, "over ${daysLeftLabel(daily.days)}")
     }
     HeroStatTile(
@@ -547,16 +552,22 @@ private fun DailyTile(daily: DailyFigure, modifier: Modifier) {
         description = "$label ${MoneyFormatter.formatSigned(money)}, $caption",
         modifier = modifier,
     ) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            MoneyText(money = money, style = HeroFigureStyle, color = ext.onHero, fractionScale = 1f, modifier = Modifier.alignByBaseline())
-            Text(caption, style = MaterialTheme.typography.labelSmall, color = ext.onHeroMuted, modifier = Modifier.alignByBaseline())
+        // Figure, then its caption beneath: a wrapping row mis-measured short figures and left the caption undrawn.
+        Column {
+            MoneyText(money = money, style = HeroFigureStyle, color = ext.onHero, fractionScale = 1f)
+            Text(caption, style = MaterialTheme.typography.labelSmall, color = ext.onHeroMuted)
         }
     }
 }
 
-/** Category rows: 16dp padding, a 36dp tile and a 12dp gap; hairlines and bars line up with the text after them. */
-private val RowTile = 36.dp
-private val RowTextInset = Spacing.lg + RowTile + Spacing.md
+/**
+ * Category rows, compact (owner, 2026-11-04): 16dp side padding, a 34dp tile and a 12dp gap; hairlines and bars line up
+ * with the text after them.
+ */
+private val RowTile = 34.dp
+private val RowPadding = Spacing.md
+private val RowGap = Spacing.sm + Spacing.xxs
+private val RowTextInset = RowPadding + RowTile + RowGap
 
 /** The Budgeted card shows this many rows, then "Show n more", unless only one more would be hidden. */
 private const val BUDGETED_FOLD = 5
@@ -571,11 +582,11 @@ private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .clickable(role = Role.Button, onClickLabel = "Change ${line.category.name} amount", onClick = onClick)
-            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            .padding(horizontal = RowPadding, vertical = Spacing.sm + Spacing.xxs),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoryTile(category = line.category, type = TransactionType.EXPENSE, size = RowTile)
-            Spacer(Modifier.width(Spacing.md))
+            Spacer(Modifier.width(RowGap))
             Column(Modifier.weight(1f)) {
                 Text(line.category.name, style = Hierarchy.cardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
@@ -593,16 +604,16 @@ private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
                     maxLines = 1,
                 )
                 // Every row says its status in words, "On track" included, so the column reads consistently.
-                StatusPill(healthLabel(line.health, remaining), healthTone(line.health), Modifier.padding(top = 3.dp))
+                StatusPill(healthLabel(line.health, remaining), healthTone(line.health), Modifier.padding(top = 2.dp))
             }
         }
-        Spacer(Modifier.height(Spacing.sm))
+        Spacer(Modifier.height(Spacing.xs + Spacing.xxs))
         ConsumptionBar(
             fraction = line.fraction,
             color = healthColor(line.health),
             description = "${line.category.name}: ${line.percentUsed ?: 0}% used",
             height = 6.dp,
-            modifier = Modifier.padding(start = RowTile + Spacing.md),
+            modifier = Modifier.padding(start = RowTile + RowGap),
         )
     }
 }
@@ -612,13 +623,13 @@ private fun UnallocatedRow(line: CategoryBudgetLine, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 60.dp)
+            .heightIn(min = 52.dp)
             .clickable(role = Role.Button, onClickLabel = "Set ${line.category.name} amount", onClick = onClick)
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            .padding(horizontal = RowPadding, vertical = Spacing.xs + Spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CategoryTile(category = line.category, type = TransactionType.EXPENSE, size = RowTile)
-        Spacer(Modifier.width(Spacing.md))
+        Spacer(Modifier.width(RowGap))
         Column(Modifier.weight(1f)) {
             Text(line.category.name, style = Hierarchy.cardTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(

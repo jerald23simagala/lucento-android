@@ -2,14 +2,12 @@ package com.lucento.app.core.designsystem.component
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,12 +37,7 @@ fun ProgressRing(
     trackColor: Color = LucentoTheme.extendedColors.track,
     content: @Composable () -> Unit = {},
 ) {
-    val reducedMotion = LucentoTheme.reducedMotion
-    val animated by animateFloatAsState(
-        targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = if (reducedMotion) tween(0) else tween(700, easing = FastOutSlowInEasing),
-        label = "ring",
-    )
+    val animated = animatedFraction(fraction.coerceIn(0f, 1f), durationMillis = 800)
     Box(modifier.size(size).clearAndSetSemantics { contentDescription = description }, contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(size)) {
             val stroke = strokeWidth.toPx()
@@ -105,4 +98,18 @@ fun DonutChart(
         }
         content()
     }
+}
+
+/**
+ * A display fraction that grows in from 0 the first time it is shown, then follows [target] smoothly — bars, rings and
+ * progress fills move instead of appearing already full. With reduced motion it is simply [target].
+ */
+@Composable
+fun animatedFraction(target: Float, durationMillis: Int = 700): Float {
+    val reducedMotion = LucentoTheme.reducedMotion
+    val value = remember { Animatable(if (reducedMotion) target else 0f) }
+    LaunchedEffect(target, reducedMotion) {
+        if (reducedMotion) value.snapTo(target) else value.animateTo(target, tween(durationMillis, easing = FastOutSlowInEasing))
+    }
+    return value.value
 }
