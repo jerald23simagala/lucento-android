@@ -880,12 +880,15 @@ class SyncRepository(
         }
     }
 
-    /** A pulled wallet's debt terms replace the local ones; a row without them (or not a card or loan) has none. */
+    /**
+     * A pulled wallet's debt terms replace the local ones; a row without them (or not a card, loan or receivable) has
+     * none.
+     */
     private suspend fun applyDebtTerms(walletId: Long, row: WalletRow) {
         val dao = debtTerms ?: return
-        val liability = row.type == "CREDIT_CARD" || row.type == "LOAN"
+        val hasTerms = runCatching { com.lucento.app.domain.WalletType.valueOf(row.type) }.getOrNull()?.hasTerms == true
         val repayment = row.repayment
-        if (!liability || repayment == null) {
+        if (!hasTerms || repayment == null) {
             dao.delete(walletId)
             return
         }

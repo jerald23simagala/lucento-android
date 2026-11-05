@@ -100,7 +100,15 @@ object DebtMath {
     fun reminderName(repayment: DebtRepayment, debtName: String, maxLength: Int): String =
         ((if (repayment == DebtRepayment.MONTHLY) "Monthly" else "One-time") + " Payment - " + debtName.trim()).take(maxLength)
 
+    /** "Monthly Collection - Loan to Ana": a receivable's instalment reminder (owner round 10). */
+    fun collectionName(repayment: DebtRepayment, receivableName: String, maxLength: Int): String =
+        ((if (repayment == DebtRepayment.MONTHLY) "Monthly" else "One-time") + " Collection - " + receivableName.trim()).take(maxLength)
+
     /** Name of the expense category that debt-payment interest is recorded under (created with the first debt). */
     const val INTEREST_CATEGORY = "Debt interest"
     const val INTEREST_ICON = "debt"
+
+    /** Name of the income category that interest received on a receivable is recorded under (created when needed). */
+    const val INTEREST_INCOME_CATEGORY = "Interest received"
+    const val INTEREST_INCOME_ICON = "investments"
 }

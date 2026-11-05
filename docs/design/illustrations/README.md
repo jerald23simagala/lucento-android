@@ -10,3 +10,5 @@ are crops of it, exported as WebP (quality 88) to `app/src/main/res/drawable-nod
 | `illustration_japan_fuji` | 1050, 110, 2172, 724 (Mount Fuji) | 1122×614 | Japan travel goal cards |
 
 Re-crop from the source rather than editing the WebPs. Keep text, numbers, logos and UI out of the artwork.
+
+`themes/` holds proposal scenery panoramas for the (unimplemented) theme system — see `themes/README.md`.

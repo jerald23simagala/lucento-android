@@ -76,6 +76,48 @@ class AdvisorTest {
         assertTrue(broken.parts.none { it.isFigure })
     }
 
+    // ---- owner round 10: projections with the user's amounts and assumed rates ----------------
+
+    @Test fun amountsFromTheQuestionAndAssumedRatesCanBeCalculated() {
+        // "₱5,000 a month in MP2 for 5 years at about 7%": the future value of the yearly savings, compounded.
+        assertEquals("$345,044.34", shown("USD 5000 * 12 * ((1 + 7%)^5 - 1) / 7%"))
+        // The code before or after the number, with or without a thousands separator.
+        assertEquals("$60,000.00", shown("USD 5000 * 12"))
+        assertEquals("$60,000.00", shown("5000 USD * 12"))
+        assertEquals("$60,000.00", shown("USD 5,000 * 12"))
+        // Percentages and powers of plain numbers.
+        assertEquals("1.1", shown("(1 + 7%)^2"))
+        assertEquals("$2,289.80", shown("avg_out * (1 + 7%)^2"))
+        assertEquals("$140.00", shown("avg_out * 7%"))
+        // A sign binds looser than a power; powers go right to left.
+        assertEquals("-4", shown("-2^2"))
+        assertEquals("512", shown("2^3^2"))
+        assertEquals("0.3", shown("2^-2 + 0.05"))
+        // Mixed with the phone's own figures, in their currency.
+        assertEquals("$1,750.00", shown("g0_left + USD 500"))
+    }
+
+    @Test fun projectionsThatDontMakeSenseStillGiveNoResult() {
+        assertNull(calc("avg_out^2")) // an amount to a power
+        assertNull(calc("2^1.5")) // a fractional exponent
+        assertNull(calc("2^5000")) // too large
+        assertNull(calc("0^-1")) // division by zero
+        assertNull(calc("avg_out%")) // a percentage of an amount
+        assertNull(calc("avg_out + PHP 500")) // across currencies
+        assertNull(calc("XYZ 500")) // not a currency
+        assertNull(calc("USD")) // a code without an amount
+        assertNull(calc("1,23 * 2")) // a comma that isn't a thousands separator
+    }
+
+    @Test fun ratesInAnAnswerAreNotUncheckedAmounts() {
+        val rates = AnswerCheck.check("MP2 paid 7.03% for 2023 and 6.50 % before; SSS 2024 rules differ. That grows to [[= USD 5000 * 12]].", snapshot)
+        assertFalse(rates.hasUnverifiedFigures)
+        assertEquals(listOf("$60,000.00"), rates.parts.filter { it.isFigure }.map { it.text })
+        assertTrue(AnswerCheck.check("Put USD 500 a month into it.", snapshot).hasUnverifiedFigures)
+        assertTrue(AnswerCheck.check("That leaves 12,500 for the trip.", snapshot).hasUnverifiedFigures)
+        assertTrue(AnswerCheck.check("About 45.50 a week.", snapshot).hasUnverifiedFigures)
+    }
+
     // ---- transaction patterns ----------------------------------------------------------------
 
     private var nextId = 1L

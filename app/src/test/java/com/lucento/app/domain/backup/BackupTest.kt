@@ -126,6 +126,30 @@ class BackupTest {
         assertEquals(0, store.writes)
     }
 
+    @Test fun receivablesAndTheirCollectionsRoundTrip() {
+        // Owner round 10: a receivable carries a loan's terms, and a collection is an INCOME schedule linked to it.
+        val at = 1_700_000_000_000L
+        val base = sample()
+        val withReceivable = base.copy(
+            wallets = base.wallets + BackupWallet("wal-ana", "Loan to Ana", WalletType.RECEIVABLE, "USD", 60_000, 2, false, at, at),
+            categories = base.categories + BackupCategory("cat-int", "Interest received", CategoryKind.INCOME, "investments", 0, false, at, at),
+            recurring = base.recurring + BackupRecurring(
+                "rec-ana", "Monthly Collection - Loan to Ana", TransactionType.INCOME, 4_800, "USD", "wal-bank", "cat-int",
+                Frequency.MONTHLY, 1, LocalDate.parse("2026-02-01"), null, 0, false, "wal-ana", 500, at, at,
+            ),
+            debtTerms = base.debtTerms + BackupDebtTerms("wal-ana", 1_000, DebtRepayment.MONTHLY, 12, 5_300, at),
+        )
+        val decoded = BackupCodec.decode(encode(withReceivable)).snapshot
+        assertEquals(WalletType.RECEIVABLE, decoded.wallets.single { it.id == "wal-ana" }.type)
+        assertEquals("wal-ana", decoded.recurring.single { it.id == "rec-ana" }.toWalletId)
+        assertEquals(5_300L, decoded.debtTerms.single { it.walletId == "wal-ana" }.installmentMinor)
+        // A collection must come from a receivable, and a debt payment can't pay one.
+        val fromCard = withReceivable.copy(recurring = withReceivable.recurring.map { if (it.id == "rec-ana") it.copy(toWalletId = "wal-card") else it })
+        assertTrue(runCatching { BackupCodec.decode(encode(fromCard)) }.isFailure)
+        val payingIt = withReceivable.copy(recurring = withReceivable.recurring.map { if (it.id == "rec-ana") it.copy(type = TransactionType.EXPENSE, categoryId = "cat-food") else it })
+        assertTrue(runCatching { BackupCodec.decode(encode(payingIt)) }.isFailure)
+    }
+
     @Test fun budgetLifecycleValuesAreValidated() {
         val at = exportedAt
         fun withBudget(budget: BackupBudget) = encode(sample().copy(budgets = listOf(budget)))

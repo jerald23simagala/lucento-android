@@ -163,6 +163,7 @@ fun WalletDetailScreen(
             // Spending and income are added with the dock's +; an account's own page moves money (left) and reconciles
             // its balance with the real one (right, with how that works), so the row is never half empty.
             val loan = wallet.type == WalletType.LOAN
+            val receivable = wallet.type == WalletType.RECEIVABLE
             Row(
                 Modifier.fillMaxWidth().padding(top = Spacing.md).height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -170,6 +171,8 @@ fun WalletDetailScreen(
                 if (transfersEnabled) {
                     when {
                         loan -> MoveMoneyCard("Repay loan", "From your bank or cash", Icons.Outlined.Payments, { onTransfer(state.payFromWalletId, wallet.id) }, Modifier.weight(0.38f).fillMaxHeight())
+                        // An instalment they paid back: from this receivable into the user's account (owner round 10).
+                        receivable -> MoveMoneyCard("Record payment", "Money they paid back", Icons.Outlined.Payments, { onTransfer(wallet.id, state.receiveIntoWalletId) }, Modifier.weight(0.38f).fillMaxHeight())
                         liability -> MoveMoneyCard(
                             "Payment",
                             "Pay this card",
@@ -181,9 +184,14 @@ fun WalletDetailScreen(
                     }
                 }
                 ReconcileCard(
-                    title = if (loan) "Adjust loan" else "Adjust balance",
+                    title = when {
+                        loan -> "Adjust loan"
+                        receivable -> "Adjust amount"
+                        else -> "Adjust balance"
+                    },
                     body = when {
                         loan -> "Lender’s statement says otherwise? Enter what you owe on a date — the gap is recorded as an adjustment, not borrowing or spending."
+                        receivable -> "Agreed on a different amount? Enter what they still owe you — the gap is recorded as an adjustment, not income or spending."
                         liability -> "Card statement says otherwise? Enter what you owe — the gap is recorded as an adjustment, not a purchase or a payment."
                         else -> "Bank says otherwise? Enter the real balance — the gap is recorded as an adjustment, not income or spending."
                     },
@@ -197,6 +205,13 @@ fun WalletDetailScreen(
                     text = "Record interest or a fee",
                     onClick = { onAddTransaction(TransactionType.EXPENSE, wallet.id) },
                     modifier = Modifier.padding(top = Spacing.xxs),
+                )
+            }
+            if (receivable) {
+                InfoNote(
+                    "What they pay back is a transfer from this receivable into your account, so it isn’t counted as income " +
+                        "again. Interest they pay is income. Lending the money was a transfer out of your account, not spending.",
+                    modifier = Modifier.padding(top = Spacing.sm),
                 )
             }
             if (liability) {
@@ -267,7 +282,11 @@ fun WalletDetailScreen(
         }
         item(key = "note") {
             Text(
-                "Balance = ${if (liability) "owed at start" else "opening balance"} ${fmt.format(wallet.openingBalance)} " +
+                "Balance = ${when {
+                    liability -> "owed at start"
+                    wallet.type == WalletType.RECEIVABLE -> "owed to you at start"
+                    else -> "opening balance"
+                }} ${fmt.format(wallet.openingBalance)} " +
                     "adjusted by everything above.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

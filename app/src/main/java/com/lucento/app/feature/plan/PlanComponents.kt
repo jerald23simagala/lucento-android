@@ -39,6 +39,19 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import com.lucento.app.core.designsystem.component.AmountTextField
 import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.theme.AmountStyles
@@ -213,6 +226,90 @@ internal fun DateField(
             dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
         ) {
             DatePicker(state = state)
+        }
+    }
+}
+
+/**
+ * A picker in the dialogs' filled look ([filledField], like the wallet editor's type and onboarding's fields): the
+ * chosen option's tile and name with [label] riding inside, and a trailing arrow; the menu lists every option the same
+ * way and matches the field's width. Owner round 10: the schedule editor's accounts, category and "how often".
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun <T> FilledDropdown(
+    label: String,
+    options: List<T>,
+    selected: T?,
+    onSelect: (T) -> Unit,
+    text: (T) -> String,
+    leading: @Composable (option: T?, size: Dp) -> Unit,
+    modifier: Modifier = Modifier,
+    detail: (T) -> String? = { null },
+    placeholder: String = "Choose",
+    isError: Boolean = false,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .filledField(active = expanded, isError = isError)
+                .semantics {
+                    role = Role.DropdownList
+                    contentDescription = "$label, ${selected?.let(text) ?: "none chosen"}"
+                }
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            leading(selected, 32.dp)
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                // The detail rides with the label ("Paid from · Bank account · USD"), so the name keeps the full width
+                // at large text sizes instead of being cut short.
+                Text(
+                    listOfNotNull(label, selected?.let(detail)).joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    selected?.let(text) ?: placeholder,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (selected != null) colors.onSurface else colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+        }
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(
+                                text(option),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = if (option == selected) FontWeight.SemiBold else null,
+                            )
+                            detail(option)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1) }
+                        }
+                    },
+                    leadingIcon = { leading(option, 28.dp) },
+                    trailingIcon = if (option == selected) ({ Icon(Icons.Filled.Check, contentDescription = "Selected", tint = colors.primary) }) else null,
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                )
+            }
         }
     }
 }

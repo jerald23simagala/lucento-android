@@ -124,7 +124,7 @@ fun WalletsScreen(
     val newDraft = { WalletDraft(currencyCode = state.primaryCurrency) }
     val canAdd = allowAdding || state.wallets.isEmpty()
 
-    // Assets by type order, then liabilities: the two halves of net worth, after the side and type filters.
+    // Assets by type order, then liabilities: the two halves of net worth, after the side filter.
     val shown = state.shown
     val assets = shown.filterNot { it.type.isLiability }.sortedBy { it.type.ordinal }
     val liabilities = shown.filter { it.type.isLiability }
@@ -170,7 +170,7 @@ fun WalletsScreen(
 
         if (state.wallets.size >= 2) {
             item(key = "filters") {
-                WalletFilters(state, onSide = viewModel::setSide, onType = viewModel::setTypeFilter, onViewMode = viewModel::setViewMode)
+                WalletFilters(state, onSide = viewModel::setSide, onViewMode = viewModel::setViewMode)
             }
         }
 
@@ -202,10 +202,7 @@ fun WalletsScreen(
             item(key = "no-match") {
                 Column(Modifier.fillMaxWidth().padding(top = Spacing.lg), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("No wallets match these filters.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    LucentoTextButton(text = "Show all wallets", onClick = {
-                        viewModel.setSide(WalletSide.ALL)
-                        viewModel.setTypeFilter(null)
-                    })
+                    LucentoTextButton(text = "Show all wallets", onClick = { viewModel.setSide(WalletSide.ALL) })
                 }
             }
         }
@@ -440,10 +437,10 @@ private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Sum
                 ) {
                     LegendKey("Assets $share%", ext.success)
                     LegendKey("Liabilities ${100 - share}%", ext.negativeIndicator)
-                    Text("Net worth = assets − liabilities", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                // Always one row (owner, 2026-11-03): both shares and the formula, shrinking to fit rather than wrapping.
+                // Always one row (owner, 2026-11-03), shrinking to fit rather than wrapping. The "Net worth = assets −
+                // liabilities" formula was dropped in owner round 10 to cut what there is to read.
                 val muted = MaterialTheme.colorScheme.onSurfaceVariant
                 val ink = MaterialTheme.colorScheme.onSurface
                 val legend = remember(share, ext.success, ext.negativeIndicator, muted, ink) {
@@ -453,8 +450,6 @@ private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Sum
                         append("   ")
                         withStyle(SpanStyle(color = ext.negativeIndicator)) { append("●") }
                         withStyle(SpanStyle(color = ink)) { append(" Liabilities ${100 - share}%") }
-                        append("   ")
-                        withStyle(SpanStyle(color = muted)) { append("Net worth = assets − liabilities") }
                     }
                 }
                 com.lucento.app.core.designsystem.component.FittingText(
@@ -466,7 +461,7 @@ private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Sum
                         .fillMaxWidth()
                         .padding(horizontal = Spacing.xxs)
                         .clearAndSetSemantics {
-                            contentDescription = "Assets $share percent, liabilities ${100 - share} percent. Net worth is assets minus liabilities."
+                            contentDescription = "Assets $share percent, liabilities ${100 - share} percent."
                         },
                 )
             }
@@ -475,18 +470,16 @@ private fun AssetsLiabilitiesSplit(code: String, summary: NetWorthCalculator.Sum
 }
 
 /**
- * All / Assets / Liabilities (only when both sides exist), the row / card view toggle, and chips for the wallet types the
- * user has on that side (only when there are two or more). Filtering is display-only; nothing is recalculated.
+ * All / Assets / Liabilities (only when both sides exist) and the row / card view toggle. Filtering is display-only;
+ * nothing is recalculated. (Per-type chips were removed in owner round 10.)
  */
 @Composable
 private fun WalletFilters(
     state: WalletsUiState,
     onSide: (WalletSide) -> Unit,
-    onType: (com.lucento.app.domain.WalletType?) -> Unit,
     onViewMode: (WalletsViewMode) -> Unit,
 ) {
     val hasBothSides = state.wallets.any { it.type.isLiability } && state.wallets.any { !it.type.isLiability }
-    val types = WalletsOverview.typesOn(state.wallets, state.side)
     val fontScale = LocalDensity.current.fontScale
     val sides: @Composable (Modifier) -> Unit = { m ->
         if (fontScale >= 1.5f) {
@@ -531,26 +524,6 @@ private fun WalletFilters(
                 sides(Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { view() }
             }
-            WalletTypeChips(state, types, onType)
-        }
-    }
-}
-
-/** Chips for the wallet types the user has on the chosen side; shown only when there are two or more to choose from. */
-@Composable
-private fun WalletTypeChips(
-    state: WalletsUiState,
-    types: List<com.lucento.app.domain.WalletType>,
-    onType: (com.lucento.app.domain.WalletType?) -> Unit,
-) {
-    if (types.size < 2) return
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        ChoicePill(label = "All types", selected = state.typeFilter == null, onClick = { onType(null) })
-        types.forEach { type ->
-            ChoicePill(label = type.chipLabel, selected = state.typeFilter == type, onClick = { onType(type) })
         }
     }
 }

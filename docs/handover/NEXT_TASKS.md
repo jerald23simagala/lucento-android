@@ -560,3 +560,28 @@ As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 9".
 | Builds | `assembleDebug`, `assembleDebugAndroidTest`; test-signed `assembleRelease` → `artifacts/apk/lucento-release-TEST-SIGNED-round9.apk` (`com.lucento.app`, signer SHA-1 `49af…8c75`), installed on API 28 and launched to the welcome screen (`artifacts/round9/01-release-launch.png`) |
 | Website | eslint clean (`ask.ts`, `gemini.ts`); `tsc --noEmit` clean on `gemini.ts`; `preferAvailable` checked with a scratch Node script (5/5); Vercel preview build of PR #10 **passed** |
 | Device | Not run for the new note and retry pill: they appear only with live AI answers (release build, signed in) |
+
+## Owner review round 10 (2026-11-04, `feature/owner-round-10`, not committed)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 10".
+
+| Next | Why |
+|---|---|
+| ~~Owner: approve committing, pushing, PRs and merging~~ **Approved 2026-11-04** ("proceed all the way to merge") | |
+| ~~Owner: apply `20261105090000_receivable_wallets.sql` to production~~ **Done by the owner 2026-11-04**; still to apply on `lucento-test` before a debug build syncs a receivable there | Until a project has it, a receivable's wallet upload is refused there (it stays pending on the phone; everything else syncs) |
+| **Owner: merge `lucento-website` PR #10** (deploys rounds 9 and 10 of the adviser) | Round 10 apps send version 3; until `SYSTEM_V3` is deployed, production answers them with the round 8 adviser prompt (version ≥ 2), so no assumed-rate projections and none of the new calculations |
+| Owner: ask the MP2 question again on the round 10 APK | First live check of projections with assumed rates (low / high case, the rate named) |
+| Owner decision: live market rates | Rates come from the model's own knowledge and can be out of date; Google Search grounding would fetch them but costs per search beyond a free allowance and sends the question to Search |
+| Later: Record payment could pre-fill the monthly instalment | Today it opens the transfer with the accounts chosen and the amount empty (as a loan's Repay does) |
+| **Last stage — Account & sync password** (unchanged) | Owner, 2026-11-04 |
+
+| Check | Result |
+|---|---|
+| Unit tests | **945/945** (new `ReceivableTest` 7: terms kept, collection = interest income + transfer, no interest = transfer only, refused links, outlook/sign, progress, receiving account; `AdvisorTest` +3: amounts with a code, %, ^, MP2 future value, refusals, rates not flagged; `BackupTest` +1: receivable + collection round trip and refusals; `PulledRowRulesTest`: a RECEIVABLE row passes) |
+| Lint | 0 errors, 9 warnings (unchanged set) |
+| Builds | `assembleDebug`, `assembleDebugAndroidTest`; test-signed `assembleRelease` → `artifacts/apk/lucento-release-TEST-SIGNED-round10.apk` |
+| `ScreenshotTourTest` (API 28) | **PASS** twice, 55 shots (`artifacts/round10/tour/`): Wallets without type chips, legend without the formula. A first attempt failed on stale app data from round 8 (two test classes in one run share an install), a second on the emulator's own "System UI isn't responding" dialog (06c under it was correct); `hide_error_dialogs` set on the AVD |
+| `ReconciliationTest` (API 28) | PASS |
+| Manual (API 28) | `artifacts/round10/`: 02 Scheduled card payment → transfer; 04a–d Home dock to top, Back keeps place, reselect to top; 05 receivable editor (preview, repayment details, suggestion "$500.00 a month pays back $6,000.00 in 12 months"); 06 receivable page and Record payment; 07 collection editor, actions sheet, interest split, list row "+$500.00 · Ana → Everyday bank", page after: Remaining $5,550, Received $450, 1 of 12. The four-kind switch first clipped "Debt payment"; now short labels (Bill · Income · Debt · Collect) |
+| Website | eslint clean on `ask.ts`, `gemini.ts`; `SYSTEM_V3` for version ≥ 3, `SYSTEM_V2` unchanged for version 2 |
+| Schedule editor (owner's follow-up) | On API 28 (`artifacts/round10/09*`): Bill and Collect layouts, the category menu, 130% and 150% text (names keep their width), ~310dp width (title wraps onto two lines) |

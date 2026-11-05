@@ -12,6 +12,11 @@ import com.lucento.app.core.money.Money
  * [isValuedManually] assets (a home, a car, investments) have no money movements: their balance is a valuation the
  * user enters and updates. They count towards net worth but never appear where a transaction, transfer or
  * recurring payment picks an account, and the repositories refuse to post movements to them.
+ *
+ * [RECEIVABLE] (owner round 10) is a loan in reverse: money someone owes the user. It is an asset — its balance is what
+ * is still owed to them and counts towards net worth — not spendable, and it carries a loan's terms ([hasTerms]): a
+ * rate, monthly instalments and a term. Instalments received are transfers out of it into a money account (scheduled as
+ * collections, [RecurringSchedule.isCollection]); interest received is income.
  */
 enum class WalletType(val isLiability: Boolean, val isSpendable: Boolean, val isValuedManually: Boolean = false) {
     CASH(isLiability = false, isSpendable = true),
@@ -20,11 +25,23 @@ enum class WalletType(val isLiability: Boolean, val isSpendable: Boolean, val is
     SAVINGS(isLiability = false, isSpendable = false),
     CREDIT_CARD(isLiability = true, isSpendable = false),
     LOAN(isLiability = true, isSpendable = false),
+    RECEIVABLE(isLiability = false, isSpendable = false),
     OTHER_ASSET(isLiability = false, isSpendable = false, isValuedManually = true),
     ;
 
     /** True for accounts that money moves through: everything except manually valued assets. */
     val acceptsTransactions: Boolean get() = !isValuedManually
+
+    /** Accounts that carry [DebtTerms]: what is owed (cards, loans) and what is owed to the user (receivables). */
+    val hasTerms: Boolean get() = isLiability || this == RECEIVABLE
+
+    /** Repaid in monthly instalments over a term: a loan, or a receivable (its mirror). */
+    val hasInstallments: Boolean get() = this == LOAN || this == RECEIVABLE
+
+    companion object {
+        /** Stored names this version understands (sync and backup reject anything else). */
+        val NAMES: Set<String> = entries.mapTo(LinkedHashSet()) { it.name }
+    }
 }
 
 /**
@@ -39,7 +56,7 @@ data class Wallet(
     val balance: Money,
     val createdAtEpochMillis: Long,
     val openingBalance: Money = balance,
-    /** Interest rate and repayment plan of a card or loan, when the user entered them. Always null for assets. */
+    /** Interest rate and repayment plan of a card, loan or receivable, when the user entered them. Null for other assets. */
     val debt: DebtTerms? = null,
     /** Bundled institution registry id (e.g. "ph_bdo") for the wallet's logo and card face; display only. */
     val institutionId: String? = null,

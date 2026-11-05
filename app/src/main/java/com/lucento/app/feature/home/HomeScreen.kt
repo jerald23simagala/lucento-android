@@ -188,6 +188,7 @@ import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.CardDue
 import com.lucento.app.domain.ScheduledFlow
 import com.lucento.app.domain.flow
+import com.lucento.app.domain.signedOccurrence
 import com.lucento.app.core.designsystem.component.scheduledFlowColor
 import com.lucento.app.core.designsystem.component.SheetHeader
 import com.lucento.app.domain.UpcomingPayment
@@ -204,6 +205,8 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.CompositionLocalProvider
 import com.lucento.app.core.designsystem.component.LocalAmountsHidden
 import com.lucento.app.core.designsystem.component.shownAmount
@@ -258,16 +261,22 @@ data class HomeActions(
 @Composable
 fun HomeScreen(
     actions: HomeActions,
+    /**
+     * Bumped each time Home is tapped in the dock: the dashboard then shows its top (owner round 10). Coming back with
+     * Back from a page opened from Home keeps the place, because the request was already handled.
+     */
+    scrollToTop: Int = 0,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     // The app's root provides LocalAmountsHidden from the same saved choice; the dashboard is where it's switched.
-    HomeDashboard(actions, viewModel, walletsViewModel)
+    HomeDashboard(actions, scrollToTop, viewModel, walletsViewModel)
 }
 
 @Composable
 private fun HomeDashboard(
     actions: HomeActions,
+    scrollToTop: Int,
     viewModel: HomeViewModel,
     walletsViewModel: WalletsViewModel,
 ) {
@@ -294,6 +303,17 @@ private fun HomeDashboard(
     }
 
     val scroll = rememberScrollState()
+    // Saved with the scroll position, so a request handled before leaving Home isn't handled again on the way back.
+    var handledToTop by rememberSaveable { mutableIntStateOf(scrollToTop) }
+    val shown = remember { mutableStateOf(false) }
+    LaunchedEffect(scrollToTop) {
+        if (scrollToTop != handledToTop) {
+            // Arriving from another tab: jump, so the restored position never flashes. Tapped again on Home: glide up.
+            if (shown.value) scroll.animateScrollTo(0) else scroll.scrollTo(0)
+            handledToTop = scrollToTop
+        }
+        shown.value = true
+    }
     // 20dp on phones; on wide windows the dashboard stays a 560dp column, centred.
     val gutter = com.lucento.app.core.designsystem.component.screenGutter()
     Column(Modifier.fillMaxSize()) {
@@ -521,14 +541,15 @@ private fun BellPanel(
     val entries = (
         state.dueSoon.map { p ->
             val flow = p.schedule.flow
-            BellEntry(p.dueDate, p.overdue, p.schedule.name, if (flow == ScheduledFlow.INCOME) p.schedule.amount else -p.schedule.total, flow, payment = p)
+            BellEntry(p.dueDate, p.overdue, p.schedule.name, p.schedule.signedOccurrence, flow, payment = p)
         } + state.cardDuesSoon.map { c ->
             BellEntry(c.cycle.dueDate, c.overdue, "${c.wallet.name} payment", -c.cycle.amountDue, ScheduledFlow.TRANSFER, card = c)
         }
         ).sortedBy { it.date }
-    // What leaves your accounts this week (overdue included), in the main currency: bills and transfers together.
+    // What leaves your accounts this week (overdue included), in the main currency: bills and transfers together. A
+    // collection from a receivable comes in, so it isn't counted (owner round 10).
     val code = state.focusCurrency
-    val outgoing = Money.sum(code, entries.filter { it.flow != ScheduledFlow.INCOME && it.amount.currencyCode == code }.map { -it.amount })
+    val outgoing = Money.sum(code, entries.filter { it.amount.isNegative && it.amount.currencyCode == code }.map { -it.amount })
     Column(Modifier.padding(bottom = Spacing.xs)) {
         // Header: Lucento and the week in one line.
         Row(
@@ -2213,6 +2234,7 @@ private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () 
     val income = schedule.type == TransactionType.INCOME
     val debt = schedule.toWalletId?.let { state.walletsById[it] }
     val kind = when {
+        debt != null && schedule.isCollection -> "Collection from ${debt.name}"
         debt != null -> "Transfer to ${debt.name}"
         else -> category?.name ?: if (income) "Scheduled income" else "Scheduled expense"
     }
@@ -2236,7 +2258,7 @@ private fun ScheduledRow(item: UpcomingPayment, state: HomeUiState, onClick: () 
                 Spacer(Modifier.width(Spacing.sm))
                 // Income green, expenses red, transfers to a card or loan in neutral ink (owner, 2026-11-03).
                 AmountText(
-                    money = if (income) schedule.amount else -schedule.total,
+                    money = schedule.signedOccurrence,
                     showPlus = true,
                     color = scheduledFlowColor(schedule.flow),
                 )

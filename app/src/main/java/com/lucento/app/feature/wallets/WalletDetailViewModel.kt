@@ -38,6 +38,8 @@ data class WalletDetailUiState(
     val cardDue: com.lucento.app.domain.CardDue? = null,
     /** For a card or loan: the account its payments usually come from ([CreditCardMath.payingWallet]). */
     val payFromWalletId: Long? = null,
+    /** A receivable's "Record payment": the account the last instalment went into, or the likeliest one (round 10). */
+    val receiveIntoWalletId: Long? = null,
     /** An instalment loan's principal, repaid and remaining, and instalments paid (LoanMath.progress). */
     val loanProgress: LoanProgress? = null,
     val today: LocalDate = LocalDate.now(),
@@ -86,6 +88,8 @@ class WalletDetailViewModel(
             cardCycle = cycle,
             cardDue = cycle?.takeIf { it.amountDue.amountMinor > 0L }?.let { com.lucento.app.domain.CardDue(wallet, it, it.isOverdue(today), payFrom) },
             payFromWalletId = payFrom,
+            receiveIntoWalletId = wallet?.takeIf { it.type == com.lucento.app.domain.WalletType.RECEIVABLE }
+                ?.let { CreditCardMath.receivingWallet(it, walletList, all)?.id },
             loanProgress = wallet?.let { LoanMath.progress(it, history) },
             today = today,
         )

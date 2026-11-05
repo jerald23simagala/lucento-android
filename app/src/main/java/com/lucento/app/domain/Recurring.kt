@@ -31,6 +31,10 @@ data class RecurringSchedule(
      * Set for a debt payment: the card or loan being paid from [walletId]. [amount] is then the part that goes against
      * the debt and [interest] the part that is interest (both entered by the user). Marking it paid records the
      * interest as an expense on the debt (category [categoryId]) and a transfer of [total] from [walletId] to it.
+     *
+     * Also set for a collection (an INCOME schedule, owner round 10): the receivable being repaid into [walletId].
+     * Marking it received records the interest as income on the receivable and a transfer of [total] from it into
+     * [walletId] — the mirror of a debt payment.
      */
     val toWalletId: Long? = null,
     val interest: Money = Money.zero(amount.currencyCode),
@@ -39,7 +43,6 @@ data class RecurringSchedule(
 ) {
     init {
         require(type == TransactionType.EXPENSE || type == TransactionType.INCOME) { "Schedules are income or expense" }
-        require(toWalletId == null || type == TransactionType.EXPENSE) { "Debt payments are expenses" }
         require(!interest.isNegative && interest.currencyCode == amount.currencyCode) { "Interest must be a non-negative amount in the same currency" }
         require(interval >= 1) { "Interval must be at least 1" }
         require(nextIndex >= 0) { "Occurrence index cannot be negative" }
@@ -47,9 +50,16 @@ data class RecurringSchedule(
 
     val currencyCode: String get() = amount.currencyCode
 
-    val isDebtPayment: Boolean get() = toWalletId != null
+    /** A payment towards a card or loan ([toWalletId]) from [walletId]. */
+    val isDebtPayment: Boolean get() = toWalletId != null && type == TransactionType.EXPENSE
 
-    /** Everything that leaves [walletId] for one occurrence: the amount, plus interest for a debt payment. */
+    /** An instalment collected from a receivable ([toWalletId]) into [walletId]. */
+    val isCollection: Boolean get() = toWalletId != null && type == TransactionType.INCOME
+
+    /** A debt payment or a collection: its principal is a transfer between the user's own accounts. */
+    val isLinked: Boolean get() = toWalletId != null
+
+    /** Everything that moves for one occurrence: the amount, plus interest for a debt payment or a collection. */
     val total: Money get() = amount + interest
 
     /** Date of the occurrence still waiting, or null when the schedule has ended. */

@@ -195,6 +195,11 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   `20261103180000_credit_card_billing.sql` must reach a project before any v11 build syncs against it, or wallet uploads
   fail (`PGRST204`, rows stay pending, nothing is lost). Older builds never send the columns, so an upsert from them
   leaves them unchanged. The card's payment reminder is derived on each phone and never synced.
+- **Receivables (owner round 10).** Wallet type `RECEIVABLE` syncs like any other wallet, with a loan's terms in the
+  same columns; a collection is a `recurring` row of type INCOME whose `to_wallet_id` is the receivable. **Rollout
+  order:** `20261105090000_receivable_wallets.sql` (the `wallets_type_known` CHECK gains `RECEIVABLE`) must reach a
+  project before a build that can create receivables syncs one there, or that wallet's upload is refused (rows stay
+  pending, nothing is lost). Older builds skip a pulled receivable (`PulledRowRules`) and can't read its collections.
 - **What the user sees (P2-2, 2026-11-04).** The Home chip shows On device · Offline · Syncing (the icon turns) · Needs
   attention · "3 to sync" / "Not synced yet" · "Synced · 5m" — never a bare "Synced", so it says how fresh it is and
   what is waiting (`syncChipLabel`; TalkBack hears it in full words). It opens a sheet with the state, when syncs happen

@@ -42,14 +42,12 @@ data class WalletsUiState(
     val trend: NetWorthTrend? = null,
     val viewMode: WalletsViewMode = WalletsViewMode.ROWS,
     val side: WalletSide = WalletSide.ALL,
-    /** The type chip in use; null for all types. Always one the user has on [side]. */
-    val typeFilter: WalletType? = null,
 ) {
     /** The currency the hero shows: the main currency when held, otherwise the first one with wallets. Never converted. */
     val heroTotal: Money? get() = summary?.let { it.totalFor(primaryCurrency) ?: it.totals.firstOrNull() }
 
-    /** What the list shows after the side and type filters. */
-    val shown: List<Wallet> get() = WalletsOverview.filter(wallets, side, typeFilter)
+    /** What the list shows after the side filter. */
+    val shown: List<Wallet> get() = WalletsOverview.filter(wallets, side)
 }
 
 /** Editable form state for creating or updating a wallet. */
@@ -115,7 +113,6 @@ class WalletsViewModel(
 ) : ViewModel() {
 
     private val side = MutableStateFlow(WalletSide.ALL)
-    private val typeFilter = MutableStateFlow<WalletType?>(null)
 
     /** Balances, net worth and the trend: rebuilt only when wallets, transactions or the main currency change. */
     private val overview = combine(
@@ -129,7 +126,7 @@ class WalletsViewModel(
     }.flowOn(Dispatchers.Default)
 
     val uiState: StateFlow<WalletsUiState> =
-        combine(overview, preferences.preferences, side, typeFilter) { (list, summary, trend), prefs, side, type ->
+        combine(overview, preferences.preferences, side) { (list, summary, trend), prefs, side ->
             WalletsUiState(
                 loading = false,
                 wallets = list,
@@ -139,17 +136,11 @@ class WalletsViewModel(
                 trend = trend,
                 viewMode = prefs.walletsViewMode,
                 side = side,
-                // A type the user no longer has on this side (or never had) quietly falls back to all types.
-                typeFilter = type?.takeIf { it in WalletsOverview.typesOn(list, side) },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WalletsUiState())
 
     fun setSide(value: WalletSide) {
         side.value = value
-    }
-
-    fun setTypeFilter(value: WalletType?) {
-        typeFilter.value = value
     }
 
     /** Remembered on this device (DataStore `wallets_view_mode`), so Wallets opens the way it was left. */
@@ -177,7 +168,7 @@ class WalletsViewModel(
             is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency ->
                 return onResult(DraftError.AmountUnclear(MoneyParser.clarification(parsed, decimalSeparator).orEmpty()), null)
         }
-        val debt = if (draft.type.isLiability) {
+        val debt = if (draft.type.hasTerms) {
             when (val terms = debtTerms(draft, decimalSeparator)) {
                 is DebtParse.Valid -> terms.terms
                 is DebtParse.Error -> return onResult(terms.error, null)
@@ -199,6 +190,10 @@ class WalletsViewModel(
                 applyDefault(result.id, draft)
                 if (draft.id == null && draft.type.isLiability) {
                     categories?.ensure(DebtMath.INTEREST_CATEGORY, CategoryKind.EXPENSE, DebtMath.INTEREST_ICON)
+                }
+                // A receivable's interest is income; its collections record it under this category (owner round 10).
+                if (draft.id == null && draft.type == WalletType.RECEIVABLE) {
+                    categories?.ensure(DebtMath.INTEREST_INCOME_CATEGORY, CategoryKind.INCOME, DebtMath.INTEREST_INCOME_ICON)
                 }
             }
             onResult(

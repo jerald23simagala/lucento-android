@@ -14,7 +14,8 @@ import kotlinx.serialization.json.longOrNull
 internal object PulledRowRules {
     private const val MAX_MINOR = 1_000_000_000_000_000L
     private val CURRENCY = Regex("^[A-Z]{3}$")
-    private val WALLET_TYPES = setOf("CASH", "BANK", "E_WALLET", "SAVINGS", "CREDIT_CARD", "LOAN", "OTHER_ASSET")
+    // Every type this version knows, RECEIVABLE included (owner round 10); an older app skips a receivable it can't read.
+    private val WALLET_TYPES = com.lucento.app.domain.WalletType.NAMES
     private val TRANSACTION_TYPES = setOf("EXPENSE", "INCOME", "TRANSFER_OUT", "TRANSFER_IN", "ADJUSTMENT_IN", "ADJUSTMENT_OUT")
     private val FREQUENCIES = setOf("WEEKLY", "MONTHLY", "YEARLY")
 

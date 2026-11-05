@@ -389,7 +389,15 @@ object AnswerCheck {
     const val MAX_ANSWER = 2_500
     private val TOKEN = Regex("\\[\\[\\s*(=[^\\[\\]]{1,${AskCalc.MAX_EXPRESSION}}|[A-Za-z0-9_]{1,40})\\s*]]")
     private val LINK = Regex("(?i)\\b(?:https?://|www\\.)\\S+")
-    private val MONEY_LIKE = Regex("\\p{Sc}\\s?\\d|\\b[A-Z]{3}\\s?\\d|\\d{1,3}(?:[,.\\u00A0]\\d{3})+|\\d+[.,]\\d{2}\\b")
+    /**
+     * What reads as an amount the model wrote itself: a currency sign or a real ISO code before a number, a grouped
+     * number ("12,500"), or one with two decimals ("45.50"). A rate is not an amount (owner round 10: the adviser may
+     * quote and assume rates), so "7.03%" and "6.50 %" don't count, nor do letters that aren't a currency ("SSS 2024").
+     */
+    private val MONEY_LIKE = Regex("\\p{Sc}\\s?\\d|\\b([A-Z]{3})\\s?\\d|\\d{1,3}(?:[,.\\u00A0]\\d{3})+(?![\\d.,]*\\s?%)|\\d+[.,]\\d{2}\\b(?!\\s?%)")
+
+    private fun hasMoneyLike(text: String): Boolean =
+        MONEY_LIKE.findAll(text).any { m -> m.groups[1]?.value?.let { AskCalc.currencyCode(it) != null } ?: true }
 
     fun check(answer: String, snapshot: AskSnapshot): CheckedAnswer {
         val cleaned = LINK.replace(answer.trim(), "").replace("**", "").take(MAX_ANSWER)
@@ -398,7 +406,7 @@ object AnswerCheck {
         var last = 0
         TOKEN.findAll(cleaned).forEach { match ->
             val before = cleaned.substring(last, match.range.first)
-            if (MONEY_LIKE.containsMatchIn(before)) unverified = true
+            if (hasMoneyLike(before)) unverified = true
             if (before.isNotEmpty()) parts.add(CheckedAnswer.Part(before, isFigure = false))
             val ref = match.groupValues[1]
             // A figure by its id, or a calculation the phone does with its own figures.
@@ -407,7 +415,7 @@ object AnswerCheck {
             last = match.range.last + 1
         }
         val tail = cleaned.substring(last)
-        if (MONEY_LIKE.containsMatchIn(tail)) unverified = true
+        if (hasMoneyLike(tail)) unverified = true
         if (tail.isNotEmpty()) parts.add(CheckedAnswer.Part(tail, isFigure = false))
         return CheckedAnswer(parts, unverified)
     }

@@ -109,6 +109,7 @@ import com.lucento.app.domain.ScheduledFlow
 import com.lucento.app.domain.ScheduledItem
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.flow
+import com.lucento.app.domain.signedOccurrence
 import com.lucento.app.feature.transactions.netFlowLabel
 import java.time.Instant
 import java.time.LocalDate
@@ -176,6 +177,8 @@ fun RecurringScreen(
     onEditSchedule: (Long) -> Unit = {},
     /** Opens a card's page from its payment reminder (where Payment is). */
     onOpenWallet: (Long) -> Unit = {},
+    /** Pays a card from its payment reminder: the transfer, filled in (owner round 10). Without it, the card's page. */
+    onPayCard: (com.lucento.app.domain.CardDue) -> Unit = { onOpenWallet(it.wallet.id) },
     viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -280,7 +283,7 @@ fun RecurringScreen(
                         onOpen = { item ->
                             when (item) {
                                 is ScheduledItem.Occurrence -> actingOn = item.schedule.id
-                                is ScheduledItem.CardPayment -> onOpenWallet(item.due.wallet.id)
+                                is ScheduledItem.CardPayment -> onPayCard(item.due)
                             }
                         },
                     )
@@ -345,6 +348,10 @@ internal fun ScheduledFlow.label(): String = when (this) {
 
 /** An item's signed amount: income comes in (+), expenses and transfers go out (−). */
 private fun signed(flow: ScheduledFlow, amount: Money): Money = if (flow == ScheduledFlow.INCOME) amount else -amount
+
+/** An agenda item signed from the user's side: a collection is money coming in (owner round 10). */
+private fun signed(item: ScheduledItem): Money =
+    if (item is ScheduledItem.Occurrence) item.schedule.signedOccurrence else signed(item.flow, item.amount)
 
 private fun monthName(month: YearMonth, locale: Locale = Locale.getDefault()): String =
     month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)
@@ -696,7 +703,7 @@ private fun AgendaRow(item: ScheduledItem, state: PlanUiState, today: LocalDate,
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 64.dp)
-                .clickable(role = Role.Button, onClickLabel = if (item is ScheduledItem.CardPayment) "Open card" else "Open $title", onClick = onClick)
+                .clickable(role = Role.Button, onClickLabel = if (item is ScheduledItem.CardPayment) "Pay ${item.due.wallet.name}" else "Open $title", onClick = onClick)
                 .padding(horizontal = Spacing.md, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -719,7 +726,7 @@ private fun AgendaRow(item: ScheduledItem, state: PlanUiState, today: LocalDate,
             }
             Spacer(Modifier.width(Spacing.sm))
             Column(horizontalAlignment = Alignment.End) {
-                AmountText(money = signed(item.flow, item.amount), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
+                AmountText(money = signed(item), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
                 if (item.overdue) StatusPill(relative, StatusTones.negative)
                 else Text(relative, style = MaterialTheme.typography.labelMedium, color = if (days == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
@@ -829,6 +836,8 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
                     append(schedule.repeatLabel())
                     val from = state.walletsById[schedule.walletId]?.name
                     when {
+                        // A collection comes from the receivable into the account; a debt payment goes the other way.
+                        debt != null && schedule.isCollection -> append(" · ").append(debt.name).append(" → ").append(from ?: "Account")
                         debt != null -> append(" · ").append(from ?: "Account").append(" → ").append(debt.name)
                         from != null -> append(" · ").append(from)
                     }
@@ -838,7 +847,7 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (schedule.isDebtPayment && !schedule.interest.isZero) {
+            if (schedule.isLinked && !schedule.interest.isZero) {
                 Text(
                     "${fmt.format(schedule.amount)} principal · ${fmt.format(schedule.interest)} interest",
                     style = MaterialTheme.typography.bodySmall,
@@ -851,7 +860,7 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
         Spacer(Modifier.width(Spacing.sm))
         Column(horizontalAlignment = Alignment.End) {
             AmountText(
-                money = signed(schedule.flow, if (schedule.type == TransactionType.INCOME) schedule.amount else schedule.total),
+                money = schedule.signedOccurrence,
                 style = AmountStyles.row,
                 showPlus = true,
                 color = scheduledFlowColor(schedule.flow),
@@ -893,10 +902,12 @@ private fun PaymentSplitFields(
     onPayment: (String) -> Unit,
     onInterest: (String) -> Unit,
     error: String?,
+    /** An instalment received from a receivable (owner round 10): the same split, read from the other side. */
+    collection: Boolean = false,
 ) {
     val fmt = amountFormat()
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        MoneyField(paymentText, onPayment, label = "Payment", currencyCode = currencyCode, modifier = Modifier.weight(1f))
+        MoneyField(paymentText, onPayment, label = if (collection) "Received" else "Payment", currencyCode = currencyCode, modifier = Modifier.weight(1f))
         MoneyField(interestText, onInterest, label = "Of which interest", currencyCode = currencyCode, modifier = Modifier.weight(1f))
     }
     val separator = remember { MoneyFormatter.decimalSeparator() }
@@ -905,8 +916,10 @@ private fun PaymentSplitFields(
     val principal = if (payment != null && interest != null) payment - interest else null
     Text(
         error ?: when {
+            principal == null && collection -> "Enter what you received and the part of it that was interest (0 if none)."
             principal == null -> "Enter the payment and the interest your statement shows (0 if none)."
             principal.isNegative -> "The interest can’t be more than the payment."
+            collection -> "${fmt.format(principal)} lowers what $debtName owes you; ${fmt.format(interest!!)} is recorded as interest income."
             else -> "${fmt.format(principal)} goes against $debtName; ${fmt.format(interest!!)} is recorded as interest spending."
         },
         style = MaterialTheme.typography.bodySmall,
@@ -965,13 +978,17 @@ private fun ScheduleActionsSheet(
                         when (schedule.flow) {
                             ScheduledFlow.INCOME -> "Expected into ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
                             ScheduledFlow.EXPENSE -> "Paid from ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
-                            ScheduledFlow.TRANSFER -> "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "the debt"}"
+                            ScheduledFlow.TRANSFER -> if (schedule.isCollection) {
+                                "Transfer from ${debt?.name ?: "the receivable"} to ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
+                            } else {
+                                "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "the debt"}"
+                            }
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     AmountText(
-                        money = signed(schedule.flow, if (schedule.type == TransactionType.INCOME) schedule.amount else schedule.total),
+                        money = schedule.signedOccurrence,
                         style = AmountStyles.large,
                         showPlus = true,
                         color = scheduledFlowColor(schedule.flow),
@@ -994,6 +1011,7 @@ private fun ScheduleActionsSheet(
                             interestText = interestText,
                             currencyCode = schedule.currencyCode,
                             debtName = debt.name,
+                            collection = schedule.isCollection,
                             onPayment = { amountText = it; message = null },
                             onInterest = { interestText = it; message = null },
                             error = message,

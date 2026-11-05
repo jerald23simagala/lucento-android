@@ -210,6 +210,8 @@ data class LucentoExtendedColors(
         WalletType.SAVINGS -> TonePair(Palette.PositiveText, Color.White)
         WalletType.CREDIT_CARD -> TonePair(Palette.MidnightNavy, Color.White)
         WalletType.LOAN -> TonePair(Palette.BlueDeep, Color.White)
+        // A receivable is money on its way back to the user: amber, with white text at 5.2:1.
+        WalletType.RECEIVABLE -> TonePair(Palette.AmberText, Color.White)
         WalletType.OTHER_ASSET -> TonePair(Palette.PaleSky, Palette.MidnightNavy)
     }
 
@@ -226,6 +228,7 @@ data class LucentoExtendedColors(
         WalletType.SAVINGS -> savings
         WalletType.CREDIT_CARD -> credit
         WalletType.LOAN -> loan
+        WalletType.RECEIVABLE -> savings
         WalletType.OTHER_ASSET -> savings
     }
 }

@@ -32,19 +32,17 @@ object WalletsOverview {
     /** How many months the hero's trend line covers. */
     const val TREND_MONTHS = 6
 
-    /** The wallets on [side] and, when [type] is set, of that type, in their original order. Display filtering only. */
-    fun filter(wallets: List<Wallet>, side: WalletSide, type: WalletType?): List<Wallet> = wallets.filter { w ->
-        val onSide = when (side) {
+    /**
+     * The wallets on [side], in their original order. Display filtering only. (The per-type chips were removed in owner
+     * round 10: assets / liabilities is enough to scan a list of wallets.)
+     */
+    fun filter(wallets: List<Wallet>, side: WalletSide): List<Wallet> = wallets.filter { w ->
+        when (side) {
             WalletSide.ALL -> true
             WalletSide.ASSETS -> !w.type.isLiability
             WalletSide.LIABILITIES -> w.type.isLiability
         }
-        onSide && (type == null || w.type == type)
     }
-
-    /** The type chips for [side]: only types the user actually has there, in the usual type order. */
-    fun typesOn(wallets: List<Wallet>, side: WalletSide): List<WalletType> =
-        filter(wallets, side, null).map { it.type }.distinct().sortedBy { it.ordinal }
 
     /**
      * Assets' share of everything tracked in one currency (assets + what is owed), in whole percent; liabilities take the
@@ -85,17 +83,6 @@ val WalletType.shortLabel: String
         WalletType.SAVINGS -> "Savings"
         WalletType.CREDIT_CARD -> "Card"
         WalletType.LOAN -> "Loan"
+        WalletType.RECEIVABLE -> "Owed to you"
         WalletType.OTHER_ASSET -> "Asset"
-    }
-
-/** The short, plural name a type takes on a filter chip ("Cards", "Loans"). */
-val WalletType.chipLabel: String
-    get() = when (this) {
-        WalletType.CASH -> "Cash"
-        WalletType.BANK -> "Bank"
-        WalletType.E_WALLET -> "E-wallet"
-        WalletType.SAVINGS -> "Savings"
-        WalletType.CREDIT_CARD -> "Cards"
-        WalletType.LOAN -> "Loans"
-        WalletType.OTHER_ASSET -> "Other assets"
     }

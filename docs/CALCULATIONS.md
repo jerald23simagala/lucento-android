@@ -174,6 +174,24 @@ Optional per card (`debt_terms.credit_limit_minor`, `statement_day`, `due_day`; 
   currency (`CreditCardMath.dues` / `payingWallet`). Every field stays editable; nothing is saved until the user saves.
 - The wallet card shows Credit limit, Available and Amount due ("by Nov 5", or "Overdue · Nov 5").
 
+## Receivables (owner round 10)
+A **Receivable** wallet (`WalletType.RECEIVABLE`) is money someone owes the user — a loan in reverse.
+- It is an **asset**: its balance (what is still owed to the user) counts towards net worth and Assets, never towards
+  Safe to spend or spendable money (not spendable), and it is never offered as the account a card or loan is paid from
+  (`CreditCardMath.payingWallet`).
+- It carries a loan's optional terms (`DebtTerms`: yearly rate, one-time or monthly with a term and instalment), stored
+  and synced in the same columns as a loan's; the editor suggests the instalment with `DebtMath.monthlyInstallment`.
+- **Collections** are recurring schedules of type INCOME whose `to_wallet_id` is the receivable and whose wallet is the
+  money account it is paid into. Marking one received writes, in one database transaction keyed by the occurrence: any
+  interest as INCOME on the receivable (category "Interest received"; it is earned and raises what is owed), then a
+  TRANSFER of principal + interest from the receivable into the account. Net: the receivable falls by the principal,
+  the account rises by the total, income rises by the interest only. Principal is never income; on the Scheduled page
+  a collection is a transfer, so it never changes net flow, Bills due or Safe to spend.
+- **Record payment** on the receivable's page opens a transfer from it into the account the last instalment went to
+  (`CreditCardMath.receivingWallet`), otherwise the spendable account in its currency with the most money.
+- Progress (`LoanMath.progress`) reads as a loan's from the other side: Principal (owed to the user at start), Received
+  (principal − remaining, never below zero), Remaining, and instalments received = transfers out of the receivable.
+
 ## Instalment loan progress (v11 display)
 For a loan repaid monthly with a term (`LoanMath.progress`):
 - **Principal** = owed at start (the opening balance); **Remaining** = owed now; **Paid** = principal − remaining, never
@@ -185,8 +203,10 @@ For a loan repaid monthly with a term (`LoanMath.progress`):
 ## Scheduled outlook (Scheduled page, Home's Upcoming and the bell)
 `ScheduleOutlook` (pure, unit-tested). Nothing here is recorded: only "Mark paid" writes a transaction.
 - **Flow** of a scheduled item: **income**; **expense** (a bill: spending); **transfer** — a debt payment (to a card or
-  loan) or a card's payment due (`CreditCardMath`). Amounts are signed: income +, expenses and transfers −. Ink: income
-  green, expenses red, transfers neutral (owner, 2026-11-03); the sign always carries the meaning too.
+  loan), a card's payment due (`CreditCardMath`), or a collection from a receivable (owner round 10). Amounts are signed
+  from the user's side (`signedOccurrence`): income and collections +, expenses, debt payments and card dues −. Ink:
+  income green, expenses red, transfers neutral (owner, 2026-11-03); the sign always carries the meaning too. The bell's
+  "outgoing this week" adds only the − entries, so a collection never lowers it.
 - **Occurrences** in a range `from..to`: every unpaid occurrence of each active schedule dated in the range (a weekly
   plan appears every week, not only once); paused and finished schedules have none. When the range starts on or before
   today, every **overdue** occurrence is included and flagged — it is still owed. Card payments: each card's *current*
@@ -234,6 +254,11 @@ the same `Report` is drawn on screen and written to the PDF. See docs/ASK.md for
   (`AskCalc`): `[[= expression ]]` over figure ids, numbers, + − × ÷ and brackets, in exact decimals; amount ± amount
   (same currency), amount × or ÷ number, amount ÷ amount = number; anything else (mixed currencies, ÷ 0, a text figure,
   an unknown id) shows "—". Amounts round half-up to the currency's minor unit; numbers show at most one decimal.
+  Round 10 (request version 3): an amount from the question or assumed by the model, written with its ISO code
+  ("PHP 5000", "5000 PHP", "PHP 5,000"); a percentage ("7%" = 0.07, plain numbers only); and a power `^` (plain numbers,
+  whole exponents −1200…1200, right to left; a sign binds looser, so −2^2 = −4). Future value of a monthly saving s for
+  n years at yearly rate r, compounded yearly on each year's total: s × 12 × ((1 + r)^n − 1) ÷ r. Rates written in an
+  answer ("7.03%") are not counted as amounts the AI wrote itself.
 - **Insights change chip**: `Insights.changePercent(net, previous net)` — the period's net flow against the equal period
   before it, as a whole percentage of the previous amount's size (half-up); omitted when the earlier period has no
   records or a zero net. **Chart axis**: `Insights.axisTicks` — round gridlines (1, 2, 2.5 or 5 × a power of ten), at
