@@ -109,7 +109,6 @@ import com.lucento.app.domain.Feature
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.graphics.SolidColor
 import com.lucento.app.core.designsystem.component.IllustratedSurface
-import com.lucento.app.core.designsystem.component.LucentoIllustration
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.domain.FinancialFocus
 import com.lucento.app.feature.budget.CategoryPicks
@@ -361,12 +360,14 @@ private fun WelcomeStep(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(Spacing.xl))
-            // Lucento greets the user standing in its sunrise landscape (decorative artwork; the mascot keeps its label).
+            // Lucento greets the user standing in its landscape — the theme's (Sunrise: "A Brighter Little World").
+            // Decorative artwork; the mascot keeps its label. Light-painted scenes are dimmed at night.
+            val spec = LucentoTheme.spec
             IllustratedSurface(
-                illustration = LucentoIllustration.SunriseLandscape,
+                artwork = spec.welcomeArt,
                 modifier = Modifier.fillMaxWidth(),
                 containerColor = MaterialTheme.colorScheme.background,
-                overlay = if (LucentoTheme.isDark) SolidColor(MaterialTheme.colorScheme.background.copy(alpha = 0.45f)) else null,
+                overlay = if (LucentoTheme.isDark && !spec.sceneryIsNight) SolidColor(MaterialTheme.colorScheme.background.copy(alpha = 0.45f)) else null,
                 artworkAlignment = Alignment.BottomCenter,
                 contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.sm),
             ) {

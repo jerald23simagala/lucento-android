@@ -106,15 +106,18 @@ fun StatementPanel(
     val colors = LucentoTheme.extendedColors
     val shape = MaterialTheme.shapes.large
     val body: @Composable () -> Unit = {
-        Column(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.xl)) {
-            Box(
-                Modifier
-                    .width(28.dp)
-                    .height(3.dp)
-                    .background(colors.accent, RoundedCornerShape(2.dp)),
-            )
-            Spacer(Modifier.height(Spacing.lg))
-            CompositionLocalProvider(LocalContentColor provides colors.onHero) { content() }
+        Column(Modifier.heroPanel()) {
+            Column(Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.xl)) {
+                Box(
+                    Modifier
+                        .width(28.dp)
+                        .height(3.dp)
+                        .background(colors.accent, RoundedCornerShape(2.dp)),
+                )
+                Spacer(Modifier.height(Spacing.lg))
+                CompositionLocalProvider(LocalContentColor provides colors.onHero) { content() }
+            }
+            HeroHorizon(height = 44.dp)
         }
     }
     val clickable = if (onClick != null) {

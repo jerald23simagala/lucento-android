@@ -88,7 +88,7 @@ import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.LucentoAnimation
 import com.lucento.app.core.designsystem.component.LucentoCard
-import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.MascotScene
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
@@ -260,7 +260,7 @@ fun TransactionsScreen(
                         title = "Add a wallet first",
                         body = "Every transaction belongs to a wallet — cash, a bank account, a card. " +
                             "It only takes a moment, and stays on this device.",
-                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
+                        illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
                         action = { LucentoPrimaryButton(text = "Add wallet", onClick = onAddWallet) },
                     )
                 }

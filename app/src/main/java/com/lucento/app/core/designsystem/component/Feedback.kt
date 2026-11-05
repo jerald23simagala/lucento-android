@@ -65,7 +65,7 @@ fun LucentoEmptyState(
                     if (animation != null) {
                         LucentoLottieAnimation(animation, Modifier.size(width = 200.dp, height = 166.dp))
                     } else if (mascot != null) {
-                        LucentoMascot(size = 104.dp, mood = mascot)
+                        MascotScene(mood = mascot, mascotSize = 104.dp)
                     }
                 }
             } else {

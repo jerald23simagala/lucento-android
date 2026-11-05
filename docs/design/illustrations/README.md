@@ -11,4 +11,5 @@ are crops of it, exported as WebP (quality 88) to `app/src/main/res/drawable-nod
 
 Re-crop from the source rather than editing the WebPs. Keep text, numbers, logos and UI out of the artwork.
 
-`themes/` holds proposal scenery panoramas for the (unimplemented) theme system — see `themes/README.md`.
+`themes/` holds the five theme landscapes (Sunrise, Midnight, Grove, Mono, Aurora), shipped as
+`scenery_<theme>_panorama` — see `themes/README.md` and docs/DESIGN.md › Themes.

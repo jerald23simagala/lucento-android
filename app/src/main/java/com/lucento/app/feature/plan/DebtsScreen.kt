@@ -30,7 +30,7 @@ import com.lucento.app.core.designsystem.component.Figure
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoCard
-import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.MascotScene
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
@@ -86,7 +86,7 @@ fun DebtsScreen(
                         title = "No debts tracked",
                         body = "Add a credit card or a loan with what you owe today. Payments then lower the balance without " +
                             "being counted as spending twice.",
-                        illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
+                        illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
                         action = { LucentoPrimaryButton(text = "Add a debt", onClick = { adding = newDebt() }) },
                     )
                 }

@@ -47,7 +47,7 @@ import com.lucento.app.core.designsystem.component.Figure
 import com.lucento.app.core.designsystem.component.IncomeExpenseChart
 import com.lucento.app.core.designsystem.component.LegendKey
 import com.lucento.app.core.designsystem.component.LucentoCard
-import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.MascotScene
 import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.MoneyText
@@ -155,7 +155,7 @@ private fun TrendSection(data: InsightsData, currency: String, period: TrendPeri
             title = "No income or expenses yet",
             body = "Record a few incomes and expenses in $currency and you’ll see how they move month by month. " +
                 "Transfers between your own accounts never count here.",
-            illustration = { LucentoMascot(size = 88.dp, mood = MascotMood.Curious) },
+            illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 88.dp) },
         )
         return
     }

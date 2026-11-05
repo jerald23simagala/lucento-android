@@ -196,6 +196,8 @@ data class LucentoExtendedColors(
      */
     val categoryTones: Map<String, TonePair> = emptyMap(),
     val categoryFallback: TonePair = TonePair(Color(0xFFECEFF4), Color(0xFF56637D)),
+    /** Where the hero panel's diagonal gradient ends; equal to [hero] (a solid panel) in every theme but Aurora. */
+    val heroEnd: Color = hero,
 ) {
     fun categoryTone(iconKey: String?): TonePair = iconKey?.let { categoryTones[it] } ?: categoryFallback
 
@@ -295,16 +297,7 @@ internal val LightExtended = LucentoExtendedColors(
     chartBarMuted = Color(0xFFC7D5FC),
     chartHighlight = Palette.ElectricBlue,
     track = Color(0xFFE8EDF7),
-    // Sunrise chart order: blue, tangerine, sunlight, emerald, blue-gray, then sky and violet for long tails.
-    categorical = listOf(
-        Palette.ElectricBlue,
-        Palette.BrightTangerine,
-        Palette.SunlightYellow,
-        Palette.Positive,
-        Color(0xFF8A97B0),
-        Color(0xFF38A3E8),
-        Color(0xFF8B7CF6),
-    ),
+    categorical = SunriseSeries.light,
     success = Palette.Positive,
     // Approved brand artwork: the mark keeps its original colours (not re-tinted to the UI palette).
     cash = TonePair(Palette.SunlightPale, Color(0xFF8A5200)),
@@ -345,15 +338,7 @@ internal val DarkExtended = LucentoExtendedColors(
     chartBarMuted = Color(0xFF2C3D66),
     chartHighlight = Palette.BlueNight,
     track = Color(0xFF26365C),
-    categorical = listOf(
-        Palette.BlueNight,
-        Color(0xFFFF9F4D),
-        Palette.SunlightYellow,
-        Color(0xFF3DD68C),
-        Color(0xFF8A97B0),
-        Color(0xFF6CC4F5),
-        Color(0xFFA99BFF),
-    ),
+    categorical = SunriseSeries.dark,
     success = Color(0xFF3DD68C),
     cash = TonePair(Color(0xFF3D3214), Color(0xFFFFD98A)),
     bank = TonePair(Color(0xFF22325E), Color(0xFFDCE6FF)),
@@ -363,4 +348,71 @@ internal val DarkExtended = LucentoExtendedColors(
     loan = TonePair(Color(0xFF2E2157), Color(0xFFDDD3FF)),
     categoryTones = categoryPalette(night = true),
     categoryFallback = TonePair(Color(0xFF26304A), Color(0xFFB8C5DC)),
+)
+
+/**
+ * Categorical chart series, separate from the UI accents. Each theme's 7 slots were generated in OKLCH inside the
+ * mode's lightness band and ordered so every adjacent pair stays apart for protan/deutan vision (Machado 2009,
+ * OKLab ΔE ≥ 8) and normal vision (ΔE ≥ 15), with chroma ≥ 0.10 and ≥ 3:1 on the theme's cards. The order is the
+ * safety mechanism: re-ordering or editing a slot needs `DataSeriesTest` to pass again.
+ */
+internal object SunriseSeries {
+    val light = series(0xFF426EC2, 0xFFAB5803, 0xFF007CA5, 0xFF1C8742, 0xFF8A57AE, 0xFF86700A, 0xFFAB4A7D)
+    val dark = series(0xFF5D87D7, 0xFFC47131, 0xFF0396C6, 0xFF459F5D, 0xFFA171C3, 0xFFA28700, 0xFFC26594)
+}
+
+internal fun series(vararg argb: Long): List<Color> = argb.map { Color(it) }
+
+/**
+ * The tokens a theme may change. Everything else in [LucentoExtendedColors] — positive / negative / warning and their
+ * containers and indicators, progress success, category tiles and wallet tones — is the financial semantics, fixed per
+ * light/dark mode for every theme (they come from [LightExtended] / [DarkExtended] via [withBrand]), so no theme can
+ * re-colour a debt or an overspend. `ThemeInvarianceTest` guards this.
+ */
+@Immutable
+internal data class BrandColors(
+    val info: Color,
+    val infoContainer: Color,
+    val accent: Color,
+    val accentText: Color,
+    val warmAccent: Color,
+    val onAccent: Color,
+    val borderDefault: Color,
+    val shadow: Color,
+    val highlight: Color,
+    val onHighlight: Color,
+    val hero: Color,
+    val heroEnd: Color = hero,
+    val onHero: Color,
+    val onHeroMuted: Color,
+    val heroRule: Color,
+    val chartBar: Color,
+    val chartBarMuted: Color,
+    val chartHighlight: Color,
+    val track: Color,
+    val categorical: List<Color>,
+)
+
+/** These semantics with a theme's [brand] tokens on top. */
+internal fun LucentoExtendedColors.withBrand(brand: BrandColors): LucentoExtendedColors = copy(
+    info = brand.info,
+    infoContainer = brand.infoContainer,
+    accent = brand.accent,
+    accentText = brand.accentText,
+    warmAccent = brand.warmAccent,
+    onAccent = brand.onAccent,
+    borderDefault = brand.borderDefault,
+    shadow = brand.shadow,
+    highlight = brand.highlight,
+    onHighlight = brand.onHighlight,
+    hero = brand.hero,
+    heroEnd = brand.heroEnd,
+    onHero = brand.onHero,
+    onHeroMuted = brand.onHeroMuted,
+    heroRule = brand.heroRule,
+    chartBar = brand.chartBar,
+    chartBarMuted = brand.chartBarMuted,
+    chartHighlight = brand.chartHighlight,
+    track = brand.track,
+    categorical = brand.categorical,
 )

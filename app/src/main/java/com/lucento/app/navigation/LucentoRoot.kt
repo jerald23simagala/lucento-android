@@ -63,7 +63,7 @@ import com.lucento.app.core.designsystem.component.Confirmation
 import com.lucento.app.core.designsystem.component.ConfirmationHost
 import com.lucento.app.core.designsystem.component.EmptyState
 import com.lucento.app.core.designsystem.component.LocalProfileChrome
-import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.MascotScene
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
@@ -685,6 +685,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             ),
             onSaveName = appViewModel::setDisplayName,
             onTheme = appViewModel::setThemeMode,
+            onThemeId = appViewModel::setThemeId,
             onOpen = { destination ->
                 when (destination) {
                     ProfileDestination.SETTINGS -> push(SettingsRoute())
@@ -764,7 +765,7 @@ private fun Gated(
             } else {
                 "Your saved data is safe — turning it back on brings everything back."
             },
-            illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
+            illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
             action = {
                 Column(Modifier.fillMaxWidth()) {
                     LucentoPrimaryButton(
