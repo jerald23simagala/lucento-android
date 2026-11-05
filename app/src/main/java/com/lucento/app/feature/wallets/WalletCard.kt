@@ -153,6 +153,7 @@ fun WalletCard(
                             label = when {
                                 loan != null -> "Remaining"
                                 liability -> "Amount owed"
+                                wallet.type == WalletType.RECEIVABLE -> "Owed to you"
                                 valued -> "Estimated value"
                                 else -> "Current balance"
                             },
@@ -188,7 +189,8 @@ private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color,
         CardFigures(
             listOfNotNull(
                 CardFigure("Principal", loan.principal),
-                CardFigure("Paid", loan.paid),
+                // A receivable's instalments come in (owner round 10).
+                CardFigure(if (wallet.type == WalletType.RECEIVABLE) "Received" else "Paid", loan.paid),
                 installment?.let { CardFigure("Monthly", it) },
             ),
             muted,
@@ -212,7 +214,11 @@ private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color,
     }
     Row(verticalAlignment = Alignment.Bottom) {
         CardField(
-            if (wallet.type.isLiability) "Owed at start" else "Opening balance",
+            when {
+                wallet.type.isLiability -> "Owed at start"
+                wallet.type == WalletType.RECEIVABLE -> "Lent at start"
+                else -> "Opening balance"
+            },
             fmt.format(wallet.openingBalance),
             muted,
             ink,
@@ -272,7 +278,8 @@ private fun BalanceBlock(wallet: Wallet, label: String, loan: LoanProgress?, mut
         InstallmentBar(paid = loan.installmentsPaid, total = loan.installments, paidColor = LucentoTheme.extendedColors.paidOnCard(ink), track = ink.copy(alpha = 0.26f))
         Spacer(Modifier.size(Spacing.xs))
         Text(
-            "${loan.installmentsPaid} of ${loan.installments} ${if (loan.installments == 1) "installment" else "installments"} paid",
+            "${loan.installmentsPaid} of ${loan.installments} ${if (loan.installments == 1) "installment" else "installments"} " +
+                if (wallet.type == WalletType.RECEIVABLE) "received" else "paid",
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
             color = ink,
         )
@@ -337,6 +344,7 @@ private fun InstitutionWalletCard(
     val label = when {
         loan != null -> "Remaining"
         liability -> "Amount owed"
+        wallet.type == WalletType.RECEIVABLE -> "Owed to you"
         wallet.type.isValuedManually -> "Estimated value"
         else -> "Current balance"
     }
@@ -511,7 +519,8 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
         institution?.name,
         wallet.type.label,
         wallet.name,
-        (if (liability) "amount owed " else "balance ") + fmt.signed(wallet.cardAmount, showPlus = false),
+        (if (liability) "amount owed " else if (wallet.type == WalletType.RECEIVABLE) "owed to you " else "balance ") +
+            fmt.signed(wallet.cardAmount, showPlus = false),
     ).joinToString(", ")
     Box(
         modifier
@@ -571,8 +580,9 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
 /** What an institution card's single spoken sentence adds for a loan's progress or a card's limit and amount due. */
 private fun cardDetailsSpoken(wallet: Wallet, cycle: CardCycle?, loan: LoanProgress?, today: LocalDate, fmt: AmountFormat): String = buildString {
     if (loan != null) {
-        append(", principal ${fmt.spoken(loan.principal)}, paid ${fmt.spoken(loan.paid)}")
-        append(", ${loan.installmentsPaid} of ${loan.installments} installments paid")
+        val done = if (wallet.type == WalletType.RECEIVABLE) "received" else "paid"
+        append(", principal ${fmt.spoken(loan.principal)}, $done ${fmt.spoken(loan.paid)}")
+        append(", ${loan.installmentsPaid} of ${loan.installments} installments $done")
     }
     val limit = wallet.debt?.creditLimit
     val available = CreditCardMath.available(wallet)

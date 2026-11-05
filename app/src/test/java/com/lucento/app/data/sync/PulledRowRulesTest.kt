@@ -21,6 +21,8 @@ class PulledRowRulesTest {
         assertNull(PulledRowRules.problem("transactions", tx()))
         assertNull(PulledRowRules.problem("transactions", tx(type = "ADJUSTMENT_OUT", amount = 0)))
         assertNull(PulledRowRules.problem("wallets", buildJsonObject { put("type", "LOAN"); put("currency_code", "BHD"); put("opening_balance_minor", -500) }))
+        // Owner round 10: receivables sync like any other wallet.
+        assertNull(PulledRowRules.problem("wallets", buildJsonObject { put("type", "RECEIVABLE"); put("currency_code", "PHP"); put("opening_balance_minor", 6_000_000) }))
         assertNull(PulledRowRules.problem("categories", buildJsonObject { put("kind", "INCOME") }))
         assertNull(PulledRowRules.problem("recurring", buildJsonObject {
             put("type", "EXPENSE"); put("frequency", "MONTHLY"); put("interval_count", 1); put("amount_minor", 90000); put("currency_code", "PHP")

@@ -98,9 +98,20 @@ class RecurringRepository(
         val interest = input.interest ?: Money.zero(input.amount.currencyCode)
         if (input.toWalletId != null) {
             val debt = wallets.getById(input.toWalletId)
-            val isDebt = debt != null && debt.acceptsTransactions &&
-                runCatching { WalletType.valueOf(debt.type) }.getOrNull()?.isLiability == true
-            if (!isDebt || input.type != TransactionType.EXPENSE || debt!!.id == wallet.id || debt.currencyCode != wallet.currencyCode ||
+            val debtType = debt?.let { runCatching { WalletType.valueOf(it.type) }.getOrNull() }
+            // A debt payment (expense) goes to a card or loan; a collection (income, owner round 10) comes from a
+            // receivable. Either way the other side is a money account in the same currency.
+            val linked = when (input.type) {
+                TransactionType.EXPENSE -> debtType?.isLiability == true
+                TransactionType.INCOME -> debtType == WalletType.RECEIVABLE
+                else -> false
+            }
+            // A collection lands in a money account (never a card, loan or another receivable). Debt payments keep
+            // their earlier rule: the paying account isn't checked here (the editor offers money accounts only).
+            val walletType = runCatching { WalletType.valueOf(wallet.type) }.getOrNull()
+            val moneyAccount = input.type == TransactionType.EXPENSE ||
+                (walletType != null && !walletType.isLiability && walletType != WalletType.RECEIVABLE)
+            if (!linked || !moneyAccount || !debt!!.acceptsTransactions || debt.id == wallet.id || debt.currencyCode != wallet.currencyCode ||
                 interest.isNegative || interest.currencyCode != input.amount.currencyCode
             ) {
                 return SaveResult.InvalidDebt
@@ -171,6 +182,9 @@ class RecurringRepository(
         if (schedule.isDebtPayment) {
             return markDebtPaid(entity, schedule, index, amount ?: schedule.amount, interest ?: schedule.interest, date ?: due)
         }
+        if (schedule.isCollection) {
+            return markCollected(entity, schedule, index, amount ?: schedule.amount, interest ?: schedule.interest, date ?: due)
+        }
         return runner.run {
             val result = transactions.save(
                 TransactionRepository.Input(
@@ -234,6 +248,60 @@ class RecurringRepository(
                         clientUuid = key,
                         fromWalletId = schedule.walletId,
                         toWalletId = debtId,
+                        amount = principal + interest,
+                        date = date,
+                        note = schedule.name,
+                    )
+                )
+                if (moved !is TransactionRepository.TransferResult.Saved) throw Rollback(PayResult.Rejected(moved))
+                dao.update(entity.copy(nextIndex = maxOf(entity.nextIndex, index + 1), updatedAt = clock()))
+                PayResult.Recorded(null)
+            }
+        } catch (e: Rollback) {
+            e.result
+        }
+    }
+
+    /**
+     * A collection from a receivable (owner round 10), the mirror of [markDebtPaid]: the interest as INCOME on the
+     * receivable (it is earned, and raises what is owed to the user), then a TRANSFER of principal + interest from the
+     * receivable into the receiving wallet (not income, and lowers what is owed). Net effect on the receivable: minus
+     * the principal. One database transaction; each row keyed by the occurrence, so a second tap can't double it.
+     */
+    private suspend fun markCollected(
+        entity: RecurringEntity,
+        schedule: RecurringSchedule,
+        index: Int,
+        principal: Money,
+        interest: Money,
+        date: LocalDate,
+    ): PayResult {
+        val receivableId = schedule.toWalletId ?: return PayResult.NotFound
+        if (principal.isNegative || interest.isNegative) return PayResult.Rejected(TransactionRepository.SaveResult.AmountNotPositive)
+        val key = schedule.occurrenceKey(index)
+        return try {
+            runner.run {
+                if (interest.amountMinor > 0) {
+                    val saved = transactions.save(
+                        TransactionRepository.Input(
+                            id = null,
+                            clientUuid = DebtPaymentLink.interestKey(key),
+                            type = TransactionType.INCOME,
+                            amount = interest,
+                            walletId = receivableId,
+                            categoryId = schedule.categoryId,
+                            date = date,
+                            note = "${schedule.name} · interest",
+                        )
+                    )
+                    if (saved !is TransactionRepository.SaveResult.Saved) throw Rollback(PayResult.Rejected(saved))
+                }
+                val moved = transactions.saveTransfer(
+                    TransactionRepository.TransferInput(
+                        group = null,
+                        clientUuid = key,
+                        fromWalletId = receivableId,
+                        toWalletId = schedule.walletId,
                         amount = principal + interest,
                         date = date,
                         note = schedule.name,

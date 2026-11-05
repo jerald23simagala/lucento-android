@@ -19,6 +19,11 @@ import java.util.Locale
  * currency, an amount can be multiplied or divided by a plain number, and an amount divided by an amount is a plain
  * number (months, a ratio). Anything else — an unknown id, a figure that isn't a number, mixed currencies, division by
  * zero — gives no result ("—"), never a guess.
+ *
+ * Owner round 10 ("projections like MP2 dividends, even speculating"): an expression may also hold an amount from the
+ * user's question or one the model assumes, written with its currency code ("PHP 5000", "5000 PHP", "PHP 5,000"); a
+ * percentage ("7%" is 0.07); and a power for compounding ("(1 + 7%)^5", whole exponents up to ±1200, plain numbers
+ * only). So "₱5,000 a month in MP2 for 5 years at 7%" becomes `[[= PHP 5000 * 12 * ((1 + 7%)^5 - 1) / 7%]]`.
  */
 object AskCalc {
 
@@ -30,6 +35,12 @@ object AskCalc {
     const val MAX_EXPRESSION = 200
     private const val MAX_DEPTH = 12
     private val CONTEXT = MathContext(24, RoundingMode.HALF_EVEN)
+    private val HUNDRED = BigDecimal(100)
+
+    /** [text] when it is an ISO 4217 code ("PHP", "USD"), else null. */
+    internal fun currencyCode(text: String): String? =
+        text.takeIf { it.length == 3 && it.all { c -> c in 'A'..'Z' } }
+            ?.takeIf { runCatching { java.util.Currency.getInstance(it) }.isSuccess }
 
     fun evaluate(expression: String, snapshot: AskSnapshot): Value? {
         if (expression.length > MAX_EXPRESSION) return null
@@ -60,6 +71,9 @@ object AskCalc {
         data class Op(val symbol: Char) : Token
     }
 
+    /** The largest whole exponent a power may have (50 years of months). */
+    private const val MAX_EXPONENT = 1_200
+
     private fun tokenize(text: String): List<Token>? {
         val out = ArrayList<Token>()
         var i = 0
@@ -67,13 +81,19 @@ object AskCalc {
             val c = text[i]
             when {
                 c.isWhitespace() -> i++
-                c in "+-*/()" -> { out += Token.Op(c); i++ }
+                c in "+-*/()^%" -> { out += Token.Op(c); i++ }
                 c == '×' -> { out += Token.Op('*'); i++ }
                 c == '÷' -> { out += Token.Op('/'); i++ }
                 c.isDigit() || c == '.' -> {
                     val start = i
-                    while (i < text.length && (text[i].isDigit() || text[i] == '.')) i++
-                    out += Token.Num(text.substring(start, i).toBigDecimalOrNull() ?: return null)
+                    while (i < text.length) {
+                        val d = text[i]
+                        // "5,000": a comma is a thousands separator only before exactly three digits.
+                        val grouping = d == ',' && (1..3).all { k -> text.getOrNull(i + k)?.isDigit() == true } &&
+                            text.getOrNull(i + 4)?.isDigit() != true
+                        if (d.isDigit() || d == '.' || grouping) i++ else break
+                    }
+                    out += Token.Num(text.substring(start, i).replace(",", "").toBigDecimalOrNull() ?: return null)
                 }
                 c.isLetter() || c == '_' -> {
                     val start = i
@@ -101,25 +121,64 @@ object AskCalc {
         }
 
         private fun term(depth: Int): Value {
-            var left = factor(depth)
+            var left = unary(depth)
             while (true) {
                 val op = (tokens.getOrNull(position) as? Token.Op)?.symbol
                 if (op != '*' && op != '/') return left
                 position++
-                left = combine(left, factor(depth), op)
+                left = combine(left, unary(depth), op)
             }
         }
 
-        private fun factor(depth: Int): Value = when (val token = tokens.getOrNull(position++) ?: error("end")) {
-            is Token.Num -> Value.Number(token.value)
-            is Token.Id -> figure(token.name)
+        /** A sign binds looser than a power: -2^2 is -(2^2). */
+        private fun unary(depth: Int): Value {
+            val op = (tokens.getOrNull(position) as? Token.Op)?.symbol
+            if (op == '-') { position++; return negate(unary(depth)) }
+            if (op == '+') { position++; return unary(depth) }
+            return power(depth)
+        }
+
+        /** base ^ exponent, right to left (2^3^2 is 2^9): plain numbers only, whole exponents. */
+        private fun power(depth: Int): Value {
+            val base = percent(depth)
+            if ((tokens.getOrNull(position) as? Token.Op)?.symbol != '^') return base
+            position++
+            val exponent = unary(depth)
+            require(base is Value.Number && exponent is Value.Number)
+            val n = exponent.value.stripTrailingZeros().let { e -> require(e.scale() <= 0); e.intValueExact() }
+            require(n in -MAX_EXPONENT..MAX_EXPONENT)
+            require(n >= 0 || base.value.signum() != 0)
+            return Value.Number(base.value.pow(n, CONTEXT))
+        }
+
+        /** "7%" is 0.07 — percentages of plain numbers only. */
+        private fun percent(depth: Int): Value {
+            val value = primary(depth)
+            if ((tokens.getOrNull(position) as? Token.Op)?.symbol != '%') return value
+            position++
+            require(value is Value.Number)
+            return Value.Number(value.value.divide(HUNDRED, CONTEXT))
+        }
+
+        private fun primary(depth: Int): Value = when (val token = tokens.getOrNull(position++) ?: error("end")) {
+            // "5000 PHP": an amount from the question, or one the model assumes.
+            is Token.Num -> currencyAt(position)?.let { code -> position++; Value.Amount(token.value, code) } ?: Value.Number(token.value)
+            is Token.Id -> when {
+                snapshot.byId.containsKey(token.name) -> figure(token.name)
+                // "PHP 5000"
+                currencyCode(token.name) != null && tokens.getOrNull(position) is Token.Num ->
+                    Value.Amount((tokens[position++] as Token.Num).value, token.name)
+                else -> error("unknown ${token.name}")
+            }
             is Token.Op -> when (token.symbol) {
-                '-' -> negate(factor(depth))
-                '+' -> factor(depth)
                 '(' -> expression(depth + 1).also { require((tokens.getOrNull(position++) as? Token.Op)?.symbol == ')') }
                 else -> error("unexpected")
             }
         }
+
+        /** The currency code at [index] when it is one and not a figure's id. */
+        private fun currencyAt(index: Int): String? =
+            (tokens.getOrNull(index) as? Token.Id)?.name?.takeIf { !snapshot.byId.containsKey(it) }?.let(::currencyCode)
 
         private fun figure(id: String): Value {
             val f = snapshot.byId[id] ?: error("unknown $id")

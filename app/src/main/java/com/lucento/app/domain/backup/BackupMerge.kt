@@ -178,7 +178,7 @@ object BackupMerge {
         }
         val debts = snapshot.debtTerms.filter { debt ->
             val wallet = snapshot.wallets.firstOrNull { it.id == debt.walletId }
-            wallet != null && wallet.type.isLiability
+            wallet != null && wallet.type.hasTerms
         }
         val settings = snapshot.settings.let { settings ->
             if (settings.defaultWalletId != null && settings.defaultWalletId !in walletIds) {

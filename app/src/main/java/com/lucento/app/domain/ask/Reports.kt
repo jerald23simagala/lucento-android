@@ -355,6 +355,7 @@ object ReportBuilder {
         WalletType.SAVINGS -> "Savings"
         WalletType.CREDIT_CARD -> "Credit card"
         WalletType.LOAN -> "Loan"
+        WalletType.RECEIVABLE -> "Receivable"
         WalletType.OTHER_ASSET -> "Other asset"
     }
 

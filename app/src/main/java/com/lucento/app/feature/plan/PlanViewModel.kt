@@ -217,13 +217,17 @@ class PlanViewModel(
 
     // ---------------------------------------------------------------- recurring
 
-    /** A debt payment without a category gets the shared interest category, created or restored as needed. */
+    /**
+     * A debt payment without a category gets the shared interest category (an expense); a collection from a receivable
+     * gets "Interest received" (income, owner round 10). Either is created or restored as needed.
+     */
     fun saveSchedule(input: RecurringRepository.Input, onResult: (RecurringRepository.SaveResult) -> Unit) =
         write({
-            val withCategory = if (input.toWalletId != null && input.categoryId == null) {
-                input.copy(categoryId = categories.ensure(DebtMath.INTEREST_CATEGORY, CategoryKind.EXPENSE, DebtMath.INTEREST_ICON))
-            } else {
-                input
+            val withCategory = when {
+                input.toWalletId == null || input.categoryId != null -> input
+                input.type == com.lucento.app.domain.TransactionType.INCOME ->
+                    input.copy(categoryId = categories.ensure(DebtMath.INTEREST_INCOME_CATEGORY, CategoryKind.INCOME, DebtMath.INTEREST_INCOME_ICON))
+                else -> input.copy(categoryId = categories.ensure(DebtMath.INTEREST_CATEGORY, CategoryKind.EXPENSE, DebtMath.INTEREST_ICON))
             }
             recurring.save(withCategory)
         }, onResult)

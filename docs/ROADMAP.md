@@ -136,6 +136,10 @@ recurring-schedule sync, syncing preferences.
   "AI advice can be inaccurate" note under every AI answer instead of a disclaimer inside it); AI requests refresh a
   stale sign-in token and retry once after a 401; the proxy tries Gemini models that were just busy last; "Ask Gemini
   again" after a busy or slow answer.
+- Owner review round 10 (2026-11-04): Receivable wallets (a loan in reverse: terms, instalment schedules as collections,
+  Record payment); the Scheduled page's card payment opens the filled-in transfer; Wallets drops the type chips and the
+  "Net worth = assets − liabilities" line; Home in the dock opens at the top; Ask Lucento projects with the user's own
+  amounts and assumed market rates (`PHP 5000`, `7%`, `^` in calculations; request version 3).
 - Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
   email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
   Insights adopt the brand hero and carded sections.

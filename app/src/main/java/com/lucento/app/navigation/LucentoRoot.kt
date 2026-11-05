@@ -38,6 +38,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -263,6 +264,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var showProfile by rememberSaveable { mutableStateOf(false) }
     // The tab a pushed screen belongs to, so the dock keeps it highlighted (e.g. Goals opened from Home).
     var selectedTab by rememberSaveable { mutableStateOf("home") }
+    // Each tap on Home in the dock asks Home to show its top (owner round 10); Back from a sub-page keeps the place.
+    var homeToTop by rememberSaveable { mutableIntStateOf(0) }
 
     LaunchedEffect(currentDestination) {
         currentDestination.primaryKey()?.let { selectedTab = it }
@@ -393,6 +396,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     onSelect = { item ->
                         val tab = tabs.first { it.item.key == item.key }
                         selectedTab = item.key
+                        if (item.key == "home") homeToTop++
                         navigateTo(tab.route)
                     },
                     onAdd = {
@@ -429,6 +433,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     }
                     composable<HomeRoute> {
                         HomeScreen(
+                            scrollToTop = homeToTop,
                             actions = HomeActions(
                                 onOpenBudget = { navigateTo(BudgetRoute) },
                                 onChooseCategories = { push(CategorySetupRoute) },
@@ -535,6 +540,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 onAddSchedule = { push(RecurringEditRoute()) },
                                 onEditSchedule = { id -> push(RecurringEditRoute(scheduleId = id)) },
                                 onOpenWallet = { id -> push(WalletDetailRoute(id)) },
+                                onPayCard = { if (features.isEnabled(Feature.MULTIPLE_WALLETS)) openCardPayment(it) else push(WalletDetailRoute(it.wallet.id)) },
                             )
                         }
                     }

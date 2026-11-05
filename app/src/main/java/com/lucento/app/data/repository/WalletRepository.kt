@@ -146,7 +146,8 @@ class WalletRepository(
 
     private suspend fun writeTerms(id: Long, type: WalletType, debt: DebtTerms?, now: Long) {
         val terms = debtTerms ?: return
-        if (debt == null || !type.isLiability) {
+        // Cards, loans and receivables (owner round 10) keep terms; any other type drops them.
+        if (debt == null || !type.hasTerms) {
             terms.delete(id)
             return
         }
@@ -210,7 +211,7 @@ internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null, terms: DebtTerms
         createdAtEpochMillis = createdAt,
         openingBalance = opening,
         institutionId = institutionId,
-        debt = terms?.takeIf { walletType.isLiability }?.toDomain(currencyCode),
+        debt = terms?.takeIf { walletType.hasTerms }?.toDomain(currencyCode),
     )
 }
 

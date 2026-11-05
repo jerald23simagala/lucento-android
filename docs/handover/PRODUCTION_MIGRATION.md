@@ -1,6 +1,26 @@
 # Production migration runbook — 2026-11-03
 
-## Pending: credit card billing (app schema v11, branch `feature/core-screens-refinement`)
+## Pending: receivable wallets (owner round 10, branch `feature/owner-round-10`)
+
+**Status: applied to production by the owner (2026-11-04); not yet on `lucento-test`.** Owner-run. No app schema
+change (Room stays v11): only the server's list of known wallet types grows.
+
+| Migration | Effect | Data risk |
+|---|---|---|
+| `20261105090000_receivable_wallets` | Re-creates `wallets_type_known` with `RECEIVABLE` added (live rows only, `NOT VALID`) | None: no row changes; existing rows aren't re-checked |
+
+- **Apply to `lucento-test` before a round 10 debug build syncs a receivable there, and to production before a round 10
+  release (or the test-signed APK) creates one while signed in.** Without it the server refuses that wallet's upload
+  (check violation); it stays pending on the phone and nothing is lost, and it uploads once the migration is applied.
+  Every other wallet and transaction keeps syncing.
+- Apply: paste the file into the SQL editor (it is two statements). Verify with
+  `select pg_get_constraintdef(oid) from pg_constraint where conname = 'wallets_type_known';` (the list includes
+  `'RECEIVABLE'`) and record history with `supabase migration repair --status applied 20261105090000`.
+- Smoke test: on a round 10 build, add a Receivable with monthly terms, sync, and check the wallet row's `type`.
+
+---
+
+## Credit card billing (app schema v11, branch `feature/core-screens-refinement`)
 
 **Status: applied by the owner to `lucento-test` and production (2026-11-03)**, and sync checked on a phone (OT-1..3).
 Owner-run, like the migrations below.

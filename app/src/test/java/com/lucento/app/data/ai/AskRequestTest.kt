@@ -28,9 +28,9 @@ class AskRequestTest {
         assertEquals(listOf(AskFigure("nw", "Net worth today", "₱10,000.00")), request.figures)
     }
 
-    @Test fun theBodyTellsTheProxyThisAppIsVersion2() {
+    @Test fun theBodyTellsTheProxyThisAppIsVersion3() {
         // Without it the proxy answers with the summaries-only prompt (no advice, no calculations).
         val body = AskLucentoClient.body(AskRequest.from("How can I save more?", emptyList(), snapshot))
-        assertTrue(body, body.contains("\"version\":2"))
+        assertTrue(body, body.contains("\"version\":3"))
     }
 }

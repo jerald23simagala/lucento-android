@@ -93,16 +93,34 @@ object CreditCardMath {
      * (the source of the latest transfer into the card), otherwise the cash, bank or e-wallet account in the card's
      * currency with the most money. Only same-currency accounts that aren't cards or loans; null when there is none.
      */
-    fun payingWallet(card: Wallet, wallets: List<Wallet>, transactions: List<Transaction>): Wallet? {
-        val candidates = wallets.filter { it.id != card.id && !it.type.isLiability && !it.type.isValuedManually && it.currencyCode == card.currencyCode }
+    fun payingWallet(card: Wallet, wallets: List<Wallet>, transactions: List<Transaction>): Wallet? =
+        counterpart(card, wallets, transactions, ownLeg = TransactionType.TRANSFER_IN)
+
+    /**
+     * Where an instalment from [receivable] most likely goes (owner round 10), to pre-fill "Record payment": the account
+     * that received the last one, otherwise the cash, bank or e-wallet account in its currency with the most money.
+     */
+    fun receivingWallet(receivable: Wallet, wallets: List<Wallet>, transactions: List<Transaction>): Wallet? =
+        counterpart(receivable, wallets, transactions, ownLeg = TransactionType.TRANSFER_OUT)
+
+    /**
+     * The money account on the other side of [wallet]'s latest transfer leg of type [ownLeg], otherwise the spendable one
+     * with the most money. Money accounts only: same currency, never a card, loan, receivable or valued asset.
+     */
+    private fun counterpart(wallet: Wallet, wallets: List<Wallet>, transactions: List<Transaction>, ownLeg: TransactionType): Wallet? {
+        val candidates = wallets.filter {
+            it.id != wallet.id && !it.type.isLiability && !it.type.isValuedManually && it.type != WalletType.RECEIVABLE &&
+                it.currencyCode == wallet.currencyCode
+        }
         if (candidates.isEmpty()) return null
         val byId = candidates.associateBy { it.id }
-        val outLegs = transactions.filter { it.type == TransactionType.TRANSFER_OUT && it.transferGroup != null }.associateBy { it.transferGroup }
-        val lastPayer = transactions
-            .filter { it.walletId == card.id && it.type == TransactionType.TRANSFER_IN && it.transferGroup != null }
+        val otherLeg = if (ownLeg == TransactionType.TRANSFER_IN) TransactionType.TRANSFER_OUT else TransactionType.TRANSFER_IN
+        val others = transactions.filter { it.type == otherLeg && it.transferGroup != null }.associateBy { it.transferGroup }
+        val last = transactions
+            .filter { it.walletId == wallet.id && it.type == ownLeg && it.transferGroup != null }
             .sortedWith(compareByDescending<Transaction> { it.date }.thenByDescending { it.createdAtEpochMillis })
-            .firstNotNullOfOrNull { leg -> outLegs[leg.transferGroup]?.walletId?.let(byId::get) }
-        return lastPayer ?: candidates.filter { it.type.isSpendable }.maxByOrNull { it.balance.amountMinor }
+            .firstNotNullOfOrNull { leg -> others[leg.transferGroup]?.walletId?.let(byId::get) }
+        return last ?: candidates.filter { it.type.isSpendable }.maxByOrNull { it.balance.amountMinor }
             ?: candidates.maxByOrNull { it.balance.amountMinor }
     }
 }
@@ -111,7 +129,8 @@ object CreditCardMath {
  * An instalment loan's progress (docs/CALCULATIONS.md). [principal] is what was owed when the loan was added; [paid] the
  * principal repaid since — principal − remaining, never below zero, the same figure as the loan history's "principal
  * repaid"; [remaining] what is owed now. [installmentsPaid] counts recorded repayments (transfers into the loan), at most
- * [installments]; a loan owed down to zero counts as fully paid.
+ * [installments]; a loan owed down to zero counts as fully paid. A receivable (owner round 10) reads the same way from
+ * the other side: what was owed to the user, what they have received, and instalments received (transfers out of it).
  */
 data class LoanProgress(
     val principal: Money,
@@ -123,15 +142,17 @@ data class LoanProgress(
 
 object LoanMath {
 
-    /** Null for anything but a loan repaid in monthly instalments with a term. */
+    /** Null for anything but a loan or receivable repaid in monthly instalments with a term. */
     fun progress(wallet: Wallet, transactions: List<Transaction>): LoanProgress? {
-        if (wallet.type != WalletType.LOAN) return null
+        if (!wallet.type.hasInstallments) return null
         val terms = wallet.debt?.takeIf { it.repayment == DebtRepayment.MONTHLY } ?: return null
         val installments = terms.termMonths ?: return null
         val principal = wallet.openingBalance
         val remaining = wallet.balance
         val repaid = principal - remaining
-        val payments = transactions.count { it.walletId == wallet.id && it.type == TransactionType.TRANSFER_IN }
+        // A loan is repaid by transfers into it; a receivable by transfers out of it into the user's accounts.
+        val repayment = if (wallet.type == WalletType.RECEIVABLE) TransactionType.TRANSFER_OUT else TransactionType.TRANSFER_IN
+        val payments = transactions.count { it.walletId == wallet.id && it.type == repayment }
         return LoanProgress(
             principal = principal,
             paid = if (repaid.isNegative) Money.zero(principal.currencyCode) else repaid,

@@ -43,6 +43,8 @@ fun LucentoTopBar(
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
+    /** More than 1 lets a long title wrap (and the bar grow) instead of being cut off, e.g. on narrow phones. */
+    titleMaxLines: Int = 1,
 ) {
     Row(
         modifier = modifier
@@ -70,7 +72,7 @@ fun LucentoTopBar(
                 Text(
                     title,
                     style = MaterialTheme.typography.headlineMedium,
-                    maxLines = 1,
+                    maxLines = titleMaxLines,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.semantics { heading() },
                 )

@@ -137,13 +137,13 @@ internal fun WalletDraft.previewWallet(decimalSeparator: Char): Wallet {
         ?.money?.takeIf { it.amountMinor > 0 }
     val amount = (MoneyParser.parse(amountText, currencyCode, decimalSeparator) as? MoneyParser.Result.Success)?.money
         ?: com.lucento.app.core.money.Money.zero(currencyCode)
-    val terms = if (!type.isLiability) {
+    val terms = if (!type.hasTerms) {
         null
     } else {
         runCatching {
             val rate = (DebtMath.parseRate(interestText) as? DebtMath.RateResult.Valid)?.bps
             val months = termMonthsText.trim().toIntOrNull()?.takeIf { it in 1..DebtTerms.MAX_TERM_MONTHS }
-            val monthly = type == WalletType.LOAN && repayment == DebtRepayment.MONTHLY && months != null
+            val monthly = type.hasInstallments && repayment == DebtRepayment.MONTHLY && months != null
             val card = type == WalletType.CREDIT_CARD
             val statement = statementDayText.trim().toIntOrNull()?.takeIf { it in 1..31 }
             val due = dueDayText.trim().toIntOrNull()?.takeIf { it in 1..31 }
@@ -229,11 +229,14 @@ fun WalletEditorSheet(
                 },
             )
 
+            val receivable = draft.type == WalletType.RECEIVABLE
             val amountLabel = when {
                 draft.type.isValuedManually -> "Estimated value"
                 initial.id != null && draft.type.isLiability -> "Opening amount owed"
+                initial.id != null && receivable -> "Opening amount owed to you"
                 initial.id != null -> "Opening balance"
                 draft.type.isLiability -> "Amount owed now"
+                receivable -> "Amount owed to you now"
                 else -> "Current balance"
             }
             if (initial.id == null) {
@@ -259,7 +262,7 @@ fun WalletEditorSheet(
                         wallet = preview,
                         movements = 0,
                         cycle = if (type == WalletType.CREDIT_CARD) CreditCardMath.cycle(preview, emptyList(), today) else null,
-                        loan = if (type == WalletType.LOAN && preview.balance.amountMinor > 0) LoanMath.progress(preview, emptyList()) else null,
+                        loan = if (type.hasInstallments && preview.balance.amountMinor > 0) LoanMath.progress(preview, emptyList()) else null,
                         today = today,
                     )
                 }
@@ -321,6 +324,7 @@ fun WalletEditorSheet(
                             WalletType.SAVINGS -> "e.g. Emergency fund"
                             WalletType.CREDIT_CARD -> "e.g. Travel card"
                             WalletType.LOAN -> "e.g. Car loan"
+                            WalletType.RECEIVABLE -> "e.g. Loan to Ana"
                             WalletType.OTHER_ASSET -> "e.g. Home, car, investments"
                         }
                     )
@@ -406,6 +410,7 @@ fun WalletEditorSheet(
                                 draft.type.isValuedManually -> "What it’s worth today. Update it whenever the value changes — no transactions needed."
                                 initial.id != null -> "Where this wallet started, before the transactions you record."
                                 draft.type == WalletType.LOAN -> "What you still owe on this loan. It counts against your net worth."
+                                receivable -> "What they still owe you. It counts towards your net worth, but not as money you can spend."
                                 draft.type.isLiability -> "What you currently owe on this card. It counts against your net worth."
                                 else -> "Leave empty to start at zero."
                             }
@@ -418,7 +423,7 @@ fun WalletEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            if (draft.type.isLiability) {
+            if (draft.type.hasTerms) {
                 DebtDetails(
                     draft = draft,
                     error = error,
@@ -456,7 +461,7 @@ fun WalletEditorSheet(
                                 haptics.reject()
                                 error = result
                             }
-                            savedId != null && remind != null && draft.type == WalletType.LOAN && onPlanPayment != null ->
+                            savedId != null && remind != null && draft.type.hasInstallments && onPlanPayment != null ->
                                 close { onPlanPayment(savedId, remind) }
                             else -> close()
                         }
@@ -540,10 +545,15 @@ private fun DebtDetails(
     fieldColors: androidx.compose.material3.TextFieldColors,
     onChange: (WalletDraft) -> Unit,
 ) {
+    val receivable = draft.type == WalletType.RECEIVABLE
     Spacer(Modifier.height(Spacing.sm))
     IconFieldHeader(
         if (draft.type == WalletType.CREDIT_CARD) Icons.Outlined.CreditCard else Icons.Outlined.Percent,
-        if (draft.type == WalletType.CREDIT_CARD) "Card details" else "Debt details",
+        when {
+            draft.type == WalletType.CREDIT_CARD -> "Card details"
+            receivable -> "Repayment details"
+            else -> "Debt details"
+        },
     )
     AmountTextField(
         value = draft.interestText,
@@ -591,7 +601,7 @@ private fun DebtDetails(
                 value = draft.installmentText,
                 onValueChange = { onChange(draft.copy(installmentText = it)) },
                 filter = { it.take(20) },
-                label = { Text("Monthly amortization") },
+                label = { Text(if (receivable) "Monthly instalment" else "Monthly amortization") },
                 prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
                 placeholder = { Text("0") },
                 isError = error == DraftError.InstallmentInvalid || error is DraftError.InstallmentUnclear,
@@ -608,11 +618,12 @@ private fun DebtDetails(
         val suggested = if (owed != null && months != null) DebtMath.monthlyInstallment(owed, months, rate) else null
         when {
             error == DraftError.TermInvalid -> HintText("Enter how many months, from 1 to ${DebtTerms.MAX_TERM_MONTHS}.", isError = true)
-            error == DraftError.InstallmentInvalid -> HintText("Enter what you pay each month.", isError = true)
+            error == DraftError.InstallmentInvalid ->
+                HintText(if (receivable) "Enter what they pay you each month." else "Enter what you pay each month.", isError = true)
             error is DraftError.InstallmentUnclear -> HintText((error as DraftError.InstallmentUnclear).message, isError = true)
             suggested != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                 HintText(
-                    "${MoneyFormatter.format(suggested)} a month repays ${MoneyFormatter.format(owed!!)} in ${if (months == 1) "1 month" else "$months months"}" +
+                    "${MoneyFormatter.format(suggested)} a month ${if (receivable) "pays back" else "repays"} ${MoneyFormatter.format(owed!!)} in ${if (months == 1) "1 month" else "$months months"}" +
                         (rate?.let { " at ${DebtMath.formatRate(it)}" } ?: "") + ".",
                     modifier = Modifier.weight(1f),
                 )
@@ -621,19 +632,30 @@ private fun DebtDetails(
                     LucentoTextButton(text = "Use", onClick = { onChange(draft.copy(installmentText = MoneyFormatter.formatPlain(suggested))) })
                 }
             }
-            else -> HintText("Enter what you owe, the months and the rate to get a suggested amortization.")
+            else -> HintText(
+                if (receivable) "Enter what you’re owed, the months and the rate to get a suggested instalment."
+                else "Enter what you owe, the months and the rate to get a suggested amortization."
+            )
         }
     }
     if (showReminder) {
         Spacer(Modifier.height(Spacing.sm))
         DateField(
-            label = if (draft.repayment == DebtRepayment.MONTHLY) "Payment reminder · first due date (optional)" else "Payment reminder · due date (optional)",
+            label = when {
+                receivable && draft.repayment == DebtRepayment.MONTHLY -> "Collection reminder · first due date (optional)"
+                receivable -> "Collection reminder · due date (optional)"
+                draft.repayment == DebtRepayment.MONTHLY -> "Payment reminder · first due date (optional)"
+                else -> "Payment reminder · due date (optional)"
+            },
             date = draft.reminderDate,
             onDate = { onChange(draft.copy(reminderDate = it)) },
             emptyText = "No reminder",
         )
         if (draft.reminderDate != null) {
-            HintText("After saving, a recurring payment opens with this filled in, so you can split it into principal and interest.")
+            HintText(
+                if (receivable) "After saving, a recurring collection opens with this filled in; each one received moves the instalment into your account."
+                else "After saving, a recurring payment opens with this filled in, so you can split it into principal and interest."
+            )
         }
     }
 }

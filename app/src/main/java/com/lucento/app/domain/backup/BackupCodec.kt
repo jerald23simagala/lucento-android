@@ -365,15 +365,22 @@ object BackupCodec {
             if (category != null && category.kind.name != schedule.type.name) invalid()
             val to = schedule.toWalletId
             if (to != null) {
-                if (schedule.type != TransactionType.EXPENSE || to == schedule.walletId || wallets[to] == null) invalid()
-                if (!wallets.getValue(to).type.isLiability) invalid()
+                if (to == schedule.walletId || wallets[to] == null) invalid()
+                // A debt payment (expense) goes to a card or loan; a collection (income) comes from a receivable.
+                val toType = wallets.getValue(to).type
+                val linked = when (schedule.type) {
+                    TransactionType.EXPENSE -> toType.isLiability
+                    TransactionType.INCOME -> toType == com.lucento.app.domain.WalletType.RECEIVABLE
+                    else -> false
+                }
+                if (!linked) invalid()
             }
         }
         val debtsByWallet = HashSet<String>()
         for (debt in snapshot.debtTerms) {
             if (!debtsByWallet.add(debt.walletId)) invalid()
             val wallet = wallets[debt.walletId] ?: invalid()
-            if (!wallet.type.isLiability) invalid()
+            if (!wallet.type.hasTerms) invalid()
             try {
                 DebtTerms(
                     interestRateBps = debt.interestRateBps,

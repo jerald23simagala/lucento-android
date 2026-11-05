@@ -71,21 +71,13 @@ class WalletsOverviewTest {
         assertNull(WalletsOverview.assetShare(usd(500_00), usd(-20_00))) // an overpaid card
     }
 
-    @Test fun filtersBySideAndType() {
+    @Test fun filtersBySide() {
         val savings = Wallet(4, "Savings", WalletType.SAVINGS, usd(5_200_00), 0L)
         val loan = Wallet(5, "Loan", WalletType.LOAN, usd(3_450_00), 0L)
         val wallets = listOf(bank, card, lateCash, savings, loan)
-        assertEquals(listOf(1L, 3L, 4L), WalletsOverview.filter(wallets, WalletSide.ASSETS, null).map { it.id })
-        assertEquals(listOf(2L, 5L), WalletsOverview.filter(wallets, WalletSide.LIABILITIES, null).map { it.id })
-        assertEquals(listOf(5L), WalletsOverview.filter(wallets, WalletSide.ALL, WalletType.LOAN).map { it.id })
-        assertEquals(emptyList<Long>(), WalletsOverview.filter(wallets, WalletSide.ASSETS, WalletType.LOAN).map { it.id })
-    }
-
-    @Test fun typeChipsOfferOnlyTypesTheUserHasOnThatSide() {
-        val wallets = listOf(card, bank, lateCash, bank.copy(id = 7))
-        assertEquals(listOf(WalletType.CASH, WalletType.BANK, WalletType.CREDIT_CARD), WalletsOverview.typesOn(wallets, WalletSide.ALL))
-        assertEquals(listOf(WalletType.CASH, WalletType.BANK), WalletsOverview.typesOn(wallets, WalletSide.ASSETS))
-        assertEquals(listOf(WalletType.CREDIT_CARD), WalletsOverview.typesOn(wallets, WalletSide.LIABILITIES))
+        assertEquals(listOf(1L, 3L, 4L), WalletsOverview.filter(wallets, WalletSide.ASSETS).map { it.id })
+        assertEquals(listOf(2L, 5L), WalletsOverview.filter(wallets, WalletSide.LIABILITIES).map { it.id })
+        assertEquals(listOf(1L, 2L, 3L, 4L, 5L), WalletsOverview.filter(wallets, WalletSide.ALL).map { it.id })
     }
 
     @Test fun viewModeReadsItsStoredKeyAndFallsBackToRows() {

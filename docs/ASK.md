@@ -8,7 +8,10 @@ so it now also sees projections, goals, spending patterns and the last 60 days o
 (v2; agreeing to the old summaries-only consent doesn't carry over). **Round 9 (2026-11-04):** a real adviser rather
 than general guidance — direct recommendations and plans, no closing disclaimer in the answer; instead every AI answer
 carries the app's own note that AI advice can be inaccurate. AI answers no longer fail when the session token went
-stale, and the proxy skips Gemini models that were just busy.
+stale, and the proxy skips Gemini models that were just busy. **Round 10 (2026-11-04):** looser — projections with the
+user's own amounts and with rates the model knows or assumes (e.g. Pag-IBIG MP2 dividends), low and high cases when
+unsure, never "it depends"; specific programmes and funds compared and a choice given. The phone's calculator learned
+amounts with a currency code, percentages and powers; requests carry `version: 3`.
 
 ## Two ways an answer is made
 
@@ -74,13 +77,23 @@ sign-in details, the Gemini key.
   phone's value (shown in bold), and replaces an unknown id with "—". If the model writes an amount itself, the answer
   carries a warning that it couldn't be checked.
 - **So do calculations.** For projections and what-ifs the model writes `[[= expression ]]` (figure ids, numbers,
-  + − × ÷, brackets); `AskCalc` works it out exactly from the phone's figures, with unit checks (no adding across
-  currencies, no amount × amount), and shows the result in bold. A calculation that doesn't make sense shows "—".
+  + − × ÷, brackets; from version 3 also `PHP 5000`-style amounts, `7%` and `^`); `AskCalc` works it out exactly, with
+  unit checks (no adding across currencies, no amount × amount, powers of plain numbers only), and shows the result in
+  bold. A calculation that doesn't make sense shows "—". An assumed rate is the model's estimate: the answer must say
+  which rate and when it applied, and the note under every AI answer says AI advice can be inaccurate. Rates and
+  percentages in the text are not flagged as unchecked amounts; an amount written outside `[[ ]]` still is.
 - **Reports are rebuilt on the phone.** The model can only name a report kind and a month. The app checks both against
   an allow-list (no future months, nothing more than 24 months back) and builds the report itself.
 - **Read-only.** Nothing in an answer can change data, open a link, or run anything. Links and markdown are stripped,
   answers are capped at 2,500 characters (calculations are longer as text than as results), and there are at most three
   follow-ups of up to 90 characters each.
+- **Version 3 (round 10).** `SYSTEM_V3`: everything below, plus projections that always give numbers, using the latest
+  rate the model knows or a range for anything not in FIGURES (savings and time deposits, MP2/SSS dividends, fund
+  returns, inflation, loan rates) with low and high cases when unsure and one short line that rates change; it may compare
+  specific programmes, funds and products by rate, risk, lock-in and access and say which it would choose. Still: no
+  individual stock or coin as a sure thing, no promised returns, no borrowing to spend or invest. Up to 250 words.
+  Version 2 apps keep `SYSTEM_V2` (they can't evaluate the new syntax). Live market data is not fetched: rates come from
+  the model's own knowledge (Google Search grounding would be a separate decision: cost and consent).
 - **Scope (round 9, owner: "an adviser, not general guidance").** The adviser prompt (proxy, version 2) leads with a
   direct answer or recommendation — what it would do in the user's position — backs it with their own figures, gives
   a plan of up to five prioritised steps with budgets, targets and effects calculated from their figures, and points
@@ -122,7 +135,7 @@ sign-in details, the Gemini key.
 | Client | `data/ai/AskLucentoClient.kt` (requests through `data/ai/ProxyCall.kt`, shared with Smarter reading) → `BuildConfig.AI_ASK_URL` (the Smarter reading URL with `/interpret` → `/ask`; debug builds only with a test proxy) |
 | PDF | `data/reports/ReportPdfWriter.kt` |
 | Consent | `UserPreferences.askLucentoAi` (`ask_lucento_ai_v2`); Settings › Privacy › Ask Lucento |
-| Proxy | `lucento-website/src/pages/api/ask.ts`: `SYSTEM` for version 1 apps, `SYSTEM_V2` (the adviser) for version 2 (`lucento-website` PR #9, deployed 2026-11-04; round 9 tone and busy-model fallback in PR #10); model fallback in `src/server/gemini.ts` |
+| Proxy | `lucento-website/src/pages/api/ask.ts`: `SYSTEM` for version 1 apps, `SYSTEM_V2` (the adviser) for version 2, `SYSTEM_V3` for version 3 (`lucento-website` PR #9, deployed 2026-11-04; rounds 9–10 in PR #10); model fallback in `src/server/gemini.ts` |
 
 ## Setting it up (owner)
 

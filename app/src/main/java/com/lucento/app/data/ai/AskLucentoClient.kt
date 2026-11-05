@@ -66,8 +66,10 @@ internal data class AskRequest(
     val history: List<AskTurn>,
     val figures: List<AskFigure>,
     /**
-     * 2: the app works out `[[= … ]]` calculations and sends transaction-level figures (the proxy's adviser prompt). No
-     * default value: the encoder leaves defaults out, and a missing version reads as 1 on the proxy.
+     * 2: the app works out `[[= … ]]` calculations and sends transaction-level figures (the proxy's adviser prompt).
+     * 3 (owner round 10): its calculator also takes amounts with a currency code, percentages and powers, so the proxy's
+     * adviser may project with the user's own amounts and assumed rates. No default value: the encoder leaves defaults
+     * out, and a missing version reads as 1 on the proxy.
      */
     val version: Int,
 ) {
@@ -75,7 +77,7 @@ internal data class AskRequest(
         const val MAX_QUESTION = 500
         const val MAX_TURNS = 6
         const val MAX_TURN_TEXT = 1_500
-        const val VERSION = 2
+        const val VERSION = 3
 
         fun from(question: String, history: List<AskLucentoClient.Turn>, snapshot: AskSnapshot) = AskRequest(
             question = question.take(MAX_QUESTION),

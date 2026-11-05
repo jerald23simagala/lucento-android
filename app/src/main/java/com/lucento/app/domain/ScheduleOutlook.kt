@@ -5,15 +5,27 @@ import java.time.LocalDate
 
 /**
  * How a scheduled item moves money: [INCOME] in, an [EXPENSE] (a bill: spending), or a [TRANSFER] to a card or loan —
- * money leaving an account to pay down a debt, which is not spending (docs/CALCULATIONS.md "Scheduled outlook").
+ * money leaving an account to pay down a debt, which is not spending — or from a receivable, an instalment someone
+ * repays the user, which is not income (docs/CALCULATIONS.md "Scheduled outlook").
  */
 enum class ScheduledFlow { INCOME, EXPENSE, TRANSFER }
 
-/** A debt payment is a transfer; any other expense schedule is a bill. */
+/**
+ * What one occurrence moves, signed from the user's side: + for income and for a collection (an instalment coming back
+ * from a receivable), − for a bill or a debt payment (money leaving an account).
+ */
+val RecurringSchedule.signedOccurrence: Money
+    get() = when {
+        isCollection -> total
+        type == TransactionType.INCOME -> amount
+        else -> -total
+    }
+
+/** A debt payment or a collection is a transfer; any other expense schedule is a bill, any other income income. */
 val RecurringSchedule.flow: ScheduledFlow
     get() = when {
+        isLinked -> ScheduledFlow.TRANSFER
         type == TransactionType.INCOME -> ScheduledFlow.INCOME
-        isDebtPayment -> ScheduledFlow.TRANSFER
         else -> ScheduledFlow.EXPENSE
     }
 
@@ -36,8 +48,8 @@ sealed interface ScheduledItem {
         override val overdue: Boolean,
     ) : ScheduledItem {
         override val flow: ScheduledFlow get() = schedule.flow
-        /** Income as planned; a bill or debt payment in full (a debt payment's interest included): what leaves the account. */
-        override val amount: Money get() = if (schedule.type == TransactionType.INCOME) schedule.amount else schedule.total
+        /** Income as planned; a bill, debt payment or collection in full (its interest included): what moves. */
+        override val amount: Money get() = if (schedule.type == TransactionType.INCOME && !schedule.isLinked) schedule.amount else schedule.total
         val isNext: Boolean get() = index == schedule.nextIndex
     }
 
