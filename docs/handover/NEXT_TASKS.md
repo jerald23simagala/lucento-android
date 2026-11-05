@@ -541,3 +541,22 @@ As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 8".
 | Release build | `artifacts/apk/lucento-release-TEST-SIGNED-round8.apk`: `com.lucento.app`, signer SHA-1 `49:AF:14:81:…:8C:75` (debug key; test only, never distribute) |
 | Manual (API 28) | `artifacts/round8/`: statement scan reply and rows, receipt scan, bell, filled-in payment |
 | Website | `eslint` clean on `ask.ts`; `astro check` errors only in the Playwright files (unrelated, pre-existing); local `astro build` fails on a missing `@fontsource-variable/manrope` in local `node_modules` (environment; Vercel installs fresh); the Vercel preview build of PR #9 **passed**; merged as `901acf8`, production deployment **succeeded**, unsigned `POST /api/ask` → 401 |
+
+## Owner review round 9 (2026-11-04, `feature/owner-round-9`, PR to `main`)
+
+As built: `docs/design/CORE_SCREENS_REFINEMENT.md` "Owner review round 9".
+
+| Next | Why |
+|---|---|
+| **Owner: merge `lucento-website` PR #10** (`feature/ask-real-adviser`; merging deploys it to Vercel production) | The adviser tone and the busy-model fallback live in the proxy. Version 2 apps (round 8 and 9) get the new tone once it's deployed; only round 9 shows the "AI advice can be inaccurate" note under answers |
+| Owner: test the round 9 test-signed APK with Smarter reading **off** | Confirms AI answers no longer depend on it; if one still fails, note the exact message under the answer and the time (Vercel keeps logs for one hour) |
+| Owner: decide whether investing advice should go further | The prompt now advises on investing in general terms but doesn't name stocks, coins or companies' products, or promise returns |
+| **Last stage — Account & sync password** (unchanged) | Owner, 2026-11-04 |
+
+| Check | Result |
+|---|---|
+| Unit tests | **935/935** (new `ProxyCallTest` 8: refresh-and-retry after 401, no retry loop, no request when signed out, Ask answer after refresh, refresh margin, failure wording) |
+| Lint | 0 errors, 9 warnings (the same set as round 8) |
+| Builds | `assembleDebug`, `assembleDebugAndroidTest`; test-signed `assembleRelease` → `artifacts/apk/lucento-release-TEST-SIGNED-round9.apk` (`com.lucento.app`, signer SHA-1 `49af…8c75`), installed on API 28 and launched to the welcome screen (`artifacts/round9/01-release-launch.png`) |
+| Website | eslint clean (`ask.ts`, `gemini.ts`); `tsc --noEmit` clean on `gemini.ts`; `preferAvailable` checked with a scratch Node script (5/5); Vercel preview build of PR #10 **passed** |
+| Device | Not run for the new note and retry pill: they appear only with live AI answers (release build, signed in) |

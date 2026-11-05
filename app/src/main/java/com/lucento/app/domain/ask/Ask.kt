@@ -116,12 +116,13 @@ object LocalAnswers {
         }
     }
 
-    /** Questions for the AI, offered as chips while AI answers are on: advice, projections, transactions. */
+    /** Questions for the AI, offered as chips while AI answers are on: plans and decisions, projections, transactions. */
     val adviceSuggestions: List<String> = listOf(
-        "How can I save more each month?",
+        "Make me a plan to save more each month",
         "Will I stay within budget this month?",
+        "Which debt should I pay off first?",
         "When will I reach my goals at this pace?",
-        "Which subscriptions and repeat charges do I have?",
+        "Which subscriptions should I cut?",
         "Anything unusual in my spending lately?",
     )
 

@@ -10,8 +10,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.math.BigDecimal
-import java.net.HttpURLConnection
-import java.net.URL
 import java.time.LocalDate
 
 /**
@@ -21,7 +19,8 @@ import java.time.LocalDate
  * The caller ([HybridTransactionInterpreter]) only uses this when the user turned Smarter reading on.
  */
 class RemoteTransactionInterpreter(
-    private val accessToken: suspend () -> String?,
+    /** The session's token; `refresh = true` after the proxy refused one ([postToProxy]). */
+    private val accessToken: suspend (refresh: Boolean) -> String?,
     private val endpoint: String = BuildConfig.AI_INTERPRET_URL,
 ) {
     sealed interface Result {
@@ -37,34 +36,22 @@ class RemoteTransactionInterpreter(
 
     suspend fun interpret(text: String, context: InterpretationContext, currency: String): Result = withContext(Dispatchers.IO) {
         if (!isConfigured) return@withContext Result.Failed("not configured")
-        val token = accessToken() ?: return@withContext Result.NotSignedIn
         val body = json.encodeToString(InterpretRequest.serializer(), InterpretRequest.from(text, context, currency))
-        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 8_000
-            readTimeout = 15_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Authorization", "Bearer $token")
-        }
-        try {
-            connection.outputStream.use { it.write(body.toByteArray()) }
-            when (val code = connection.responseCode) {
-                200 -> {
-                    val reply = json.decodeFromString(InterpretResponse.serializer(), connection.inputStream.bufferedReader().readText())
-                    Result.Read(RemoteCandidates.toCandidates(reply.items, context, text), reply.remaining)
-                }
-                401 -> Result.NotSignedIn
-                429 -> Result.LimitReached
-                else -> Result.Failed("HTTP $code")
+        val reply = postToProxy(endpoint, body, READ_TIMEOUT_MS, accessToken) ?: return@withContext Result.NotSignedIn
+        when (reply.code) {
+            200 -> {
+                val read = json.decodeFromString(InterpretResponse.serializer(), reply.body.orEmpty())
+                Result.Read(RemoteCandidates.toCandidates(read.items, context, text), read.remaining)
             }
-        } finally {
-            connection.disconnect()
+            401 -> Result.NotSignedIn
+            429 -> Result.LimitReached
+            else -> Result.Failed("HTTP ${reply.code}")
         }
     }
 
     private companion object {
         val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+        const val READ_TIMEOUT_MS = 15_000
     }
 }
 

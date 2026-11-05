@@ -671,9 +671,9 @@ private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
                 "categories, balances, budgets, debts, goals and upcoming bills — projections worked out on this phone, and " +
                 "your transactions from the last 60 days in your main currency (date, amount, type, category, account and " +
                 "note) to Lucento’s server, which asks Google’s Gemini. Receipts, photos, older transactions and other " +
-                "currencies are never sent. Every amount in an answer is worked out on this phone. Advice is general " +
-                "guidance, not professional financial advice. Each account has a daily allowance, shared with Smarter " +
-                "reading, and you can turn this off at any time.",
+                "currencies are never sent. Every amount in an answer is worked out on this phone. Gemini's advice is " +
+                "based on your figures, but AI can be inaccurate, so check it before you act on it. Each account has a " +
+                "daily allowance, shared with Smarter reading, and you can turn this off at any time.",
             confirmLabel = "Turn on",
             onConfirm = {
                 asking = false

@@ -6,8 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * Ask Lucento's AI answers, through Lucento's own proxy (lucento-website `api/ask`), which holds the Gemini key and the
@@ -17,7 +15,8 @@ import java.net.URL
  * photos). The reply's figures and calculations are references the app fills in.
  */
 class AskLucentoClient(
-    private val accessToken: suspend () -> String?,
+    /** The session's token; `refresh = true` after the proxy refused one ([postToProxy]). */
+    private val accessToken: suspend (refresh: Boolean) -> String?,
     private val endpoint: String = BuildConfig.AI_ASK_URL,
 ) {
     sealed interface Result {
@@ -34,35 +33,25 @@ class AskLucentoClient(
 
     suspend fun ask(question: String, history: List<Turn>, snapshot: AskSnapshot): Result = withContext(Dispatchers.IO) {
         if (!isConfigured) return@withContext Result.Failed("not configured")
-        val token = accessToken() ?: return@withContext Result.NotSignedIn
-        val body = body(AskRequest.from(question, history, snapshot))
-        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 8_000
-            readTimeout = 25_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Authorization", "Bearer $token")
-        }
-        try {
-            connection.outputStream.use { it.write(body.toByteArray()) }
-            when (val code = connection.responseCode) {
-                200 -> {
-                    val reply = json.decodeFromString(AskResponse.serializer(), connection.inputStream.bufferedReader().readText())
-                    if (reply.answer.isNullOrBlank()) Result.Failed("empty answer")
-                    else Result.Answered(reply.answer, reply.report, reply.month, reply.followUps.orEmpty(), reply.remaining)
-                }
-                401 -> Result.NotSignedIn
-                429 -> Result.LimitReached
-                else -> Result.Failed("HTTP $code")
+        val reply = postToProxy(endpoint, body(AskRequest.from(question, history, snapshot)), READ_TIMEOUT_MS, accessToken)
+            ?: return@withContext Result.NotSignedIn
+        when (reply.code) {
+            200 -> {
+                val answer = json.decodeFromString(AskResponse.serializer(), reply.body.orEmpty())
+                if (answer.answer.isNullOrBlank()) Result.Failed("empty answer")
+                else Result.Answered(answer.answer, answer.report, answer.month, answer.followUps.orEmpty(), answer.remaining)
             }
-        } finally {
-            connection.disconnect()
+            401 -> Result.NotSignedIn
+            429 -> Result.LimitReached
+            else -> Result.Failed("HTTP ${reply.code}")
         }
     }
 
     internal companion object {
         val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+
+        /** The proxy stops calling Gemini by about 22 s (lucento-website `server/gemini.ts`); this waits a little longer. */
+        const val READ_TIMEOUT_MS = 25_000
 
         /** The request body exactly as sent. */
         fun body(request: AskRequest): String = json.encodeToString(AskRequest.serializer(), request)
