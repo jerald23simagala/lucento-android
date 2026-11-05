@@ -22,7 +22,7 @@
 
 | # | Task | Priority | Notes |
 |---|---|---|---|
-| IC-T1 | Owner: authorise a commit of the institution work (app repo) — the asset libraries are outside git | P1 | See CURRENT_STATUS top row |
+| IC-T1 | ~~Owner: authorise a commit of the institution work~~ **Done**: `761d0ea` on `feature/institution-coverage` (not pushed; push + PR need the owner's go-ahead). The asset libraries are outside git | P1 | See CURRENT_STATUS top row |
 | IC-T2 | Official vector logos for the 19 institutions that show a monogram card: PSBank, DBP, Metrobank (2025 logo), UNO, UnionDigital, OFBank (2025 logo), AUB, Bank of Commerce, PBB, BDO Network Bank, City Savings, CARD Bank, Sterling, PalawanPay, Veterans Bank, ShopeePay, CTBC, Taishin, LINE Bank (+ UBS) | P2 | Sites publish rasters only or refuse automated requests; needs press kits or the owner asking the banks. Workflow: `tools/institutions/expansion/README.md` |
 | IC-T3 | Researcher: regenerate the library's `coverage_report.md`, `missing_assets.md`, `validation_report.md` and `master_inventory.xlsx` (they predate the expansion; the CSV is current) | P3 | `additions_2026-11-04.md` is the interim record |
 | IC-T4 | "Not listed" path: let a wallet carry a typed institution name with a monogram | P3 | Needs a Room column + migration, sync and backup fields — a product decision, not done here. Today the empty state suggests naming the wallet after the bank |
