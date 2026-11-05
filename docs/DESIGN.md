@@ -1,8 +1,8 @@
 # Lucento Design System
 
 Philosophy: **financial clarity without the complexity.** The identity comes from a bright, restrained palette, clear
-type and calm composition — not effects. No gradients in UI chrome, no glassmorphism, no glows, no charts that answer
-no question. Feeling: *a little sunlight, a lot of clarity, and confidence about tomorrow.*
+type and calm composition — not effects. No gradients in UI chrome (the Aurora theme's hero panel is the one
+deliberate exception), no glassmorphism, no glows, no charts that answer no question. Feeling: *a little sunlight, a lot of clarity, and confidence about tomorrow.*
 
 ## Identity: Sunrise Energy
 **Gold and orange are Lucento's light and optimism. Blue is trust, clarity and interaction. Navy is structure.**
@@ -53,15 +53,63 @@ and icons; text uses the darker variants above. Warnings inform without shaming:
 red screen.
 
 ### Charts
-Series order: Electric Blue → Tangerine → Sunlight → Emerald `#16865C` → blue-gray `#8A97B0` → sky `#38A3E8` →
-violet `#8B7CF6` (night: `#7C9AFF`, `#FF9F4D`, `#FFC928`, `#3DD68C`, `#8A97B0`, `#6CC4F5`, `#A99BFF`). Sunlight
-and tangerine are under 3:1 on ivory, so every series keeps its legend label and exact figure beside the chart.
-Bars: `chartBar` blue, `chartBarMuted` `#C7D5FC` / `#2C3D66`, `track` `#E8EDF7` / `#26365C`.
+Categorical series (`extendedColors.categorical`) are their own tokens, separate from the UI accents (2026-11-05;
+the earlier blue → tangerine → sunlight… order failed colour-blind separation and was never wired to a chart). Each
+theme has 7 slots generated in OKLCH and **ordered** so every gate of the dataviz palette check passes: lightness
+inside the mode's band (light 0.43–0.77, dark 0.48–0.67), chroma ≥ 0.10, adjacent pairs ≥ 8 OKLab ΔE apart under
+protanopia/deuteranopia (Machado 2009) and ≥ 15 for normal vision, ≥ 3:1 on the theme's cards. Sunrise light:
+`#426EC2 #AB5803 #007CA5 #1C8742 #8A57AE #86700A #AB4A7D`; night: `#5D87D7 #C47131 #0396C6 #459F5D #A171C3 #A28700
+#C26594`. The order is the safety mechanism — `DataSeriesTest` fails a reordered or edited series. Series 8+ fold into
+"Other"; every series keeps its legend label and exact figure. Bars: `chartBar` = primary, `chartBarMuted`, `track`.
 
-Every text/background pair is checked for WCAG AA (≥ 4.5:1 body, ≥ 3:1 large text, boundaries and marks) in both
-themes by `ThemeContrastTest` (unit test). All tokens live in `core/designsystem/theme/Color.kt`
-(`MaterialTheme.colorScheme` + `LucentoTheme.extendedColors`); features never hardcode colours (the literal
-theme-preview swatches in Settings are the single, intentional exception). Lottie files carry the same palette.
+Every text/background pair is checked for WCAG AA (≥ 4.5:1 body, ≥ 3:1 large text, boundaries and marks) in every
+theme and mode by `ThemeContrastTest` (unit test). All tokens live in `core/designsystem/theme/Color.kt` and
+`Themes.kt` (`MaterialTheme.colorScheme` + `LucentoTheme.extendedColors`); features never hardcode colours (the theme
+picker's previews are drawn from each `ThemeSpec`'s own tokens). Lottie files carry the Sunrise palette in every theme.
+
+### Themes (2026-11-05)
+Five curated themes, chosen in the profile menu › Appearance (`feature/profile/ThemePicker`): a row of previews,
+each drawn from that theme's own tokens over its landscape, then System / Light / Dark. Picking applies at once — the
+palette cross-fades for 250 ms (instant under reduced motion), nothing restarts.
+
+| Theme | Character | Light / dark |
+|---|---|---|
+| **Sunrise** (default) | The signature palette above, unchanged. | Both |
+| **Midnight** | Indigo black `#0A0E1A`, periwinkle `#8FA8FF` action, champagne `#E3C87E` accent. | Dark only — the mode is set aside (kept, not changed) and the picker says so |
+| **Grove** | Sage paper `#F5F6EF`, forest green `#2E7D5B`, harvest gold `#D9A441`. | Both |
+| **Mono** | Graphite, slate `#46557A` action; colour is left to the money. | Both |
+| **Aurora** | Violet `#6C4DE0` with teal `#2BB8A8` and magenta accents; the hero panel carries the system's only gradient (`#4B37B8 → #2F4DB0`, AA at both ends). | Both |
+
+- **What a theme may change** (`BrandColors`): surfaces, ink, primary and containers, outline, accent / accent text /
+  warm accent, highlight, the hero panel (+ gradient end), chart bar/track tokens, the categorical series, and its
+  landscape. **What it can't** (financial semantics, fixed per light/dark mode): positive / negative / warning and their
+  containers and indicators, progress success, error roles, category tiles, wallet tones and wallet card faces.
+  Themes are built as `LightExtended/DarkExtended.withBrand(…)`, and `ThemeInvarianceTest` checks it.
+- The approved logo, wordmark and mascot art are never re-tinted; launcher icon and splash stay Sunrise. Lottie files
+  keep their palette. Institution and wallet-type card faces are theme-invariant (they are the bank's or the type's).
+- **Home net-balance card takes the theme** (owner, 2026-11-05; `ThemeSpec.balanceCard`, `BalanceCardFace`). Still a
+  physical card — the same face in light and dark mode, same layout and type sizes — with per theme: a deep diagonal
+  face, light ink and muted ink (labels, line icons, contactless mark), the two trend bars, and the chip plating.
+
+  | Theme | Face (top left → bottom right) | Muted ink | Bars | Chip |
+  |---|---|---|---|---|
+  | Sunrise | `#245BD8 → #162D88` | `#DCE5FF` | sky blues | gold |
+  | Midnight | `#2B3456 → #0C1020`, ink `#F4F1E8` | champagne `#D8C795` | champagne | gold |
+  | Grove | `#2A6E4E → #123423` | `#D3EADC` | harvest gold | gold |
+  | Mono | `#454B5A → #1B1E26` | `#CDD2DC` | silver | silver |
+  | Aurora | `#5C43CF → #22308F` | `#E0D9FB` | teal | silver |
+
+  The theme's landscape is printed on the face tone-on-tone (`silhouetteFilter`): scene pixels darker than the face's
+  threshold darken it, sky / sun / moon / aurora leave it untouched — so the print can only raise the ink's contrast.
+  Gain `#A7F3C5` / loss `#FFC2B8` stay the same in every theme, always beside a signed figure. `ThemeContrastTest`
+  checks ink and muted ink at both ends and the middle of every face, and the trend text and bars where they sit.
+  Sunrise's start moved from `#2768ED` and its muted ink from `#C9D7FF`: the small labels were 3.4:1 in the bright
+  corner (AA needs 4.5).
+- Persistence: DataStore `theme_id` beside `theme_mode`; unknown values fall back to Sunrise. A device choice (like the
+  wallets view): kept across sign-outs, not in backups or sync (the backup settings format is strict; adding it would
+  need a backup schema bump). Owner-confirmed 2026-11-05.
+- Adding a theme: one `ThemeSpec` (two `ThemeColors` built from `BrandColors`, a `BalanceCardFace`), a landscape, then
+  `ThemeContrastTest` and `DataSeriesTest` must pass. No screen changes.
 
 **Colour never carries meaning alone:** amounts use `MoneyFormatter.formatSigned` (typographic `−` / `+`), owed
 balances say "owed", budget states say "Over" / a percentage, and transfers are labelled "From → To".
@@ -103,6 +151,13 @@ logos or UI in the art.
   picture — where Automatic means Japan → Fuji, other trips → sunrise, others plain), and the
   onboarding welcome (Lucento in the sunrise landscape). Lists, forms and settings stay clean.
 - Decorative: no content descriptions. Night: art dimmed by the scrim / a background wash.
+- **Theme landscapes** (2026-11-05): each theme has one panorama (`scenery_<theme>_panorama`, 1200×600 WebP,
+  11–24 KB; masters and provenance in `docs/design/illustrations/themes/`). All five share one composition (ridges in
+  the lower third, a calm sky), so one framing works for every theme. Shown only where nothing needs reading:
+  `HeroHorizon` — a 36dp strip of horizon and ridges along the bottom of every `HeroCard` (44dp on `StatementPanel`),
+  below the content and fading up into the panel; `MascotScene` — Lucento standing in the landscape in empty states;
+  the onboarding welcome (Sunrise keeps the approved "A Brighter Little World" crop); and the theme picker previews.
+  Light-painted scenes are dimmed at night; night scenes (Midnight, Aurora) show as painted.
 
 - New-goal form: optional suggestions (Trip to Japan, Holiday, Emergency fund, New laptop) fill in the name and
   picture only; nothing is created until the user saves.

@@ -67,9 +67,9 @@ import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.NavRow
 import com.lucento.app.core.designsystem.component.ProfileAvatar
 import com.lucento.app.core.designsystem.component.FieldHeader
-import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.data.preferences.ThemeId
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.data.preferences.UserPreferencesRepository
@@ -104,6 +104,7 @@ fun ProfileSheet(
     preferences: UserPreferences,
     onSaveName: (String) -> Unit,
     onTheme: (ThemeMode) -> Unit,
+    onThemeId: (ThemeId) -> Unit,
     onOpen: (ProfileDestination) -> Unit,
     onDismiss: () -> Unit,
     signedInEmail: String? = null,
@@ -176,10 +177,11 @@ fun ProfileSheet(
             }
 
             FieldHeader("Appearance", Modifier.padding(top = Spacing.lg))
-            SegmentedToggle(
-                options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"),
-                selected = preferences.themeMode,
-                onSelect = onTheme,
+            ThemePicker(
+                selected = preferences.themeId,
+                mode = preferences.themeMode,
+                onTheme = onThemeId,
+                onMode = onTheme,
             )
 
             FieldHeader("Account and app", Modifier.padding(top = Spacing.lg))

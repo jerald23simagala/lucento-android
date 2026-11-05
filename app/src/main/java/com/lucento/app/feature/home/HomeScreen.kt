@@ -124,6 +124,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.BiasAlignment
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -170,7 +172,9 @@ import com.lucento.app.core.designsystem.component.ProfileButton
 import com.lucento.app.core.designsystem.component.StatementPanel
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.StatusTones
+import com.lucento.app.core.designsystem.component.silhouetteFilter
 import com.lucento.app.core.designsystem.theme.AmountStyles
+import com.lucento.app.core.designsystem.theme.BalanceCardFace
 import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
@@ -1161,14 +1165,9 @@ private fun quickLinkName(feature: Feature): String = when (feature) {
 
 // ------------------------------------------------------------------ Dashboard: net wallet balance card
 
-// The card's own face (Figma "Net wallet balance"): the same in light and dark themes, like a physical card.
-private val CardBlue = Color(0xFF2768ED)
-private val CardNavy = Color(0xFF162D88)
-private val CardInk = Color.White
-private val TrendUp = Color(0xFFA7F3C5)
-private val TrendDown = Color(0xFFFFC2B8)
+// The card's face (Figma "Net wallet balance") comes from the theme (LucentoTheme.spec.balanceCard): the same in light
+// and dark mode, like a physical card.
 private val CardFigureStyle = AmountStyles.large.copy(fontSize = 20.sp, letterSpacing = (-0.5).sp)
-private val CardInkMuted = Color(0xFFC9D7FF)
 
 /**
  * The dashboard's focal point, drawn as a physical card: ID-1 proportions (it only grows for large text), a soft drop
@@ -1178,6 +1177,8 @@ private val CardInkMuted = Color(0xFFC9D7FF)
 @Composable
 private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthComposition, onOpen: () -> Unit) {
     val shape = RoundedCornerShape(20.dp)
+    val spec = LucentoTheme.spec
+    val face = spec.balanceCard
     val owed = -composition.totalLiabilities
     val label = if (state.isCurrentMonth) "Net Wallet Balance" else "Net Wallet Balance · end of ${monthLabel(state.month)}"
     val history = state.balanceHistory
@@ -1202,12 +1203,21 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = cardHeight)
-                .shadow(12.dp, shape, ambientColor = CardNavy.copy(alpha = 0.35f), spotColor = CardNavy.copy(alpha = 0.55f))
+                .shadow(12.dp, shape, ambientColor = face.end.copy(alpha = 0.35f), spotColor = face.end.copy(alpha = 0.55f))
                 .clip(shape)
-                .background(Brush.linearGradient(listOf(CardBlue, CardNavy), start = Offset.Zero, end = Offset.Infinite))
+                .background(Brush.linearGradient(listOf(face.start, face.end), start = Offset.Zero, end = Offset.Infinite))
                 .clickable(role = Role.Button, onClickLabel = "Open wallets", onClick = onOpen),
         ) {
-            // The Figma texture disc, then the printed surface. matchParentSize: neither makes the card taller.
+            // The theme's landscape printed tone-on-tone (it only darkens the face), the Figma texture disc, then the
+            // printed surface. matchParentSize: none of them makes the card taller.
+            Image(
+                painterResource(spec.scenery),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = BiasAlignment(horizontalBias = 0.3f, verticalBias = 1f),
+                colorFilter = silhouetteFilter(face.artThreshold),
+                modifier = Modifier.matchParentSize(),
+            )
             Box(Modifier.matchParentSize()) {
                 Image(
                     painterResource(com.lucento.app.R.drawable.bg_dash_card_texture),
@@ -1235,7 +1245,7 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                             Text(
                                 label.uppercase(Locale.getDefault()),
                                 style = Hierarchy.cardOverline,
-                                color = CardInkMuted,
+                                color = face.inkMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics { contentDescription = spoken },
@@ -1252,7 +1262,7 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                         MoneyText(
                             money = composition.netWorth,
                             style = AmountStyles.hero,
-                            color = CardInk,
+                            color = face.ink,
                             fractionScale = 1f,
                             minScale = 0.5f,
                             modifier = Modifier.weight(1f),
@@ -1265,12 +1275,12 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                 }
                 // Where a real card carries its chip: the chip and the contactless mark (decorative, no card number).
                 Row(Modifier.padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                    com.lucento.app.core.designsystem.component.CardChip()
+                    com.lucento.app.core.designsystem.component.CardChip(metal = face.metal)
                     Spacer(Modifier.width(Spacing.sm))
-                    Icon(Icons.Filled.Contactless, contentDescription = null, tint = CardInkMuted.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+                    Icon(Icons.Filled.Contactless, contentDescription = null, tint = face.inkMuted.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
                 }
                 Column {
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(CardInk.copy(alpha = 0.14f)))
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(face.ink.copy(alpha = 0.14f)))
                     Spacer(Modifier.height(Spacing.sm))
                     val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
                     if (cardWidth >= 330.dp * textScale) {
@@ -1331,20 +1341,27 @@ private fun BalanceInfo() {
         state = tip,
     ) {
         IconButton(onClick = { scope.launch { tip.show() } }, modifier = Modifier.size(Sizes.minTouch)) {
-            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net wallet balance means", tint = Color.Unspecified, modifier = Modifier.size(14.dp))
+            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net wallet balance means", tint = LucentoTheme.spec.balanceCard.inkMuted, modifier = Modifier.size(14.dp))
         }
     }
 }
 
 @Composable
 private fun CardFigure(@androidx.annotation.DrawableRes icon: Int, iconWidth: Dp, label: String, money: Money, modifier: Modifier) {
+    val face = LucentoTheme.spec.balanceCard
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Image(painterResource(icon), contentDescription = null, modifier = Modifier.size(width = iconWidth, height = 42.dp))
+        // Line icons drawn in the Sunrise muted ink; tinted to the theme's.
+        Image(
+            painterResource(icon),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(face.inkMuted),
+            modifier = Modifier.size(width = iconWidth, height = 42.dp),
+        )
         Spacer(Modifier.width(7.dp))
         Column {
-            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = CardInkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = face.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(5.dp))
-            MoneyText(money = money, style = CardFigureStyle, color = CardInk, fractionScale = 1f, minScale = 0.55f)
+            MoneyText(money = money, style = CardFigureStyle, color = face.ink, fractionScale = 1f, minScale = 0.55f)
         }
     }
 }
@@ -1355,7 +1372,8 @@ private fun BalanceTrend(history: List<com.lucento.app.domain.MonthBalance>, tre
     val values = history.map { it.netWorth.amountMinor }
     val min = values.min()
     val max = values.max()
-    val barColors = listOf(Color(0xFF89C4FF), Color(0xFFC2E2FF))
+    val face = LucentoTheme.spec.balanceCard
+    val barColors = face.bars
     Column(horizontalAlignment = Alignment.End) {
         Row(Modifier.height(28.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
             values.forEachIndexed { i, v ->
@@ -1374,7 +1392,7 @@ private fun BalanceTrend(history: List<com.lucento.app.domain.MonthBalance>, tre
                 Icon(
                     painterResource(com.lucento.app.R.drawable.ic_dash_trending_up),
                     contentDescription = null,
-                    tint = if (trend >= 0) TrendUp else TrendDown,
+                    tint = if (trend >= 0) BalanceCardFace.Gain else BalanceCardFace.Loss,
                     modifier = Modifier.size(14.dp).graphicsLayer { if (trend < 0) scaleY = -1f },
                 )
                 Spacer(Modifier.width(3.dp))
@@ -1382,26 +1400,14 @@ private fun BalanceTrend(history: List<com.lucento.app.domain.MonthBalance>, tre
                     "${if (trend >= 0) "+" else "−"}${kotlin.math.abs(trend)}%",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (trend >= 0) TrendUp else TrendDown,
+                    color = if (trend >= 0) BalanceCardFace.Gain else BalanceCardFace.Loss,
                     maxLines = 1,
                 )
             }
         } else {
-            MoneyText(money = history.last().netWorth - history.first().netWorth, style = MaterialTheme.typography.labelLarge, color = CardInk, showPlus = true, fractionScale = 1f, minScale = 0.5f)
+            MoneyText(money = history.last().netWorth - history.first().netWorth, style = MaterialTheme.typography.labelLarge, color = face.ink, showPlus = true, fractionScale = 1f, minScale = 0.5f)
         }
-        Text("vs last month", style = MaterialTheme.typography.labelSmall, color = CardInkMuted, maxLines = 1)
-    }
-}
-
-@Composable
-private fun CardFigure(icon: ImageVector, label: String, money: Money, modifier: Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = CardInkMuted, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(Spacing.xs))
-        Column {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = CardInkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            MoneyText(money = money, style = AmountStyles.row, color = CardInk, fractionScale = 1f, minScale = 0.6f)
-        }
+        Text("vs last month", style = MaterialTheme.typography.labelSmall, color = face.inkMuted, maxLines = 1)
     }
 }
 

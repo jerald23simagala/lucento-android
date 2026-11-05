@@ -156,6 +156,14 @@ recurring-schedule sync, syncing preferences.
   website proxy, with a per-user daily limit (docs/CAPTURE.md).
 - Open: notifications/reminders behind the header bell; older installs read `OTHER_ASSET` as Cash after a sync pull. Older installs also read balance adjustments as expenses after a sync pull.
 
+## Done — Theme system (2026-11-05, `feature/theme-system`, merged to `main` by PR)
+- Five curated themes (Sunrise, Midnight dark-only, Grove, Mono, Aurora) from the Theme Studio exploration
+  (https://claude.ai/artifact/3xambaCBLTQPEbwcb6bYnX): `ThemeSpec` registry, brand tokens over fixed financial
+  semantics, DataStore `theme_id`, picker in the profile menu, 250 ms cross-fade, per-theme landscapes (hero horizon
+  strip, empty-state vignette, onboarding welcome), and a themed Home balance card (face, inks, chip, printed
+  landscape). Gates: `ThemeContrastTest` (every theme × mode),
+  `ThemeInvarianceTest`, `DataSeriesTest`. Follow-ups: NEXT_TASKS TS-1…TS-7. Details: docs/DESIGN.md › Themes.
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).

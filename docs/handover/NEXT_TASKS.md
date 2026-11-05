@@ -30,6 +30,18 @@
 | IC-T6 | Run `ScreenshotTourTest` and a light-theme pass of the picker | P2 | Not run in this session |
 | IC-T7 | Legal: replace community (Commons) files for the most visible brands with official press-kit files before a public release | P2 | All logos are `not_cleared`; nominative use only |
 
+## Theme system — follow-ups (2026-11-05, `feature/theme-system` → `main`)
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| TS-1 | Owner: try the five themes on a phone (profile menu › Appearance) | P1 | Commit + merge to `main` owner-approved 2026-11-05. See CURRENT_STATUS top rows for what was verified |
+| TS-2 | `ScreenshotTourTest`: add one themed pass (Midnight, and Grove in light) over Home, Wallets, Budget, an empty state and the picker | P2 | The tour still runs Sunrise only; the themed shots in `artifacts/theme-system/` were taken by hand |
+| TS-3 | Offer the theme in onboarding's appearance step (today: System / Light / Dark only) | P3 | Reuse `ThemePicker`; a new user starts on Sunrise |
+| TS-4 | Mascot torch glow taking the theme's accent (Theme Studio proposal) | P3 | Not done: the glow is the mascot's wellness signal; needs the owner's call |
+| TS-5 | First categorical chart (e.g. spending by category donut) should use `extendedColors.categorical` in order | P3 | The validated series exist in every theme but no chart reads them yet |
+| TS-6 | Lottie files keep the Sunrise palette in every theme; review them in Mono and Aurora | P3 | Approved assets; re-colouring them would be a new asset proposal |
+| TS-7 | Bring the JVM harness up to date (stubs for `luminance`, `ColorScheme.copy`, `lerp`, `R.drawable`, and `ThemeId` in its own file) | P3 | Already stale before this work — see KNOWN_ISSUES TS-K1 |
+
 ## Stabilization cycle (2026-11-02, uncommitted on `main` from 01cfd04)
 
 | Item | Status | Evidence |

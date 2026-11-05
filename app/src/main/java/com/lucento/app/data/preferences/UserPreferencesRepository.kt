@@ -29,6 +29,24 @@ import java.util.Locale
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/**
+ * The colour theme (docs/DESIGN.md › Themes). Independent of [ThemeMode]: a theme defines its own light and dark
+ * palettes, except Midnight, which is dark only and ignores the mode while it is chosen (the mode is kept, so switching
+ * back restores it). A device choice like [WalletsViewMode]: kept across sign-outs, never synced or backed up.
+ */
+enum class ThemeId(val key: String) {
+    SUNRISE("sunrise"),
+    MIDNIGHT("midnight"),
+    GROVE("grove"),
+    MONO("mono"),
+    AURORA("aurora");
+
+    companion object {
+        /** Unknown or missing values (a newer build's theme, a damaged file) fall back to Sunrise, the brand theme. */
+        fun fromKey(key: String?): ThemeId = entries.firstOrNull { it.key == key } ?: SUNRISE
+    }
+}
+
 /** How the Wallets screen lists accounts: rows, or card faces two to a row. A device choice, never synced or backed up. */
 enum class WalletsViewMode(val key: String) {
     ROWS("rows"),
@@ -114,6 +132,8 @@ data class UserPreferences(
      * changes. The photo itself is a private file ([com.lucento.app.data.media.ProfilePhotos]).
      */
     val profilePhotoVersion: Long? = null,
+    /** The colour theme. A device choice: kept across sign-outs, never in backups. */
+    val themeId: ThemeId = ThemeId.SUNRISE,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
@@ -167,6 +187,7 @@ class UserPreferencesRepository(
         val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
         val walletsViewMode = stringPreferencesKey("wallets_view_mode")
         val profilePhotoVersion = longPreferencesKey("profile_photo_version")
+        val themeId = stringPreferencesKey("theme_id")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -205,6 +226,7 @@ class UserPreferencesRepository(
                 addSpotlightSeen = p[Keys.addSpotlightSeen] ?: false,
                 walletsViewMode = WalletsViewMode.fromKey(p[Keys.walletsViewMode]),
                 profilePhotoVersion = p[Keys.profilePhotoVersion],
+                themeId = ThemeId.fromKey(p[Keys.themeId]),
             )
         }
 
@@ -389,6 +411,10 @@ class UserPreferencesRepository(
 
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { it[Keys.themeMode] = mode.name }
+    }
+
+    suspend fun setThemeId(theme: ThemeId) {
+        context.dataStore.edit { it[Keys.themeId] = theme.key }
     }
 
     /** Adds [achievements] to the acknowledged set (and baselines it on first use). */

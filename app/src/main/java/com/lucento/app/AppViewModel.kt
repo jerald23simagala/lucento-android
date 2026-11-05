@@ -3,6 +3,7 @@ package com.lucento.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lucento.app.core.containerFactory
+import com.lucento.app.data.preferences.ThemeId
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.data.preferences.UserPreferencesRepository
@@ -113,6 +114,10 @@ class AppViewModel(
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { preferences.setThemeMode(mode) }
+    }
+
+    fun setThemeId(theme: ThemeId) {
+        viewModelScope.launch { preferences.setThemeId(theme) }
     }
 
     companion object {

@@ -71,7 +71,7 @@ import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LegendKey
 import com.lucento.app.core.designsystem.component.ListSectionHeader
 import com.lucento.app.core.designsystem.component.LucentoCard
-import com.lucento.app.core.designsystem.component.LucentoMascot
+import com.lucento.app.core.designsystem.component.MascotScene
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
@@ -155,7 +155,7 @@ fun WalletsScreen(
                     title = "No wallets yet",
                     body = "Add the cash, bank accounts, e-wallets, savings and cards you use. " +
                         "Balances are entered by you and stay on this device — no bank connection needed.",
-                    illustration = { LucentoMascot(size = 96.dp, mood = MascotMood.Curious) },
+                    illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
                     action = { LucentoPrimaryButton(text = "Add wallet", onClick = { editing = newDraft() }) },
                 )
             }
@@ -366,7 +366,8 @@ private fun TrendBlock(history: List<com.lucento.app.domain.MonthBalance>, fontS
             description = description,
             labelColor = ext.onHeroMuted,
             currentLabelColor = ext.onHero,
-            background = ext.hero,
+            // The ring around the latest point sits at the panel's trailing end (where Aurora's gradient ends).
+            background = ext.heroEnd,
         )
     }
 }

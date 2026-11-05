@@ -11,17 +11,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import com.lucento.app.core.designsystem.theme.CardMetal
 
 /**
  * A drawn EMV-style contact chip, so the wallet reads as a card at a glance (owner decision 2026-11-02). Decorative only:
  * no card number, expiry or network mark is ever shown, and the chip is hidden from accessibility services.
  */
 @Composable
-fun CardChip(modifier: Modifier = Modifier) {
+fun CardChip(modifier: Modifier = Modifier, metal: CardMetal = CardMetal.GOLD) {
+    val plate = if (metal == CardMetal.SILVER) Silver else Gold
     Canvas(modifier.size(width = 42.dp, height = 32.dp)) {
         val r = CornerRadius(5.dp.toPx())
-        drawRoundRect(Brush.linearGradient(listOf(ChipLight, ChipMid, ChipDark, ChipLight)), cornerRadius = r)
-        val line = ChipLine
+        drawRoundRect(Brush.linearGradient(listOf(plate.light, plate.mid, plate.dark, plate.light)), cornerRadius = r)
+        val line = plate.line
         val stroke = 1.dp.toPx()
         val w = size.width
         val h = size.height
@@ -33,13 +35,26 @@ fun CardChip(modifier: Modifier = Modifier) {
         drawLine(line, Offset(w * 0.66f, h * 0.64f), Offset(w, h * 0.64f), stroke)
         drawLine(line, Offset(w * 0.5f, 0f), Offset(w * 0.5f, h * 0.24f), stroke)
         drawLine(line, Offset(w * 0.5f, h * 0.76f), Offset(w * 0.5f, h), stroke)
-        drawRoundRect(ChipEdge, cornerRadius = r, style = Stroke(stroke))
+        drawRoundRect(plate.edge, cornerRadius = r, style = Stroke(stroke))
     }
 }
 
-// Metallic gold, the same on every face (like a real card), with darker engraving.
-private val ChipLight = Color(0xFFF3DC9A)
-private val ChipMid = Color(0xFFD9B45E)
-private val ChipDark = Color(0xFFB98E3A)
-private val ChipLine = Color(0xFF8C6A26).copy(alpha = 0.75f)
-private val ChipEdge = Color(0xFF7A5A1E).copy(alpha = 0.55f)
+private class Plate(val light: Color, val mid: Color, val dark: Color, val line: Color, val edge: Color)
+
+// Metallic gold (wallet faces and the warm themes' balance card), with darker engraving.
+private val Gold = Plate(
+    light = Color(0xFFF3DC9A),
+    mid = Color(0xFFD9B45E),
+    dark = Color(0xFFB98E3A),
+    line = Color(0xFF8C6A26).copy(alpha = 0.75f),
+    edge = Color(0xFF7A5A1E).copy(alpha = 0.55f),
+)
+
+// Brushed silver for the cool themes' balance card (Mono, Aurora).
+private val Silver = Plate(
+    light = Color(0xFFF1F3F6),
+    mid = Color(0xFFC9CED6),
+    dark = Color(0xFF9AA1AD),
+    line = Color(0xFF5F6672).copy(alpha = 0.75f),
+    edge = Color(0xFF4E5560).copy(alpha = 0.55f),
+)

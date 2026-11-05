@@ -40,7 +40,9 @@ import kotlinx.coroutines.launch
 import com.lucento.app.core.designsystem.component.EnvironmentBadge
 import com.lucento.app.core.designsystem.component.LaunchAnimation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.ThemeSpec
 import com.lucento.app.core.designsystem.theme.isDark
+import com.lucento.app.data.preferences.ThemeId
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.navigation.LucentoRoot
 
@@ -107,7 +109,9 @@ class MainActivity : FragmentActivity() {
             val state by appViewModel.uiState.collectAsStateWithLifecycle()
             val ready = state as? AppUiState.Ready
             val themeMode = ready?.preferences?.themeMode ?: ThemeMode.SYSTEM
-            val dark = themeMode.isDark()
+            val themeId = ready?.preferences?.themeId ?: ThemeId.SUNRISE
+            // A dark-only theme (Midnight) is dark whatever the mode, and the system bars follow it.
+            val dark = ThemeSpec.of(themeId).isDark(themeMode.isDark())
 
             // Keep status / navigation bar icons legible when the in-app theme overrides the system.
             DisposableEffect(dark) {
@@ -136,7 +140,8 @@ class MainActivity : FragmentActivity() {
             val institutions by produceState(InstitutionRegistry.EMPTY) {
                 value = (application as LucentoApplication).container.institutions.registry()
             }
-            LucentoTheme(darkTheme = dark) {
+            // The saved theme arrives with the preferences, during the launch animation: shown at once, not faded in.
+            LucentoTheme(darkTheme = dark, theme = themeId, animateChanges = ready != null && !launching) {
                 Box(Modifier.fillMaxSize()) {
                     if (ready != null) {
                         // Kept composed while locked so nothing in progress is lost, but hidden from TalkBack.
