@@ -183,6 +183,11 @@ unconfigured), HomeOnTrackTest (L9).
 
 | ID | Issue | Evidence |
 |---|---|---|
+| IC-1 | 19 bundled institutions (and UBS) have no vector logo, so their wallet card shows a brand-accent monogram: PSBank, DBP, Metrobank (its 2025 logo exists only as white PNGs), UNO, UnionDigital, OFBank (2025 logo), AUB, Bank of Commerce, PBB, BDO Network Bank, City Savings, CARD Bank, Sterling, PalawanPay, Veterans Bank, ShopeePay, CTBC, Taishin, LINE Bank. List icons are their official app icons except DBP, ShopeePay and BDO Network Bank (monogram; BDO Network Bank has no brand colour at all) | Verified (library + device). NEXT_TASKS IC-T2 |
+| IC-2 | DBP's monogram reads "DP": the design system's initials rule skips "of", "the" and "Bank" | Verified (device). Cosmetic |
+| IC-3 | Re-running `lucento-wallet-design/tools/designs.py` in full on this machine would drop white-logo detection (cairosvg not installable) and change existing cards; use `tools/institutions/expansion/design_new_institutions.py` for incremental ids | Verified (import fails) |
+| IC-4 | The library's generated reports (`coverage_report.md`, `missing_assets.md`, `validation_report.md`, `master_inventory.xlsx`) predate the 2026-11-04 expansion; `master_inventory.csv` and `additions_2026-11-04.md` are current | Verified. NEXT_TASKS IC-T3 |
+| IC-5 | Changing the system font size while the New wallet sheet is open recreates the screen and closes the sheet, discarding the unsaved draft (pre-existing; seen while testing the picker at 130%) | Verified (device, API 28) |
 | N-06 | ~~No server CHECK constraints~~. **Done on `lucento-test` only** (22 NOT VALID constraints, live rows only); pulled *and pushed* rows are checked by `PulledRowRules`, so one invalid local row no longer blocks a batch. Production needs owner approval | Verified (test: invalid live row blocked, soft delete accepted, app write accepted) |
 | N-08 | Production leaked-password protection disabled (advisor) | Verified |
 | N-09 | `usage_events` accepts unlimited anonymous inserts; allowlist checks names only; `onboarding_completed` not allowed; dead event names remain | Code-only |

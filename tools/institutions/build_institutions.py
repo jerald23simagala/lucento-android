@@ -9,7 +9,7 @@ Builds Lucento's bundled institution registry and artwork from the bank asset li
     # Conversion uses Android's own Svg2Vector (com.android.tools:sdk-common, from the Gradle cache; JAVA_HOME = JDK 17+).
 
 Outputs (all committed; CI and the app never need Node or the source libraries):
-  app/src/main/assets/banks/institutions.json          trimmed registry: identity, card face, list icon
+  app/src/main/assets/banks/institutions.json          trimmed registry: identity (+ search aliases), card face, list icon
   app/src/main/res/drawable/inst_logo_<id>.xml           card logo (VectorDrawable)
   app/src/main/res/drawable/inst_icon_<id>.xml           square list icon (VectorDrawable)
   app/src/main/res/drawable-nodpi/inst_app_<id>.webp     square list icon from the official app icon (144px, never vectorised)
@@ -343,6 +343,8 @@ def main():
             "name": r["name"],
             "country": r["country"],
             "type": r["type"],
+            # Search-only names (former names, abbreviations, local script); omitted when empty to keep entries lean.
+            **({"aliases": r["aliases"]} if r.get("aliases") else {}),
             "brand": brand,
             "card": {
                 "template": design["template"],

@@ -32,7 +32,7 @@ class InstitutionRegistryTest {
     }
 
     @Test fun `the shipped registry parses and every id, colour and art file is consistent`() {
-        assertEquals(380, registry.all.size) // 386 in the library minus the 6 card networks, which are never a wallet
+        assertEquals(409, registry.all.size) // 415 in the library minus the 6 card networks, which are never a wallet
         assertTrue(registry.all.all { it.id.matches(Regex("^[a-z]{2,3}_[a-z0-9_]+$")) })
         assertEquals(registry.all.size, registry.all.map { it.id }.toSet().size)
         val hex = Regex("^#[0-9A-Fa-f]{6}$")
@@ -76,6 +76,61 @@ class InstitutionRegistryTest {
         assertTrue(registry.search("zzzz-no-such-bank").isEmpty())
         assertNull(registry["xx_unknown"])
         assertNull(registry[null])
+    }
+
+    @Test fun `the Philippines covers its universal, thrift, digital and e-money institutions`() {
+        val ph = registry.all.filter { it.country == "PH" }.map { it.id }.toSet()
+        listOf(
+            "ph_bdo", "ph_bpi", "ph_metrobank", "ph_landbank", "ph_pnb", "ph_security_bank", "ph_unionbank", "ph_rcbc",
+            "ph_chinabank", "ph_eastwest", "ph_dbp", "ph_psbank", "ph_aub", "ph_bankcom", "ph_maybank_ph", "ph_hsbc_ph",
+            "ph_pbb", "ph_veterans", "ph_banko", "ph_citysavings", "ph_sterling", "ph_card_bank", "ph_bdo_network",
+            // all seven BSP-licensed digital banks (MariBank, formerly SeaBank, licensed July 2026)
+            "ph_gotyme", "ph_maya", "ph_tonik", "ph_uno", "ph_uniondigital", "ph_ofbank", "ph_maribank",
+            "ph_cimb_ph", "ph_gcash", "ph_grabpay_ph", "ph_shopeepay", "ph_coins", "ph_palawanpay",
+        ).forEach { assertTrue(it, it in ph) }
+        // Robinsons Bank merged into BPI (2024) and Citi sold its PH consumer business (2022): neither is offered.
+        assertTrue(ph.none { "robinsons" in it || it == "ph_citi" })
+        listOf("ph_eastwest", "ph_security_bank", "ph_landbank", "ph_maribank").forEach { assertTrue(it, registry[it]!!.card.logo != null) }
+    }
+
+    @Test fun `aliases find renamed and abbreviated institutions, in any script`() {
+        assertEquals("ph_maribank", registry.search("seabank", country = "PH").first().id)
+        assertEquals("ph_psbank", registry.search("philippine savings", country = "PH").first().id)
+        assertEquals("ph_dbp", registry.search("dbp", country = "PH").first().id)
+        assertTrue(registry.search("中國").any { it.id == "tw_ctbc" })
+        assertEquals("tw_jkopay", registry.search("街口").first().id)
+        val mari = registry["ph_maribank"]!!
+        assertEquals("SeaBank", registry.matchedAlias(mari, "sea"))
+        assertNull("the name itself matched", registry.matchedAlias(mari, "mari"))
+        assertNull(registry.matchedAlias(mari, " "))
+    }
+
+    @Test fun `among equal matches the parent brand comes first`() {
+        assertEquals(listOf("ph_bdo", "ph_bdo_network"), registry.search("bdo", country = "PH").map { it.id }.take(2))
+        assertEquals("ph_bpi", registry.search("bpi", country = "PH").first().id)
+        assertEquals("ph_unionbank", registry.search("union", country = "PH").first().id)
+        assertEquals(listOf("my_maybank", "ph_maybank_ph"), registry.search("maybank").map { it.id }.take(2))
+    }
+
+    @Test fun `a name that starts with the query outranks an alias that does, and browsing stays alphabetical`() {
+        fun inst(id: String, name: String, vararg aliases: String) =
+            """{"id":"$id","name":"$name","country":"PH","type":"traditional_bank","brand":"#000000",""" +
+                """"aliases":[${aliases.joinToString(",") { "\"$it\"" }}],""" +
+                """"card":{"template":"monochrome","stops":["#000000"],"accent":"#000000","ink":"#FFFFFF","muted_alpha":0.7,""" +
+                """"monogram":{"text":"X","bg":"#000000","fg":"#FFFFFF"}},"icon":{"kind":"monogram"}}"""
+        val mini = InstitutionRegistry.parse(
+            """{"schema_version":1,"institutions":[${inst("ph_zeta", "Zeta Bank", "Alpha Savings")},${inst("ph_alphabet", "Alphabet Bank Of The Islands")}]}"""
+        )
+        assertEquals(listOf("ph_alphabet", "ph_zeta"), mini.search("alpha").map { it.id })
+        assertEquals("Alpha Savings", mini.matchedAlias(mini["ph_zeta"]!!, "alpha"))
+        assertEquals(listOf("ph_alphabet", "ph_zeta"), mini.search("", country = "PH").map { it.id })
+        assertTrue(mini.search("savings").single().id == "ph_zeta")
+    }
+
+    @Test fun `search keys fold accents and case but keep every script`() {
+        assertEquals("societe generale", InstitutionRegistry.searchKey("Société Générale"))
+        assertEquals("中國信託", InstitutionRegistry.searchKey("中國信託"))
+        assertEquals("coins ph", InstitutionRegistry.searchKey("Coins.ph"))
     }
 
     @Test fun `a wallet keeps its institution through edits, and an edit that doesn't know about it keeps it too`() = runTest {

@@ -38,6 +38,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
   assets and liabilities in separate cards (Debts & loans linked from Liabilities), each wallet shown as a bank-style card, warnings for balances that can't be right, and
   **Adjust balance** (the gap is recorded as a visible Balance adjustment, never income or spending); account detail with history.
+  A wallet can show its bank or provider's logo and colours: 409 institutions in 48 countries are bundled offline (36 in
+  the Philippines, including all seven BSP-licensed digital banks), chosen by country and kind or found by name, former
+  name or abbreviation (`tools/institutions/`; display only — Lucento never connects to a bank).
 - **Savings goals**, **Debts & loans** (optional interest rate; loans: one-time or monthly amortization with an
   instalment bar and payment reminders; credit cards: credit limit, available credit, statement and due days with an
   amount-due reminder that is never counted in Safe to spend),
