@@ -407,6 +407,10 @@ private fun AnswerItem(
             Spacer(Modifier.height(Spacing.sm))
             LucentoPrimaryButton(text = "Turn on AI answers", icon = Icons.Outlined.AutoAwesome, onClick = onTurnOnAi)
         }
+        answer.retry?.let { question ->
+            Spacer(Modifier.height(Spacing.sm))
+            ChoicePill(label = "Ask Gemini again", selected = false, onClick = { onFollowUp(question) }, role = androidx.compose.ui.semantics.Role.Button)
+        }
         if (answer.followUps.isNotEmpty()) {
             Spacer(Modifier.height(Spacing.sm))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
@@ -427,24 +431,40 @@ private fun annotated(parts: List<CheckedAnswer.Part>): AnnotatedString {
     }
 }
 
-/** Who worked the answer out — never leaving local calculation looking like AI, or AI looking like a calculation. */
+/**
+ * Who worked the answer out — never leaving local calculation looking like AI, or AI looking like a calculation — and,
+ * under every AI answer, that AI can be wrong (owner round 9: the adviser speaks plainly; the note sits here instead).
+ */
 @Composable
 private fun SourceLine(source: AnswerSource) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            if (source == AnswerSource.GEMINI) Icons.Outlined.AutoAwesome else Icons.Outlined.PhoneAndroid,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(14.dp),
-        )
-        Spacer(Modifier.width(Spacing.xs))
-        Text(
-            if (source == AnswerSource.GEMINI) "Answered by Gemini · bold figures worked out on this phone" else "Calculated on this phone",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (source == AnswerSource.GEMINI) Icons.Outlined.AutoAwesome else Icons.Outlined.PhoneAndroid,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(Spacing.xs))
+            Text(
+                if (source == AnswerSource.GEMINI) "Answered by Gemini · bold figures worked out on this phone" else "Calculated on this phone",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (source == AnswerSource.GEMINI) {
+            Text(
+                AI_CAN_BE_WRONG,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 14.dp + Spacing.xs, top = Spacing.xxs),
+            )
+        }
     }
 }
+
+/** Under every AI answer, and in the consents. */
+internal const val AI_CAN_BE_WRONG = "AI advice can be inaccurate. Check it before you act on it."
 
 /** A report inside an answer: its headline figure and first lines, and the way into the full statement. */
 @Composable
@@ -668,7 +688,7 @@ private fun AiConsentSheet(onAccept: () -> Unit, onDismiss: () -> Unit) {
             SheetHeader(title = "Turn on AI answers?", subtitle = "Ask anything about your money and get advice, answered by Gemini.", icon = Icons.Outlined.AutoAwesome)
             ConsentPoint("Sent", AI_SENT)
             ConsentPoint("Never sent", AI_NEVER_SENT)
-            ConsentPoint("Checked here", "Every amount in an answer is one of your figures, or a sum this phone worked out from them — shown in bold. AI can still misread a question, so check anything important. Advice is general guidance, not professional financial advice.")
+            ConsentPoint("Checked here", "Every amount in an answer is one of your figures, or a sum this phone worked out from them — shown in bold. Gemini gives you its own recommendations from your figures, but AI can misread a question or miss something only you know, so check advice before you act on it.")
             ConsentPoint("Limits", "Needs your sync account. Each account has a daily allowance, shared with Smarter reading. Turn this off any time from the menu or Settings.")
             Spacer(Modifier.height(Spacing.md))
             LucentoPrimaryButton(text = "Turn on AI answers", onClick = onAccept)

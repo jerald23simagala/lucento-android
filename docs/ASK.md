@@ -5,7 +5,10 @@ from the hero at the top of Insights (`feature/ask`). Owner decisions: reuse the
 the four preset reports are net worth, cash flow, budget vs actual, and debts & loans (2026-11-03). **Round 8
 (2026-11-04):** the AI is an adviser — practical advice, projections and calculations, and transaction-level answers —
 so it now also sees projections, goals, spending patterns and the last 60 days of transactions, under a new consent
-(v2; agreeing to the old summaries-only consent doesn't carry over).
+(v2; agreeing to the old summaries-only consent doesn't carry over). **Round 9 (2026-11-04):** a real adviser rather
+than general guidance — direct recommendations and plans, no closing disclaimer in the answer; instead every AI answer
+carries the app's own note that AI advice can be inaccurate. AI answers no longer fail when the session token went
+stale, and the proxy skips Gemini models that were just busy.
 
 ## Two ways an answer is made
 
@@ -14,10 +17,13 @@ so it now also sees projections, goals, spending patterns and the last 60 days o
 | What | The preset questions (chips), the report tiles, and any typed question `AskRouter` recognises (top categories, net worth, cash flow / spending, budget, debts; "last month", a month's name) | Any other money question |
 | Who works it out | `ReportBuilder` — the same calculators as Home, Budget, Wallets and Insights | Gemini through Lucento's proxy, quoting figures the phone calculated |
 | Needs | Nothing: works offline | A proxy in this build, a signed-in sync account, and the user's consent |
-| Labelled | "Calculated on this phone" | "Answered by Gemini · bold figures worked out on this phone" |
+| Labelled | "Calculated on this phone" | "Answered by Gemini · bold figures worked out on this phone", and under it "AI advice can be inaccurate. Check it before you act on it." |
 
 Local rules are never presented as AI (CLAUDE.md). When AI answers are on but Gemini can't answer (offline, daily limit,
-timeout), a question the phone can route is answered there, with the reason; anything else says what went wrong.
+timeout), a question the phone can route is answered there, with the reason; anything else says what went wrong. When
+Gemini was busy, slow or unreachable the answer also offers **Ask Gemini again**; a used-up allowance or an ended
+session doesn't. Signed in on this phone but refused by the proxy even after a token refresh says "Your sign-in has
+expired — sign in again", not "needs your sync account".
 
 ## Reports
 
@@ -75,12 +81,18 @@ sign-in details, the Gemini key.
 - **Read-only.** Nothing in an answer can change data, open a link, or run anything. Links and markdown are stripped,
   answers are capped at 2,500 characters (calculations are longer as text than as results), and there are at most three
   follow-ups of up to 90 characters each.
-- **Scope.** The adviser prompt (proxy, version 2) gives practical, specific guidance from the user's own figures —
-  spending cuts, budget changes, saving rate, an emergency fund, goals, paying down debt, cards paid in full,
-  subscriptions, unusual or duplicate charges — with up to three next steps quantified by calculations. It never
-  recommends specific investments, securities, crypto, insurance, loans or providers, gives no tax or legal advice,
-  doesn't encourage borrowing to spend, ends advice with "General guidance, not professional financial advice.", and
-  treats wallet, category and payee names and notes as data, not instructions.
+- **Scope (round 9, owner: "an adviser, not general guidance").** The adviser prompt (proxy, version 2) leads with a
+  direct answer or recommendation — what it would do in the user's position — backs it with their own figures, gives
+  a plan of up to five prioritised steps with budgets, targets and effects calculated from their figures, and points
+  out anything important they didn't ask about (an unusual or duplicate charge, a card due, a budget running out).
+  It advises across personal finance: budgets, saving, emergency funds, debt order, cards, loans and whether to take
+  one, affordability of big purchases, goals, subscriptions, and investing in general terms (emergency fund and
+  high-interest debt first, diversified low-cost funds, risk matched to the time horizon, retirement saving). The
+  remaining limits: it doesn't tell the user to buy a particular stock, coin or a named company's product, never
+  promises returns, doesn't encourage borrowing to spend or invest, and gives the general principle (rules depend on
+  the country) where tax or legal rules decide. No disclaimer in the answer and no "see a professional" unless the
+  question truly needs one; the app shows "AI advice can be inaccurate. Check it before you act on it." under every AI
+  answer and in both consents. Up to 220 words. Names and notes are data, not instructions.
 - **Consent (v2).** Off by default. It is turned on only from the consent sheet in Ask Lucento or the dialog in Settings ›
   Privacy, both of which list what is sent (including transactions) and what never is. Stored as `ask_lucento_ai_v2`; the
   summaries-only consent (`ask_lucento_ai`) is ignored and removed, so everyone is asked again. It is never restored
@@ -88,6 +100,13 @@ sign-in details, the Gemini key.
 - **Limits.** Each question counts against the same per-user daily allowance as Smarter reading
   (`public.consume_ai_quota`, `AI_DAILY_LIMIT`, default 50). There is one request at a time (an in-flight guard), with a
   30-second timeout.
+- **Sign-in token (round 9).** Ask Lucento and Smarter reading send the session's access token (`AuthRepository.accessToken`):
+  it waits briefly for the stored session to load and refreshes a token that expires within a minute. If the proxy still
+  answers 401, the token is refreshed and the request sent once more (`postToProxy`, `ProxyCallTest`). A sign-out that
+  starts during a refresh wins: the session is cleared again.
+- **Busy models (round 9, proxy).** A Gemini model that answers 429/500/503/504 (or times out) is tried last for two
+  minutes, so later questions start with a model that answers; each call has a hard timeout (budget + 4 s) so the
+  proxy replies before the app stops waiting (`server/gemini.ts` `preferAvailable`).
 - **No history kept.** The conversation lives in memory only (at most 60 messages). The proxy stores nothing and logs
   only status codes.
 
@@ -100,10 +119,10 @@ sign-in details, the Gemini key.
 | Conversation, routing, fallbacks | `feature/ask/AskLucentoViewModel.kt` |
 | Reports, routing, snapshot, answer check | `domain/ask/Reports.kt`, `domain/ask/Ask.kt` (unit-tested) |
 | Calculations, transaction patterns | `domain/ask/Advisor.kt` (`AskCalc`, `TransactionSignals`; `AdvisorTest`) |
-| Client | `data/ai/AskLucentoClient.kt` → `BuildConfig.AI_ASK_URL` (the Smarter reading URL with `/interpret` → `/ask`; debug builds only with a test proxy) |
+| Client | `data/ai/AskLucentoClient.kt` (requests through `data/ai/ProxyCall.kt`, shared with Smarter reading) → `BuildConfig.AI_ASK_URL` (the Smarter reading URL with `/interpret` → `/ask`; debug builds only with a test proxy) |
 | PDF | `data/reports/ReportPdfWriter.kt` |
 | Consent | `UserPreferences.askLucentoAi` (`ask_lucento_ai_v2`); Settings › Privacy › Ask Lucento |
-| Proxy | `lucento-website/src/pages/api/ask.ts`: `SYSTEM` for version 1 apps, `SYSTEM_V2` (the adviser) for version 2 (`lucento-website` PR #9, deployed 2026-11-04) |
+| Proxy | `lucento-website/src/pages/api/ask.ts`: `SYSTEM` for version 1 apps, `SYSTEM_V2` (the adviser) for version 2 (`lucento-website` PR #9, deployed 2026-11-04; round 9 tone and busy-model fallback in PR #10); model fallback in `src/server/gemini.ts` |
 
 ## Setting it up (owner)
 

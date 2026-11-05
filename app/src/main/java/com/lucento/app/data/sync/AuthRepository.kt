@@ -244,8 +244,42 @@ class AuthRepository(
         block()
     }
 
-    /** The signed-in session's access token, for Lucento's own proxy (Smarter reading); null when signed out. */
-    suspend fun accessToken(): String? = runCatching { client?.auth?.currentAccessTokenOrNull() }.getOrNull()
+    /** Counts sign-outs begun, so a token refresh that overlaps one can tell and not bring the session back. */
+    private val signOuts = java.util.concurrent.atomic.AtomicInteger()
+
+    /**
+     * The signed-in session's access token, for Lucento's own proxies (Smarter reading, Ask Lucento); null when signed
+     * out. Waits briefly for the stored session to load, and refreshes a token that has expired or is about to — after
+     * the phone slept, the stored token can be stale until the automatic refresh catches up, and the proxy would refuse
+     * it as signed out (owner round 9). [refresh]: the proxy refused the token (401), so refresh it whatever its expiry.
+     * A refresh that fails leaves the current token; a sign-out that starts meanwhile wins.
+     */
+    suspend fun accessToken(refresh: Boolean = false): String? {
+        val auth = client?.auth ?: return null
+        try {
+            withTimeoutOrNull(TOKEN_WAIT_MS) { auth.awaitInitialization() }
+            val session = auth.currentSessionOrNull() ?: return null
+            if (refresh || tokenNeedsRefresh(session.expiresAt.toEpochMilliseconds(), System.currentTimeMillis())) {
+                val before = signOuts.get()
+                try {
+                    withTimeoutOrNull(TOKEN_WAIT_MS) { auth.refreshCurrentSession() }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Offline or refused: carry on with the token there is; the proxy says if it's no longer good.
+                }
+                if (signOuts.get() != before) {
+                    runCatching { auth.clearSession() }
+                    return null
+                }
+            }
+            return auth.currentAccessTokenOrNull()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return null
+        }
+    }
 
     /** The signed-in account's id, or null. Used to tell an account switch from a return to the same account. */
     suspend fun currentUserId(): String? = runCatching {
@@ -260,6 +294,7 @@ class AuthRepository(
      * to call twice: the record is keyed by session id.
      */
     fun beginSignOutNow(): Boolean {
+        signOuts.incrementAndGet()
         val auth = client?.auth
         if (auth != null) {
             runCatching { auth.stopAutoRefreshForCurrentSession() }
@@ -307,6 +342,8 @@ class AuthRepository(
 
     private companion object {
         const val REVOKE_TIMEOUT_MS = 8_000L
+        /** How long a proxy request waits for the stored session to load, or for a token refresh. */
+        const val TOKEN_WAIT_MS = 5_000L
     }
 }
 
@@ -341,6 +378,12 @@ internal suspend fun endLocalSession(signOutLocal: suspend () -> Unit = {}, clea
  * server's own error description via [safeFailureDescription], never a token, header or raw exception message — so a
  * setup mistake (missing Android OAuth client, wrong Client ID in Supabase, provider disabled) is visible on screen.
  */
+/** A token is refreshed before a proxy request when it expires within this margin (or already has). */
+internal const val TOKEN_REFRESH_MARGIN_MS = 60_000L
+
+/** Whether a token expiring at [expiresAtMs] should be refreshed before it is sent at [nowMs]. */
+internal fun tokenNeedsRefresh(expiresAtMs: Long, nowMs: Long): Boolean = expiresAtMs - nowMs < TOKEN_REFRESH_MARGIN_MS
+
 internal fun isTimeout(e: Throwable): Boolean =
     generateSequence(e) { it.cause }.take(5).any {
         it is HttpRequestTimeoutException || it is ConnectTimeoutException || it is SocketTimeoutException

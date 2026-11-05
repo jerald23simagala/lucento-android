@@ -132,6 +132,10 @@ recurring-schedule sync, syncing preferences.
   statement or an app's transaction history (one row per transaction, money in or out from the running balance,
   CR/DR or +/− marks); Ask Lucento becomes an adviser — advice, projections and calculations worked out on the phone
   (`[[= … ]]`), goals and transaction-level answers — under a new consent that covers recent transactions.
+- Owner review round 9 (2026-11-04): Ask Lucento speaks as an adviser (direct recommendations and plans; the app's own
+  "AI advice can be inaccurate" note under every AI answer instead of a disclaimer inside it); AI requests refresh a
+  stale sign-in token and retry once after a 401; the proxy tries Gemini models that were just busy last; "Ask Gemini
+  again" after a busy or slow answer.
 - Sync v9: recurring schedules (incl. debt payments) and debt terms sync (`public.recurring`, wallet term columns);
   email + password accounts beside Google; onboarding asks to connect sync (first sync after setup). Budgets, Goals and
   Insights adopt the brand hero and carded sections.

@@ -57,6 +57,8 @@ sealed interface AskMessage {
         val followUps: List<String> = emptyList(),
         /** The question needs AI answers, which are off: the answer offers to turn them on. */
         val offersAi: Boolean = false,
+        /** Gemini didn't answer [retry] (busy, too slow, unreachable): the answer offers to ask it again. */
+        val retry: String? = null,
     ) : AskMessage {
         val text: String get() = parts.joinToString("") { it.text }
     }
@@ -267,14 +269,16 @@ class AskLucentoViewModel(
                 )
             }
             else -> {
-                val reason = when (result) {
-                    AskLucentoClient.Result.LimitReached -> "Today’s AI answers are used up"
-                    AskLucentoClient.Result.NotSignedIn -> "AI answers need your sync account"
-                    null -> "Gemini took too long to answer"
-                    else -> "Gemini couldn’t be reached"
-                }
-                local("$reason, so this was calculated on this phone.")
-                    ?: AskMessage.Answer(0, plain("$reason. Try again later, or pick one of the reports below — they work offline."), AnswerSource.PHONE)
+                val reason = failureReason(result, state.signedIn)
+                // Worth asking again: Gemini was busy, slow or unreachable. Not a used-up allowance or an ended session.
+                val retry = text.takeIf { result is AskLucentoClient.Result.Failed || result == null }
+                local("$reason, so this was calculated on this phone.")?.copy(retry = retry)
+                    ?: AskMessage.Answer(
+                        0,
+                        plain("$reason. ${if (retry != null) "Try again in a moment" else "Try again later"}, or pick one of the reports below — they work offline."),
+                        AnswerSource.PHONE,
+                        retry = retry,
+                    )
             }
         }
     }
@@ -297,6 +301,18 @@ class AskLucentoViewModel(
         private const val REMOTE_TIMEOUT_MS = 30_000L
         private const val MAX_MONTHS_BACK = 24L
         private const val MAX_MESSAGES = 60
+
+        /**
+         * Why Gemini didn't answer. Signed in on this phone yet refused even after a token refresh means the session
+         * ended on the server (signed out elsewhere, password changed): say so, rather than "needs your sync account".
+         */
+        internal fun failureReason(result: AskLucentoClient.Result?, signedIn: Boolean): String = when (result) {
+            AskLucentoClient.Result.LimitReached -> "Today’s AI answers are used up"
+            AskLucentoClient.Result.NotSignedIn ->
+                if (signedIn) "Your sign-in has expired — sign in again in Settings › Account & sync" else "AI answers need your sync account"
+            null -> "Gemini took too long to answer"
+            else -> "Gemini couldn’t be reached"
+        }
 
         val Factory = containerFactory {
             AskLucentoViewModel(
