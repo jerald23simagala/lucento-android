@@ -23,6 +23,8 @@ data class Institution(
     val brand: String,
     val card: CardFace,
     val icon: IconSpec,
+    /** Other names people search by: a former name (SeaBank for MariBank), an abbreviation, the local-script name. Never shown as the name. */
+    val aliases: List<String> = emptyList(),
 )
 
 /** How a wallet card looks for this institution; colours were contrast-checked when the registry was generated. */
@@ -75,7 +77,8 @@ private data class InstitutionFile(@SerialName("schema_version") val schemaVersi
 /** The parsed registry: lookup by id and the picker's search. Pure Kotlin, so it is tested on the JVM. */
 class InstitutionRegistry(val all: List<Institution>) {
     private val byId = all.associateBy { it.id }
-    private val keys = all.associate { it.id to searchKey(it.name) }
+    private val nameKeys = all.associate { it.id to searchKey(it.name) }
+    private val aliasKeys = all.associate { inst -> inst.id to inst.aliases.map(::searchKey).filter { it.isNotEmpty() } }
 
     operator fun get(id: String?): Institution? = id?.let(byId::get)
 
@@ -83,39 +86,70 @@ class InstitutionRegistry(val all: List<Institution>) {
     val countries: List<String> = all.groupingBy { it.country }.eachCount().entries
         .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key }).map { it.key }
 
+    /** How many institutions each country has. */
+    val countryCounts: Map<String, Int> = all.groupingBy { it.country }.eachCount()
+
     /**
-     * Institutions matching [query] (accent- and case-insensitive; every word must match the start of a word in the
-     * name, or the id's slug). With a [country], its institutions come first. A blank query lists that country (or
-     * everything) alphabetically.
+     * Institutions matching [query] (accent- and case-insensitive, any script; every word must match the start of a
+     * word in the name or in one alias, or the id's slug). With a [country], its institutions come first; then a name
+     * that starts with the query beats an alias that does, and a shorter name a longer one. A blank query lists that
+     * country (or everything) alphabetically.
      */
     fun search(query: String, country: String? = null): List<Institution> {
-        val words = searchKey(query).split(' ').filter { it.isNotEmpty() }
-        val matches = if (words.isEmpty()) {
+        val terms = terms(query)
+        val matches = if (terms.isEmpty()) {
             if (country != null) all.filter { it.country == country } else all
         } else {
             all.filter { inst ->
-                val nameWords = keys.getValue(inst.id).split(' ')
                 val slug = inst.id.substringAfter('_')
-                words.all { w -> nameWords.any { it.startsWith(w) } || slug.startsWith(w.replace(' ', '_')) }
+                fun matchesAll(key: String) = key.split(' ').let { words -> terms.all { t -> words.any { it.startsWith(t) } || slug.startsWith(t) } }
+                matchesAll(nameKeys.getValue(inst.id)) || aliasKeys.getValue(inst.id).any(::matchesAll)
             }
         }
         return matches.sortedWith(
             compareBy<Institution> { if (country != null && it.country == country) 0 else 1 }
-                .thenBy { if (words.isNotEmpty() && keys.getValue(it.id).startsWith(words.first())) 0 else 1 }
-                .thenBy { keys.getValue(it.id) }
+                .thenBy { rank(it, terms) }
+                // Searching, the shorter of two equally good names is usually the parent brand ("BDO Unibank" before
+                // "BDO Network Bank", "BPI" before "BPI BanKo"); browsing stays alphabetical.
+                .thenBy { if (terms.isEmpty()) 0 else nameKeys.getValue(it.id).length }
+                .thenBy { nameKeys.getValue(it.id) }
                 .thenBy { it.country }
         )
     }
 
+    /**
+     * The alias that made [institution] match [query] when its own name doesn't ("SeaBank" for MariBank), so a picker
+     * can say why the row is there. Null when the name matches or the query is blank.
+     */
+    fun matchedAlias(institution: Institution, query: String): String? {
+        val terms = terms(query)
+        if (terms.isEmpty()) return null
+        fun matchesAll(key: String) = key.split(' ').let { words -> terms.all { t -> words.any { it.startsWith(t) } } }
+        if (matchesAll(nameKeys[institution.id] ?: searchKey(institution.name))) return null
+        return institution.aliases.firstOrNull { matchesAll(searchKey(it)) }
+    }
+
+    /** 0: the name starts with the first term; 1: an alias does; 2: another word matched. */
+    private fun rank(inst: Institution, terms: List<String>): Int = when {
+        terms.isEmpty() || nameKeys.getValue(inst.id).startsWith(terms.first()) -> 0
+        aliasKeys.getValue(inst.id).any { it.startsWith(terms.first()) } -> 1
+        else -> 2
+    }
+
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
+        private val marks = Regex("\\p{M}+")
+        private val separators = Regex("[^\\p{L}\\p{N}]+")
 
         fun parse(text: String): InstitutionRegistry = InstitutionRegistry(json.decodeFromString(InstitutionFile.serializer(), text).institutions)
 
         val EMPTY = InstitutionRegistry(emptyList())
 
+        private fun terms(query: String) = searchKey(query).split(' ').filter { it.isNotEmpty() }
+
+        /** Accents and case folded, any script kept (中國信託, Société → societe); everything else separates words. */
         internal fun searchKey(text: String): String =
-            Normalizer.normalize(text, Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
-                .lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]+"), " ").trim()
+            Normalizer.normalize(text, Normalizer.Form.NFD).replace(marks, "")
+                .lowercase(Locale.ROOT).replace(separators, " ").trim()
     }
 }

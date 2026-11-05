@@ -18,6 +18,18 @@
 | OT-4 | Deploy Ask Lucento's `/api/ask` | **Done** (2026-11-04): owner confirmed `consume_ai_quota` exists in production; PR lucento-website#6 (`280a905` endpoint, `9471726` env-name fix) merged as `e90326c` and deployed. Verified on production: `POST /api/ask` and `/api/interpret` → `401 sign_in_required` (settings resolve from the `LUCENTO_` names), a fake token → 401, `GET /api/ask` → 405, canonical URL and sitemap present again | Release builds now get AI answers once the user consents |
 | OT-5 | Try AI answers on a phone: install `artifacts/apk/lucento-release-TEST-SIGNED-ot5.apk` (a **test-only** release build: production Supabase and proxy, signed with this machine's Android debug key, SHA-1 `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75`; never distribute it). Sign in with an **email** account (Google sign-in likely fails: that key isn't registered for `com.lucento.app`), Insights › Ask Lucento › ask a question of your own (e.g. "How did October compare with September?") › Turn on AI answers › check the bold figures and "Answered by Gemini". Uninstall afterwards | Waits on OT-4 | The AI path can't run here; no signing secrets exist (`gh secret list` empty), so CI's release APK is unsigned |
 
+## Institution coverage — follow-ups (2026-11-05)
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| IC-T1 | ~~Owner: authorise a commit of the institution work~~ **Done**: `761d0ea` on `feature/institution-coverage` (not pushed; push + PR need the owner's go-ahead). The asset libraries are outside git | P1 | See CURRENT_STATUS top row |
+| IC-T2 | Official vector logos for the 19 institutions that show a monogram card: PSBank, DBP, Metrobank (2025 logo), UNO, UnionDigital, OFBank (2025 logo), AUB, Bank of Commerce, PBB, BDO Network Bank, City Savings, CARD Bank, Sterling, PalawanPay, Veterans Bank, ShopeePay, CTBC, Taishin, LINE Bank (+ UBS) | P2 | Sites publish rasters only or refuse automated requests; needs press kits or the owner asking the banks. Workflow: `tools/institutions/expansion/README.md` |
+| IC-T3 | Researcher: regenerate the library's `coverage_report.md`, `missing_assets.md`, `validation_report.md` and `master_inventory.xlsx` (they predate the expansion; the CSV is current) | P3 | `additions_2026-11-04.md` is the interim record |
+| IC-T4 | "Not listed" path: let a wallet carry a typed institution name with a monogram | P3 | Needs a Room column + migration, sync and backup fields — a product decision, not done here. Today the empty state suggests naming the wallet after the bank |
+| IC-T5 | Optional `rank` (market prominence) per country so browsing lists big banks first | P3 | Search already prefers the shorter (parent-brand) name |
+| IC-T6 | Run `ScreenshotTourTest` and a light-theme pass of the picker | P2 | Not run in this session |
+| IC-T7 | Legal: replace community (Commons) files for the most visible brands with official press-kit files before a public release | P2 | All logos are `not_cleared`; nominative use only |
+
 ## Stabilization cycle (2026-11-02, uncommitted on `main` from 01cfd04)
 
 | Item | Status | Evidence |
