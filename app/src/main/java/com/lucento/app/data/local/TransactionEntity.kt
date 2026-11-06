@@ -57,4 +57,11 @@ data class TransactionEntity(
     @ColumnInfo(name = "synced_at") val syncedAt: Long? = null,
     /** Server `revision` this row was last synced at; a push based on it is a causal successor (v7, docs/SYNC.md). */
     @ColumnInfo(name = "base_revision") val baseRevision: Long? = null,
+    /**
+     * v12, Lucento Shared: the account that added / last changed this row (docs/shared). Display only and never uploaded —
+     * the server stamps both from the signed-in session. Set here when this phone writes, so the row reads right before it
+     * syncs; replaced by the server's values on pull. Null: written before attribution existed, or never signed in.
+     */
+    @ColumnInfo(name = "created_by") val createdBy: String? = null,
+    @ColumnInfo(name = "updated_by") val updatedBy: String? = null,
 )

@@ -152,6 +152,12 @@ class AppContainer(application: Application) {
     val backup: BackupEngine by lazy {
         BackupEngine(RoomBackupStore(database, runner, preferences, GoalPhotos(application)))
     }
+    /**
+     * Lucento Shared: a Partner's phone (bound to an Owner's Shared Space) doesn't change the financial structure. Read
+     * from the sync binding on every write, so it holds offline and switches the moment the phone joins or leaves.
+     */
+    private val structureAccess = com.lucento.app.data.repository.StructureAccess { syncPreferences.sharedSpaceOwnerId() == null }
+
     val wallets: WalletRepository by lazy {
         WalletRepository(
             dao = database.walletDao(),
@@ -159,22 +165,24 @@ class AppContainer(application: Application) {
             scheduleCount = { id -> database.recurringDao().countForWallet(id) },
             debtTerms = database.debtTermsDao(),
             runner = runner,
+            access = structureAccess,
         )
     }
     val institutions: com.lucento.app.core.banks.InstitutionRepository by lazy {
         com.lucento.app.core.banks.InstitutionRepository { application.assets.open("banks/institutions.json").bufferedReader().use { it.readText() } }
     }
-    val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao(), runner = runner) }
+    val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao(), runner = runner, access = structureAccess) }
     val transactions: TransactionRepository by lazy {
         TransactionRepository(
             database.transactionDao(), database.walletDao(), database.categoryDao(), runner = runner,
             shareScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            actor = { auth.signedInUserIdNow() },
         )
     }
-    val budgets: BudgetRepository by lazy { BudgetRepository(database.budgetDao(), database.categoryDao(), runner = runner) }
-    val goals: GoalRepository by lazy { GoalRepository(database.goalDao()) }
+    val budgets: BudgetRepository by lazy { BudgetRepository(database.budgetDao(), database.categoryDao(), runner = runner, access = structureAccess) }
+    val goals: GoalRepository by lazy { GoalRepository(database.goalDao(), access = structureAccess) }
     val recurring: RecurringRepository by lazy {
-        RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner)
+        RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner, access = structureAccess)
     }
 
     // --- optional cloud sync (see docs/SYNC.md); every value here is safe to hold even when unconfigured ---
@@ -240,6 +248,8 @@ class AppContainer(application: Application) {
             recurring = database.recurringDao(),
             debtTerms = database.debtTermsDao(),
             transact = { block -> runner.run { block() } },
+            // Lucento Shared: this phone's Partner membership is gone — the shared ledger leaves the phone.
+            onMembershipRevoked = { ownerId -> sharedSpace.endedByOwner(ownerId) },
         )
     }
 
@@ -276,6 +286,45 @@ class AppContainer(application: Application) {
                 profilePhotos.delete()
             },
             accountSetup = preferences,
+            clearTablesUnseeded = { com.lucento.app.data.local.clearLedgerTables(database, seed = false) },
+            deleteLedgerPhotos = { photos.deleteAll() },
+            // Same DataStore file as sharedSpace's store (preferencesDataStore is one instance per process).
+            forgetAccount = { com.lucento.app.data.sharedspace.DataStoreSharedSpaceStore(application).clearAll() },
+        )
+    }
+
+    /** Lucento Shared (docs/shared): one Owner's financial environment shared with a Partner. */
+    val sharedSpace: com.lucento.app.data.sharedspace.SharedSpaceRepository by lazy {
+        com.lucento.app.data.sharedspace.SharedSpaceRepository(
+            remote = supabaseClient?.let { com.lucento.app.data.sharedspace.SupabaseSharedSpaceRemote(it) },
+            store = com.lucento.app.data.sharedspace.DataStoreSharedSpaceStore(application),
+            partnerOf = syncPreferences.sharedSpaceOwner,
+            readPartnerOf = syncPreferences::sharedSpaceOwnerId,
+            signedInUserId = auth.observeUserId(),
+            transitions = object : com.lucento.app.data.sharedspace.LedgerTransitions {
+                override suspend fun joinSpace(ownerId: String) {
+                    // The same order as a sign-out wipe: a durable marker first, background sync stopped, then the
+                    // ledger replaced under the sync lock. Sync comes back on bound to the space.
+                    check(ledgerReset.markPending()) { "Could not record the ledger switch" }
+                    SyncScheduler.cancelPeriodic(application)
+                    syncPreferences.setEnabled(false)
+                    SyncFlight.exclusive { ledgerReset.switchToSharedSpace(bind = { syncPreferences.setSharedSpaceOwnerId(ownerId) }) }
+                    syncPreferences.setEnabled(true)
+                    SyncScheduler.ensurePeriodic(application)
+                }
+
+                override suspend fun returnToOwnLedger() {
+                    check(ledgerReset.markPending()) { "Could not record the ledger switch" }
+                    SyncScheduler.cancelPeriodic(application)
+                    syncPreferences.setEnabled(false)
+                    SyncFlight.exclusive { ledgerReset.returnToOwnLedger() }
+                }
+
+                override suspend fun sync() = syncRepository.sync()
+
+                override suspend fun hasUnsyncedChanges() = syncRepository.hasUnsyncedChanges()
+            },
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
         )
     }
 

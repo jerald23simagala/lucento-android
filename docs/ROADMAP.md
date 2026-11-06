@@ -164,6 +164,15 @@ recurring-schedule sync, syncing preferences.
   landscape). Gates: `ThemeContrastTest` (every theme × mode),
   `ThemeInvarianceTest`, `DataSeriesTest`. Follow-ups: NEXT_TASKS TS-1…TS-7. Details: docs/DESIGN.md › Themes.
 
+## Built, awaiting product testing — Lucento Shared (2026-11-05, `feature/lucento-shared`, uncommitted)
+- One Owner's ledger shared with a Partner on their own account. The Partner has full transaction collaboration; the
+  Owner keeps the structure. The design supports several Partners but is limited to one (`max_partners`); there is no
+  billing. Invitations go through the share sheet, and the database stamps who added and edited each transaction.
+  Wallets carry Shared / personal labels. The Partner's own data comes back when they leave or are removed.
+- Room v12; two additive Supabase migrations, verified on Postgres 17 (`tools/sql-verify`, 69/69) and **applied to
+  `lucento-test`** (owner, 2026-11-05); production after the two-device test (NEXT_TASKS OT-8, OT-9). Docs: docs/shared/ (start with SECURITY_MODEL.md and
+  TWO_DEVICE_TEST.md). Follow-ups: NEXT_TASKS LS-1…LS-6.
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).

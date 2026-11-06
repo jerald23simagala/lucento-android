@@ -13,6 +13,7 @@ import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletBalanceCalculator
 import com.lucento.app.domain.WalletChangePolicy
 import com.lucento.app.domain.WalletChangeViolation
+import com.lucento.app.domain.WalletClassification
 import com.lucento.app.domain.WalletType
 import com.lucento.app.domain.WalletUsage
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +30,8 @@ class WalletRepository(
     /** Debt terms of cards and loans; null in tests that don't need them. */
     private val debtTerms: DebtTermsDao? = null,
     private val runner: TransactionRunner = TransactionRunner.Direct,
+    /** Lucento Shared: false on a Partner's phone, where wallets are the Owner's to change ([StructureAccess]). */
+    private val access: StructureAccess = StructureAccess.Always,
 ) {
 
     sealed interface SaveResult {
@@ -41,6 +44,8 @@ class WalletRepository(
         /** Can't switch between an asset and a liability type while anything uses the wallet. */
         data class TypeLocked(val usage: WalletUsage) : SaveResult
         data object NotFound : SaveResult
+        /** A Partner's phone: wallets are changed by the Shared Space's Owner. Nothing was written. */
+        data object NotPermitted : SaveResult
     }
 
     sealed interface DeleteResult {
@@ -49,6 +54,8 @@ class WalletRepository(
         data class HasTransactions(val count: Int) : DeleteResult
         /** The wallet is used by [count] recurring schedules; they must be removed first. */
         data class HasSchedules(val count: Int) : DeleteResult
+        /** A Partner's phone: wallets are changed by the Shared Space's Owner. Nothing was removed. */
+        data object NotPermitted : DeleteResult
     }
 
     /** Active wallets with balances derived from opening balance plus transactions, and any debt terms. */
@@ -68,7 +75,9 @@ class WalletRepository(
         openingBalance: Money,
         debt: DebtTerms? = null,
         institutionId: String? = null,
+        classification: WalletClassification? = null,
     ): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = 0)?.let { return it }
         val now = clock()
@@ -84,11 +93,24 @@ class WalletRepository(
                     updatedAt = now,
                     clientUuid = UUID.randomUUID().toString(),
                     institutionId = institutionId?.takeIf(::isInstitutionId),
+                    classification = classification?.name,
                 )
             )
             writeTerms(id, type, debt, now)
             SaveResult.Saved(id)
         }
+    }
+
+    /**
+     * Lucento Shared: labels a wallet Shared, the Owner's or a Partner's (an organizational label, never an access rule).
+     * Bumps updated_at, so the label syncs like any other wallet edit.
+     */
+    suspend fun setClassification(id: Long, classification: WalletClassification): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
+        val existing = dao.getById(id) ?: return SaveResult.NotFound
+        if (existing.classification == classification.name) return SaveResult.Saved(id)
+        dao.update(existing.copy(classification = classification.name, updatedAt = clock()))
+        return SaveResult.Saved(id)
     }
 
     /** Updates a wallet and keeps its institution as it is (callers that don't edit it). */
@@ -107,6 +129,7 @@ class WalletRepository(
         debt: DebtTerms?,
         institutionId: String?,
     ): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         val existing = dao.getById(id) ?: return SaveResult.NotFound
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = id)?.let { return it }
@@ -175,6 +198,7 @@ class WalletRepository(
 
     /** Refuses to delete a wallet that still has transactions so financial history is never lost silently. */
     suspend fun delete(id: Long): DeleteResult {
+        if (!access.canManageStructure()) return DeleteResult.NotPermitted
         val count = transactionDao.countForWallet(id)
         if (count > 0) return DeleteResult.HasTransactions(count)
         val schedules = scheduleCount?.invoke(id) ?: 0
@@ -212,6 +236,7 @@ internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null, terms: DebtTerms
         openingBalance = opening,
         institutionId = institutionId,
         debt = terms?.takeIf { walletType.hasTerms }?.toDomain(currencyCode),
+        classification = WalletClassification.fromKey(classification),
     )
 }
 

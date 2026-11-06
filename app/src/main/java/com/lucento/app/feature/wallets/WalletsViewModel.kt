@@ -204,7 +204,7 @@ class WalletsViewModel(
                     WalletRepository.SaveResult.NegativeBalance -> DraftError.AmountInvalid
                     is WalletRepository.SaveResult.CurrencyLocked -> DraftError.CurrencyLocked(result.usage)
                     is WalletRepository.SaveResult.TypeLocked -> DraftError.TypeLocked(result.usage)
-                    WalletRepository.SaveResult.NotFound -> DraftError.NotFound
+                    WalletRepository.SaveResult.NotFound, WalletRepository.SaveResult.NotPermitted -> DraftError.NotFound
                 },
                 (result as? WalletRepository.SaveResult.Saved)?.id,
             )
@@ -275,6 +275,11 @@ class WalletsViewModel(
     }
 
     /** Deletes an empty wallet; [onResult] says whether it was deleted or what still uses it. */
+    /** Lucento Shared: the Owner labels a wallet Shared, theirs or their Partner's (an organizational label). */
+    fun setClassification(id: Long, classification: com.lucento.app.domain.WalletClassification) {
+        viewModelScope.launch { wallets.setClassification(id, classification) }
+    }
+
     fun delete(id: Long, onResult: (WalletRepository.DeleteResult) -> Unit) {
         viewModelScope.launch { onResult(wallets.delete(id)) }
     }

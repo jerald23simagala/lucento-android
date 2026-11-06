@@ -60,6 +60,8 @@ data class Wallet(
     val debt: DebtTerms? = null,
     /** Bundled institution registry id (e.g. "ph_bdo") for the wallet's logo and card face; display only. */
     val institutionId: String? = null,
+    /** Lucento Shared: whose wallet it is (an organizational label); null = never classified, read as Shared in a space. */
+    val classification: WalletClassification? = null,
 ) {
     val currencyCode: String get() = balance.currencyCode
 

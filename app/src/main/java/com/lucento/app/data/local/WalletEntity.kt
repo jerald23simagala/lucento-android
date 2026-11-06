@@ -40,6 +40,11 @@ data class WalletEntity(
      * wallet before v10, cash, or a bank not in the registry). Never inferred from the wallet's name.
      */
     @ColumnInfo(name = "institution_id") val institutionId: String? = null,
+    /**
+     * v12, Lucento Shared: [com.lucento.app.domain.WalletClassification] name (Shared / the Owner's / a Partner's), set by
+     * the Owner. An organizational label only. Null = never classified (every wallet before v12).
+     */
+    @ColumnInfo(name = "classification") val classification: String? = null,
 )
 
 /** Money can be posted to this wallet: it is active and not a manually valued asset (see WalletType.isValuedManually). */

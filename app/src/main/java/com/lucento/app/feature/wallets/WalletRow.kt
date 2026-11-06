@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -21,6 +22,8 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,7 +78,7 @@ fun WalletRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                listOfNotNull(wallet.institution()?.name, wallet.type.label, wallet.currencyCode).joinToString(" · "),
+                listOfNotNull(walletOwnership(wallet), wallet.institution()?.name, wallet.type.label, wallet.currencyCode).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -134,6 +137,70 @@ private fun BalanceFlagIcon(flag: BalanceFlag) {
                 tint = LucentoTheme.extendedColors.warning,
                 modifier = Modifier.size(20.dp),
             )
+        }
+    }
+}
+
+/**
+ * Lucento Shared: whose wallet it is, in words — "Shared", "Yours", or a person's ("Olivia’s"). An organizational label
+ * only: everyone in the space sees every wallet. Null outside a Shared Space, where nothing is shown.
+ */
+@Composable
+fun walletOwnership(wallet: Wallet): String? {
+    val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
+    if (!access.inSpace) return null
+    return when (wallet.classification) {
+        null, com.lucento.app.domain.WalletClassification.SHARED -> "Shared"
+        com.lucento.app.domain.WalletClassification.OWNER ->
+            if (access.role == com.lucento.app.domain.SpaceRole.OWNER) "Yours" else "${access.ownerDisplay}’s"
+        com.lucento.app.domain.WalletClassification.PARTNER ->
+            if (access.isPartner) "Yours" else "${access.partnerName ?: "Your partner"}’s"
+    }
+}
+
+/**
+ * Lucento Shared: "Belongs to: Shared" under a wallet. The Owner can change it (Shared, theirs, their Partner's); a
+ * Partner reads it. It never changes who can see or use the wallet. Nothing is shown outside a Shared Space.
+ */
+@Composable
+fun WalletOwnershipRow(wallet: Wallet, onChange: (com.lucento.app.domain.WalletClassification) -> Unit) {
+    val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
+    val current = walletOwnership(wallet) ?: return
+    var open by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val canChange = access.canManageStructure
+    androidx.compose.foundation.layout.Box(Modifier.padding(top = Spacing.sm)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Sizes.minTouch)
+                .let { if (canChange) it.clickable(role = Role.Button, onClickLabel = "Change who it belongs to") { open = true } else it }
+                .padding(horizontal = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.Icon(
+                Icons.Outlined.Group,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(Sizes.icon),
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Text("Belongs to", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(current, style = MaterialTheme.typography.labelLarge, color = if (canChange) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf(
+                com.lucento.app.domain.WalletClassification.SHARED to "Shared",
+                com.lucento.app.domain.WalletClassification.OWNER to "Yours",
+                com.lucento.app.domain.WalletClassification.PARTNER to "${access.partnerName ?: "Your partner"}’s",
+            ).forEach { (value, label) ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        open = false
+                        onChange(value)
+                    },
+                )
+            }
         }
     }
 }

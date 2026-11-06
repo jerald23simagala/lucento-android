@@ -15,6 +15,8 @@ class CategoryRepository(
     private val dao: CategoryDao,
     private val clock: () -> Long = System::currentTimeMillis,
     private val runner: TransactionRunner = TransactionRunner.Direct,
+    /** Lucento Shared: false on a Partner's phone, where categories are the Owner's to change ([StructureAccess]). */
+    private val access: StructureAccess = StructureAccess.Always,
 ) {
 
     sealed interface SaveResult {
@@ -22,6 +24,8 @@ class CategoryRepository(
         data object BlankName : SaveResult
         data object DuplicateName : SaveResult
         data object NotFound : SaveResult
+        /** A Partner's phone: categories are changed by the Shared Space's Owner. Nothing was written. */
+        data object NotPermitted : SaveResult
     }
 
     sealed interface DeleteResult {
@@ -32,12 +36,15 @@ class CategoryRepository(
          */
         data class Archived(val usage: CategoryUsage) : DeleteResult
         data object NotFound : DeleteResult
+        /** A Partner's phone: categories are changed by the Shared Space's Owner. Nothing was removed. */
+        data object NotPermitted : DeleteResult
     }
 
     /** All categories including archived ones (needed to label old transactions). */
     fun observeCategories(): Flow<List<Category>> = dao.observeAll().map { list -> list.map { it.toDomain() } }
 
     suspend fun create(name: String, kind: CategoryKind, iconKey: String = "other"): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         val trimmed = name.trim().take(MAX_NAME)
         if (trimmed.isEmpty()) return SaveResult.BlankName
         if (dao.countActiveWithName(kind.name, trimmed, excludeId = 0) > 0) return SaveResult.DuplicateName
@@ -57,6 +64,7 @@ class CategoryRepository(
     }
 
     suspend fun rename(id: Long, name: String): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         val existing = dao.getById(id) ?: return SaveResult.NotFound
         val trimmed = name.trim().take(MAX_NAME)
         if (trimmed.isEmpty()) return SaveResult.BlankName
@@ -80,6 +88,7 @@ class CategoryRepository(
      * would cascade-delete its budgets and silently uncategorise schedules, so that path does not exist.
      */
     suspend fun remove(id: Long): DeleteResult {
+        if (!access.canManageStructure()) return DeleteResult.NotPermitted
         val existing = dao.getById(id) ?: return DeleteResult.NotFound
         val usage = usage(id)
         return if (usage.isUsed) {
@@ -98,6 +107,9 @@ class CategoryRepository(
     suspend fun ensure(name: String, kind: CategoryKind, iconKey: String): Long? = runner.run {
         val same = dao.getAll().filter { it.kind == kind.name && it.name.equals(name, ignoreCase = true) }
         same.firstOrNull { !it.archived }?.let { return@run it.id }
+        // A Partner's phone only finds one: a category it created could never reach the server, and a transaction
+        // pointing at it would then never upload either.
+        if (!access.canManageStructure()) return@run null
         same.firstOrNull()?.let { archived ->
             dao.update(archived.copy(archived = false, updatedAt = clock()))
             return@run archived.id
@@ -107,6 +119,7 @@ class CategoryRepository(
 
     /** Brings an archived category back. Refused (DuplicateName) when an active category already has its name. */
     suspend fun restore(id: Long): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         val existing = dao.getById(id) ?: return SaveResult.NotFound
         if (!existing.archived) return SaveResult.Saved(id)
         if (dao.countActiveWithName(existing.kind, existing.name, excludeId = id) > 0) return SaveResult.DuplicateName
@@ -131,6 +144,7 @@ class CategoryRepository(
         choices: List<CategorySelection.Choice>,
         keepAccountCategories: Boolean = false,
     ): SelectionResult = runner.run {
+        if (!access.canManageStructure()) return@run SelectionResult(created = 0, restored = 0, archived = 0, deleted = 0)
         val rows = dao.getAll()
         val existing = rows.map { it.toDomain() }
         val plan: CategorySelectionPlan = CategorySelection.plan(existing, choices)
@@ -146,7 +160,7 @@ class CategoryRepository(
             when (remove(id)) {
                 is DeleteResult.Archived -> archived++
                 DeleteResult.Deleted -> deleted++
-                DeleteResult.NotFound -> Unit
+                DeleteResult.NotFound, DeleteResult.NotPermitted -> Unit
             }
         }
         var created = 0
@@ -161,6 +175,7 @@ class CategoryRepository(
      * sort orders with its neighbour. Ids and history are unchanged.
      */
     suspend fun move(id: Long, delta: Int): Boolean = runner.run {
+        if (!access.canManageStructure()) return@run false
         val target = dao.getById(id) ?: return@run false
         val siblings = dao.getAll().filter { it.kind == target.kind && !it.archived }
             .sortedWith(compareBy<CategoryEntity> { it.sortOrder }.thenBy { it.id })

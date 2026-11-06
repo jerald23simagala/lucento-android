@@ -24,6 +24,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -75,6 +76,11 @@ class SyncRepository(
      * pushed) — never in between, where the pulled copy would silently replace it. Tests run it inline.
      */
     private val transact: suspend (suspend () -> Unit) -> Unit = { it() },
+    /**
+     * Lucento Shared: called with the Owner's id once a cycle finds this phone's Partner membership gone, after the sync
+     * lock is released (the shared ledger is then removed from the phone; see SharedSpaceRepository.endedByOwner).
+     */
+    private val onMembershipRevoked: suspend (String) -> Unit = {},
 ) {
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
@@ -93,10 +99,15 @@ class SyncRepository(
     /** True while this process is syncing (P2-2: the "Syncing" state). Not persisted; another process's sync isn't shown. */
     val running: kotlinx.coroutines.flow.StateFlow<Boolean> = _running
 
-    suspend fun sync(): SyncResult = try {
-        cycle()
-    } catch (e: SyncFlight.Busy) {
-        fail(e)
+    suspend fun sync(): SyncResult {
+        val result = try {
+            cycle()
+        } catch (e: SyncFlight.Busy) {
+            fail(e)
+        }
+        // Outside the cycle: the lock is free again, and removing the ledger takes it (SyncFlight isn't reentrant).
+        if (result is SyncResult.MembershipRevoked) onMembershipRevoked(result.spaceOwnerId)
+        return result
     }
 
     private suspend fun cycle(): SyncResult = SyncFlight.exclusive {
@@ -129,62 +140,64 @@ class SyncRepository(
             return SyncResult.AccountMismatch
         }
 
+        // Lucento Shared (docs/shared/ARCHITECTURE_PROPOSAL.md): a Partner's phone syncs the Owner's environment — every
+        // row keeps the Owner's id as user_id — under the Partner's own sign-in. Its membership is checked first, every
+        // cycle: once it is gone the database refuses this account, and nothing is pushed or pulled.
+        val spaceOwner = preferences.sharedSpaceOwnerId()
+        if (spaceOwner != null) {
+            val member = try {
+                r.partnerSpaceOwnerId()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return fail(e)
+            }
+            if (member != spaceOwner) return SyncResult.MembershipRevoked(spaceOwner)
+        }
+        val env = spaceOwner ?: userId
+        val partner = spaceOwner != null
+
         return try {
             // First sign-in into an account that already has data: pull first, so the account's own categories are
             // here, then drop this phone's unused preset copies. Only then upload (QA R6-14). This stays pending until
             // that pull has finished, so a first sync that fails half-way pulls first again on the retry (P0-2).
-            val initialPullDone = initialPullDone(owner, userId)
-            val firstIntoExisting = !initialPullDone && remoteHasData(r, userId)
+            val initialPullDone = initialPullDone(owner, userId, env)
+            val firstIntoExisting = !initialPullDone && remoteHasData(r, env)
             // Claimed before anything is pulled or pushed, and never moved later: a half-finished pull must still mark
             // this phone as the account's, so a different account signing in next is wiped first (AccountBoundary).
             if (owner == null) preferences.setSyncedUserId(userId)
             var report = SyncReport()
             if (firstIntoExisting) {
-                report += pull(r, userId, Rejected())
+                report += pull(r, env, Rejected())
                 dropUnusedLocalCategories()
             }
-            if (!initialPullDone) preferences.setInitialPullDoneFor(userId)
-            assignMissingCategoryIds(userId)
+            if (!initialPullDone) preferences.setInitialPullDoneFor(env)
+            assignMissingCategoryIds(env)
 
             val rejected = Rejected()
-            report += pushTombstones(r, userId, rejected)
-            report += pushWallets(r, userId, rejected)
-            report += pushCategories(r, userId, rejected)
-            report += pushBudgets(r, userId, rejected)
-            report += pushTransactions(r, userId, rejected)
-            report += pushRecurring(r, userId, rejected)
-            report += pushGoals(r, userId, rejected)
-            report += pushGoalContributions(r, userId, rejected)
+            report += pushAll(r, env, rejected, partner)
 
-            val pulled = pull(r, userId, rejected)
+            val pulled = pull(r, env, rejected)
             report += pulled
             // A same-moment local edit was kept and nudged later; send it now so this cycle converges.
-            if (pulled.pendingKept > 0) {
-                val again = Rejected()
-                report += pushTombstones(r, userId, again)
-                report += pushWallets(r, userId, again)
-                report += pushCategories(r, userId, again)
-                report += pushBudgets(r, userId, again)
-                report += pushTransactions(r, userId, again)
-                report += pushRecurring(r, userId, again)
-                report += pushGoals(r, userId, again)
-                report += pushGoalContributions(r, userId, again)
-            }
+            if (pulled.pendingKept > 0) report += pushAll(r, env, Rejected(), partner)
+            // The folds below rewrite categories and budgets: the Owner's phones do them and a Partner's phone pulls the
+            // result (a Partner may not change either, and would only collect changes it can never upload).
             // Copies of one category from two setups on this account fold into one; the merge's edits go up now.
-            if (mergeDuplicateCategories() > 0) {
+            if (!partner && mergeDuplicateCategories() > 0) {
                 val again = Rejected()
-                report += pushTombstones(r, userId, again)
-                report += pushBudgets(r, userId, again)
-                report += pushTransactions(r, userId, again)
-                report += pushRecurring(r, userId, again)
+                report += pushTombstones(r, env, again)
+                report += pushBudgets(r, env, again)
+                report += pushTransactions(r, env, again)
+                report += pushRecurring(r, env, again)
             }
             // Two phones that each set an amount for the same category and currency: one row is kept everywhere.
-            val budgetFold = mergeDuplicateBudgets()
+            val budgetFold = if (partner) BudgetFold(0, 0) else mergeDuplicateBudgets()
             if (budgetFold.removed > 0) {
                 report += SyncReport(overridden = budgetFold.changedHere)
                 val again = Rejected()
-                report += pushTombstones(r, userId, again)
-                report += pushBudgets(r, userId, again)
+                report += pushTombstones(r, env, again)
+                report += pushBudgets(r, env, again)
             }
             preferences.setLastSyncedAtMillis(clock())
             preferences.clearLastError()
@@ -211,18 +224,26 @@ class SyncRepository(
     private class Rejected {
         val ids = mutableMapOf<String, MutableSet<String>>()
         fun add(table: String, id: String) = ids.getOrPut(table) { mutableSetOf() }.add(id)
+
+        /**
+         * Lucento Shared: rows a Partner's phone holds changes to but may not upload. The server's copy replaces the local
+         * one whatever its edit time, so the phone matches what everyone else sees.
+         */
+        val forced = mutableMapOf<String, MutableSet<String>>()
+        fun force(table: String, id: String) = forced.getOrPut(table) { mutableSetOf() }.add(id)
     }
 
     /**
-     * Whether this account's first pull has finished here. Builds before P0-2 kept no such marker: for them a phone that
-     * already completed a full sync with this account ([SyncPreferencesStore.lastSyncedAtMillis] set) counts as done,
-     * and the marker is written so the question isn't asked again; one whose first sync never finished pulls first.
+     * Whether the first pull of environment [env] (the account's own, or a Shared Space this phone holds as a Partner)
+     * has finished here. Builds before P0-2 kept no such marker: for them a phone that already completed a full sync
+     * with this account ([SyncPreferencesStore.lastSyncedAtMillis] set) counts as done, and the marker is written so the
+     * question isn't asked again; one whose first sync never finished pulls first.
      */
-    private suspend fun initialPullDone(owner: String?, userId: String): Boolean {
+    private suspend fun initialPullDone(owner: String?, userId: String, env: String): Boolean {
         val done = preferences.initialPullDoneFor()
-        if (done != null) return done == userId
-        val legacyDone = owner == userId && preferences.lastSyncedAtMillis() != null
-        if (legacyDone) preferences.setInitialPullDoneFor(userId)
+        if (done != null) return done == env
+        val legacyDone = env == userId && owner == userId && preferences.lastSyncedAtMillis() != null
+        if (legacyDone) preferences.setInitialPullDoneFor(env)
         return legacyDone
     }
 
@@ -402,7 +423,51 @@ class SyncRepository(
 
     // --- push ---
 
-    private suspend fun pushTombstones(r: SyncRemote, userId: String, rejected: Rejected): SyncReport {
+    /** Every pending change, parents first — or, on a Partner's phone, only what a Partner may upload. */
+    private suspend fun pushAll(r: SyncRemote, env: String, rejected: Rejected, partner: Boolean): SyncReport {
+        if (partner) return pushAsPartner(r, env, rejected)
+        var report = SyncReport()
+        report += pushTombstones(r, env, rejected)
+        report += pushWallets(r, env, rejected)
+        report += pushCategories(r, env, rejected)
+        report += pushBudgets(r, env, rejected)
+        report += pushTransactions(r, env, rejected)
+        report += pushRecurring(r, env, rejected)
+        report += pushGoals(r, env, rejected)
+        report += pushGoalContributions(r, env, rejected)
+        return report
+    }
+
+    /**
+     * Lucento Shared, a Partner's phone: only transactions and their deletions go up. The database accepts nothing else
+     * from a Partner, and one refused row fails its whole batch, so nothing else is ever sent. A pending change to anything
+     * else (the app doesn't offer one; this is the safety net) is replaced by the server's copy during the pull, and a
+     * deletion of it — normally the echo of a delete pulled from the Owner — is checked against the server's copy too.
+     */
+    private suspend fun pushAsPartner(r: SyncRemote, env: String, rejected: Rejected): SyncReport {
+        var report = pushTombstones(r, env, rejected, uploadable = PARTNER_TABLES)
+        report += pushTransactions(r, env, rejected)
+        var notPermitted = 0
+        fun force(table: String, ids: List<String?>) = ids.filterNotNull().forEach {
+            rejected.force(table, it)
+            notPermitted++
+        }
+        force("wallets", wallets.getDirty().map { it.clientUuid })
+        force("categories", categories.getDirty().map { it.clientUuid })
+        force("budgets", budgets.getDirty().map { it.clientUuid })
+        force("goals", goals.getDirtyGoals().map { it.clientUuid })
+        force("goal_contributions", goals.getDirtyContributions().map { it.clientUuid })
+        recurring?.let { dao -> force("recurring", dao.getDirty().map { it.clientUuid }) }
+        return report + SyncReport(notPermitted = notPermitted)
+    }
+
+    private suspend fun pushTombstones(
+        r: SyncRemote,
+        userId: String,
+        rejected: Rejected,
+        /** Tables whose deletions may be uploaded; a deletion of any other is settled from the server's copy instead. */
+        uploadable: Set<String>? = null,
+    ): SyncReport {
         val pending = syncMeta.unpushedTombstones()
         if (pending.isEmpty()) return SyncReport()
         val byTable = pending.groupBy { it.tableName }
@@ -410,6 +475,13 @@ class SyncRepository(
         var accepted = 0
         CHILD_FIRST.forEach { table ->
             byTable[table].orEmpty().forEach { t ->
+                if (uploadable != null && table !in uploadable) {
+                    // Never sent. The pull fetches the row by id: already deleted there (the usual case, a remote delete
+                    // applied here) changes nothing; still live there brings it back.
+                    rejected.force(table, t.clientUuid)
+                    done += t.id
+                    return@forEach
+                }
                 // The delete's time is when the user deleted, not when it is uploaded: an offline delete pushed later must
                 // still lose to an edit made elsewhere after it (D3 "newer action wins"; device sync QA C-2).
                 if (r.softDelete(table, userId, t.clientUuid, t.baseRevision, SyncTime.toIso(t.deletedAt))) {
@@ -464,9 +536,13 @@ class SyncRepository(
         val dirty = wallets.getDirty().filter { it.clientUuid != null }
         // A debt's terms ride on its wallet row; WalletRepository bumps the wallet's updated_at whenever they change.
         val terms = dirty.associate { it.id to debtTerms?.get(it.id) }
+        // Lucento Shared: one bulk upsert must give every row the same keys — a key one row lacks is written as null for
+        // it — so a batch carries `classification` on every wallet (null included) only when one of them is classified.
+        // Otherwise it sends none: exactly what v11 sent, and the server keeps a label another phone set.
+        val withClassification = dirty.any { it.classification != null }
         return pushRows(r, "wallets", dirty, { it.clientUuid!! }, {
             val t = terms[it.id]
-            encode(WalletRow.serializer(), WalletRow(
+            val json = encode(WalletRow.serializer(), WalletRow(
                 id = it.clientUuid!!, userId = userId, name = it.name, type = it.type,
                 currencyCode = it.currencyCode, openingBalanceMinor = it.openingBalanceMinor,
                 sortOrder = it.sortOrder, archived = it.archived,
@@ -475,6 +551,11 @@ class SyncRepository(
                 installmentMinor = t?.installmentMinor, institutionId = it.institutionId,
                 creditLimitMinor = t?.creditLimitMinor, statementDay = t?.statementDay, dueDay = t?.dueDay,
             ))
+            if (withClassification) {
+                JsonObject(json + (CLASSIFICATION to (it.classification?.let(::JsonPrimitive) ?: JsonNull)))
+            } else {
+                json
+            }
         }, { row, rev -> wallets.markPushed(row.clientUuid!!, row.updatedAt, rev, clock()) }, rejected)
     }
 
@@ -633,6 +714,12 @@ class SyncRepository(
                     transact { applyPulled(table, row, state, serverWins = true) }
                 }
             }
+            // Lucento Shared: changes a Partner's phone may not upload give way to the server's copy, whatever their time.
+            rejected.forced[table]?.takeIf { it.isNotEmpty() }?.let { ids ->
+                r.fetchByIds(table, userId, ids.toList()).forEach { row ->
+                    transact { applyPulled(table, row, state, serverWins = true, force = true) }
+                }
+            }
             var after: SyncRemote.PageKey? = null
             while (true) {
                 val page = r.fetchPage(table, userId, sinceIso, after, pageSize)
@@ -683,9 +770,10 @@ class SyncRepository(
 
     /**
      * Applies one pulled row. With [serverWins] (the server refused this device's write) the server copy wins,
-     * except a pending local edit that is not older than that copy — a same-moment edit is not overwritten.
+     * except a pending local edit that is not older than that copy — a same-moment edit is not overwritten. With [force]
+     * (Lucento Shared: a change a Partner's phone may not upload) the server copy wins outright.
      */
-    private suspend fun applyPulled(table: String, json: JsonObject, s: PullState, serverWins: Boolean) {
+    private suspend fun applyPulled(table: String, json: JsonObject, s: PullState, serverWins: Boolean, force: Boolean = false) {
         // P2-9: a row that breaks the record rules is skipped, never reinterpreted (e.g. an unknown type as an expense).
         if (PulledRowRules.problem(table, json) != null) {
             s.invalidSkipped++
@@ -693,6 +781,7 @@ class SyncRepository(
         }
         val revision = json.revisionOrNull()
         fun decide(localExists: Boolean, dirty: Boolean, base: Long?, updatedAt: Long, remoteUpdatedAtIso: String): PullDecision {
+            if (force) return if (localExists) PullDecision.UPDATE else PullDecision.INSERT
             val remoteAt = SyncTime.fromIso(remoteUpdatedAtIso)
             val decision = when {
                 serverWins && localExists && dirty && protectsPendingEdit(base, updatedAt, revision, remoteAt) -> PullDecision.KEEP_LOCAL
@@ -703,6 +792,9 @@ class SyncRepository(
             if (overridesLocalChange(decision, serverWins, localExists, dirty, base)) s.overridden++
             return decision
         }
+        /** A pending local edit the rule keeps (never under [force]). */
+        suspend fun keep(dirty: Boolean, base: Long?, updatedAt: Long, remoteUpdatedAtIso: String, bump: suspend (Long) -> Unit): Boolean =
+            !force && holdPending(dirty, base, updatedAt, revision, remoteUpdatedAtIso, s, bump)
         when (table) {
             "wallets" -> {
                 val row = decode(WalletRow.serializer(), json)
@@ -714,13 +806,13 @@ class SyncRepository(
                 val walletId = when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> wallets.insert(row.toEntity(syncedAt = clock()))
                     PullDecision.UPDATE -> {
-                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null && keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             wallets.update(local.copy(updatedAt = at, dirty = true))
                         }) return
                         local!!.id.also { wallets.update(row.toEntity(syncedAt = freshSyncedAt(local.syncedAt), id = it)) }
                     }
                     PullDecision.KEEP_LOCAL -> {
-                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null) keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             wallets.update(local.copy(updatedAt = at, dirty = true))
                         }
                         return
@@ -740,13 +832,13 @@ class SyncRepository(
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> categories.insert(row.toEntity(syncedAt = clock()))
                     PullDecision.UPDATE -> {
-                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null && keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             categories.update(local.copy(updatedAt = at, dirty = true))
                         }) return
                         categories.update(row.toEntity(syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
                     }
                     PullDecision.KEEP_LOCAL -> {
-                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null) keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             categories.update(local.copy(updatedAt = at, dirty = true))
                         }
                         return
@@ -763,13 +855,13 @@ class SyncRepository(
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> budgets.insert(row.toEntity(categoryId, syncedAt = clock()))
                     PullDecision.UPDATE -> {
-                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null && keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             budgets.update(local.copy(updatedAt = at, dirty = true))
                         }) return
                         budgets.update(row.toEntity(categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
                     }
                     PullDecision.KEEP_LOCAL -> {
-                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null) keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             budgets.update(local.copy(updatedAt = at, dirty = true))
                         }
                         return
@@ -787,18 +879,27 @@ class SyncRepository(
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> transactions.insert(row.toEntity(walletId, categoryId, syncedAt = clock()))
                     PullDecision.UPDATE -> {
-                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null && keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             transactions.update(local.copy(updatedAt = at, dirty = true))
                         }) return
                         transactions.update(row.toEntity(walletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
                     }
                     PullDecision.KEEP_LOCAL -> {
-                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null) keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             transactions.update(local.copy(updatedAt = at, dirty = true))
                         }
                         return
                     }
-                    PullDecision.UNCHANGED -> return
+                    PullDecision.UNCHANGED -> {
+                        // Lucento Shared: this phone's own push comes back unchanged, now with the server's attribution.
+                        // Only when the server has the columns (older projects send none), and without marking it dirty.
+                        if (local != null && json.containsKey(CREATED_BY) &&
+                            (local.createdBy != row.createdBy || local.updatedBy != row.updatedBy)
+                        ) {
+                            transactions.updateAttribution(local.id, row.createdBy, row.updatedBy)
+                        }
+                        return
+                    }
                 }
                 s.pulled++
             }
@@ -813,13 +914,13 @@ class SyncRepository(
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> dao.insert(row.toEntity(walletId, toWalletId, categoryId, syncedAt = clock()))
                     PullDecision.UPDATE -> {
-                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null && keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             dao.update(local.copy(updatedAt = at, dirty = true))
                         }) return
                         dao.update(row.toEntity(walletId, toWalletId, categoryId, syncedAt = freshSyncedAt(local!!.syncedAt), id = local.id))
                     }
                     PullDecision.KEEP_LOCAL -> {
-                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null) keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             dao.update(local.copy(updatedAt = at, dirty = true))
                         }
                         return
@@ -841,7 +942,7 @@ class SyncRepository(
                     // photoPath never comes from the cloud — it names a file on the device that chose it.
                     PullDecision.INSERT -> goals.insert(row.toEntity(walletId, photoPath = null, syncedAt = clock()))
                     PullDecision.UPDATE -> {
-                        if (local != null && holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null && keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             goals.update(local.copy(updatedAt = at, dirty = true))
                         }) return
                         goals.update(
@@ -849,7 +950,7 @@ class SyncRepository(
                         )
                     }
                     PullDecision.KEEP_LOCAL -> {
-                        if (local != null) holdPending(local.dirty, local.baseRevision, local.updatedAt, revision, row.updatedAt, s) { at ->
+                        if (local != null) keep(local.dirty, local.baseRevision, local.updatedAt, row.updatedAt) { at ->
                             goals.update(local.copy(updatedAt = at, dirty = true))
                         }
                         return
@@ -1029,6 +1130,11 @@ class SyncRepository(
             "This phone still has another account’s data, so nothing was uploaded. Sign in with that account, or switch accounts to remove it from this phone."
         private val PARENT_FIRST = listOf("wallets", "categories", "budgets", "transactions", "recurring", "goals", "goal_contributions")
         private val CHILD_FIRST = listOf("goal_contributions", "recurring", "transactions", "budgets", "goals", "categories", "wallets")
+
+        /** Lucento Shared: the only table a Partner's phone uploads (supabase/migrations/20261105120000_lucento_shared.sql). */
+        private val PARTNER_TABLES = setOf("transactions")
+        private const val CLASSIFICATION = "classification"
+        private const val CREATED_BY = "created_by"
     }
 }
 
@@ -1046,6 +1152,8 @@ private fun WalletRow.toEntity(syncedAt: Long, id: Long = 0): WalletEntity = Wal
     // Display only: an id this build can't read (another client, a future format) shows the wallet type's look instead
     // of hiding the whole wallet and leaving its transactions without one.
     institutionId = institutionId?.takeIf(::isInstitutionId),
+    // Lucento Shared: a label only; one this version doesn't know reads as unclassified rather than hiding the wallet.
+    classification = classification?.takeIf { it in com.lucento.app.domain.WalletClassification.NAMES },
 )
 
 private fun CategoryRow.toEntity(syncedAt: Long, id: Long = 0): CategoryEntity = CategoryEntity(
@@ -1066,6 +1174,7 @@ private fun TransactionRow.toEntity(localWalletId: Long, localCategoryId: Long?,
         categoryId = localCategoryId, occurredOn = occurredOn, note = note, clientUuid = this.id,
         createdAt = SyncTime.fromIso(createdAt), updatedAt = SyncTime.fromIso(updatedAt), transferGroup = transferGroup,
         dirty = false, syncedAt = syncedAt, baseRevision = revision,
+        createdBy = createdBy, updatedBy = updatedBy,
     )
 
 private fun RecurringRow.toEntity(

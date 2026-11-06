@@ -431,9 +431,24 @@ object Migrations {
         }
     }
 
+    /**
+     * v12 — Lucento Shared (docs/shared). Additive only: `transactions.created_by` / `updated_by` (who added and who last
+     * changed a row, stamped by the server and pulled for display) and `wallets.classification` (Shared / the Owner's /
+     * a Partner's, an organizational label). Every existing row keeps null — unattributed and unclassified — so nothing
+     * changes for anyone outside a Shared Space and nothing re-uploads. The dirty/tombstone triggers already cover these
+     * columns (they watch updated_at and deletes).
+     */
+    val MIGRATION_11_12: Migration = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `created_by` TEXT")
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `updated_by` TEXT")
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `classification` TEXT")
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-        MIGRATION_9_10, MIGRATION_10_11,
+        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
     )
 }
 

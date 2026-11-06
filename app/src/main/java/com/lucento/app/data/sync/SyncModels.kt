@@ -47,6 +47,12 @@ internal data class WalletRow(
     @EncodeDefault @SerialName("credit_limit_minor") val creditLimitMinor: Long? = null,
     @EncodeDefault @SerialName("statement_day") val statementDay: Int? = null,
     @EncodeDefault @SerialName("due_day") val dueDay: Int? = null,
+    /**
+     * v12, Lucento Shared: Shared / the Owner's / a Partner's. Not @EncodeDefault: [SyncRepository] adds the key to every
+     * wallet of a push batch only when one of them is classified, so a phone that never classified anything sends exactly
+     * what v11 sent (and the server keeps whatever another phone set).
+     */
+    val classification: String? = null,
 )
 
 @Serializable
@@ -90,6 +96,12 @@ internal data class TransactionRow(
     val revision: Long? = null,
     /** The revision this push was based on. Always sent, null included, so the server never reuses a stored value. */
     @EncodeDefault @SerialName("base_revision") val baseRevision: Long? = null,
+    /**
+     * v12, Lucento Shared: who added and who last changed the row, stamped by the database from the signed-in session.
+     * Read-only for clients: always null when pushing, so never encoded — the push is exactly what v11 sent.
+     */
+    @SerialName("created_by") val createdBy: String? = null,
+    @SerialName("updated_by") val updatedBy: String? = null,
 )
 
 /** A recurring schedule (v9). Wallet and category ids are the parents' client uuids, like every other row. */
@@ -206,6 +218,11 @@ data class SyncReport(
      * this phone's edit winning, this is exactly what the user is told about.
      */
     val overridden: Int = 0,
+    /**
+     * Lucento Shared, a Partner's phone: pending changes to something only the Owner may change (a wallet, category,
+     * budget, goal or schedule). They are never sent — the database would refuse them — and the Owner's copy replaces them.
+     */
+    val notPermitted: Int = 0,
 ) {
     operator fun plus(other: SyncReport) = SyncReport(
         pushed + other.pushed,
@@ -217,6 +234,7 @@ data class SyncReport(
         pendingKept + other.pendingKept,
         invalidSkipped + other.invalidSkipped,
         overridden + other.overridden,
+        notPermitted + other.notPermitted,
     )
 }
 
@@ -341,6 +359,12 @@ sealed interface SyncResult {
     data object AccountMismatch : SyncResult
     /** Network/server failure; safe to retry later. Nothing local was lost. */
     data class Retryable(val message: String) : SyncResult
+    /**
+     * Lucento Shared: this phone holds the Shared Space of [spaceOwnerId], and the signed-in account is no longer one of
+     * its Partners (removed by the Owner, or left on another phone). Nothing was pushed or pulled; the database already
+     * refuses this account. The shared ledger is removed from the phone next ([SyncRepository]'s revocation callback).
+     */
+    data class MembershipRevoked(val spaceOwnerId: String) : SyncResult
 }
 
 /**

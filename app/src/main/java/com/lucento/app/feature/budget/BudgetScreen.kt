@@ -162,6 +162,9 @@ fun BudgetScreen(
     val isCurrentMonth = monthOffset == 0
     var editing by remember { mutableStateOf<CategoryBudgetLine?>(null) }
     var showAllBudgeted by rememberSaveable { mutableStateOf(false) }
+    // Lucento Shared: a Partner sees the whole budget; the Shared Space's Owner sets the amounts and categories.
+    val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
+    val canEdit = access.canManageStructure
 
     // A finished month kept within the category-based budget is acknowledged once (persisted), never for overspending.
     var celebration by remember { mutableStateOf<Confirmation?>(null) }
@@ -195,8 +198,10 @@ fun BudgetScreen(
                     title = "Budget",
                     onBack = onBack,
                     actions = {
-                        IconButton(onClick = onManageCategories) {
-                            Icon(Icons.Outlined.Category, contentDescription = "Manage categories")
+                        if (canEdit) {
+                            IconButton(onClick = onManageCategories) {
+                                Icon(Icons.Outlined.Category, contentDescription = "Manage categories")
+                            }
                         }
                         ProfileButton()
                     },
@@ -208,13 +213,17 @@ fun BudgetScreen(
             if (state.activeExpense.isEmpty()) {
                 item(key = "finish-setup") {
                     EmptyState(
-                        title = "Finish setting up your budget",
-                        body = "Choose the categories you spend on. Your monthly budget is the sum of the amounts you give them.",
+                        title = if (canEdit) "Finish setting up your budget" else "No budget yet",
+                        body = if (canEdit) {
+                            "Choose the categories you spend on. Your monthly budget is the sum of the amounts you give them."
+                        } else {
+                            "${access.ownerDisplay} hasn’t set up budget categories in this Shared Space yet."
+                        },
                         illustration = { EmptyIllustration(LucentoAnimation.EmptyBudgets) },
-                        action = { LucentoPrimaryButton(text = "Choose categories", onClick = onChooseCategories) },
+                        action = if (canEdit) ({ LucentoPrimaryButton(text = "Choose categories", onClick = onChooseCategories) }) else null,
                     )
                 }
-                if (state.archivedExpense.isNotEmpty()) {
+                if (canEdit && state.archivedExpense.isNotEmpty()) {
                     item(key = "restore-hint") {
                         LucentoTextButton(text = "Restore archived categories", onClick = onManageCategories)
                     }
@@ -245,14 +254,14 @@ fun BudgetScreen(
                 }
             }
 
-            if (!state.categorySetupDone) {
+            if (canEdit && !state.categorySetupDone) {
                 item(key = "personalise") {
                     PersonaliseCard(onChoose = onChooseCategories, onKeep = viewModel::keepCurrentCategories)
                     Spacer(Modifier.height(Spacing.md))
                 }
             }
 
-            plan.legacyOverall?.let { legacy ->
+            plan.legacyOverall?.takeIf { canEdit }?.let { legacy ->
                 item(key = "legacy") {
                     LegacyOverallCard(legacy.limit, plan, onRemove = viewModel::removeLegacyOverall)
                     Spacer(Modifier.height(Spacing.md))
@@ -298,7 +307,7 @@ fun BudgetScreen(
                     val shown = if (folded) lines.take(BUDGETED_FOLD) else lines
                     LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
                         shown.forEachIndexed { index, line ->
-                            AllocationRow(line, onClick = { editing = line })
+                            AllocationRow(line, onClick = if (canEdit) ({ editing = line }) else null)
                             if (index < shown.lastIndex) Hairline(inset = RowTextInset)
                         }
                         if (lines.size > BUDGETED_FOLD + 1) {
@@ -331,7 +340,7 @@ fun BudgetScreen(
                 item(key = "unallocated-card") {
                     LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
                         plan.unallocatedLines.forEachIndexed { index, line ->
-                            UnallocatedRow(line, onClick = { editing = line })
+                            UnallocatedRow(line, onClick = if (canEdit) ({ editing = line }) else null)
                             if (index < plan.unallocatedLines.lastIndex) Hairline(inset = RowTextInset)
                         }
                     }
@@ -340,7 +349,11 @@ fun BudgetScreen(
 
             item(key = "manage") {
                 Spacer(Modifier.height(Spacing.lg))
-                LucentoSecondaryButton(text = "Manage categories", icon = Icons.Outlined.Category, onClick = onManageCategories)
+                if (canEdit) {
+                    LucentoSecondaryButton(text = "Manage categories", icon = Icons.Outlined.Category, onClick = onManageCategories)
+                } else {
+                    com.lucento.app.feature.sharedspace.OwnerManagesNote("budgets and categories")
+                }
                 InfoNote(
                     "Changing an amount affects the month you’re viewing; choose “onward” to change the months after it " +
                         "too. Earlier months always keep their amounts. " +
@@ -585,14 +598,14 @@ private const val BUDGETED_FOLD = 5
 private fun categoryCount(n: Int): String = "$n ${if (n == 1) "category" else "categories"}"
 
 @Composable
-private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
+private fun AllocationRow(line: CategoryBudgetLine, onClick: (() -> Unit)?) {
     val fmt = amountFormat()
     val limit = line.limit ?: return
     val remaining = line.remaining ?: return
     Column(
         Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClickLabel = "Change ${line.category.name} amount", onClick = onClick)
+            .let { if (onClick != null) it.clickable(role = Role.Button, onClickLabel = "Change ${line.category.name} amount", onClick = onClick) else it }
             .padding(horizontal = RowPadding, vertical = Spacing.sm + Spacing.xxs),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -630,13 +643,13 @@ private fun AllocationRow(line: CategoryBudgetLine, onClick: () -> Unit) {
 }
 
 @Composable
-private fun UnallocatedRow(line: CategoryBudgetLine, onClick: () -> Unit) {
+private fun UnallocatedRow(line: CategoryBudgetLine, onClick: (() -> Unit)?) {
     val fmt = amountFormat()
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
-            .clickable(role = Role.Button, onClickLabel = "Set ${line.category.name} amount", onClick = onClick)
+            .let { if (onClick != null) it.clickable(role = Role.Button, onClickLabel = "Set ${line.category.name} amount", onClick = onClick) else it }
             .padding(horizontal = RowPadding, vertical = Spacing.xs + Spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -650,7 +663,7 @@ private fun UnallocatedRow(line: CategoryBudgetLine, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text("Set amount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        if (onClick != null) Text("Set amount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -723,6 +736,7 @@ private fun AllocationSheet(
             BudgetRepository.SaveResult.LimitNotPositive -> error = "The amount must be greater than zero."
             BudgetRepository.SaveResult.InvalidCategory -> error = "This category is archived. Restore it in Manage categories first."
             BudgetRepository.SaveResult.Duplicate, BudgetRepository.SaveResult.NotFound -> close()
+            BudgetRepository.SaveResult.NotPermitted -> error = "Only the Shared Space’s owner can change this."
         }
     }
 

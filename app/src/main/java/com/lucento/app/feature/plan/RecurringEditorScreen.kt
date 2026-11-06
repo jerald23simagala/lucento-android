@@ -526,6 +526,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                         RecurringRepository.SaveResult.InvalidInterval,
                         RecurringRepository.SaveResult.InvalidType,
                         RecurringRepository.SaveResult.NotFound -> "This schedule couldn’t be saved."
+                        RecurringRepository.SaveResult.NotPermitted -> "Only the Shared Space’s owner can change this."
                     }
                     if (error != null) haptics.reject()
                 }

@@ -16,10 +16,14 @@ import java.util.UUID
 class GoalRepository(
     private val dao: GoalDao,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Lucento Shared: false on a Partner's phone, where goals are the Owner's to change ([StructureAccess]). */
+    private val access: StructureAccess = StructureAccess.Always,
 ) {
 
     sealed interface SaveResult {
         data class Saved(val id: Long) : SaveResult
+        /** A Partner's phone: goals are changed by the Shared Space's Owner. Nothing was written. */
+        data object NotPermitted : SaveResult
         data object BlankName : SaveResult
         data object TargetNotPositive : SaveResult
         /** The target currency can't change once contributions exist. */
@@ -29,6 +33,8 @@ class GoalRepository(
 
     sealed interface ContributionResult {
         data object Saved : ContributionResult
+        /** A Partner's phone: goals are changed by the Shared Space's Owner. Nothing was written. */
+        data object NotPermitted : ContributionResult
         data object AmountZero : ContributionResult
         data object CurrencyMismatch : ContributionResult
         /** A withdrawal larger than what has been set aside. */
@@ -39,6 +45,8 @@ class GoalRepository(
 
     sealed interface ArchiveResult {
         data object Archived : ArchiveResult
+        /** A Partner's phone: goals are changed by the Shared Space's Owner. Nothing changed. */
+        data object NotPermitted : ArchiveResult
         /** Only a goal that has reached its target can be archived. */
         data object NotReached : ArchiveResult
         data object NotFound : ArchiveResult
@@ -62,6 +70,7 @@ class GoalRepository(
         sceneKey: String? = null,
         photoPath: String? = null,
     ): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         val scene = GoalIcon.normalizeKey(sceneKey)
         val trimmed = name.trim().take(MAX_NAME)
         if (trimmed.isEmpty()) return SaveResult.BlankName
@@ -111,6 +120,7 @@ class GoalRepository(
         note: String,
         clientUuid: String,
     ): ContributionResult {
+        if (!access.canManageStructure()) return ContributionResult.NotPermitted
         val goal = dao.getById(goalId)?.takeUnless { it.archived } ?: return ContributionResult.GoalNotFound
         if (dao.findContributionByClientUuid(clientUuid) != null) return ContributionResult.Saved
         if (amount.isZero) return ContributionResult.AmountZero
@@ -130,16 +140,21 @@ class GoalRepository(
         return ContributionResult.Saved
     }
 
-    suspend fun deleteContribution(id: Long) = dao.deleteContribution(id)
+    suspend fun deleteContribution(id: Long) {
+        if (access.canManageStructure()) dao.deleteContribution(id)
+    }
 
     /** Deletes a goal and its contribution history. Wallet balances are unaffected (contributions are earmarks). */
-    suspend fun delete(id: Long) = dao.deleteById(id)
+    suspend fun delete(id: Long) {
+        if (access.canManageStructure()) dao.deleteById(id)
+    }
 
     /**
      * Archives a goal that has reached its target: it keeps its history (and syncs) but leaves the active list, the
      * Goals totals and Home's savings card. Archiving an archived goal again is a no-op.
      */
     suspend fun archive(id: Long): ArchiveResult {
+        if (!access.canManageStructure()) return ArchiveResult.NotPermitted
         val existing = dao.getById(id) ?: return ArchiveResult.NotFound
         if (dao.savedMinor(id) < existing.targetMinor) return ArchiveResult.NotReached
         if (!existing.archived) dao.update(existing.copy(archived = true, updatedAt = clock()))
@@ -148,6 +163,7 @@ class GoalRepository(
 
     /** Brings an archived goal back to the active list, history intact. */
     suspend fun restore(id: Long) {
+        if (!access.canManageStructure()) return
         val existing = dao.getById(id) ?: return
         if (existing.archived) dao.update(existing.copy(archived = false, updatedAt = clock()))
     }

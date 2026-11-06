@@ -25,6 +25,11 @@ class TransactionRepository(
     private val runner: TransactionRunner = TransactionRunner.Direct,
     /** The app's scope, so screens share one whole-table query (null in JVM tests: each collector reads directly). */
     private val shareScope: kotlinx.coroutines.CoroutineScope? = null,
+    /**
+     * Lucento Shared: the signed-in account, stamped on rows this phone adds or changes so "Added by" reads right before
+     * the next sync. Display only — the server stamps the same values itself and never takes them from the app.
+     */
+    private val actor: suspend () -> String? = { null },
 ) {
 
     /** Everything needed to create or update a transaction. [clientUuid] makes creation idempotent. */
@@ -118,6 +123,7 @@ class TransactionRepository(
 
         val note = input.note.trim().take(MAX_NOTE)
         val now = clock()
+        val by = actor()
 
         if (input.id == null) {
             // Idempotency: a retry or double-tap carrying the same key returns the original row.
@@ -134,6 +140,7 @@ class TransactionRepository(
                     clientUuid = input.clientUuid,
                     createdAt = now,
                     updatedAt = now,
+                    createdBy = by,
                 )
             }
             return SaveResult.Saved(id)
@@ -151,6 +158,7 @@ class TransactionRepository(
                 occurredOn = input.date.toEpochDay(),
                 note = note,
                 updatedAt = now,
+                updatedBy = by ?: existing.updatedBy,
             )
         )
         return SaveResult.Saved(input.id)
@@ -179,6 +187,7 @@ class TransactionRepository(
         }
         val note = input.note.trim().take(MAX_NOTE)
         val now = clock()
+        val by = actor()
 
         if (input.group == null) {
             val outKey = input.clientUuid + OUT_SUFFIX
@@ -196,6 +205,7 @@ class TransactionRepository(
                 createdAt = now,
                 updatedAt = now,
                 transferGroup = group,
+                createdBy = by,
             )
             // Both legs in one database transaction: if the second insert fails, the first is rolled back, so a
             // transfer can never exist as a single leg. The duplicate check is repeated inside the transaction.
@@ -226,6 +236,7 @@ class TransactionRepository(
             occurredOn = input.date.toEpochDay(),
             note = note,
             updatedAt = now,
+            updatedBy = by ?: updatedBy,
         )
         runner.run {
             transactions.update(outLeg.edited(from.id))
@@ -248,6 +259,7 @@ class TransactionRepository(
         val type = runCatching { WalletType.valueOf(wallet.type) }.getOrDefault(WalletType.CASH)
         transactions.findByClientUuid(clientUuid)?.let { return AdjustResult.Adjusted(it.id) }
         val now = clock()
+        val by = actor()
         var result: AdjustResult = AdjustResult.Unchanged
         runner.run {
             val tracked = WalletBalanceCalculator.balanceOn(
@@ -270,6 +282,7 @@ class TransactionRepository(
                     clientUuid = clientUuid,
                     createdAt = now,
                     updatedAt = now,
+                    createdBy = by,
                 )
             )
             result = AdjustResult.Adjusted(id)
@@ -306,6 +319,7 @@ class TransactionRepository(
             if (problem != null) return BatchResult.Rejected(index, problem)
         }
         val now = clock()
+        val by = actor()
         runner.run {
             entries.forEach { entry ->
                 when (entry) {
@@ -324,6 +338,7 @@ class TransactionRepository(
                                     clientUuid = input.clientUuid,
                                     createdAt = now,
                                     updatedAt = now,
+                                    createdBy = by,
                                 )
                             )
                         }
@@ -344,6 +359,7 @@ class TransactionRepository(
                                 createdAt = now,
                                 updatedAt = now,
                                 transferGroup = input.clientUuid,
+                                createdBy = by,
                             )
                             transactions.insert(leg(TransactionType.TRANSFER_OUT, input.fromWalletId, outKey))
                             transactions.insert(leg(TransactionType.TRANSFER_IN, input.toWalletId, input.clientUuid + IN_SUFFIX))
@@ -410,6 +426,8 @@ internal fun TransactionEntity.toDomain(): Transaction = Transaction(
     createdAtEpochMillis = createdAt,
     transferGroup = transferGroup,
     clientUuid = clientUuid,
+    createdBy = createdBy,
+    updatedBy = updatedBy,
 )
 
 /**

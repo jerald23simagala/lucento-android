@@ -240,6 +240,10 @@ class FakeTransactionDao : TransactionDao {
 
     override suspend fun getAll() = rows.value.sortedWith(compareBy<TransactionEntity> { it.occurredOn }.thenBy { it.id })
 
+    override suspend fun updateAttribution(id: Long, createdBy: String?, updatedBy: String?) {
+        rows.value = rows.value.map { if (it.id == id) it.copy(createdBy = createdBy, updatedBy = updatedBy) else it }
+    }
+
     override suspend fun deleteAll() {
         rows.value = emptyList()
     }

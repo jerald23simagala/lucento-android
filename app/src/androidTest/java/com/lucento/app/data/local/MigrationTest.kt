@@ -439,6 +439,41 @@ class MigrationTest {
     }
 
     /**
+     * Lucento Shared: who added and last edited each transaction, and a wallet's label inside a Shared Space. Existing
+     * rows get neither (a solo ledger shows no attribution, and an unlabelled wallet reads as Shared), nothing
+     * re-uploads, and a label set later is an ordinary change that syncs.
+     */
+    @Test
+    fun migrate11To12_addsAttributionAndWalletLabelsWithoutChangingAnything() {
+        helper.createDatabase(TEST_DB, 11).apply {
+            execSQL(
+                "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, dirty, synced_at) " +
+                    "VALUES (1, 'Joint', 'BANK', 'USD', 100000, 0, 0, 1, 1, 'w-1', 0, 5)"
+            )
+            execSQL(
+                "INSERT INTO transactions (id, type, amount_minor, currency_code, wallet_id, occurred_on, note, client_uuid, created_at, updated_at, dirty, synced_at) " +
+                    "VALUES (1, 'EXPENSE', 4500, 'USD', 1, 20000, 'Groceries', 'tx-1', 1, 1, 0, 5)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 12, true, Migrations.MIGRATION_11_12)
+
+        assertEquals(1L, db.long("SELECT COUNT(*) FROM wallets WHERE classification IS NULL"))
+        assertEquals(1L, db.long("SELECT COUNT(*) FROM transactions WHERE created_by IS NULL AND updated_by IS NULL"))
+        assertEquals(4500L, db.long("SELECT amount_minor FROM transactions WHERE id = 1"))
+        assertEquals(
+            "migrated rows are unchanged, so they do not re-upload",
+            0L,
+            db.long("SELECT SUM(dirty) FROM wallets") + db.long("SELECT SUM(dirty) FROM transactions"),
+        )
+
+        SyncTriggers.ensure(db)
+        db.execSQL("UPDATE wallets SET classification = 'SHARED', updated_at = 2 WHERE id = 1")
+        assertEquals("a label is an ordinary change and syncs", 1L, db.long("SELECT dirty FROM wallets WHERE id = 1"))
+        db.assertNoForeignKeyViolations()
+    }
+
+    /**
      * A fresh install never runs a migration — Room creates the tables from the entities — so the sync triggers must
      * come from the open callback. Before SyncTriggers, a new install had none: deletes never reached other devices and
      * edits after the first sync were never pushed.

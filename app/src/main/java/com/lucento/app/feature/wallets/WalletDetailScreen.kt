@@ -95,6 +95,7 @@ fun WalletDetailScreen(
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
     var adjusting by remember { mutableStateOf(false) }
     val wallet = state.wallet
+    val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
 
     // The account was deleted (from its editor): leave the screen.
     LaunchedEffect(state.loading, wallet) {
@@ -111,7 +112,8 @@ fun WalletDetailScreen(
                 title = "View wallet",
                 onBack = onBack,
                 actions = {
-                    if (wallet != null) {
+                    // A Partner sees the wallet but doesn't change it (the Shared Space's Owner does).
+                    if (wallet != null && access.canManageStructure) {
                         IconButton(onClick = { editing = wallet.toDraft(isDefault = wallet.id == walletsState.defaultWalletId) }) {
                             Icon(Icons.Outlined.Edit, contentDescription = "Edit account")
                         }
@@ -134,6 +136,7 @@ fun WalletDetailScreen(
             )
             val ext = LucentoTheme.extendedColors
             val notes = Modifier.padding(top = Spacing.sm)
+            WalletOwnershipRow(wallet, onChange = { walletsViewModel.setClassification(wallet.id, it) })
             when {
                 valued -> InfoNote(
                     "A value you enter yourself — no money moves through it. Use the edit button when it changes. " +

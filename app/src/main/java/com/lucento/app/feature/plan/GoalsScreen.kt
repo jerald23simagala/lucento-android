@@ -223,6 +223,8 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
     // Restoring the last archived goal leaves nothing to show there: fall back to the active list.
     val viewingArchived = showArchived && archived.isNotEmpty()
     val haptics = rememberHaptics()
+    // Lucento Shared: a Partner sees every goal and its progress; the Shared Space's Owner manages them.
+    val canEdit = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
     val archive: (Long) -> Unit = { id ->
         viewModel.archiveGoal(id) { result -> if (result == GoalRepository.ArchiveResult.Archived) haptics.confirm() }
     }
@@ -234,7 +236,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
         ) {
             item(key = "bar") {
                 LucentoTopBar(title = "Goals", onBack = onBack, actions = {
-                    if (state.goals.isNotEmpty() || archived.isNotEmpty()) {
+                    if (canEdit && (state.goals.isNotEmpty() || archived.isNotEmpty())) {
                         com.lucento.app.core.designsystem.component.AddPillButton(
                             "Add",
                             onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
@@ -263,7 +265,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                             "Your finished goals are under Archived. Set a new target whenever you’re ready."
                         },
                         illustration = { EmptyIllustration(LucentoAnimation.EmptyGoals) },
-                        action = { LucentoPrimaryButton(text = "Create a goal", onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) }) },
+                        action = if (canEdit) ({ LucentoPrimaryButton(text = "Create a goal", onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) }) }) else null,
                     )
                 }
             }
@@ -316,9 +318,14 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                         p,
                         walletName = p.goal.linkedWalletId?.let { state.walletsById[it]?.name },
                         onClick = { openGoalId = p.goal.id },
-                        onArchive = { archive(p.goal.id) },
+                        onArchive = if (canEdit) ({ archive(p.goal.id) }) else null,
                         modifier = Modifier.animateItem().padding(bottom = Spacing.sm),
                     )
+                }
+            }
+            if (!canEdit) {
+                item(key = "owner-manages") {
+                    com.lucento.app.feature.sharedspace.OwnerManagesNote("goals", Modifier.padding(top = Spacing.sm))
                 }
             }
             if (state.goals.isNotEmpty() && !viewingArchived) {
@@ -642,6 +649,8 @@ private fun GoalDetailSheet(
     val ext = LucentoTheme.extendedColors
     var confirmingDelete by remember { mutableStateOf(false) }
     var confirmingContributionId by remember { mutableStateOf<Long?>(null) }
+    // Lucento Shared: read-only on a Partner's phone (the Owner manages goals).
+    val canEdit = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
 
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -657,9 +666,11 @@ private fun GoalDetailSheet(
                 subtitle = linkedWallet?.let { "Kept in $it" },
                 leading = { GoalBadge(goal, size = 48.dp) },
                 trailing = {
-                    if (!archived) IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Edit goal") }
-                    IconButton(onClick = { confirmingDelete = true }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete goal", tint = MaterialTheme.colorScheme.error)
+                    if (canEdit) {
+                        if (!archived) IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Edit goal") }
+                        IconButton(onClick = { confirmingDelete = true }) {
+                            Icon(Icons.Outlined.Delete, contentDescription = "Delete goal", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
                 },
             )
@@ -685,7 +696,10 @@ private fun GoalDetailSheet(
                 goalFacts(progress, null, amountFormat()).forEach { (icon, text) -> FactChip(icon, text) }
             }
 
-            if (archived) {
+            if (!canEdit) {
+                Spacer(Modifier.height(Spacing.lg))
+                com.lucento.app.feature.sharedspace.OwnerManagesNote("goals")
+            } else if (archived) {
                 Spacer(Modifier.height(Spacing.lg))
                 InfoNote(
                     "Archived — it isn’t counted in your goal totals or on Home. Restore it to add or take out money.",
@@ -731,7 +745,7 @@ private fun GoalDetailSheet(
                             showPlus = true,
                             color = if (c.amount.isNegative) MaterialTheme.colorScheme.onSurface else ext.positive,
                         )
-                        if (!archived) {
+                        if (!archived && canEdit) {
                             IconButton(onClick = { confirmingContributionId = c.id }) {
                                 Icon(Icons.Outlined.Delete, contentDescription = "Remove this entry", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -821,6 +835,7 @@ private fun ContributionForm(
                         GoalRepository.ContributionResult.AmountZero -> error = "The amount must be greater than zero."
                         GoalRepository.ContributionResult.CurrencyMismatch -> error = "This goal is in ${goal.currencyCode}."
                         GoalRepository.ContributionResult.GoalNotFound -> onDismiss()
+                        GoalRepository.ContributionResult.NotPermitted -> error = "Only the Shared Space’s owner can change this."
                     }
                 }
             },
@@ -1013,6 +1028,7 @@ private fun GoalEditorSheet(
                             GoalRepository.SaveResult.TargetNotPositive -> amountError = "The target must be greater than zero."
                             GoalRepository.SaveResult.CurrencyLocked -> amountError = "A goal’s currency can’t change."
                             GoalRepository.SaveResult.NotFound -> close()
+                            GoalRepository.SaveResult.NotPermitted -> nameError = "Only the Shared Space’s owner can change this."
                         }
                     }
                 },

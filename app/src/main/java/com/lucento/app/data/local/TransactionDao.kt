@@ -92,6 +92,13 @@ interface TransactionDao {
     )
     suspend fun markPushed(clientUuid: String, expectedUpdatedAt: Long, revision: Long, syncedAt: Long): Int
 
+    /**
+     * Lucento Shared: the server's attribution for a row that is otherwise unchanged. Leaves `updated_at` alone, so the
+     * dirty trigger doesn't fire and nothing is uploaded again.
+     */
+    @Query("UPDATE transactions SET created_by = :createdBy, updated_by = :updatedBy WHERE id = :id")
+    suspend fun updateAttribution(id: Long, createdBy: String?, updatedBy: String?)
+
     @Query("SELECT * FROM transactions ORDER BY occurred_on ASC, id ASC")
     suspend fun getAll(): List<TransactionEntity>
 

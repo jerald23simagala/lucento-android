@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -94,6 +95,8 @@ enum class SettingsPage(val key: String, val title: String) {
     DATA("data", "Your data"),
     PRIVACY("privacy", "Privacy & security"),
     FEATURES("features", "Enabled features"),
+    /** Lucento Shared: opens its own screen (SharedSpaceRoute), like [FEATURES]. */
+    SHARED("shared", "Lucento Shared"),
     ;
 
     companion object {
@@ -106,6 +109,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     page: SettingsPage? = null,
     onOpenPage: (SettingsPage) -> Unit = {},
+    /** Test builds: open Google's account picker as soon as the page shows (profile menu › Switch account). */
+    startAccountSwitch: Boolean = false,
     /**
      * Whose ViewModel to use: the hub's, for a page opened from it, so the hub and its pages share one account check and
      * one account prompt (QA M3). Null uses this screen's own.
@@ -123,6 +128,14 @@ fun SettingsScreen(
     var confirmReplace by remember { mutableStateOf(false) }
     var lockNotice by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    // Once per visit (saved across rotation): the picker shouldn't reopen after it was cancelled.
+    var switchStarted by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(startAccountSwitch) {
+        if (startAccountSwitch && !switchStarted) {
+            switchStarted = true
+            viewModel.connectGoogleAccount(context)
+        }
+    }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) viewModel.exportCsv(context.contentResolver, uri) { exportMessage = it }
     }
@@ -418,6 +431,7 @@ private fun SettingsContent(
 
       }
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
+      SettingsPage.SHARED -> Unit
       SettingsPage.ACCOUNT -> CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword, showHeader = false)
       SettingsPage.DATA -> {
         NavRow(
@@ -434,12 +448,22 @@ private fun SettingsContent(
             onClick = onExportBackup,
             wrapTitle = true,
         )
-        NavRow(
-            icon = Icons.Outlined.FileUpload,
-            title = "Restore backup",
-            summary = "Merge with this phone, or replace everything here",
-            onClick = onRestoreBackup,
-        )
+        // Lucento Shared: a restore rewrites wallets and categories, which a Partner doesn't change.
+        if (com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure) {
+            NavRow(
+                icon = Icons.Outlined.FileUpload,
+                title = "Restore backup",
+                summary = "Merge with this phone, or replace everything here",
+                onClick = onRestoreBackup,
+            )
+        } else {
+            val owner = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.ownerDisplay
+            com.lucento.app.core.designsystem.component.InfoNote(
+                text = "Restoring a backup replaces wallets and categories, which $owner manages in this Shared Space. " +
+                    "You can still export one.",
+                icon = Icons.Outlined.FileUpload,
+            )
+        }
         exportMessage?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -577,6 +601,25 @@ internal fun CloudSyncSection(
                         }
                     }
                     OutlinedButton(onClick = onDisconnect, enabled = !state.syncing) { Text("Disconnect") }
+                }
+                // Test builds only: one tap to Google's account picker. Signing in as another account is the ordinary
+                // account switch (AccountBoundary): this phone's ledger is removed first — after a confirmation when
+                // changes haven't synced — and onboarding restores the chosen account, its Shared Space included.
+                if (BuildConfig.DEBUG && state.googleSignInConfigured) {
+                    Spacer(Modifier.height(Spacing.md))
+                    com.lucento.app.core.designsystem.component.LucentoSecondaryButton(
+                        text = "Switch account",
+                        icon = Icons.Outlined.SwapHoriz,
+                        enabled = !state.syncing,
+                        onClick = onConnectGoogle,
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        "Test builds only. Pick another Google account on this phone: this account’s data leaves the " +
+                            "phone (it stays in the account) and the other account’s comes back from the cloud.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Spacer(Modifier.height(Spacing.sm))
                 ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)

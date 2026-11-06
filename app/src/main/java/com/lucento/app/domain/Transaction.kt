@@ -50,6 +50,9 @@ data class Transaction(
     val transferGroup: String? = null,
     /** The row's stable idempotency key; links a debt payment's interest row to its transfer ([DebtPaymentLink]). */
     val clientUuid: String? = null,
+    /** Lucento Shared: the account that added / last changed it (see [PeopleDirectory.attribution]); null when unknown. */
+    val createdBy: String? = null,
+    val updatedBy: String? = null,
 ) {
     val currencyCode: String get() = amount.currencyCode
 

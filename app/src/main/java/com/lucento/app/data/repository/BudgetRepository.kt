@@ -21,10 +21,14 @@ class BudgetRepository(
     private val categories: CategoryDao,
     private val clock: () -> Long = System::currentTimeMillis,
     private val runner: TransactionRunner = TransactionRunner.Direct,
+    /** Lucento Shared: false on a Partner's phone, where budgets are the Owner's to change ([StructureAccess]). */
+    private val access: StructureAccess = StructureAccess.Always,
 ) {
 
     sealed interface SaveResult {
         data class Saved(val id: Long) : SaveResult
+        /** A Partner's phone: budgets are changed by the Shared Space's Owner. Nothing was written. */
+        data object NotPermitted : SaveResult
         data object LimitNotPositive : SaveResult
         /** This category already has an allocation in this currency. */
         data object Duplicate : SaveResult
@@ -37,6 +41,7 @@ class BudgetRepository(
     fun observeBudgets(): Flow<List<Budget>> = dao.observeAll().map { list -> list.map { it.toDomain() } }
 
     suspend fun save(id: Long?, categoryId: Long, limit: Money): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         if (limit.amountMinor <= 0L) return SaveResult.LimitNotPositive
         val category = categories.getById(categoryId)
         if (category == null || category.kind != CategoryKind.EXPENSE.name || category.archived) return SaveResult.InvalidCategory
@@ -157,6 +162,7 @@ class BudgetRepository(
     }
 
     private suspend fun validate(categoryId: Long, currencyCode: String, limit: Money?): SaveResult? {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         if (limit != null) {
             require(limit.currencyCode == currencyCode) { "Currency mismatch" }
             if (limit.amountMinor <= 0L) return SaveResult.LimitNotPositive
@@ -190,10 +196,12 @@ class BudgetRepository(
     }
 
     /** Removing an allocation never touches transactions. */
-    suspend fun delete(id: Long) = dao.deleteById(id)
+    suspend fun delete(id: Long) {
+        if (access.canManageStructure()) dao.deleteById(id)
+    }
 
     /** Removes the legacy "budget for everything" rows the user has been told about. Returns how many were removed. */
-    suspend fun removeLegacyOverall(): Int = dao.deleteLegacyOverall()
+    suspend fun removeLegacyOverall(): Int = if (access.canManageStructure()) dao.deleteLegacyOverall() else 0
 }
 
 internal fun BudgetEntity.toDomain(): Budget = Budget(

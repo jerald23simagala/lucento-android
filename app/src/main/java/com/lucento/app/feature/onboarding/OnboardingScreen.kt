@@ -115,6 +115,8 @@ import com.lucento.app.feature.budget.CategoryPicks
 import com.lucento.app.feature.budget.CategoryPresetPicker
 import com.lucento.app.feature.budget.CategoryReview
 import com.lucento.app.core.designsystem.component.IconFieldHeader
+import com.lucento.app.data.sharedspace.body
+import com.lucento.app.data.sharedspace.title
 
 @Composable
 fun OnboardingScreen(
@@ -203,9 +205,54 @@ fun OnboardingScreen(
     BackHandler(enabled = step > 0 && restoreStage == RestoreStage.NONE) { viewModel.back() }
     BackHandler(enabled = restoreStage != RestoreStage.NONE && restoreStage != RestoreStage.RESTORING) { viewModel.cancelRestore() }
 
+    // Lucento Shared: why a Shared Space just left this phone. The person's own account is checked once it's read.
+    val spaceNotice by viewModel.spaceNotice.collectAsStateWithLifecycle()
+    spaceNotice?.let { notice ->
+        ConfirmDialog(
+            title = notice.title,
+            text = notice.body,
+            confirmLabel = "OK",
+            dismissLabel = null,
+            onConfirm = viewModel::acknowledgeSpaceNotice,
+            onDismiss = viewModel::acknowledgeSpaceNotice,
+        )
+    }
+
+    // Lucento Shared: invited before setting anything up. Joining replaces the setup; the other way continues it.
+    val invitationOffer by viewModel.invitationOffer.collectAsStateWithLifecycle()
+    val joiningSpace by viewModel.joiningSpace.collectAsStateWithLifecycle()
+    val offerBusy by viewModel.offerBusy.collectAsStateWithLifecycle()
+    val offerMessage by viewModel.offerMessage.collectAsStateWithLifecycle()
+    val spaceName by viewModel.spaceNameSuggestion.collectAsStateWithLifecycle()
+    val spaceOwner by viewModel.spaceOwner.collectAsStateWithLifecycle()
+    invitationOffer?.let { invitation ->
+        BackHandler { if (!joiningSpace) viewModel.setInvitationAside() }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .safeDrawingPadding(),
+        ) {
+            com.lucento.app.feature.sharedspace.InvitationReview(
+                invitation = invitation,
+                suggestedName = spaceName,
+                unsynced = 0,
+                joining = joiningSpace,
+                busy = offerBusy,
+                message = offerMessage,
+                onJoin = viewModel::joinInvitation,
+                onDecline = viewModel::declineInvitation,
+                onBack = viewModel::setInvitationAside,
+                notNowLabel = "Set up my own Lucento",
+            )
+        }
+        return@AmountsShown
+    }
+
     // Restoring an account on a new phone replaces the story with its own short flow.
     if (restoreStage != RestoreStage.NONE) {
         RestoreFlow(
+            spaceOwner = spaceOwner,
             stage = restoreStage,
             welcomeBack = welcomeBack,
             signedInEmail = signedInEmail,
@@ -506,6 +553,8 @@ internal fun RestoreFlow(
     holdsAccountData: Boolean = false,
     /** The way out when the account can't be brought across: set Lucento up without it. */
     onLeaveAccount: () -> Unit = {},
+    /** Lucento Shared: the Owner's name when the download is their Shared Space rather than the person's own data. */
+    spaceOwner: String? = null,
 ) {
     val ext = LucentoTheme.extendedColors
     Column(
@@ -548,7 +597,13 @@ internal fun RestoreFlow(
                     )
                 }
                 RestoreStage.RESTORING -> {
-                    if (welcomeBack) {
+                    if (spaceOwner != null) {
+                        StepTitle(
+                            "Opening $spaceOwner’s Shared Space",
+                            "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "Your account"} shares $spaceOwner’s finances, " +
+                                "so this phone downloads them. Keep Lucento open — this can take a moment on a slow connection.",
+                        )
+                    } else if (welcomeBack) {
                         // A returning account recognised on the setup path: say why setup changed course.
                         StepTitle(
                             "Welcome back",
@@ -905,14 +960,14 @@ private fun ThemeChoices(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
 }
 
 /**
- * After a Google sign-in: "Use your Google photo?" — one tap downloads the account's picture once and keeps it on this
- * phone for the profile button; "Not now" leaves it (it can be added later from the profile menu). Never automatic.
+ * After a Google sign-in the account's picture becomes the profile photo by default (owner, 2026-11-05; AppViewModel
+ * fetches it once and keeps it only on this phone). This card says so while it arrives and once it's there; it can be
+ * changed or removed from the profile menu. Nothing shows if it couldn't be fetched.
  */
 @Composable
 private fun GooglePhotoOffer(photo: com.lucento.app.feature.profile.ProfilePhotoState) {
-    var dismissed by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     val done = photo.image != null
-    if (dismissed && !done) return
+    if (!done && !photo.busy) return
     com.lucento.app.core.designsystem.component.LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(contentAlignment = Alignment.Center) {
@@ -922,25 +977,15 @@ private fun GooglePhotoOffer(photo: com.lucento.app.feature.profile.ProfilePhoto
             Spacer(Modifier.width(Spacing.md))
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (done) "Your Google photo is on your profile" else "Use your Google photo?",
+                    if (done) "Your Google photo is on your profile" else "Getting your Google photo…",
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(
-                    if (done) "Change or remove it any time from the profile menu."
-                    else "Lucento downloads your Google profile picture once and keeps it only on this phone.",
+                    if (done) "It’s kept only on this phone. Change or remove it any time from the profile menu."
+                    else "It’s kept only on this phone.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-        }
-        photo.message?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = Spacing.xs))
-        }
-        if (!done) {
-            Spacer(Modifier.height(Spacing.sm))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                LucentoTextButton(text = "Not now", onClick = { dismissed = true }, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                LucentoTextButton(text = if (photo.busy) "Getting photo…" else "Use photo", onClick = { if (!photo.busy) photo.onUseGoogle() })
             }
         }
     }

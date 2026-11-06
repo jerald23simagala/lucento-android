@@ -53,6 +53,14 @@ interface SyncPreferencesStore {
     suspend fun setInitialPullDoneFor(userId: String)
     /** P2-6: adds to the "changed on another device" count shown to the user (never decreased by sync). */
     suspend fun addOverriddenChanges(count: Int)
+
+    /**
+     * Lucento Shared: when this phone holds a Shared Space as a Partner, the Owner's account id — the environment every
+     * synced row belongs to — while [syncedUserId] stays the Partner's own account. Null for everyone else (solo users and
+     * Owners sync their own environment). Cleared with the rest of the binding whenever the ledger is wiped.
+     */
+    suspend fun sharedSpaceOwnerId(): String?
+    suspend fun setSharedSpaceOwnerId(ownerId: String?)
 }
 
 /**
@@ -69,6 +77,18 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
         val syncedUserId = stringPreferencesKey("synced_user_id")
         val initialPullDoneFor = stringPreferencesKey("initial_pull_done_for")
         val overridden = intPreferencesKey("overridden_changes")
+        val sharedSpaceOwner = stringPreferencesKey("shared_space_owner_id")
+    }
+
+    /** Lucento Shared: the Owner whose Shared Space this phone holds as a Partner, or null. */
+    val sharedSpaceOwner: Flow<String?> = context.syncDataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[Keys.sharedSpaceOwner] }
+
+    override suspend fun sharedSpaceOwnerId(): String? = context.syncDataStore.data.first()[Keys.sharedSpaceOwner]
+
+    override suspend fun setSharedSpaceOwnerId(ownerId: String?) {
+        context.syncDataStore.edit { if (ownerId == null) it.remove(Keys.sharedSpaceOwner) else it[Keys.sharedSpaceOwner] = ownerId }
     }
 
     val status: Flow<SyncStatus> = context.syncDataStore.data
@@ -143,6 +163,7 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
             it.remove(Keys.syncedUserId)
             it.remove(Keys.initialPullDoneFor)
             it.remove(Keys.overridden)
+            it.remove(Keys.sharedSpaceOwner)
         }
     }
 

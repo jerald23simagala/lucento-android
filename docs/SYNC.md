@@ -200,6 +200,13 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   order:** `20261105090000_receivable_wallets.sql` (the `wallets_type_known` CHECK gains `RECEIVABLE`) must reach a
   project before a build that can create receivables syncs one there, or that wallet's upload is refused (rows stay
   pending, nothing is lost). Older builds skip a pulled receivable (`PulledRowRules`) and can't read its collections.
+- **Lucento Shared (v12).** `transactions.created_by` / `updated_by` are stamped by the database from the session and
+  only ever pulled; the app never sends them. `wallets.classification` is sent only when a wallet in that upload batch
+  is classified, so a solo v12 phone sends exactly what v11 sent and older builds leave the value alone. **Rollout
+  order:** a v12 build against a project without `20261105120000_lucento_shared.sql` and
+  `20261105120100_lucento_shared_privileges.sql` syncs exactly like v11. Pulls select `*`, and a wallet can only be
+  classified inside a Shared Space. Lucento Shared itself says the server doesn't have it yet (its RPCs return 404).
+  Apply both migrations, after the receivables one, before anyone creates or joins a space there.
 - **What the user sees (P2-2, 2026-11-04).** The Home chip shows On device · Offline · Syncing (the icon turns) · Needs
   attention · "3 to sync" / "Not synced yet" · "Synced · 5m" — never a bare "Synced", so it says how fresh it is and
   what is waiting (`syncChipLabel`; TalkBack hears it in full words). It opens a sheet with the state, when syncs happen
@@ -277,6 +284,34 @@ signed in, then restores it or sets it up. Sync refuses to push while the signed
 
 The device is no longer permanently tied to the first account. Signing back in to an account downloads it again.
 
+## Lucento Shared
+
+One Owner's ledger, shared with a Partner who signs in with their own account (docs/shared, database rules in
+docs/shared/SECURITY_MODEL.md). The sync engine and its conflict rules are unchanged: to the engine, a Partner's
+phone is one more device of the Owner's ledger.
+
+- **Binding.** A Partner's phone stores the Owner's id (`SyncPreferences.sharedSpaceOwnerId`, cleared with the rest of
+  the binding). Every seam that used the signed-in id — upload rows, pull filters, fetch-by-ids, the account probe —
+  uses `env = sharedSpaceOwnerId ?: userId`. `syncedUserId` stays the person's own id, so `AccountBoundary` works as
+  before.
+- **Membership check every cycle.** A bound phone first reads its row in `space_members`. If it's gone (removed, or
+  left on another phone), the cycle ends with `MembershipRevoked` before anything is pushed. Once the sync lock is
+  released, `SharedSpaceRepository.endedByOwner` removes the shared ledger: the same marker-protected order as
+  sign-out, via `LocalLedgerReset.returnToOwnLedger`. The person stays signed in and onboarding restores their own
+  account. A one-time notice says why, and whether unsynced changes were lost.
+- **What a Partner's phone uploads.** Only transactions and transaction tombstones (soft deletes), the two things the
+  database lets a Partner write. Structure writes are refused earlier by the repositories (`StructureAccess`). A dirty
+  structure row that appears anyway is reverted from the server copy, never left pending. A tombstone echoing a delete
+  that came from the server is settled from the server copy rather than uploaded. Category and budget merges (seed
+  folding, duplicate budgets) run on the Owner's phones only.
+- **Joining.** `accept_space_invite` succeeds on the server first. Then `LocalLedgerReset.switchToSharedSpace` empties
+  the ledger (no income-category reseed; the space brings its own), binds the Owner's id and turns sync on, and one
+  full sync downloads the space. A join interrupted by a kill finishes as a full wipe on the next launch, and
+  onboarding then finds the membership and restores the space.
+- **Leaving.** `leave_shared_space` succeeds on the server first, then the same path as removal. A phone that never
+  held the space (the person joined on another phone) keeps its own ledger.
+- **Attribution and labels** are ordinary columns: pulled like any other, never part of conflict resolution.
+
 ## Security
 
 - Table privileges: `select/insert/update/delete` granted to `authenticated` only; `anon` has none.
@@ -293,8 +328,10 @@ The device is no longer permanently tied to the first account. Signing back in t
 - The APK contains only the Supabase URL and the **publishable** key — no service-role key, database password or
   Google client secret exists in the repository or the app. Values come from `local.properties` / CI env.
 - Network: HTTPS only (`res/xml/network_security_config.xml`). No tokens, emails or financial values are logged.
-- **Profile photo from Google** (owner request, 2026-11-03): only when signed in with Google and only when the user taps
-  "Use my Google photo" (profile menu, or the offer on setup's sync step after a Google sign-in). The URL comes from the
+- **Profile photo from Google** (owner request, 2026-11-03; the default since 2026-11-05): when signed in with Google and
+  no photo is on the phone, the account's picture is fetched once after sign-in, unless the person picked their own
+  picture or removed it (`ProfilePhotoChoice`; the account wipe resets it). "Use my Google photo" in the profile menu
+  brings it back. The URL comes from the
   session's user metadata (`avatar_url` / `picture`, filled by Supabase from Google); `ProfilePhotos` fetches it once over
   HTTPS from Google's image host (`*.googleusercontent.com` only, redirects included; image types only; 5 MB cap) and
   keeps a 384 px JPEG in app-private files. Nothing is sent but the request. Never synced, never in a backup, removed by

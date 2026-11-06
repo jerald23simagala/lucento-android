@@ -117,6 +117,9 @@ class AuthRepository(
     suspend fun signInWithGoogle(activity: Context): SignInResult {
         val auth = client?.auth ?: return SignInResult.NotConfigured
         if (!SupabaseModule.isGoogleSignInConfigured) return SignInResult.NotConfigured
+        // Before Google's picker: offline, Credential Manager answers "no credential", which read as a missing Google
+        // account (owner, 2026-11-05). Nothing on the phone has changed at this point, including on an account switch.
+        offlineFailure(isOnline)?.let { return it }
         return try {
             // Supabase's documented Android flow: Google signs a token containing the SHA-256 of a one-time nonce,
             // and Supabase checks it against the raw nonce, so a captured ID token can't be replayed.
@@ -160,6 +163,7 @@ class AuthRepository(
      */
     suspend fun signUpWithEmail(email: String, password: String): SignInResult {
         val auth = client?.auth ?: return SignInResult.NotConfigured
+        offlineFailure(isOnline)?.let { return it }
         passwords.problem(password)?.let { return SignInResult.Failed(it) }
         return emailCall {
             retryOnTimeout {
@@ -189,6 +193,7 @@ class AuthRepository(
 
     suspend fun signInWithEmail(email: String, password: String): SignInResult {
         val auth = client?.auth ?: return SignInResult.NotConfigured
+        offlineFailure(isOnline)?.let { return it }
         return emailCall {
             retryOnTimeout {
                 auth.signInWith(Email) {
@@ -286,6 +291,24 @@ class AuthRepository(
         client?.auth?.awaitInitialization()
         client?.auth?.currentUserOrNull()?.id
     }.getOrNull()
+
+    /**
+     * Lucento Shared: the signed-in account's id without waiting for the stored session to load (null until it has, or
+     * when signed out). Stamped on rows this phone writes so "Added by" reads right before the next sync.
+     */
+    fun signedInUserIdNow(): String? = runCatching { client?.auth?.currentUserOrNull()?.id }.getOrNull()
+
+    /** Lucento Shared: the signed-in account's id as it changes (for "Added by you"). */
+    fun observeUserId(): Flow<String?> {
+        val auth = client?.auth ?: return flowOf(null)
+        return auth.sessionStatus.map { status ->
+            when (status) {
+                is SessionStatus.Authenticated -> status.session.user?.id
+                is SessionStatus.RefreshFailure -> auth.currentUserOrNull()?.id
+                else -> null
+            }
+        }.distinctUntilChanged()
+    }
 
     /**
      * The first step of every sign-out, synchronous and with no network call (QA R9-01, R10-01): stops auto-refresh,
@@ -422,6 +445,14 @@ internal fun signInFailureMessage(e: Throwable, debug: Boolean): String {
     }
     return "$message (debug: $detail)"
 }
+
+/** Said first when there's no connection: signing in can't work offline, and nothing on the phone has changed. */
+internal const val OFFLINE_SIGN_IN_MESSAGE =
+    "You’re offline. Connect to the internet, then try again — nothing on this phone has changed."
+
+/** The connection check every sign-in runs before anything else (Google's picker, the email call, an account switch). */
+internal fun offlineFailure(isOnline: () -> Boolean): AuthRepository.SignInResult.Failed? =
+    if (isOnline()) null else AuthRepository.SignInResult.Failed(OFFLINE_SIGN_IN_MESSAGE)
 
 /** At least this many characters; Supabase's own minimum (6) is too weak for an account that holds financial data. */
 const val MIN_PASSWORD_LENGTH = 8
