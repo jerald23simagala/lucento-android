@@ -19,6 +19,9 @@ import com.lucento.app.domain.Wallet
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -43,9 +46,24 @@ data class WalletDetailUiState(
     /** An instalment loan's principal, repaid and remaining, and instalments paid (LoanMath.progress). */
     val loanProgress: LoanProgress? = null,
     val today: LocalDate = LocalDate.now(),
+    /** Multicurrency: for a wallet in another currency, its value in the main currency (null for a main-currency one). */
+    val fx: WalletFx? = null,
 ) {
     val walletNames: Map<Long, String> = wallets.associate { it.id to it.name }
 }
+
+/**
+ * A wallet in another currency, in the main currency (docs/CALCULATIONS.md "Exchange rates"): what it is carried at and
+ * its average rate, and the FX gains and losses its movements have realized so far. [unvalued]: it has no rate yet, so
+ * it stays out of the main-currency totals until one is set.
+ */
+data class WalletFx(
+    val mainCurrency: String,
+    val carrying: com.lucento.app.core.money.Money?,
+    val averageRate: java.math.BigDecimal?,
+    val realized: com.lucento.app.core.money.Money,
+    val unvalued: Boolean,
+)
 
 /** Why a balance override was refused; nothing is written when one is. */
 sealed interface AdjustError {
@@ -66,13 +84,16 @@ class WalletDetailViewModel(
     wallets: WalletRepository,
     private val transactions: TransactionRepository,
     categories: CategoryRepository,
+    /** Multicurrency: the main currency (null in tests: no FX panel). */
+    preferences: com.lucento.app.data.preferences.UserPreferencesRepository? = null,
 ) : ViewModel() {
 
     val uiState: StateFlow<WalletDetailUiState> = combine(
         wallets.observeWallets(),
         transactions.observeTransactions(),
         categories.observeCategories(),
-    ) { walletList, all, categoryList ->
+        preferences?.preferences?.map { it.primaryCurrency }?.distinctUntilChanged() ?: flowOf(null),
+    ) { walletList, all, categoryList, main ->
         val wallet = walletList.firstOrNull { it.id == walletId }
         val history = all.filter { it.walletId == walletId }
         val today = LocalDate.now()
@@ -92,6 +113,17 @@ class WalletDetailViewModel(
                 ?.let { CreditCardMath.receivingWallet(it, walletList, all)?.id },
             loanProgress = wallet?.let { LoanMath.progress(it, history) },
             today = today,
+            fx = if (wallet == null || main == null || wallet.currencyCode == main) null else {
+                val book = com.lucento.app.domain.fx.FxLedger.build(main, listOf(wallet), history)
+                val position = book.positions[wallet.id]
+                WalletFx(
+                    mainCurrency = main,
+                    carrying = position?.carrying,
+                    averageRate = position?.averageRate,
+                    realized = com.lucento.app.core.money.Money.sum(main, book.realized.map { it.amount }),
+                    unvalued = wallet.id in book.unvalued,
+                )
+            },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WalletDetailUiState())
 
@@ -134,7 +166,7 @@ class WalletDetailViewModel(
 
     companion object {
         fun factory(walletId: Long) = containerFactory {
-            WalletDetailViewModel(walletId, it.wallets, it.transactions, it.categories)
+            WalletDetailViewModel(walletId, it.wallets, it.transactions, it.categories, it.preferences)
         }
     }
 }

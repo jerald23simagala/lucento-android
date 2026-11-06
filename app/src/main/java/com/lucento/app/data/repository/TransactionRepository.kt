@@ -11,6 +11,8 @@ import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.WalletBalanceCalculator
 import com.lucento.app.domain.WalletType
+import com.lucento.app.domain.fx.FxSource
+import com.lucento.app.domain.fx.FxValue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
@@ -42,6 +44,11 @@ class TransactionRepository(
         val categoryId: Long?,
         val date: LocalDate,
         val note: String,
+        /**
+         * Multicurrency: the value in the main currency, for a wallet in another currency. Null: follows the wallet's
+         * average (no gain or loss). On an edit it replaces what was stored, so callers pass the existing value to keep it.
+         */
+        val fx: FxValue? = null,
     )
 
     sealed interface SaveResult {
@@ -55,7 +62,12 @@ class TransactionRepository(
         data object InvalidType : SaveResult
     }
 
-    /** A movement between two of the user's wallets. [group] is null when creating. */
+    /**
+     * A movement between two of the user's wallets. [group] is null when creating. [amount] leaves the source wallet in its
+     * currency. Between currencies (multicurrency), [received] is what arrived in the destination's currency — the two real
+     * amounts are the rate. [outFx] / [inFx] are each leg's value in the main currency where its wallet is in another
+     * currency ([com.lucento.app.domain.fx.FxTransfer.legValues] works them out); null legs follow their wallet's average.
+     */
     data class TransferInput(
         val group: String?,
         val clientUuid: String,
@@ -64,14 +76,23 @@ class TransactionRepository(
         val amount: Money,
         val date: LocalDate,
         val note: String,
-    )
+        val received: Money? = null,
+        val outFx: FxValue? = null,
+        val inFx: FxValue? = null,
+    ) {
+        /** What the destination wallet receives: [received] between currencies, otherwise the same [amount]. */
+        val arriving: Money get() = received ?: amount
+    }
 
     sealed interface TransferResult {
         data class Saved(val group: String) : TransferResult
         data object AmountNotPositive : TransferResult
         data object WalletNotFound : TransferResult
         data object SameWallet : TransferResult
-        /** Both wallets must use the transfer's currency; Lucento never converts with a guessed rate. */
+        /**
+         * Each wallet must use its leg's currency, and between two currencies the amount received is required: Lucento
+         * never converts with a guessed rate.
+         */
         data object CurrencyMismatch : TransferResult
         data object TransferNotFound : TransferResult
     }
@@ -141,7 +162,7 @@ class TransactionRepository(
                     createdAt = now,
                     updatedAt = now,
                     createdBy = by,
-                )
+                ).withFx(input.fx)
             }
             return SaveResult.Saved(id)
         }
@@ -159,7 +180,7 @@ class TransactionRepository(
                 note = note,
                 updatedAt = now,
                 updatedBy = by ?: existing.updatedBy,
-            )
+            ).withFx(input.fx)
         )
         return SaveResult.Saved(input.id)
     }
@@ -177,14 +198,12 @@ class TransactionRepository(
      * idempotent on [TransferInput.clientUuid].
      */
     suspend fun saveTransfer(input: TransferInput): TransferResult {
-        if (input.amount.amountMinor <= 0L) return TransferResult.AmountNotPositive
+        if (input.amount.amountMinor <= 0L || input.arriving.amountMinor <= 0L) return TransferResult.AmountNotPositive
         if (input.fromWalletId == input.toWalletId) return TransferResult.SameWallet
         val from = wallets.getById(input.fromWalletId)
         val to = wallets.getById(input.toWalletId)
         if (from == null || !from.acceptsTransactions || to == null || !to.acceptsTransactions) return TransferResult.WalletNotFound
-        if (from.currencyCode != input.amount.currencyCode || to.currencyCode != input.amount.currencyCode) {
-            return TransferResult.CurrencyMismatch
-        }
+        if (!currenciesFit(from.currencyCode, to.currencyCode, input)) return TransferResult.CurrencyMismatch
         val note = input.note.trim().take(MAX_NOTE)
         val now = clock()
         val by = actor()
@@ -193,10 +212,10 @@ class TransactionRepository(
             val outKey = input.clientUuid + OUT_SUFFIX
             transactions.findByClientUuid(outKey)?.transferGroup?.let { return TransferResult.Saved(it) }
             val group = input.clientUuid
-            fun leg(type: TransactionType, walletId: Long, key: String) = TransactionEntity(
+            fun leg(type: TransactionType, walletId: Long, key: String, amount: Money, fx: FxValue?) = TransactionEntity(
                 type = type.name,
-                amountMinor = input.amount.amountMinor,
-                currencyCode = input.amount.currencyCode,
+                amountMinor = amount.amountMinor,
+                currencyCode = amount.currencyCode,
                 walletId = walletId,
                 categoryId = null,
                 occurredOn = input.date.toEpochDay(),
@@ -206,14 +225,14 @@ class TransactionRepository(
                 updatedAt = now,
                 transferGroup = group,
                 createdBy = by,
-            )
+            ).withFx(fx)
             // Both legs in one database transaction: if the second insert fails, the first is rolled back, so a
             // transfer can never exist as a single leg. The duplicate check is repeated inside the transaction.
             try {
                 runner.run {
                     if (transactions.findByClientUuid(outKey) == null) {
-                        transactions.insert(leg(TransactionType.TRANSFER_OUT, from.id, outKey))
-                        transactions.insert(leg(TransactionType.TRANSFER_IN, to.id, input.clientUuid + IN_SUFFIX))
+                        transactions.insert(leg(TransactionType.TRANSFER_OUT, from.id, outKey, input.amount, input.outFx))
+                        transactions.insert(leg(TransactionType.TRANSFER_IN, to.id, input.clientUuid + IN_SUFFIX, input.arriving, input.inFx))
                     }
                 }
             } catch (e: Exception) {
@@ -229,18 +248,18 @@ class TransactionRepository(
         val outLeg = legs.firstOrNull { it.type == TransactionType.TRANSFER_OUT.name }
         val inLeg = legs.firstOrNull { it.type == TransactionType.TRANSFER_IN.name }
         if (outLeg == null || inLeg == null) return TransferResult.TransferNotFound
-        fun TransactionEntity.edited(walletId: Long) = copy(
-            amountMinor = input.amount.amountMinor,
-            currencyCode = input.amount.currencyCode,
+        fun TransactionEntity.edited(walletId: Long, amount: Money, fx: FxValue?) = copy(
+            amountMinor = amount.amountMinor,
+            currencyCode = amount.currencyCode,
             walletId = walletId,
             occurredOn = input.date.toEpochDay(),
             note = note,
             updatedAt = now,
             updatedBy = by ?: updatedBy,
-        )
+        ).withFx(fx)
         runner.run {
-            transactions.update(outLeg.edited(from.id))
-            transactions.update(inLeg.edited(to.id))
+            transactions.update(outLeg.edited(from.id, input.amount, input.outFx))
+            transactions.update(inLeg.edited(to.id, input.arriving, input.inFx))
         }
         return TransferResult.Saved(input.group)
     }
@@ -339,7 +358,7 @@ class TransactionRepository(
                                     createdAt = now,
                                     updatedAt = now,
                                     createdBy = by,
-                                )
+                                ).withFx(input.fx)
                             )
                         }
                     }
@@ -347,10 +366,10 @@ class TransactionRepository(
                         val input = entry.input
                         val outKey = input.clientUuid + OUT_SUFFIX
                         if (transactions.findByClientUuid(outKey) == null) {
-                            fun leg(type: TransactionType, walletId: Long, key: String) = TransactionEntity(
+                            fun leg(type: TransactionType, walletId: Long, key: String, amount: Money, fx: FxValue?) = TransactionEntity(
                                 type = type.name,
-                                amountMinor = input.amount.amountMinor,
-                                currencyCode = input.amount.currencyCode,
+                                amountMinor = amount.amountMinor,
+                                currencyCode = amount.currencyCode,
                                 walletId = walletId,
                                 categoryId = null,
                                 occurredOn = input.date.toEpochDay(),
@@ -360,9 +379,11 @@ class TransactionRepository(
                                 updatedAt = now,
                                 transferGroup = input.clientUuid,
                                 createdBy = by,
+                            ).withFx(fx)
+                            transactions.insert(leg(TransactionType.TRANSFER_OUT, input.fromWalletId, outKey, input.amount, input.outFx))
+                            transactions.insert(
+                                leg(TransactionType.TRANSFER_IN, input.toWalletId, input.clientUuid + IN_SUFFIX, input.arriving, input.inFx),
                             )
-                            transactions.insert(leg(TransactionType.TRANSFER_OUT, input.fromWalletId, outKey))
-                            transactions.insert(leg(TransactionType.TRANSFER_IN, input.toWalletId, input.clientUuid + IN_SUFFIX))
                         }
                     }
                 }
@@ -386,13 +407,22 @@ class TransactionRepository(
 
     private suspend fun validateNewTransfer(input: TransferInput): TransferResult? {
         if (input.group != null) return TransferResult.TransferNotFound
-        if (input.amount.amountMinor <= 0L) return TransferResult.AmountNotPositive
+        if (input.amount.amountMinor <= 0L || input.arriving.amountMinor <= 0L) return TransferResult.AmountNotPositive
         if (input.fromWalletId == input.toWalletId) return TransferResult.SameWallet
         val from = wallets.getById(input.fromWalletId)
         val to = wallets.getById(input.toWalletId)
         if (from == null || !from.acceptsTransactions || to == null || !to.acceptsTransactions) return TransferResult.WalletNotFound
-        if (from.currencyCode != input.amount.currencyCode || to.currencyCode != input.amount.currencyCode) return TransferResult.CurrencyMismatch
+        if (!currenciesFit(from.currencyCode, to.currencyCode, input)) return TransferResult.CurrencyMismatch
         return null
+    }
+
+    /**
+     * Each leg in its wallet's currency. Between two currencies the amount received is required (the rate is what the
+     * two amounts say); within one currency there is nothing to receive separately.
+     */
+    private fun currenciesFit(fromCurrency: String, toCurrency: String, input: TransferInput): Boolean {
+        if (fromCurrency != input.amount.currencyCode || toCurrency != input.arriving.currencyCode) return false
+        return if (fromCurrency == toCurrency) input.received == null || input.received == input.amount else input.received != null
     }
 
     /**
@@ -428,7 +458,20 @@ internal fun TransactionEntity.toDomain(): Transaction = Transaction(
     clientUuid = clientUuid,
     createdBy = createdBy,
     updatedBy = updatedBy,
+    baseAmount = baseAmountMinor?.let { minor -> baseCurrency?.takeIf { it.length == 3 }?.let { Money(minor, it) } },
+    fxSource = FxSource.fromName(fxSource),
 )
+
+/**
+ * Stores a movement's main-currency value (multicurrency). Nothing is stored when there is none, or when it is in the
+ * row's own currency (a main-currency wallet needs no translation).
+ */
+internal fun TransactionEntity.withFx(fx: FxValue?): TransactionEntity =
+    if (fx == null || fx.base.currencyCode == currencyCode) {
+        copy(baseAmountMinor = null, baseCurrency = null, fxSource = null)
+    } else {
+        copy(baseAmountMinor = fx.base.amountMinor, baseCurrency = fx.base.currencyCode, fxSource = fx.source.name)
+    }
 
 /**
  * Like [TransactionRepository.save] but returns null instead of throwing when the database refuses the write

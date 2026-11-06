@@ -5,7 +5,7 @@ import com.lucento.app.core.designsystem.component.SheetHeader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import com.lucento.app.core.designsystem.component.StageIndicator
 import com.lucento.app.core.designsystem.component.IconTile
@@ -136,6 +136,7 @@ fun OnboardingScreen(
     val connecting by viewModel.connecting.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val restoreStage by viewModel.restoreStage.collectAsStateWithLifecycle()
+    val joiningByInvitation by viewModel.joiningByInvitation.collectAsStateWithLifecycle()
     val restoreMessage by viewModel.restoreMessage.collectAsStateWithLifecycle()
     val switchPrompt by viewModel.switchPrompt.collectAsStateWithLifecycle()
     val accountCheck by viewModel.accountCheck.collectAsStateWithLifecycle()
@@ -253,6 +254,7 @@ fun OnboardingScreen(
     if (restoreStage != RestoreStage.NONE) {
         RestoreFlow(
             spaceOwner = spaceOwner,
+            invited = joiningByInvitation,
             stage = restoreStage,
             welcomeBack = welcomeBack,
             signedInEmail = signedInEmail,
@@ -299,6 +301,7 @@ fun OnboardingScreen(
                 OnboardingViewModel.STEP_WELCOME -> WelcomeStep(
                     onStartFresh = viewModel::next,
                     onSignIn = if (viewModel.syncAvailable) viewModel::startRestore else null,
+                    onInvited = if (viewModel.syncAvailable) viewModel::startInvited else null,
                     onRestoreFile = if (viewModel.fileRestoreAvailable) {
                         { backupPicker.launch(arrayOf("application/json", "application/octet-stream", "text/plain")) }
                     } else {
@@ -385,20 +388,25 @@ private fun WelcomeStep(
     onStartFresh: () -> Unit,
     /** Sign in to an account that already has data; null when cloud sync isn't available in this build. */
     onSignIn: (() -> Unit)?,
+    /** Lucento Shared: sign in with the account an invitation was sent to; null without cloud sync. */
+    onInvited: (() -> Unit)?,
     /** Pick a backup file exported from Lucento; null when unavailable. */
     onRestoreFile: (() -> Unit)?,
     fileMessage: String?,
     fileBusy: Boolean,
 ) {
-    var choosing by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
+        // Short screens (or large text) shrink the artwork first; whatever still doesn't fit scrolls instead of being cut
+        // off behind the three ways in.
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val compact = maxHeight < 520.dp
         Column(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             // The Rising Crest symbol settles in once (never blocks the button); reduced motion shows it complete.
-            LucentoStackedLockup(symbolSize = 96.dp, animate = true, wordmarkModifier = Modifier.semantics { heading() })
+            LucentoStackedLockup(symbolSize = if (compact) 64.dp else 96.dp, animate = true, wordmarkModifier = Modifier.semantics { heading() })
             Spacer(Modifier.height(Spacing.sm))
             Text(
                 "Financial clarity without the complexity.",
@@ -406,7 +414,7 @@ private fun WelcomeStep(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(Spacing.xl))
+            Spacer(Modifier.height(if (compact) Spacing.md else Spacing.xl))
             // Lucento greets the user standing in its landscape — the theme's (Sunrise: "A Brighter Little World").
             // Decorative artwork; the mascot keeps its label. Light-painted scenes are dimmed at night.
             val spec = LucentoTheme.spec
@@ -416,19 +424,21 @@ private fun WelcomeStep(
                 containerColor = MaterialTheme.colorScheme.background,
                 overlay = if (LucentoTheme.isDark && !spec.sceneryIsNight) SolidColor(MaterialTheme.colorScheme.background.copy(alpha = 0.45f)) else null,
                 artworkAlignment = Alignment.BottomCenter,
-                contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.sm),
+                contentPadding = PaddingValues(top = if (compact) Spacing.sm else Spacing.lg, bottom = Spacing.sm),
             ) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LucentoMascot(size = 140.dp, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
+                    LucentoMascot(size = if (compact) 104.dp else 140.dp, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
                 }
             }
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(if (compact) Spacing.md else Spacing.lg))
             Text(
-                "Track what you spend, plan what’s next. Your data stays only on this phone unless you turn on cloud sync. No account, no bank login.",
+                "Track what you spend, plan what’s next. Your data stays on this phone unless you turn on cloud sync.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(Spacing.md))
+        }
         }
         if (fileMessage != null) {
             InfoNote(fileMessage, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
@@ -438,51 +448,23 @@ private fun WelcomeStep(
             LucentoWorkingIndicator(label = "Reading the backup")
             Spacer(Modifier.height(Spacing.sm))
         }
-        LucentoPrimaryButton(text = "Start fresh", onClick = onStartFresh)
-        // Coming back: an account (sign in and download) or a backup file (offline). Never merged into a new setup.
-        if (onSignIn != null || onRestoreFile != null) {
-            Spacer(Modifier.height(Spacing.xs))
-            LucentoTextButton(text = "I already use Lucento", onClick = { choosing = true }, modifier = Modifier.fillMaxWidth())
+        // Three ways in (owner, 2026-11-06): new to Lucento; coming back to an account; invited to someone's Shared Space.
+        // The last two go straight to choosing the account. Never merged into a new setup.
+        LucentoPrimaryButton(text = "Get started", onClick = onStartFresh)
+        if (onSignIn != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            com.lucento.app.core.designsystem.component.LucentoSecondaryButton(text = "I already have Lucento", onClick = onSignIn)
         }
-    }
-    if (choosing) {
-        ReturningUserSheet(
-            onSignIn = onSignIn?.let { { choosing = false; it() } },
-            onRestoreFile = onRestoreFile?.let { { choosing = false; it() } },
-            onDismiss = { choosing = false },
-        )
-    }
-}
-
-/** "I already use Lucento": bring an account back by signing in, or a workspace from a backup file. */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
-private fun ReturningUserSheet(onSignIn: (() -> Unit)?, onRestoreFile: (() -> Unit)?, onDismiss: () -> Unit) {
-    com.lucento.app.core.designsystem.component.LucentoBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = Spacing.gutter).padding(bottom = Spacing.xl)) {
-            SheetHeader(
-                title = "Welcome back",
-                subtitle = "Bring your money in with you. Nothing is combined with a new setup.",
-                leading = { com.lucento.app.core.designsystem.component.LucentoMascot(size = 52.dp, mood = com.lucento.app.core.designsystem.component.MascotMood.Greeting) },
-                modifier = Modifier.padding(bottom = Spacing.xs),
+        if (onInvited != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            com.lucento.app.core.designsystem.component.LucentoSecondaryButton(
+                text = "I was invited to share",
+                icon = Icons.Outlined.Group,
+                onClick = onInvited,
             )
-            if (onSignIn != null) {
-                ChoiceCard(
-                    icon = Icons.Outlined.CloudSync,
-                    title = "Sign in to my account",
-                    body = "Downloads everything you synced: wallets, transactions, budgets and goals.",
-                    onClick = onSignIn,
-                )
-                Spacer(Modifier.height(Spacing.sm))
-            }
-            if (onRestoreFile != null) {
-                ChoiceCard(
-                    icon = Icons.Outlined.FileOpen,
-                    title = "Restore a backup file",
-                    body = "A file you exported from Lucento. Stays on this phone; nothing is uploaded.",
-                    onClick = onRestoreFile,
-                )
-            }
+        }
+        if (onRestoreFile != null) {
+            LucentoTextButton(text = "Restore a backup file", onClick = onRestoreFile, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -555,6 +537,8 @@ internal fun RestoreFlow(
     onLeaveAccount: () -> Unit = {},
     /** Lucento Shared: the Owner's name when the download is their Shared Space rather than the person's own data. */
     spaceOwner: String? = null,
+    /** Lucento Shared: came in through "I was invited to share". */
+    invited: Boolean = false,
 ) {
     val ext = LucentoTheme.extendedColors
     Column(
@@ -586,7 +570,23 @@ internal fun RestoreFlow(
                     )
                 }
                 RestoreStage.SIGN_IN -> {
-                    StepTitle("Sign in to your account", "Use the same Google or email account as on your old phone.")
+                    if (invited) {
+                        StepTitle(
+                            "Sign in to join",
+                            "Use the Google or email account your invitation was sent to. You’ll see the invitation right " +
+                                "after — nothing is shared until you accept it.",
+                        )
+                    } else {
+                        StepTitle("Sign in to your account", "Use the same Google or email account as on your old phone.")
+                        Spacer(Modifier.height(Spacing.sm))
+                        InfoNote(
+                            "Moving from another phone? Sync it first (Settings › Cloud sync › Sync now): anything added there " +
+                                "since its last sync won’t come across.",
+                            icon = Icons.Outlined.WarningAmber,
+                            container = ext.warningContainer,
+                            content = ext.warning,
+                        )
+                    }
                     Spacer(Modifier.height(Spacing.md))
                     com.lucento.app.feature.settings.ConnectAccountPanel(
                         busy = connecting,
@@ -624,7 +624,12 @@ internal fun RestoreFlow(
                 RestoreStage.EMPTY -> {
                     LucentoMascot(size = 88.dp, mood = MascotMood.Curious, contentDescription = "Lucento")
                     Spacer(Modifier.height(Spacing.md))
-                    StepTitle(
+                    if (invited) StepTitle(
+                        "No invitation for this account yet",
+                        "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "This account"} has no invitation waiting. Ask the " +
+                            "person who invited you to check the email address, or set Lucento up as your own for now — an " +
+                            "invitation that arrives later shows up on Home.",
+                    ) else StepTitle(
                         "Nothing to restore yet",
                         "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "This account"} has no wallets, spending categories, " +
                             "transactions, budgets or scheduled payments saved yet. " +
@@ -886,7 +891,8 @@ private fun EssentialsStep(
                     Column {
                         StepTitle(
                             "Currency and look",
-                            "Your main currency is used for totals. Each wallet can still use its own.",
+                            "Every total is in your main currency, and you can’t change it later. Wallets can still " +
+                                "use other currencies — they’re converted into it.",
                             icon = Icons.Outlined.Public,
                         )
                         IconFieldHeader(Icons.Outlined.Palette, "Appearance")

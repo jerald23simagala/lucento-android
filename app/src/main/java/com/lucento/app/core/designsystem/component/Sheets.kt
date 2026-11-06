@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -18,12 +19,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -53,7 +60,12 @@ import androidx.compose.ui.unit.Velocity
  *
  * A fast fling through a long form keeps its leftover speed inside the sheet ([KeepFlingInSheet]): reaching the top
  * mid-fling no longer carries on into dismissing the sheet, which closed the New wallet form while it was being scrolled
- * (owner, 2026-11-04). Dragging the handle, or pulling down from the top, still closes it.
+ * (owner, 2026-11-04). Dragging the handle, or pulling down from the top, still closes it — unless [dragToDismiss] is
+ * false: a long form (New wallet, Transfer) then stays put however it is scrolled or pulled, and only Back (the system
+ * gesture, or the form's own Cancel) closes it (owner, 2026-11-06: a long scroll down still closed the New wallet form).
+ * Such a sheet takes [rememberStickySheetState], which refuses to be dragged or tapped away; its content keeps every
+ * leftover scroll and drag, so the sheet doesn't even move, and it has no drag handle to promise a gesture that does
+ * nothing. (Material 3 1.3 has no switch for the sheet's gestures; Back and `hide()` still close it.)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +73,7 @@ fun LucentoBottomSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    dragToDismiss: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val reducedMotion = LucentoTheme.reducedMotion
@@ -72,13 +85,24 @@ fun LucentoBottomSheet(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
         sheetState = sheetState,
+        dragHandle = if (dragToDismiss) DefaultHandle else null,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .nestedScroll(KeepFlingInSheet)
+                .then(
+                    if (dragToDismiss) {
+                        Modifier.nestedScroll(KeepFlingInSheet)
+                    } else {
+                        Modifier
+                            .padding(top = Spacing.md)
+                            .nestedScroll(KeepAllInSheet)
+                            // A drag on the form's still parts (not taken by a scrolling list) goes no further either.
+                            .pointerInput(Unit) { detectVerticalDragGestures { change, _ -> change.consume() } }
+                    },
+                )
                 .graphicsLayer {
                     alpha = 0.35f + 0.65f * appear.value
                     translationY = (1f - appear.value) * 20.dp.toPx()
@@ -92,6 +116,21 @@ fun LucentoBottomSheet(
 private val KeepFlingInSheet = object : NestedScrollConnection {
     override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity = available
 }
+
+/** For a sheet that only Back closes: whatever scroll or fling the content leaves is kept, so the sheet never moves. */
+private val KeepAllInSheet = object : NestedScrollConnection {
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset = available
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity = available
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+private val DefaultHandle: @Composable () -> Unit = { BottomSheetDefaults.DragHandle() }
+
+/** The state for a [LucentoBottomSheet] with `dragToDismiss = false`: fully open, and never dragged or tapped away. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun rememberStickySheetState(): SheetState =
+    rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { it != SheetValue.Hidden })
 
 /**
  * The top of every sheet, so they read as one family: what the sheet is about as a tile — [leading] (a category, a

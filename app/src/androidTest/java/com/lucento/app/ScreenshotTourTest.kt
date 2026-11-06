@@ -164,9 +164,9 @@ class ScreenshotTourTest {
     fun tour() {
         // ---------------------------------------------------------------- onboarding
         // Part B onboarding: workspace choice, focus, how you pay, categories, currency, backups, summary.
-        waitForText("Start fresh")
+        waitForText("Get started")
         shot("01-onboarding-welcome")
-        click("Start fresh")
+        click("Get started")
         waitForText("What do you want Lucento to help with?")
         shot("01b-onboarding-focus")
         click("Continue") // tracking spending and budgeting are always included

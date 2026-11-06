@@ -250,6 +250,13 @@ class AppContainer(application: Application) {
             transact = { block -> runner.run { block() } },
             // Lucento Shared: this phone's Partner membership is gone — the shared ledger leaves the phone.
             onMembershipRevoked = { ownerId -> sharedSpace.endedByOwner(ownerId) },
+            // Multicurrency: the main currency counts as chosen once onboarding is done; the ledger's (on the server) wins.
+            mainCurrency = {
+                preferences.preferences.first().let { p -> p.primaryCurrency.takeIf { p.onboardingComplete } }
+            },
+            adoptMainCurrency = { code ->
+                if (com.lucento.app.core.money.CurrencyRules.isSupported(code)) preferences.setPrimaryCurrency(code)
+            },
         )
     }
 
@@ -272,6 +279,15 @@ class AppContainer(application: Application) {
 
     /** The profile picture (private file; from the photo picker, or the Google account's picture on request). */
     val profilePhotos: com.lucento.app.data.media.ProfilePhotos by lazy { com.lucento.app.data.media.ProfilePhotos(application) }
+
+    /** Multicurrency: the day's exchange rates, fetched only while "Exchange rates online" is on (docs/MULTICURRENCY.md). */
+    val fxRates: com.lucento.app.data.fx.FxRateSource by lazy {
+        com.lucento.app.data.fx.OnlineFxRates(
+            cache = com.lucento.app.data.fx.DataStoreFxRateCache(application),
+            enabled = { preferences.preferences.first().fxRatesOnline },
+            isOnline = { application.isOnlineNow() },
+        )
+    }
 
     val ledgerReset: LocalLedgerReset by lazy {
         val photos = GoalPhotos(application)

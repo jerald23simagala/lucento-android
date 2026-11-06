@@ -194,6 +194,8 @@ class RoomBackupStore(
                     name = row.name,
                     type = row.type.name,
                     institutionId = row.institutionId,
+                    fxBasisRate = row.fxBasisRate,
+                    fxRevalue = row.fxRevalue,
                     currencyCode = row.currency,
                     openingBalanceMinor = row.openingBalanceMinor,
                     sortOrder = row.sortOrder,
@@ -289,6 +291,9 @@ class RoomBackupStore(
                     createdAt = row.createdAt,
                     updatedAt = row.updatedAt,
                     transferGroup = row.transferGroup,
+                    baseAmountMinor = row.baseAmountMinor,
+                    baseCurrency = row.baseCurrency,
+                    fxSource = row.fxSource,
                     dirty = RestoredSync.DIRTY,
                     syncedAt = RestoredSync.syncedAt,
                     baseRevision = RestoredSync.baseRevision,
@@ -519,6 +524,8 @@ class RoomBackupStore(
 private fun WalletEntity.toBackup() = BackupWallet(
     id = requireNotNull(clientUuid),
     institutionId = institutionId,
+    fxBasisRate = fxBasisRate,
+    fxRevalue = fxRevalue,
     name = name,
     type = enumValueOf(type),
     currency = currencyCode,
@@ -552,6 +559,9 @@ private fun TransactionEntity.toBackup(wallets: Map<Long, String>, categories: M
     createdAt = createdAt,
     updatedAt = updatedAt,
     transferGroup = transferGroup,
+    baseAmountMinor = baseAmountMinor,
+    baseCurrency = baseCurrency,
+    fxSource = fxSource,
 )
 
 private fun BudgetEntity.toBackup(categories: Map<Long, String>) = BackupBudget(
@@ -658,6 +668,8 @@ private fun CategoryEntity.edited(row: BackupCategory) = copy(
 
 private fun newWallet(row: BackupWallet) = WalletEntity(
     institutionId = row.institutionId,
+    fxBasisRate = row.fxBasisRate,
+    fxRevalue = row.fxRevalue,
     name = row.name,
     type = row.type.name,
     currencyCode = row.currency,
@@ -674,6 +686,8 @@ private fun newWallet(row: BackupWallet) = WalletEntity(
 
 private fun WalletEntity.edited(row: BackupWallet) = copy(
     institutionId = row.institutionId,
+    fxBasisRate = row.fxBasisRate,
+    fxRevalue = row.fxRevalue,
     name = row.name,
     type = row.type.name,
     currencyCode = row.currency,
@@ -775,6 +789,9 @@ private fun newTransaction(
     createdAt = row.createdAt,
     updatedAt = row.updatedAt,
     transferGroup = row.transferGroup,
+    baseAmountMinor = row.baseAmountMinor,
+    baseCurrency = row.baseCurrency,
+    fxSource = row.fxSource,
     dirty = true,
     syncedAt = null,
     baseRevision = null,
@@ -795,6 +812,9 @@ private fun TransactionEntity.edited(
     createdAt = row.createdAt,
     updatedAt = row.updatedAt,
     transferGroup = row.transferGroup,
+    baseAmountMinor = row.baseAmountMinor,
+    baseCurrency = row.baseCurrency,
+    fxSource = row.fxSource,
     dirty = true,
     syncedAt = null,
     baseRevision = null,

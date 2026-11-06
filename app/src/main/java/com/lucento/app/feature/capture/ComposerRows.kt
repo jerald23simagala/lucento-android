@@ -116,6 +116,8 @@ internal fun ReviewRowItem(
     modifier: Modifier = Modifier,
     /** Inside Lucento's reply card: a flat, tinted panel instead of a raised card of its own. */
     nested: Boolean = false,
+    /** Multicurrency: a row in another currency's value in the main currency, and the rate it is saved at. */
+    fx: com.lucento.app.domain.fx.FxQuote? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val category = categories.firstOrNull { it.id == row.categoryId }
@@ -248,6 +250,15 @@ internal fun ReviewRowItem(
                     AmountLabel(row, status, enabled) { editingAmount = true }
                 }
             }
+            fx?.let { quote ->
+                Text(
+                    fxLine(quote, row.date, wallets.firstOrNull { it.id == row.walletId }?.currencyCode.orEmpty()),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    modifier = Modifier.fillMaxWidth().padding(start = 40.dp, end = Spacing.sm, bottom = Spacing.xs),
+                )
+            }
 
             // Competing amounts, as one-tap choices; they wrap rather than run off the card.
             if (row.amountText.isBlank() && row.amountOptions.isNotEmpty()) {
@@ -303,6 +314,20 @@ internal fun ReviewRowItem(
             shownIssues.forEach { IssueLine(it, Modifier.padding(start = 40.dp, end = Spacing.sm, bottom = Spacing.xs)) }
         }
     }
+}
+
+/** "≈ ₱6,369.38 · 1 USD = 63.69 PHP, today's rate" — what a row in another currency is saved at, and why that rate. */
+internal fun fxLine(quote: com.lucento.app.domain.fx.FxQuote, date: java.time.LocalDate, from: String): String {
+    val why = when (quote.source) {
+        com.lucento.app.domain.fx.FxSource.MARKET -> if (date == java.time.LocalDate.now()) "today’s rate" else "that day’s rate"
+        com.lucento.app.domain.fx.FxSource.LAST_RATE -> "this wallet’s last rate"
+        com.lucento.app.domain.fx.FxSource.AVERAGE -> "this wallet’s average, no FX gain or loss"
+        com.lucento.app.domain.fx.FxSource.ENTERED -> "your rate"
+        com.lucento.app.domain.fx.FxSource.TRANSFER -> "the transfer’s rate"
+    }
+    val code = quote.value.currencyCode
+    return "≈ ${com.lucento.app.core.money.MoneyFormatter.format(quote.value)} · " +
+        "1 $from = ${com.lucento.app.core.money.FxRate.displayRate(quote.rate)} $code, $why"
 }
 
 /** "Bank → GCash", with "?" for a side still to choose, so a transfer never reads like spending. */

@@ -51,6 +51,15 @@ interface SyncRemote {
      * Throws on any network or server error — a failed request is never reported as "not a Partner".
      */
     suspend fun partnerSpaceOwnerId(): String?
+
+    /**
+     * Multicurrency: the main currency of the ledger [ledgerUserId] (the account's own, or the Owner's in a Shared Space)
+     * as set on the server, or null when none is set yet. Throws on network or server errors.
+     */
+    suspend fun mainCurrency(ledgerUserId: String): String? = null
+
+    /** Multicurrency: sets it, once. The server keeps the first value (there is no way to change it). */
+    suspend fun setMainCurrency(ledgerUserId: String, code: String) = Unit
 }
 
 class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
@@ -140,7 +149,29 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
         }.decodeList<JsonObject>().firstOrNull()?.get("owner_id")?.jsonPrimitive?.contentOrNull
     }
 
+    override suspend fun mainCurrency(ledgerUserId: String): String? =
+        // RLS shows the account's own row and, to a Partner, their Owner's (supabase/migrations/…_multicurrency.sql).
+        client.from(LEDGER_SETTINGS).select(columns = Columns.list("main_currency")) {
+            filter { eq("user_id", ledgerUserId) }
+            limit(1)
+        }.decodeList<JsonObject>().firstOrNull()?.get("main_currency")?.jsonPrimitive?.contentOrNull
+
+    override suspend fun setMainCurrency(ledgerUserId: String, code: String) {
+        try {
+            client.from(LEDGER_SETTINGS).insert(
+                kotlinx.serialization.json.buildJsonObject {
+                    put("user_id", kotlinx.serialization.json.JsonPrimitive(ledgerUserId))
+                    put("main_currency", kotlinx.serialization.json.JsonPrimitive(code))
+                },
+            )
+        } catch (e: io.github.jan.supabase.postgrest.exception.PostgrestRestException) {
+            // Another phone of this account set it first (unique user_id): the next cycle reads and adopts that one.
+            if (e.code != "23505") throw e
+        }
+    }
+
     companion object {
+        const val LEDGER_SETTINGS = "ledger_settings"
         const val SERVER_UPDATED_AT = "server_updated_at"
         const val REVISION = "revision"
     }

@@ -28,7 +28,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -122,7 +124,18 @@ class AskLucentoViewModel(
         ) { t, w, c, b, s -> ReportInputs(w, t, c, b, s, LocalDate.now()) },
         goals?.observeGoals() ?: flowOf(emptyList()),
         goals?.observeContributions() ?: flowOf(emptyList()),
-    ) { base, g, contributions -> base.copy(goals = g, contributions = contributions) }
+        preferences.preferences.map { it.primaryCurrency }.distinctUntilChanged(),
+    ) { base, g, contributions, main ->
+        // Multicurrency: reports and AI answers read every figure in the main currency, FX results included.
+        val ledger = com.lucento.app.domain.fx.FxTranslation.translate(main, base.wallets, base.transactions)
+        base.copy(
+            wallets = ledger.wallets,
+            transactions = ledger.withFxResults,
+            categories = ledger.withFxCategories(base.categories),
+            goals = g,
+            contributions = contributions,
+        )
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val uiState: StateFlow<AskUiState> = combine(inputs, preferences.preferences, signedInEmail, conversation) { data, prefs, email, chat ->

@@ -101,6 +101,8 @@ fun DebtsScreen(
                                 money = totals.first(),
                                 style = AmountStyles.hero,
                                 color = if (totals.first().isZero) MaterialTheme.colorScheme.onSurface else LucentoTheme.extendedColors.negative,
+                                fractionScale = 1f,
+                                minScale = 0.5f,
                             )
                         }
                         totals.drop(1).forEach { other ->

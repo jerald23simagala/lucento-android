@@ -168,7 +168,8 @@ private fun TrendSection(data: InsightsData, currency: String, period: TrendPeri
             Column(Modifier.weight(1.15f)) {
                 HeroPill("Net · last ${period.months} months", if (net.isNegative) HeroTones.tangerine else HeroTones.main)
                 Spacer(Modifier.height(Spacing.xs))
-                MoneyText(money = net, style = AmountStyles.hero, showPlus = true, color = ext.onHero)
+                // Cents at full size, as on Home and Wallets (owner, 2026-11-06: the decimals read smaller than the figure).
+                MoneyText(money = net, style = AmountStyles.hero, showPlus = true, color = ext.onHero, fractionScale = 1f, minScale = 0.5f)
                 val change = if (hadData) Insights.changePercent(net, Money.sum(currency, earlier.map { it.net })) else null
                 if (change != null) {
                     ChangeChip(change, "vs. prior ${period.months} months")
@@ -320,7 +321,7 @@ private fun NetWorthSection(data: InsightsData, currency: String) {
     val net = composition.netWorth
     LucentoCard(Modifier.fillMaxWidth()) {
         Figure("Net worth · $currency") {
-            MoneyText(money = net, style = AmountStyles.hero, color = if (net.isNegative) ext.negative else MaterialTheme.colorScheme.onSurface)
+            MoneyText(money = net, style = AmountStyles.hero, color = if (net.isNegative) ext.negative else MaterialTheme.colorScheme.onSurface, fractionScale = 1f, minScale = 0.5f)
         }
         Text(
             when {

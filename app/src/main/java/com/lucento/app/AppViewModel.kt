@@ -48,7 +48,24 @@ class AppViewModel(
     accountPhotoUrl: Flow<String?> = flowOf(null),
     /** Lucento Shared (docs/shared); null in tests. */
     private val sharedSpace: com.lucento.app.data.sharedspace.SharedSpaceRepository? = null,
+    /** Multicurrency: for the app-wide "≈ ₱…" values (null in tests: none shown). */
+    wallets: com.lucento.app.data.repository.WalletRepository? = null,
+    transactions: com.lucento.app.data.repository.TransactionRepository? = null,
 ) : ViewModel() {
+    /** Multicurrency: every wallet's and movement's value in the main currency, for the "≈ ₱…" lines under them. */
+    val fxDisplay: StateFlow<com.lucento.app.domain.fx.FxDisplay> =
+        if (wallets == null || transactions == null) {
+            kotlinx.coroutines.flow.MutableStateFlow(com.lucento.app.domain.fx.FxDisplay.NONE)
+        } else {
+            combine(
+                wallets.observeWallets(),
+                transactions.observeTransactions(),
+                preferences.preferences.map { it.primaryCurrency }.distinctUntilChanged(),
+            ) { w, t, main -> com.lucento.app.domain.fx.FxDisplay.of(main, w, t) }
+                .flowOn(Dispatchers.Default)
+                .stateIn(viewModelScope, SharingStarted.Eagerly, com.lucento.app.domain.fx.FxDisplay.NONE)
+        }
+
     /** Lucento Shared: what this phone may change (a Partner's phone doesn't change the financial structure). */
     val sharedAccess: StateFlow<com.lucento.app.domain.SharedAccess> = (sharedSpace?.access ?: flowOf(com.lucento.app.domain.SharedAccess.Solo))
         .stateIn(viewModelScope, SharingStarted.Eagerly, com.lucento.app.domain.SharedAccess.Solo)
@@ -190,7 +207,7 @@ class AppViewModel(
 
     companion object {
         val Factory = containerFactory {
-            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace)
+            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions)
         }
     }
 }

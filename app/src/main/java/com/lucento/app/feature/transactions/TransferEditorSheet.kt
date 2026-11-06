@@ -31,7 +31,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -90,7 +89,7 @@ fun TransferEditorSheet(
     onDismiss: () -> Unit,
     sourceNote: String? = null,
 ) = AmountsShown {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = com.lucento.app.core.designsystem.component.rememberStickySheetState()
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     val decimalSeparator = remember { MoneyFormatter.decimalSeparator() }
@@ -102,8 +101,9 @@ fun TransferEditorSheet(
     val isNew = initial.group == null
 
     val from = wallets.firstOrNull { it.id == draft.fromWalletId }
-    // Destinations: any other wallet in the same currency.
-    val destinations = wallets.filter { it.id != draft.fromWalletId && (from == null || it.currencyCode == from.currencyCode) }
+    // Destinations: any other wallet. Between two currencies the amount that arrived is asked for (multicurrency).
+    val destinations = wallets.filter { it.id != draft.fromWalletId }
+    val to = wallets.firstOrNull { it.id == draft.toWalletId }
     val amountError = error is TransferDraftError.AmountInvalid || error is TransferDraftError.AmountZero ||
         error is TransferDraftError.AmountTooPrecise || error is TransferDraftError.AmountTooLarge ||
         error is TransferDraftError.AmountUnclear
@@ -112,7 +112,7 @@ fun TransferEditorSheet(
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
     }
 
-    LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, dragToDismiss = false) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -173,9 +173,7 @@ fun TransferEditorSheet(
             IconFieldHeader(Icons.Filled.NorthEast, "From", Modifier.padding(top = Spacing.xs))
             WalletPills(wallets, draft.fromWalletId, mixedCurrencies) { id ->
                 haptics.tick()
-                val newFrom = wallets.firstOrNull { it.id == id }
-                val keepTo = wallets.firstOrNull { it.id == draft.toWalletId }
-                    ?.takeIf { it.id != id && it.currencyCode == newFrom?.currencyCode }
+                val keepTo = wallets.firstOrNull { it.id == draft.toWalletId }?.takeIf { it.id != id }
                 draft = draft.copy(fromWalletId = id, toWalletId = keepTo?.id)
                 error = null
             }
@@ -199,7 +197,7 @@ fun TransferEditorSheet(
             IconFieldHeader(Icons.Filled.SouthWest, "To")
             if (destinations.isEmpty()) {
                 Text(
-                    if (from == null) "Choose the source account first." else "No other ${from.currencyCode} account. Add one in Wallets to transfer.",
+                    if (from == null) "Choose the source account first." else "No other account yet. Add one in Wallets to transfer.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -213,8 +211,24 @@ fun TransferEditorSheet(
             when (error) {
                 TransferDraftError.ToRequired -> ErrorText("Choose where the money goes.")
                 TransferDraftError.SameWallet -> ErrorText("Choose two different accounts.")
-                TransferDraftError.CurrencyMismatch -> ErrorText("Both accounts must use the same currency.")
+                TransferDraftError.CurrencyMismatch -> ErrorText("Each account must keep its own currency.")
                 else -> Unit
+            }
+            // Multicurrency: between two currencies, what arrived — the two real amounts are the rate paid.
+            if (from != null && to != null && from.currencyCode != to.currencyCode) {
+                ReceivedField(
+                    from = from.currencyCode,
+                    to = to.currencyCode,
+                    sentText = draft.amountText,
+                    text = draft.receivedText,
+                    date = draft.date,
+                    decimalSeparator = decimalSeparator,
+                    isError = error == TransferDraftError.ReceivedInvalid,
+                    onTextChange = {
+                        draft = draft.copy(receivedText = it)
+                        if (error == TransferDraftError.ReceivedInvalid) error = null
+                    },
+                )
             }
 
             IconFieldHeader(Icons.Outlined.CalendarMonth, "Date", Modifier.padding(top = Spacing.xs))
@@ -307,4 +321,65 @@ private fun WalletPills(wallets: List<Wallet>, selectedId: Long?, showCurrency: 
 @Composable
 private fun ErrorText(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = Spacing.xs))
+}
+
+/**
+ * Multicurrency: "They receive" in the destination's currency. While empty it is suggested from the day's rate when
+ * "Exchange rates online" is on; the person types what actually arrived. Underneath, the rate the two amounts imply.
+ */
+@Composable
+private fun ReceivedField(
+    from: String,
+    to: String,
+    sentText: String,
+    text: String,
+    date: java.time.LocalDate,
+    decimalSeparator: Char,
+    isError: Boolean,
+    onTextChange: (String) -> Unit,
+) {
+    val rates = com.lucento.app.feature.fx.LocalFxRates.current
+    val sent = (com.lucento.app.core.money.MoneyParser.parse(sentText, from, decimalSeparator) as? com.lucento.app.core.money.MoneyParser.Result.Success)?.money
+    val received = (com.lucento.app.core.money.MoneyParser.parse(text, to, decimalSeparator) as? com.lucento.app.core.money.MoneyParser.Result.Success)?.money
+    val currentText by androidx.compose.runtime.rememberUpdatedState(text)
+    val change by androidx.compose.runtime.rememberUpdatedState(onTextChange)
+    var suggested by androidx.compose.runtime.remember(from, to, date) { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(from, to, date, sent) {
+        if (sent == null || sent.isZero || rates == null || (currentText.isNotBlank() && !suggested)) return@LaunchedEffect
+        val rate = runCatching { rates.rate(from, to, date) }.getOrNull() ?: return@LaunchedEffect
+        if (currentText.isBlank() || suggested) {
+            change(MoneyFormatter.formatPlain(com.lucento.app.core.money.FxRate(from, to, rate).convert(sent).abs()))
+            suggested = true
+        }
+    }
+    OutlinedTextField(
+        value = text,
+        onValueChange = {
+            suggested = false
+            onTextChange(it.take(20))
+        },
+        label = { Text("They receive") },
+        prefix = { Text(MoneyFormatter.currencySymbol(to) + " ") },
+        placeholder = { Text("0") },
+        singleLine = true,
+        isError = isError,
+        supportingText = {
+            val implied = if (sent != null && received != null && !sent.isZero && !received.isZero) {
+                com.lucento.app.core.money.FxRate.implied(sent, received)
+            } else {
+                null
+            }
+            Text(
+                when {
+                    isError -> "Enter what arrived in $to — the two amounts are the exchange rate."
+                    implied != null -> "1 $from = ${implied.display()} $to" + if (suggested) " (today’s rate — change it to what arrived)" else ""
+                    else -> "What arrived in $to. The two amounts are the rate you got."
+                },
+            )
+        },
+        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+        shape = com.lucento.app.core.designsystem.component.LucentoFields.shape,
+        colors = com.lucento.app.core.designsystem.component.LucentoFields.filledColors(),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -93,6 +94,27 @@ fun shownAmount(money: Money, signed: Boolean = false, showPlus: Boolean = false
 @ReadOnlyComposable
 fun spokenAmount(money: Money, signed: Boolean = false, showPlus: Boolean = false): String =
     if (LocalAmountsHidden.current) HIDDEN_AMOUNT_DESCRIPTION else shownAmount(money, signed, showPlus)
+
+/**
+ * "≈ ₱6,369.38": what an amount in another currency is worth in the main currency, in small type under it
+ * (multicurrency; owner, 2026-11-06: every foreign amount shows its main-currency equivalent). Hidden with the others.
+ */
+@Composable
+fun EquivalentAmount(
+    money: Money,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    signed: Boolean = true,
+) {
+    val hidden = LocalAmountsHidden.current
+    Text(
+        "≈ " + shownAmount(money, signed),
+        style = AmountStyles.small,
+        color = color,
+        maxLines = 1,
+        modifier = modifier.hiddenAmountSemantics(hidden),
+    )
+}
 
 private fun Modifier.hiddenAmountSemantics(hidden: Boolean): Modifier =
     if (hidden) clearAndSetSemantics { contentDescription = HIDDEN_AMOUNT_DESCRIPTION } else this

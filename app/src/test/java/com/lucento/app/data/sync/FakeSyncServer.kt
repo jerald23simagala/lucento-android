@@ -30,6 +30,13 @@ class FakeSyncServer(var serverNow: Long = 1_000_000_000_000L) {
     /** Lucento Shared: Partner account id -> the Owner (environment) they belong to. */
     val members = mutableMapOf<String, String>()
 
+    /**
+     * Multicurrency (20261106090000_multicurrency.sql): ledger -> main currency. Set once (the first stays), only by the
+     * account itself; read by it and by its Partners. [noLedgerSettings]: a project without the migration (errors).
+     */
+    val mainCurrencies = mutableMapOf<String, String>()
+    var noLedgerSettings = false
+
     /** Every upsert batch received, by table (for tests that check what a phone sent). */
     val upserts = mutableListOf<Pair<String, List<JsonObject>>>()
 
@@ -145,6 +152,17 @@ class FakeSyncServer(var serverNow: Long = 1_000_000_000_000L) {
         }
 
         override suspend fun partnerSpaceOwnerId(): String? = userId?.let { members[it] }
+
+        override suspend fun mainCurrency(ledgerUserId: String): String? {
+            if (noLedgerSettings) error("relation \"public.ledger_settings\" does not exist")
+            return mainCurrencies[ledgerUserId]?.takeIf { userId != null && canRead(userId, ledgerUserId) }
+        }
+
+        override suspend fun setMainCurrency(ledgerUserId: String, code: String) {
+            if (noLedgerSettings) error("relation \"public.ledger_settings\" does not exist")
+            require(ledgerUserId == userId) { "new row violates row-level security policy" }
+            mainCurrencies.putIfAbsent(ledgerUserId, code)
+        }
 
         private fun currentAccount(): String = userId!!
     }

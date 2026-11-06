@@ -61,6 +61,8 @@ data class TransactionsUiState(
     val totalCount: Int = 0,
     val matchCount: Int = 0,
     val transfers: Map<String, Transfer> = emptyMap(),
+    /** Multicurrency: each movement in another currency's value in the main currency, for an "≈ ₱…" line. */
+    val fxValues: Map<Long, com.lucento.app.core.money.Money> = emptyMap(),
 ) {
     val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
     val walletNames: Map<Long, String> = wallets.associate { it.id to it.name }
@@ -104,6 +106,11 @@ class TransactionsViewModel(
             categoryNames = categoryList.associate { it.id to it.name },
             walletNames = walletList.associate { it.id to it.name },
         )
+        // Multicurrency: rows keep their own currency; the day and page totals are in the main currency, each movement
+        // in another currency at its own value (docs/CALCULATIONS.md "Exchange rates").
+        val ledger = com.lucento.app.domain.fx.FxTranslation.translate(prefs.primaryCurrency, walletList, all)
+        val valued = ledger.transactions.associateBy { it.id }
+        fun inMain(list: List<com.lucento.app.domain.Transaction>) = list.map { valued[it.id] ?: it }
         TransactionsUiState(
             loading = false,
             primaryCurrency = prefs.primaryCurrency,
@@ -111,12 +118,13 @@ class TransactionsViewModel(
             categories = categoryList,
             filter = filter,
             sections = TransactionQueries.groupByDay(matches).map { group ->
-                DaySection(group, Insights.netByCurrency(group.items, prefs.primaryCurrency))
+                DaySection(group, Insights.netByCurrency(inMain(group.items), prefs.primaryCurrency))
             },
             shownTotals = TransactionQueries.totalsByCurrency(
-                matches,
-                com.lucento.app.domain.FocusCurrency.of(prefs.primaryCurrency, walletList, all),
+                inMain(matches),
+                com.lucento.app.domain.FocusCurrency.of(prefs.primaryCurrency, ledger.wallets, ledger.transactions),
             ),
+            fxValues = ledger.book.values,
             totalCount = visible.size,
             matchCount = matches.size,
             transfers = Transfer.pair(all),

@@ -95,6 +95,10 @@ fun WalletRow(
                     else -> MaterialTheme.colorScheme.onSurface
                 },
             )
+            // Multicurrency: a wallet in another currency shows what it's worth in the main one under its own amount.
+            com.lucento.app.feature.fx.LocalFxDisplay.current.netWorthValue(wallet)?.let {
+                com.lucento.app.core.designsystem.component.EquivalentAmount(it)
+            }
             val caption = when {
                 flag == BalanceFlag.OWED_TO_YOU -> "in credit · check"
                 flag != null -> "below zero · check"

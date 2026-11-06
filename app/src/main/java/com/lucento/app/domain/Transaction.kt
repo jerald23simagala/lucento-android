@@ -53,6 +53,18 @@ data class Transaction(
     /** Lucento Shared: the account that added / last changed it (see [PeopleDirectory.attribution]); null when unknown. */
     val createdBy: String? = null,
     val updatedBy: String? = null,
+    /**
+     * v13, multicurrency (docs/CALCULATIONS.md "Exchange rates"): this movement's value in the main currency, for a
+     * wallet in another currency — what the rate in [fxSource] made of [amount]. Null in a main-currency wallet, and for
+     * rows written before multicurrency or without a rate (they follow the wallet's average, [com.lucento.app.domain.fx.FxSource.AVERAGE]).
+     */
+    val baseAmount: Money? = null,
+    val fxSource: com.lucento.app.domain.fx.FxSource? = null,
+    /**
+     * Not a recorded movement: a realized FX gain (INCOME) or loss (EXPENSE) the average method worked out
+     * ([com.lucento.app.domain.fx.FxTranslation]). Shown in Insights and reports, never in budgets or the transaction list.
+     */
+    val fxResult: Boolean = false,
 ) {
     val currencyCode: String get() = amount.currencyCode
 

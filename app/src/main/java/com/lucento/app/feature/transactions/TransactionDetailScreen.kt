@@ -174,6 +174,10 @@ fun TransactionDetailScreen(
                             showPlus = true,
                             color = tone.content,
                         )
+                        // Multicurrency: its value in the main currency, under the amount.
+                        com.lucento.app.feature.fx.LocalFxDisplay.current
+                            .value(transaction, sign = if (isTransfer) 0 else if (transaction.signedAmount.isNegative) -1 else 1)
+                            ?.let { com.lucento.app.core.designsystem.component.EquivalentAmount(it, signed = !isTransfer) }
                         Spacer(Modifier.height(Spacing.sm))
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                             Pill(kindLabel, tone)

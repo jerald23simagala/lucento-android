@@ -474,6 +474,40 @@ class MigrationTest {
     }
 
     /**
+     * Multicurrency (v13): every existing row follows its wallet's average (no value of its own), every wallet starts
+     * unvalued with revaluation off, and nothing is marked for upload.
+     */
+    @Test
+    fun migrate12To13_addsFxColumnsWithoutChangingAnything() {
+        helper.createDatabase(TEST_DB, 12).apply {
+            execSQL(
+                "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, dirty, synced_at) " +
+                    "VALUES (1, 'Dollars', 'BANK', 'USD', 100000, 0, 0, 1, 1, 'w-1', 0, 5)"
+            )
+            execSQL(
+                "INSERT INTO transactions (id, type, amount_minor, currency_code, wallet_id, occurred_on, note, client_uuid, created_at, updated_at, dirty, synced_at) " +
+                    "VALUES (1, 'EXPENSE', 4500, 'USD', 1, 20000, 'Groceries', 'tx-1', 1, 1, 0, 5)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 13, true, Migrations.MIGRATION_12_13)
+
+        assertEquals(1L, db.long("SELECT COUNT(*) FROM wallets WHERE fx_basis_rate IS NULL AND fx_revalue = 0"))
+        assertEquals(1L, db.long("SELECT COUNT(*) FROM transactions WHERE base_amount_minor IS NULL AND base_currency IS NULL AND fx_source IS NULL"))
+        assertEquals(4500L, db.long("SELECT amount_minor FROM transactions WHERE id = 1"))
+        assertEquals(
+            "migrated rows are unchanged, so they do not re-upload",
+            0L,
+            db.long("SELECT SUM(dirty) FROM wallets") + db.long("SELECT SUM(dirty) FROM transactions"),
+        )
+
+        SyncTriggers.ensure(db)
+        db.execSQL("UPDATE wallets SET fx_basis_rate = '56.1234', updated_at = 2 WHERE id = 1")
+        assertEquals("a wallet's rate is an ordinary change and syncs", 1L, db.long("SELECT dirty FROM wallets WHERE id = 1"))
+        db.assertNoForeignKeyViolations()
+    }
+
+    /**
      * A fresh install never runs a migration — Room creates the tables from the entities — so the sync triggers must
      * come from the open callback. Before SyncTriggers, a new install had none: deletes never reached other devices and
      * edits after the first sync were never pushed.

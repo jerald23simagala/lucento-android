@@ -196,6 +196,18 @@ unconfigured), HomeOnTrackTest (L9).
 | LS-K12 | ~~Lucento Shared's local cache (role, space, people's names, dismissed invitations, notice) wasn't tied to an account and survived sign-out / account switch, so the next account could see the previous one's Shared Space state for up to 5 minutes (until the next refresh)~~ **Fixed 2026-11-05 (uncommitted)**: the account wipe (`LocalLedgerReset.wipe`, used by sign-out and by switching accounts) now clears it (`SharedSpaceStore.clearAll`); switching ledgers for the same person keeps it | Code review while adding the test-build account switch; `SharedSpaceLedgerSwitchTest` (+3) | — |
 | LS-K11 | The wallets reconcile note said "Open the wallet › Edit › Adjust balance"; Adjust balance moved to the wallet page in review round 2. Now "Open the wallet › Adjust balance" | Owner, 2026-11-05 | Fixed (uncommitted, on `feature/lucento-shared`) |
 
+## Multicurrency (2026-11-06, `feature/multicurrency`, uncommitted)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| MC-K1 | The migration isn't on `lucento-test` or production. A ledger with a wallet in another currency can't sync its FX values until it is (uploads stay pending; nothing is lost); one-currency ledgers sync as before | `MulticurrencySyncTest` (a one-currency ledger sends no FX keys; a project without `ledger_settings` still syncs) | NEXT_TASKS OT-10 |
+| MC-K2 | Month-end revaluation isn't built: `fx_revalue` is stored, synced and backed up, but no screen sets or uses it. Carrying values move only with movements | By design for stage 1 | NEXT_TASKS MC-2 |
+| MC-K3 | Movements the composer can't value at a market rate — scheduled payments, debt payments, balance adjustments, and any row while offline with "Average rate" chosen — follow the wallet's average (no FX gain or loss) | Code | MC-2 |
+| MC-K4 | The composer can't transfer between currencies (its review still requires one currency); the transfer sheet can | Code | MC-2 |
+| MC-K5 | Editing a transfer between two foreign wallets values it afresh (day rate, else last, else average) instead of keeping its old value; one-sided transfers (pesos ↔ dollars) always use their real amounts | Code | MC-2 |
+| MC-K6 | An older build (v12) that edits a foreign movement's amount on a ledger already using v13 leaves its stored value as it was (it doesn't know the columns); the next v13 edit corrects it | Same pattern as LS-K6's columns | Keep every phone of a ledger on v13 |
+| MC-K7 | Not run: on a device, against `lucento-test`, `MigrationTest.migrate12To13…`, `ScreenshotTourTest`, TalkBack and font scaling on the new fields | — | OT-11, MC-3 |
+
 ## Open — P2 / P3
 
 | ID | Issue | Evidence |

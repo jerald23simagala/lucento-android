@@ -536,7 +536,7 @@ private fun WalletFilters(
 }
 
 /**
- * Assets or liabilities: the section title with what it holds (or a link) and its per-currency subtotal, then the
+ * Assets or liabilities: the section title with what it holds (or a link) and its subtotal in the main currency, then the
  * wallets as rows in one card or, in card view, as wallet faces — two to a row (one under 340dp, three from 600dp).
  */
 private fun LazyListScope.walletSection(
@@ -554,9 +554,14 @@ private fun LazyListScope.walletSection(
 ) {
     if (wallets.isEmpty()) return
     item(key = "header-$key") {
-        // Per-currency subtotal; currencies are never added together.
-        val subtotals = wallets.groupBy { it.currencyCode }
-            .map { (code, list) -> Money.sum(code, list.map { it.netWorthContribution }) }
+        // One subtotal in the main currency (owner, 2026-11-06): a wallet in another currency counts at its value in the
+        // main one (the same average-method value its row shows). Only a foreign wallet with no rate yet stays in its own
+        // currency, listed after — currencies are never added together without a rate.
+        val fx = com.lucento.app.feature.fx.LocalFxDisplay.current
+        val subtotals = wallets.groupBy { wallet ->
+            if (wallet.currencyCode == primaryCurrency || fx.netWorthValue(wallet) != null) primaryCurrency else wallet.currencyCode
+        }
+            .map { (code, list) -> Money.sum(code, list.map { if (it.currencyCode == code) it.netWorthContribution else fx.netWorthValue(it)!! }) }
             .sortedWith(compareBy<Money> { it.currencyCode != primaryCurrency }.thenBy { it.currencyCode })
         ListSectionHeader(
             title,

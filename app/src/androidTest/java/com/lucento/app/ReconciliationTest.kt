@@ -79,7 +79,7 @@ class ReconciliationTest {
     @Test
     fun monthSpendingIsOneFigureAcrossHomeTransactionsAndBudget() {
         // Onboarding, as the screenshot tour walks it, keeping everything on this phone.
-        click("Start fresh")
+        click("Get started")
         click("Continue")
         waitForText("How do you pay?")
         click("Continue")

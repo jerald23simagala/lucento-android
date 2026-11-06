@@ -14,12 +14,13 @@ fun interface BackupMigrationStep {
 }
 
 object BackupMigrations {
-    const val CURRENT = 3
+    const val CURRENT = 4
 
     private val steps: Map<Int, BackupMigrationStep> = mapOf(
         0 to Migrate0To1,
         1 to Migrate1To2,
         2 to Migrate2To3,
+        3 to Migrate3To4,
     )
 
     fun toCurrent(document: JsonValue.Obj): JsonValue.Obj {
@@ -43,6 +44,17 @@ object BackupMigrations {
         }
         return current
     }
+}
+
+/**
+ * Version 4 (app v13, multicurrency) adds `fxBasisRate` / `fxRevalue` to wallets and `baseAmountMinor` / `baseCurrency` /
+ * `fxSource` to transactions. A version 3 file has none: its rows keep the original key sets, which the codec reads as
+ * "not valued yet" and "follows the wallet's average". The bump makes an older app refuse a version 4 file as "from a
+ * newer Lucento" instead of calling it invalid.
+ */
+private object Migrate3To4 : BackupMigrationStep {
+    override fun migrate(document: JsonValue.Obj): JsonValue.Obj =
+        JsonValue.Obj(LinkedHashMap(document.fields).apply { put("schemaVersion", JsonValue.Num("4")) })
 }
 
 /**

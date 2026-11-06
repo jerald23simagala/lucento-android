@@ -59,7 +59,10 @@ class InsightsViewModel(
         budgets.observeBudgets(),
         preferences.preferences,
     ) { t, w, c, b, p ->
-        InsightsData(false, LocalDate.now(), p.primaryCurrency, p.features, t, w, c, b)
+        // Multicurrency: Insights reads everything in the main currency, FX gains as income and FX losses as expenses,
+        // each under its own category (docs/CALCULATIONS.md "Exchange rates").
+        val ledger = com.lucento.app.domain.fx.FxTranslation.translate(p.primaryCurrency, w, t)
+        InsightsData(false, LocalDate.now(), p.primaryCurrency, p.features, ledger.withFxResults, ledger.wallets, ledger.withFxCategories(c), b)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InsightsData())
 
     companion object {

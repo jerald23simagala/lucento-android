@@ -147,17 +147,21 @@ fun BudgetScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var monthOffset by rememberSaveable { mutableIntStateOf(0) }
     val month = YearMonth.from(state.today).minusMonths(monthOffset.toLong())
-    // The same currency as Home's budget card and the Transactions totals (FocusCurrency), so all three agree.
-    val focus = remember(state.primaryCurrency, state.wallets, state.transactions) {
-        com.lucento.app.domain.FocusCurrency.of(state.primaryCurrency, state.wallets, state.transactions)
+    // Multicurrency: spending in other currencies counts toward the main-currency budget at its own value (owner,
+    // 2026-11-05); FX gains and losses never do. The same figures as Home's budget card and the Transactions totals.
+    val ledger = remember(state.primaryCurrency, state.wallets, state.transactions) {
+        com.lucento.app.domain.fx.FxTranslation.translate(state.primaryCurrency, state.wallets, state.transactions)
+    }
+    val focus = remember(state.primaryCurrency, ledger) {
+        com.lucento.app.domain.FocusCurrency.of(state.primaryCurrency, ledger.wallets, ledger.transactions)
     }
     val currencies = remember(state.budgets, state.categories, focus, month) {
         BudgetPlanner.currencies(state.budgets, state.categories, focus, month)
     }
     var currency by rememberSaveable { mutableStateOf<String?>(null) }
     val shownCurrency = currency?.takeIf { it in currencies } ?: focus
-    val plan = remember(state.categories, state.budgets, state.transactions, shownCurrency, month) {
-        BudgetPlanner.plan(state.categories, state.budgets, state.transactions, shownCurrency, month)
+    val plan = remember(state.categories, state.budgets, ledger, shownCurrency, month) {
+        BudgetPlanner.plan(state.categories, state.budgets, ledger.transactions, shownCurrency, month)
     }
     val isCurrentMonth = monthOffset == 0
     var editing by remember { mutableStateOf<CategoryBudgetLine?>(null) }
@@ -430,7 +434,7 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
         if (!plan.hasBudget) {
             CardOverline("Monthly budget · ${plan.currencyCode}", color = ext.onHeroMuted)
             Spacer(Modifier.height(Spacing.xs))
-            MoneyText(money = plan.total, style = AmountStyles.hero, color = ext.onHero)
+            MoneyText(money = plan.total, style = AmountStyles.hero, color = ext.onHero, fractionScale = 1f, minScale = 0.5f)
             Text(
                 "No amounts yet. Your total is the sum of your category amounts — set them below.",
                 style = MaterialTheme.typography.bodySmall,

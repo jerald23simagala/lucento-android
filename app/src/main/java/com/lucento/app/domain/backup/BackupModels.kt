@@ -48,6 +48,9 @@ data class BackupWallet(
     val updatedAt: Long,
     /** Institution registry id (v10), or null. Absent in backups written before v10. */
     val institutionId: String? = null,
+    /** Multicurrency (backup v4): a foreign wallet's opening rate ("63.69"), or null; revaluation at month end. */
+    val fxBasisRate: String? = null,
+    val fxRevalue: Boolean = false,
 )
 
 data class BackupCategory(
@@ -73,6 +76,10 @@ data class BackupTransaction(
     val createdAt: Long,
     val updatedAt: Long,
     val transferGroup: String?,
+    /** Multicurrency (backup v4): the value in the main currency with its currency and source; all three or none. */
+    val baseAmountMinor: Long? = null,
+    val baseCurrency: String? = null,
+    val fxSource: String? = null,
 )
 
 data class BackupBudget(
