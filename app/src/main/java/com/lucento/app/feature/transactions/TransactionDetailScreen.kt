@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SouthEast
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -205,6 +206,9 @@ fun TransactionDetailScreen(
             LucentoCard(modifier = Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
                 CardOverline("Details")
                 Spacer(Modifier.height(Spacing.xs))
+                // Lucento Shared: who added it (and who changed it last, when that was someone else). Nothing for a solo
+                // phone's own entries.
+                val attribution = com.lucento.app.feature.sharedspace.LocalPeople.current.attribution(transaction.createdBy, transaction.updatedBy)
                 val lines = buildList<@Composable () -> Unit> {
                     if (!isTransfer && !isAdjustment) {
                         add {
@@ -264,6 +268,16 @@ fun TransactionDetailScreen(
                                 label = "Recorded",
                                 value = recordedAt(transaction.createdAtEpochMillis),
                                 leading = { IconLeading(Icons.Outlined.Schedule) },
+                            )
+                        }
+                    }
+                    if (attribution != null) {
+                        add {
+                            DetailLine(
+                                label = "Added by",
+                                value = attribution.addedBy?.replaceFirstChar { it.uppercase() } ?: "Unknown",
+                                supporting = attribution.editedBy?.let { "Edited by $it" },
+                                leading = { IconLeading(Icons.Outlined.Group) },
                             )
                         }
                     }

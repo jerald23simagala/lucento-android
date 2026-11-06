@@ -67,6 +67,8 @@ fun DebtsScreen(
         .map { (code, list) -> Money.sum(code, list.map { it.balance }) }
         .sortedWith(compareBy<Money> { it.currencyCode != state.primaryCurrency }.thenBy { it.currencyCode })
     val newDebt = { WalletDraft(type = WalletType.LOAN, currencyCode = state.primaryCurrency) }
+    // Lucento Shared: a Partner sees every debt; the Shared Space's Owner adds and changes them.
+    val canEdit = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -75,7 +77,7 @@ fun DebtsScreen(
         ) {
             item(key = "bar") {
                 LucentoTopBar(title = "Debts", onBack = onBack, actions = {
-                    if (debts.isNotEmpty()) {
+                    if (canEdit && debts.isNotEmpty()) {
                         com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = { adding = newDebt() }, contentDescription = "Add debt")
                     }
                 })
@@ -87,7 +89,7 @@ fun DebtsScreen(
                         body = "Add a credit card or a loan with what you owe today. Payments then lower the balance without " +
                             "being counted as spending twice.",
                         illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
-                        action = { LucentoPrimaryButton(text = "Add a debt", onClick = { adding = newDebt() }) },
+                        action = if (canEdit) ({ LucentoPrimaryButton(text = "Add a debt", onClick = { adding = newDebt() }) }) else null,
                     )
                 }
             }

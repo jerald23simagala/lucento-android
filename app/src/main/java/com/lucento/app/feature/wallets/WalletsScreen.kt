@@ -122,7 +122,9 @@ fun WalletsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
     val newDraft = { WalletDraft(currencyCode = state.primaryCurrency) }
-    val canAdd = allowAdding || state.wallets.isEmpty()
+    val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
+    // A Partner sees every wallet but doesn't add them (the Shared Space's Owner does).
+    val canAdd = (allowAdding || state.wallets.isEmpty()) && access.canManageStructure
 
     // Assets by type order, then liabilities: the two halves of net worth, after the side filter.
     val shown = state.shown
@@ -156,7 +158,7 @@ fun WalletsScreen(
                     body = "Add the cash, bank accounts, e-wallets, savings and cards you use. " +
                         "Balances are entered by you and stay on this device — no bank connection needed.",
                     illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
-                    action = { LucentoPrimaryButton(text = "Add wallet", onClick = { editing = newDraft() }) },
+                    action = if (canAdd) ({ LucentoPrimaryButton(text = "Add wallet", onClick = { editing = newDraft() }) }) else null,
                 )
             }
         }
@@ -207,7 +209,11 @@ fun WalletsScreen(
             }
         }
 
-        if (!canAdd) {
+        if (!access.canManageStructure) {
+            item(key = "owner-manages") {
+                com.lucento.app.feature.sharedspace.OwnerManagesNote("wallets", Modifier.padding(top = Spacing.lg))
+            }
+        } else if (!canAdd) {
             item(key = "single") {
                 InfoNote(
                     "You’re tracking a single account. Turn on Multiple wallets in Settings › Enabled features to add more.",
@@ -614,7 +620,20 @@ private fun WalletFaceGrid(wallets: List<Wallet>, onOpen: (Wallet) -> Unit, modi
             wallets.chunked(columns).forEach { row ->
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     row.forEach { wallet ->
-                        CompactWalletFace(wallet, onClick = { onOpen(wallet) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        val owner = walletOwnership(wallet)
+                        if (owner == null) {
+                            CompactWalletFace(wallet, onClick = { onOpen(wallet) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        } else {
+                            Column(Modifier.weight(1f).fillMaxHeight()) {
+                                CompactWalletFace(wallet, onClick = { onOpen(wallet) }, modifier = Modifier.fillMaxWidth().weight(1f))
+                                Text(
+                                    owner,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = Spacing.xs, start = Spacing.xxs),
+                                )
+                            }
+                        }
                     }
                     repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
@@ -635,7 +654,7 @@ private fun ReconcileNote(flagged: Int, onScanReceipt: (() -> Unit)?) {
         buildString {
             if (warn) append("${if (flagged == 1) "1 balance looks" else "$flagged balances look"} off. ")
             append("Lucento doesn’t sync with your bank: compare balances with your real accounts and add what’s missing. ")
-            append("Can’t reconcile? Open the wallet › Edit › Adjust balance.")
+            append("Can’t reconcile? Open the wallet › Adjust balance.")
         },
         modifier = Modifier.padding(top = Spacing.lg),
         icon = if (warn) Icons.Outlined.WarningAmber else Icons.Outlined.Info,

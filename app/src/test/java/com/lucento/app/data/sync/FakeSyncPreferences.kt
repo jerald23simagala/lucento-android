@@ -51,4 +51,13 @@ class FakeSyncPreferences(
     override suspend fun addOverriddenChanges(count: Int) {
         overriddenChanges += count
     }
+
+    /** Lucento Shared: the Owner whose space this fake phone holds as a Partner. */
+    var sharedSpaceOwner: String? = null
+
+    override suspend fun sharedSpaceOwnerId(): String? = sharedSpaceOwner
+
+    override suspend fun setSharedSpaceOwnerId(ownerId: String?) {
+        sharedSpaceOwner = ownerId
+    }
 }

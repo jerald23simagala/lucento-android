@@ -37,7 +37,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -77,7 +79,16 @@ import com.lucento.app.domain.Feature
 import kotlinx.coroutines.launch
 
 /** Where the profile menu can take the user. */
-enum class ProfileDestination { SETTINGS, FEATURES }
+enum class ProfileDestination {
+    SETTINGS,
+    FEATURES,
+
+    /** Settings › Lucento Shared. */
+    SHARED,
+
+    /** Test builds only: Settings › Account & sync, opening Google's account picker straight away. */
+    SWITCH_ACCOUNT,
+}
 
 /**
  * The profile photo and what can be done with it: pick one from the phone, use the signed-in Google account's picture
@@ -198,6 +209,24 @@ fun ProfileSheet(
                 summary = "${Feature.entries.count { preferences.features.isEnabled(it) }} of ${Feature.entries.size} on · turn modules on or off",
                 onClick = { open(ProfileDestination.FEATURES) },
             )
+            Hairline(inset = inset)
+            val sharedWith = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.sharedWith
+            NavRow(
+                icon = Icons.Outlined.Group,
+                title = "Lucento Shared",
+                summary = sharedWith?.let { "Shared with $it" } ?: "Share your finances with someone",
+                onClick = { open(ProfileDestination.SHARED) },
+            )
+            // Test builds only: straight to Google's account picker (Settings › Account & sync › Switch account).
+            if (BuildConfig.DEBUG) {
+                Hairline(inset = inset)
+                NavRow(
+                    icon = Icons.Outlined.SwapHoriz,
+                    title = "Switch account",
+                    summary = "Test builds · pick another Google account on this phone",
+                    onClick = { open(ProfileDestination.SWITCH_ACCOUNT) },
+                )
+            }
             Spacer(Modifier.height(Spacing.lg))
             Text(
                 "Lucento ${BuildConfig.VERSION_NAME} · Financial clarity without the complexity.",

@@ -25,6 +25,16 @@ class LocalLedgerReset(
     /** Goal pictures and the profile photo: both belong to the account being removed. */
     private val deletePhotos: suspend () -> Unit,
     private val accountSetup: AccountSetupStore,
+    /** Lucento Shared: empties every table without seeding income categories (a Shared Space brings its own). */
+    private val clearTablesUnseeded: suspend () -> Unit = clearTables,
+    /** Lucento Shared: the ledger's own pictures (goal photos) — the person's profile photo stays. */
+    private val deleteLedgerPhotos: suspend () -> Unit = deletePhotos,
+    /**
+     * What else this phone remembers about the account being removed: Lucento Shared's cached space, names and dismissed
+     * invitations. Without it the next account briefly saw the previous one's Shared Space (role, people, invitations)
+     * until the next refresh, up to five minutes.
+     */
+    private val forgetAccount: suspend () -> Unit = {},
 ) {
     suspend fun wipe() = runWipe(
         marker = marker,
@@ -32,8 +42,43 @@ class LocalLedgerReset(
         clearTables = clearTables,
         clearRest = {
             deletePhotos()
+            forgetAccount()
             // Last: this edit sends the app back to onboarding (F-7), which may end the screen that started the wipe.
             accountSetup.resetForNextAccount()
+        },
+    )
+
+    /**
+     * Lucento Shared, joining: replaces this phone's ledger with an empty one bound to a Shared Space ([bind] records the
+     * Owner as the environment to sync), ready for its first pull. Nothing is seeded — every category comes from the
+     * space, and a Partner's phone could never upload a seeded one. Same order and marker as [wipe]; a kill part-way is
+     * finished on the next launch by [resumeIfInterrupted], which clears the binding too and lets onboarding find the
+     * membership and restore the space.
+     */
+    suspend fun switchToSharedSpace(bind: suspend () -> Unit) = runWipe(
+        marker = marker,
+        clearBinding = {
+            clearBinding()
+            bind()
+        },
+        clearTables = clearTablesUnseeded,
+        clearRest = {
+            deleteLedgerPhotos()
+            accountSetup.resetForSharedSpace()
+        },
+    )
+
+    /**
+     * Lucento Shared, leaving or removed: the shared ledger leaves this phone, which goes back through onboarding to the
+     * person's own account (restored there if it has data). The person stays signed in; their name and photo stay.
+     */
+    suspend fun returnToOwnLedger() = runWipe(
+        marker = marker,
+        clearBinding = clearBinding,
+        clearTables = clearTables,
+        clearRest = {
+            deleteLedgerPhotos()
+            accountSetup.resetForOwnLedger()
         },
     )
 
@@ -54,9 +99,9 @@ class LocalLedgerReset(
  * Empties every table in one Room transaction and seeds the fresh-install income categories. Returns only once both have
  * committed, which [runWipe] relies on.
  */
-fun clearLedgerTables(database: LucentoDatabase) {
+fun clearLedgerTables(database: LucentoDatabase, seed: Boolean = true) {
     database.clearAllTables()
-    CategorySeed.insertFreshInstall(database.openHelper.writableDatabase, System.currentTimeMillis())
+    if (seed) CategorySeed.insertFreshInstall(database.openHelper.writableDatabase, System.currentTimeMillis())
     // Room only refreshes observed queries for its own transactions; the seed above wrote through the raw
     // helper, so tell observers explicitly that every table changed (no stale ledger kept in a flow).
     database.invalidationTracker.refreshVersionsAsync()

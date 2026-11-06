@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ToggleOn
@@ -42,6 +43,19 @@ internal fun SettingsHub(current: SettingsUiState, onOpenPage: (SettingsPage) ->
             title = SettingsPage.ACCOUNT.title,
             summary = accountSummary(current.cloudSync, System.currentTimeMillis()),
             onClick = { onOpenPage(SettingsPage.ACCOUNT) },
+            wrapTitle = true,
+        )
+        Hairline(inset = inset)
+        val shared = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
+        NavRow(
+            icon = Icons.Outlined.Group,
+            title = SettingsPage.SHARED.title,
+            summary = when {
+                shared.isPartner -> "Sharing ${shared.ownerDisplay}’s finances"
+                shared.role == com.lucento.app.domain.SpaceRole.OWNER -> "Your Shared Space is on"
+                else -> "Manage money together with one other person"
+            },
+            onClick = { onOpenPage(SettingsPage.SHARED) },
             wrapTitle = true,
         )
         Hairline(inset = inset)

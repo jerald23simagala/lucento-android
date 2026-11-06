@@ -164,6 +164,7 @@ fun ManageCategoriesScreen(
                         CategoryRepository.SaveResult.BlankName -> setError("Enter a name.")
                         CategoryRepository.SaveResult.DuplicateName -> setError("You already have a category with this name.")
                         CategoryRepository.SaveResult.NotFound -> renaming = null
+                        CategoryRepository.SaveResult.NotPermitted -> setError("Only the Shared Space’s owner can change this.")
                     }
                 }
             },
@@ -183,6 +184,7 @@ fun ManageCategoriesScreen(
                         CategoryRepository.SaveResult.BlankName -> setError("Enter a name.")
                         CategoryRepository.SaveResult.DuplicateName -> setError("You already have a category with this name.")
                         CategoryRepository.SaveResult.NotFound -> adding = false
+                        CategoryRepository.SaveResult.NotPermitted -> setError("Only the Shared Space’s owner can change this.")
                     }
                 }
             },
@@ -204,6 +206,7 @@ fun ManageCategoriesScreen(
                         is CategoryRepository.DeleteResult.Archived -> "${category.name} was archived — its history is kept."
                         CategoryRepository.DeleteResult.Deleted -> "${category.name} was removed."
                         CategoryRepository.DeleteResult.NotFound -> null
+                        CategoryRepository.DeleteResult.NotPermitted -> "Only the Shared Space’s owner can change this."
                     }
                 }
             },

@@ -205,6 +205,9 @@ fun RecurringScreen(
         ScheduleOutlook.items(active, cardDues, today, from, to).filter(filter::matches)
     }
     val hasAnything = state.schedules.isNotEmpty() || cardDues.isNotEmpty()
+    // Lucento Shared: a Partner sees every schedule and reminder; the Shared Space's Owner manages and records them.
+    val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
+    val canEdit = access.canManageStructure
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -213,7 +216,7 @@ fun RecurringScreen(
         ) {
             item(key = "bar") {
                 LucentoTopBar(title = "Scheduled", onBack = onBack, actions = {
-                    if (state.schedules.isNotEmpty() && state.wallets.isNotEmpty()) {
+                    if (canEdit && state.schedules.isNotEmpty() && state.wallets.isNotEmpty()) {
                         com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = onAddSchedule, contentDescription = "Add scheduled transaction")
                     }
                 })
@@ -222,13 +225,15 @@ fun RecurringScreen(
                 item(key = "empty") {
                     EmptyState(
                         title = "Nothing scheduled yet",
-                        body = if (state.wallets.isEmpty()) {
+                        body = if (!canEdit) {
+                            "${access.ownerDisplay} hasn’t scheduled anything in this Shared Space yet."
+                        } else if (state.wallets.isEmpty()) {
                             "Add a wallet first — every scheduled transaction is paid from (or into) one."
                         } else {
                             "Add rent, subscriptions, loan payments or your salary. Lucento reminds you here and on Home, and you confirm each one."
                         },
                         illustration = { EmptyIllustration(LucentoAnimation.EmptyRecurring) },
-                        action = if (state.wallets.isEmpty()) {
+                        action = if (state.wallets.isEmpty() || !canEdit) {
                             null
                         } else {
                             { LucentoPrimaryButton(text = "Schedule a transaction", onClick = onAddSchedule) }
@@ -288,6 +293,11 @@ fun RecurringScreen(
                         },
                     )
                     ScheduledView.SCHEDULES -> scheduleItems(state, filter, onOpen = { actingOn = it })
+                }
+                if (!canEdit) {
+                    item(key = "owner-manages") {
+                        com.lucento.app.feature.sharedspace.OwnerManagesNote("scheduled payments", Modifier.padding(top = Spacing.md))
+                    }
                 }
                 item(key = "rule") {
                     InfoNote(
@@ -949,6 +959,7 @@ private fun ScheduleActionsSheet(
     var paidOn by remember(schedule.id, schedule.nextIndex) { mutableStateOf<LocalDate?>(due) }
     var message by remember { mutableStateOf<String?>(null) }
     var confirmingDelete by remember { mutableStateOf(false) }
+    val canEdit = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
 
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -1002,7 +1013,10 @@ private fun ScheduleActionsSheet(
                     else -> StatusPill(com.lucento.app.feature.transactions.shortDayLabel(due, state.today), StatusTones.neutral)
                 }
             }
-            if (due != null && !schedule.paused) {
+            if (!canEdit) {
+                com.lucento.app.feature.sharedspace.OwnerManagesNote("scheduled payments")
+            }
+            if (canEdit && due != null && !schedule.paused) {
                 LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
                     FieldHeader(if (schedule.type == TransactionType.INCOME) "Record as received" else "Record as paid")
                     if (debt != null) {
@@ -1053,6 +1067,7 @@ private fun ScheduleActionsSheet(
                                 is RecurringRepository.PayResult.Recorded -> onDismiss()
                                 RecurringRepository.PayResult.NotDue -> message = "This schedule has no more dates."
                                 RecurringRepository.PayResult.NotFound -> onDismiss()
+                                RecurringRepository.PayResult.NotPermitted -> message = "Only the Shared Space’s owner can change this."
                                 is RecurringRepository.PayResult.Rejected ->
                                     message = "Couldn’t record it — check that ${state.walletsById[schedule.walletId]?.name ?: "the wallet"}" +
                                         (debt?.let { " and ${it.name} still exist" } ?: " still exists") + "."
@@ -1065,7 +1080,7 @@ private fun ScheduleActionsSheet(
                     onDismiss()
                 })
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            if (canEdit) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 LucentoTextButton(text = if (schedule.paused) "Resume" else "Pause", onClick = {
                     onPause()
                     onDismiss()

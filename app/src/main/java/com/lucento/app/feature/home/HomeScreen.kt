@@ -14,6 +14,7 @@ import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Category
 import com.lucento.app.core.designsystem.component.icon
 import androidx.compose.foundation.Canvas
@@ -249,6 +250,11 @@ data class HomeActions(
     val onAddTransaction: (TransactionType?) -> Unit = {},
     val onTransfer: () -> Unit = {},
     val onScanReceipt: (() -> Unit)? = null,
+    /** Lucento Shared: an invitation waiting for this account, or a membership this phone doesn't show yet. */
+    val spacePrompt: com.lucento.app.data.sharedspace.SpacePrompt? = null,
+    val onOpenSpacePrompt: () -> Unit = {},
+    /** "Not now": the prompt goes; what it points to stays in Settings › Lucento Shared. */
+    val onDismissSpacePrompt: () -> Unit = {},
     /** A "top spending" tile: that category's transactions in the shown month. */
     val onOpenCategory: (Long, YearMonth) -> Unit = { _, _ -> },
 )
@@ -365,9 +371,17 @@ private fun HomeDashboard(
         ) { content ->
             when (content) {
                 HomeContent.Loading -> HomeSkeleton()
-                HomeContent.Welcome -> WelcomePanel(
-                    onAddWallet = { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) },
-                )
+                HomeContent.Welcome -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    actions.spacePrompt?.let { SpacePromptCard(it, actions) }
+                    WelcomePanel(
+                        // A Partner's phone: the Shared Space's Owner adds wallets (the panel then says so).
+                        onAddWallet = if (com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure) {
+                            { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) }
+                        } else {
+                            null
+                        },
+                    )
+                }
                 HomeContent.Overview -> Overview(
                     state = state,
                     actions = actions,
@@ -419,7 +433,10 @@ private enum class HomeContent { Loading, Welcome, Overview }
 
 // ------------------------------------------------------------------ Header
 
-/** "Dashboard" on the left; sync status, the payments bell (when Scheduled is on) and the profile entry on the right. */
+/**
+ * "Dashboard" on the left; sync status, the payments bell (when Scheduled is on) and the profile entry on the right.
+ * In a Shared Space someone has joined, the profile entry carries a "Shared" pill (ProfileButton).
+ */
 @Composable
 private fun HomeHeader(
     status: CloudStatus,
@@ -917,8 +934,21 @@ private fun MonthPill(state: HomeUiState, onSelect: (YearMonth) -> Unit) {
 
 /** First run with no wallets: one clear next step, and an honest description of what follows. */
 @Composable
-private fun WelcomePanel(onAddWallet: () -> Unit) {
+private fun WelcomePanel(onAddWallet: (() -> Unit)?) {
     val colors = LucentoTheme.extendedColors
+    if (onAddWallet == null) {
+        val owner = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.ownerDisplay
+        StatementPanel(Modifier.fillMaxWidth()) {
+            Text("Nothing here yet", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                "$owner hasn’t added any wallets to the Shared Space yet. Once they do, everything appears here.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onHeroMuted,
+            )
+        }
+        return
+    }
     Column {
         Spacer(Modifier.height(Spacing.sm))
         StatementPanel(Modifier.fillMaxWidth()) {
@@ -963,7 +993,9 @@ private fun Overview(
     onDismissSpotlight: () -> Unit = {},
 ) {
     val f = state.features
+    val canEdit = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        actions.spacePrompt?.let { SpacePromptCard(it, actions) }
         // P2-6: said only when one of this phone's own changes lost to a newer one from another device.
         overriddenNotice(state.syncDetails.overriddenChanges)?.let { notice ->
             InfoNote(notice, actionLabel = "Got it", onAction = onDismissOverridden)
@@ -996,7 +1028,8 @@ private fun Overview(
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
         }
 
-        if (state.gettingStartedLeft.isNotEmpty()) {
+        // Setting up wallets and a budget is the Owner's part in a Shared Space.
+        if (canEdit && state.gettingStartedLeft.isNotEmpty()) {
             GettingStartedCard(
                 left = state.gettingStartedLeft,
                 onAddWallet = onAddWallet,
@@ -2290,3 +2323,34 @@ internal fun monthLabel(month: YearMonth, locale: Locale = Locale.getDefault()):
     month.month.getDisplayName(TextStyle.FULL_STANDALONE, locale).replaceFirstChar { it.titlecase(locale) }
 
 private fun monthYearLabel(month: YearMonth, locale: Locale = Locale.getDefault()): String = "${monthLabel(month, locale)} ${month.year}"
+
+/**
+ * Lucento Shared, on the theme's hero panel so it is noticed: "Olivia invited you to share finances" (the action opens the
+ * invitation's review directly), or "You're in Olivia's Shared Space" when the account joined on another phone (the
+ * action opens Settings › Lucento Shared to switch). Not now puts the prompt away; Settings › Lucento Shared keeps it.
+ */
+@Composable
+private fun SpacePromptCard(prompt: com.lucento.app.data.sharedspace.SpacePrompt, actions: HomeActions) {
+    when (prompt) {
+        is com.lucento.app.data.sharedspace.SpacePrompt.Invitation ->
+            com.lucento.app.feature.sharedspace.InvitationSpotlight(
+                invitation = prompt.invitation,
+                myName = null,
+                actionLabel = "Review invitation",
+                onAction = actions.onOpenSpacePrompt,
+                dismissLabel = "Not now",
+                onDismiss = actions.onDismissSpacePrompt,
+            )
+        is com.lucento.app.data.sharedspace.SpacePrompt.JoinedElsewhere ->
+            com.lucento.app.core.designsystem.component.SpotlightCard(
+                eyebrow = "Lucento Shared",
+                title = "You’re in ${prompt.ownerName}’s Shared Space",
+                body = "You joined on another phone. Switch this one to see ${prompt.ownerName}’s finances here too.",
+                visual = { com.lucento.app.core.designsystem.component.PeoplePair(first = prompt.ownerName, second = null) },
+                actionLabel = "Open",
+                onAction = actions.onOpenSpacePrompt,
+                dismissLabel = "Not now",
+                onDismiss = actions.onDismissSpacePrompt,
+            )
+    }
+}

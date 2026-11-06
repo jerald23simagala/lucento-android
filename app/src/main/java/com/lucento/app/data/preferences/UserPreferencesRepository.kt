@@ -132,15 +132,46 @@ data class UserPreferences(
      * changes. The photo itself is a private file ([com.lucento.app.data.media.ProfilePhotos]).
      */
     val profilePhotoVersion: Long? = null,
+    /** Where the profile photo comes from: the Google account's picture by default, or the person's own choice. */
+    val profilePhotoChoice: ProfilePhotoChoice = ProfilePhotoChoice.GOOGLE,
     /** The colour theme. A device choice: kept across sign-outs, never in backups. */
     val themeId: ThemeId = ThemeId.SUNRISE,
 )
+
+/**
+ * The profile photo's source (owner, 2026-11-05: "Google by default, the user can override"). [GOOGLE]: a Google
+ * account's picture is fetched after each sign-in when no photo is on the phone. [OWN]: a picture the person picked.
+ * [NONE]: they removed it — initials, and no fetching. Belongs to the account: back to [GOOGLE] when the account changes.
+ */
+enum class ProfilePhotoChoice(val key: String) {
+    GOOGLE("google"),
+    OWN("own"),
+    NONE("none"),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): ProfilePhotoChoice = entries.firstOrNull { it.key == key } ?: GOOGLE
+    }
+}
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
 
 /** What a sign-out wipe resets in the preferences (F-7). An interface so the wipe can be tested without Android. */
 interface AccountSetupStore {
     suspend fun resetForNextAccount()
+
+    /**
+     * Lucento Shared, joining: this phone's ledger becomes a Shared Space's. Only what belonged to the old ledger goes
+     * (default wallet, budget acknowledgements, the guided setup); onboarding stays as it is, and so does everything
+     * about the person (name, photo, consents, theme, modules).
+     */
+    suspend fun resetForSharedSpace() = resetForNextAccount()
+
+    /**
+     * Lucento Shared, leaving or removed: back to the person's own account through onboarding, which restores it (or
+     * sets it up). Like [resetForNextAccount], but it is the same person, so their name, photo and consents stay.
+     */
+    suspend fun resetForOwnLedger() = resetForNextAccount()
 }
 
 class UserPreferencesRepository(
@@ -187,6 +218,7 @@ class UserPreferencesRepository(
         val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
         val walletsViewMode = stringPreferencesKey("wallets_view_mode")
         val profilePhotoVersion = longPreferencesKey("profile_photo_version")
+        val profilePhotoChoice = stringPreferencesKey("profile_photo_choice")
         val themeId = stringPreferencesKey("theme_id")
     }
 
@@ -226,6 +258,7 @@ class UserPreferencesRepository(
                 addSpotlightSeen = p[Keys.addSpotlightSeen] ?: false,
                 walletsViewMode = WalletsViewMode.fromKey(p[Keys.walletsViewMode]),
                 profilePhotoVersion = p[Keys.profilePhotoVersion],
+                profilePhotoChoice = ProfilePhotoChoice.fromKey(p[Keys.profilePhotoChoice]),
                 themeId = ThemeId.fromKey(p[Keys.themeId]),
             )
         }
@@ -233,6 +266,28 @@ class UserPreferencesRepository(
     /** One atomic edit, so no screen ever sees a half-reset state. See [resetAccountSetup]. */
     override suspend fun resetForNextAccount() {
         context.dataStore.edit { resetAccountSetup(it) }
+    }
+
+    override suspend fun resetForSharedSpace() {
+        context.dataStore.edit { resetForSharedSpaceLedger(it) }
+    }
+
+    override suspend fun resetForOwnLedger() {
+        context.dataStore.edit { p ->
+            val name = p[Keys.displayName]
+            val photo = p[Keys.profilePhotoVersion]
+            val photoChoice = p[Keys.profilePhotoChoice]
+            val smart = p[Keys.smartReading]
+            val ai = p[Keys.askLucentoAi]
+            val aiV1 = p[Keys.askLucentoAiV1]
+            resetAccountSetup(p)
+            name?.let { p[Keys.displayName] = it }
+            photo?.let { p[Keys.profilePhotoVersion] = it }
+            photoChoice?.let { p[Keys.profilePhotoChoice] = it }
+            smart?.let { p[Keys.smartReading] = it }
+            ai?.let { p[Keys.askLucentoAi] = it }
+            aiV1?.let { p[Keys.askLucentoAiV1] = it }
+        }
     }
 
     /**
@@ -362,6 +417,14 @@ class UserPreferencesRepository(
         context.dataStore.edit { if (version == null) it.remove(Keys.profilePhotoVersion) else it[Keys.profilePhotoVersion] = version }
     }
 
+    /** A photo change and where it came from, in one edit ([version] null = removed). */
+    suspend fun setProfilePhoto(version: Long?, choice: ProfilePhotoChoice) {
+        context.dataStore.edit {
+            if (version == null) it.remove(Keys.profilePhotoVersion) else it[Keys.profilePhotoVersion] = version
+            if (choice == ProfilePhotoChoice.GOOGLE) it.remove(Keys.profilePhotoChoice) else it[Keys.profilePhotoChoice] = choice.key
+        }
+    }
+
 
 
 
@@ -484,12 +547,28 @@ class UserPreferencesRepository(
             p.remove(Keys.insightsVisited)
             p.remove(Keys.defaultWalletId)
             p.remove(Keys.displayName)
-            // The photo belongs to the account like the name; its file goes with the ledger wipe (LocalLedgerReset).
+            // The photo belongs to the account like the name; its file goes with the ledger wipe (LocalLedgerReset). The
+            // next account starts on its Google picture again (ProfilePhotoChoice.GOOGLE).
             p.remove(Keys.profilePhotoVersion)
+            p.remove(Keys.profilePhotoChoice)
             p.remove(Keys.acknowledgedBudgetMonth)
             p[Keys.smartReading] = false
             p[Keys.askLucentoAi] = false
             p.remove(Keys.askLucentoAiV1)
+        }
+
+        /**
+         * Lucento Shared: the ledger on this phone is replaced by a Shared Space's. A finished onboarding stays finished
+         * (a new generation, so screens holding the old ledger's state start over); the guided setup and choices tied to
+         * the old ledger go. Categories are the Owner's to set up, so the category prompt is treated as done.
+         */
+        internal fun resetForSharedSpaceLedger(p: MutablePreferences) {
+            if (p[Keys.onboardingComplete] == true) p[Keys.setupGeneration] = (p[Keys.setupGeneration] ?: 0) + 1
+            p[Keys.categorySetupDone] = true
+            p.remove(Keys.guideStep)
+            p.remove(Keys.defaultWalletId)
+            p.remove(Keys.acknowledgedBudgetMonth)
+            p.remove(Keys.achievementsSeen)
         }
         const val MAX_DISPLAY_NAME = 40
 

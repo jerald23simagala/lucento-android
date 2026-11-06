@@ -142,8 +142,17 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 // Focused workflows: full screen, the dock is hidden.
 @Serializable data object CategorySetupRoute
 /** Settings: the hub, or one of its pages ([com.lucento.app.feature.settings.SettingsPage] key; empty = hub). */
-@Serializable data class SettingsRoute(val page: String = "")
+@Serializable data class SettingsRoute(
+    val page: String = "",
+    /** Test builds: on the Account page, open Google's account picker straight away (profile menu › Switch account). */
+    val switchAccount: Boolean = false,
+)
 @Serializable data object FeaturesRoute
+/**
+ * Settings › Lucento Shared (docs/shared): create a Shared Space, invite, join, remove, leave. [reviewInvite] (an
+ * invitation id, from Home's card) opens straight on that invitation's review; empty = the page.
+ */
+@Serializable data class SharedSpaceRoute(val reviewInvite: String = "")
 /** Full-page editor for the transaction held in LucentoRoot's editor draft (opened from Edit on a row). */
 @Serializable data object TransactionEditRoute
 /** Read-only View Transaction page; Edit there opens [TransactionEditRoute] (or the transfer sheet). */
@@ -183,6 +192,7 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     CategorySetupRoute::class,
     SettingsRoute::class,
     FeaturesRoute::class,
+    SharedSpaceRoute::class,
     ComposerRoute::class,
     TransactionEditRoute::class,
     TransactionViewRoute::class,
@@ -410,7 +420,15 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         },
     ) { innerPadding ->
         val profilePhoto by appViewModel.profilePhoto.collectAsStateWithLifecycle()
-        CompositionLocalProvider(LocalProfileChrome provides ProfileChrome(preferences.displayName, profilePhoto) { showProfile = true }) {
+        val sharedAccess by appViewModel.sharedAccess.collectAsStateWithLifecycle()
+        val people by appViewModel.people.collectAsStateWithLifecycle()
+        CompositionLocalProvider(
+            LocalProfileChrome provides ProfileChrome(preferences.displayName, profilePhoto, sharedWith = sharedAccess.sharedWith) {
+                showProfile = true
+            },
+            com.lucento.app.feature.sharedspace.LocalSharedAccess provides sharedAccess,
+            com.lucento.app.feature.sharedspace.LocalPeople provides people,
+        ) {
             // The padding is consumed as insets too, so a screen's imePadding() adds only the keyboard above the navigation
             // bar the Scaffold already cleared, not the bar a second time (a gap above the keyboard in the composer).
             Box(Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding)) {
@@ -432,10 +450,16 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         )
                     }
                     composable<HomeRoute> {
+                        val spacePrompt by appViewModel.spacePrompt.collectAsStateWithLifecycle()
                         HomeScreen(
                             scrollToTop = homeToTop,
                             actions = HomeActions(
-                                onOpenBudget = { navigateTo(BudgetRoute) },
+                                spacePrompt = spacePrompt,
+                                onOpenSpacePrompt = {
+                                    val invite = (spacePrompt as? com.lucento.app.data.sharedspace.SpacePrompt.Invitation)?.invitation?.id
+                                    push(SharedSpaceRoute(reviewInvite = invite.orEmpty()))
+                                },
+                                onDismissSpacePrompt = { spacePrompt?.let { appViewModel.dismissSpacePrompt(it.key) } },                                onOpenBudget = { navigateTo(BudgetRoute) },
                                 onChooseCategories = { push(CategorySetupRoute) },
                                 onOpenInsights = { push(InsightsRoute) },
                                 onOpenGoals = { push(GoalsRoute) },
@@ -547,6 +571,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     pushed<RecurringEditRoute>(reducedMotion) { entry ->
                         val route = entry.toRoute<RecurringEditRoute>()
                         Gated(Feature.RECURRING, features, enableFeature, back) {
+                          com.lucento.app.feature.sharedspace.OwnerOnly("Scheduled payment", "scheduled payments", back) {
                             RecurringEditorScreen(
                                 onBack = back,
                                 scheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE },
@@ -557,12 +582,17 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     notify("Recurring payment saved")
                                 },
                             )
+                          }
                         }
                     }
                     pushed<CategoriesRoute>(reducedMotion) {
-                        ManageCategoriesScreen(onBack = back, onChooseFromPresets = { push(CategorySetupRoute) })
+                        com.lucento.app.feature.sharedspace.OwnerOnly("Categories", "categories", back) {
+                            ManageCategoriesScreen(onBack = back, onChooseFromPresets = { push(CategorySetupRoute) })
+                        }
                     }
-                    pushed<CategorySetupRoute>(reducedMotion) { CategorySetupScreen(onDone = back) }
+                    pushed<CategorySetupRoute>(reducedMotion) {
+                        com.lucento.app.feature.sharedspace.OwnerOnly("Categories", "categories", back) { CategorySetupScreen(onDone = back) }
+                    }
                     pushed<SettingsRoute>(reducedMotion) { entry ->
                         // A page opened from the hub uses the hub's ViewModel (one account check, one prompt).
                         // Pages open straight from the hub, so the hub is the entry underneath (public API only).
@@ -576,9 +606,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onBack = back,
                             viewModelOwner = hub,
                             page = SettingsPage.fromKey(entry.toRoute<SettingsRoute>().page),
+                            // Test builds: the profile menu's Switch account opens Google's account picker at once.
+                            startAccountSwitch = com.lucento.app.BuildConfig.DEBUG && entry.toRoute<SettingsRoute>().switchAccount,
                             onOpenPage = { page ->
                                 when {
                                     page == SettingsPage.FEATURES -> push(FeaturesRoute)
+                                    page == SettingsPage.SHARED -> push(SharedSpaceRoute())
                                     // Not push(): launchSingleTop would replace the hub (same route type), so Back would skip
                                     // it. A repeated tap on the same row is ignored instead.
                                     navController.currentBackStackEntry?.arguments?.getString("page") != page.key ->
@@ -588,6 +621,17 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         )
                     }
                     pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
+                    pushed<SharedSpaceRoute>(reducedMotion) { entry ->
+                        com.lucento.app.feature.sharedspace.SharedSpaceScreen(
+                            onBack = back,
+                            onOpenAccount = { navController.navigate(SettingsRoute(SettingsPage.ACCOUNT.key)) },
+                            onJoined = {
+                                notify("You’re in. This phone now shows the Shared Space.")
+                                navigateTo(HomeRoute)
+                            },
+                            reviewInviteId = entry.toRoute<SharedSpaceRoute>().reviewInvite.ifBlank { null },
+                        )
+                    }
                     pushed<TransactionViewRoute>(reducedMotion) { entry ->
                         val route = entry.toRoute<TransactionViewRoute>()
                         TransactionDetailScreen(
@@ -671,29 +715,35 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         val googlePhoto by appViewModel.googlePhotoUrl.collectAsStateWithLifecycle()
         val photoBusy by appViewModel.photoBusy.collectAsStateWithLifecycle()
         val photoMessage by appViewModel.photoMessage.collectAsStateWithLifecycle()
-        ProfileSheet(
-            preferences = preferences,
-            signedInEmail = profileEmail,
-            photo = ProfilePhotoState(
-                image = photo,
-                googleAvailable = googlePhoto != null,
-                busy = photoBusy,
-                message = photoMessage,
-                onPick = appViewModel::setPhotoFromDevice,
-                onUseGoogle = appViewModel::useGooglePhoto,
-                onRemove = appViewModel::removePhoto,
-            ),
-            onSaveName = appViewModel::setDisplayName,
-            onTheme = appViewModel::setThemeMode,
-            onThemeId = appViewModel::setThemeId,
-            onOpen = { destination ->
-                when (destination) {
-                    ProfileDestination.SETTINGS -> push(SettingsRoute())
-                    ProfileDestination.FEATURES -> push(FeaturesRoute)
-                }
-            },
-            onDismiss = { showProfile = false },
-        )
+        // The sheet sits outside the screens' providers; its Lucento Shared row needs to know who this ledger is shared with.
+        val sheetAccess by appViewModel.sharedAccess.collectAsStateWithLifecycle()
+        CompositionLocalProvider(com.lucento.app.feature.sharedspace.LocalSharedAccess provides sheetAccess) {
+            ProfileSheet(
+                preferences = preferences,
+                signedInEmail = profileEmail,
+                photo = ProfilePhotoState(
+                    image = photo,
+                    googleAvailable = googlePhoto != null,
+                    busy = photoBusy,
+                    message = photoMessage,
+                    onPick = appViewModel::setPhotoFromDevice,
+                    onUseGoogle = appViewModel::useGooglePhoto,
+                    onRemove = appViewModel::removePhoto,
+                ),
+                onSaveName = appViewModel::setDisplayName,
+                onTheme = appViewModel::setThemeMode,
+                onThemeId = appViewModel::setThemeId,
+                onOpen = { destination ->
+                    when (destination) {
+                        ProfileDestination.SETTINGS -> push(SettingsRoute())
+                        ProfileDestination.FEATURES -> push(FeaturesRoute)
+                        ProfileDestination.SHARED -> push(SharedSpaceRoute())
+                        ProfileDestination.SWITCH_ACCOUNT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, switchAccount = true))
+                    }
+                },
+                onDismiss = { showProfile = false },
+            )
+        }
     }
 
     transferDraft?.let { draft ->

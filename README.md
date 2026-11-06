@@ -63,6 +63,10 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Optional cloud sync** (Google Sign-In + Supabase, row-level security): off until you connect an account; every
   core feature works offline without it, and signing out keeps local data. See [docs/SYNC.md](docs/SYNC.md) —
   sign-in needs the Google OAuth setup listed there.
+- **Lucento Shared** (on `feature/lucento-shared`, awaiting product testing): one person's finances shared with a
+  Partner who signs in with their own account. Both see everything and add, edit or delete transactions; the Owner
+  manages wallets, budgets, goals, categories and schedules. Built on cloud sync; needs its Supabase migrations on the
+  project. See [docs/shared/](docs/shared/).
 - Android cloud backup disabled.
 
 ## Not yet

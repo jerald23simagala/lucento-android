@@ -52,6 +52,11 @@ class OnboardingViewModel(
     private val usage: com.lucento.app.domain.UsageCountsService? = null,
     /** Restoring a backup file on the welcome screen (offline: nothing is sent anywhere). Null in tests. */
     private val backup: com.lucento.app.domain.backup.BackupEngine? = null,
+    /**
+     * Lucento Shared (docs/shared): an account that is a Partner gets its Shared Space here instead of its own ledger,
+     * a new account can join the space it was invited to, and the reason a space left this phone is shown. Null in tests.
+     */
+    private val space: com.lucento.app.data.sharedspace.SharedSpaceRepository? = null,
 ) : ViewModel() {
 
     /** Anonymous usage counts: one `onboarding_step_viewed` per screen, numbered from 1 (welcome). */
@@ -160,6 +165,37 @@ class OnboardingViewModel(
 
     private var restoring = false
 
+    // Lucento Shared state, declared before init: its coroutine can reach it before the constructor finishes.
+
+    /** Why a Shared Space just left this phone (left, or no longer shared); shown once over onboarding. */
+    val spaceNotice: StateFlow<com.lucento.app.data.sharedspace.SpaceNotice?> =
+        (space?.notice ?: kotlinx.coroutines.flow.flowOf(null)).stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val _invitationOffer = MutableStateFlow<com.lucento.app.data.sharedspace.ReceivedInvitation?>(null)
+    /**
+     * An invitation waiting for an account that has nothing of its own yet, offered before the person sets anything up.
+     * Joining makes this phone the Shared Space's; "Set up my own" continues the normal setup.
+     */
+    val invitationOffer: StateFlow<com.lucento.app.data.sharedspace.ReceivedInvitation?> = _invitationOffer
+
+    private val _joiningSpace = MutableStateFlow(false)
+    val joiningSpace: StateFlow<Boolean> = _joiningSpace
+
+    private val _offerBusy = MutableStateFlow(false)
+    val offerBusy: StateFlow<Boolean> = _offerBusy
+
+    private val _offerMessage = MutableStateFlow<String?>(null)
+    val offerMessage: StateFlow<String?> = _offerMessage
+
+    /** The Owner's name while this phone holds their Shared Space (the restore is then downloading it); else null. */
+    val spaceOwner: StateFlow<String?> = (space?.access?.map { if (it.isPartner) it.ownerDisplay else null } ?: kotlinx.coroutines.flow.flowOf(null))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** "Your name, as Alex will see it": the profile name, else the email's first part. */
+    val spaceNameSuggestion: StateFlow<String> = combine(preferences.preferences.map { it.displayName }, signedInEmail) { name, email ->
+        name?.takeIf { it.isNotBlank() } ?: email?.substringBefore('@').orEmpty()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     init {
         // The app was closed mid-download: pick it up again rather than leave the spinner with nothing behind it.
         if (savedState.get<String>(KEY_RESTORE) == RestoreStage.RESTORING.name) {
@@ -167,10 +203,107 @@ class OnboardingViewModel(
         } else {
             // Already signed in from an earlier, unfinished setup (the app was closed, or restarted after a crash):
             // a returning account is recognised now rather than set up again (P0-2, scenario D). A failed check says
-            // nothing here; finishing checks again.
+            // nothing here; finishing checks again. After a Shared Space left this phone, the notice is read first.
             viewModelScope.launch {
                 refreshHoldsAccountData()
+                if (space?.pendingNotice() != null) return@launch
                 if (auth?.currentUserId() != null && restoreStage.value == RestoreStage.NONE) checkAccount(quiet = true)
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- Lucento Shared
+
+    /** The notice was read: the person's own account is checked next, as for any returning account. */
+    fun acknowledgeSpaceNotice() {
+        viewModelScope.launch {
+            space?.takeNotice()
+            if (auth?.currentUserId() != null && restoreStage.value == RestoreStage.NONE) checkAccount(quiet = true)
+        }
+    }
+
+    /**
+     * True when this phone now holds the Shared Space the signed-in account is a Partner in (see
+     * [com.lucento.app.data.sharedspace.SharedSpaceRepository.adoptMembership]). Any failure means "carry on as before".
+     */
+    private suspend fun adoptSpace(): Boolean = try {
+        space?.adoptMembership() == true
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        android.util.Log.w("Lucento", "Checking Lucento Shared during onboarding failed", e)
+        false
+    }
+
+    private suspend fun offerInvitation() {
+        _offerMessage.value = null
+        _invitationOffer.value = try {
+            space?.invitationToOffer()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** "Set up my own Lucento": the invitation stays in Settings › Lucento Shared (and off Home) until it expires. */
+    fun setInvitationAside() {
+        val invitation = _invitationOffer.value ?: return
+        if (_joiningSpace.value) return
+        _invitationOffer.value = null
+        _offerMessage.value = null
+        viewModelScope.launch { space?.dismiss(invitation.id) }
+    }
+
+    fun declineInvitation() {
+        val repository = space ?: return
+        val invitation = _invitationOffer.value ?: return
+        if (_joiningSpace.value || _offerBusy.value) return
+        _offerBusy.value = true
+        viewModelScope.launch {
+            try {
+                when (val result = repository.decline(invitation.id)) {
+                    com.lucento.app.data.sharedspace.SpaceActionResult.Done -> {
+                        _invitationOffer.value = null
+                        _offerMessage.value = null
+                    }
+                    is com.lucento.app.data.sharedspace.SpaceActionResult.Failed ->
+                        _offerMessage.value = com.lucento.app.data.sharedspace.sharedSpaceMessage(result.code, invitation.inviterName)
+                }
+            } finally {
+                _offerBusy.value = false
+            }
+        }
+    }
+
+    /**
+     * Joins the offered Shared Space: the server accepts, this phone becomes the space's and downloads it, and onboarding
+     * finishes the way a restore does — nothing of the person's own is set up.
+     */
+    fun joinInvitation(name: String) {
+        val repository = space ?: return
+        val invitation = _invitationOffer.value ?: return
+        if (_joiningSpace.value) return
+        _joiningSpace.value = true
+        _offerMessage.value = null
+        viewModelScope.launch {
+            try {
+                when (val result = repository.join(invitation, name.ifBlank { spaceNameSuggestion.value })) {
+                    is com.lucento.app.data.sharedspace.JoinResult.Joined -> {
+                        _invitationOffer.value = null
+                        savedState[KEY_WELCOME_BACK] = false
+                        restore(membershipChecked = true)
+                    }
+                    is com.lucento.app.data.sharedspace.JoinResult.Failed ->
+                        _offerMessage.value = com.lucento.app.data.sharedspace.sharedSpaceMessage(result.code, invitation.inviterName)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("Lucento", "Joining a Shared Space during onboarding failed", e)
+                _offerMessage.value = "Couldn’t join right now. Check your connection and try again."
+            } finally {
+                _joiningSpace.value = false
             }
         }
     }
@@ -189,11 +322,20 @@ class OnboardingViewModel(
     /**
      * Asks whether the connected account already holds data and acts on the answer ([setupRoute]): a returning account
      * goes to the restore ("Welcome back"); an empty one is remembered as new; a failed check shows Try again unless
-     * [quiet]. Writes nothing to the ledger.
+     * [quiet]. Writes nothing to the ledger — except that an account that is a Lucento Shared Partner gets its Shared
+     * Space on this phone (an empty ledger bound to it), which the restore then downloads. An account with nothing of its
+     * own is offered a waiting invitation when [offerInvitation].
      */
-    private suspend fun checkAccount(quiet: Boolean): SetupRoute? {
+    private suspend fun checkAccount(quiet: Boolean, offerInvitation: Boolean = true): SetupRoute? {
         val repository = sync ?: return null
         if (!quiet) _accountCheck.value = AccountCheck.Checking
+        if (adoptSpace()) {
+            _accountCheck.value = AccountCheck.Idle
+            savedState[KEY_WELCOME_BACK] = true
+            syncPreferences?.setEnabled(true)
+            restore(membershipChecked = true)
+            return SetupRoute.RESTORE
+        }
         val probe = repository.probeAccount()
         val route = setupRoute(probe, savedState[KEY_NEW_FOR])
         when (route) {
@@ -201,11 +343,12 @@ class OnboardingViewModel(
                 _accountCheck.value = AccountCheck.Idle
                 savedState[KEY_WELCOME_BACK] = true
                 syncPreferences?.setEnabled(true)
-                runRestore()
+                restore(membershipChecked = true)
             }
             SetupRoute.NEW_SETUP -> {
                 _accountCheck.value = AccountCheck.Idle
                 (probe as? com.lucento.app.data.sync.AccountProbe.Empty)?.let { savedState[KEY_NEW_FOR] = it.userId }
+                if (offerInvitation) offerInvitation()
             }
             SetupRoute.RETRY -> if (!quiet) {
                 refreshHoldsAccountData()
@@ -237,7 +380,9 @@ class OnboardingViewModel(
         if (restoring || restoreStage.value == RestoreStage.RESTORING) return
         viewModelScope.launch {
             try {
-                if (syncPreferences?.syncedUserId() != null) {
+                // A phone bound to a Shared Space (even before its first download) goes through the wipe too, which
+                // drops that binding: a setup on this phone alone must not stay tied to someone else's space.
+                if (syncPreferences?.syncedUserId() != null || syncPreferences?.sharedSpaceOwnerId() != null) {
                     accounts?.signOutAndWipe()
                 } else {
                     auth?.signOut()
@@ -320,12 +465,19 @@ class OnboardingViewModel(
      * Pulls the account with a full sync (this phone holds only the seeded income categories, which merge with the
      * account's own), then finishes onboarding without the story or guided setup — or, for an empty account, moves to
      * [RestoreStage.EMPTY]. Nothing is marked complete unless the download succeeded.
+     *
+     * Lucento Shared: an account that is a Partner restores its Shared Space instead, and always finishes — an empty
+     * space is still the person's to use, and only its Owner sets it up.
      */
-    fun runRestore() {
+    fun runRestore() = restore(membershipChecked = false)
+
+    /** [runRestore]; [membershipChecked] when the Lucento Shared check already ran in this attempt. */
+    private fun restore(membershipChecked: Boolean) {
         val repository = sync ?: return
         if (restoring) return
         restoring = true
         _restoreMessage.value = null
+        _invitationOffer.value = null
         setRestoreStage(RestoreStage.RESTORING)
         viewModelScope.launch {
             try {
@@ -338,23 +490,26 @@ class OnboardingViewModel(
                     }
                     else -> syncPreferences?.setEnabled(true)
                 }
+                if (!membershipChecked) adoptSpace()
                 when (val result = repository.sync()) {
                     is com.lucento.app.data.sync.SyncResult.Success -> {
+                        val partner = syncPreferences?.sharedSpaceOwnerId() != null
                         val restoredWallets = wallets?.observeWallets()?.first().orEmpty()
                         val restoredCategories = categories.observeCategories().first()
                         // Same rule as the check before onboarding (P0-2.1): archived wallets, transactions, schedules
                         // and budgets count too, so a "Welcome back" never ends in "nothing to restore".
                         val otherRecords = repository.localHasRestorableRecords()
-                        if (com.lucento.app.domain.RestorePlan.hasData(restoredWallets, restoredCategories, otherRecords)) {
+                        if (partner || com.lucento.app.domain.RestorePlan.hasData(restoredWallets, restoredCategories, otherRecords)) {
                             preferences.completeRestore(
                                 primaryCurrency = com.lucento.app.domain.RestorePlan.primaryCurrency(restoredWallets, currency.value),
                                 themeMode = theme.value,
                                 features = com.lucento.app.domain.RestorePlan.features,
-                                categoriesChosen = com.lucento.app.domain.RestorePlan.hasSpendingCategories(restoredCategories),
+                                categoriesChosen = partner || com.lucento.app.domain.RestorePlan.hasSpendingCategories(restoredCategories),
                             )
                             appContext?.let { com.lucento.app.data.sync.SyncScheduler.ensurePeriodic(it) }
                         } else {
                             setRestoreStage(RestoreStage.EMPTY)
+                            offerInvitation()
                         }
                     }
                     com.lucento.app.data.sync.SyncResult.NotSignedIn -> {
@@ -372,6 +527,11 @@ class OnboardingViewModel(
                     is com.lucento.app.data.sync.SyncResult.Retryable -> {
                         // The technical reason is kept in sync status for diagnosis; the screen says what to do.
                         _restoreMessage.value = "Check your connection and try again."
+                        setRestoreStage(RestoreStage.FAILED)
+                    }
+                    is com.lucento.app.data.sync.SyncResult.MembershipRevoked -> {
+                        // Lucento Shared: the space this phone was joining no longer includes this account.
+                        _restoreMessage.value = "That Shared Space isn’t shared with this account any more. Try again to restore your own data."
                         setRestoreStage(RestoreStage.FAILED)
                     }
                 }
@@ -500,7 +660,7 @@ class OnboardingViewModel(
                 // instead (no second set of categories, wallets or budgets); one that can't be checked stops here, with
                 // nothing written and onboarding not complete, and the sync step offers Try again.
                 val userId = auth?.currentUserId()
-                if (userId == null && syncPreferences?.syncedUserId() != null) {
+                if (userId == null && (syncPreferences?.syncedUserId() != null || syncPreferences?.sharedSpaceOwnerId() != null)) {
                     // An interrupted restore left part of an account here and the session has since ended: never finish
                     // a new setup on top of it. Sign in to complete the restore, or leave the account (removes the copy).
                     finishing = false
@@ -511,7 +671,7 @@ class OnboardingViewModel(
                     return@launch
                 }
                 if (userId != null && syncAvailable && savedState.get<String>(KEY_NEW_FOR) != userId) {
-                    when (checkAccount(quiet = true)) {
+                    when (checkAccount(quiet = true, offerInvitation = false)) {
                         SetupRoute.RESTORE -> {
                             finishing = false
                             return@launch
@@ -686,6 +846,7 @@ class OnboardingViewModel(
                     accounts = container.accountBoundary,
                     usage = container.usageCounts,
                     backup = container.backup,
+                    space = container.sharedSpace,
                 )
             }
         }

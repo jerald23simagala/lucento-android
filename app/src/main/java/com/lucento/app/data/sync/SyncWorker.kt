@@ -27,6 +27,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             is SyncResult.Success -> Result.success(workDataOf(KEY_PUSHED to result.report.pushed, KEY_PULLED to result.report.pulled))
             // Nothing a retry could fix; Settings shows the state (and the stored error for an account mismatch).
             SyncResult.NotSignedIn, SyncResult.NotConfigured, SyncResult.AccountMismatch -> Result.success()
+            // The shared ledger is already being removed (SyncRepository's revocation callback); nothing to retry.
+            is SyncResult.MembershipRevoked -> Result.success()
             is SyncResult.Retryable -> if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
     }

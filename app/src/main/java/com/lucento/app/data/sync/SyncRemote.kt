@@ -6,6 +6,8 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Everything [SyncRepository] needs from the server, as an interface so the engine runs against an in-memory
@@ -43,6 +45,12 @@ interface SyncRemote {
      * [activeOnly] skips archived rows. Throws on any network or server error — an error is never reported as "no rows".
      */
     suspend fun hasLiveRows(table: String, userId: String, kind: String? = null, activeOnly: Boolean = false): Boolean
+
+    /**
+     * Lucento Shared: the Owner's id of the Shared Space the signed-in account is a Partner of, or null when it is none.
+     * Throws on any network or server error — a failed request is never reported as "not a Partner".
+     */
+    suspend fun partnerSpaceOwnerId(): String?
 }
 
 class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
@@ -122,6 +130,15 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
             }
             limit(1)
         }.decodeList<JsonObject>().isNotEmpty()
+
+    override suspend fun partnerSpaceOwnerId(): String? {
+        val me = currentUserId() ?: return null
+        // RLS shows a Partner their own membership row (supabase/migrations/20261105120000_lucento_shared.sql).
+        return client.from("space_members").select(columns = Columns.list("owner_id")) {
+            filter { eq("partner_id", me) }
+            limit(1)
+        }.decodeList<JsonObject>().firstOrNull()?.get("owner_id")?.jsonPrimitive?.contentOrNull
+    }
 
     companion object {
         const val SERVER_UPDATED_AT = "server_updated_at"

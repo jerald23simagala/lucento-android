@@ -28,6 +28,11 @@ class RecurringRepository(
     private val transactions: TransactionRepository,
     private val clock: () -> Long = System::currentTimeMillis,
     private val runner: TransactionRunner = TransactionRunner.Direct,
+    /**
+     * Lucento Shared: false on a Partner's phone, where schedules are the Owner's to change — marking one paid included,
+     * since that advances the schedule ([StructureAccess]).
+     */
+    private val access: StructureAccess = StructureAccess.Always,
 ) {
 
     data class Input(
@@ -49,6 +54,8 @@ class RecurringRepository(
 
     sealed interface SaveResult {
         data class Saved(val id: Long) : SaveResult
+        /** A Partner's phone: schedules are changed by the Shared Space's Owner. Nothing was written. */
+        data object NotPermitted : SaveResult
         data object BlankName : SaveResult
         data object AmountNotPositive : SaveResult
         data object InvalidType : SaveResult
@@ -69,6 +76,8 @@ class RecurringRepository(
         data class Recorded(val transactionId: Long?) : PayResult
         data object NotDue : PayResult
         data object NotFound : PayResult
+        /** A Partner's phone: schedules are changed by the Shared Space's Owner. Nothing was recorded. */
+        data object NotPermitted : PayResult
         /** Nothing was recorded: a [TransactionRepository.SaveResult] or [TransactionRepository.TransferResult] refusal. */
         data class Rejected(val reason: Any) : PayResult
     }
@@ -80,6 +89,7 @@ class RecurringRepository(
         dao.observeAll().map { list -> list.mapNotNull { it.toDomainOrNull() } }
 
     suspend fun save(input: Input): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
         val name = input.name.trim().take(MAX_NAME)
         if (name.isEmpty()) return SaveResult.BlankName
         if (input.type.isTransfer) return SaveResult.InvalidType
@@ -175,6 +185,7 @@ class RecurringRepository(
      * amount by default — bills vary), then advances the schedule. Safe to call twice.
      */
     suspend fun markPaid(id: Long, amount: Money? = null, date: LocalDate? = null, interest: Money? = null): PayResult {
+        if (!access.canManageStructure()) return PayResult.NotPermitted
         val entity = dao.getById(id) ?: return PayResult.NotFound
         val schedule = entity.toDomainOrNull() ?: return PayResult.NotFound
         val index = schedule.nextIndex
@@ -318,17 +329,21 @@ class RecurringRepository(
 
     /** Skips the waiting occurrence without recording a transaction. */
     suspend fun skip(id: Long) {
+        if (!access.canManageStructure()) return
         val entity = dao.getById(id) ?: return
         dao.update(entity.copy(nextIndex = entity.nextIndex + 1, updatedAt = clock()))
     }
 
     suspend fun setPaused(id: Long, paused: Boolean) {
+        if (!access.canManageStructure()) return
         val entity = dao.getById(id) ?: return
         dao.update(entity.copy(paused = paused, updatedAt = clock()))
     }
 
     /** Deleting a schedule keeps every transaction it already recorded. */
-    suspend fun delete(id: Long) = dao.deleteById(id)
+    suspend fun delete(id: Long) {
+        if (access.canManageStructure()) dao.deleteById(id)
+    }
 
     suspend fun countForWallet(walletId: Long): Int = dao.countForWallet(walletId)
 

@@ -519,6 +519,7 @@ fun WalletEditorSheet(
                 "“${initial.name}” is used by ${result.count} recurring ${if (result.count == 1) "payment" else "payments"}. " +
                     "Delete or change them in Plan › Recurring payments first."
             WalletRepository.DeleteResult.Deleted -> ""
+            WalletRepository.DeleteResult.NotPermitted -> "Only the Shared Space’s owner can change this."
         }
         ConfirmDialog(
             title = "Can’t delete yet",

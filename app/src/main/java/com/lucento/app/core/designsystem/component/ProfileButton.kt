@@ -4,10 +4,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,8 +30,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 
-/** What the profile button shows and does; provided once by the app shell for every primary screen. */
-data class ProfileChrome(val displayName: String?, val photo: ImageBitmap? = null, val onOpen: () -> Unit)
+/**
+ * What the profile button shows and does; provided once by the app shell for every primary screen. [sharedWith]: the
+ * other person when this ledger is shared (Lucento Shared) — the button then carries their initial as a badge.
+ */
+data class ProfileChrome(
+    val displayName: String?,
+    val photo: ImageBitmap? = null,
+    val sharedWith: String? = null,
+    val onOpen: () -> Unit,
+)
 
 val LocalProfileChrome = compositionLocalOf<ProfileChrome?> { null }
 
@@ -71,17 +84,55 @@ fun ProfileAvatar(name: String?, modifier: Modifier = Modifier, size: Dp = 36.dp
 fun ProfileButton(modifier: Modifier = Modifier) {
     val chrome = LocalProfileChrome.current ?: return
     val haptics = rememberHaptics()
+    Box(modifier.size(48.dp)) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .clip(CircleShape)
+                .clickable(role = Role.Button, onClickLabel = "Open profile and settings") {
+                    haptics.tick()
+                    chrome.onOpen()
+                }
+                .semantics {
+                    contentDescription = chrome.sharedWith?.let { "Profile and settings. Shared with $it" } ?: "Profile and settings"
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            ProfileAvatar(chrome.displayName, photo = chrome.photo)
+        }
+        // Outside the circular clip, so the pill isn't cut; it takes no touches, so taps on it still open the menu.
+        if (chrome.sharedWith != null) SharedPill(Modifier.align(Alignment.BottomCenter).offset(y = 3.dp))
+    }
+}
+
+/**
+ * "Shared" across the foot of the avatar (owner, 2026-11-05: a small pill by the profile, not a name — it stays short
+ * however many people share). In the accent, ringed in the page colour so it stands apart from the photo. At large font
+ * sizes it becomes the group glyph alone, so it never spills over the neighbouring buttons.
+ */
+@Composable
+private fun SharedPill(modifier: Modifier = Modifier) {
+    val ext = com.lucento.app.core.designsystem.theme.LucentoTheme.extendedColors
+    val compact = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Box(
         modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .clickable(role = Role.Button, onClickLabel = "Open profile and settings") {
-                haptics.tick()
-                chrome.onOpen()
-            }
-            .semantics { contentDescription = "Profile and settings" },
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.background)
+            .padding(1.5.dp)
+            .clip(RoundedCornerShape(50))
+            .background(ext.accent)
+            .padding(horizontal = if (compact) 3.dp else 5.dp, vertical = 0.dp),
         contentAlignment = Alignment.Center,
     ) {
-        ProfileAvatar(chrome.displayName, photo = chrome.photo)
+        if (compact) {
+            Icon(Icons.Outlined.Group, contentDescription = null, tint = ext.onAccent, modifier = Modifier.size(12.dp))
+        } else {
+            Text(
+                "Shared",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = ext.onAccent,
+                maxLines = 1,
+            )
+        }
     }
 }
