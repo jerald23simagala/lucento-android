@@ -81,9 +81,27 @@ class AppViewModel(
     val spacePrompt: StateFlow<com.lucento.app.data.sharedspace.SpacePrompt?> =
         (sharedSpace?.prompt ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    private var spaceRefresh: kotlinx.coroutines.Job? = null
+
     init {
-        // Learn where this account stands in Lucento Shared (role, names, invitations); quiet and at most every 5 minutes.
-        sharedSpace?.let { space -> viewModelScope.launch { runCatching { space.refreshIfStale() } } }
+        // Learn where this account stands in Lucento Shared (role, names, invitations): at start, and again whenever the
+        // account on this phone changes or finishes onboarding — an account switch wipes what the last account knew, and
+        // a new invitation for the next account used to wait for a restart (owner, 2026-11-06: it only showed in
+        // Settings). LucentoRoot also asks each time the app comes back to the foreground.
+        if (sharedSpace != null) {
+            viewModelScope.launch {
+                combine(signedInEmail, preferences.preferences.map { it.onboardingComplete }) { email, onboarded -> email to onboarded }
+                    .distinctUntilChanged()
+                    .collect { refreshSharedSpace() }
+            }
+        }
+    }
+
+    /** Lucento Shared: asks where this account stands, quietly and at most once a minute (one ask at a time). */
+    fun refreshSharedSpace() {
+        val space = sharedSpace ?: return
+        if (spaceRefresh?.isActive == true) return
+        spaceRefresh = viewModelScope.launch { runCatching { space.refreshIfStale(SPACE_FRESH_MILLIS) } }
     }
 
     /** Home's prompt: "Not now" (what it points to stays in Settings › Lucento Shared). */
@@ -206,6 +224,9 @@ class AppViewModel(
     }
 
     companion object {
+        /** How long an answer about Lucento Shared counts as fresh when the app comes back or the account changes. */
+        const val SPACE_FRESH_MILLIS = 60_000L
+
         val Factory = containerFactory {
             AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions)
         }

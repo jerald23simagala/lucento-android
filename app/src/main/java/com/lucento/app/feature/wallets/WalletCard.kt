@@ -377,7 +377,9 @@ private fun InstitutionWalletCard(
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false).align(Alignment.CenterVertically)) {
+                    // The mark and name take the whole row beside the chip (owner, 2026-11-06: a spacer here took half the
+                    // free width, so "Bank of Commerce" read "Bank of …"). The name wraps to two lines before it's cut.
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).align(Alignment.CenterVertically)) {
                         InstitutionCardMark(institution)
                         if (!institution.markSpellsName) {
                             Spacer(Modifier.width(Spacing.sm))
@@ -390,7 +392,6 @@ private fun InstitutionWalletCard(
                             )
                         }
                     }
-                    Spacer(Modifier.weight(1f))
                     Box(Modifier.align(Alignment.CenterVertically)) { TypeChip(wallet.type, ink) }
                 }
                 Column {
