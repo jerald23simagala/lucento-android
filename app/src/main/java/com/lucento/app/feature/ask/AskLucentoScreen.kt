@@ -611,7 +611,7 @@ private fun ReportBody(report: Report) {
         Modifier.fillMaxWidth().background(colors.primaryContainer.copy(alpha = 0.55f), RoundedCornerShape(18.dp)).padding(Spacing.md),
     ) {
         Text(report.headline.label.uppercase(), style = MaterialTheme.typography.labelSmall, color = colors.onPrimaryContainer)
-        report.headline.values.firstOrNull()?.let { MoneyText(money = it, style = AmountStyles.hero, color = colors.onSurface, minScale = 0.5f) }
+        report.headline.values.firstOrNull()?.let { MoneyText(money = it, style = AmountStyles.hero, color = colors.onSurface, fractionScale = 1f, minScale = 0.5f) }
         report.headline.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant) }
     }
     report.sections.forEach { section ->

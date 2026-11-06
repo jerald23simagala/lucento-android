@@ -1,5 +1,6 @@
 package com.lucento.app.feature.capture
 
+import com.lucento.app.feature.fx.FxOfflineChoice
 import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import com.lucento.app.core.designsystem.component.SheetHeader
@@ -355,6 +356,7 @@ fun TransactionComposerScreen(
                                 },
                                 nested = true,
                                 modifier = Modifier.padding(top = Spacing.sm),
+                                fx = state.fx[row.key],
                             )
                         }
                     }
@@ -367,6 +369,14 @@ fun TransactionComposerScreen(
                 error,
                 container = LucentoTheme.extendedColors.warningContainer,
                 content = LucentoTheme.extendedColors.warning,
+                modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.xs),
+            )
+        }
+        if (state.rows.isNotEmpty() && state.fxNeedsChoice) {
+            FxOfflineChoice(
+                choice = state.fxOffline,
+                enabled = !state.saving,
+                onChoose = viewModel::setFxOffline,
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.xs),
             )
         }

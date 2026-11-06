@@ -150,6 +150,9 @@ class MainActivity : FragmentActivity() {
                             CompositionLocalProvider(
                                 LocalInstitutions provides institutions,
                                 com.lucento.app.core.designsystem.component.LocalAmountsHidden provides ready.preferences.hideAmounts,
+                                // Multicurrency: the main currency and the day's rates for every screen that records money.
+                                com.lucento.app.feature.fx.LocalMainCurrency provides ready.preferences.primaryCurrency,
+                                com.lucento.app.feature.fx.LocalFxRates provides (application as LucentoApplication).container.fxRates,
                             ) {
                                 LucentoRoot(preferences = ready.preferences)
                             }

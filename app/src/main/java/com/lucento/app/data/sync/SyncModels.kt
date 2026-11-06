@@ -53,6 +53,13 @@ internal data class WalletRow(
      * what v11 sent (and the server keeps whatever another phone set).
      */
     val classification: String? = null,
+    /**
+     * v13, multicurrency: a foreign wallet's opening rate and month-end revaluation switch. Like [classification], sent
+     * only in batches that hold a wallet in another currency (SyncRepository), so a one-currency ledger sends exactly what
+     * v12 sent and keeps syncing with a project that doesn't have the columns yet.
+     */
+    @SerialName("fx_basis_rate") val fxBasisRate: String? = null,
+    @SerialName("fx_revalue") val fxRevalue: Boolean? = null,
 )
 
 @Serializable
@@ -102,6 +109,13 @@ internal data class TransactionRow(
      */
     @SerialName("created_by") val createdBy: String? = null,
     @SerialName("updated_by") val updatedBy: String? = null,
+    /**
+     * v13, multicurrency: the row's value in the main currency (docs/CALCULATIONS.md "Exchange rates"). Sent only in
+     * batches that hold a movement in another currency (SyncRepository), nulls included there so a cleared value syncs.
+     */
+    @SerialName("base_amount_minor") val baseAmountMinor: Long? = null,
+    @SerialName("base_currency") val baseCurrency: String? = null,
+    @SerialName("fx_source") val fxSource: String? = null,
 )
 
 /** A recurring schedule (v9). Wallet and category ids are the parents' client uuids, like every other row. */

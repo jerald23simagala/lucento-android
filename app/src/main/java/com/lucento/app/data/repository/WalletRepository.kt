@@ -1,5 +1,6 @@
 package com.lucento.app.data.repository
 
+import com.lucento.app.core.money.FxRate
 import com.lucento.app.core.money.Money
 import com.lucento.app.data.local.DebtTermsDao
 import com.lucento.app.data.local.DebtTermsEntity
@@ -76,6 +77,8 @@ class WalletRepository(
         debt: DebtTerms? = null,
         institutionId: String? = null,
         classification: WalletClassification? = null,
+        /** Multicurrency: for a wallet in another currency, the rate its opening balance is valued at (1 unit = this many). */
+        fxBasisRate: java.math.BigDecimal? = null,
     ): SaveResult {
         if (!access.canManageStructure()) return SaveResult.NotPermitted
         val trimmed = name.trim()
@@ -94,6 +97,7 @@ class WalletRepository(
                     clientUuid = UUID.randomUUID().toString(),
                     institutionId = institutionId?.takeIf(::isInstitutionId),
                     classification = classification?.name,
+                    fxBasisRate = fxBasisRate?.takeIf { it.signum() > 0 }?.let(FxRate::encode),
                 )
             )
             writeTerms(id, type, debt, now)
@@ -110,6 +114,29 @@ class WalletRepository(
         val existing = dao.getById(id) ?: return SaveResult.NotFound
         if (existing.classification == classification.name) return SaveResult.Saved(id)
         dao.update(existing.copy(classification = classification.name, updatedAt = clock()))
+        return SaveResult.Saved(id)
+    }
+
+    /**
+     * Multicurrency: the rate a foreign wallet's opening balance is valued at in the main currency — for a wallet from
+     * before multicurrency, or to correct it. Everything after is replayed from it (docs/CALCULATIONS.md "Exchange rates").
+     */
+    suspend fun setFxBasis(id: Long, rate: java.math.BigDecimal): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
+        if (rate.signum() <= 0) return SaveResult.NotFound
+        val existing = dao.getById(id) ?: return SaveResult.NotFound
+        val encoded = FxRate.encode(rate)
+        if (existing.fxBasisRate == encoded) return SaveResult.Saved(id)
+        dao.update(existing.copy(fxBasisRate = encoded, updatedAt = clock()))
+        return SaveResult.Saved(id)
+    }
+
+    /** Multicurrency: revalue this foreign wallet at each month end (unrealized FX gain or loss). */
+    suspend fun setFxRevalue(id: Long, on: Boolean): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
+        val existing = dao.getById(id) ?: return SaveResult.NotFound
+        if (existing.fxRevalue == on) return SaveResult.Saved(id)
+        dao.update(existing.copy(fxRevalue = on, updatedAt = clock()))
         return SaveResult.Saved(id)
     }
 
@@ -160,6 +187,8 @@ class WalletRepository(
                     openingBalanceMinor = openingBalance.amountMinor,
                     institutionId = institutionId?.takeIf(::isInstitutionId),
                     updatedAt = now,
+                    // A rate belongs to a currency: a (still unused) wallet switched to another currency needs a new one.
+                    fxBasisRate = existing.fxBasisRate.takeIf { existing.currencyCode == openingBalance.currencyCode },
                 )
             )
             writeTerms(id, type, debt, now)
@@ -237,6 +266,8 @@ internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null, terms: DebtTerms
         institutionId = institutionId,
         debt = terms?.takeIf { walletType.hasTerms }?.toDomain(currencyCode),
         classification = WalletClassification.fromKey(classification),
+        fxBasisRate = FxRate.parse(fxBasisRate),
+        fxRevalue = fxRevalue,
     )
 }
 

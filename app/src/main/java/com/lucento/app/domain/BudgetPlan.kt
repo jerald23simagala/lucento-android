@@ -235,8 +235,9 @@ object BudgetPlanner {
         currencyCode: String,
         month: YearMonth,
     ): BudgetPlan {
+        // An FX loss is reported as an expense but is never spending: no budget ever counts it (owner, 2026-11-05).
         val expenses = transactions.filter {
-            it.type == TransactionType.EXPENSE && it.currencyCode == currencyCode && YearMonth.from(it.date) == month
+            it.type == TransactionType.EXPENSE && !it.fxResult && it.currencyCode == currencyCode && YearMonth.from(it.date) == month
         }
         val spentByCategory: Map<Long?, Money> = expenses.groupBy { it.categoryId }
             .mapValues { (_, list) -> Money.sum(currencyCode, list.map { it.amount }) }

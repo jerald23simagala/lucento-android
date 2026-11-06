@@ -332,6 +332,21 @@ class SharedSpaceRepositoryTest {
     }
 
     @Test
+    fun `after an account change the next check finds the new account's invitation`() = runTest {
+        // Owner, 2026-11-06: switching to the invited account on the same phone, the invitation only showed in Settings.
+        val s = Setup(this)
+        s.store.saveSnapshot(SharedSpaceSnapshot(), 1_000L) // the last account: nothing waiting, checked just now
+        s.remote.snapshot = SharedSpaceSnapshot(received = listOf(invitation))
+
+        s.repo.refreshIfStale(60_000L)
+        assertNull("a fresh answer isn't asked for again within the minute", s.repo.prompt.first())
+
+        s.store.clearAll() // the account wipe forgets what the last account knew
+        s.repo.refreshIfStale(60_000L)
+        assertEquals(SpacePrompt.Invitation(invitation), s.repo.prompt.first())
+    }
+
+    @Test
     fun `Home's prompt stays away once put aside and never shows on a phone holding a space`() = runTest {
         val s = Setup(this)
         s.remote.snapshot = SharedSpaceSnapshot(received = listOf(invitation))

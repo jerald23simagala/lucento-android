@@ -200,6 +200,13 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   order:** `20261105090000_receivable_wallets.sql` (the `wallets_type_known` CHECK gains `RECEIVABLE`) must reach a
   project before a build that can create receivables syncs one there, or that wallet's upload is refused (rows stay
   pending, nothing is lost). Older builds skip a pulled receivable (`PulledRowRules`) and can't read its collections.
+- **Multicurrency (v13).** `transactions.base_amount_minor` / `base_currency` / `fx_source` and `wallets.fx_basis_rate` /
+  `fx_revalue` travel only in upload batches that hold a movement or wallet in another currency (nulls included there,
+  so a cleared value syncs); a one-currency ledger sends exactly what v12 sent. The ledger's main currency lives in
+  `ledger_settings` (set once by its first phone, read by every other phone and by a Partner) and is settled at the start
+  of each cycle without ever failing it. Pulled FX values that don't read right are dropped, never misread. **Rollout
+  order:** `20261106090000_multicurrency.sql` must reach a project before a v13 phone syncs a ledger with a wallet in
+  another currency (otherwise those uploads are refused and stay pending). docs/MULTICURRENCY.md.
 - **Lucento Shared (v12).** `transactions.created_by` / `updated_by` are stamped by the database from the session and
   only ever pulled; the app never sends them. `wallets.classification` is sent only when a wallet in that upload batch
   is classified, so a solo v12 phone sends exactly what v11 sent and older builds leave the value alone. **Rollout

@@ -42,8 +42,13 @@ data class WalletsUiState(
     val trend: NetWorthTrend? = null,
     val viewMode: WalletsViewMode = WalletsViewMode.ROWS,
     val side: WalletSide = WalletSide.ALL,
+    /**
+     * Multicurrency: what each wallet in another currency is carried at in the main currency (the average method), and
+     * which ones have no rate yet (still outside the main-currency totals).
+     */
+    val fxBook: com.lucento.app.domain.fx.FxBook? = null,
 ) {
-    /** The currency the hero shows: the main currency when held, otherwise the first one with wallets. Never converted. */
+    /** The hero's total: the main currency, with every valued wallet in another currency converted into it. */
     val heroTotal: Money? get() = summary?.let { it.totalFor(primaryCurrency) ?: it.totals.firstOrNull() }
 
     /** What the list shows after the side filter. */
@@ -73,6 +78,8 @@ data class WalletDraft(
     val dueDayText: String = "",
     /** Bank or provider from the bundled registry (display only); never kept for cash. */
     val institutionId: String? = null,
+    /** Multicurrency: for a wallet in another currency, 1 unit = this many of the main currency, as typed ("63.69"). */
+    val fxRateText: String = "",
 )
 
 sealed interface DraftError {
@@ -96,6 +103,8 @@ sealed interface DraftError {
     data class CreditLimitUnclear(val message: String) : DraftError
     /** A billing day outside 1–31, or only one of the statement and due days. */
     data object BillingDaysInvalid : DraftError
+    /** Multicurrency: a wallet in another currency needs its rate into the main currency. */
+    data object RateRequired : DraftError
 }
 
 /** Plain-language explanation of what still uses a wallet, e.g. "3 transactions and 1 recurring payment". */
@@ -120,22 +129,32 @@ class WalletsViewModel(
         transactions?.observeTransactions() ?: flowOf(emptyList()),
         preferences.preferences.map { it.primaryCurrency }.distinctUntilChanged(),
     ) { list, all, primary ->
-        val summary = if (list.isEmpty()) null else NetWorthCalculator.summarize(list, primary)
+        // Multicurrency: totals in the main currency; the list keeps each wallet's own currency (docs/CALCULATIONS.md).
+        val ledger = com.lucento.app.domain.fx.FxTranslation.translate(primary, list, all)
+        val summary = if (list.isEmpty()) null else NetWorthCalculator.summarize(ledger.wallets, primary)
         val currency = summary?.let { (it.totalFor(primary) ?: it.totals.first()).currencyCode }
-        Triple(list, summary, currency?.let { WalletsOverview.trend(list, all, it, LocalDate.now()) })
+        Overview(list, summary, currency?.let { WalletsOverview.trend(ledger.wallets, ledger.withFxResults, it, LocalDate.now()) }, ledger.book)
     }.flowOn(Dispatchers.Default)
 
+    private data class Overview(
+        val wallets: List<Wallet>,
+        val summary: NetWorthCalculator.Summary?,
+        val trend: NetWorthTrend?,
+        val book: com.lucento.app.domain.fx.FxBook,
+    )
+
     val uiState: StateFlow<WalletsUiState> =
-        combine(overview, preferences.preferences, side) { (list, summary, trend), prefs, side ->
+        combine(overview, preferences.preferences, side) { overview, prefs, side ->
             WalletsUiState(
                 loading = false,
-                wallets = list,
+                wallets = overview.wallets,
                 primaryCurrency = prefs.primaryCurrency,
-                summary = summary,
+                summary = overview.summary,
                 defaultWalletId = prefs.defaultWalletId,
-                trend = trend,
+                trend = overview.trend,
                 viewMode = prefs.walletsViewMode,
                 side = side,
+                fxBook = overview.book,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WalletsUiState())
 
@@ -179,10 +198,22 @@ class WalletsViewModel(
 
         saving = true
         viewModelScope.launch {
+            // Multicurrency: a wallet in another currency is valued at a rate into the main currency (required).
+            val main = preferences.preferences.first().primaryCurrency
+            val rate = if (draft.currencyCode == main) null else com.lucento.app.core.money.FxRate.parse(draft.fxRateText)
+            if (draft.currencyCode != main && rate == null) {
+                saving = false
+                return@launch onResult(DraftError.RateRequired, null)
+            }
             val result = try {
                 val institution = draft.institutionId.takeIf { draft.type != WalletType.CASH }
-                if (draft.id == null) wallets.create(draft.name, draft.type, amount, debt, institution)
-                else wallets.update(draft.id, draft.name, draft.type, amount, debt, institution)
+                if (draft.id == null) {
+                    wallets.create(draft.name, draft.type, amount, debt, institution, fxBasisRate = rate)
+                } else {
+                    wallets.update(draft.id, draft.name, draft.type, amount, debt, institution).also { saved ->
+                        if (saved is WalletRepository.SaveResult.Saved && rate != null) wallets.setFxBasis(draft.id, rate)
+                    }
+                }
             } finally {
                 saving = false
             }

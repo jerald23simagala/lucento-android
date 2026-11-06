@@ -359,8 +359,9 @@ class SettingsViewModel(
         viewModelScope.launch { preferences.setThemeMode(mode) }
     }
 
-    fun setPrimaryCurrency(code: String) {
-        viewModelScope.launch { preferences.setPrimaryCurrency(code) }
+    /** Multicurrency: "Get exchange rates online" (Settings › Money). */
+    fun setFxRatesOnline(enabled: Boolean) {
+        viewModelScope.launch { preferences.setFxRatesOnline(enabled) }
     }
 
     /** Switching a module never touches its data; it only changes what is shown. */

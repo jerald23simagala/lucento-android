@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
@@ -63,7 +64,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.BuildConfig
 import com.lucento.app.R
-import com.lucento.app.core.designsystem.component.CurrencyPickerSheet
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.InfoNote
@@ -122,7 +122,6 @@ fun SettingsScreen(
     ),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var pickingCurrency by remember { mutableStateOf(false) }
     var exportMessage by remember { mutableStateOf<String?>(null) }
     var backupPreview by remember { mutableStateOf<BackupPreview?>(null) }
     var confirmReplace by remember { mutableStateOf(false) }
@@ -165,7 +164,7 @@ fun SettingsScreen(
                 current = current,
                 page = page,
                 onOpenPage = onOpenPage,
-                onPickCurrency = { pickingCurrency = true },
+                onFxRatesOnline = viewModel::setFxRatesOnline,
                 onFeature = viewModel::setFeatureEnabled,
                 onSmartReading = viewModel::setSmartReading,
                 onAskLucentoAi = viewModel::setAskLucentoAi,
@@ -283,17 +282,6 @@ fun SettingsScreen(
         )
     }
 
-    val current = state
-    if (pickingCurrency && current != null) {
-        CurrencyPickerSheet(
-            selected = current.preferences.primaryCurrency,
-            onSelect = {
-                viewModel.setPrimaryCurrency(it)
-                pickingCurrency = false
-            },
-            onDismiss = { pickingCurrency = false },
-        )
-    }
 }
 
 /** Just the Enabled features list, reached from More. */
@@ -365,7 +353,7 @@ private fun SettingsContent(
     current: SettingsUiState,
     page: SettingsPage?,
     onOpenPage: (SettingsPage) -> Unit,
-    onPickCurrency: () -> Unit,
+    onFxRatesOnline: (Boolean) -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
     onSmartReading: (Boolean) -> Unit,
     onAskLucentoAi: (Boolean) -> Unit,
@@ -389,12 +377,12 @@ private fun SettingsContent(
       when (page) {
       null -> SettingsHub(current, onOpenPage)
       SettingsPage.MONEY -> {
+        // Multicurrency (owner, 2026-11-05): the main currency is chosen once. Every value in another currency is kept in
+        // it, so it can't change afterwards — shown here, not editable.
         Row(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 64.dp)
-                .clip(MaterialTheme.shapes.medium)
-                .clickable(role = Role.Button, onClickLabel = "Change main currency", onClick = onPickCurrency)
                 .padding(vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -421,14 +409,25 @@ private fun SettingsContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+            Icon(Icons.Outlined.Lock, contentDescription = "Can’t be changed", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
-            "Used for Home and Insights. Each wallet keeps its own currency — Lucento never converts.",
+            "All your totals are in your main currency. Wallets in other currencies keep their own, and each of their " +
+                "transactions is converted at its own rate. It was set when you started and can’t be changed, so every " +
+                "converted amount stays comparable.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-
+        SectionHeader("Exchange rates", Modifier.padding(top = Spacing.section))
+        SwitchRow(
+            title = "Get exchange rates online",
+            description = "Fills in each day’s rate when you record something in another currency. Only two currency " +
+                "codes and a date are sent — never an amount — to free rate services (currency-api on jsDelivr, or the " +
+                "European Central Bank’s rates). Nothing is fetched while you only use your main currency.",
+            note = if (prefs.fxRatesOnline) null else "Off: you type rates, or use a wallet’s last or average rate.",
+            checked = prefs.fxRatesOnline,
+            onCheckedChange = onFxRatesOnline,
+        )
       }
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
       SettingsPage.SHARED -> Unit

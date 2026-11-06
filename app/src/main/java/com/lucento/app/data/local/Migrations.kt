@@ -446,9 +446,24 @@ object Migrations {
         }
     }
 
+    /**
+     * Multicurrency (docs/CALCULATIONS.md "Exchange rates"): a row's value in the main currency with its currency and
+     * source, and a foreign wallet's opening rate and month-end revaluation switch. All nullable or defaulted: existing
+     * rows follow their wallet's average and nothing is marked dirty, so the migration uploads nothing.
+     */
+    val MIGRATION_12_13: Migration = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `base_amount_minor` INTEGER")
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `base_currency` TEXT")
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `fx_source` TEXT")
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `fx_basis_rate` TEXT")
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `fx_revalue` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
     )
 }
 

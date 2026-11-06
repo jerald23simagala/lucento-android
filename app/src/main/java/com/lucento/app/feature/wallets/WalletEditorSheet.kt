@@ -52,7 +52,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import com.lucento.app.core.designsystem.component.AmountTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -108,6 +107,7 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Percent
+import com.lucento.app.feature.fx.FxRateField
 
 fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     id = id,
@@ -125,6 +125,7 @@ fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     creditLimitText = debt?.creditLimit?.let { MoneyFormatter.formatPlain(it) }.orEmpty(),
     statementDayText = debt?.statementDay?.toString().orEmpty(),
     dueDayText = debt?.dueDay?.toString().orEmpty(),
+    fxRateText = fxBasisRate?.let(com.lucento.app.core.money.FxRate::encode).orEmpty(),
 )
 
 /**
@@ -185,7 +186,7 @@ fun WalletEditorSheet(
      */
     onPlanPayment: ((Long, LocalDate) -> Unit)? = null,
 ) = AmountsShown {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = com.lucento.app.core.designsystem.component.rememberStickySheetState()
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     val decimalSeparator = remember { MoneyFormatter.decimalSeparator() }
@@ -205,7 +206,7 @@ fun WalletEditorSheet(
         scope.launch { sheetState.hide() }.invokeOnCompletion { then() }
     }
 
-    LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    LucentoBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, dragToDismiss = false) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -375,10 +376,31 @@ fun WalletEditorSheet(
             (error as? DraftError.CurrencyLocked)?.let { locked ->
                 Text(
                     "This wallet has ${locked.usage.describe()}, so its currency can’t change. " +
-                        "Amounts are never converted; create a wallet in the other currency instead.",
+                        "Create a wallet in the other currency instead.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = Spacing.xs, start = Spacing.md),
+                )
+            }
+            // Multicurrency: a wallet in another currency is valued in the main currency from this rate on.
+            val main = com.lucento.app.feature.fx.LocalMainCurrency.current
+            if (main != null && draft.currencyCode != main) {
+                Spacer(Modifier.height(Spacing.sm))
+                FxRateField(
+                    currency = draft.currencyCode,
+                    mainCurrency = main,
+                    text = draft.fxRateText,
+                    onTextChange = {
+                        draft = draft.copy(fxRateText = it)
+                        if (error == DraftError.RateRequired) error = null
+                    },
+                    isError = error == DraftError.RateRequired,
+                    explanation = if (initial.id == null || initial.fxRateText.isBlank()) {
+                        "Its balance is valued at this rate in your totals; each transaction then uses its own rate. " +
+                            "Settings › Money can fill in rates online."
+                    } else {
+                        "The rate its starting balance is valued at. Changing it recalculates this wallet's value."
+                    },
                 )
             }
 

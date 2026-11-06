@@ -115,6 +115,9 @@ class OnboardingViewModel(
     /** The restore started because a returning account was recognised, not because the user asked: "Welcome back". */
     val welcomeBack: StateFlow<Boolean> = savedState.getStateFlow(KEY_WELCOME_BACK, false)
 
+    /** Lucento Shared: "I was invited to share" on the welcome screen — the sign-in speaks of the invitation. */
+    val joiningByInvitation: StateFlow<Boolean> = savedState.getStateFlow(KEY_INVITED, false)
+
     /**
      * Signing in on the setup path checks the account first (P0-2): an account that already has data is restored
      * instead of being set up again. Sync is turned on only when onboarding finishes (or a restore starts), so nothing
@@ -428,11 +431,27 @@ class OnboardingViewModel(
         }
     }
 
-    /** "I already have an account": first the reminder to sync the old phone. */
+    /**
+     * "I already have Lucento": straight to choosing the account (owner, 2026-11-06); the reminder to sync the old phone
+     * first is a note on that screen. Already signed in, it goes on to the download.
+     */
     fun startRestore() {
         if (!syncAvailable) return
         _syncMessage.value = null
-        setRestoreStage(RestoreStage.WARN)
+        savedState[KEY_INVITED] = false
+        continueRestore()
+    }
+
+    /**
+     * Lucento Shared, "I was invited to share": choose the account the invitation was sent to. After signing in the
+     * account is checked like any other — a Partner already gets the space; otherwise its invitation is offered (an
+     * account with data of its own restores first, and Home offers it).
+     */
+    fun startInvited() {
+        if (!syncAvailable) return
+        _syncMessage.value = null
+        savedState[KEY_INVITED] = true
+        continueRestore()
     }
 
     /** Past the reminder: sign in (or, already signed in, go straight to the download). */
@@ -445,6 +464,7 @@ class OnboardingViewModel(
         if (restoreStage.value == RestoreStage.RESTORING) return
         _restoreMessage.value = null
         savedState[KEY_WELCOME_BACK] = false
+        savedState[KEY_INVITED] = false
         setRestoreStage(RestoreStage.NONE)
     }
 
@@ -832,6 +852,7 @@ class OnboardingViewModel(
         private const val KEY_PRESETS = "category_presets"
         private const val KEY_CUSTOM = "category_custom"
         private const val KEY_WELCOME_BACK = "welcome_back"
+        private const val KEY_INVITED = "joining_by_invitation"
         /** The account the user chose to set up as new after its restore found nothing (see [setupRoute]). */
         private const val KEY_NEW_FOR = "new_setup_for"
 

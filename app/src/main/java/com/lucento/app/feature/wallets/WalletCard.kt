@@ -273,6 +273,10 @@ private fun NameWithRate(wallet: Wallet, style: TextStyle, color: Color, modifie
 private fun BalanceBlock(wallet: Wallet, label: String, loan: LoanProgress?, muted: Color, ink: Color) {
     Text(label, style = MaterialTheme.typography.labelMedium, color = muted)
     MoneyText(money = wallet.cardAmount, style = AmountStyles.large, color = ink, fractionScale = 1f, minScale = 0.6f)
+    // Multicurrency: the main-currency value under a foreign card's own amount.
+    com.lucento.app.feature.fx.LocalFxDisplay.current.netWorthValue(wallet)?.let {
+        com.lucento.app.core.designsystem.component.EquivalentAmount(it, color = ink.copy(alpha = 0.82f))
+    }
     if (loan != null) {
         Spacer(Modifier.size(Spacing.sm))
         InstallmentBar(paid = loan.installmentsPaid, total = loan.installments, paidColor = LucentoTheme.extendedColors.paidOnCard(ink), track = ink.copy(alpha = 0.26f))
@@ -373,7 +377,9 @@ private fun InstitutionWalletCard(
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false).align(Alignment.CenterVertically)) {
+                    // The mark and name take the whole row beside the chip (owner, 2026-11-06: a spacer here took half the
+                    // free width, so "Bank of Commerce" read "Bank of …"). The name wraps to two lines before it's cut.
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).align(Alignment.CenterVertically)) {
                         InstitutionCardMark(institution)
                         if (!institution.markSpellsName) {
                             Spacer(Modifier.width(Spacing.sm))
@@ -386,7 +392,6 @@ private fun InstitutionWalletCard(
                             )
                         }
                     }
-                    Spacer(Modifier.weight(1f))
                     Box(Modifier.align(Alignment.CenterVertically)) { TypeChip(wallet.type, ink) }
                 }
                 Column {
@@ -496,7 +501,7 @@ private fun TypeMark(type: WalletType, ink: Color) {
 
 /**
  * A wallet's face at list size (Wallets' card view, two or three to a row): the same type or institution face as
- * [WalletCard], 118dp tall — chip or institution icon and the type chip on top, then the name (one line) and the balance,
+ * [WalletCard], 118dp tall — chip or institution icon and the type chip on top, then the name (up to two lines) and the balance,
  * which shrinks rather than wraps. A debt reads without colour: a dashed type chip, a hatched trailing edge, the signed
  * amount and "owed". TalkBack hears one sentence with the signed amount.
  */
@@ -551,11 +556,12 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
                 TypeChip(wallet.type, ink, label = wallet.type.shortLabel)
             }
             Column {
+            // Two lines before anything is cut (owner, 2026-11-06: "Bank of Commerce" read "Bank of …").
             Text(
                 wallet.name,
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = ink,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Row(verticalAlignment = Alignment.Bottom) {
@@ -571,6 +577,9 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
                     Spacer(Modifier.width(6.dp))
                     Text("owed", style = MaterialTheme.typography.labelSmall, color = ink.copy(alpha = 0.78f), maxLines = 1)
                 }
+            }
+            com.lucento.app.feature.fx.LocalFxDisplay.current.netWorthValue(wallet)?.let {
+                com.lucento.app.core.designsystem.component.EquivalentAmount(it, color = ink.copy(alpha = 0.82f))
             }
             }
         }

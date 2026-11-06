@@ -38,7 +38,10 @@ a better user-facing structure while preserving sound engineering boundaries.
 
 ## Money rules (non-negotiable)
 - Store amounts as `Long` minor units with an ISO 4217 code. Use `CurrencyRules.fractionDigits` (JPY 0, BHD 3).
-- Never convert between currencies implicitly. Totals are per currency.
+- Never convert between currencies implicitly. The main currency is chosen once and locked; a movement in another
+  currency carries an explicit, stored value in it (rate source recorded), and totals use those values by the average
+  method (docs/CALCULATIONS.md "Exchange rates", docs/MULTICURRENCY.md). Rates are exact decimals (`FxRate`), never
+  floating point. A wallet with no rate stays in its own currency.
 - Use `Math.addExact`-style arithmetic; overflow must throw, not wrap.
 - Parse user input only through `MoneyParser`.
 - Transfers are a single atomic DB transaction producing two linked legs (`transfer_group`); never double-count.
@@ -66,7 +69,9 @@ a better user-facing structure while preserving sound engineering boundaries.
   different account, wipes this phone’s ledger and sync binding so the next account starts clean and one user’s data
   is never uploaded into another account; unsynced changes require confirmation before that wipe. Crash reports,
   only when `app/google-services.json` is present at build time, send stacks without amounts or notes (docs/QUALITY.md).
-  Any other network use needs its own explicit opt-in with clear consent. CI allow-lists release permissions. OCR uses ML Kit's
+  Exchange rates (docs/MULTICURRENCY.md) are the one default-on exception, by owner decision (2026-11-06): fetched only
+  when something is recorded in another currency, sending two currency codes and a date (never an amount), and the
+  person can turn it off in Settings › Money. Any other network use needs its own explicit opt-in with clear consent. CI allow-lists release permissions. OCR uses ML Kit's
   bundled on-device model.
 - Supabase: schema changes ship as new files in `supabase/migrations/` (never edit applied DDL); every user-owned
   table has RLS (`auth.uid() = user_id`) and grants to `authenticated` only. Only the publishable key may reach the

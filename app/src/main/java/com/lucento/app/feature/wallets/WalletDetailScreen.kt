@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.CurrencyExchange
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -137,6 +138,36 @@ fun WalletDetailScreen(
             val ext = LucentoTheme.extendedColors
             val notes = Modifier.padding(top = Spacing.sm)
             WalletOwnershipRow(wallet, onChange = { walletsViewModel.setClassification(wallet.id, it) })
+            // Multicurrency: what this wallet is worth in the main currency, or a prompt to give it a rate.
+            state.fx?.let { fx ->
+                val main = fx.mainCurrency
+                if (fx.unvalued) {
+                    InfoNote(
+                        "Not in your $main totals yet: this ${wallet.currencyCode} wallet has no exchange rate. Set the rate its " +
+                            "balance is worth, and it joins your net worth and reports.",
+                        modifier = notes,
+                        icon = Icons.Outlined.WarningAmber,
+                        container = ext.warningContainer,
+                        content = ext.warning,
+                        actionLabel = if (com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure) "Set rate" else null,
+                        onAction = { editing = wallet.toDraft(isDefault = wallet.id == walletsState.defaultWalletId) },
+                    )
+                } else {
+                    val worth = fx.carrying?.let { com.lucento.app.core.money.MoneyFormatter.format(if (liability) -it else it) }
+                    val average = fx.averageRate?.let { "1 ${wallet.currencyCode} = ${com.lucento.app.core.money.FxRate.displayRate(it)} $main on average" }
+                    val result = when {
+                        fx.realized.isZero -> null
+                        fx.realized.isNegative -> "FX losses so far ${com.lucento.app.core.money.MoneyFormatter.formatSigned(fx.realized, showPlus = true)}"
+                        else -> "FX gains so far ${com.lucento.app.core.money.MoneyFormatter.formatSigned(fx.realized, showPlus = true)}"
+                    }
+                    InfoNote(
+                        listOfNotNull(worth?.let { "In $main: $it" }, average, result).joinToString(" · ") +
+                            ". Each transaction counts at its own rate; what leaves goes at the average, and the difference is an FX gain or loss.",
+                        modifier = notes,
+                        icon = Icons.Outlined.CurrencyExchange,
+                    )
+                }
+            }
             when {
                 valued -> InfoNote(
                     "A value you enter yourself — no money moves through it. Use the edit button when it changes. " +

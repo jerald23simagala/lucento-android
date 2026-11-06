@@ -19,6 +19,7 @@ import com.lucento.app.domain.Wallet
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -57,6 +58,8 @@ data class TransferDraft(
     val amountText: String = "",
     val date: LocalDate = LocalDate.now(),
     val note: String = "",
+    /** Multicurrency: between two currencies, what arrived in the destination's currency, as typed. */
+    val receivedText: String = "",
 )
 
 fun Transfer.toDraft(): TransferDraft = TransferDraft(
@@ -66,6 +69,7 @@ fun Transfer.toDraft(): TransferDraft = TransferDraft(
     amountText = MoneyFormatter.formatPlain(amount),
     date = date,
     note = note,
+    receivedText = if (inLeg.currencyCode != outLeg.currencyCode) MoneyFormatter.formatPlain(inLeg.amount) else "",
 )
 
 sealed interface TransferDraftError {
@@ -73,6 +77,8 @@ sealed interface TransferDraftError {
     data object ToRequired : TransferDraftError
     data object SameWallet : TransferDraftError
     data object CurrencyMismatch : TransferDraftError
+    /** Multicurrency: between two currencies the amount that arrived is needed — it is the rate actually paid. */
+    data object ReceivedInvalid : TransferDraftError
     data object AmountInvalid : TransferDraftError
     data object AmountZero : TransferDraftError
     data class AmountTooPrecise(val digits: Int) : TransferDraftError
@@ -112,12 +118,49 @@ class TransactionEditorViewModel(
     private val transactions: TransactionRepository,
     wallets: WalletRepository,
     categories: CategoryRepository,
+    /** Multicurrency: the main currency (null in tests: nothing is valued) and the day's rates. */
+    private val preferences: com.lucento.app.data.preferences.UserPreferencesRepository? = null,
+    private val fxRates: com.lucento.app.data.fx.FxRateSource? = null,
 ) : ViewModel() {
+
+    /** Multicurrency: the whole ledger as last seen, to value a movement in another currency (rate, average). */
+    @Volatile private var ledgerWallets: List<Wallet> = emptyList()
+    @Volatile private var ledgerTransactions: List<Transaction> = emptyList()
 
     val state: StateFlow<TransactionEditorState> =
         combine(wallets.observeWallets(), categories.observeCategories(), transactions.observeTransactions()) { walletList, categoryList, all ->
+            ledgerWallets = walletList
+            ledgerTransactions = all
             TransactionEditorState(loaded = true, wallets = walletList.transactable(), categories = categoryList, transfers = Transfer.pair(all))
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransactionEditorState())
+
+    /**
+     * Multicurrency: the value a saved movement of [amount] in [wallet] keeps in the main currency. An edit keeps the
+     * rate it was saved at (rescaled to the new amount; a market rate moves to the new day's when it can be had); a row
+     * that follows the average keeps doing so; anything else gets the day's rate, else the wallet's last, else its average.
+     */
+    private suspend fun fxFor(wallet: Wallet, amount: com.lucento.app.core.money.Money, date: LocalDate, id: Long?): com.lucento.app.domain.fx.FxValue? {
+        val main = preferences?.preferences?.first()?.primaryCurrency ?: return null
+        if (wallet.currencyCode == main) return null
+        val existing = id?.let { key -> ledgerTransactions.firstOrNull { it.id == key } }?.takeIf { it.walletId == wallet.id }
+        val source = existing?.fxSource
+        val base = existing?.baseAmount?.takeIf { it.currencyCode == main }
+        if (existing != null && (source == null || source == com.lucento.app.domain.fx.FxSource.AVERAGE || base == null)) return null
+        if (existing != null && base != null && source != null && !existing.amount.isZero) {
+            if (existing.amount == amount && existing.date == date) return com.lucento.app.domain.fx.FxValue(base, source)
+            if (source == com.lucento.app.domain.fx.FxSource.MARKET && existing.date != date) {
+                fxRates?.rate(wallet.currencyCode, main, date)?.let { rate ->
+                    return com.lucento.app.domain.fx.FxValue(com.lucento.app.core.money.FxRate(wallet.currencyCode, main, rate).convert(amount).abs(), source)
+                }
+            }
+            val rate = com.lucento.app.core.money.FxRate.implied(existing.amount, base).perUnit
+            return com.lucento.app.domain.fx.FxValue(com.lucento.app.core.money.FxRate(wallet.currencyCode, main, rate).convert(amount).abs(), source)
+        }
+        val market = fxRates?.rate(wallet.currencyCode, main, date)
+        val book = com.lucento.app.domain.fx.FxLedger.build(main, ledgerWallets, ledgerTransactions)
+        val last = com.lucento.app.domain.fx.FxLedger.lastRate(main, wallet, ledgerTransactions)
+        return com.lucento.app.domain.fx.FxQuotes.quote(main, wallet, amount, market, com.lucento.app.domain.fx.FxSource.LAST_RATE, book, last)?.asValue
+    }
 
     /** The wallet used for the most recent successful save in this session; pre-selected next time. */
     private var lastWalletId: Long? = null
@@ -165,6 +208,7 @@ class TransactionEditorViewModel(
                         categoryId = draft.categoryId,
                         date = draft.date,
                         note = draft.note,
+                        fx = fxFor(wallet, amount, draft.date, draft.id),
                     )
                 )
             } finally {
@@ -210,7 +254,13 @@ class TransactionEditorViewModel(
         val from = wallets[draft.fromWalletId] ?: return onResult(TransferDraftError.FromRequired)
         val to = wallets[draft.toWalletId] ?: return onResult(TransferDraftError.ToRequired)
         if (from.id == to.id) return onResult(TransferDraftError.SameWallet)
-        if (from.currencyCode != to.currencyCode) return onResult(TransferDraftError.CurrencyMismatch)
+        // Multicurrency: between two currencies, what arrived is required — the two real amounts are the rate.
+        val received = if (from.currencyCode == to.currencyCode) {
+            null
+        } else {
+            (MoneyParser.parse(draft.receivedText, to.currencyCode, decimalSeparator) as? MoneyParser.Result.Success)?.money
+                ?.takeIf { it.amountMinor > 0 } ?: return onResult(TransferDraftError.ReceivedInvalid)
+        }
         val amount = when (val parsed = MoneyParser.parse(draft.amountText, from.currencyCode, decimalSeparator)) {
             is MoneyParser.Result.Success -> parsed.money
             MoneyParser.Result.Empty, MoneyParser.Result.Invalid -> return onResult(TransferDraftError.AmountInvalid)
@@ -224,6 +274,17 @@ class TransactionEditorViewModel(
         savingTransfer = true
         viewModelScope.launch {
             val result = try {
+                // Each leg's value in the main currency: the main-currency side's own amount, or — between two other
+                // currencies — the source's value (its day rate, else last rate, else average).
+                val main = preferences?.preferences?.first()?.primaryCurrency
+                val arriving = received ?: amount
+                val (outFx, inFx) = if (main == null) {
+                    null to null
+                } else {
+                    val bothForeign = amount.currencyCode != main && arriving.currencyCode != main
+                    val value = if (bothForeign) fxFor(from, amount, draft.date, id = null) else null
+                    com.lucento.app.domain.fx.FxTransfer.legValues(main, amount, arriving, value)
+                }
                 transactions.saveTransferOrNull(
                     TransactionRepository.TransferInput(
                         group = draft.group,
@@ -233,6 +294,9 @@ class TransactionEditorViewModel(
                         amount = amount,
                         date = draft.date,
                         note = draft.note,
+                        received = received,
+                        outFx = outFx,
+                        inFx = inFx,
                     )
                 )
             } finally {
@@ -264,7 +328,7 @@ class TransactionEditorViewModel(
 
     companion object {
         val Factory = containerFactory {
-            TransactionEditorViewModel(it.transactions, it.wallets, it.categories)
+            TransactionEditorViewModel(it.transactions, it.wallets, it.categories, it.preferences, it.fxRates)
         }
     }
 }

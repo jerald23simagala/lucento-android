@@ -123,15 +123,17 @@ fun TransactionRow(
         }
         Spacer(Modifier.width(Spacing.md))
         Column(horizontalAlignment = Alignment.End) {
+            val unsigned = isTransfer && !perspectiveOfWallet
+            val shown = if (owedPerspective) -transaction.signedAmount else transaction.signedAmount
             when {
-                isTransfer && !perspectiveOfWallet -> AmountText(
+                unsigned -> AmountText(
                     money = transaction.amount,
                     style = AmountStyles.row,
                     signed = false,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 else -> AmountText(
-                    money = if (owedPerspective) -transaction.signedAmount else transaction.signedAmount,
+                    money = shown,
                     style = AmountStyles.row,
                     showPlus = true,
                     color = when (amountInk(transaction.type, owedPerspective)) {
@@ -142,6 +144,10 @@ fun TransactionRow(
                     },
                 )
             }
+            // Multicurrency: a movement in another currency shows its main-currency value under it, signed the same way.
+            com.lucento.app.feature.fx.LocalFxDisplay.current
+                .value(transaction, sign = if (unsigned) 0 else if (shown.isNegative) -1 else 1)
+                ?.let { com.lucento.app.core.designsystem.component.EquivalentAmount(it, signed = !unsigned) }
             if (trailingCaption != null) {
                 Text(
                     trailingCaption,

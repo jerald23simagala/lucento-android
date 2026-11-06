@@ -45,6 +45,14 @@ data class WalletEntity(
      * the Owner. An organizational label only. Null = never classified (every wallet before v12).
      */
     @ColumnInfo(name = "classification") val classification: String? = null,
+    /**
+     * v13, multicurrency: for a wallet in another currency, the rate its opening balance is valued at in the main currency
+     * (1 unit = this many), stored as an exact decimal string ("56.1234"; [com.lucento.app.core.money.FxRate.encode]).
+     * Null: not valued yet (main-currency wallets, and foreign wallets from before multicurrency until they get one).
+     */
+    @ColumnInfo(name = "fx_basis_rate") val fxBasisRate: String? = null,
+    /** v13: revalue this foreign wallet at each month end (unrealized FX gain or loss). */
+    @ColumnInfo(name = "fx_revalue", defaultValue = "0") val fxRevalue: Boolean = false,
 )
 
 /** Money can be posted to this wallet: it is active and not a manually valued asset (see WalletType.isValuedManually). */

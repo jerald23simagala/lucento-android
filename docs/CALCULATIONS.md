@@ -1,8 +1,29 @@
 # Lucento financial definitions
 
-All money is `Long` minor units with an ISO 4217 code. Nothing is ever converted between currencies; every figure
-below is computed for one currency (the dashboard's *focus currency*: the main currency when used, otherwise the
-first wallet's). Implementations are pure Kotlin in `domain/` with JVM tests.
+All money is `Long` minor units with an ISO 4217 code. Every figure below is computed for one currency: the **main
+currency**, chosen once and locked (v13, owner 2026-11-05). Wallets in other currencies keep their own currency, and
+each of their movements carries an explicit, stored value in the main currency; the totals use those values (see
+"Exchange rates" below). Nothing is converted with a guessed or hidden rate. A foreign wallet with no rate yet stays in
+its own currency and is listed apart (the *focus currency* rule still names which one the page shows). Implementations
+are pure Kotlin in `domain/` with JVM tests.
+
+## Exchange rates (multicurrency, v13)
+
+Docs: docs/MULTICURRENCY.md. Code: `domain/fx/FxLedger.kt` (`FxLedger`, `FxTranslation`), `FxValue.kt` (`FxQuotes`,
+`FxTransfer`), `core/money/FxRate.kt`. Tests: `FxLedgerTest`, `FxRateTest`, `MulticurrencyRepositoryTest`.
+
+| Figure | Definition | Code |
+|---|---|---|
+| Rate | 1 unit of the wallet's currency = *r* units of the main currency, an exact decimal (12 significant digits, never floating point). A conversion rounds once, half-even, to the target's minor units | `FxRate` |
+| A movement's value | its amount in the main currency, stored with the movement (`base_amount_minor`, `base_currency`, `fx_source`): the day's market rate (MARKET), a typed rate (ENTERED), offline the wallet's last rate (LAST_RATE) or its average (AVERAGE), or — between currencies — the other side's real amount (TRANSFER). A main-currency movement has none | `FxQuotes.quote`, `FxTransfer.legValues` |
+| Opening rate | a foreign wallet's opening balance is valued at its `fx_basis_rate`, set when the wallet is created (or later, for a wallet from before v13). Without one the wallet is *unvalued* | `Wallet.fxBasisRate` |
+| Carrying value (average method) | replay the wallet's movements by date, then entry: an **increase** (money in; on a card or loan, more owed) adds its own value; a **decrease** takes off its share of the carrying value (carrying × amount ÷ held). The average rate = carrying ÷ held. A movement without a value of its own (AVERAGE, or written before v13) follows the average; while nothing is held, the opening rate (or the last rate seen) | `FxLedger.build` |
+| Realized FX gain / loss | on each decrease: its own value − the carrying value taken off (on a card or loan: the reverse — paying less than it was carried at is a gain). AVERAGE movements never make one. Anything still carried when the wallet reaches exactly zero is settled then (only an overdraft can leave any) | `FxLedger.build` → `FxRealized` |
+| Where FX results count | **gains as income, losses as expenses** under "FX gains" / "FX losses" in Insights, trends and Ask Lucento reports, and in net worth (through carrying values). **Never** in budgets, Spent, Safe to spend, Home's "Where it went" or the Transactions page totals — they are not spending (owner, 2026-11-05) | `TranslatedLedger.withFxResults`, `BudgetPlanner.plan` skips `fxResult` |
+| Totals in the main currency | net worth, assets and liabilities: valued foreign wallets at their carrying value; income, expenses, budgets and safe to spend: foreign movements at their own value | `FxTranslation.translate` (Home, Wallets, Budget, Transactions, Insights, Ask) |
+| Transfer between currencies | two legs, each in its wallet's currency; the amount received is required — the two real amounts are the rate. A leg in the main currency is the other leg's value; between two foreign wallets both legs carry the source's value (day rate, else last, else average) | `TransactionRepository.saveTransfer`, `FxTransfer.legValues` |
+| Editing a movement | keeps the rate it was saved at, rescaled to the new amount (a market rate moves to the new day's when that can be had); a movement following the average keeps doing so | `TransactionEditorViewModel.fxFor` |
+| Month-end revaluation | not yet: `fx_revalue` is stored and synced, but nothing uses it (stage 2, NEXT_TASKS MC-2) | — |
 
 | Figure | Definition | Code |
 |---|---|---|

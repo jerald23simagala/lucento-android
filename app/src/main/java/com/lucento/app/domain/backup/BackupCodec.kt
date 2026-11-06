@@ -102,9 +102,17 @@ object BackupCodec {
     }
 
     private fun wallet(row: JsonValue.Obj): BackupWallet {
-        // Backups written before v10 have no institutionId key; newer ones always write it.
+        // Backups written before v10 have no institutionId key, and before v13 (backup v4) no FX keys; newer ones always
+        // write them.
         val legacy = setOf("id", "name", "type", "currency", "openingBalanceMinor", "sortOrder", "archived", "createdAt", "updatedAt")
-        if (row.fields.keys != legacy) requireKeys(row, legacy + "institutionId")
+        val withInstitution = legacy + "institutionId"
+        if (row.fields.keys != legacy && row.fields.keys != withInstitution) requireKeys(row, withInstitution + setOf("fxBasisRate", "fxRevalue"))
+        val fxBasisRate = when (val value = row.fields["fxBasisRate"]) {
+            null, JsonValue.Null -> null
+            is JsonValue.Str -> value.value.takeIf { com.lucento.app.core.money.FxRate.parse(it) != null } ?: invalid()
+            else -> invalid()
+        }
+        val fxRevalue = if (row.fields.containsKey("fxRevalue")) row.bool("fxRevalue") else false
         val opening = row.long("openingBalanceMinor")
         if (opening < 0L) invalid()
         val institution = when (val value = row.fields["institutionId"]) {
@@ -123,6 +131,8 @@ object BackupCodec {
             createdAt = row.instant("createdAt"),
             updatedAt = row.instant("updatedAt"),
             institutionId = institution,
+            fxBasisRate = fxBasisRate,
+            fxRevalue = fxRevalue,
         )
     }
 
@@ -141,20 +151,31 @@ object BackupCodec {
     }
 
     private fun transaction(row: JsonValue.Obj): BackupTransaction {
-        requireKeys(
-            row,
-            setOf(
-                "id", "type", "amountMinor", "currency", "walletId", "categoryId", "occurredOn",
-                "note", "createdAt", "updatedAt", "transferGroup",
-            ),
+        val legacy = setOf(
+            "id", "type", "amountMinor", "currency", "walletId", "categoryId", "occurredOn",
+            "note", "createdAt", "updatedAt", "transferGroup",
         )
+        // Before v13 (backup v4) there are no FX keys; newer backups always write all three (null included).
+        if (row.fields.keys != legacy) requireKeys(row, legacy + setOf("baseAmountMinor", "baseCurrency", "fxSource"))
         val amount = row.long("amountMinor")
         if (amount <= 0L) invalid()
+        val currency = row.currency("currency")
+        val baseAmount = (row.fields["baseAmountMinor"] as? JsonValue.Num)?.let { row.long("baseAmountMinor") }
+        val baseCurrency = (row.fields["baseCurrency"] as? JsonValue.Str)?.let { row.currency("baseCurrency") }
+        val fxSource = when (val value = row.fields["fxSource"]) {
+            null, JsonValue.Null -> null
+            is JsonValue.Str -> value.value.takeIf { com.lucento.app.domain.fx.FxSource.fromName(it) != null } ?: invalid()
+            else -> invalid()
+        }
+        // All three or none, never negative, never in the row's own currency.
+        val present = listOf(baseAmount != null, baseCurrency != null, fxSource != null)
+        if (present.any { it } && !present.all { it }) invalid()
+        if (baseAmount != null && (baseAmount < 0L || baseCurrency == currency)) invalid()
         return BackupTransaction(
             id = row.id("id"),
             type = row.enum("type"),
             amountMinor = amount,
-            currency = row.currency("currency"),
+            currency = currency,
             walletId = row.id("walletId"),
             categoryId = row.idOrNull("categoryId"),
             occurredOn = row.date("occurredOn"),
@@ -162,6 +183,9 @@ object BackupCodec {
             createdAt = row.instant("createdAt"),
             updatedAt = row.instant("updatedAt"),
             transferGroup = row.idOrNull("transferGroup"),
+            baseAmountMinor = baseAmount,
+            baseCurrency = baseCurrency,
+            fxSource = fxSource,
         )
     }
 
@@ -430,6 +454,8 @@ object BackupCodec {
         "createdAt" to jsonInstant(row.createdAt),
         "updatedAt" to jsonInstant(row.updatedAt),
         "institutionId" to jsonNullable(row.institutionId),
+        "fxBasisRate" to jsonNullable(row.fxBasisRate),
+        "fxRevalue" to JsonValue.Bool(row.fxRevalue),
     )
 
     private fun categoryJson(row: BackupCategory) = jsonObject(
@@ -455,6 +481,9 @@ object BackupCodec {
         "createdAt" to jsonInstant(row.createdAt),
         "updatedAt" to jsonInstant(row.updatedAt),
         "transferGroup" to jsonNullable(row.transferGroup),
+        "baseAmountMinor" to (row.baseAmountMinor?.let(::jsonLong) ?: JsonValue.Null),
+        "baseCurrency" to jsonNullable(row.baseCurrency),
+        "fxSource" to jsonNullable(row.fxSource),
     )
 
     private fun budgetJson(row: BackupBudget) = jsonObject(

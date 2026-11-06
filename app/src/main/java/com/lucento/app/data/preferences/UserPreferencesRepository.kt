@@ -95,6 +95,12 @@ data class UserPreferences(
     /** Anonymous usage counts. Off until the user opts in. Nothing is sent while this is false. */
     val usageCounts: Boolean = false,
     /**
+     * Multicurrency: fetch the day's exchange rates from free services (two currency codes and a date per request, never
+     * an amount), and only when something is recorded in another currency. On by default (owner, 2026-11-06), and the
+     * person can turn it off; offline or off, rates are typed or taken from the wallet's own history.
+     */
+    val fxRatesOnline: Boolean = true,
+    /**
      * The one-time Home note that data stays on this phone and uninstalling erases it. New setup marks this seen.
      * Installs that finished onboarding before the note existed start unseen, so they are told once.
      */
@@ -190,6 +196,7 @@ class UserPreferencesRepository(
         val defaultWalletId = longPreferencesKey("default_wallet_id")
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
+        val fxRatesOnline = booleanPreferencesKey("fx_rates_online")
         /**
          * v2 (owner, 2026-11-04): AI answers now send recent transactions, goals and projections. Agreeing to v1
          * ("ask_lucento_ai", summaries only) doesn't cover that, so v1 is ignored and removed: the user is asked again.
@@ -246,6 +253,7 @@ class UserPreferencesRepository(
                 askLucentoAi = p[Keys.askLucentoAi] ?: false,
                 crashReports = p[Keys.crashReports] ?: false,
                 usageCounts = p[Keys.usageCounts] ?: false,
+                fxRatesOnline = p[Keys.fxRatesOnline] ?: true,
                 localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
                 setupGeneration = p[Keys.setupGeneration] ?: 0,
                 appLock = p[Keys.appLock] ?: false,
@@ -332,6 +340,11 @@ class UserPreferencesRepository(
 
     suspend fun setSmartReading(enabled: Boolean) {
         context.dataStore.edit { it[Keys.smartReading] = enabled }
+    }
+
+    /** Multicurrency: "Exchange rates online" (see [UserPreferences.fxRatesOnline]). A device choice, kept across sign-outs. */
+    suspend fun setFxRatesOnline(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.fxRatesOnline] = enabled }
     }
 
     suspend fun setAskLucentoAi(enabled: Boolean) {

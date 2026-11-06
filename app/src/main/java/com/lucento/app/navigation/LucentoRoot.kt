@@ -422,7 +422,11 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         val profilePhoto by appViewModel.profilePhoto.collectAsStateWithLifecycle()
         val sharedAccess by appViewModel.sharedAccess.collectAsStateWithLifecycle()
         val people by appViewModel.people.collectAsStateWithLifecycle()
+        val fxDisplay by appViewModel.fxDisplay.collectAsStateWithLifecycle()
+        // Lucento Shared: an invitation sent while the app was in the background shows on Home when it comes back.
+        androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_START) { appViewModel.refreshSharedSpace() }
         CompositionLocalProvider(
+            com.lucento.app.feature.fx.LocalFxDisplay provides fxDisplay,
             LocalProfileChrome provides ProfileChrome(preferences.displayName, profilePhoto, sharedWith = sharedAccess.sharedWith) {
                 showProfile = true
             },

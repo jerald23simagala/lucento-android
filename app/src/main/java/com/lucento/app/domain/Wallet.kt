@@ -62,6 +62,15 @@ data class Wallet(
     val institutionId: String? = null,
     /** Lucento Shared: whose wallet it is (an organizational label); null = never classified, read as Shared in a space. */
     val classification: WalletClassification? = null,
+    /**
+     * v13, multicurrency: for a wallet in another currency, the rate (1 unit = this many of the main currency) its opening
+     * balance — and any movement without a rate of its own while it holds nothing — is valued at. Set when the wallet is
+     * created (or, for a wallet older than multicurrency, when it first gets a rate). Null: not valued yet, so the wallet
+     * stays out of main-currency totals and is listed in its own currency.
+     */
+    val fxBasisRate: java.math.BigDecimal? = null,
+    /** v13: revalue this foreign wallet at each month end (unrealized FX gain or loss). */
+    val fxRevalue: Boolean = false,
 ) {
     val currencyCode: String get() = balance.currencyCode
 

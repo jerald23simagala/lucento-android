@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -87,6 +88,15 @@ data class ComposerState(
     /** Several accounts and none active yet: the wallet picker is (or will be) asked. */
     val needsWalletChoice: Boolean = false,
     val showWalletPicker: Boolean = false,
+    /** Multicurrency: the main currency, and each row in another currency's value in it (by row key). */
+    val mainCurrency: String? = null,
+    val fx: Map<String, com.lucento.app.domain.fx.FxQuote> = emptyMap(),
+    /**
+     * Some row in another currency has no online rate for its day (offline, or "Exchange rates online" off): the batch
+     * uses [fxOffline] — the wallet's last rate, or its average (no gain or loss). The person chooses (owner, 2026-11-05).
+     */
+    val fxNeedsChoice: Boolean = false,
+    val fxOffline: com.lucento.app.domain.fx.FxSource = com.lucento.app.domain.fx.FxSource.LAST_RATE,
 )
 
 /**
@@ -104,6 +114,8 @@ class ComposerViewModel(
     private val preferences: UserPreferencesRepository? = null,
     private val separator: Char = MoneyFormatter.decimalSeparator(),
     private val today: () -> LocalDate = LocalDate::now,
+    /** Multicurrency: the day's exchange rates (null in tests: rows then use the offline choice). */
+    private val fxRates: com.lucento.app.data.fx.FxRateSource? = null,
 ) : ViewModel() {
 
     private data class Session(
@@ -121,6 +133,9 @@ class ComposerViewModel(
         val showWalletPicker: Boolean = false,
         /** A message sent before any wallet was chosen; it goes out right after the picker answers. */
         val pending: Pair<String, CaptureSource>? = null,
+        /** Multicurrency: the offline choice, and the day rates asked for ("USD@2026-11-06" → rate, null = none to be had). */
+        val fxOffline: com.lucento.app.domain.fx.FxSource = com.lucento.app.domain.fx.FxSource.LAST_RATE,
+        val marketRates: Map<String, java.math.BigDecimal?> = emptyMap(),
     )
 
     private val session = MutableStateFlow(Session())
@@ -133,9 +148,9 @@ class ComposerViewModel(
         wallets.observeWallets(),
         categories.observeCategories(),
         transactions.observeTransactions(),
-        preferences?.preferences?.map { it.defaultWalletId } ?: flowOf(null),
+        preferences?.preferences?.map { it.defaultWalletId to it.primaryCurrency } ?: flowOf(null to null),
         session,
-    ) { allWallets, categoryList, history, savedDefault, s ->
+    ) { allWallets, categoryList, history, (savedDefault, main), s ->
         val walletList = allWallets.transactable()
         val ids = walletList.map { it.id }.toSet()
         val defaultId = savedDefault?.takeIf { it in ids }
@@ -145,6 +160,18 @@ class ComposerViewModel(
         val setup = ReviewSetup(walletList, categoryList, separator, transfersAllowed, history)
         val statuses = s.rows.associate { it.key to BatchReview.check(it, setup) }
         latestHistory = history
+        // Multicurrency: each row in another currency is valued at its day's rate, or the offline choice.
+        val book = if (main == null) null else com.lucento.app.domain.fx.FxLedger.build(main, allWallets, history)
+        var needsChoice = false
+        val fx = if (main == null || book == null) emptyMap() else s.rows.mapNotNull { row ->
+            val wallet = walletList.firstOrNull { it.id == row.walletId } ?: return@mapNotNull null
+            val money = statuses[row.key]?.money ?: return@mapNotNull null
+            if (wallet.currencyCode == main) return@mapNotNull null
+            val market = s.marketRates[marketKey(wallet.currencyCode, row.date)]
+            if (market == null) needsChoice = true
+            val last = com.lucento.app.domain.fx.FxLedger.lastRate(main, wallet, history)
+            com.lucento.app.domain.fx.FxQuotes.quote(main, wallet, money, market, s.fxOffline, book, last)?.let { row.key to it }
+        }.toMap()
         ComposerState(
             loaded = true,
             wallets = walletList,
@@ -161,8 +188,41 @@ class ComposerViewModel(
             defaultWalletId = defaultId,
             needsWalletChoice = active == null && walletList.size > 1,
             showWalletPicker = s.showWalletPicker && active == null && walletList.size > 1,
+            mainCurrency = main,
+            fx = fx,
+            fxNeedsChoice = needsChoice,
+            fxOffline = s.fxOffline,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ComposerState())
+
+    init {
+        // Multicurrency: ask once for each day rate the rows need (foreign currency × date). Declared after [state].
+        viewModelScope.launch {
+            state.map { st ->
+                val main = st.mainCurrency ?: return@map emptySet()
+                st.rows.mapNotNull { row ->
+                    st.wallets.firstOrNull { it.id == row.walletId }?.currencyCode?.takeIf { it != main }?.let { marketKey(it, row.date) }
+                }.toSet()
+            }.distinctUntilChanged().collect { needed ->
+                val main = state.value.mainCurrency ?: return@collect
+                val source = fxRates ?: return@collect
+                needed.filter { it !in session.value.marketRates }.forEach { key ->
+                    val currency = key.substringBefore('@')
+                    val day = LocalDate.parse(key.substringAfter('@'))
+                    val rate = runCatching { source.rate(currency, main, day) }.getOrNull()
+                    session.update { it.copy(marketRates = it.marketRates + (key to rate)) }
+                }
+            }
+        }
+    }
+
+    /** Multicurrency: the batch's choice when a row has no online rate — the wallet's last rate, or its average. */
+    fun setFxOffline(choice: com.lucento.app.domain.fx.FxSource) {
+        if (choice != com.lucento.app.domain.fx.FxSource.LAST_RATE && choice != com.lucento.app.domain.fx.FxSource.AVERAGE) return
+        session.update { it.copy(fxOffline = choice) }
+    }
+
+    private fun marketKey(currency: String, date: LocalDate) = "$currency@$date"
 
     /** Where the composer was opened from: a wallet pre-selects its account; "Income" makes income the default. */
     fun configure(walletId: Long?, typeHint: TransactionType?, transfersEnabled: Boolean) {
@@ -367,13 +427,19 @@ class ComposerViewModel(
         val ready = current.rows
         val entries = ready.map { row ->
             val money = current.statuses.getValue(row.key).money!!
+            // Multicurrency: a row in another currency is saved with its value in the main currency.
+            val fx = current.fx[row.key]?.asValue
             if (row.type.isTransfer) {
+                val (outFx, inFx) = current.mainCurrency
+                    ?.let { main -> com.lucento.app.domain.fx.FxTransfer.legValues(main, money, money, fx) } ?: (null to null)
                 TransactionRepository.BatchEntry.Move(
-                    TransactionRepository.TransferInput(null, row.key, row.walletId!!, row.toWalletId!!, money, row.date, row.description)
+                    TransactionRepository.TransferInput(
+                        null, row.key, row.walletId!!, row.toWalletId!!, money, row.date, row.description, outFx = outFx, inFx = inFx,
+                    )
                 )
             } else {
                 TransactionRepository.BatchEntry.Single(
-                    TransactionRepository.Input(null, row.key, row.type, money, row.walletId!!, row.categoryId, row.date, row.description)
+                    TransactionRepository.Input(null, row.key, row.type, money, row.walletId!!, row.categoryId, row.date, row.description, fx = fx)
                 )
             }
         }
@@ -415,7 +481,7 @@ class ComposerViewModel(
         const val SCAN_LABEL = "Scanned image"
 
         val Factory = containerFactory {
-            ComposerViewModel(it.transactions, it.wallets, it.categories, it.interpreter, it.preferences)
+            ComposerViewModel(it.transactions, it.wallets, it.categories, it.interpreter, it.preferences, fxRates = it.fxRates)
         }
 
         /** True when the phone writes short dates day first (03/11 for 3 November). */

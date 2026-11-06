@@ -226,7 +226,7 @@ private fun WalletsStep(title: String, body: String, wallets: List<Wallet>, addL
                     Spacer(Modifier.width(Spacing.md))
                     Text(w.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     // A card or loan shows what it does to net worth (−300.00), never an unsigned owed amount.
-                    MoneyText(money = if (w.type.isLiability) w.netWorthContribution else w.balance, style = AmountStyles.row)
+                    MoneyText(money = if (w.type.isLiability) w.netWorthContribution else w.balance, style = AmountStyles.row, fractionScale = 1f)
                 }
                 if (i < wallets.lastIndex) Hairline()
             }

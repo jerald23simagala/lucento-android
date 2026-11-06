@@ -427,21 +427,28 @@ object HomeStateBuilder {
         cloudStatus: CloudStatus = CloudStatus.LOCAL,
         visitedInsights: Boolean = false,
     ): HomeUiState {
-        val focus = com.lucento.app.domain.FocusCurrency.of(primaryCurrency, wallets, all)
+        // Multicurrency (docs/CALCULATIONS.md "Exchange rates"): every figure below is in the main currency — wallets in
+        // other currencies at their carrying value, their movements at their own value. Lists of what was recorded
+        // (recent activity, card dues) keep each movement's own currency. A wallet with no rate yet stays in its own.
+        val ledger = com.lucento.app.domain.fx.FxTranslation.translate(primaryCurrency, wallets, all)
+        val valued = ledger.wallets
+        val recorded = ledger.transactions
+        val focus = com.lucento.app.domain.FocusCurrency.of(primaryCurrency, valued, recorded)
         val current = YearMonth.from(today)
         val earliest = all.minOfOrNull { it.date }?.let { YearMonth.from(it) }?.coerceAtMost(current) ?: current
         val shown = month.coerceIn(earliest, current)
-        val monthTotals = TransactionQueries.totalsByCurrency(all, DateRange.monthOf(shown.atDay(1)), focus)
+        val monthTotals = TransactionQueries.totalsByCurrency(recorded, DateRange.monthOf(shown.atDay(1)), focus)
         val budgetsOn = features.isEnabled(Feature.BUDGETS)
         val recurringOn = features.isEnabled(Feature.RECURRING)
         val goalsOn = features.isEnabled(Feature.SAVINGS_GOALS)
         // Disabled modules keep their data but do not influence the dashboard.
-        val plan = if (budgetsOn) BudgetPlanner.plan(categories, budgets, all, focus, shown) else null
+        val plan = if (budgetsOn) BudgetPlanner.plan(categories, budgets, recorded, focus, shown) else null
         val activeSchedules = if (recurringOn) schedules else emptyList()
-        val netWorth = if (wallets.isEmpty()) null else NetWorthCalculator.summarize(wallets, primaryCurrency)
-        val monthChange = if (wallets.isEmpty()) null else CashflowCalculator.netFlow(focus, current, all).net.takeUnless { it.isZero }
-        val spending = spendingBreakdown(all, categories.associateBy { it.id }, focus, shown)
-        val history = if (wallets.isEmpty()) emptyList() else com.lucento.app.domain.BalanceHistory.lastMonths(wallets, all, focus, shown, today, count = 2)
+        val netWorth = if (wallets.isEmpty()) null else NetWorthCalculator.summarize(valued, primaryCurrency)
+        val monthChange = if (wallets.isEmpty()) null else CashflowCalculator.netFlow(focus, current, recorded).net.takeUnless { it.isZero }
+        val spending = spendingBreakdown(recorded, categories.associateBy { it.id }, focus, shown)
+        // Past balances replay movements and FX results together, so they land on the carrying values.
+        val history = if (wallets.isEmpty()) emptyList() else com.lucento.app.domain.BalanceHistory.lastMonths(valued, ledger.withFxResults, focus, shown, today, count = 2)
         val recentInMonth = recentActivity(all.filter { YearMonth.from(it.date) == shown }, limit = RECENT_LIMIT)
         val months = generateSequence(current) { it.minusMonths(1) }
             .takeWhile { !it.isBefore(earliest) }
@@ -456,7 +463,7 @@ object HomeStateBuilder {
             features = features,
             wallets = wallets,
             netWorth = netWorth,
-            netWorthComposition = if (wallets.isEmpty()) null else NetWorthComposer.compose(wallets, focus),
+            netWorthComposition = if (wallets.isEmpty()) null else NetWorthComposer.compose(valued, focus),
             otherNetWorth = netWorth?.totals.orEmpty().filter { it.currencyCode != focus },
             focusCurrency = focus,
             month = shown,
@@ -469,7 +476,7 @@ object HomeStateBuilder {
             burn = plan?.let { BudgetPlanner.burn(it, today) },
             expenseCategoryCount = categories.count { it.kind == CategoryKind.EXPENSE && !it.archived },
             otherBudgetCurrencies = if (budgetsOn) BudgetPlanner.currencies(budgets, categories, focus, shown).drop(1) else emptyList(),
-            netFlow = if (wallets.isEmpty()) null else CashflowCalculator.netFlow(focus, shown, all),
+            netFlow = if (wallets.isEmpty()) null else CashflowCalculator.netFlow(focus, shown, recorded),
             goals = if (goalsOn) GoalsSummary.overview(goals, contributions, focus, today) else null,
             hasAnyGoals = goalsOn && goals.isNotEmpty(),
             upcoming = RecurringMath.upcomingPayments(activeSchedules, today),
@@ -483,11 +490,11 @@ object HomeStateBuilder {
                 com.lucento.app.domain.Achievements.facts(all, wallets, categories, budgets, goals + archivedGoals, today, visitedInsights),
             ),
             recordedCount = all.count { com.lucento.app.domain.Achievements.countsAsRecorded(it.type) },
-            monthComposition = if (wallets.isEmpty()) null else com.lucento.app.domain.BalanceHistory.compositionAt(wallets, all, focus, shown, today),
+            monthComposition = if (wallets.isEmpty()) null else com.lucento.app.domain.BalanceHistory.compositionAt(valued, ledger.withFxResults, focus, shown, today),
             balanceHistory = history,
-            balanceTrend = com.lucento.app.domain.BalanceHistory.comparableTrendPercent(history, wallets, focus),
+            balanceTrend = com.lucento.app.domain.BalanceHistory.comparableTrendPercent(history, valued, focus),
             safeToSpend = if (plan?.hasBudget == true && shown == current) {
-                CashflowCalculator.safeToSpend(focus, today, all, wallets, budgets, activeSchedules, categories)
+                CashflowCalculator.safeToSpend(focus, today, recorded, valued, budgets, activeSchedules, categories)
                     ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
             } else {
                 null

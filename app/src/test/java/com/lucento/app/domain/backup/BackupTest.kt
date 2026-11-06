@@ -25,7 +25,7 @@ class BackupTest {
         val store = MemoryBackupStore(original)
         val engine = engine(store)
         val json = engine.export("0.5.0")
-        assertTrue(json.contains("\"schemaVersion\": 3"))
+        assertTrue(json.contains("\"schemaVersion\": 4"))
         assertTrue(json.contains("\"appVersion\": \"0.5.0\""))
         assertTrue(json.contains("\"exportedAt\": \"2026-03-01T00:00:00Z\""))
         assertTrue(json.contains("\"amountMinor\": 450"))
@@ -82,7 +82,7 @@ class BackupTest {
         assertNull(decoded.getValue("bud-1").month)
 
         // A file written before the lifecycle has no month/effectiveFrom keys at all: every budget is "every month".
-        val legacy = encode(sample()).replace(Regex(""",\s*"(month|effectiveFrom)"\s*:\s*null"""), "").replace("\"schemaVersion\": 3", "\"schemaVersion\": 1")
+        val legacy = encode(sample()).replace(Regex(""",\s*"(month|effectiveFrom)"\s*:\s*null"""), "").replace("\"schemaVersion\": 4", "\"schemaVersion\": 1")
         assertTrue(!legacy.contains("effectiveFrom"))
         val restored = BackupCodec.decode(legacy).snapshot.budgets.single()
         assertNull(restored.month)
@@ -99,11 +99,54 @@ class BackupTest {
         val decoded = BackupCodec.decode(encode(linked)).snapshot.wallets.associateBy { it.id }
         assertEquals("ph_bdo", decoded.getValue("wal-bank").institutionId)
         assertNull(decoded.getValue("wal-card").institutionId)
-        val legacy = encode(sample()).replace(Regex(""",\s*"institutionId"\s*:\s*null"""), "").replace("\"schemaVersion\": 3", "\"schemaVersion\": 1")
+        // A version 1 file: no institutionId on wallets (and none of the later FX keys either).
+        val legacy = encode(sample())
+            .replace(Regex(""",\s*"(institutionId|fxBasisRate)"\s*:\s*null"""), "")
+            .replace(Regex(""",\s*"fxRevalue"\s*:\s*false"""), "")
+            .replace("\"schemaVersion\": 4", "\"schemaVersion\": 1")
         assertTrue(!legacy.contains("institutionId"))
         assertTrue(BackupCodec.decode(legacy).snapshot.wallets.all { it.institutionId == null })
         val store = MemoryBackupStore(BackupSnapshot())
         failure(engine(store), store, encode(linked).replace("\"ph_bdo\"", "\"Not an id\""))
+    }
+
+    @Test fun multicurrencyValuesRoundTripAndOlderFilesStillRestore() = runTest {
+        // Multicurrency (backup v4): a wallet's opening rate, revaluation, and a movement's value in the main currency.
+        val valued = sample().let { s ->
+            s.copy(
+                wallets = s.wallets.map { w -> if (w.id == "wal-bank") w.copy(fxBasisRate = "56.1234", fxRevalue = true) else w },
+                transactions = s.transactions.map { t ->
+                    if (t.id == "tx-1") t.copy(baseAmountMinor = 25_200, baseCurrency = "PHP", fxSource = "MARKET") else t
+                },
+            )
+        }
+        val decoded = BackupCodec.decode(encode(valued)).snapshot
+        val bank = decoded.wallets.single { it.id == "wal-bank" }
+        assertEquals("56.1234", bank.fxBasisRate)
+        assertTrue(bank.fxRevalue)
+        val milk = decoded.transactions.single { it.id == "tx-1" }
+        assertEquals(25_200L, milk.baseAmountMinor)
+        assertEquals("PHP", milk.baseCurrency)
+        assertEquals("MARKET", milk.fxSource)
+        assertNull(decoded.transactions.single { it.id == "tx-2" }.baseAmountMinor)
+
+        // A version 3 file has no FX keys at all: unvalued wallets, movements that follow the average.
+        val legacy = encode(sample())
+            .replace(Regex(""",\s*"(fxBasisRate|baseAmountMinor|baseCurrency|fxSource)"\s*:\s*null"""), "")
+            .replace(Regex(""",\s*"fxRevalue"\s*:\s*false"""), "")
+            .replace("\"schemaVersion\": 4", "\"schemaVersion\": 3")
+        assertTrue(!legacy.contains("fxSource") && !legacy.contains("fxRevalue"))
+        val restored = BackupCodec.decode(legacy).snapshot
+        assertTrue(restored.wallets.all { it.fxBasisRate == null && !it.fxRevalue })
+        assertTrue(restored.transactions.all { it.baseAmountMinor == null && it.fxSource == null })
+
+        // All three or none, never in the row's own currency, a source this version knows, a readable rate.
+        val store = MemoryBackupStore(BackupSnapshot())
+        val json = encode(valued)
+        assertEquals(BackupFailure.INVALID, failure(engine(store), store, json.replace("\"baseCurrency\": \"PHP\"", "\"baseCurrency\": null")))
+        assertEquals(BackupFailure.INVALID, failure(engine(store), store, json.replace("\"baseCurrency\": \"PHP\"", "\"baseCurrency\": \"USD\"")))
+        assertEquals(BackupFailure.INVALID, failure(engine(store), store, json.replace("\"MARKET\"", "\"GUESSED\"")))
+        assertEquals(BackupFailure.INVALID, failure(engine(store), store, json.replace("\"56.1234\"", "\"5.6e1\"")))
     }
 
     @Test fun cardBillingRoundTripsAndOlderFilesStillRestore() = runTest {
@@ -114,7 +157,7 @@ class BackupTest {
         assertEquals(5, decoded.dueDay)
         // A version 2 file has no billing keys on its debt rows: no limit, no cycle.
         val legacy = encode(sample()).replace(Regex(""",\s*"(creditLimitMinor|statementDay|dueDay)"\s*:\s*null"""), "")
-            .replace("\"schemaVersion\": 3", "\"schemaVersion\": 2")
+            .replace("\"schemaVersion\": 4", "\"schemaVersion\": 2")
         assertTrue(!legacy.contains("statementDay"))
         val restored = BackupCodec.decode(legacy).snapshot.debtTerms.single()
         assertNull(restored.creditLimitMinor)
@@ -319,9 +362,9 @@ class BackupTest {
 
         assertEquals(BackupFailure.MALFORMED, failure(engine, store, "{"))
         assertEquals(BackupFailure.MALFORMED, failure(engine, store, valid.replace("\"amountMinor\": 450", "\"amountMinor\": 4.50")))
-        assertEquals(BackupFailure.UNSUPPORTED_VERSION, failure(engine, store, valid.replace("\"schemaVersion\": 3", "\"schemaVersion\": 99")))
+        assertEquals(BackupFailure.UNSUPPORTED_VERSION, failure(engine, store, valid.replace("\"schemaVersion\": 4", "\"schemaVersion\": 99")))
         assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replaceFirst("{", "{\"accessToken\":\"secret\",")))
-        assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replace("\"schemaVersion\": 3", "\"schemaVersion\": \"3\"")))
+        assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replace("\"schemaVersion\": 4", "\"schemaVersion\": \"3\"")))
         assertEquals(sample(), store.snapshot)
         assertEquals(0, store.writes)
     }

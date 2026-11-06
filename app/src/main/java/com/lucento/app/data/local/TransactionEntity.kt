@@ -64,4 +64,13 @@ data class TransactionEntity(
      */
     @ColumnInfo(name = "created_by") val createdBy: String? = null,
     @ColumnInfo(name = "updated_by") val updatedBy: String? = null,
+    /**
+     * v13, multicurrency (docs/CALCULATIONS.md "Exchange rates"): the row's value in the main currency, for a wallet in
+     * another currency, in [baseCurrency]'s minor units; [fxSource] says where it came from
+     * ([com.lucento.app.domain.fx.FxSource]). All three null in a main-currency wallet, and for rows that follow the
+     * wallet's average. The currency is stored with the value so a value can never be read in the wrong currency.
+     */
+    @ColumnInfo(name = "base_amount_minor") val baseAmountMinor: Long? = null,
+    @ColumnInfo(name = "base_currency") val baseCurrency: String? = null,
+    @ColumnInfo(name = "fx_source") val fxSource: String? = null,
 )

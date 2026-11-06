@@ -81,6 +81,12 @@ class SyncRepository(
      * lock is released (the shared ledger is then removed from the phone; see SharedSpaceRepository.endedByOwner).
      */
     private val onMembershipRevoked: suspend (String) -> Unit = {},
+    /**
+     * Multicurrency: this phone's main currency (null before one is chosen), and taking the ledger's from the server —
+     * every value in the main currency must be in the same one on every phone of a ledger, Partners' included.
+     */
+    private val mainCurrency: suspend () -> String? = { null },
+    private val adoptMainCurrency: suspend (String) -> Unit = {},
 ) {
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
@@ -166,6 +172,7 @@ class SyncRepository(
             // Claimed before anything is pulled or pushed, and never moved later: a half-finished pull must still mark
             // this phone as the account's, so a different account signing in next is wiped first (AccountBoundary).
             if (owner == null) preferences.setSyncedUserId(userId)
+            settleMainCurrency(r, env, partner)
             var report = SyncReport()
             if (firstIntoExisting) {
                 report += pull(r, env, Rejected())
@@ -231,6 +238,27 @@ class SyncRepository(
          */
         val forced = mutableMapOf<String, MutableSet<String>>()
         fun force(table: String, id: String) = forced.getOrPut(table) { mutableSetOf() }.add(id)
+    }
+
+    /**
+     * Multicurrency (docs/CALCULATIONS.md "Exchange rates"): the ledger's main currency lives on the server, set once by
+     * its first phone. A phone with another one takes the server's (a reinstall, a second phone, a Partner); a ledger with
+     * none yet gets this phone's — never from a Partner's phone, which writes only transactions. Never fails the cycle:
+     * a server without multicurrency answers with an error, and syncing carries on as before.
+     */
+    private suspend fun settleMainCurrency(r: SyncRemote, env: String, partner: Boolean) {
+        try {
+            val local = mainCurrency()
+            val server = r.mainCurrency(env)
+            when {
+                server == null && local != null && !partner -> r.setMainCurrency(env, local)
+                server != null && server != local -> adoptMainCurrency(server)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Kept as before: values already on this phone stay in the currency they say they're in (base_currency).
+        }
     }
 
     /**
@@ -540,6 +568,10 @@ class SyncRepository(
         // it — so a batch carries `classification` on every wallet (null included) only when one of them is classified.
         // Otherwise it sends none: exactly what v11 sent, and the server keeps a label another phone set.
         val withClassification = dirty.any { it.classification != null }
+        // Multicurrency, the same way: the FX keys go on every wallet of a batch that holds one in another currency (or
+        // one already valued), and on none otherwise — a one-currency ledger sends exactly what v12 sent.
+        val main = mainCurrency()
+        val withFx = dirty.any { it.fxBasisRate != null || it.fxRevalue || (main != null && it.currencyCode != main) }
         return pushRows(r, "wallets", dirty, { it.clientUuid!! }, {
             val t = terms[it.id]
             val json = encode(WalletRow.serializer(), WalletRow(
@@ -551,11 +583,14 @@ class SyncRepository(
                 installmentMinor = t?.installmentMinor, institutionId = it.institutionId,
                 creditLimitMinor = t?.creditLimitMinor, statementDay = t?.statementDay, dueDay = t?.dueDay,
             ))
-            if (withClassification) {
-                JsonObject(json + (CLASSIFICATION to (it.classification?.let(::JsonPrimitive) ?: JsonNull)))
-            } else {
-                json
+            val extra = buildMap {
+                if (withClassification) put(CLASSIFICATION, it.classification?.let(::JsonPrimitive) ?: JsonNull)
+                if (withFx) {
+                    put(FX_BASIS_RATE, it.fxBasisRate?.let(::JsonPrimitive) ?: JsonNull)
+                    put(FX_REVALUE, JsonPrimitive(it.fxRevalue))
+                }
             }
+            if (extra.isEmpty()) json else JsonObject(json + extra)
         }, { row, rev -> wallets.markPushed(row.clientUuid!!, row.updatedAt, rev, clock()) }, rejected)
     }
 
@@ -592,14 +627,27 @@ class SyncRepository(
         // Never push a transaction whose wallet or category can't be referenced yet: it would arrive orphaned or
         // uncategorised elsewhere. It stays dirty and goes out once its parent has a stable id.
         val eligible = dirty.filter { walletUuid[it.walletId] != null && (it.categoryId == null || categoryUuid[it.categoryId] != null) }
+        // Multicurrency: the FX keys go on every row of a batch that holds a movement in another currency (or a value),
+        // nulls included so a cleared value syncs; a one-currency ledger never sends them (what v12 sent).
+        val main = mainCurrency()
+        val withFx = eligible.any { it.baseAmountMinor != null || (main != null && it.currencyCode != main) }
         return pushRows(r, "transactions", eligible, { it.clientUuid }, {
-            encode(TransactionRow.serializer(), TransactionRow(
+            val json = encode(TransactionRow.serializer(), TransactionRow(
                 id = it.clientUuid, userId = userId, type = it.type, amountMinor = it.amountMinor,
                 currencyCode = it.currencyCode, walletId = walletUuid[it.walletId]!!,
                 categoryId = it.categoryId?.let(categoryUuid::get), occurredOn = it.occurredOn, note = it.note,
                 transferGroup = it.transferGroup,
                 createdAt = SyncTime.toIso(it.createdAt), updatedAt = SyncTime.toIso(it.updatedAt), baseRevision = it.baseRevision,
             ))
+            if (!withFx) {
+                json
+            } else {
+                JsonObject(json + mapOf(
+                    BASE_AMOUNT_MINOR to (it.baseAmountMinor?.let(::JsonPrimitive) ?: JsonNull),
+                    BASE_CURRENCY to (it.baseCurrency?.let(::JsonPrimitive) ?: JsonNull),
+                    FX_SOURCE to (it.fxSource?.let(::JsonPrimitive) ?: JsonNull),
+                ))
+            }
         }, { row, rev -> transactions.markPushed(row.clientUuid, row.updatedAt, rev, clock()) }, rejected)
     }
 
@@ -1134,6 +1182,11 @@ class SyncRepository(
         /** Lucento Shared: the only table a Partner's phone uploads (supabase/migrations/20261105120000_lucento_shared.sql). */
         private val PARTNER_TABLES = setOf("transactions")
         private const val CLASSIFICATION = "classification"
+        private const val FX_BASIS_RATE = "fx_basis_rate"
+        private const val FX_REVALUE = "fx_revalue"
+        private const val BASE_AMOUNT_MINOR = "base_amount_minor"
+        private const val BASE_CURRENCY = "base_currency"
+        private const val FX_SOURCE = "fx_source"
         private const val CREATED_BY = "created_by"
     }
 }
@@ -1154,6 +1207,9 @@ private fun WalletRow.toEntity(syncedAt: Long, id: Long = 0): WalletEntity = Wal
     institutionId = institutionId?.takeIf(::isInstitutionId),
     // Lucento Shared: a label only; one this version doesn't know reads as unclassified rather than hiding the wallet.
     classification = classification?.takeIf { it in com.lucento.app.domain.WalletClassification.NAMES },
+    // Multicurrency: a rate this version can't read is dropped (the wallet then shows unvalued) rather than misread.
+    fxBasisRate = fxBasisRate?.takeIf { com.lucento.app.core.money.FxRate.parse(it) != null },
+    fxRevalue = fxRevalue ?: false,
 )
 
 private fun CategoryRow.toEntity(syncedAt: Long, id: Long = 0): CategoryEntity = CategoryEntity(
@@ -1175,7 +1231,14 @@ private fun TransactionRow.toEntity(localWalletId: Long, localCategoryId: Long?,
         createdAt = SyncTime.fromIso(createdAt), updatedAt = SyncTime.fromIso(updatedAt), transferGroup = transferGroup,
         dirty = false, syncedAt = syncedAt, baseRevision = revision,
         createdBy = createdBy, updatedBy = updatedBy,
-    )
+    ).let { entity ->
+        // Multicurrency: kept only when all three read right, so a value is never taken in the wrong currency; otherwise
+        // the row follows its wallet's average.
+        val valid = baseAmountMinor != null && baseAmountMinor >= 0 && baseCurrency != null &&
+            baseCurrency.matches(Regex("[A-Z]{3}")) && baseCurrency != currencyCode &&
+            com.lucento.app.domain.fx.FxSource.fromName(fxSource) != null
+        if (valid) entity.copy(baseAmountMinor = baseAmountMinor, baseCurrency = baseCurrency, fxSource = fxSource) else entity
+    }
 
 private fun RecurringRow.toEntity(
     localWalletId: Long,
