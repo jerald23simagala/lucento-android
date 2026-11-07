@@ -3,7 +3,7 @@ package com.lucento.app.data.ai
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** A proxy's reply: the HTTP status, and the body when it is 200. */
+/** A proxy's reply: the HTTP status, and the body when it is 200 (or any status, when the caller asked for errors). */
 internal data class ProxyReply(val code: Int, val body: String?)
 
 /**
@@ -17,15 +17,24 @@ internal suspend fun postToProxy(
     body: String,
     readTimeoutMs: Int,
     accessToken: suspend (refresh: Boolean) -> String?,
+): ProxyReply? = postToProxy(endpoint, body, readTimeoutMs, errorBodies = false, accessToken = accessToken)
+
+/** As above; with [errorBodies] the body of a refusal (`{"error": "linked_elsewhere"}`) is read too, for callers that word each one. */
+internal suspend fun postToProxy(
+    endpoint: String,
+    body: String,
+    readTimeoutMs: Int,
+    errorBodies: Boolean,
+    accessToken: suspend (refresh: Boolean) -> String?,
 ): ProxyReply? {
     val token = accessToken(false) ?: return null
-    val first = post(endpoint, body, readTimeoutMs, token)
+    val first = post(endpoint, body, readTimeoutMs, token, errorBodies)
     if (first.code != 401) return first
     val fresh = accessToken(true)?.takeIf { it != token } ?: return first
-    return post(endpoint, body, readTimeoutMs, fresh)
+    return post(endpoint, body, readTimeoutMs, fresh, errorBodies)
 }
 
-private fun post(endpoint: String, body: String, readTimeoutMs: Int, token: String): ProxyReply {
+private fun post(endpoint: String, body: String, readTimeoutMs: Int, token: String, errorBodies: Boolean): ProxyReply {
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "POST"
         connectTimeout = 8_000
@@ -37,9 +46,15 @@ private fun post(endpoint: String, body: String, readTimeoutMs: Int, token: Stri
     try {
         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
         val code = connection.responseCode
-        val text = if (code == 200) connection.inputStream.bufferedReader(Charsets.UTF_8).readText() else null
+        val text = when {
+            code == 200 -> connection.inputStream.bufferedReader(Charsets.UTF_8).readText()
+            errorBodies -> connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText().take(MAX_ERROR_BODY) }
+            else -> null
+        }
         return ProxyReply(code, text)
     } finally {
         connection.disconnect()
     }
 }
+
+private const val MAX_ERROR_BODY = 2_000

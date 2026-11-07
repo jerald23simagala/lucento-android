@@ -1,6 +1,9 @@
 package com.lucento.app.feature.pro
 
+import com.lucento.app.data.billing.BillingProblem
 import com.lucento.app.data.billing.ProductPrice
+import com.lucento.app.data.billing.PurchaseResult
+import com.lucento.app.data.billing.VerifyOutcome
 import com.lucento.app.data.entitlement.RefreshOutcome
 import com.lucento.app.domain.entitlement.Capability
 import com.lucento.app.domain.entitlement.ComparisonRow
@@ -12,6 +15,7 @@ import com.lucento.app.domain.entitlement.EntitlementStatus
 import com.lucento.app.domain.entitlement.Limit
 import com.lucento.app.domain.entitlement.PlanCatalog
 import com.lucento.app.domain.entitlement.PlanNotice
+import com.lucento.app.domain.entitlement.PlayProducts
 import com.lucento.app.domain.entitlement.ProFeature
 import com.lucento.app.domain.entitlement.Verifier
 import java.time.Instant
@@ -228,6 +232,39 @@ object ProCopy {
     }
 
     // ------------------------------------------------------------------------------------------------ restore
+
+    /** What the page says when Google Play couldn't do it (docs/MONETIZATION.md §9 "Errors"). Nothing about the plan changes. */
+    fun billingProblem(problem: BillingProblem): String = when (problem) {
+        BillingProblem.UNAVAILABLE ->
+            "Google Play can’t take payments on this phone right now. Check that the Play Store is installed and signed in, then try again."
+        BillingProblem.NETWORK -> "Google Play couldn’t be reached. Check your connection and try again. Nothing was charged."
+        BillingProblem.ALREADY_OWNED -> "Your Google account already owns this. Tap Restore purchases to bring it back on this phone."
+        BillingProblem.ITEM_UNAVAILABLE -> "Google Play doesn’t offer this plan here right now. Nothing was charged."
+        BillingProblem.DEVELOPER, BillingProblem.OTHER -> "Something went wrong with Google Play. Nothing was charged; please try again."
+    }
+
+    /** What the page says after a purchase it started (customer copy D-9); null when there is nothing to say (cancelled). */
+    fun purchaseResult(result: PurchaseResult, productId: String?): String? = when (result) {
+        PurchaseResult.Completed -> when (productId) {
+            PlayProducts.PRO_LIFETIME -> "Pro Lifetime is yours. Everything that runs on this phone is unlocked, for good."
+            PlayProducts.CLOUD_ADDON -> "Lucento Cloud is on: cloud sync, Lucento Shared and the AI adviser’s Pro allowance."
+            else -> "Welcome to Lucento Pro. Everything is unlocked on this phone now."
+        }
+        PurchaseResult.Pending -> ProOffers.PENDING_NOTE
+        PurchaseResult.Cancelled -> null
+        is PurchaseResult.Failed -> billingProblem(result.problem)
+    }
+
+    /** When the server wouldn't record a purchase on this account (§5.4 linking rule). The phone keeps its plan either way. */
+    fun verificationIssue(outcome: VerifyOutcome): String? = when (outcome) {
+        VerifyOutcome.LINKED_ELSEWHERE ->
+            "This purchase is linked to a different Lucento account. It keeps working on this phone; cloud services follow the " +
+                "account it’s linked to. To move it, contact support with your Google Play order number."
+        VerifyOutcome.REVIEW_REQUIRED ->
+            "This purchase has moved between Lucento accounts several times, so support needs to look at it before it moves again. " +
+                "It keeps working on this phone. Contact support with your Google Play order number."
+        else -> null
+    }
 
     /** What "Restore purchases" says afterwards (customer copy D-8). */
     fun restoreMessage(before: DisplayPlan, after: DisplayPlan, outcome: RefreshOutcome): String = when {

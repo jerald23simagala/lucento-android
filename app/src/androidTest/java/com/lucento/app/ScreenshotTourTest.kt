@@ -609,5 +609,23 @@ class ScreenshotTourTest {
         click("6 months · Pro")
         waitForText("Trends over 6 and 12 months are part of Lucento Pro")
         shot("24f-insights-locked-period")
+
+        // ---------------------------------------------------------------- Lucento Pro: buying (Phase 4), with the test store
+        // Test builds fake Google Play's purchase flow: nothing is charged and every price says "test". The plan that
+        // results comes through the same entitlement manager a real Play purchase does.
+        back()
+        waitForText("Monthly budget")
+        simulator.setTestStore(true)
+        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        compose.waitForIdle()
+        click("Lucento Pro")
+        waitForText("Start 7-day free trial")
+        runCatching { compose.onNodeWithText("Start 7-day free trial").performScrollTo() }
+        shot("24g-pro-page-buy")
+        compose.onNodeWithText("Buy Lifetime").performScrollTo().performClick()
+        waitForText("Pro Lifetime is yours")
+        runCatching { compose.onNodeWithText("Pro Lifetime is yours", substring = true).performScrollTo() }
+        shot("24h-bought-lifetime")
+        simulator.setTestStore(false)
     }
 }

@@ -1,5 +1,7 @@
 package com.lucento.app.data.billing
 
+import android.app.Activity
+import com.lucento.app.domain.entitlement.PlayProducts
 import com.lucento.app.domain.entitlement.PurchaseRecord
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -33,15 +35,21 @@ data class ProductPrice(
 )
 
 /**
- * What the app needs from a store. `PlayPurchaseSource` (Billing Library 9.x) arrives with Google Play Billing; until
- * then, and in debug, CI and JVM tests, [FakePurchaseSource] stands in. Nothing else in the app knows the billing library.
- * Launching a purchase needs an Activity and is added with the Play implementation, behind this same interface.
+ * What the app needs from a store. [PlayPurchaseSource] (Billing Library 9.x) in release builds; [FakePurchaseSource] in
+ * debug, CI and JVM tests; [UnavailablePurchaseSource] in a release built without Play's licence key. Nothing else in the
+ * app knows the billing library.
  */
 interface PurchaseSource {
     val availability: StateFlow<BillingAvailability>
 
-    /** Pushed whenever Play reports a change (a purchase completing, a renewal), so the UI updates without a restart. */
+    /**
+     * Pushed whenever Play reports a change (a purchase completing, a renewal), so the UI updates without a restart.
+     * Always the **whole** list this Google account owns, like [queryPurchases]: a missing purchase means it ended.
+     */
     val updates: Flow<PurchaseQuery>
+
+    /** How each purchase started with [launchPurchase] ended. */
+    val results: Flow<PurchaseResult>
 
     /** Everything this Google account owns, from Play's local cache when offline. */
     suspend fun queryPurchases(): PurchaseQuery
@@ -50,6 +58,28 @@ interface PurchaseSource {
 
     /** Confirms a purchase to Play (within three days, or Play refunds it). True when Play accepted it. */
     suspend fun acknowledge(purchaseToken: String): Boolean
+
+    /**
+     * Opens Google Play's purchase sheet for [price] over [activity]. Null when the sheet opened; the outcome then arrives
+     * on [results] and the plan on [updates]. [obfuscatedAccountId] ties the order to the signed-in Lucento account
+     * (sha256 of its id, docs/MONETIZATION.md §5.4 linking rule); null when signed out.
+     */
+    suspend fun launchPurchase(activity: Activity, price: ProductPrice, obfuscatedAccountId: String?): BillingProblem?
+}
+
+/**
+ * A release build without Play's licence key (`LUCENTO_PLAY_LICENSE_KEY`) can't check a purchase's signature, so it
+ * doesn't bill: no prices, so the Pro page says Lucento Pro isn't on sale. Its query always fails, which never removes a
+ * plan this phone already holds (docs §5.3 L-2).
+ */
+object UnavailablePurchaseSource : PurchaseSource {
+    override val availability: StateFlow<BillingAvailability> = MutableStateFlow(BillingAvailability.UNAVAILABLE)
+    override val updates: Flow<PurchaseQuery> = MutableSharedFlow()
+    override val results: Flow<PurchaseResult> = MutableSharedFlow()
+    override suspend fun queryPurchases(): PurchaseQuery = PurchaseQuery.Failed("billing not configured in this build")
+    override suspend fun queryPrices(productIds: Set<String>): List<ProductPrice> = emptyList()
+    override suspend fun acknowledge(purchaseToken: String): Boolean = false
+    override suspend fun launchPurchase(activity: Activity, price: ProductPrice, obfuscatedAccountId: String?) = BillingProblem.UNAVAILABLE
 }
 
 /**
@@ -66,6 +96,9 @@ class FakePurchaseSource(
     private val _updates = MutableSharedFlow<PurchaseQuery>(extraBufferCapacity = 8)
     override val updates: Flow<PurchaseQuery> get() = _updates
 
+    private val _results = MutableSharedFlow<PurchaseResult>(extraBufferCapacity = 8)
+    override val results: Flow<PurchaseResult> get() = _results
+
     private var purchases: List<PurchaseRecord> = initial
     /** When set, [queryPurchases] fails with this reason (Play unreachable). */
     var failure: String? = null
@@ -81,6 +114,32 @@ class FakePurchaseSource(
         acknowledged += purchaseToken
         purchases = purchases.map { if (it.purchaseToken == purchaseToken) it.copy(acknowledged = true) else it }
         return true
+    }
+
+    /**
+     * Test builds: "buys" [price] at once, as if Play confirmed the payment — the record joins what the fake account owns
+     * (unacknowledged, like a fresh Play purchase) and listeners hear the whole list. Nothing is charged; it lasts until
+     * the simulator changes the plan or the app restarts.
+     */
+    override suspend fun launchPurchase(activity: Activity, price: ProductPrice, obfuscatedAccountId: String?): BillingProblem? {
+        if (_availability.value != BillingAvailability.AVAILABLE) return BillingProblem.UNAVAILABLE
+        if (purchases.any { it.productId == price.productId && !it.pending }) {
+            _results.tryEmit(PurchaseResult.Failed(BillingProblem.ALREADY_OWNED))
+            return null
+        }
+        val now = System.currentTimeMillis()
+        val record = PurchaseRecord(
+            productId = price.productId,
+            purchaseToken = "debug-buy-${price.productId}-$now",
+            orderId = "GPA.debug-buy-$now",
+            purchaseTimeMillis = now,
+            pending = false,
+            acknowledged = false,
+            autoRenewing = price.productId in PlayProducts.SUBSCRIPTIONS,
+        )
+        setPurchases(purchases.filterNot { it.productId == price.productId } + record)
+        _results.tryEmit(PurchaseResult.Completed)
+        return null
     }
 
     /** Replaces what the fake Google account owns and tells listeners, like Play's `PurchasesUpdatedListener`. */
