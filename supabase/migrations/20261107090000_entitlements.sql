@@ -72,6 +72,9 @@ create table if not exists lucento_private.plan_limits (
   value_int integer not null check (value_int >= 0),
   updated_at timestamptz not null default now()
 );
+-- Private schema, no client privileges; RLS on top so the dashboard's check and production agree. The functions below
+-- are security definer and owned by the table's owner, so RLS never applies to them.
+alter table lucento_private.plan_limits enable row level security;
 revoke all on table lucento_private.plan_limits from public, anon, authenticated;
 
 insert into lucento_private.plan_limits (key, value_int) values
