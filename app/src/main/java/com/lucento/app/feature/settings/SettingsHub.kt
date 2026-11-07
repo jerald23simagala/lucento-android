@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ToggleOn
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +39,15 @@ internal fun SettingsHub(current: SettingsUiState, onOpenPage: (SettingsPage) ->
     val prefs = current.preferences
     val inset = Sizes.iconTile + Spacing.md
     Column {
+        NavRow(
+            icon = Icons.Outlined.WorkspacePremium,
+            title = SettingsPage.PRO.title,
+            summary = com.lucento.app.feature.pro.ProCopy.planStatus(
+                com.lucento.app.feature.pro.LocalEntitlements.current, System.currentTimeMillis(),
+            ).title,
+            onClick = { onOpenPage(SettingsPage.PRO) },
+        )
+        Hairline(inset = inset)
         NavRow(
             icon = Icons.Outlined.CloudSync,
             title = SettingsPage.ACCOUNT.title,

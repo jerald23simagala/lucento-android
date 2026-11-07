@@ -714,7 +714,27 @@ check; usage queries (`WalletDao.countActiveOfTypes`, `GoalDao.countActive`); de
 except GRANT rows; proxy plan-aware limits (website PR); `lucento-qa` pass on §6.3; owner / tester GRANTs on
 `lucento-test`.
 
-### Phase 3 — UI
+### Phase 3 — UI — **built 2026-11-06 on `feature/lucento-pro-ui`**
+
+What landed: the **Lucento Pro page** (`feature/pro/ProScreen`, route `ProRoute(from)`): the plan this phone holds
+(`ProCopy.planStatus`, customer copy D-11), the lock that led there, the comparison generated from
+`PlanCatalog.comparisonRows()` (one row per feature, Free / Pro / Lifetime, wrapping at large text, one TalkBack
+sentence per row), plan cards with Google Play's price strings when there are any — and, until Lucento Pro is on sale,
+a note saying so instead of prices or buy buttons — the Lifetime promise (short, expandable), Restore purchases
+(re-reads Play and the server; `ProCopy.restoreMessage`), Manage subscription (only with a subscription), and a
+**test-build plan simulator** (`DebugPlanSimulator`, seven scenarios fed through the same `PurchaseInterpreter` Play
+will use; a simulated plan ignores the account's server rows). Entry points: profile menu row and Settings hub row (both
+show the plan), every lock note, the paused-sync sheet. **Locks are one inline pattern, not sheets** (a deliberate change
+from §5.1): `ProNote` = the existing note with a "See Lucento Pro" link, where the person is — wallet editor (by the
+button, no longer a red name field), goal editor, goal Restore (fixes a Phase 2 defect: a refused restore confirmed and
+closed), Insights, the report sheet, Settings › Account, the theme picker; a sheet over an editor sheet would stack two
+modals and lose the draft. `ProBadge` marks locked themes and the Receivable / Asset wallet types. The one-time
+**plan-ended notice** (`PlanNotices`, `PlanNoticeSheet`, last plan in `entitlement_preferences`) waits for the first
+refresh (`EntitlementManager.ready`) so a cold start never reads as a downgrade. Insights opens on 3 months on the free
+plan; the note appears only when a locked period is picked. `ScreenshotTourTest` runs on a simulated Pro plan and adds
+six Free frames (plan ended, Pro page ×3, Insights ×2).
+
+Original scope:
 `ProBadge`, `ProLockedSheet`, `ProLimitSheet`, the Lucento Pro page (plans, comparison from `PlanCatalog`, Lifetime
 explainer, restore, manage), profile row, Settings page, theme preview, Insights locked preview, first-start
 restriction notice, test-build plan simulator; screenshot tour frames; font scale 2.0 / 320 dp / TalkBack.

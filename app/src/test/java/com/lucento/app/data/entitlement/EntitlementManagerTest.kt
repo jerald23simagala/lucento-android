@@ -156,6 +156,20 @@ class EntitlementManagerTest {
         assertTrue(m.access(ProFeature.SAVINGS_GOALS, flowOf(20)).first() is Access.LimitReached)
     }
 
+    @Test fun refresh_says_what_it_reached_and_marks_the_manager_ready() = runTest {
+        val m = manager()
+        assertFalse("not ready before the first refresh", m.ready.value)
+        m.loadCached()
+        assertFalse("the cache alone isn't a refresh", m.ready.value)
+        serverRows = listOf(serverGrant())
+        assertEquals(RefreshOutcome(playReached = true, serverReached = true), m.refresh())
+        assertTrue(m.ready.value)
+        play.failure = "DISCONNECTED"
+        serverRows = null
+        assertEquals(RefreshOutcome(playReached = false, serverReached = false), m.refresh())
+        assertTrue("nothing reached removes nothing", m.state.value.has(Capability.LOCAL_PRO, now))
+    }
+
     @Test fun a_tampered_cache_reads_as_free_until_play_or_the_server_restore_it() = runTest {
         play.setPurchases(listOf(lifetimePurchase()))
         manager().refresh()

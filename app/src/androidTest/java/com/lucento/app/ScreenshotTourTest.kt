@@ -209,6 +209,13 @@ class ScreenshotTourTest {
         shot("05-home-first-run")
 
         // ---------------------------------------------------------------- seed realistic data through the repositories
+        // Lucento Pro: the tour shows every module, so it runs on a simulated Pro plan (test builds only); the free plan's
+        // locks, the plan-ended notice and the Pro page are captured at the end.
+        val simulator = checkNotNull(container.planSimulator) { "Test builds have the plan simulator" }
+        runBlocking {
+            simulator.select(com.lucento.app.data.billing.SimulatedPlan.PRO_MONTHLY)
+            container.entitlements.refresh()
+        }
         val today = LocalDate.now()
         val currency = runBlocking { container.preferences.preferences.first().primaryCurrency }
         fun money(major: Long, cents: Long = 0) = Money(major * 100 + cents, currency)
@@ -569,5 +576,38 @@ class ScreenshotTourTest {
         waitForText("overdue included", substring = true)
         noFigures("Scheduled")
         shot("23i-hidden-scheduled")
+
+        // ---------------------------------------------------------------- Lucento Pro: the plan ends; the free plan's locks
+        back()
+        runBlocking {
+            simulator.select(com.lucento.app.data.billing.SimulatedPlan.FREE)
+            container.entitlements.refresh()
+        }
+        // Told once, with what changed and that nothing was removed.
+        waitForText("Your Lucento Pro has ended")
+        shot("24a-plan-ended")
+        click("OK")
+        tab("Home")
+        waitForText("Monthly budget")
+        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        compose.waitForIdle()
+        click("Lucento Pro")
+        waitForText("What each plan includes")
+        shot("24b-pro-page-free")
+        runCatching { compose.onNodeWithText("Pro Lifetime").performScrollTo() }
+        shot("24c-pro-page-plans")
+        runCatching { compose.onNodeWithText("Restore purchases").performScrollTo() }
+        shot("24d-pro-page-purchases")
+        // The top bar scrolled away with the page: leave with the system back.
+        back()
+        // Back lands on Home (the Pro page opened from its profile menu); the dock returns after the page's exit animation.
+        waitForText("Monthly budget")
+        // Insights opens on the free plan's 3 months; a locked period explains itself only when picked.
+        compose.onNodeWithContentDescription("Insights").performScrollTo().performClick()
+        waitForText("6 months · Pro")
+        shot("24e-insights-free")
+        click("6 months · Pro")
+        waitForText("Trends over 6 and 12 months are part of Lucento Pro")
+        shot("24f-insights-locked-period")
     }
 }

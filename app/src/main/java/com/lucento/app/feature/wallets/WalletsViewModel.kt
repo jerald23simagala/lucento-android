@@ -94,7 +94,7 @@ sealed interface DraftError {
     data class TypeLocked(val usage: WalletUsage) : DraftError
     data object NotFound : DraftError
     /** Lucento Pro: the plan doesn't allow this wallet; [message] says the limit and that nothing existing changes. */
-    data class PlanLimit(val message: String) : DraftError
+    data class PlanLimit(val feature: com.lucento.app.domain.entitlement.ProFeature, val message: String) : DraftError
     data object InterestInvalid : DraftError
     data object TermInvalid : DraftError
     data object InstallmentInvalid : DraftError
@@ -238,33 +238,15 @@ class WalletsViewModel(
                     is WalletRepository.SaveResult.CurrencyLocked -> DraftError.CurrencyLocked(result.usage)
                     is WalletRepository.SaveResult.TypeLocked -> DraftError.TypeLocked(result.usage)
                     WalletRepository.SaveResult.NotFound, WalletRepository.SaveResult.NotPermitted -> DraftError.NotFound
-                    is WalletRepository.SaveResult.LimitReached -> DraftError.PlanLimit(planLimitMessage(result))
-                    is WalletRepository.SaveResult.ProRequired -> DraftError.PlanLimit(proRequiredMessage(result.feature))
+                    is WalletRepository.SaveResult.LimitReached -> DraftError.PlanLimit(
+                        result.feature, com.lucento.app.feature.pro.ProCopy.limitReachedLine(result.feature, result.used, result.limit),
+                    )
+                    is WalletRepository.SaveResult.ProRequired ->
+                        DraftError.PlanLimit(result.feature, com.lucento.app.feature.pro.ProCopy.lockedLine(result.feature))
                 },
                 (result as? WalletRepository.SaveResult.Saved)?.id,
             )
         }
-    }
-
-    /** Lucento Pro copy (docs/monetization/CUSTOMER_COPY.md D-1). Reached only once the gates are on. */
-    private fun planLimitMessage(result: WalletRepository.SaveResult.LimitReached): String {
-        val kind = when (result.feature) {
-            com.lucento.app.domain.entitlement.ProFeature.DEBT_ACCOUNTS -> "cards or loans"
-            else -> "money wallets"
-        }
-        val max = result.limit.maxOrNull
-        return if (max != null) {
-            "You have $max $kind, the most on your plan. Everything in the ones you have keeps working."
-        } else {
-            "Your plan doesn\u2019t allow another of these. Everything you have keeps working."
-        }
-    }
-
-    private fun proRequiredMessage(feature: com.lucento.app.domain.entitlement.ProFeature): String = when (feature) {
-        com.lucento.app.domain.entitlement.ProFeature.RECEIVABLES -> "Receivables are part of Lucento Pro."
-        com.lucento.app.domain.entitlement.ProFeature.VALUED_ASSETS -> "Assets at a value you set are part of Lucento Pro."
-        com.lucento.app.domain.entitlement.ProFeature.FOREIGN_CURRENCY_WALLETS -> "Wallets in other currencies are part of Lucento Pro. A wallet in your main currency is always free."
-        else -> "This kind of wallet is part of Lucento Pro."
     }
 
     private sealed interface DebtParse {

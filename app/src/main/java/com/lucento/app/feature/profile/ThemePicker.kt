@@ -103,7 +103,10 @@ fun ThemePicker(
         )
         lockedTapped.value?.let { spec ->
             Spacer(Modifier.height(Spacing.sm))
-            InfoNote("${spec.displayName} is part of Lucento Pro. Sunrise and Midnight are always free.")
+            com.lucento.app.feature.pro.ProNote(
+                "${spec.displayName} is part of Lucento Pro. Sunrise and Midnight are always free.",
+                from = com.lucento.app.domain.entitlement.ProFeature.EXTRA_THEMES,
+            )
         }
         Spacer(Modifier.height(Spacing.md))
         if (current.darkOnly) {
@@ -162,6 +165,7 @@ private fun ThemePreview(spec: ThemeSpec, dark: Boolean, selected: Boolean, onSe
                 alpha = if (dark && !spec.sceneryIsNight) 0.55f else 1f,
                 modifier = Modifier.matchParentSize(),
             )
+            if (locked) com.lucento.app.feature.pro.ProBadge(Modifier.align(Alignment.TopEnd).padding(Spacing.xs))
             // A miniature of the theme: its hero panel with a figure bar, and its primary + accent as two dots.
             Column(Modifier.align(Alignment.BottomStart).padding(Spacing.xs)) {
                 Box(
