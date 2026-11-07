@@ -23,6 +23,7 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
+import io.github.jan.supabase.postgrest.postgrest
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
@@ -73,8 +74,28 @@ class AuthRepository(
         data object NotConfigured : SignInResult
         /** An email account was created but must be confirmed from the link Supabase emailed before signing in. */
         data class ConfirmEmail(val email: String) : SignInResult
+        /**
+         * Creating an account found one that already exists for this email (Supabase answers a sign-up for a confirmed
+         * address with a user that has no identities, and sends nothing). The caller may try signing in with the same
+         * password before saying so.
+         */
+        data class AlreadyRegistered(val email: String) : SignInResult
         data class Failed(val message: String) : SignInResult
     }
+
+    /** One look at whether a new email account has been confirmed yet ([checkEmailConfirmed]). */
+    enum class EmailCheck {
+        /** Confirmed, and now signed in. */
+        CONFIRMED,
+        /** The link hasn't been opened yet. */
+        PENDING,
+        /** The password doesn't match this email (or the account was made another way, e.g. with Google). */
+        WRONG_PASSWORD,
+        /** Offline, rate-limited or the server didn't answer: nothing is known; look again later. */
+        UNREACHABLE,
+    }
+
+    enum class ResendResult { SENT, TOO_SOON, FAILED }
 
     /**
      * The signed-in account's email, or null. Follows the session status, so it updates once the stored session
@@ -161,18 +182,71 @@ class AuthRepository(
      * Creates an email + password account. When the project requires email confirmation (Supabase's default) no
      * session exists yet and [SignInResult.ConfirmEmail] asks the user to open the link, then sign in.
      */
-    suspend fun signUpWithEmail(email: String, password: String): SignInResult {
+    suspend fun signUpWithEmail(
+        email: String,
+        password: String,
+        /** The Terms of Use and Privacy Policy version the person agreed to; kept with the account (user metadata). */
+        acceptedTermsVersion: String? = null,
+    ): SignInResult {
         val auth = client?.auth ?: return SignInResult.NotConfigured
         offlineFailure(isOnline)?.let { return it }
         passwords.problem(password)?.let { return SignInResult.Failed(it) }
         return emailCall {
-            retryOnTimeout {
+            val user = retryOnTimeout {
                 auth.signUpWith(Email) {
                     this.email = email.trim()
                     this.password = password
+                    if (acceptedTermsVersion != null) data = consentMetadata(acceptedTermsVersion, java.time.Instant.now())
                 }
             }
-            if (auth.currentSessionOrNull() != null) SignInResult.Success else SignInResult.ConfirmEmail(email.trim())
+            when {
+                auth.currentSessionOrNull() != null -> SignInResult.Success
+                user != null && user.identities?.isEmpty() == true -> SignInResult.AlreadyRegistered(email.trim())
+                else -> SignInResult.ConfirmEmail(email.trim())
+            }
+        }
+    }
+
+    /**
+     * Whether a new email account has been confirmed, found by signing in with the password it was created with: until
+     * the link is opened Supabase refuses with `email_not_confirmed`; afterwards the sign-in succeeds and the session is
+     * kept. Shows nothing and never throws; every failure that isn't an answer is [EmailCheck.UNREACHABLE].
+     */
+    suspend fun checkEmailConfirmed(email: String, password: String): EmailCheck {
+        val auth = client?.auth ?: return EmailCheck.UNREACHABLE
+        if (!isOnline()) return EmailCheck.UNREACHABLE
+        return try {
+            auth.signInWith(Email) {
+                this.email = email.trim()
+                this.password = password
+            }
+            EmailCheck.CONFIRMED
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: AuthRestException) {
+            emailCheckFor(e.errorCode)
+        } catch (e: Exception) {
+            EmailCheck.UNREACHABLE
+        }
+    }
+
+    /** Sends the confirmation email again. Supabase allows one per address a minute (and the project's hourly limit). */
+    suspend fun resendConfirmation(email: String): ResendResult {
+        val auth = client?.auth ?: return ResendResult.FAILED
+        if (!isOnline()) return ResendResult.FAILED
+        return try {
+            auth.resendEmail(io.github.jan.supabase.auth.OtpType.Email.SIGNUP, email.trim())
+            ResendResult.SENT
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: AuthRestException) {
+            if (e.errorCode == AuthErrorCode.OverEmailSendRateLimit || e.errorCode == AuthErrorCode.OverRequestRateLimit) {
+                ResendResult.TOO_SOON
+            } else {
+                ResendResult.FAILED
+            }
+        } catch (e: Exception) {
+            ResendResult.FAILED
         }
     }
 
@@ -180,6 +254,34 @@ class AuthRepository(
      * Replaces the signed-in email account's password. The same length and breach checks as sign-up run first.
      * A breach lookup that cannot reach the network does not block the change.
      */
+    /**
+     * Deletes the signed-in account on the server with everything stored under it (`public.delete_my_account`,
+     * docs/ACCOUNT_DELETION.md). Only the server changes here; on [DeleteAccountResult.Deleted] the caller wipes this
+     * phone exactly like a sign-out. Never retried automatically: the answer can be lost after the deletion happened,
+     * and the person's own retry then hears "already deleted", which also counts as done.
+     */
+    suspend fun deleteAccount(): com.lucento.app.feature.account.DeleteAccountResult {
+        val failures = com.lucento.app.feature.account.DeleteAccountFailures
+        val failed = { message: String -> com.lucento.app.feature.account.DeleteAccountResult.Failed(message) }
+        val c = client ?: return failed(failures.NOT_CONFIGURED)
+        if (!SupabaseModule.isConfigured) return failed(failures.NOT_CONFIGURED)
+        if (!isOnline()) return failed(failures.OFFLINE)
+        return try {
+            withTimeoutOrNull(TOKEN_WAIT_MS) { c.auth.awaitInitialization() }
+            if (c.auth.currentSessionOrNull() == null) return failed(failures.SIGNED_OUT)
+            c.postgrest.rpc("delete_my_account")
+            com.lucento.app.feature.account.DeleteAccountResult.Deleted
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: io.github.jan.supabase.postgrest.exception.PostgrestRestException) {
+            failures.fromServer(e.statusCode, e.code)
+        } catch (e: RestException) {
+            failures.fromServer(e.statusCode, null)
+        } catch (e: Exception) {
+            failed(if (isTimeout(e)) failures.NO_ANSWER else if (e is HttpRequestException) failures.OFFLINE else failures.UNAVAILABLE)
+        }
+    }
+
     suspend fun changePassword(password: String): SignInResult {
         val auth = client?.auth ?: return SignInResult.NotConfigured
         passwords.problem(password)?.let { return SignInResult.Failed(it) }
@@ -454,12 +556,42 @@ internal const val OFFLINE_SIGN_IN_MESSAGE =
 internal fun offlineFailure(isOnline: () -> Boolean): AuthRepository.SignInResult.Failed? =
     if (isOnline()) null else AuthRepository.SignInResult.Failed(OFFLINE_SIGN_IN_MESSAGE)
 
+/** What a refused sign-in says about a new account's confirmation ([AuthRepository.checkEmailConfirmed]). */
+internal fun emailCheckFor(code: AuthErrorCode?): AuthRepository.EmailCheck = when (code) {
+    AuthErrorCode.EmailNotConfirmed -> AuthRepository.EmailCheck.PENDING
+    AuthErrorCode.InvalidCredentials -> AuthRepository.EmailCheck.WRONG_PASSWORD
+    else -> AuthRepository.EmailCheck.UNREACHABLE
+}
+
+/** Kept with a new email account (Supabase user metadata): which Terms and Privacy Policy were agreed to, and when. */
+internal fun consentMetadata(termsVersion: String, at: java.time.Instant): kotlinx.serialization.json.JsonObject =
+    kotlinx.serialization.json.buildJsonObject {
+        put("terms_version", kotlinx.serialization.json.JsonPrimitive(termsVersion))
+        put("terms_accepted_at", kotlinx.serialization.json.JsonPrimitive(at.toString()))
+    }
+
 /** At least this many characters; Supabase's own minimum (6) is too weak for an account that holds financial data. */
 const val MIN_PASSWORD_LENGTH = 8
 
 /** What the user is told when an email sign-up or sign-in is refused: one honest sentence per cause. */
 internal fun emailFailureMessage(code: AuthErrorCode?, debug: Boolean, detail: String): String {
-    val message = when (code) {
+    val message = when {
+        // The project's email sender refused (e.g. its key isn't allowed to send from the domain): Supabase rolls the
+        // new account back, so nothing exists yet and trying again later is the right advice.
+        emailNotSent(code, detail) ->
+            "We couldn’t send the verification email just now, so your account wasn’t created yet. Try again in a few minutes."
+        else -> emailFailureText(code)
+    }
+    return if (debug) "$message (debug: $detail)" else message
+}
+
+/** Supabase's answer when its email sender failed: `unexpected_failure`, "Error sending confirmation email". */
+internal fun emailNotSent(code: AuthErrorCode?, detail: String): Boolean =
+    (code == AuthErrorCode.UnexpectedFailure || code == null) && detail.contains("sending", ignoreCase = true) &&
+        detail.contains("email", ignoreCase = true)
+
+private fun emailFailureText(code: AuthErrorCode?): String {
+    return when (code) {
         AuthErrorCode.InvalidCredentials -> "That email and password don’t match an account. Check them, or create an account."
         AuthErrorCode.EmailNotConfirmed -> "Confirm your email first — open the link we sent you, then sign in."
         AuthErrorCode.UserAlreadyExists, AuthErrorCode.EmailExists -> "An account with this email already exists. Sign in instead."
@@ -469,5 +601,4 @@ internal fun emailFailureMessage(code: AuthErrorCode?, debug: Boolean, detail: S
         AuthErrorCode.ValidationFailed -> "Check the email address and password, then try again."
         else -> "Couldn’t connect your account. Try again."
     }
-    return if (debug) "$message (debug: $detail)" else message
 }

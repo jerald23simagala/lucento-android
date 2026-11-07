@@ -55,11 +55,22 @@ to the server and every sync fails safely, keeping all local data and dirty flag
 
 - **Google** (native, Credential Manager → ID token → `signInWith(IDToken)`), or **email + password** (`signUpWith(Email)` /
   `signInWith(Email)`; at least 8 characters).
-- With "Confirm email" on (the project default), a new email account has no session until the user opens the link;
-  the app says so and the user signs in afterwards.
-- Onboarding asks once (after currency and look): connect Google or an email account, or "Not now". Connecting turns
-  sync on, but the **first sync runs only when onboarding finishes**, so an existing account's data is never merged
-  with categories the user hasn't confirmed yet.
+- With "Confirm email" on (the project default), a new email account has no session until the user opens the link.
+  The app shows **Check your inbox** (`feature/account/AccountStatusDialog.kt`) and notices the verification by itself
+  (`EmailVerification`): it signs in with the password just chosen — refused as `email_not_confirmed` until the link is
+  opened — when Lucento returns to the front and every 15 s while on screen (never in the background; at most 20
+  attempts per 5 minutes, under the project's 30). The password is kept in memory only; after a process death the
+  dialog asks for it once. **Send again** uses `resendEmail(SIGNUP)` with a 60 s cooldown. Then **Email verified**, and
+  the flow continues. Confirmation emails go through Resend custom SMTP (owner, 2026-11-06); the link lands on the
+  website's `/auth/confirmed` page (the project's Site URL).
+- Creating an account for an address that already has one (Supabase answers with a user that has no identities and
+  sends nothing) tries the same password: the person's own account just signs in; otherwise they're told to sign in.
+- A new email account records the Terms of Use / Privacy Policy version it agreed to (`terms_version`,
+  `terms_accepted_at` in user metadata; docs/LEGAL.md). Google sign-in shows "By continuing with Google, you agree…".
+- Onboarding asks first, right after Get started (owner, 2026-11-06): **Keep your money safe** — Sync with an account
+  (Google, or "Use email instead" → a create-only page) or Keep it on this phone only. "I already have Lucento" signs in
+  only; "I was invited to share" can sign in or create. Connecting turns sync on, but the **first sync runs only when
+  onboarding finishes**, so an existing account's data is never merged with categories the user hasn't confirmed yet.
 
 Amounts stay `bigint` minor units with their ISO 4217 code — no conversion, no floating point. `occurred_on` and
 `target_date` stay epoch days. Only `created_at` / `updated_at` / `deleted_at` become `timestamptz`.
@@ -392,9 +403,10 @@ On 2026-10-25 the live project reported the Google provider as **enabled**.
 2. **Supabase dashboard** → Authentication → Sign In / Providers → **Google**: enabled; **Client IDs** contains the
    **Web** client ID (the Android client IDs are not needed there); Client Secret = the Web client's secret; leave
    "Skip nonce check" **off** (Lucento sends a nonce). No redirect URL allow-list entry is needed for native sign-in.
-3. Recommended: Sign In / Providers → **Email**: turn the provider off; Lucento never uses it and the project currently
-   allows open email sign-up. **Do not** turn off "Allow new users to sign up" — that would also block every new
-   Google user (Supabase creates the account on a user's first Google sign-in).
+3. Sign In / Providers → **Email**: on, with **Confirm email** on — Lucento offers email accounts and waits for the
+   verification. Authentication → Emails → SMTP: Resend (sending-only key per project). URL Configuration → Site URL:
+   `https://www.lucentoapp.com/auth/confirmed`. **Do not** turn off "Allow new users to sign up" — that would also block
+   every new user, Google included (Supabase creates the account on a user's first Google sign-in).
 4. **Local build**: `local.properties` → `LUCENTO_GOOGLE_WEB_CLIENT_ID=<Web client ID>` (the Web one, not Android).
    Each build type has its own Supabase project:
 

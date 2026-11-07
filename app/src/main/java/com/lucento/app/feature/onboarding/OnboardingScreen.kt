@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.PersonAddAlt
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.foundation.layout.offset
 import com.lucento.app.core.designsystem.component.StageIndicator
 import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.theme.Hierarchy
@@ -203,6 +207,20 @@ fun OnboardingScreen(
         )
     }
 
+    // A new account becoming ready: "Check your inbox" until the email is verified, then "Email verified" (or, after
+    // Google, "You're connected") before Lucento moves on. Shown over whichever screen started it.
+    val verification by viewModel.verification.state.collectAsStateWithLifecycle()
+    val accountReady by viewModel.accountReady.collectAsStateWithLifecycle()
+    com.lucento.app.feature.account.AccountStatusDialog(
+        waiting = verification,
+        ready = accountReady,
+        onVisible = viewModel.verification::onVisible,
+        onResend = viewModel.verification::resendEmail,
+        onChangeEmail = viewModel.verification::cancel,
+        onPassword = viewModel.verification::providePassword,
+        onContinue = viewModel::continueFromAccount,
+    )
+
     BackHandler(enabled = step > 0 && restoreStage == RestoreStage.NONE) { viewModel.back() }
     BackHandler(enabled = restoreStage != RestoreStage.NONE && restoreStage != RestoreStage.RESTORING) { viewModel.cancelRestore() }
 
@@ -347,7 +365,9 @@ fun OnboardingScreen(
                 else -> ConfirmStep(
                     currency, theme, features, picks.count, error, signedInEmail,
                     spendTypes = spendTypes,
-                    backupPath = backupPath,
+                    accountUnavailable = signedInEmail != null && accountCheck == AccountCheck.Unavailable,
+                    holdsAccountData = holdsAccountData,
+                    onLeaveAccount = onLeaveAccount,
                     onFinish = viewModel::finish,
                 )
             }
@@ -469,44 +489,81 @@ private fun WelcomeStep(
     }
 }
 
+/**
+ * One answer to "Keep your money safe": a card chosen like a radio button that, once chosen, opens to show what comes
+ * next for that answer ([content]) — so the next step always follows from the choice just made.
+ */
 @Composable
-private fun ChoiceCard(
+private fun PathCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     body: String,
-    onClick: () -> Unit,
-    selected: Boolean = false,
-    role: Role = Role.Button,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    badge: String? = null,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {},
 ) {
-    val border by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-        tween(160),
-        label = "choice-border",
+    val haptics = rememberHaptics()
+    val scheme = MaterialTheme.colorScheme
+    val border by animateColorAsState(if (selected) scheme.primary else scheme.outlineVariant, tween(160), label = "path-border")
+    val fill by animateColorAsState(
+        if (selected) scheme.primaryContainer.copy(alpha = 0.28f) else Color.Transparent,
+        tween(200),
+        label = "path-fill",
     )
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .border(BorderStroke(if (selected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
-            .then(
-                if (role == Role.RadioButton) Modifier.selectable(selected = selected, role = role, onClick = onClick)
-                else Modifier.clickable(role = role, onClick = onClick)
-            )
-            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(MaterialTheme.shapes.large)
+            .background(fill)
+            .border(BorderStroke(if (selected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.large),
     ) {
-        OnboardingIcon(icon)
-        Spacer(Modifier.width(Spacing.md))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (role == Role.RadioButton) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp)
+                .selectable(selected = selected, role = Role.RadioButton) {
+                    if (!selected) haptics.tick()
+                    onSelect()
+                }
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OnboardingIcon(icon)
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                if (badge != null) {
+                    Spacer(Modifier.height(Spacing.xxs))
+                    Text(
+                        badge,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = scheme.onPrimaryContainer,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(scheme.primaryContainer)
+                            .padding(horizontal = Spacing.sm, vertical = 2.dp),
+                    )
+                    Spacer(Modifier.height(Spacing.xxs))
+                }
+                Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(Spacing.sm))
             Icon(
                 if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
                 contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                tint = if (selected) scheme.primary else scheme.outline,
+            )
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = selected,
+            enter = androidx.compose.animation.expandVertically(tween(240)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = androidx.compose.animation.shrinkVertically(tween(200)) + fadeOut(tween(120)),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                content = content,
             )
         }
     }
@@ -588,12 +645,19 @@ internal fun RestoreFlow(
                         )
                     }
                     Spacer(Modifier.height(Spacing.md))
+                    // "I already have Lucento" signs in to an account that exists; an invitation may be for someone new
+                    // to Lucento, so that path can create the account too.
                     com.lucento.app.feature.settings.ConnectAccountPanel(
                         busy = connecting,
                         googleAvailable = googleAvailable,
                         onGoogle = onGoogle,
                         onEmail = onEmail,
                         onPrepareEmail = onPrepareEmail,
+                        emailModes = if (invited) {
+                            listOf(com.lucento.app.feature.settings.EmailMode.SIGN_IN, com.lucento.app.feature.settings.EmailMode.CREATE)
+                        } else {
+                            listOf(com.lucento.app.feature.settings.EmailMode.SIGN_IN)
+                        },
                     )
                 }
                 RestoreStage.RESTORING -> {
@@ -998,8 +1062,10 @@ private fun GooglePhotoOffer(photo: com.lucento.app.feature.profile.ProfilePhoto
 }
 
 /**
- * Optional cloud sync: back up and sync across devices by connecting Google or an email account. Turning it on needs
- * an account; "Not now" keeps everything on this phone (sync can be turned on later in Settings).
+ * "Keep your money safe" — the first question after Get started (owner, 2026-11-06). Two answers, each opening what
+ * follows from it: **Sync with an account** offers Google, or an email account made on its own page (create only: this
+ * path is for people new to Lucento; returning ones use "I already have Lucento"); **Keep it on this phone only** shows
+ * Continue. Nothing leaves the phone until an account is connected, and sync itself starts when setup finishes.
  */
 @Composable
 private fun SyncStep(
@@ -1016,124 +1082,216 @@ private fun SyncStep(
     onRetryCheck: () -> Unit,
     onContinueOffline: () -> Unit,
     onContinue: () -> Unit,
-    path: BackupPath,
+    path: BackupPath?,
     onPath: (BackupPath) -> Unit,
     photo: com.lucento.app.feature.profile.ProfilePhotoState = com.lucento.app.feature.profile.ProfilePhotoState(),
 ) {
-    val ext = LucentoTheme.extendedColors
-    // Without cloud sync in this build, the account path isn't offered.
-    val shownPath = if (!available && path == BackupPath.ACCOUNT) BackupPath.FILE else path
-    Column(Modifier.fillMaxSize().imePadding()) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepTitle(
-                "Keep your money safe",
-                "Choose how Lucento protects your records. You can change this any time in Settings.",
-                icon = Icons.Outlined.Shield,
+    // Without cloud sync in this build, only this phone is offered.
+    val shownPath = if (!available) BackupPath.DEVICE_ONLY else path
+    var emailPage by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var legal by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<com.lucento.app.feature.legal.LegalDoc?>(null) }
+    legal?.let { com.lucento.app.feature.legal.LegalSheet(it, onDismiss = { legal = null }) }
+    val onEmailPage = emailPage && signedInEmail == null && available
+    // Back from the account form returns to the two choices, not to the welcome screen.
+    BackHandler(enabled = onEmailPage && !connecting) { emailPage = false }
+
+    AnimatedContent(
+        targetState = onEmailPage,
+        transitionSpec = {
+            val forward = targetState
+            (slideInHorizontally(tween(300)) { w -> if (forward) w / 6 else -w / 6 } + fadeIn(tween(300)))
+                .togetherWith(slideOutHorizontally(tween(200)) { w -> if (forward) -w / 6 else w / 6 } + fadeOut(tween(160)))
+        },
+        modifier = Modifier.fillMaxSize(),
+        label = "account-page",
+    ) { showForm ->
+        if (showForm) {
+            CreateAccountPage(
+                googleAvailable = googleAvailable,
+                connecting = connecting,
+                message = message,
+                onEmail = onEmail,
+                onOpenLegal = { legal = it },
+                onBack = { emailPage = false },
             )
-            if (signedInEmail == null) {
-                if (available) {
-                    ChoiceCard(
-                        icon = Icons.Outlined.CloudSync,
-                        title = "Sync with an account",
-                        body = "Backed up automatically and the same on every phone. Uses Google or an email account.",
-                        selected = shownPath == BackupPath.ACCOUNT,
-                        role = Role.RadioButton,
-                        onClick = { onPath(BackupPath.ACCOUNT) },
-                    )
-                    Spacer(Modifier.height(Spacing.sm))
-                }
-                ChoiceCard(
-                    icon = Icons.Outlined.SaveAlt,
-                    title = "Back up to a file",
-                    body = "Export a backup whenever you like from Settings › Your data. Nothing leaves your phone unless you share the file.",
-                    selected = shownPath == BackupPath.FILE,
-                    role = Role.RadioButton,
-                    onClick = { onPath(BackupPath.FILE) },
-                )
-                Spacer(Modifier.height(Spacing.sm))
-                ChoiceCard(
-                    icon = Icons.Outlined.PhoneAndroid,
-                    title = "Keep it on this phone only",
-                    body = "No copies anywhere. Uninstalling Lucento or losing this phone loses your records.",
-                    selected = shownPath == BackupPath.DEVICE_ONLY,
-                    role = Role.RadioButton,
-                    onClick = { onPath(BackupPath.DEVICE_ONLY) },
-                )
-                Spacer(Modifier.height(Spacing.md))
-            }
-            when {
-                !available -> InfoNote("Cloud sync isn’t available in this version of Lucento. Everything works fully offline.")
-                signedInEmail != null && accountCheck == AccountCheck.Checking -> {
-                    Spacer(Modifier.height(Spacing.md))
-                    LucentoWorkingIndicator(label = "Checking your account")
-                }
-                signedInEmail != null && accountCheck == AccountCheck.Unavailable -> InfoNote(
-                    if (!holdsAccountData) {
-                        "We couldn’t reach your account to see what’s already in it, so nothing has been set up or " +
-                            "uploaded yet. Check your connection and try again — or carry on without syncing for now."
+            return@AnimatedContent
+        }
+        Column(Modifier.fillMaxSize().imePadding()) {
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                StepTitle(
+                    "Keep your money safe",
+                    if (signedInEmail == null) {
+                        "Choose where Lucento keeps your records. You can change this any time in Settings."
                     } else {
-                        "We couldn’t reach your account, and part of it is already on this phone. Try again to finish " +
-                            "bringing it across — or use Lucento without this account for now. Your account keeps everything."
+                        "Your records are backed up to your account and stay the same on every phone you use."
                     },
-                    icon = Icons.Outlined.WarningAmber,
-                    container = ext.warningContainer,
-                    content = ext.warning,
+                    icon = Icons.Outlined.Shield,
                 )
-                signedInEmail != null -> {
-                    InfoNote(
-                        "Connected as ${signedInEmail.ifEmpty { "your account" }}. Sync starts when you finish setting up.",
-                        icon = Icons.Outlined.CloudDone,
-                        container = MaterialTheme.colorScheme.primaryContainer,
-                        content = MaterialTheme.colorScheme.onPrimaryContainer,
+                when {
+                    signedInEmail != null && accountCheck == AccountCheck.Checking -> LucentoWorkingIndicator(label = "Checking your account")
+                    signedInEmail != null && accountCheck == AccountCheck.Unavailable -> InfoNote(
+                        if (!holdsAccountData) {
+                            "We couldn’t reach your account to see what’s already in it, so nothing has been set up or " +
+                                "uploaded yet. Check your connection and try again — or carry on without syncing for now."
+                        } else {
+                            "We couldn’t reach your account, and part of it is already on this phone. Try again to finish " +
+                                "bringing it across — or use Lucento without this account for now. Your account keeps everything."
+                        },
+                        icon = Icons.Outlined.WarningAmber,
+                        container = LucentoTheme.extendedColors.warningContainer,
+                        content = LucentoTheme.extendedColors.warning,
                     )
-                    if (photo.googleAvailable) {
-                        Spacer(Modifier.height(Spacing.md))
-                        GooglePhotoOffer(photo)
+                    signedInEmail != null -> ConnectedAccount(signedInEmail, photo)
+                    else -> Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        if (available) {
+                            PathCard(
+                                icon = Icons.Outlined.CloudSync,
+                                title = "Sync with an account",
+                                body = "Backed up automatically and the same on every phone you use.",
+                                badge = "Recommended",
+                                selected = shownPath == BackupPath.ACCOUNT,
+                                onSelect = { onPath(BackupPath.ACCOUNT) },
+                            ) {
+                                if (connecting) {
+                                    com.lucento.app.core.designsystem.component.ConnectingIndicator(
+                                        "Connecting your account…",
+                                        Modifier.fillMaxWidth().padding(vertical = Spacing.md),
+                                    )
+                                } else {
+                                    if (googleAvailable) com.lucento.app.feature.settings.GoogleSignInButton(onClick = onGoogle)
+                                    com.lucento.app.core.designsystem.component.LucentoSecondaryButton(
+                                        text = if (googleAvailable) "Use email instead" else "Create an account with email",
+                                        icon = Icons.Outlined.Email,
+                                        onClick = {
+                                            onPrepareEmail()
+                                            emailPage = true
+                                        },
+                                    )
+                                    if (googleAvailable) com.lucento.app.feature.settings.GoogleConsentNote(onOpen = { legal = it })
+                                }
+                            }
+                        }
+                        PathCard(
+                            icon = Icons.Outlined.PhoneAndroid,
+                            title = "Keep it on this phone only",
+                            body = "Nothing leaves this phone. Export a backup file any time from Settings › Your data.",
+                            selected = shownPath == BackupPath.DEVICE_ONLY,
+                            onSelect = { onPath(BackupPath.DEVICE_ONLY) },
+                        ) {
+                            Text(
+                                "Without a backup, losing this phone or uninstalling Lucento loses your records.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (!available) InfoNote("Cloud sync isn’t available in this version of Lucento. Everything works fully offline.")
                     }
                 }
-                shownPath != BackupPath.ACCOUNT -> Unit
-                else -> {
-                    InfoNote(
-                        "Your data stays only on this phone until you connect an account. Signing out removes that " +
-                            "account’s data from this phone so it can’t be uploaded to a different one.",
-                    )
+                // Only beside the account choice it came from: "Keep it on this phone only" has nothing to do with it.
+                if (message != null && !connecting && (signedInEmail != null || shownPath == BackupPath.ACCOUNT)) {
                     Spacer(Modifier.height(Spacing.md))
-                    com.lucento.app.feature.settings.ConnectAccountPanel(
-                        busy = connecting,
-                        googleAvailable = googleAvailable,
-                        onGoogle = onGoogle,
-                        onEmail = onEmail,
-                        onPrepareEmail = onPrepareEmail,
+                    InfoNote(message)
+                }
+                Spacer(Modifier.height(Spacing.md))
+            }
+            Spacer(Modifier.height(Spacing.md))
+            when {
+                available && signedInEmail != null && accountCheck == AccountCheck.Unavailable -> {
+                    LucentoPrimaryButton(text = "Try again", onClick = onRetryCheck)
+                    LucentoTextButton(
+                        text = if (holdsAccountData) "Use Lucento without this account" else "Continue without syncing",
+                        onClick = onContinueOffline,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-            }
-            if (message != null) {
-                Spacer(Modifier.height(Spacing.sm))
-                Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                signedInEmail != null && accountCheck == AccountCheck.Checking -> LucentoPrimaryButton(text = "Continue", onClick = {}, enabled = false)
+                signedInEmail != null -> {
+                    LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+                    LucentoTextButton(
+                        text = "Don’t sync — keep it on this phone",
+                        onClick = onContinueOffline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                shownPath == BackupPath.DEVICE_ONLY -> LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+                // Sync chosen: the card above holds the next step (Google or email). Nothing chosen yet: just the cards.
+                else -> Unit
             }
         }
+    }
+}
+
+/** Signed in already (came back to this step): which account, and its Google photo when there is one. */
+@Composable
+private fun ConnectedAccount(email: String, photo: com.lucento.app.feature.profile.ProfilePhotoState) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(
+                Icons.Outlined.CloudDone,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                content = MaterialTheme.colorScheme.onPrimaryContainer,
+                size = Sizes.iconTile,
+                shape = MaterialTheme.shapes.small,
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text("Syncing with", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(email.ifEmpty { "Your account" }, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Sync starts when you finish setting up.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    if (photo.googleAvailable) {
         Spacer(Modifier.height(Spacing.md))
-        if (available && signedInEmail != null && accountCheck == AccountCheck.Unavailable) {
-            LucentoPrimaryButton(text = "Try again", onClick = onRetryCheck)
-            LucentoTextButton(
-                text = if (holdsAccountData) "Use Lucento without this account" else "Continue without syncing",
-                onClick = onContinueOffline,
-                modifier = Modifier.fillMaxWidth(),
+        GooglePhotoOffer(photo)
+    }
+}
+
+/**
+ * "Use email instead": a page of its own for making the account — create only, since this path is for people new to
+ * Lucento. The form asks for agreement to the Terms of Use and Privacy Policy; after it, "Check your inbox" takes over.
+ */
+@Composable
+private fun CreateAccountPage(
+    googleAvailable: Boolean,
+    connecting: Boolean,
+    message: String?,
+    onEmail: (String, String, com.lucento.app.feature.settings.EmailMode) -> Unit,
+    onOpenLegal: (com.lucento.app.feature.legal.LegalDoc) -> Unit,
+    onBack: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            androidx.compose.material3.IconButton(
+                onClick = onBack,
+                enabled = !connecting,
+                modifier = Modifier.padding(bottom = Spacing.xs).offset(x = (-12).dp),
+            ) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back to the choices")
+            }
+            StepTitle(
+                "Create your account",
+                "Use an email you can open now — we’ll send a link to verify it. Your account keeps your records backed " +
+                    "up and in sync.",
+                icon = Icons.Outlined.PersonAddAlt,
             )
-        } else if (signedInEmail != null && accountCheck == AccountCheck.Checking) {
-            LucentoPrimaryButton(text = "Continue", onClick = {}, enabled = false)
-        } else if (signedInEmail != null || shownPath != BackupPath.ACCOUNT) {
-            LucentoPrimaryButton(text = "Continue", onClick = onContinue)
-        } else {
-            // Account chosen but not connected yet: the panel above signs in; this keeps going without it.
-            LucentoTextButton(
-                text = "Not now — keep it on this phone",
-                onClick = {
-                    onPath(BackupPath.DEVICE_ONLY)
-                    onContinue()
-                },
-                modifier = Modifier.fillMaxWidth(),
+            com.lucento.app.feature.settings.EmailAccountForm(
+                modes = listOf(com.lucento.app.feature.settings.EmailMode.CREATE),
+                busy = connecting,
+                message = message,
+                onSubmit = onEmail,
+                onOpenLegal = onOpenLegal,
             )
+            if (googleAvailable && !connecting) {
+                Spacer(Modifier.height(Spacing.xs))
+                LucentoTextButton(text = "Use Google instead", onClick = onBack, modifier = Modifier.fillMaxWidth())
+            }
+            Spacer(Modifier.height(Spacing.lg))
         }
     }
 }
@@ -1147,7 +1305,10 @@ private fun ConfirmStep(
     error: String?,
     signedInEmail: String?,
     spendTypes: Set<SpendType>,
-    backupPath: BackupPath,
+    /** Finishing couldn't check the connected account: Try again, or finish without syncing. */
+    accountUnavailable: Boolean,
+    holdsAccountData: Boolean,
+    onLeaveAccount: () -> Unit,
     onFinish: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -1188,16 +1349,12 @@ private fun ConfirmStep(
                 add(Triple(Icons.Outlined.ToggleOn, "Turned on", Feature.entries.filter { it in features }.joinToString { it.title }.ifEmpty { "Just the essentials" }))
                 add(
                     Triple(
-                        when {
-                            signedInEmail != null -> Icons.Outlined.CloudSync
-                            backupPath == BackupPath.FILE -> Icons.Outlined.SaveAlt
-                            else -> Icons.Outlined.PhoneAndroid
-                        },
+                        if (signedInEmail != null) Icons.Outlined.CloudSync else Icons.Outlined.PhoneAndroid,
                         "Backups",
-                        when {
-                            signedInEmail != null -> "Cloud sync · ${signedInEmail.ifEmpty { "connected" }}"
-                            backupPath == BackupPath.FILE -> "Backup files · export any time from Settings › Your data"
-                            else -> "This phone only"
+                        if (signedInEmail != null) {
+                            "Cloud sync · ${signedInEmail.ifEmpty { "connected" }}"
+                        } else {
+                            "This phone only · export a backup file any time from Settings › Your data"
                         },
                     ),
                 )
@@ -1208,12 +1365,37 @@ private fun ConfirmStep(
                     if (i < rows.lastIndex) Hairline(inset = Spacing.md + Sizes.iconTile + Spacing.md)
                 }
             }
+            if (accountUnavailable) {
+                Spacer(Modifier.height(Spacing.md))
+                InfoNote(
+                    if (!holdsAccountData) {
+                        "We couldn’t reach your account to see what’s already in it, so nothing has been set up or " +
+                            "uploaded yet. Check your connection and try again — or finish without syncing for now."
+                    } else {
+                        "We couldn’t reach your account, and part of it is already on this phone. Try again to finish " +
+                            "bringing it across — or use Lucento without this account for now. Your account keeps everything."
+                    },
+                    icon = Icons.Outlined.WarningAmber,
+                    container = LucentoTheme.extendedColors.warningContainer,
+                    content = LucentoTheme.extendedColors.warning,
+                )
+            }
             if (error != null) {
                 Spacer(Modifier.height(Spacing.md))
                 InfoNote(error, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
-        LucentoPrimaryButton(text = "Continue to set up", onClick = onFinish)
+        Spacer(Modifier.height(Spacing.md))
+        if (accountUnavailable) {
+            LucentoPrimaryButton(text = "Try again", onClick = onFinish)
+            LucentoTextButton(
+                text = if (holdsAccountData) "Use Lucento without this account" else "Finish without syncing",
+                onClick = onLeaveAccount,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            LucentoPrimaryButton(text = "Continue to set up", onClick = onFinish)
+        }
     }
 }
 

@@ -103,8 +103,49 @@ class OnboardingViewModel(
     /** Google's account picker runs from [activity]; it is used for this call only and not retained. */
     fun connectGoogle(activity: android.content.Context) = connect { auth?.signInWithGoogle(activity) }
 
-    fun connectEmail(email: String, password: String, mode: com.lucento.app.feature.settings.EmailMode) = connect {
-        if (mode == com.lucento.app.feature.settings.EmailMode.CREATE) auth?.signUpWithEmail(email, password) else auth?.signInWithEmail(email, password)
+    /**
+     * An email account. Creating one records the Terms and Privacy Policy version agreed to on the form, then waits for
+     * the address to be verified ([verification]); an address that already has an account is tried with the same
+     * password, so a person who made theirs earlier (or verified it while Lucento was closed) simply carries on.
+     */
+    fun connectEmail(email: String, password: String, mode: com.lucento.app.feature.settings.EmailMode) {
+        val creating = mode == com.lucento.app.feature.settings.EmailMode.CREATE
+        connect(email = email, password = password) {
+            if (creating) {
+                auth?.signUpWithEmail(email, password, acceptedTermsVersion = com.lucento.app.feature.legal.LegalDocuments.VERSION)
+            } else {
+                auth?.signInWithEmail(email, password)
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- a new account becoming ready
+
+    /**
+     * Waiting for a new email account's link to be opened ("Check your inbox"); the address survives a restart in
+     * saved state, the password never does.
+     */
+    val verification = com.lucento.app.feature.account.EmailVerification(
+        scope = viewModelScope,
+        check = { email, password -> auth?.checkEmailConfirmed(email, password) ?: com.lucento.app.data.sync.AuthRepository.EmailCheck.UNREACHABLE },
+        resend = { email -> auth?.resendConfirmation(email) ?: com.lucento.app.data.sync.AuthRepository.ResendResult.FAILED },
+        onVerified = { afterSignIn() },
+        persist = { email -> if (email == null) savedState.remove<String>(KEY_VERIFY_EMAIL) else savedState[KEY_VERIFY_EMAIL] = email },
+        restoredEmail = savedState.get<String>(KEY_VERIFY_EMAIL),
+    )
+
+    private val _accountReady = MutableStateFlow<com.lucento.app.feature.account.AccountReady?>(null)
+    /** "Email verified" / "You're connected" on the setup path, until the person continues (or it moves on by itself). */
+    val accountReady: StateFlow<com.lucento.app.feature.account.AccountReady?> = _accountReady
+
+    /** From the account dialog: on to personalizing Lucento. */
+    fun continueFromAccount() {
+        if (_accountReady.value?.settling == true) return
+        _accountReady.value = null
+        if (step.value == STEP_SYNC) {
+            savedState[KEY_BACKUP_PATH] = BackupPath.ACCOUNT.name
+            moveTo(STEP_FOCUS)
+        }
     }
 
     private val _accountCheck = MutableStateFlow<AccountCheck>(AccountCheck.Idle)
@@ -129,7 +170,11 @@ class OnboardingViewModel(
      * instead of being set up again. Sync is turned on only when onboarding finishes (or a restore starts), so nothing
      * is pulled into — or uploaded from — a half-finished setup.
      */
-    private fun connect(signIn: suspend () -> com.lucento.app.data.sync.AuthRepository.SignInResult?) {
+    private fun connect(
+        email: String? = null,
+        password: String? = null,
+        signIn: suspend () -> com.lucento.app.data.sync.AuthRepository.SignInResult?,
+    ) {
         if (_connecting.value) return
         _connecting.value = true
         _syncMessage.value = null
@@ -137,27 +182,60 @@ class OnboardingViewModel(
             try {
                 _syncMessage.value = when (val result = signIn()) {
                     com.lucento.app.data.sync.AuthRepository.SignInResult.Success -> {
-                        when (accounts?.afterSignIn()) {
-                            is com.lucento.app.data.sync.AccountBoundary.AfterSignIn.ConfirmSwitch -> {
-                                _switchPrompt.value = true
-                                null
-                            }
-                            else -> {
-                                continueAfterSignIn()
-                                null
-                            }
-                        }
+                        afterSignIn()
+                        null
                     }
                     com.lucento.app.data.sync.AuthRepository.SignInResult.Cancelled, null -> null
                     com.lucento.app.data.sync.AuthRepository.SignInResult.NotConfigured ->
                         "Cloud sync isn’t available in this version of Lucento yet. You can keep going — everything works offline."
-                    is com.lucento.app.data.sync.AuthRepository.SignInResult.ConfirmEmail ->
-                        "Almost there: open the link we sent to ${result.email}, then sign in here (or later in Settings)."
+                    is com.lucento.app.data.sync.AuthRepository.SignInResult.ConfirmEmail -> {
+                        // "Check your inbox": it notices the verification by itself and continues from there.
+                        if (password != null) verification.start(result.email, password)
+                        null
+                    }
+                    is com.lucento.app.data.sync.AuthRepository.SignInResult.AlreadyRegistered ->
+                        existingAccount(result.email, password)
                     is com.lucento.app.data.sync.AuthRepository.SignInResult.Failed -> result.message
                 }
             } finally {
                 _connecting.value = false
             }
+        }
+    }
+
+    /**
+     * "Create account" for an address that already has one. The same password is tried: it is the person's own account
+     * (made earlier, or verified while Lucento was closed) — carry on, a returning account being restored as always.
+     * Otherwise they're pointed to signing in. Returns the message to show, or null.
+     */
+    private suspend fun existingAccount(email: String, password: String?): String? {
+        val repository = auth ?: return null
+        val check = if (password != null) repository.checkEmailConfirmed(email, password) else com.lucento.app.data.sync.AuthRepository.EmailCheck.WRONG_PASSWORD
+        return when (check) {
+            com.lucento.app.data.sync.AuthRepository.EmailCheck.CONFIRMED -> {
+                afterSignIn()
+                null
+            }
+            com.lucento.app.data.sync.AuthRepository.EmailCheck.PENDING -> {
+                verification.start(email, password!!, emailJustSent = false)
+                null
+            }
+            com.lucento.app.data.sync.AuthRepository.EmailCheck.WRONG_PASSWORD -> if (restoreStage.value == RestoreStage.SIGN_IN) {
+                "$email already has a Lucento account. Choose Sign in to use it — or continue with Google if you made it that way."
+            } else {
+                "$email already has a Lucento account. If it’s yours, go back to the start and choose “I already have " +
+                    "Lucento” to sign in — or continue with Google if you made it that way."
+            }
+            com.lucento.app.data.sync.AuthRepository.EmailCheck.UNREACHABLE ->
+                "Couldn’t reach Lucento to finish. Check your connection and try again."
+        }
+    }
+
+    /** Signed in (Google, email, or a verified new email account): a different account is confirmed first. */
+    private suspend fun afterSignIn() {
+        when (accounts?.afterSignIn()) {
+            is com.lucento.app.data.sync.AccountBoundary.AfterSignIn.ConfirmSwitch -> _switchPrompt.value = true
+            else -> continueAfterSignIn()
         }
     }
 
@@ -325,7 +403,20 @@ class OnboardingViewModel(
             syncPreferences?.setEnabled(true)
             runRestore()
         } else {
-            checkAccount(quiet = false)
+            // A new account on the setup path: "Email verified" / "You're connected", then on to personalizing. An
+            // account that turns out to hold data goes to its restore instead, and an invitation waiting for it is
+            // offered first — neither needs the dialog.
+            val verified = verification.state.value as? com.lucento.app.feature.account.EmailVerification.State.Verified
+            val viaEmail = verified != null
+            val email = verified?.email ?: signedInEmail.value
+                ?: kotlinx.coroutines.withTimeoutOrNull(2_000) { auth?.observeSignedInEmail()?.first { it != null } }.orEmpty()
+            if (step.value == STEP_SYNC) _accountReady.value = com.lucento.app.feature.account.AccountReady(email, viaEmail, settling = true)
+            val route = checkAccount(quiet = false)
+            _accountReady.value = if (route == SetupRoute.NEW_SETUP && _invitationOffer.value == null && step.value == STEP_SYNC) {
+                com.lucento.app.feature.account.AccountReady(email, viaEmail, settling = false)
+            } else {
+                null
+            }
         }
     }
 
@@ -622,12 +713,17 @@ class OnboardingViewModel(
             .map { com.lucento.app.domain.SpendType.fromKeys(it) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, com.lucento.app.domain.SpendType.DEFAULT)
 
-    /** The backup choice on the sync step: an account, a file now and then, or this phone only. */
-    val backupPath: StateFlow<BackupPath> = savedState.getStateFlow(KEY_BACKUP_PATH, BackupPath.ACCOUNT.name)
-        .map { runCatching { BackupPath.valueOf(it) }.getOrDefault(BackupPath.ACCOUNT) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, BackupPath.ACCOUNT)
+    /**
+     * The choice on "Keep your money safe": sync with an account, or this phone only. Nothing is chosen until the person
+     * picks one; each choice then shows what comes next (Google or email; Continue).
+     */
+    val backupPath: StateFlow<BackupPath?> = savedState.getStateFlow<String?>(KEY_BACKUP_PATH, null)
+        .map { name -> name?.let { runCatching { BackupPath.valueOf(it) }.getOrNull() } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun selectBackupPath(path: BackupPath) {
+        // A message from an attempt to connect (e.g. the email couldn't be sent) belongs to that attempt, not the new choice.
+        if (path != backupPath.value) _syncMessage.value = null
         savedState[KEY_BACKUP_PATH] = path.name
     }
 
@@ -725,10 +821,11 @@ class OnboardingViewModel(
                             return@launch
                         }
                         SetupRoute.RETRY -> {
+                            // Said on the summary itself (Try again, or finish without syncing): the account step is
+                            // now at the start, and sending the person back through every question would be a detour.
                             finishing = false
                             refreshHoldsAccountData()
                             _accountCheck.value = AccountCheck.Unavailable
-                            moveTo(STEP_SYNC)
                             return@launch
                         }
                         SetupRoute.NEW_SETUP, SetupRoute.LOCAL, null -> Unit
@@ -859,13 +956,18 @@ class OnboardingViewModel(
 
     companion object {
         const val STEP_WELCOME = 0
-        const val STEP_FOCUS = 1
-        /** "How do you pay?" (replaced the feature switches; same position, so usage step numbers are unchanged). */
-        const val STEP_SPEND = 2
-        const val STEP_CATEGORIES = 3
-        const val STEP_REVIEW = 4
-        const val STEP_ESSENTIALS = 5
-        const val STEP_SYNC = 6
+        /**
+         * "Keep your money safe" comes right after Get started (owner, 2026-11-06): a new person decides first whether
+         * Lucento syncs with an account — and creates it — then personalizes. Usage step numbers keep their old meaning
+         * ([onboardingStepNumber]).
+         */
+        const val STEP_SYNC = 1
+        const val STEP_FOCUS = 2
+        /** "How do you pay?" (replaced the feature switches). */
+        const val STEP_SPEND = 3
+        const val STEP_CATEGORIES = 4
+        const val STEP_REVIEW = 5
+        const val STEP_ESSENTIALS = 6
         const val STEP_CONFIRM = 7
         const val LAST_STEP = STEP_CONFIRM
         private const val KEY_STEP = "step"
@@ -883,6 +985,8 @@ class OnboardingViewModel(
         private const val KEY_INVITED = "joining_by_invitation"
         /** The account the user chose to set up as new after its restore found nothing (see [setupRoute]). */
         private const val KEY_NEW_FOR = "new_setup_for"
+        /** The address of a new email account waiting to be verified (never its password). */
+        private const val KEY_VERIFY_EMAIL = "verify_email"
 
         val Factory = viewModelFactory {
             initializer {
@@ -907,16 +1011,35 @@ class OnboardingViewModel(
     }
 }
 
-/** Where each backup choice on the sync step leads. Only [ACCOUNT] sends anything, and only after sign-in. */
-enum class BackupPath { ACCOUNT, FILE, DEVICE_ONLY }
+/**
+ * The choice on "Keep your money safe". Only [ACCOUNT] sends anything, and only after sign-in. A backup file is no
+ * longer a separate choice: anyone can export one from Settings › Your data, whichever they pick.
+ */
+enum class BackupPath { ACCOUNT, DEVICE_ONLY }
 
-/** Which of the three visible stages an onboarding screen belongs to; the welcome screen shows none. */
+/**
+ * Which of the visible stages an onboarding screen belongs to. The welcome screen and "Keep your money safe" show none:
+ * they are how a person gets in, before the setup proper begins.
+ */
 internal fun onboardingStage(step: Int): com.lucento.app.domain.SetupStage? = when (step) {
-    OnboardingViewModel.STEP_WELCOME -> null
+    OnboardingViewModel.STEP_WELCOME, OnboardingViewModel.STEP_SYNC -> null
     in OnboardingViewModel.STEP_FOCUS..OnboardingViewModel.STEP_ESSENTIALS -> com.lucento.app.domain.SetupStage.PERSONALIZE
     else -> com.lucento.app.domain.SetupStage.SET_UP
 }
 
-/** The 1-based screen number sent with `onboarding_step_viewed`: welcome is 1, the confirmation is 8. */
-internal fun onboardingStepNumber(step: Int): Int = step.coerceIn(0, OnboardingViewModel.LAST_STEP) + 1
+/**
+ * The 1-based screen number sent with `onboarding_step_viewed`. The numbers name screens, not positions, so counts stay
+ * comparable after "Keep your money safe" moved to second place: welcome 1, focus 2, payments 3, categories 4, review 5,
+ * currency and look 6, keep your money safe 7, summary 8.
+ */
+internal fun onboardingStepNumber(step: Int): Int = when (step.coerceIn(0, OnboardingViewModel.LAST_STEP)) {
+    OnboardingViewModel.STEP_WELCOME -> 1
+    OnboardingViewModel.STEP_FOCUS -> 2
+    OnboardingViewModel.STEP_SPEND -> 3
+    OnboardingViewModel.STEP_CATEGORIES -> 4
+    OnboardingViewModel.STEP_REVIEW -> 5
+    OnboardingViewModel.STEP_ESSENTIALS -> 6
+    OnboardingViewModel.STEP_SYNC -> 7
+    else -> 8
+}
 

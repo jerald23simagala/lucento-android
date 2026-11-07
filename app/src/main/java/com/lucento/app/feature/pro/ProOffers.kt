@@ -55,7 +55,11 @@ object ProOffers {
                 kind = PlanCardKind.PRO,
                 current = plan == DisplayPlan.PRO,
                 actions = offers,
-                note = if (PlayProducts.PRO_SUBSCRIPTION in pending) PENDING_NOTE else null,
+                note = when {
+                    PlayProducts.PRO_SUBSCRIPTION in pending -> PENDING_NOTE
+                    offers.isNotEmpty() -> SUBSCRIPTION_TERMS
+                    else -> null
+                },
             )
         }
         val lifetimeOffers = if (!ownsLifetime && PlayProducts.PRO_LIFETIME !in pending) {
@@ -84,11 +88,22 @@ object ProOffers {
                 kind = PlanCardKind.CLOUD,
                 current = active.any { it.source == EntitlementSource.PLAY_CLOUD_ADDON },
                 actions = cloudOffers,
-                note = if (PlayProducts.CLOUD_ADDON in pending) PENDING_NOTE else null,
+                note = when {
+                    PlayProducts.CLOUD_ADDON in pending -> PENDING_NOTE
+                    cloudOffers.isNotEmpty() -> SUBSCRIPTION_TERMS
+                    else -> null
+                },
             )
         }
         return cards
     }
+
+    /**
+     * Google Play's subscription policy: next to every subscribe button, say that it renews, that a trial turns into a
+     * paid subscription, and where to cancel. The price line above the buttons gives the price, period and trial length.
+     */
+    const val SUBSCRIPTION_TERMS = "Renews automatically until you cancel in Google Play. A free trial becomes a paid " +
+        "subscription when it ends unless you cancel before then. Cancel any time in Google Play › Payments & subscriptions."
 
     const val PENDING_NOTE = "Waiting for Google Play to confirm your payment. Finish it at the store or in Google Play; your plan " +
         "starts the moment it’s confirmed, even if Lucento is closed."

@@ -13,7 +13,17 @@ class OnboardingStepNumberTest {
     @Test fun `usage step numbers run from welcome 1 to confirmation 8`() {
         assertEquals(1, onboardingStepNumber(OnboardingViewModel.STEP_WELCOME))
         assertEquals(8, onboardingStepNumber(OnboardingViewModel.STEP_CONFIRM))
-        assertEquals((1..8).toList(), (0..OnboardingViewModel.LAST_STEP).map(::onboardingStepNumber))
+        assertEquals((1..8).toList(), (0..OnboardingViewModel.LAST_STEP).map(::onboardingStepNumber).sorted())
+    }
+
+    @Test fun `numbers name screens, so moving keep your money safe to second place keeps old counts comparable`() {
+        assertEquals(1, OnboardingViewModel.STEP_SYNC)
+        assertEquals(7, onboardingStepNumber(OnboardingViewModel.STEP_SYNC))
+        assertEquals(2, onboardingStepNumber(OnboardingViewModel.STEP_FOCUS))
+        assertEquals(3, onboardingStepNumber(OnboardingViewModel.STEP_SPEND))
+        assertEquals(4, onboardingStepNumber(OnboardingViewModel.STEP_CATEGORIES))
+        assertEquals(5, onboardingStepNumber(OnboardingViewModel.STEP_REVIEW))
+        assertEquals(6, onboardingStepNumber(OnboardingViewModel.STEP_ESSENTIALS))
     }
 
     @Test fun `welcome step 1 is queued once counts are on`() {

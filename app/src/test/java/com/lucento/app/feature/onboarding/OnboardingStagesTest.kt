@@ -19,14 +19,17 @@ import org.junit.Test
 /** Redesign Part B: three visible stages, mandatory focus, and "How do you pay?" in place of feature switches. */
 class OnboardingStagesTest {
 
-    @Test fun `every onboarding screen after welcome belongs to Personalize or Set up`() {
+    @Test fun `after welcome and keep your money safe, every onboarding screen belongs to Personalize or Set up`() {
         assertNull(onboardingStage(OnboardingViewModel.STEP_WELCOME))
+        // Owner, 2026-11-06: the account question comes right after Get started, before the stages begin.
+        assertNull(onboardingStage(OnboardingViewModel.STEP_SYNC))
+        assertEquals(OnboardingViewModel.STEP_WELCOME + 1, OnboardingViewModel.STEP_SYNC)
+        assertEquals(OnboardingViewModel.STEP_SYNC + 1, OnboardingViewModel.STEP_FOCUS)
         (OnboardingViewModel.STEP_FOCUS..OnboardingViewModel.STEP_ESSENTIALS).forEach {
             assertEquals(SetupStage.PERSONALIZE, onboardingStage(it))
         }
-        assertEquals(SetupStage.SET_UP, onboardingStage(OnboardingViewModel.STEP_SYNC))
         assertEquals(SetupStage.SET_UP, onboardingStage(OnboardingViewModel.STEP_CONFIRM))
-        assertEquals("the payment step took the features step's place, so usage numbering is unchanged", 2, OnboardingViewModel.STEP_SPEND)
+        assertEquals("the payment step keeps the features step's usage number", 3, onboardingStepNumber(OnboardingViewModel.STEP_SPEND))
     }
 
     @Test fun `the guided setup continues Set up and ends in Get started, with bars that only move forward`() {

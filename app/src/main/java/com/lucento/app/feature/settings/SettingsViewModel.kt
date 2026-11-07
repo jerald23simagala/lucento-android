@@ -77,6 +77,8 @@ data class CloudSyncUiState(
     val pendingChanges: Int = 0,
     /** Lucento Pro: this phone's plan doesn't include cloud sync (docs/MONETIZATION.md §3.5); sync is off or paused, nothing lost. */
     val lockedByPlan: Boolean = false,
+    /** The open delete-account confirmation (docs/ACCOUNT_DELETION.md), or null. */
+    val deletion: com.lucento.app.feature.account.DeleteAccountPrompt? = null,
 )
 
 class SettingsViewModel(
@@ -100,6 +102,7 @@ class SettingsViewModel(
     private val syncing = MutableStateFlow(false)
     private val syncMessage = MutableStateFlow<String?>(null)
     private val prompt = MutableStateFlow<AccountPrompt?>(null)
+    private val deletion = MutableStateFlow<com.lucento.app.feature.account.DeleteAccountPrompt?>(null)
 
     init {
         // A previous session can already be a different account (the app was closed on the confirm step).
@@ -127,6 +130,7 @@ class SettingsViewModel(
             syncRepository.observePendingChanges(),
             entitlements ?: kotlinx.coroutines.flow.flowOf(null),
             partnerOfSpace,
+            deletion,
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
@@ -139,6 +143,7 @@ class SettingsViewModel(
             val pending = values[8] as Int
             val plan = values[9] as com.lucento.app.domain.entitlement.EntitlementState?
             val partner = values[10] as Boolean
+            val deleting = values[11] as com.lucento.app.feature.account.DeleteAccountPrompt?
             val lockedByPlan = plan != null && !com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, partner, System.currentTimeMillis())
             SettingsUiState(
                 preferences = prefs,
@@ -154,6 +159,7 @@ class SettingsViewModel(
                     prompt = accountPrompt,
                     pendingChanges = pending,
                     lockedByPlan = lockedByPlan,
+                    deletion = deleting,
                 ),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -170,18 +176,45 @@ class SettingsViewModel(
         }
     }
 
-    /** An email account: [mode] creates one or signs in to an existing one; then sync turns on as for Google. */
+    /**
+     * An email account: [mode] creates one (recording the Terms and Privacy Policy version agreed to) or signs in to an
+     * existing one; then sync turns on as for Google. A new account first waits for its email to be verified
+     * ([verification]), as in onboarding.
+     */
     fun connectEmailAccount(email: String, password: String, mode: EmailMode) {
         if (syncing.value) return
         viewModelScope.launch {
             syncing.value = true
             syncMessage.value = null
-            handleSignIn(
-                if (mode == EmailMode.CREATE) auth.signUpWithEmail(email, password) else auth.signInWithEmail(email, password)
-            )
+            val result = if (mode == EmailMode.CREATE) {
+                auth.signUpWithEmail(email, password, acceptedTermsVersion = com.lucento.app.feature.legal.LegalDocuments.VERSION)
+            } else {
+                auth.signInWithEmail(email, password)
+            }
+            when (result) {
+                is AuthRepository.SignInResult.ConfirmEmail -> verification.start(result.email, password)
+                is AuthRepository.SignInResult.AlreadyRegistered -> when (auth.checkEmailConfirmed(email, password)) {
+                    // Their own account (made earlier, or verified while Lucento was closed): simply signed in.
+                    AuthRepository.EmailCheck.CONFIRMED -> handleSignIn(AuthRepository.SignInResult.Success)
+                    AuthRepository.EmailCheck.PENDING -> verification.start(email, password, emailJustSent = false)
+                    AuthRepository.EmailCheck.WRONG_PASSWORD ->
+                        syncMessage.value = "$email already has a Lucento account. Choose Sign in to use it — or continue with Google if you made it that way."
+                    AuthRepository.EmailCheck.UNREACHABLE ->
+                        syncMessage.value = "Couldn’t reach Lucento to finish. Check your connection and try again."
+                }
+                else -> handleSignIn(result)
+            }
             syncing.value = false
         }
     }
+
+    /** "Check your inbox" for an account created here; once verified it is signed in and sync turns on. */
+    val verification = com.lucento.app.feature.account.EmailVerification(
+        scope = viewModelScope,
+        check = auth::checkEmailConfirmed,
+        resend = auth::resendConfirmation,
+        onVerified = { handleSignIn(AuthRepository.SignInResult.Success) },
+    )
 
     private suspend fun handleSignIn(result: AuthRepository.SignInResult) {
         when (result) {
@@ -191,6 +224,8 @@ class SettingsViewModel(
                 syncMessage.value = "Cloud sync isn’t available in this version of Lucento yet."
             is AuthRepository.SignInResult.ConfirmEmail ->
                 syncMessage.value = "Almost there: open the link we sent to ${result.email}, then come back and sign in."
+            is AuthRepository.SignInResult.AlreadyRegistered ->
+                syncMessage.value = "${result.email} already has a Lucento account. Choose Sign in to use it."
             is AuthRepository.SignInResult.Failed -> syncMessage.value = result.message
         }
     }
@@ -200,6 +235,55 @@ class SettingsViewModel(
         if (syncing.value) return
         viewModelScope.launch {
             prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.pendingChangeCount())
+        }
+    }
+
+    /** Opens the delete-account confirmation (docs/ACCOUNT_DELETION.md). Nothing changes until [confirmDeleteAccount]. */
+    fun requestDeleteAccount() {
+        if (syncing.value) return
+        deletion.value = com.lucento.app.feature.account.DeleteAccountPrompt(
+            com.lucento.app.feature.account.DeletionPlan.of(entitlements?.value, System.currentTimeMillis()),
+        )
+    }
+
+    /** Closes the confirmation; never while the server call runs. */
+    fun dismissDeleteAccount() {
+        if (deletion.value?.deleting == true) return
+        deletion.value = null
+    }
+
+    /**
+     * Deletes the account on the server first. Only after the server confirms is this phone wiped, in the sign-out
+     * order (durable marker, local session, ledger, then the server revoke, which simply finds nothing). A refused or
+     * unanswered call changes nothing on the phone, and the dialog stays open with the reason.
+     */
+    fun confirmDeleteAccount() {
+        val current = deletion.value ?: return
+        if (current.deleting || syncing.value) return
+        deletion.value = current.copy(deleting = true, error = null)
+        viewModelScope.launch {
+            syncing.value = true
+            when (val result = withContext(NonCancellable) { auth.deleteAccount() }) {
+                is com.lucento.app.feature.account.DeleteAccountResult.Failed ->
+                    deletion.value = current.copy(deleting = false, error = result.message)
+                com.lucento.app.feature.account.DeleteAccountResult.Deleted -> {
+                    val wiped = withContext(NonCancellable) {
+                        runCatching {
+                            check(accounts.markWipePendingNow()) { "Could not record the wipe" }
+                            auth.beginSignOutNow()
+                            accounts.signOutAndWipe()
+                        }.isSuccess
+                    }
+                    deletion.value = null
+                    syncMessage.value = if (wiped) {
+                        com.lucento.app.feature.account.AccountDeletionCopy.DONE
+                    } else {
+                        "Your account was deleted, but this phone’s records couldn’t be erased just now. Choose " +
+                            "Disconnect to finish."
+                    }
+                }
+            }
+            syncing.value = false
         }
     }
 

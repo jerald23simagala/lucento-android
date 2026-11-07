@@ -163,10 +163,16 @@ class ScreenshotTourTest {
     @Test
     fun tour() {
         // ---------------------------------------------------------------- onboarding
-        // Part B onboarding: workspace choice, focus, how you pay, categories, currency, backups, summary.
+        // Onboarding: keep your money safe (account or this phone), focus, how you pay, categories, currency, summary.
         waitForText("Get started")
         shot("01-onboarding-welcome")
         click("Get started")
+        // "Keep your money safe" comes right after Get started (owner, 2026-11-06). The tour stays offline: no account
+        // is connected, everything stays on this phone. (Without sync in the build, this phone is the only choice.)
+        waitForText("Keep it on this phone only")
+        shot("01a-onboarding-backups")
+        click("Keep it on this phone only")
+        click("Continue")
         waitForText("What do you want Lucento to help with?")
         shot("01b-onboarding-focus")
         click("Continue") // tracking spending and budgeting are always included
@@ -180,12 +186,6 @@ class ScreenshotTourTest {
         click("Confirm", substring = true)
         waitForText("Currency and look")
         shot("03b-onboarding-currency")
-        click("Continue")
-        // The tour stays offline: no account is connected, everything stays on this phone. (With sync configured the
-        // account path is preselected and Continue appears only once another path is chosen.)
-        waitForText("Keep it on this phone only")
-        shot("04a-onboarding-backups")
-        click("Keep it on this phone only")
         click("Continue")
         waitForText("Lucento is personalized")
         shot("04-onboarding-confirm")
