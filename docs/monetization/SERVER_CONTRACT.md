@@ -83,16 +83,39 @@ refunded purchase active for more than a day).
 and `limited_by` on success so the app's "x of y left" line is a display of the server's decision. `AI_DAILY_LIMIT`
 becomes unused (the limits are `plan_limits`); keep it as a last-resort fallback for one release.
 
-## 7. Grants (owner operation)
+## 7. Applying to `lucento-test` (owner operation) — migration and grants in one go
+
+The grants live in `public.entitlements`, which the migration creates, so the migration must run **first** (running the
+insert alone fails with `42P01: relation "public.entitlements" does not exist`). One paste in the SQL editor does both,
+atomically:
+
+```sql
+begin;
+-- 1. the whole of supabase/migrations/20261107090000_entitlements.sql, pasted here verbatim
+-- 2. every account that exists on lucento-test keeps what it could do before plans existed (a test project; on
+--    production this would be the founders' and testers' accounts only, by uuid)
+insert into public.entitlements (user_id, source, status, grants, expires_at, note)
+select u.id, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '180 days', 'lucento-test account'
+from auth.users u
+on conflict do nothing;
+commit;
+
+-- verify
+select u.email, e.source, e.status, e.grants, e.expires_at
+from public.entitlements e join auth.users u on u.id = e.user_id order by u.email;
+select lucento_private.max_partners(id) from auth.users limit 3;   -- 1 for each granted account
+```
+
+For one account later (a new tester):
 
 ```sql
 insert into public.entitlements (user_id, source, status, grants, expires_at, note)
-values ('<uuid>', 'GRANT', 'ACTIVE', array['LOCAL_PRO','CLOUD','AI_PRO','SHARED'], now() + interval '180 days', 'founder');
+values ('<uuid from auth.users>', 'GRANT', 'ACTIVE', array['LOCAL_PRO','CLOUD','AI_PRO','SHARED'], now() + interval '180 days', 'founder');
 ```
 
-Run as the owner in the SQL editor (service role). Apply to `lucento-test` for every account that already shares a
-Shared Space there **before** the entitlement migration lands, because `max_partners` becomes 0 for accounts without
-SHARED (existing Partners stay; only new invitations stop — D-16).
+Why together: `max_partners` becomes plan-aware in the migration, so an Owner without SHARED can no longer send new
+invitations (existing Partners stay — D-16). Production gets the migration only with the gated release, with grant rows
+for the founders' and testers' accounts by uuid, never for every user.
 
 ## 8. App ↔ server reading
 
