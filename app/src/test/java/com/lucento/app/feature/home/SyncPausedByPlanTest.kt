@@ -30,8 +30,9 @@ class SyncPausedByPlanTest {
         assertEquals("Cloud sync is part of Lucento Pro", copy.headline)
         assertTrue(copy.body.contains("Nothing in your account is deleted"))
         assertTrue(copy.body.contains("backup file"))
-        assertEquals("Open Account & sync", copy.action)
-        assertTrue(copy.actionOpensSettings)
+        assertEquals("See Lucento Pro", copy.action)
+        assertTrue(copy.actionOpensPro)
+        assertFalse(copy.actionOpensSettings)
     }
 
     @Test fun background_and_launch_sync_wait_for_the_plan() {

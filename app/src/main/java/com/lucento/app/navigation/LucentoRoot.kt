@@ -153,6 +153,8 @@ import androidx.compose.foundation.layout.consumeWindowInsets
  * invitation id, from Home's card) opens straight on that invitation's review; empty = the page.
  */
 @Serializable data class SharedSpaceRoute(val reviewInvite: String = "")
+/** Lucento Pro: the plan, what each plan includes, restore (docs/MONETIZATION.md §5.5). [from] names the lock that led here. */
+@Serializable data class ProRoute(val from: String = "")
 /** Full-page editor for the transaction held in LucentoRoot's editor draft (opened from Edit on a row). */
 @Serializable data object TransactionEditRoute
 /** Read-only View Transaction page; Edit there opens [TransactionEditRoute] (or the transfer sheet). */
@@ -193,6 +195,7 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     SettingsRoute::class,
     FeaturesRoute::class,
     SharedSpaceRoute::class,
+    ProRoute::class,
     ComposerRoute::class,
     TransactionEditRoute::class,
     TransactionViewRoute::class,
@@ -425,8 +428,15 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         val fxDisplay by appViewModel.fxDisplay.collectAsStateWithLifecycle()
         // Lucento Shared: an invitation sent while the app was in the background shows on Home when it comes back.
         androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_START) { appViewModel.refreshSharedSpace() }
+        // Lucento Pro: every lock note links to the Pro page through this, naming the feature that led there.
+        val openPro = remember(navController) {
+            { feature: com.lucento.app.domain.entitlement.ProFeature? ->
+                navController.navigate(ProRoute(feature?.name.orEmpty())) { launchSingleTop = true }
+            }
+        }
         CompositionLocalProvider(
             com.lucento.app.feature.fx.LocalFxDisplay provides fxDisplay,
+            com.lucento.app.feature.pro.LocalOpenPro provides openPro,
             LocalProfileChrome provides ProfileChrome(preferences.displayName, profilePhoto, sharedWith = sharedAccess.sharedWith) {
                 showProfile = true
             },
@@ -616,6 +626,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 when {
                                     page == SettingsPage.FEATURES -> push(FeaturesRoute)
                                     page == SettingsPage.SHARED -> push(SharedSpaceRoute())
+                                    page == SettingsPage.PRO -> push(ProRoute())
                                     // Not push(): launchSingleTop would replace the hub (same route type), so Back would skip
                                     // it. A repeated tap on the same row is ignored instead.
                                     navController.currentBackStackEntry?.arguments?.getString("page") != page.key ->
@@ -634,6 +645,13 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 navigateTo(HomeRoute)
                             },
                             reviewInviteId = entry.toRoute<SharedSpaceRoute>().reviewInvite.ifBlank { null },
+                        )
+                    }
+                    pushed<ProRoute>(reducedMotion) { entry ->
+                        val from = entry.toRoute<ProRoute>().from
+                        com.lucento.app.feature.pro.ProScreen(
+                            onBack = back,
+                            from = com.lucento.app.domain.entitlement.ProFeature.entries.firstOrNull { it.name == from },
                         )
                     }
                     pushed<TransactionViewRoute>(reducedMotion) { entry ->
@@ -722,7 +740,14 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         // The sheet sits outside the screens' providers; its Lucento Shared row needs to know who this ledger is shared with.
         val sheetAccess by appViewModel.sharedAccess.collectAsStateWithLifecycle()
         val lockedThemes by appViewModel.lockedThemes.collectAsStateWithLifecycle()
-        CompositionLocalProvider(com.lucento.app.feature.sharedspace.LocalSharedAccess provides sheetAccess) {
+        CompositionLocalProvider(
+            com.lucento.app.feature.sharedspace.LocalSharedAccess provides sheetAccess,
+            // The theme picker's lock note: the sheet closes first, then the Pro page opens.
+            com.lucento.app.feature.pro.LocalOpenPro provides { feature ->
+                showProfile = false
+                push(ProRoute(feature?.name.orEmpty()))
+            },
+        ) {
             ProfileSheet(
                 preferences = preferences,
                 signedInEmail = profileEmail,
@@ -744,12 +769,26 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         ProfileDestination.SETTINGS -> push(SettingsRoute())
                         ProfileDestination.FEATURES -> push(FeaturesRoute)
                         ProfileDestination.SHARED -> push(SharedSpaceRoute())
+                        ProfileDestination.PRO -> push(ProRoute())
                         ProfileDestination.SWITCH_ACCOUNT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, switchAccount = true))
                     }
                 },
                 onDismiss = { showProfile = false },
             )
         }
+    }
+
+    // Lucento Pro: once, after a plan ends — what changed, and that nothing was removed.
+    val planNotice by appViewModel.planNotice.collectAsStateWithLifecycle()
+    planNotice?.let { notice ->
+        com.lucento.app.feature.pro.PlanNoticeSheet(
+            notice = notice,
+            onSeePro = {
+                appViewModel.dismissPlanNotice()
+                push(ProRoute())
+            },
+            onDismiss = appViewModel::dismissPlanNotice,
+        )
     }
 
     transferDraft?.let { draft ->

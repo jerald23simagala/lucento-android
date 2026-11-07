@@ -97,6 +97,8 @@ enum class SettingsPage(val key: String, val title: String) {
     FEATURES("features", "Enabled features"),
     /** Lucento Shared: opens its own screen (SharedSpaceRoute), like [FEATURES]. */
     SHARED("shared", "Lucento Shared"),
+    /** Lucento Pro: opens its own screen (ProRoute), like [SHARED]. */
+    PRO("pro", "Lucento Pro"),
     ;
 
     companion object {
@@ -430,7 +432,7 @@ private fun SettingsContent(
         )
       }
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
-      SettingsPage.SHARED -> Unit
+      SettingsPage.SHARED, SettingsPage.PRO -> Unit
       SettingsPage.ACCOUNT -> CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword, showHeader = false)
       SettingsPage.DATA -> {
         NavRow(
@@ -627,7 +629,9 @@ internal fun CloudSyncSection(
         // Lucento Pro: signed in, but the plan doesn't include cloud sync (docs/MONETIZATION.md §3.5). Nothing is lost.
         if (state.lockedByPlan && state.signedInEmail != null) {
             Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.core.designsystem.component.InfoNote(
+            com.lucento.app.feature.pro.ProNote(
+                from = com.lucento.app.domain.entitlement.ProFeature.CLOUD_SYNC,
+                text =
                 if (state.status.enabled) "Cloud sync is paused: it’s part of Lucento Pro. Everything stays on this phone and in your account; uploads resume when your plan includes it. A backup file is always free."
                 else "Cloud sync is part of Lucento Pro. You’re signed in; everything stays on this phone. A backup file is always free.",
             )

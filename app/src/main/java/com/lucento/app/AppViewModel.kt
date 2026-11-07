@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.SharingStarted
@@ -53,7 +54,39 @@ class AppViewModel(
     transactions: com.lucento.app.data.repository.TransactionRepository? = null,
     /** Lucento Pro: the plan this phone holds; null in tests (every theme allowed). */
     private val entitlements: StateFlow<com.lucento.app.domain.entitlement.EntitlementState>? = null,
+    /** True once the plan has been re-read in this process (the notice below waits for it). */
+    entitlementsReady: Flow<Boolean> = flowOf(false),
+    /** The plan this phone last showed; null in tests (no notice). */
+    private val planMemory: com.lucento.app.data.entitlement.PlanMemory? = null,
 ) : ViewModel() {
+    /** Lucento Pro: the one-time "your plan has ended" notice (docs/MONETIZATION.md §6.3 rule 7); null when there is none. */
+    private val _planNotice = MutableStateFlow<com.lucento.app.domain.entitlement.PlanNotice?>(null)
+    val planNotice: StateFlow<com.lucento.app.domain.entitlement.PlanNotice?> = _planNotice
+    private var noticeFor: com.lucento.app.domain.entitlement.DisplayPlan? = null
+
+    init {
+        val memory = planMemory
+        if (entitlements != null && memory != null) {
+            viewModelScope.launch {
+                combine(entitlements, entitlementsReady) { plan, ready -> if (ready) plan.displayPlan(System.currentTimeMillis()) else null }
+                    .filterNotNull()
+                    .distinctUntilChanged()
+                    .collect { current ->
+                        val notice = com.lucento.app.domain.entitlement.PlanNotices.after(memory.lastSeen(), current)
+                        noticeFor = current
+                        _planNotice.value = notice
+                        // Remembered at once when there is nothing to say; after the person has read it otherwise.
+                        if (notice == null) memory.remember(current)
+                    }
+            }
+        }
+    }
+
+    fun dismissPlanNotice() {
+        val plan = noticeFor ?: return
+        _planNotice.value = null
+        viewModelScope.launch { planMemory?.remember(plan) }
+    }
     /** Lucento Pro: the themes this plan may not pick (docs/MONETIZATION.md §3.8). A locked theme already chosen stays. */
     val lockedThemes: StateFlow<Set<ThemeId>> =
         if (entitlements == null) MutableStateFlow(emptySet())
@@ -236,7 +269,7 @@ class AppViewModel(
         const val SPACE_FRESH_MILLIS = 60_000L
 
         val Factory = containerFactory {
-            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions, it.entitlements.state)
+            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions, it.entitlements.state, it.entitlements.ready, it.planMemory)
         }
     }
 }

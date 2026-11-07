@@ -97,10 +97,15 @@ fun InsightsScreen(
     viewModel: InsightsViewModel = viewModel(factory = InsightsViewModel.Factory),
 ) {
     val data by viewModel.data.collectAsStateWithLifecycle()
-    var chosenPeriod by rememberSaveable { mutableStateOf(TrendPeriod.SIX) }
-    // Lucento Pro: 6 and 12 months are Pro; a locked choice shows the 3-month view and says why (docs/MONETIZATION.md §3.4).
-    val period = if (data.longPeriodsLocked && chosenPeriod != TrendPeriod.THREE) TrendPeriod.THREE else chosenPeriod
-    val lockedPeriodChosen = data.longPeriodsLocked && chosenPeriod != TrendPeriod.THREE
+    var chosenPeriod by rememberSaveable { mutableStateOf<TrendPeriod?>(null) }
+    // Lucento Pro: 6 and 12 months are Pro (docs/MONETIZATION.md §3.4). The free plan opens on its own 3 months, and the
+    // note appears only when someone picks a locked period — never as a greeting.
+    val locked = data.longPeriodsLocked
+    val period = when (val chosen = chosenPeriod) {
+        null -> if (locked) TrendPeriod.THREE else TrendPeriod.SIX
+        else -> if (locked && chosen != TrendPeriod.THREE) TrendPeriod.THREE else chosen
+    }
+    val lockedPeriodChosen = locked && chosenPeriod != null && chosenPeriod != TrendPeriod.THREE
     var currencyChoice by rememberSaveable { mutableStateOf<String?>(null) }
     val currencies = remember(data.wallets, data.transactions, data.focusCurrency) {
         (listOf(data.focusCurrency) +
@@ -129,8 +134,9 @@ fun InsightsScreen(
         if (data.compositionLocked) {
             SectionIntro("What your net worth is made of", "Your accounts and debts, by kind.")
             Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.core.designsystem.component.InfoNote(
-                "This breakdown is part of Lucento Pro. Your net worth itself is always on Home and Wallets.",
+            com.lucento.app.feature.pro.ProNote(
+                com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.NET_WORTH_COMPOSITION),
+                from = com.lucento.app.domain.entitlement.ProFeature.NET_WORTH_COMPOSITION,
             )
         } else {
             NetWorthSection(data, currency)
@@ -160,7 +166,10 @@ private fun TrendSection(data: InsightsData, currency: String, period: TrendPeri
     )
     if (lockedChoice) {
         Spacer(Modifier.height(Spacing.sm))
-        com.lucento.app.core.designsystem.component.InfoNote("Trends over 6 and 12 months are part of Lucento Pro. Your last 3 months are always free.")
+        com.lucento.app.feature.pro.ProNote(
+            com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS),
+            from = com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS,
+        )
     }
     Spacer(Modifier.height(Spacing.md))
     val hasData = months.any { !it.income.isZero || !it.expense.isZero }

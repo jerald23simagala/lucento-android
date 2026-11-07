@@ -213,7 +213,7 @@ class PlanViewModel(
     /** Archives a reached goal; [onResult] runs after the write. */
     fun archiveGoal(id: Long, onResult: (GoalRepository.ArchiveResult) -> Unit) = write({ goals.archive(id) }, onResult)
 
-    fun restoreGoal(id: Long, onDone: () -> Unit) = write({ goals.restore(id) }) { onDone() }
+    fun restoreGoal(id: Long, onResult: (GoalRepository.RestoreResult) -> Unit) = write({ goals.restore(id) }, onResult)
 
     // ---------------------------------------------------------------- recurring
 

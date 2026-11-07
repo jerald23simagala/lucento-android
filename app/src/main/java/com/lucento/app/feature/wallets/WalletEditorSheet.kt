@@ -276,7 +276,7 @@ fun WalletEditorSheet(
                 onSelect = {
                     haptics.tick()
                     draft = draft.copy(type = it)
-                    if (error is DraftError.TypeLocked) error = null
+                    if (error is DraftError.TypeLocked || error is DraftError.PlanLimit) error = null
                 },
             )
             (error as? DraftError.TypeLocked)?.let { locked ->
@@ -306,7 +306,6 @@ fun WalletEditorSheet(
                 DraftError.NameRequired -> "Give this wallet a name."
                 DraftError.NameTaken -> "You already have a wallet with this name."
                 DraftError.NotFound -> "This wallet no longer exists."
-                is DraftError.PlanLimit -> (error as DraftError.PlanLimit).message
                 else -> null
             }
             OutlinedTextField(
@@ -332,7 +331,7 @@ fun WalletEditorSheet(
                     )
                 },
                 singleLine = true,
-                isError = error is DraftError.NameRequired || error is DraftError.NameTaken || error is DraftError.NotFound || error is DraftError.PlanLimit,
+                isError = error is DraftError.NameRequired || error is DraftError.NameTaken || error is DraftError.NotFound,
                 supportingText = if (nameMessage != null) {
                     { Text(nameMessage) }
                 } else {
@@ -473,6 +472,16 @@ fun WalletEditorSheet(
                 )
             }
 
+            // Lucento Pro: a plan limit isn't a mistake in the form; it is said here, by the button, with the way out.
+            (error as? DraftError.PlanLimit)?.let { limit ->
+                val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+                Spacer(Modifier.height(Spacing.md))
+                com.lucento.app.feature.pro.ProNote(
+                    limit.message,
+                    from = limit.feature,
+                    open = { feature -> close { onDismiss(); openPro(feature) } },
+                )
+            }
             Spacer(Modifier.height(Spacing.lg))
             LucentoPrimaryButton(
                 text = if (initial.id == null) "Add wallet" else "Save changes",
@@ -500,7 +509,7 @@ fun WalletEditorSheet(
             selected = draft.currencyCode,
             onSelect = {
                 draft = draft.copy(currencyCode = it)
-                if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked) error = null
+                if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked || error is DraftError.PlanLimit) error = null
                 pickingCurrency = false
             },
             onDismiss = { pickingCurrency = false },
@@ -843,11 +852,21 @@ private fun TypeDropdown(selected: WalletType, onSelect: (WalletType) -> Unit) {
             Text(selected.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
         }
+        val proTypes = if (com.lucento.app.feature.pro.LocalEntitlements.current.has(
+                com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, System.currentTimeMillis(),
+            )
+        ) {
+            emptySet()
+        } else {
+            setOf(WalletType.RECEIVABLE, WalletType.OTHER_ASSET)
+        }
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             WalletType.entries.forEach { type ->
                 DropdownMenuItem(
                     text = { Text(type.label, fontWeight = if (type == selected) FontWeight.SemiBold else null) },
                     leadingIcon = { WalletTypeTile(type, size = 28.dp) },
+                    // Lucento Pro: kinds the plan doesn't include carry a mark before they're chosen (display only).
+                    trailingIcon = if (type in proTypes) { { com.lucento.app.feature.pro.ProBadge() } } else null,
                     onClick = {
                         expanded = false
                         onSelect(type)
