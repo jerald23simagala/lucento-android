@@ -12,7 +12,7 @@ make sensible decisions, and ship real functionality — not plans, mockups or s
 - Room (local source of truth), DataStore (preferences), ViewModel + Coroutines/Flow, Navigation Compose (type-safe routes).
 - Versions live in `gradle/libs.versions.toml`. Upgrade deliberately and keep them mutually compatible
   (AGP ↔ Gradle ↔ Kotlin ↔ KSP ↔ Compose compiler).
-- JDK 17. compileSdk/targetSdk 35, minSdk 26. Application ID `com.lucento.app` (debug builds add `.debug`).
+- JDK 17. compileSdk/targetSdk 36 (Play requires 36 since 31 Aug 2026), minSdk 26. Application ID `com.lucento.app` (debug builds add `.debug`).
 
 ## Architecture
 ```

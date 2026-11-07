@@ -52,8 +52,8 @@ something did not pass.
   SetJavaScriptEnabled, MissingPermission) to errors.
 - **Warnings are informational**: reported (HTML/XML/SARIF artifacts) and triaged here, not suppressed.
 - Triage of the v0.3.0 warnings: GradleDependency/AGP version → *informational* (upgrades are deliberate, through the
-  version catalog, kept mutually compatible); OldTargetApi → accepted for now (targetSdk 35; move to 36 with the next
-  AGP upgrade); UnusedResources (`lucento_blue`, `lucento_sun` colours) → kept warning; harmless, may be removed.
+  version catalog, kept mutually compatible); OldTargetApi → resolved 2026-11-07 (targetSdk 36 with AGP 8.10.1,
+  `chore/target-sdk-36`); UnusedResources (`lucento_blue`, `lucento_sun` colours) → kept warning; harmless, may be removed.
 - `MissingTranslation` ignored: the app is English-only.
 
 ## Release configuration review (source-level)

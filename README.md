@@ -75,7 +75,7 @@ split, budget periods other than calendar months. See the roadmap.
 
 ## Tech
 Kotlin · Jetpack Compose · Material 3 · Room · DataStore · ViewModel · Coroutines/Flow · Navigation Compose (type-safe).
-JDK 17, compileSdk 35, minSdk 26 (Android 8.0+). Application ID `com.lucento.app` (debug: `com.lucento.app.debug`).
+JDK 17, compileSdk and targetSdk 36, minSdk 26 (Android 8.0+). Application ID `com.lucento.app` (debug: `com.lucento.app.debug`).
 
 ## Get the APK (no local build needed)
 1. Open the repository's **Actions** tab → **Android CI** → the latest green run on `main`.
