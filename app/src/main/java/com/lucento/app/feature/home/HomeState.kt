@@ -79,6 +79,8 @@ enum class CloudStatus(val label: String) {
     PENDING("Waiting to sync"),
     OFFLINE("Offline"),
     ERROR("Needs attention"),
+    /** Lucento Pro: sync is on but the plan doesn't include it; uploads wait, nothing is lost (docs/MONETIZATION.md §6.4). */
+    PAUSED("Sync paused"),
     ;
 
     companion object {
@@ -97,8 +99,10 @@ enum class CloudStatus(val label: String) {
             pendingChanges: Int,
             online: Boolean,
             running: Boolean = false,
+            planAllows: Boolean = true,
         ): CloudStatus = when {
             !configured || !signedIn || !enabled -> LOCAL
+            !planAllows -> PAUSED
             !online -> OFFLINE
             running -> SYNCING
             hasError -> ERROR

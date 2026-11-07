@@ -120,6 +120,8 @@ fun ProfileSheet(
     onDismiss: () -> Unit,
     signedInEmail: String? = null,
     photo: ProfilePhotoState = ProfilePhotoState(),
+    /** Lucento Pro: themes this plan may not pick (marked, explained, never applied). */
+    lockedThemes: Set<ThemeId> = emptySet(),
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -193,6 +195,7 @@ fun ProfileSheet(
                 mode = preferences.themeMode,
                 onTheme = onThemeId,
                 onMode = onTheme,
+                lockedThemes = lockedThemes,
             )
 
             FieldHeader("Account and app", Modifier.padding(top = Spacing.lg))

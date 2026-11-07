@@ -81,6 +81,13 @@ fun syncSheetCopy(status: CloudStatus, details: SyncDetails, nowMillis: Long): S
         action = if (details.everSynced) "Sync now" else "Finish setting up sync",
         actionOpensSettings = !details.everSynced,
     )
+    CloudStatus.PAUSED -> SyncSheetCopy(
+        headline = "Cloud sync is part of Lucento Pro",
+        body = "Everything you add or change is saved on this phone" + pendingSuffix(details.pendingChanges) +
+            " Nothing in your account is deleted; uploads resume when your plan includes cloud sync. A backup file is always free.",
+        action = "Open Account & sync",
+        actionOpensSettings = true,
+    )
     CloudStatus.SYNCED -> SyncSheetCopy(
         headline = "Synced",
         body = syncStatusText(details.lastSyncedAtMillis, nowMillis, 0, null) + ", nothing waiting. " + SYNC_CADENCE,

@@ -73,7 +73,7 @@ class LucentoApplication : Application() {
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now".
             uploadRequests(container.syncRepository.observePendingChanges()).collect {
-                if (backgroundSyncAllowed(container.syncPreferences.isEnabled(), container.onboardingComplete())) {
+                if (backgroundSyncAllowed(container.syncPreferences.isEnabled(), container.onboardingComplete(), container.planAllowsSync())) {
                     // Open: send it now. In the background (or if the app is closed before it runs): WorkManager.
                     if (container.inForeground.get()) container.foregroundSync.request(forced = true)
                     else SyncScheduler.enqueueAfterLocalWrite(this@LucentoApplication)
@@ -104,7 +104,7 @@ class LucentoApplication : Application() {
                 else -> if (container.syncPreferences.isEnabled()) {
                     SyncScheduler.ensurePeriodic(this@LucentoApplication)
                     // ensurePeriodic keeps an existing schedule (KEEP), so a launch alone never pulled (QA R6-11).
-                    if (shouldSyncOnLaunch(true, container.auth.currentUserId())) SyncScheduler.syncNow(this@LucentoApplication)
+                    if (shouldSyncOnLaunch(true, container.auth.currentUserId(), container.planAllowsSync())) SyncScheduler.syncNow(this@LucentoApplication)
                 }
             }
         }
@@ -160,9 +160,10 @@ class AppContainer(application: Application) {
     private val structureAccess = com.lucento.app.data.repository.StructureAccess { syncPreferences.sharedSpaceOwnerId() == null }
 
     /**
-     * Lucento Pro (docs/MONETIZATION.md §5): the plan this phone holds. Phase 1 of the entitlement work wires the model,
-     * the cache and a fake store; the gates below stay [EntitlementGate.Permissive], so nothing is restricted yet. Google
-     * Play Billing replaces [com.lucento.app.data.billing.FakePurchaseSource] in release builds in a later phase.
+     * Lucento Pro (docs/MONETIZATION.md §5): the plan this phone holds — the cached snapshot first, then Google Play's
+     * reading, then the server's rows (`public.entitlements`, read at start, on every sign-in change and on each return to
+     * the foreground). Google Play Billing replaces [com.lucento.app.data.billing.FakePurchaseSource] in a later phase; until
+     * then a plan comes only from the server (GRANT rows), so a signed-out phone is Free.
      */
     val entitlements: com.lucento.app.data.entitlement.EntitlementManager by lazy {
         val manager = com.lucento.app.data.entitlement.EntitlementManager(
@@ -171,16 +172,43 @@ class AppContainer(application: Application) {
                 sealer = com.lucento.app.data.entitlement.KeystoreSealer.create(application),
             ),
             purchases = purchaseSource,
-            remote = null,
+            remote = supabaseClient?.let { com.lucento.app.data.entitlement.SupabaseEntitlementRemote(it) },
         )
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        manager.observePlayUpdates(scope)
-        scope.launch { manager.refresh() }
+        manager.observePlayUpdates(entitlementScope)
+        entitlementScope.launch { manager.refresh() }
+        // A sign-in (or a switch) brings that account's rows; a sign-out leaves the cached snapshot, which Play-sourced
+        // rows keep and server rows lose at the next successful fetch.
+        entitlementScope.launch { auth.observeUserId().collect { if (it != null) manager.refresh() } }
         manager
     }
+    private val entitlementScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val purchaseSource: com.lucento.app.data.billing.FakePurchaseSource by lazy { com.lucento.app.data.billing.FakePurchaseSource() }
-    /** Phase 1: every plan check answers Allowed. Phase 2 switches this to the manager (`entitlements::check`). */
-    private val planGate: EntitlementGate = EntitlementGate.Permissive
+
+    /** Phase 2: the repositories ask the plan. The cache is loaded first, so a cold start never answers Free by accident. */
+    private val planGate: EntitlementGate = EntitlementGate { feature, used ->
+        entitlements.loadCached()
+        entitlements.check(feature, used)
+    }
+
+    /** Re-reads Play and the server; MainActivity calls it on every return to the foreground. Never blocks the caller. */
+    fun refreshEntitlements() {
+        entitlementScope.launch { runCatching { entitlements.refresh() } }
+    }
+
+    /**
+     * Lucento Pro: whether this phone's plan lets it sync (docs/MONETIZATION.md §3.5). A Partner in a Shared Space syncs on
+     * the Owner's plan. Read from the cached snapshot, so it holds offline.
+     */
+    suspend fun planAllowsSync(): Boolean {
+        entitlements.loadCached()
+        return com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(
+            entitlements.state.value, partnerOfSpace = syncPreferences.sharedSpaceOwnerId() != null, now = System.currentTimeMillis(),
+        )
+    }
+
+    /** Multicurrency: the main currency counts as chosen once onboarding is done (the wallet gate and sync read the same). */
+    private suspend fun mainCurrencyOrNull(): String? =
+        preferences.preferences.first().let { p -> p.primaryCurrency.takeIf { p.onboardingComplete } }
 
     val wallets: WalletRepository by lazy {
         WalletRepository(
@@ -191,6 +219,7 @@ class AppContainer(application: Application) {
             runner = runner,
             access = structureAccess,
             gate = planGate,
+            mainCurrency = ::mainCurrencyOrNull,
         )
     }
     val institutions: com.lucento.app.core.banks.InstitutionRepository by lazy {
@@ -292,7 +321,7 @@ class AppContainer(application: Application) {
     internal val foregroundSync: com.lucento.app.data.sync.ForegroundSync by lazy {
         com.lucento.app.data.sync.ForegroundSync(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            allowed = { backgroundSyncAllowed(syncPreferences.isEnabled(), onboardingComplete()) },
+            allowed = { backgroundSyncAllowed(syncPreferences.isEnabled(), onboardingComplete(), planAllowsSync()) },
             upToDate = {
                 val last = syncPreferences.lastSyncedAtMillis()
                 last != null && System.currentTimeMillis() - last < com.lucento.app.data.sync.ForegroundSync.FRESH_MILLIS &&

@@ -51,7 +51,14 @@ class AppViewModel(
     /** Multicurrency: for the app-wide "≈ ₱…" values (null in tests: none shown). */
     wallets: com.lucento.app.data.repository.WalletRepository? = null,
     transactions: com.lucento.app.data.repository.TransactionRepository? = null,
+    /** Lucento Pro: the plan this phone holds; null in tests (every theme allowed). */
+    private val entitlements: StateFlow<com.lucento.app.domain.entitlement.EntitlementState>? = null,
 ) : ViewModel() {
+    /** Lucento Pro: the themes this plan may not pick (docs/MONETIZATION.md §3.8). A locked theme already chosen stays. */
+    val lockedThemes: StateFlow<Set<ThemeId>> =
+        if (entitlements == null) MutableStateFlow(emptySet())
+        else entitlements.map { plan -> com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(plan, System.currentTimeMillis()).mapNotNull { id -> ThemeId.entries.firstOrNull { it.name == id } }.toSet() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
     /** Multicurrency: every wallet's and movement's value in the main currency, for the "≈ ₱…" lines under them. */
     val fxDisplay: StateFlow<com.lucento.app.domain.fx.FxDisplay> =
         if (wallets == null || transactions == null) {
@@ -220,6 +227,7 @@ class AppViewModel(
     }
 
     fun setThemeId(theme: ThemeId) {
+        if (theme in lockedThemes.value) return // the picker shows why; nothing is persisted
         viewModelScope.launch { preferences.setThemeId(theme) }
     }
 
@@ -228,7 +236,7 @@ class AppViewModel(
         const val SPACE_FRESH_MILLIS = 60_000L
 
         val Factory = containerFactory {
-            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions)
+            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions, it.entitlements.state)
         }
     }
 }

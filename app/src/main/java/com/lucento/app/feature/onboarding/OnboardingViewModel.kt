@@ -57,6 +57,12 @@ class OnboardingViewModel(
      * a new account can join the space it was invited to, and the reason a space left this phone is shown. Null in tests.
      */
     private val space: com.lucento.app.data.sharedspace.SharedSpaceRepository? = null,
+    /**
+     * Lucento Pro (docs/MONETIZATION.md §3.5): whether this account's plan includes cloud restore and sync. Asked after a
+     * sign-in, so it must re-read the server first (the account's GRANT or purchase rows). Null in tests: always allowed.
+     * A Partner's binding to their Shared Space counts as allowed (the space is on the Owner's plan).
+     */
+    private val planAllowsCloud: (suspend () -> Boolean)? = null,
 ) : ViewModel() {
 
     /** Anonymous usage counts: one `onboarding_step_viewed` per screen, numbered from 1 (welcome). */
@@ -314,7 +320,8 @@ class OnboardingViewModel(
     /** After a sign-in on either path: restoring pulls right away; the setup path checks the account first. */
     private suspend fun continueAfterSignIn() {
         if (restoreStage.value == RestoreStage.SIGN_IN) {
-            // Restoring: this phone has nothing of its own yet, so the account can be pulled right away.
+            // Restoring: this phone has nothing of its own yet, so the account can be pulled right away. The plan is asked
+            // inside restore(), after the account-boundary check and the Shared Space check (a Partner never needs one).
             syncPreferences?.setEnabled(true)
             runRestore()
         } else {
@@ -491,6 +498,19 @@ class OnboardingViewModel(
      */
     fun runRestore() = restore(membershipChecked = false)
 
+    /**
+     * Lucento Pro: a returning account restores from the cloud only on a plan that includes it. Otherwise the person is
+     * told, stays signed in, and can restore a backup file (free) or start fresh; nothing in the account is touched.
+     */
+    private suspend fun cloudAllowedForRestore(): Boolean {
+        val allowed = planAllowsCloud ?: return true
+        if (allowed()) return true
+        _restoreMessage.value = "Restoring from your account is part of Lucento Pro. You’re signed in, and your data is safe in " +
+            "your account. Restore a backup file instead, or start fresh on this phone."
+        setRestoreStage(RestoreStage.SIGN_IN)
+        return false
+    }
+
     /** [runRestore]; [membershipChecked] when the Lucento Shared check already ran in this attempt. */
     private fun restore(membershipChecked: Boolean) {
         val repository = sync ?: return
@@ -511,6 +531,14 @@ class OnboardingViewModel(
                     else -> syncPreferences?.setEnabled(true)
                 }
                 if (!membershipChecked) adoptSpace()
+                // Lucento Pro: after the boundary check (never before — adopting a space replaces this phone's ledger) and
+                // after the Shared check: a Partner restores on the Owner's plan; anyone else needs cloud restore.
+                val partnerOfSpace = syncPreferences?.sharedSpaceOwnerId() != null
+                if (!partnerOfSpace && !cloudAllowedForRestore()) {
+                    syncPreferences?.setEnabled(false)
+                    restoring = false
+                    return@launch
+                }
                 when (val result = repository.sync()) {
                     is com.lucento.app.data.sync.SyncResult.Success -> {
                         val partner = syncPreferences?.sharedSpaceOwnerId() != null
@@ -712,7 +740,7 @@ class OnboardingViewModel(
                 preferences.completeOnboarding(currency.value, theme.value, features.value, spendTypes.value)
                 // Connected on the sync step: sync is turned on only now that the user's own setup is saved.
                 val context = appContext
-                if (context != null && syncAvailable && auth?.currentUserId() != null) {
+                if (context != null && syncAvailable && auth?.currentUserId() != null && (planAllowsCloud?.invoke() ?: true)) {
                     syncPreferences?.setEnabled(true)
                     com.lucento.app.data.sync.SyncScheduler.ensurePeriodic(context)
                     com.lucento.app.data.sync.SyncScheduler.enqueueAfterLocalWrite(context)
@@ -868,6 +896,11 @@ class OnboardingViewModel(
                     usage = container.usageCounts,
                     backup = container.backup,
                     space = container.sharedSpace,
+                    planAllowsCloud = {
+                        // The account just signed in: fetch its rows before deciding (a Partner's binding counts too).
+                        runCatching { container.entitlements.refresh() }
+                        container.planAllowsSync()
+                    },
                 )
             }
         }

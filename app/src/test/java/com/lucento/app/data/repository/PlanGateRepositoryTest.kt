@@ -102,6 +102,23 @@ class PlanGateRepositoryTest {
         assertTrue(!(pro.check(ProFeature.SAVINGS_GOALS, 20) as Access.LimitReached).upgradeHelps)
     }
 
+    @Test fun a_wallet_in_another_currency_is_pro_and_existing_foreign_wallets_keep_working() = runTest {
+        val main = "PHP"
+        val proRepo = WalletRepository(walletDao, transactionDao, clock = { 1L }, gate = pro, mainCurrency = { main })
+        val usd = (proRepo.create("Dollars", WalletType.BANK, Money(0, "USD")) as WalletRepository.SaveResult.Saved).id
+        val freeRepo = WalletRepository(walletDao, transactionDao, clock = { 1L }, gate = free, mainCurrency = { main })
+        assertEquals(WalletRepository.SaveResult.ProRequired(ProFeature.FOREIGN_CURRENCY_WALLETS), freeRepo.create("Euros", WalletType.BANK, Money(0, "EUR")))
+        assertTrue("main currency is always free", freeRepo.create("Pesos", WalletType.BANK, Money(0, main)) is WalletRepository.SaveResult.Saved)
+        // The dollar wallet from before the downgrade: rename, change its opening balance — still allowed in dollars.
+        assertTrue(freeRepo.update(usd, "USD savings", WalletType.SAVINGS, Money(5_000, "USD")) is WalletRepository.SaveResult.Saved)
+        // Turning a peso wallet into a dollar one is a new foreign wallet to the plan.
+        val pesos = walletDao.observeActive().first().first { it.name == "Pesos" }.id
+        assertEquals(WalletRepository.SaveResult.ProRequired(ProFeature.FOREIGN_CURRENCY_WALLETS), freeRepo.update(pesos, "Pesos", WalletType.BANK, Money(0, "JPY")))
+        // Without a main currency yet (onboarding), nothing is gated.
+        val early = WalletRepository(walletDao, transactionDao, clock = { 1L }, gate = free, mainCurrency = { null })
+        assertTrue(early.create("Early", WalletType.CASH, Money(0, "EUR")) is WalletRepository.SaveResult.Saved)
+    }
+
     @Test fun the_permissive_gate_the_app_wires_today_never_refuses() = runTest {
         val repo = wallets(EntitlementGate.Permissive)
         repeat(8) { assertTrue(repo.create("W$it", WalletType.CASH, php) is WalletRepository.SaveResult.Saved) }

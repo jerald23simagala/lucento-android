@@ -263,6 +263,7 @@ class WalletsViewModel(
     private fun proRequiredMessage(feature: com.lucento.app.domain.entitlement.ProFeature): String = when (feature) {
         com.lucento.app.domain.entitlement.ProFeature.RECEIVABLES -> "Receivables are part of Lucento Pro."
         com.lucento.app.domain.entitlement.ProFeature.VALUED_ASSETS -> "Assets at a value you set are part of Lucento Pro."
+        com.lucento.app.domain.entitlement.ProFeature.FOREIGN_CURRENCY_WALLETS -> "Wallets in other currencies are part of Lucento Pro. A wallet in your main currency is always free."
         else -> "This kind of wallet is part of Lucento Pro."
     }
 

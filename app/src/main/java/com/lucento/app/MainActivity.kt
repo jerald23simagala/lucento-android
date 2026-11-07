@@ -58,6 +58,8 @@ class MainActivity : FragmentActivity() {
         // Opening Lucento (or coming back to it) brings in changes from other devices and sends any waiting here.
         val container = (application as LucentoApplication).container
         container.inForeground.set(true)
+        // Lucento Pro: a renewal, a grant or a lapse shows up on the next return to the app, before the sync below runs.
+        container.refreshEntitlements()
         container.foregroundSync.request(forced = false)
     }
 

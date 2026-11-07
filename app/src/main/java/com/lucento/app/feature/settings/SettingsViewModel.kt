@@ -75,6 +75,8 @@ data class CloudSyncUiState(
     val prompt: AccountPrompt? = null,
     /** Dirty rows and unpushed deletions. "Synced just now" is withheld while this is not zero. */
     val pendingChanges: Int = 0,
+    /** Lucento Pro: this phone's plan doesn't include cloud sync (docs/MONETIZATION.md §3.5); sync is off or paused, nothing lost. */
+    val lockedByPlan: Boolean = false,
 )
 
 class SettingsViewModel(
@@ -90,6 +92,9 @@ class SettingsViewModel(
     private val usage: UsageCountsService? = null,
     private val backup: BackupEngine,
     private val appLock: com.lucento.app.core.security.AppLockSession? = null,
+    /** Lucento Pro: the plan this phone holds; null in tests (everything allowed). */
+    private val entitlements: kotlinx.coroutines.flow.StateFlow<com.lucento.app.domain.entitlement.EntitlementState>? = null,
+    private val partnerOfSpace: kotlinx.coroutines.flow.Flow<Boolean> = kotlinx.coroutines.flow.flowOf(false),
 ) : ViewModel() {
 
     private val syncing = MutableStateFlow(false)
@@ -120,6 +125,8 @@ class SettingsViewModel(
             auth.observeSignedInEmail(),
             prompt,
             syncRepository.observePendingChanges(),
+            entitlements ?: kotlinx.coroutines.flow.flowOf(null),
+            partnerOfSpace,
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
@@ -130,6 +137,9 @@ class SettingsViewModel(
             val email = values[6] as String?
             val accountPrompt = values[7] as AccountPrompt?
             val pending = values[8] as Int
+            val plan = values[9] as com.lucento.app.domain.entitlement.EntitlementState?
+            val partner = values[10] as Boolean
+            val lockedByPlan = plan != null && !com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, partner, System.currentTimeMillis())
             SettingsUiState(
                 preferences = prefs,
                 walletCount = w.size,
@@ -143,6 +153,7 @@ class SettingsViewModel(
                     lastMessage = message,
                     prompt = accountPrompt,
                     pendingChanges = pending,
+                    lockedByPlan = lockedByPlan,
                 ),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -304,9 +315,19 @@ class SettingsViewModel(
     }
 
     private suspend fun enableSyncAndRun() {
+        // Lucento Pro: the account stays connected (free AI allowance, Shared invitations); only the upload waits for a plan.
+        if (!planAllowsSyncNow()) {
+            syncMessage.value = "Cloud sync is part of Lucento Pro. You’re signed in, and everything stays on this phone; a backup file is always free."
+            return
+        }
         syncPreferences.setEnabled(true)
         SyncScheduler.ensurePeriodic(application)
         runSyncNow()
+    }
+
+    private suspend fun planAllowsSyncNow(): Boolean {
+        val plan = entitlements?.value ?: return true
+        return com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, partnerOfSpace.first(), System.currentTimeMillis())
     }
 
     /** Email accounts only. Length and the breach check run before the password is sent. */
@@ -542,6 +563,8 @@ class SettingsViewModel(
                 usage = container.usageCounts,
                 backup = container.backup,
                 appLock = container.appLock,
+                entitlements = container.entitlements.state,
+                partnerOfSpace = kotlinx.coroutines.flow.flow { container.syncPreferences.sharedSpaceOwner.collect { emit(it != null) } },
             )
         }
     }

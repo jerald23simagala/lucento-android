@@ -297,6 +297,7 @@ fun AskLucentoScreen(
             onSave = viewModel::savePdf,
             onShare = viewModel::pdfForSharing,
             onDismiss = { openReport = null },
+            pdfLocked = state.pdfLocked,
         )
     }
 }
@@ -523,6 +524,8 @@ private fun ReportSheet(
     onSave: (Report, android.net.Uri, android.content.ContentResolver, (Boolean) -> Unit) -> Unit,
     onShare: (Report, (java.io.File?) -> Unit) -> Unit,
     onDismiss: () -> Unit,
+    /** Lucento Pro: the statement stays on screen; Save as PDF and Share wait for a plan that includes them. */
+    pdfLocked: Boolean = false,
 ) {
     val context = LocalContext.current
     var report by remember(initial) { mutableStateOf(initial) }
@@ -554,6 +557,11 @@ private fun ReportSheet(
             message?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 Spacer(Modifier.height(Spacing.sm))
+            }
+            if (pdfLocked) {
+                com.lucento.app.core.designsystem.component.InfoNote("Saving or sharing this statement as a PDF is part of Lucento Pro. Everything on this screen is always free.")
+                Spacer(Modifier.height(Spacing.lg))
+                return@Column
             }
             LucentoPrimaryButton(text = "Save as PDF", icon = Icons.Outlined.PictureAsPdf, onClick = { saver.launch(ReportPdfWriter.fileName(report)) })
             Spacer(Modifier.height(Spacing.sm))
