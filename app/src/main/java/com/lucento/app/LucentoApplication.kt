@@ -11,6 +11,7 @@ import com.lucento.app.data.preferences.SharedPreferencesCrashReportsStore
 import com.lucento.app.data.preferences.UserPreferencesRepository
 import com.lucento.app.data.repository.BudgetRepository
 import com.lucento.app.data.repository.CategoryRepository
+import com.lucento.app.data.repository.EntitlementGate
 import com.lucento.app.data.repository.GoalRepository
 import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
@@ -158,6 +159,29 @@ class AppContainer(application: Application) {
      */
     private val structureAccess = com.lucento.app.data.repository.StructureAccess { syncPreferences.sharedSpaceOwnerId() == null }
 
+    /**
+     * Lucento Pro (docs/MONETIZATION.md §5): the plan this phone holds. Phase 1 of the entitlement work wires the model,
+     * the cache and a fake store; the gates below stay [EntitlementGate.Permissive], so nothing is restricted yet. Google
+     * Play Billing replaces [com.lucento.app.data.billing.FakePurchaseSource] in release builds in a later phase.
+     */
+    val entitlements: com.lucento.app.data.entitlement.EntitlementManager by lazy {
+        val manager = com.lucento.app.data.entitlement.EntitlementManager(
+            cache = com.lucento.app.data.entitlement.SealedEntitlementCache(
+                store = com.lucento.app.data.entitlement.DataStoreSnapshotStore(application),
+                sealer = com.lucento.app.data.entitlement.KeystoreSealer.create(application),
+            ),
+            purchases = purchaseSource,
+            remote = null,
+        )
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        manager.observePlayUpdates(scope)
+        scope.launch { manager.refresh() }
+        manager
+    }
+    val purchaseSource: com.lucento.app.data.billing.FakePurchaseSource by lazy { com.lucento.app.data.billing.FakePurchaseSource() }
+    /** Phase 1: every plan check answers Allowed. Phase 2 switches this to the manager (`entitlements::check`). */
+    private val planGate: EntitlementGate = EntitlementGate.Permissive
+
     val wallets: WalletRepository by lazy {
         WalletRepository(
             dao = database.walletDao(),
@@ -166,6 +190,7 @@ class AppContainer(application: Application) {
             debtTerms = database.debtTermsDao(),
             runner = runner,
             access = structureAccess,
+            gate = planGate,
         )
     }
     val institutions: com.lucento.app.core.banks.InstitutionRepository by lazy {
@@ -180,7 +205,7 @@ class AppContainer(application: Application) {
         )
     }
     val budgets: BudgetRepository by lazy { BudgetRepository(database.budgetDao(), database.categoryDao(), runner = runner, access = structureAccess) }
-    val goals: GoalRepository by lazy { GoalRepository(database.goalDao(), access = structureAccess) }
+    val goals: GoalRepository by lazy { GoalRepository(database.goalDao(), access = structureAccess, gate = planGate) }
     val recurring: RecurringRepository by lazy {
         RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner, access = structureAccess)
     }

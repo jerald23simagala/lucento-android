@@ -1029,6 +1029,9 @@ private fun GoalEditorSheet(
                             GoalRepository.SaveResult.CurrencyLocked -> amountError = "A goal’s currency can’t change."
                             GoalRepository.SaveResult.NotFound -> close()
                             GoalRepository.SaveResult.NotPermitted -> nameError = "Only the Shared Space’s owner can change this."
+                            // Lucento Pro (docs/monetization/CUSTOMER_COPY.md D-2); reached only once the gates are on.
+                            is GoalRepository.SaveResult.LimitReached ->
+                                nameError = "You have ${result.used} active goals, the most on your plan. Nothing happens to the goals you have."
                         }
                     }
                 },

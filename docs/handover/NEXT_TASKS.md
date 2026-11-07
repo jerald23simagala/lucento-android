@@ -25,6 +25,18 @@
 | OT-12 | Production: apply `20261106090000_multicurrency.sql`, after OT-9 and before any release that includes multicurrency (v13) | **Approved** (owner, 2026-11-06: "good with me"); the owner applies it after OT-9. Confirm here once applied | A v13 build with a foreign wallet can't sync its FX values without it (uploads stay pending; nothing lost) |
 | OT-5 | Try AI answers on a phone: install `artifacts/apk/lucento-release-TEST-SIGNED-ot5.apk` (a **test-only** release build: production Supabase and proxy, signed with this machine's Android debug key, SHA-1 `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75`; never distribute it). Sign in with an **email** account (Google sign-in likely fails: that key isn't registered for `com.lucento.app`), Insights › Ask Lucento › ask a question of your own (e.g. "How did October compare with September?") › Turn on AI answers › check the bold figures and "Answered by Gemini". Uninstall afterwards | Waits on OT-4 | The AI path can't run here; no signing secrets exist (`gh secret list` empty), so CI's release APK is unsigned |
 
+## Lucento Pro — Phases 2–5 (2026-11-06, `feature/lucento-pro-architecture`; plan in `docs/MONETIZATION.md` §11)
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| LP-1 | Owner: review Phase 1 (`lucento-architect` pass on the model and the server contract), then decide on a PR to `main` | P0 | Nothing is restricted yet; merging Phase 1 alone is safe |
+| LP-2 | Owner: apply `20261107090000_entitlements.sql` to **`lucento-test`** **together with GRANT rows** for every account that owns a Shared Space there (`docs/monetization/SERVER_CONTRACT.md` §7) — `max_partners` becomes 0 without SHARED (invitations only; existing Partners stay) | P0 (before Phase 2's remote) | Verified offline 38/38; production only with the gated release |
+| LP-3 | Phase 2 — gates: `planGate` → `entitlements::check` in `AppContainer`; foreign-currency wallet gate (needs the main currency in `WalletRepository.create` / `WalletChangePolicy`); Insights 6/12 + composition; PDF; themes; `backgroundSyncAllowed(cloud)` + onboarding restore; `SupabaseEntitlementRemote`; proxy → `consume_ai_request` (website PR: `ask.ts`, `interpret.ts`); default plan Free | P1 | §6.3 rules are the acceptance; `lucento-qa` pass |
+| LP-4 | Phase 3 — UI: `ProBadge`, locked / limit sheets, Lucento Pro page (plans from Play, comparison from `PlanCatalog.comparisonRows()`, Lifetime explainer, restore, manage), profile row, Settings page, first-start restriction notice, test-build plan simulator (`FakePurchaseSource.setPurchases`) | P1 | Copy: `docs/monetization/CUSTOMER_COPY.md` D |
+| LP-5 | Phase 4 — Play Billing 9.x `PlayPurchaseSource` (SUBS + INAPP, pending, acknowledge, restore, `obfuscatedAccountId`), Vercel `verify` / `rtdn` / `voided`, Play Console products and offers, license testers. **Prerequisites**: release signing (CS-20), `targetSdk` check | P1 | `SERVER_CONTRACT.md` §3–§5 |
+| LP-6 | Phase 5 — device matrix (`docs/MONETIZATION.md` §10), website pricing / FAQ / terms / feature copy, Play listing, production migrations with the gated release | P2 | |
+| LP-7 | `ScreenshotTourTest` after Phase 3 (Pro page, locked sheet frames) | P2 | |
+
 ## Lucento Shared — follow-ups (2026-11-05, `feature/lucento-shared`, uncommitted)
 
 | # | Task | Priority | Notes |

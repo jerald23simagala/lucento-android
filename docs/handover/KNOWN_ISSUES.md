@@ -209,6 +209,16 @@ unconfigured), HomeOnTrackTest (L9).
 | MC-K6 | An older build (v12) that edits a foreign movement's amount on a ledger already using v13 leaves its stored value as it was (it doesn't know the columns); the next v13 edit corrects it | Same pattern as LS-K6's columns | Keep every phone of a ledger on v13 |
 | MC-K7 | Not run: on a device, against `lucento-test`, `MigrationTest.migrate12To13…`, `ScreenshotTourTest`, TalkBack and font scaling on the new fields | — | OT-11, MC-3 |
 
+## Lucento Pro — Phase 1 (2026-11-06, `feature/lucento-pro-architecture`)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| LP-K1 | **By design, Phase 1 restricts nothing**: `AppContainer.planGate` is `EntitlementGate.Permissive`, so the `LimitReached` / `ProRequired` results and their two UI branches are unreachable until Phase 2 | Verified (`PlanGateRepositoryTest.the_permissive_gate_the_app_wires_today_never_refuses`) | LP-3 |
+| LP-K2 | A Play-local **subscription** reading carries no expiry (Play's `Purchase` has none), so it is trusted for 35 days from the last successful query plus the 3-day grace; a phone that never sees Play or the server again keeps Pro that long after a lapse. The server's `expires_at` replaces it as soon as either is reachable | Code-only (`PurchaseInterpreter.LOCAL_SUBSCRIPTION_HORIZON_MILLIS`), unit-tested | Accepted (docs/MONETIZATION.md §5.3 L-1, L-4) |
+| LP-K3 | A refund with revoke reaches the phone only through the server (or Play dropping the purchase from its list). While offline after a Lifetime refund, `LOCAL_PRO` stays until the next contact | Code-only; `EntitlementMergeTest.a_revoked_server_row_is_not_overridden_by_play_while_its_dates_are_current` pins the sequence | Accepted (§4.3: exposure is one lost sale) |
+| LP-K4 | `KeystoreSealer` falls back to a SharedPreferences key when the Android Keystore refuses; the snapshot is then tamper-evident but not device-bound | Code-only; the fallback path is not exercised on a device | Try on the API 28 AVD and a Keystore-less emulator in Phase 3 |
+| LP-K5 | The entitlement migration changes `max_partners` for accounts without a SHARED entitlement (invitations only). Applying it to `lucento-test` without GRANT rows for the owner's test accounts stops their new invitations | Verified in `entitlements_suite.sql` S1 / S2 | NEXT_TASKS LP-2 |
+
 ## Open — P2 / P3
 
 | ID | Issue | Evidence |
