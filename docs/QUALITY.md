@@ -34,7 +34,8 @@ export) → schema committed and unchanged (`git diff --exit-code app/schemas`) 
 → `assembleRelease bundleRelease` (signed only if `LUCENTO_KEYSTORE_BASE64`, `LUCENTO_KEYSTORE_PASSWORD`,
 `LUCENTO_KEY_ALIAS`, `LUCENTO_KEY_PASSWORD` secrets exist; otherwise unsigned) → inspect release APK with `aapt2`
 (application id `com.lucento.app`, not debuggable, permissions limited to an allow-list — INTERNET,
-ACCESS_NETWORK_STATE for opt-in cloud sync, WAKE_LOCK, RECEIVE_BOOT_COMPLETED for WorkManager; debug id `com.lucento.app.debug`)
+ACCESS_NETWORK_STATE for opt-in cloud sync, WAKE_LOCK, RECEIVE_BOOT_COMPLETED for WorkManager, USE_BIOMETRIC /
+USE_FINGERPRINT for the app lock, `com.android.vending.BILLING` for Google Play Billing (Lucento Pro); debug id `com.lucento.app.debug`)
 → size table in the run summary → artifacts (debug APK, release AAB/APK + R8 mapping, schemas, reports).
 
 Job **migrations** (needs build): fails immediately if schema history is incomplete, otherwise boots an API 30 x86_64

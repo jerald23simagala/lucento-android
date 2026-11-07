@@ -600,7 +600,7 @@ parked until the Android side is final (memory: website PRs deferred).
 
 | Requirement | How |
 |---|---|
-| Library | `com.android.billingclient:billing-ktx` **9.x** (v8+ mandatory for submissions since 31 Aug 2026; v9 shipped May 2026 — v1 §4.5 sources). `enablePendingPurchases`, `enableAutoServiceReconnection` |
+| Library | `com.android.billingclient:billing` **9.1.0** (v8+ mandatory for submissions since 31 Aug 2026; v9 shipped May 2026, 9.1.0 June 2026). The plain artifact, not billing-ktx (Phase 4 note in §11). `enablePendingPurchases`, `enableAutoServiceReconnection` |
 | Subscriptions | `queryProductDetailsAsync(SUBS)` → base plan / offer token → `launchBillingFlow` with `obfuscatedAccountId` when signed in |
 | One-time Lifetime | `queryProductDetailsAsync(INAPP)`; Billing 8+ exposes `getOneTimePurchaseOfferDetailsList()` per product — use the single purchase option's offer token ([Android Developers — one-time product purchase options and offers](https://developer.android.com/google/play/billing/one-time-product-multi-purchase-options-offers?hl=de), [RevenueCat — the purchase flow](https://www.revenuecat.com/guides/google-play-billing/the-purchase-flow)). Non-consumable: **acknowledge, never consume** |
 | Verification | local `Purchase` signature check with the app's Play public key; server verification when signed in; RTDN + daily Voided Purchases check keep the server current |
@@ -739,7 +739,54 @@ Original scope:
 explainer, restore, manage), profile row, Settings page, theme preview, Insights locked preview, first-start
 restriction notice, test-build plan simulator; screenshot tour frames; font scale 2.0 / 320 dp / TalkBack.
 
-### Phase 4 — Google Play Billing and server verification
+### Phase 4 — Google Play Billing and server verification — **built 2026-11-07 on `feature/lucento-pro-billing`**
+
+What landed:
+
+- **The app.** `com.android.billingclient:billing` **9.1.0** is the plain artifact: `PlayPurchaseSource` wraps the
+  callbacks in coroutines itself, so billing-ktx's Kotlin metadata can't pin the compiler. Its behaviour:
+  - Pending purchases are on for one-time products, with auto service reconnection.
+  - It queries subscriptions and one-time purchases separately.
+  - Every purchase must pass its signature check against Play's licence key (`PurchaseSignature`). One failure makes the
+    whole reading a *failure*, so a forged purchase neither adds a plan nor hides a real one.
+  - `onPurchasesUpdated` re-reads the whole list, because the merge treats a missing purchase as ended.
+  - Offers are chosen in `PlayPriceSelection`: the trial when Play lists it, the base plan otherwise, never an offer with
+    a paid intro phase, and the cheapest Lifetime option (the founder price).
+  - `obfuscatedAccountId` is sha256 of the Lucento user id.
+  - Release builds use Play only with `LUCENTO_PLAY_LICENSE_KEY`. Without it they use `UnavailablePurchaseSource`, which
+    never removes a plan. Debug builds keep the fake store.
+- **Confirmation** (`EntitlementManager`, after every Play reading and every pushed update):
+  - A purchase without a server row for this account goes to `ProxyPurchaseVerifier` (`/api/billing/verify`).
+  - Then every unacknowledged paid purchase is acknowledged, whatever the server said.
+  - Pending payments get neither. Failures retry at the next refresh.
+  - Linked elsewhere or review required shows a note under "Your purchases".
+- **The Pro page.** `ProOffers` decides who sees what (§4.1):
+  - Free sees "Start 7-day free trial", "Subscribe monthly" and "Buy Lifetime".
+  - A subscriber sees "Switch to Lifetime" with the cancel reminder (D-11).
+  - A Lifetime owner sees Lucento Cloud once their services have ended, and never the subscription.
+  - A pending payment replaces that plan's buttons with D-9.
+  - Results and Play problems are worded by `ProCopy`.
+  - Test builds get a **Test store** switch in the simulator: marked test prices, and buying at once through the fake.
+- **The server.** `20261108090000_play_purchases.sql`:
+  - `apply_play_purchase` holds the linking rule and the row writes in one transaction. A refund is final, and a stale
+    ending never undoes a newer purchase.
+  - `revoke_play_purchase` ends a refunded purchase.
+  - Both are service role only.
+  - The website (`feature/play-billing-verify`) has `verify`, `rtdn` and the daily `voided` cron over the Play Developer
+    API (`subscriptionsv2`, `productsv2`, voided purchases), signed with Web Crypto, with no SDK.
+- **What leaves the phone.**
+  - Buying talks to the Play Store app. Google Play handles the payment; Lucento never sees card details.
+  - When signed in, the purchase token, product id and package name go to Lucento's site, once per purchase per account.
+    Nothing about the person's money is sent.
+  - The Billing Library itself sends Google its own diagnostics through Google's data transport. Every app using Play
+    Billing does this, and Lucento can't turn it off (KNOWN_ISSUES LP-K13).
+- **Not done here** (owner, `docs/monetization/PLAY_CONSOLE_SETUP.md`):
+  - Play Console products, offers, licence key, RTDN topic, service account and license testers.
+  - Release signing (CS-20).
+  - Target SDK 36: its own branch, `chore/target-sdk-36`.
+  - Monthly ↔ yearly switching stays in Google Play's subscription centre; there is no in-app plan change.
+
+Original scope:
 `billing-ktx` 9.x, `PlayPurchaseSource` (SUBS + INAPP, pending, acknowledge, restore, `obfuscatedAccountId`);
 Vercel `verify.ts`, `rtdn.ts`, `voided.ts`; Play Console products, base plans, offers (trial, founder price), RTDN
 topic, license testers; release signing (CS-20) and `targetSdk` check first.
@@ -756,7 +803,8 @@ topic, license testers; release signing (CS-20) and `targetSdk` check first.
    ₱3,490 with founder offer, 12 months of services, Owner / Partner names).
 2. ~~Branch reconciliation~~ — **done 2026-11-06** (§1.1); the checkout is on `origin/main` `15e7a46`.
 3. **Release signing (CS-20) and `targetSdk`** — without a signed internal-track build, Phase 4 cannot be tested on a
-   device; verify whether Play requires `targetSdk 36` for new submissions.
+   device. *Checked 2026-11-07:* Play requires `targetSdk 36` for new apps and updates since 31 Aug 2026; the bump is on
+   `chore/target-sdk-36` (AGP 8.10.1, compileSdk/targetSdk 36).
 4. **Production Supabase state** — confirm the Lucento Shared and multicurrency migrations are applied to production
    (OT-9, OT-12) before stacking the entitlement migration on them.
 5. **Play Developer API access** — a service account with "View financial data" (for Voided Purchases) and

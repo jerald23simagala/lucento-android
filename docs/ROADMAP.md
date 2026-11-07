@@ -173,6 +173,18 @@ recurring-schedule sync, syncing preferences.
   `lucento-test`** (owner, 2026-11-05); production after the two-device test (NEXT_TASKS OT-8, OT-9). Docs: docs/shared/ (start with SECURITY_MODEL.md and
   TWO_DEVICE_TEST.md). Follow-ups: NEXT_TASKS LS-1…LS-6.
 
+## Built, awaiting Google Play setup — Lucento Pro (2026-11-06 → 11-07, `feature/lucento-pro-*`)
+- Three plans: Free, Pro Subscription and Pro Lifetime (docs/MONETIZATION.md, approved 2026-11-06). Phase 1, the
+  entitlement architecture, is merged (PR #22).
+- Phase 2: gates, sync pause, Insights, PDF, themes and the AI allowance.
+- Phase 3: the Lucento Pro page, one inline lock pattern, the plan-ended notice and the test-build plan simulator.
+- Phase 4: Google Play Billing 9.1.0 with on-phone signature checks, server verification and acknowledgement, buy
+  buttons, and the website's `verify`, `rtdn` and `voided` endpoints.
+- No Room change. Two additive Supabase migrations: the first is applied to `lucento-test`; the second is checked
+  offline (`tools/sql-verify`, 30/30).
+- Before the first sale: target SDK 36 (`chore/target-sdk-36`), release signing, and Play Console products
+  (docs/monetization/PLAY_CONSOLE_SETUP.md). Then Phase 5: the device matrix, website pricing pages and legal pages.
+
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
 - Same-currency transfers first; cross-currency transfers record both amounts explicitly (user-entered rate, no guessing).

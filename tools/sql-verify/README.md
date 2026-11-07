@@ -24,6 +24,12 @@ wallets … affect 0 rows`. Run both variants: a migration must be safe whicheve
 
 ## Suites
 
+- `play_purchases_suite.sql` — Lucento Pro Phase 4 (`docs/monetization/SERVER_CONTRACT.md` §3–§5), 30 checks: only the
+  service role writes purchases; Lifetime's forever row and its 365-day services row from the purchase time; the linking
+  rule (another account refused, a move after 30 days when bought for that account, a third move needs support);
+  subscriptions through trial, grace, hold, expiry and resubscription, with a stale ending never undoing a newer purchase;
+  refunds final; pending payments grant nothing; malformed input refused.
+- `entitlements_suite.sql` — Lucento Pro tables and the AI allowance, 38 checks.
 - `shared_space_suite.sql` — Lucento Shared (`docs/shared/SECURITY_MODEL.md`), 69 checks. It covers invitations
   (verified email, capacity, duplicates, expiry, withdrawal) and atomic acceptance. It covers what a Partner may read and
   write: transactions yes, the financial structure no, including upserts refused as a whole statement. It also checks

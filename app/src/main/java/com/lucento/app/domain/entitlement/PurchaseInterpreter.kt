@@ -103,7 +103,15 @@ object PurchaseInterpreter {
     }
 
     /** SHA-256, lower-case hex. The token itself is never stored. */
-    fun tokenHash(purchaseToken: String): String =
-        MessageDigest.getInstance("SHA-256").digest(purchaseToken.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+    fun tokenHash(purchaseToken: String): String = sha256Hex(purchaseToken)
+
+    /**
+     * What Lucento tells Play about the signed-in account at purchase (`obfuscatedAccountId`): sha256 of the Supabase user
+     * id, lower-case hex — 64 characters, Play's maximum. The server computes the same value to check the linking rule
+     * (docs/MONETIZATION.md §5.4); Play and Google never see the id itself.
+     */
+    fun obfuscatedAccountId(userId: String): String = sha256Hex(userId.trim().lowercase())
+
+    private fun sha256Hex(text: String): String =
+        MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 }

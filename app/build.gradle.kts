@@ -64,6 +64,12 @@ val debugAiInterpretUrl = lucentoConfig("LUCENTO_DEBUG_AI_INTERPRET_URL")
 // rules: debug only talks to a test proxy, and a build without one simply has no AI answers (reports still work).
 fun askUrlFor(interpretUrl: String): String =
     if (interpretUrl.isBlank()) "" else interpretUrl.trimEnd('/').replace(Regex("/interpret$"), "") + "/ask"
+// Lucento Pro (docs/monetization/SERVER_CONTRACT.md §3): purchases are checked by /api/billing/verify on the same site.
+fun billingVerifyUrlFor(interpretUrl: String): String =
+    if (interpretUrl.isBlank()) "" else interpretUrl.trimEnd('/').replace(Regex("/interpret$"), "") + "/billing/verify"
+// Google Play's licence key (Play Console › Monetization setup › Licensing), public by design: the phone checks every
+// purchase's signature with it. Without it a release doesn't bill (no prices; "not on sale yet"). Debug never bills.
+val playLicenceKey = lucentoConfig("LUCENTO_PLAY_LICENSE_KEY")
 if (debugAiInterpretUrl.trimEnd('/').equals(releaseAiInterpretUrl.trimEnd('/'), ignoreCase = true)) {
     throw GradleException("LUCENTO_DEBUG_AI_INTERPRET_URL is the production proxy. Debug builds must use a test proxy or none.")
 }
@@ -123,12 +129,17 @@ android {
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"$debugSupabaseKey\"")
             buildConfigField("String", "AI_INTERPRET_URL", "\"$debugAiInterpretUrl\"")
             buildConfigField("String", "AI_ASK_URL", "\"${askUrlFor(debugAiInterpretUrl)}\"")
+            // The .debug application id can never bill: test builds use the plan simulator instead.
+            buildConfigField("String", "PLAY_LICENSE_KEY", "\"\"")
+            buildConfigField("String", "BILLING_VERIFY_URL", "\"\"")
         }
         release {
             buildConfigField("String", "SUPABASE_URL", "\"$releaseSupabaseUrl\"")
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"$releaseSupabaseKey\"")
             buildConfigField("String", "AI_INTERPRET_URL", "\"$releaseAiInterpretUrl\"")
             buildConfigField("String", "AI_ASK_URL", "\"${askUrlFor(releaseAiInterpretUrl)}\"")
+            buildConfigField("String", "PLAY_LICENSE_KEY", "\"$playLicenceKey\"")
+            buildConfigField("String", "BILLING_VERIFY_URL", "\"${billingVerifyUrlFor(releaseAiInterpretUrl)}\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -212,6 +223,8 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.biometric)
+    // Lucento Pro: Google Play Billing (release builds; debug and tests use FakePurchaseSource).
+    implementation(libs.play.billing)
     implementation(libs.androidx.fragment.ktx)
 
     // On-device receipt OCR (bundled model; works offline).

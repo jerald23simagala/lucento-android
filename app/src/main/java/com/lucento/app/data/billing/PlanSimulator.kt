@@ -52,6 +52,8 @@ enum class SimulatedPlan(val label: String, val detail: String) {
 interface SimulatorStore {
     fun read(): String?
     fun write(name: String?)
+    fun readTestStore(): Boolean = false
+    fun writeTestStore(on: Boolean) = Unit
 }
 
 class PrefsSimulatorStore(context: Context) : SimulatorStore {
@@ -60,16 +62,25 @@ class PrefsSimulatorStore(context: Context) : SimulatorStore {
     override fun write(name: String?) {
         prefs.edit().apply { if (name == null) remove(KEY) else putString(KEY, name) }.apply()
     }
+    override fun readTestStore(): Boolean = prefs.getBoolean(TEST_STORE, false)
+    override fun writeTestStore(on: Boolean) {
+        prefs.edit().putBoolean(TEST_STORE, on).apply()
+    }
 
     private companion object {
         const val KEY = "simulated_plan"
+        const val TEST_STORE = "test_store"
     }
 }
 
-class InMemorySimulatorStore(var value: String? = null) : SimulatorStore {
+class InMemorySimulatorStore(var value: String? = null, var testStore: Boolean = false) : SimulatorStore {
     override fun read(): String? = value
     override fun write(name: String?) {
         value = name
+    }
+    override fun readTestStore(): Boolean = testStore
+    override fun writeTestStore(on: Boolean) {
+        testStore = on
     }
 }
 
@@ -88,8 +99,23 @@ class DebugPlanSimulator(
 
     val ignoresServer: Boolean get() = _current.value != null
 
+    /**
+     * The test store: Google Play's purchase flow, faked. On, the Pro page lists [TEST_PRICES] and its buttons "buy" at
+     * once through [FakePurchaseSource.launchPurchase] — nothing is charged, and every price says "test". Off (the
+     * default), the page shows what a release without products on sale shows.
+     */
+    private val _testStore = MutableStateFlow(store.readTestStore())
+    val testStore: StateFlow<Boolean> get() = _testStore
+
     init {
         purchases.setPurchases(_current.value?.purchases(clock()).orEmpty())
+        purchases.prices = if (_testStore.value) TEST_PRICES else emptyList()
+    }
+
+    fun setTestStore(on: Boolean) {
+        store.writeTestStore(on)
+        _testStore.value = on
+        purchases.prices = if (on) TEST_PRICES else emptyList()
     }
 
     /** Switches to [plan] (null: the account's own plan). The caller refreshes the entitlement manager afterwards. */
@@ -99,3 +125,16 @@ class DebugPlanSimulator(
         purchases.setPurchases(plan?.purchases(clock()).orEmpty())
     }
 }
+
+/**
+ * Test builds only: what the test store lists, shaped like Google Play's answer (trial on yearly Pro, one Lifetime option,
+ * Cloud monthly and yearly). Every string says "test" so a screenshot can't pass for a real price list; the real prices
+ * only ever come from Play Console through `ProductDetails`.
+ */
+val TEST_PRICES: List<ProductPrice> = listOf(
+    ProductPrice(PlayProducts.PRO_SUBSCRIPTION, "annual", "test-pro-annual", "₱1,190.00 (test)", "P1Y", freeTrialPeriodIso = "P7D"),
+    ProductPrice(PlayProducts.PRO_SUBSCRIPTION, "monthly", "test-pro-monthly", "₱149.00 (test)", "P1M"),
+    ProductPrice(PlayProducts.PRO_LIFETIME, null, "test-lifetime", "₱3,490.00 (test)", null),
+    ProductPrice(PlayProducts.CLOUD_ADDON, "annual", "test-cloud-annual", "₱490.00 (test)", "P1Y"),
+    ProductPrice(PlayProducts.CLOUD_ADDON, "monthly", "test-cloud-monthly", "₱59.00 (test)", "P1M"),
+)
