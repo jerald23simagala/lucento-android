@@ -41,6 +41,10 @@ class ProOffersTest {
         assertEquals(listOf("Start 7-day free trial", "Subscribe monthly"), pro.map { it.label })
         assertEquals(listOf(true, false), pro.map { it.primary })
         assertEquals("₱1,190.00 a year · 7-day free trial", pro.first().priceLine)
+        // Google Play's subscription policy: renewal, trial conversion and where to cancel, next to the buttons.
+        assertEquals(ProOffers.SUBSCRIPTION_TERMS, c.getValue(PlanCardKind.PRO).note)
+        assertTrue(ProOffers.SUBSCRIPTION_TERMS.contains("Renews automatically"))
+        assertTrue(ProOffers.SUBSCRIPTION_TERMS.contains("free trial becomes a paid subscription"))
         val life = c.getValue(PlanCardKind.LIFETIME)
         assertEquals(listOf("Buy Lifetime"), life.actions.map { it.label })
         assertEquals("₱3,490.00 once", life.actions.single().priceLine)
@@ -71,6 +75,8 @@ class ProOffersTest {
 
         val afterYear = cards(state(record(PlayProducts.PRO_LIFETIME, boughtAt = now - 400 * day, renewing = false)))
         assertEquals(listOf("Add Lucento Cloud", "Choose monthly instead"), afterYear.getValue(PlanCardKind.CLOUD).actions.map { it.label })
+        assertEquals(ProOffers.SUBSCRIPTION_TERMS, afterYear.getValue(PlanCardKind.CLOUD).note)
+        assertNull("nothing to buy, so no terms", inYearOne.getValue(PlanCardKind.CLOUD).note)
 
         val withCloud = cards(state(record(PlayProducts.PRO_LIFETIME, boughtAt = now - 400 * day, renewing = false), record(PlayProducts.CLOUD_ADDON)))
         assertTrue(withCloud.getValue(PlanCardKind.CLOUD).current)
@@ -89,6 +95,7 @@ class ProOffersTest {
         val c = cards(EntitlementState.FREE, emptyList())
         assertTrue(c.values.all { it.actions.isEmpty() })
         assertNull(c.getValue(PlanCardKind.LIFETIME).note)
+        assertNull(c.getValue(PlanCardKind.PRO).note)
     }
 
     @Test fun purchase_outcomes_and_play_problems_read_plainly() {

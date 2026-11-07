@@ -80,14 +80,16 @@ class ReconciliationTest {
     fun monthSpendingIsOneFigureAcrossHomeTransactionsAndBudget() {
         // Onboarding, as the screenshot tour walks it, keeping everything on this phone.
         click("Get started")
+        // "Keep your money safe" comes first (owner, 2026-11-06).
+        click("Keep it on this phone only")
+        click("Continue")
+        waitForText("What do you want Lucento to help with?")
         click("Continue")
         waitForText("How do you pay?")
         click("Continue")
         click("Review", substring = true)
         click("Confirm", substring = true)
         waitForText("Currency and look")
-        click("Continue")
-        click("Keep it on this phone only")
         click("Continue")
         click("Continue to set up")
         waitForText("Add your accounts")

@@ -56,7 +56,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   Aurora — each with its own landscape, every one contrast-checked (WCAG AA) with colour-blind-safe chart colours, plus
   System / Light / Dark. Switching is instant; money colours (income, spending, warnings) never change between themes.
 - **Settings**: main currency, Enabled features, CSV export, JSON backup and restore, privacy facts, an
-  optional app lock (fingerprint, face or screen lock) and Hide in recent apps.
+  optional app lock (fingerprint, face or screen lock) and Hide in recent apps. Signed in, **Delete account** removes the
+  account and its cloud data (docs/ACCOUNT_DELETION.md); the Terms of Use and Privacy Policy open from Settings ›
+  Privacy & security (docs/LEGAL.md).
 - **Motion**: the mascot's gentle float and pose cross-fades; original Lottie net-flow glyphs, onboarding mark,
   empty states, receipt scan beam, saved confirmation, milestones — bundled and reduced-motion aware.
 - Exact money math in minor units; 497 JVM unit tests; an emulator screenshot tour in CI.

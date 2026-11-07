@@ -24,6 +24,10 @@ wallets … affect 0 rows`. Run both variants: a migration must be safe whicheve
 
 ## Suites
 
+- `account_deletion_suite.sql` — account deletion (docs/ACCOUNT_DELETION.md), 10 checks: only a signed-in account can call
+  `delete_my_account`, and only for itself; nothing of it is left in any public table or `auth.users`; other accounts
+  untouched; a late sync with the old token can't recreate data; a Lifetime purchase restores on a new account; a
+  Partner and an Owner deleting leave the other person's ledger intact.
 - `play_purchases_suite.sql` — Lucento Pro Phase 4 (`docs/monetization/SERVER_CONTRACT.md` §3–§5), 30 checks: only the
   service role writes purchases; Lifetime's forever row and its 365-day services row from the purchase time; the linking
   rule (another account refused, a move after 30 days when bought for that account, a third move needs support);

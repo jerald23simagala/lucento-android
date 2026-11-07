@@ -227,6 +227,15 @@ recurring-schedule sync, syncing preferences.
   then merges by stable id (newer `updatedAt` wins) or replaces the ledger inside one Room transaction. Older files
   migrate forward. Password encryption and a checksum are not included.
 
+## Built, awaiting owner steps — Google Play readiness (2026-11-07, `feature/play-readiness`)
+- In-app account deletion (Settings › Cloud sync › Delete account) on a new server function, plus the public
+  `www.lucentoapp.com/delete-account` page (docs/ACCOUNT_DELETION.md).
+- Terms and Privacy Policy cover Lucento Pro and account deletion, name a contact address, and are generated onto the
+  website from the app's text. The account-onboarding work (legal sheet, email verification) is folded in.
+- Play Console answers (Data safety, App content, listing, Google sign-in SHA-1s, testing tracks):
+  docs/play/PLAY_STORE_SUBMISSION.md. Website refresh with pricing, terms and deletion pages (`feature/site-refresh`).
+- Owner: OT-15 (migration), OT-16 (Play Console), legal review.
+
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,

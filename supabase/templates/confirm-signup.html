@@ -1,0 +1,75 @@
+<!--
+  Lucento — "Confirm signup" email (Supabase Auth › Email Templates › Confirm signup), both projects.
+  Subject: Welcome to Lucento — verify your email
+  The app's "Check your inbox" dialog tells people to tap "Verify email": keep that button label in step with it.
+  Email-safe on purpose: tables, inline styles, no web fonts, one hosted PNG (the website's app icon).
+  {{ .ConfirmationURL }} and {{ .Email }} are filled in by Supabase. See docs/SYNC.md "Setup required".
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light only" />
+    <title>Welcome to Lucento</title>
+  </head>
+  <body style="margin:0;padding:0;background:#FFFDF5;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+      One tap to verify your email and finish creating your Lucento account.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFFDF5;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+            <tr>
+              <td align="center" style="padding-bottom:24px;">
+                <img src="https://www.lucentoapp.com/apple-touch-icon.png" width="56" height="56" alt="Lucento"
+                  style="display:block;border:0;border-radius:14px;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#FFFFFF;border:1px solid #E3E8F4;border-radius:20px;padding:32px 28px;
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#17233F;">
+                <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:700;color:#17233F;">
+                  Welcome to Lucento
+                </h1>
+                <p style="margin:0 0 20px;font-size:16px;line-height:1.5;color:#3A4560;">
+                  You’re one step from financial clarity without the complexity. Verify your email to finish creating
+                  your account, then return to Lucento to carry on.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+                  <tr>
+                    <td align="center" bgcolor="#3563F5" style="border-radius:12px;">
+                      <a href="{{ .ConfirmationURL }}"
+                        style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:700;color:#FFFFFF;
+                        text-decoration:none;border-radius:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                        Verify email
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#3A4560;">
+                  With your account, Lucento keeps your records backed up and the same on every phone you sign in to.
+                  Your data stays yours: no ads, and nothing is shared unless you choose to.
+                </p>
+                <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#5B6680;">
+                  This link was requested for {{ .Email }}. If you didn’t create a Lucento account, you can ignore
+                  this email — nothing happens unless the link is opened.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:20px 8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                font-size:12px;line-height:1.5;color:#5B6680;">
+                If the button doesn’t work, copy this link into your browser:<br />
+                <a href="{{ .ConfirmationURL }}" style="color:#2447C7;word-break:break-all;">{{ .ConfirmationURL }}</a>
+                <br /><br />
+                Lucento · <a href="https://www.lucentoapp.com" style="color:#2447C7;">lucentoapp.com</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

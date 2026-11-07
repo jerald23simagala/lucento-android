@@ -29,8 +29,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.Article
+import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardVoice
@@ -154,6 +157,18 @@ fun SettingsScreen(
         }
     }
 
+    // An email account created here: "Check your inbox" until it is verified, then "Email verified" and sync turns on.
+    val verification by viewModel.verification.state.collectAsStateWithLifecycle()
+    com.lucento.app.feature.account.AccountStatusDialog(
+        waiting = verification,
+        ready = null,
+        onVisible = viewModel.verification::onVisible,
+        onResend = viewModel.verification::resendEmail,
+        onChangeEmail = viewModel.verification::cancel,
+        onPassword = viewModel.verification::providePassword,
+        onContinue = {},
+    )
+
     Column(
         Modifier
             .fillMaxSize()
@@ -190,6 +205,7 @@ fun SettingsScreen(
                 onDisconnect = viewModel::disconnectAccount,
                 onSyncNow = viewModel::syncNow,
                 onChangePassword = viewModel::changePassword,
+                onDeleteAccount = viewModel::requestDeleteAccount,
                 onUsageCounts = viewModel::setUsageCounts,
                 onAppLock = { enable ->
                     lockNotice = null
@@ -212,6 +228,19 @@ fun SettingsScreen(
                 onHideInRecents = viewModel::setHideInRecents,
                 lockNotice = lockNotice,
             )
+            current.cloudSync.deletion?.let { deletion ->
+                com.lucento.app.feature.account.DeleteAccountDialog(
+                    prompt = deletion,
+                    onConfirm = viewModel::confirmDeleteAccount,
+                    onDismiss = viewModel::dismissDeleteAccount,
+                    onManageSubscription = {
+                        val url = "https://play.google.com/store/account/subscriptions?package=${context.packageName}"
+                        runCatching {
+                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                        }
+                    },
+                )
+            }
             current.cloudSync.prompt?.takeIf { it.kind == AccountPrompt.Kind.MERGE }?.let {
                 // P0-2: this phone and the account both have records. Both are kept; the user decides whether to join them.
                 ConfirmDialog(
@@ -369,6 +398,7 @@ private fun SettingsContent(
     onDisconnect: () -> Unit,
     onSyncNow: () -> Unit,
     onChangePassword: (String) -> Unit,
+    onDeleteAccount: () -> Unit,
     onUsageCounts: (Boolean) -> Unit,
     onAppLock: (Boolean) -> Unit = {},
     onHideInRecents: (Boolean) -> Unit = {},
@@ -433,7 +463,7 @@ private fun SettingsContent(
       }
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
       SettingsPage.SHARED, SettingsPage.PRO -> Unit
-      SettingsPage.ACCOUNT -> CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword, showHeader = false)
+      SettingsPage.ACCOUNT -> CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword, showHeader = false, onDeleteAccount = onDeleteAccount)
       SettingsPage.DATA -> {
         NavRow(
             icon = Icons.Outlined.FileDownload,
@@ -529,6 +559,22 @@ private fun SettingsContent(
         Fact(Icons.Outlined.KeyboardVoice, "Voice and receipts are read on this phone", "Speech is turned into text by your phone’s own speech service and receipts by on-device text recognition; Lucento reads both offline.")
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.CloudOff, "Not in cloud backups", "Your financial data is excluded from Android’s automatic cloud backup.")
+        // The documents agreed to when creating an account, readable any time (and offline).
+        var legal by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<com.lucento.app.feature.legal.LegalDoc?>(null) }
+        legal?.let { com.lucento.app.feature.legal.LegalSheet(it, onDismiss = { legal = null }) }
+        SectionHeader("Legal", Modifier.padding(top = Spacing.section))
+        com.lucento.app.core.designsystem.component.NavRow(
+            icon = Icons.Outlined.PrivacyTip,
+            title = com.lucento.app.feature.legal.LegalDocuments.privacy.title,
+            summary = "What stays on this phone and what leaves it",
+            onClick = { legal = com.lucento.app.feature.legal.LegalDoc.PRIVACY },
+        )
+        com.lucento.app.core.designsystem.component.NavRow(
+            icon = Icons.AutoMirrored.Outlined.Article,
+            title = com.lucento.app.feature.legal.LegalDocuments.terms.title,
+            summary = "Updated ${com.lucento.app.feature.legal.LegalDocuments.UPDATED}",
+            onClick = { legal = com.lucento.app.feature.legal.LegalDoc.TERMS },
+        )
 
       }
       }
@@ -548,6 +594,7 @@ internal fun CloudSyncSection(
     onConnectEmail: (String, String, EmailMode) -> Unit = { _, _, _ -> },
     onChangePassword: (String) -> Unit = {},
     showHeader: Boolean = true,
+    onDeleteAccount: () -> Unit = {},
 ) {
     Column {
         if (showHeader) SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
@@ -624,6 +671,32 @@ internal fun CloudSyncSection(
                 }
                 Spacer(Modifier.height(Spacing.sm))
                 ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
+                // Google Play's account-deletion requirement (docs/ACCOUNT_DELETION.md): always here while signed in,
+                // whatever the plan, and never hidden behind sync.
+                Spacer(Modifier.height(Spacing.lg))
+                TextButton(
+                    onClick = onDeleteAccount,
+                    enabled = !state.syncing,
+                    modifier = Modifier.heightIn(min = Sizes.minTouch),
+                ) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Outlined.DeleteForever,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(
+                        com.lucento.app.feature.account.AccountDeletionCopy.ENTRY,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                Text(
+                    com.lucento.app.feature.account.AccountDeletionCopy.ENTRY_HINT,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         // Lucento Pro: signed in, but the plan doesn't include cloud sync (docs/MONETIZATION.md §3.5). Nothing is lost.
