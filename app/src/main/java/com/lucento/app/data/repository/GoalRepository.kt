@@ -8,6 +8,10 @@ import com.lucento.app.data.local.GoalEntity
 import com.lucento.app.domain.Goal
 import com.lucento.app.domain.GoalContribution
 import com.lucento.app.domain.GoalIcon
+import com.lucento.app.domain.entitlement.Access
+import com.lucento.app.domain.entitlement.Limit
+import com.lucento.app.domain.entitlement.ProFeature
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -18,6 +22,8 @@ class GoalRepository(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Lucento Shared: false on a Partner's phone, where goals are the Owner's to change ([StructureAccess]). */
     private val access: StructureAccess = StructureAccess.Always,
+    /** Lucento Pro: whether the plan allows one more active goal ([EntitlementGate]). Archived goals never count. */
+    private val gate: EntitlementGate = EntitlementGate.Permissive,
 ) {
 
     sealed interface SaveResult {
@@ -29,6 +35,16 @@ class GoalRepository(
         /** The target currency can't change once contributions exist. */
         data object CurrencyLocked : SaveResult
         data object NotFound : SaveResult
+        /** Lucento Pro: the plan allows [limit] active goals and [used] exist. Nothing was written; existing goals are untouched. */
+        data class LimitReached(val used: Int, val limit: Limit) : SaveResult
+    }
+
+    sealed interface RestoreResult {
+        data object Restored : RestoreResult
+        data object NotPermitted : RestoreResult
+        data object NotFound : RestoreResult
+        /** Lucento Pro: un-archiving would exceed the plan's active goals; the goal stays archived, history intact. */
+        data class LimitReached(val used: Int, val limit: Limit) : RestoreResult
     }
 
     sealed interface ContributionResult {
@@ -77,6 +93,7 @@ class GoalRepository(
         if (target.amountMinor <= 0L) return SaveResult.TargetNotPositive
         val now = clock()
         if (id == null) {
+            activeGoalsGate()?.let { return SaveResult.LimitReached(it.used, it.limit) }
             val newId = dao.insert(
                 GoalEntity(
                     name = trimmed,
@@ -161,11 +178,25 @@ class GoalRepository(
         return ArchiveResult.Archived
     }
 
-    /** Brings an archived goal back to the active list, history intact. */
-    suspend fun restore(id: Long) {
-        if (!access.canManageStructure()) return
-        val existing = dao.getById(id) ?: return
-        if (existing.archived) dao.update(existing.copy(archived = false, updatedAt = clock()))
+    /** Brings an archived goal back to the active list, history intact. Counts against the plan's active goals. */
+    suspend fun restore(id: Long): RestoreResult {
+        if (!access.canManageStructure()) return RestoreResult.NotPermitted
+        val existing = dao.getById(id) ?: return RestoreResult.NotFound
+        if (!existing.archived) return RestoreResult.Restored
+        activeGoalsGate()?.let { return RestoreResult.LimitReached(it.used, it.limit) }
+        dao.update(existing.copy(archived = false, updatedAt = clock()))
+        return RestoreResult.Restored
+    }
+
+    /** Lucento Pro (docs/MONETIZATION.md §3.3): one more active goal, or the limit that stops it. */
+    private suspend fun activeGoalsGate(): Access.LimitReached? {
+        val used = dao.observeActive().first().size
+        return when (val access = gate.check(ProFeature.SAVINGS_GOALS, used)) {
+            Access.Allowed -> null
+            is Access.LimitReached -> access
+            // Goals are a count on every plan, never locked outright; an unexpected lock reads as the count being full.
+            is Access.Locked -> Access.LimitReached(access.feature, used, Limit.None, Limit.None)
+        }
     }
 
     companion object {

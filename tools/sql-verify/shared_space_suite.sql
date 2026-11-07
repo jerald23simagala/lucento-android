@@ -25,6 +25,16 @@ begin
     (v_q, 'second@lucento-test.invalid', now(), 'authenticated', 'authenticated'),
     (v_u, 'unverified@lucento-test.invalid', null, 'authenticated', 'authenticated');
 
+  -- Lucento Pro (20261107090000_entitlements.sql): inviting a Partner now needs the SHARED capability. Every account in
+  -- this suite holds it (a GRANT row, as the server would write for a founder on lucento-test), so the suite keeps testing
+  -- exactly what it did before plans existed. Plan-specific behaviour is entitlements_suite.sql.
+  insert into public.entitlements (user_id, source, status, grants, expires_at, note) values
+    (v_o, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '30 days', 'suite fixture'),
+    (v_p, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '30 days', 'suite fixture'),
+    (v_x, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '30 days', 'suite fixture'),
+    (v_q, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '30 days', 'suite fixture'),
+    (v_u, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '30 days', 'suite fixture');
+
   -- The owner's ledger, written as the owner through RLS (the app's normal path).
   perform pg_temp.as_user(v_o, 'owner@lucento-test.invalid');
   insert into public.wallets (id, user_id, name, type, currency_code, opening_balance_minor, created_at, updated_at)

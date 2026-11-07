@@ -17,8 +17,12 @@ import com.lucento.app.domain.WalletChangeViolation
 import com.lucento.app.domain.WalletClassification
 import com.lucento.app.domain.WalletType
 import com.lucento.app.domain.WalletUsage
+import com.lucento.app.domain.entitlement.Access
+import com.lucento.app.domain.entitlement.Limit
+import com.lucento.app.domain.entitlement.ProFeature
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import java.util.UUID
 
@@ -33,6 +37,8 @@ class WalletRepository(
     private val runner: TransactionRunner = TransactionRunner.Direct,
     /** Lucento Shared: false on a Partner's phone, where wallets are the Owner's to change ([StructureAccess]). */
     private val access: StructureAccess = StructureAccess.Always,
+    /** Lucento Pro: whether the plan allows one more wallet of this kind ([EntitlementGate]). Only creation is gated. */
+    private val gate: EntitlementGate = EntitlementGate.Permissive,
 ) {
 
     sealed interface SaveResult {
@@ -47,6 +53,10 @@ class WalletRepository(
         data object NotFound : SaveResult
         /** A Partner's phone: wallets are changed by the Shared Space's Owner. Nothing was written. */
         data object NotPermitted : SaveResult
+        /** Lucento Pro: the plan allows [limit] of this kind of wallet and [used] exist. Nothing was written; nothing existing changes. */
+        data class LimitReached(val feature: ProFeature, val used: Int, val limit: Limit) : SaveResult
+        /** Lucento Pro: this kind of wallet is not on the plan. Nothing was written. */
+        data class ProRequired(val feature: ProFeature) : SaveResult
     }
 
     sealed interface DeleteResult {
@@ -83,6 +93,7 @@ class WalletRepository(
         if (!access.canManageStructure()) return SaveResult.NotPermitted
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = 0)?.let { return it }
+        planGate(type)?.let { return it }
         val now = clock()
         return runner.run {
             val id = dao.insert(
@@ -236,12 +247,34 @@ class WalletRepository(
         return DeleteResult.Deleted
     }
 
+    /**
+     * Lucento Pro (docs/MONETIZATION.md §3.2): money wallets and debt accounts are counted separately; receivables and
+     * manually valued assets are Pro kinds. Counts are of active wallets of the same kind, so what exists is never affected.
+     */
+    private suspend fun planGate(type: WalletType): SaveResult? {
+        val feature = planFeature(type)
+        val used = dao.observeActive().first().count { row -> WalletType.entries.firstOrNull { it.name == row.type }?.let(::planFeature) == feature }
+        return when (val access = gate.check(feature, used)) {
+            Access.Allowed -> null
+            is Access.Locked -> SaveResult.ProRequired(access.feature)
+            is Access.LimitReached -> SaveResult.LimitReached(access.feature, access.used, access.limit)
+        }
+    }
+
     private suspend fun validate(name: String, balance: Money, excludeId: Long): SaveResult? = when {
         name.isEmpty() -> SaveResult.BlankName
         balance.isNegative -> SaveResult.NegativeBalance
         dao.countActiveWithName(name, excludeId) > 0 -> SaveResult.DuplicateName
         else -> null
     }
+}
+
+/** Which plan limit a wallet of [type] counts against (docs/MONETIZATION.md §3.2). */
+internal fun planFeature(type: WalletType): ProFeature = when (type) {
+    WalletType.CASH, WalletType.BANK, WalletType.E_WALLET, WalletType.SAVINGS -> ProFeature.MONEY_WALLETS
+    WalletType.CREDIT_CARD, WalletType.LOAN -> ProFeature.DEBT_ACCOUNTS
+    WalletType.RECEIVABLE -> ProFeature.RECEIVABLES
+    WalletType.OTHER_ASSET -> ProFeature.VALUED_ASSETS
 }
 
 internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null, terms: DebtTermsEntity? = null): Wallet {

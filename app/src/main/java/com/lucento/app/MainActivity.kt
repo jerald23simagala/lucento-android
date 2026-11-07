@@ -133,6 +133,8 @@ class MainActivity : FragmentActivity() {
             val hideInRecents = ready?.preferences?.hideInRecents ?: false
             LaunchedEffect(hideInRecents) { applyHideInRecents(hideInRecents) }
             val unlocked by lock.unlocked.collectAsStateWithLifecycle()
+            // Lucento Pro: the plan this phone holds, for badges and the plan row (display only; repositories decide).
+            val entitlements by (application as LucentoApplication).container.entitlements.state.collectAsStateWithLifecycle()
             val locked = AppLockSession.isLocked(ready?.preferences?.appLock ?: false, unlocked)
 
             // The rising logo plays once per launch (not on rotation) while the app loads underneath.
@@ -153,6 +155,7 @@ class MainActivity : FragmentActivity() {
                                 // Multicurrency: the main currency and the day's rates for every screen that records money.
                                 com.lucento.app.feature.fx.LocalMainCurrency provides ready.preferences.primaryCurrency,
                                 com.lucento.app.feature.fx.LocalFxRates provides (application as LucentoApplication).container.fxRates,
+                                com.lucento.app.feature.pro.LocalEntitlements provides entitlements,
                             ) {
                                 LucentoRoot(preferences = ready.preferences)
                             }

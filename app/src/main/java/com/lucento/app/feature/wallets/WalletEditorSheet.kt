@@ -306,6 +306,7 @@ fun WalletEditorSheet(
                 DraftError.NameRequired -> "Give this wallet a name."
                 DraftError.NameTaken -> "You already have a wallet with this name."
                 DraftError.NotFound -> "This wallet no longer exists."
+                is DraftError.PlanLimit -> (error as DraftError.PlanLimit).message
                 else -> null
             }
             OutlinedTextField(
@@ -331,7 +332,7 @@ fun WalletEditorSheet(
                     )
                 },
                 singleLine = true,
-                isError = error is DraftError.NameRequired || error is DraftError.NameTaken || error is DraftError.NotFound,
+                isError = error is DraftError.NameRequired || error is DraftError.NameTaken || error is DraftError.NotFound || error is DraftError.PlanLimit,
                 supportingText = if (nameMessage != null) {
                     { Text(nameMessage) }
                 } else {
