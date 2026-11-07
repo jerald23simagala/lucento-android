@@ -690,7 +690,25 @@ What landed (see docs/handover/CURRENT_STATUS.md for the test evidence):
 - **Acceptance**: `testDebugUnitTest assembleDebug` green; app behaviour identical to today (permissive gate);
   `lucento-architect` review of the model and server contract; owner approval of the migration before it is applied.
 
-### Phase 2 — Gates and downgrade rules
+### Phase 2 — Gates and downgrade rules — **built 2026-11-06 on `feature/lucento-pro-gates`**
+
+What landed: `AppContainer.planGate` now asks the manager (cache loaded first); `SupabaseEntitlementRemote` reads
+`public.entitlements` under the person's JWT at start, on every sign-in change and on each return to the foreground;
+`ProGates` (pure) holds the non-count rules: sync / restore by plan (a Partner syncs on the Owner's plan), Insights
+periods and composition, PDF, themes. Gates: foreign-currency wallets (`WalletRepository` create and currency change,
+needs the main currency), `backgroundSyncAllowed(…, planAllows)` and `shouldSyncOnLaunch(…, planAllows)` in the
+application, `SyncWorker` and `ForegroundSync`; Settings refuses to turn sync on and shows why (`lockedByPlan`); Home's
+chip has a quiet `PAUSED` state with its own sheet copy; onboarding's cloud restore and end-of-setup sync-on ask the plan
+after re-reading the server (a Partner adopting a space never needs one); Insights locks 6 / 12 months and the
+net-worth breakdown with a note; the report sheet replaces Save / Share with a note; the theme picker marks locked
+themes and explains a tap, `AppViewModel.setThemeId` never persists one; the AI clients read `403 pro_required`
+(Smarter reading falls back to on-phone reading, saying so) and the allowance copy no longer says "today". Website:
+`ask.ts` / `interpret.ts` call `consume_ai_request` (branch `feature/plan-aware-ai` in `lucento-website`, committed,
+not pushed — the owner opens the PR; **not for production before the entitlement migration is there**).
+Deliberately not in Phase 2: any Pro page, badges or sheets (Phase 3), Play Billing (Phase 4), the test-build plan
+simulator (Phase 3), server-side gating of the sync tables (KNOWN_ISSUES LP-K6).
+
+Original scope:
 Repository and ViewModel gates of §5.2 with real `Limit`s; `backgroundSyncAllowed(cloud)`; onboarding restore
 check; usage queries (`WalletDao.countActiveOfTypes`, `GoalDao.countActive`); default plan **FREE** for everyone
 except GRANT rows; proxy plan-aware limits (website PR); `lucento-qa` pass on §6.3; owner / tester GRANTs on

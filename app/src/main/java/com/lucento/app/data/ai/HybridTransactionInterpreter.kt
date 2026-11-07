@@ -34,7 +34,8 @@ class HybridTransactionInterpreter(
         val fallbackReason = when (result) {
             is RemoteTransactionInterpreter.Result.Read ->
                 if (result.items.isNotEmpty()) return Interpretation.Candidates(result.items, GEMINI) else "Gemini found nothing"
-            RemoteTransactionInterpreter.Result.LimitReached -> "today’s Gemini limit is used up"
+            RemoteTransactionInterpreter.Result.LimitReached -> "the Gemini allowance is used up for now"
+            RemoteTransactionInterpreter.Result.ProRequired -> "Smarter reading is part of Lucento Pro"
             RemoteTransactionInterpreter.Result.NotSignedIn -> "Gemini needs your sync account"
             // A slow answer and an unreachable server need different fixes, so they read differently.
             null -> "Gemini took too long to answer"

@@ -25,8 +25,10 @@ class RemoteTransactionInterpreter(
 ) {
     sealed interface Result {
         data class Read(val items: List<TransactionCandidate>, val remainingToday: Int?) : Result
-        /** The daily allowance for this account is used up; resets tomorrow. */
+        /** The account's AI allowance is used up for now (a day for Pro, a month on the free plan). */
         data object LimitReached : Result
+        /** Lucento Pro: Smarter reading is a Pro feature; the free allowance covers Ask Lucento only. */
+        data object ProRequired : Result
         /** No sync account is signed in; the proxy needs one to apply the per-user limit. */
         data object NotSignedIn : Result
         data class Failed(val reason: String) : Result
@@ -44,6 +46,7 @@ class RemoteTransactionInterpreter(
                 Result.Read(RemoteCandidates.toCandidates(read.items, context, text), read.remaining)
             }
             401 -> Result.NotSignedIn
+            403 -> Result.ProRequired
             429 -> Result.LimitReached
             else -> Result.Failed("HTTP ${reply.code}")
         }

@@ -39,6 +39,8 @@ class WalletRepository(
     private val access: StructureAccess = StructureAccess.Always,
     /** Lucento Pro: whether the plan allows one more wallet of this kind ([EntitlementGate]). Only creation is gated. */
     private val gate: EntitlementGate = EntitlementGate.Permissive,
+    /** Multicurrency: the ledger's main currency (null until chosen). A wallet in another currency is a Pro kind (docs §3.2). */
+    private val mainCurrency: suspend () -> String? = { null },
 ) {
 
     sealed interface SaveResult {
@@ -94,6 +96,7 @@ class WalletRepository(
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = 0)?.let { return it }
         planGate(type)?.let { return it }
+        foreignCurrencyGate(openingBalance.currencyCode)?.let { return it }
         val now = clock()
         return runner.run {
             val id = dao.insert(
@@ -187,6 +190,8 @@ class WalletRepository(
                 is WalletChangeViolation.TypeLocked -> return SaveResult.TypeLocked(violation.usage)
                 null -> Unit
             }
+            // A wallet changing *into* another currency is a new foreign wallet as far as the plan is concerned.
+            if (existing.currencyCode != openingBalance.currencyCode) foreignCurrencyGate(openingBalance.currencyCode)?.let { return it }
         }
         val now = clock()
         runner.run {
@@ -255,6 +260,18 @@ class WalletRepository(
         val feature = planFeature(type)
         val used = dao.observeActive().first().count { row -> WalletType.entries.firstOrNull { it.name == row.type }?.let(::planFeature) == feature }
         return when (val access = gate.check(feature, used)) {
+            Access.Allowed -> null
+            is Access.Locked -> SaveResult.ProRequired(access.feature)
+            is Access.LimitReached -> SaveResult.LimitReached(access.feature, access.used, access.limit)
+        }
+    }
+
+    /** Lucento Pro: a wallet in a currency other than the main one. Existing foreign wallets are never touched (§6.3). */
+    private suspend fun foreignCurrencyGate(currencyCode: String): SaveResult? {
+        val main = mainCurrency() ?: return null
+        if (currencyCode == main) return null
+        val used = dao.observeActive().first().count { it.currencyCode != main }
+        return when (val access = gate.check(ProFeature.FOREIGN_CURRENCY_WALLETS, used)) {
             Access.Allowed -> null
             is Access.Locked -> SaveResult.ProRequired(access.feature)
             is Access.LimitReached -> SaveResult.LimitReached(access.feature, access.used, access.limit)

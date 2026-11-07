@@ -80,6 +80,8 @@ data class AskUiState(
     val aiOn: Boolean = false,
     val remainingToday: Int? = null,
     val hasRecords: Boolean = false,
+    /** Lucento Pro: statements as PDF are Pro; on screen they are always free (docs/MONETIZATION.md §3.4). */
+    val pdfLocked: Boolean = false,
 ) {
     val aiAvailable: Boolean get() = aiConfigured && signedIn
     val aiActive: Boolean get() = aiAvailable && aiOn
@@ -103,6 +105,8 @@ class AskLucentoViewModel(
     signedInEmail: Flow<String?>,
     private val client: AskLucentoClient,
     private val pdf: ReportPdfWriter,
+    /** Lucento Pro: the plan this phone holds; null in tests (everything allowed). */
+    private val entitlements: StateFlow<com.lucento.app.domain.entitlement.EntitlementState>? = null,
 ) : ViewModel() {
 
     private val conversation = MutableStateFlow(Conversation())
@@ -138,7 +142,7 @@ class AskLucentoViewModel(
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val uiState: StateFlow<AskUiState> = combine(inputs, preferences.preferences, signedInEmail, conversation) { data, prefs, email, chat ->
+    val uiState: StateFlow<AskUiState> = combine(inputs, preferences.preferences, signedInEmail, conversation, entitlements ?: flowOf(null)) { data, prefs, email, chat, plan ->
         AskUiState(
             loading = data == null,
             today = data?.today ?: LocalDate.now(),
@@ -150,8 +154,12 @@ class AskLucentoViewModel(
             aiOn = prefs.askLucentoAi,
             remainingToday = chat.remaining,
             hasRecords = data != null && (data.transactions.isNotEmpty() || data.wallets.isNotEmpty()),
+            pdfLocked = plan != null && !com.lucento.app.domain.entitlement.ProGates.pdfAllowed(plan, System.currentTimeMillis()),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AskUiState())
+
+    private fun pdfAllowedNow(): Boolean =
+        entitlements?.value?.let { com.lucento.app.domain.entitlement.ProGates.pdfAllowed(it, System.currentTimeMillis()) } ?: true
 
     /** Asks [question]. Ignored while an answer is on its way (one at a time, never duplicated). */
     fun ask(question: String) = send(question, echo = true, consented = false)
@@ -208,6 +216,7 @@ class AskLucentoViewModel(
 
     /** Writes [report] as a PDF to the document the user picked. */
     fun savePdf(report: Report, uri: Uri, contentResolver: android.content.ContentResolver, done: (Boolean) -> Unit) {
+        if (!pdfAllowedNow()) return done(false)
         viewModelScope.launch {
             val ok = withContext(Dispatchers.IO) {
                 runCatching { contentResolver.openOutputStream(uri)?.use { pdf.write(report, it); true } ?: false }.getOrDefault(false)
@@ -218,6 +227,7 @@ class AskLucentoViewModel(
 
     /** Writes [report] to private cache for the share sheet. */
     fun pdfForSharing(report: Report, done: (File?) -> Unit) {
+        if (!pdfAllowedNow()) return done(null)
         viewModelScope.launch {
             done(withContext(Dispatchers.IO) { runCatching { pdf.writeToCache(report) }.getOrNull() })
         }
@@ -320,7 +330,7 @@ class AskLucentoViewModel(
          * ended on the server (signed out elsewhere, password changed): say so, rather than "needs your sync account".
          */
         internal fun failureReason(result: AskLucentoClient.Result?, signedIn: Boolean): String = when (result) {
-            AskLucentoClient.Result.LimitReached -> "Today’s AI answers are used up"
+            AskLucentoClient.Result.LimitReached -> "Your AI adviser allowance is used up for now"
             AskLucentoClient.Result.NotSignedIn ->
                 if (signedIn) "Your sign-in has expired — sign in again in Settings › Account & sync" else "AI answers need your sync account"
             null -> "Gemini took too long to answer"
@@ -333,6 +343,7 @@ class AskLucentoViewModel(
                 signedInEmail = runCatching { it.auth.observeSignedInEmail() }.getOrElse { flowOf(null) },
                 client = it.askClient,
                 pdf = it.reportPdf,
+                entitlements = it.entitlements.state,
             )
         }
     }

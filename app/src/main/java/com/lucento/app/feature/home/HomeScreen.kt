@@ -752,6 +752,8 @@ private fun SyncStatusChip(status: CloudStatus, details: SyncDetails, onClick: (
         CloudStatus.SYNCING -> { tone = StatusTones.brand; icon = Icons.Outlined.CloudSync }
         CloudStatus.OFFLINE -> { tone = StatusTones.neutral; icon = Icons.Outlined.CloudOff }
         CloudStatus.ERROR -> { tone = StatusTones.negative; icon = Icons.Outlined.SyncProblem }
+        // Lucento Pro: on but waiting for a plan — quiet, never a warning (nothing is wrong and nothing is lost).
+        CloudStatus.PAUSED -> { tone = StatusTones.neutral; icon = Icons.Outlined.CloudOff }
     }
     Box(
         Modifier

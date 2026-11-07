@@ -624,6 +624,14 @@ internal fun CloudSyncSection(
                 ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
             }
         }
+        // Lucento Pro: signed in, but the plan doesn't include cloud sync (docs/MONETIZATION.md §3.5). Nothing is lost.
+        if (state.lockedByPlan && state.signedInEmail != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            com.lucento.app.core.designsystem.component.InfoNote(
+                if (state.status.enabled) "Cloud sync is paused: it’s part of Lucento Pro. Everything stays on this phone and in your account; uploads resume when your plan includes it. A backup file is always free."
+                else "Cloud sync is part of Lucento Pro. You’re signed in; everything stays on this phone. A backup file is always free.",
+            )
+        }
         // The status line already shows the stored error; don't print the same sentence twice (account mismatch).
         state.lastMessage?.takeIf { state.signedInEmail == null || it != state.status.lastError }?.let {
             Spacer(Modifier.height(Spacing.sm))

@@ -54,6 +54,8 @@ class HomeViewModel(
     private val requestSync: () -> Unit = {},
     /** P2-6: the user has read the "changed on another device" notice, which showed [Int] changes. */
     private val clearOverridden: suspend (Int) -> Unit = {},
+    /** Lucento Pro: whether this phone's plan lets it sync (true in tests). */
+    planAllowsSync: Flow<Boolean> = flowOf(true),
 ) : ViewModel() {
 
     private data class Core(
@@ -66,11 +68,14 @@ class HomeViewModel(
 
     private data class Savings(val goals: List<Goal>, val archived: List<Goal>, val contributions: List<GoalContribution>)
 
+    private data class CloudInputs(val status: SyncStatus, val email: String?, val pending: Int, val online: Boolean, val running: Boolean)
+
     /** The month the budget card describes; null follows the current month (so it rolls over at midnight). */
     private val selectedMonth = MutableStateFlow<YearMonth?>(null)
 
     private val cloud: Flow<Pair<CloudStatus, SyncDetails>> =
-        combine(syncStatus, signedInEmail, pendingChanges, online, running) { status, email, pending, isOnline, isRunning ->
+        combine(combine(syncStatus, signedInEmail, pendingChanges, online, running) { s, e, p, o, r -> CloudInputs(s, e, p, o, r) }, planAllowsSync) { c, allowed ->
+            val (status, email, pending, isOnline, isRunning) = c
             CloudStatus.of(
                 configured = syncConfigured,
                 signedIn = email != null,
@@ -80,6 +85,7 @@ class HomeViewModel(
                 pendingChanges = pending,
                 online = isOnline,
                 running = isRunning,
+                planAllows = allowed,
             ) to SyncDetails(
                 email = email,
                 lastSyncedAtMillis = status.lastSyncedAtMillis,
@@ -220,6 +226,9 @@ class HomeViewModel(
                 // Run in the app now: WorkManager may hold a queued sync back for a long time (owner, 2026-11-04).
                 requestSync = { c.foregroundSync.request(forced = true) },
                 clearOverridden = { seen -> c.syncPreferences.clearOverriddenChanges(seen) },
+                planAllowsSync = combine(c.entitlements.state, c.syncPreferences.sharedSpaceOwner) { plan, owner ->
+                    com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, owner != null, System.currentTimeMillis())
+                },
             )
         }
     }

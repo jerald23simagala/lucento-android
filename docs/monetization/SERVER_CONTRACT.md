@@ -75,7 +75,7 @@ Vercel cron. Calls the Voided Purchases API for the last 30 days and sets `REVOK
 `purchase_token_hash` rows that are not already revoked. The belt to RTDN's braces (a missed push never leaves a
 refunded purchase active for more than a day).
 
-## 6. The proxy's AI calls
+## 6. The proxy's AI calls — **written 2026-11-06** (`lucento-website` branch `feature/plan-aware-ai`, not deployed)
 
 `ask.ts` / `interpret.ts`: after auth, `POST /rest/v1/rpc/consume_ai_request` with the user's JWT (replaces
 `consume_ai_quota`). Refuse with `429 { error: 'allowance', limited_by, remaining, plan }` when `allowed` is false.
