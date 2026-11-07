@@ -87,7 +87,9 @@ becomes unused (the limits are `plan_limits`); keep it as a last-resort fallback
 
 The grants live in `public.entitlements`, which the migration creates, so the migration must run **first** (running the
 insert alone fails with `42P01: relation "public.entitlements" does not exist`). One paste in the SQL editor does both,
-atomically:
+atomically — `docs/monetization/LUCENTO_TEST_APPLY.sql` is that paste with the migration already inlined (regenerated
+from the migration, never edited by hand). The dashboard's "potential issues" dialog flags the two `drop … if exists`
+guards and asks about RLS; both are expected, choose *Run and enable RLS*. In outline:
 
 ```sql
 begin;
