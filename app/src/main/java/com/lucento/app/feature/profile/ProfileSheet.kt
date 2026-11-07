@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -88,6 +89,9 @@ enum class ProfileDestination {
 
     /** Test builds only: Settings › Account & sync, opening Google's account picker straight away. */
     SWITCH_ACCOUNT,
+
+    /** The Lucento Pro page. */
+    PRO,
 }
 
 /**
@@ -199,6 +203,15 @@ fun ProfileSheet(
             )
 
             FieldHeader("Account and app", Modifier.padding(top = Spacing.lg))
+            NavRow(
+                icon = Icons.Outlined.WorkspacePremium,
+                title = "Lucento Pro",
+                summary = com.lucento.app.feature.pro.ProCopy.planStatus(
+                    com.lucento.app.feature.pro.LocalEntitlements.current, System.currentTimeMillis(),
+                ).title,
+                onClick = { open(ProfileDestination.PRO) },
+            )
+            Hairline(inset = inset)
             NavRow(
                 icon = Icons.Outlined.Settings,
                 title = "Settings",

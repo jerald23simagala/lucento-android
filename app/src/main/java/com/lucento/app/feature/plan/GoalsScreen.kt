@@ -341,6 +341,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
     }
 
     val open = progress.firstOrNull { it.goal.id == openGoalId } ?: archived.firstOrNull { it.goal.id == openGoalId }
+    var restoreLimit by remember(openGoalId) { mutableStateOf<GoalRepository.RestoreResult.LimitReached?>(null) }
     if (open != null) {
         GoalDetailSheet(
             progress = open,
@@ -352,11 +353,21 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                 openGoalId = null
             },
             onRestore = {
-                viewModel.restoreGoal(open.goal.id) {
-                    haptics.confirm()
-                    openGoalId = null
-                    showArchived = false
+                viewModel.restoreGoal(open.goal.id) { result ->
+                    if (result is GoalRepository.RestoreResult.LimitReached) {
+                        // Lucento Pro: the goal stays archived, history intact; the sheet says why and how.
+                        haptics.reject()
+                        restoreLimit = result
+                    } else {
+                        haptics.confirm()
+                        restoreLimit = null
+                        openGoalId = null
+                        showArchived = false
+                    }
                 }
+            },
+            restoreNote = restoreLimit?.let {
+                com.lucento.app.feature.pro.ProCopy.limitReachedLine(com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, it.used, it.limit)
             },
             onContribute = { amount, done ->
                 val name = open.goal.name
@@ -644,6 +655,8 @@ private fun GoalDetailSheet(
     onDelete: () -> Unit,
     onDeleteContribution: (Long) -> Unit,
     onDismiss: () -> Unit,
+    /** Lucento Pro: why Restore didn't bring the goal back (the plan's active goals are full). */
+    restoreNote: String? = null,
 ) {
     val goal = progress.goal
     val ext = LucentoTheme.extendedColors
@@ -707,6 +720,17 @@ private fun GoalDetailSheet(
                 )
                 Spacer(Modifier.height(Spacing.sm))
                 LucentoPrimaryButton(text = "Restore goal", onClick = onRestore)
+                restoreNote?.let { note ->
+                    Spacer(Modifier.height(Spacing.sm))
+                    if (com.lucento.app.feature.pro.ProCopy.upgradeHelps(com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS,
+                            com.lucento.app.domain.entitlement.PlanCatalog.limit(com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS,
+                                com.lucento.app.feature.pro.LocalEntitlements.current, System.currentTimeMillis()))
+                    ) {
+                        com.lucento.app.feature.pro.ProNote(note, from = com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS)
+                    } else {
+                        InfoNote(note)
+                    }
+                }
             } else {
                 if (progress.reached) {
                     Spacer(Modifier.height(Spacing.md))
@@ -871,6 +895,7 @@ private fun GoalEditorSheet(
     val separator = remember { MoneyFormatter.decimalSeparator() }
     var draft by remember { mutableStateOf(initial) }
     var nameError by remember { mutableStateOf<String?>(null) }
+    var planLimit by remember { mutableStateOf<GoalRepository.SaveResult.LimitReached?>(null) }
     var amountError by remember { mutableStateOf<String?>(null) }
     var photoError by remember { mutableStateOf<String?>(null) }
     var saved by remember { mutableStateOf(false) }
@@ -1004,6 +1029,22 @@ private fun GoalEditorSheet(
             photoError?.let {
                 Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
             }
+            planLimit?.let { limit ->
+                val note = com.lucento.app.feature.pro.ProCopy.limitReachedLine(
+                    com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, limit.used, limit.limit,
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                if (com.lucento.app.feature.pro.ProCopy.upgradeHelps(com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, limit.limit)) {
+                    val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+                    com.lucento.app.feature.pro.ProNote(
+                        note,
+                        from = com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS,
+                        open = { feature -> close(); openPro(feature) },
+                    )
+                } else {
+                    InfoNote(note)
+                }
+            }
             Spacer(Modifier.height(Spacing.xs))
             LucentoPrimaryButton(
                 text = if (initial.id == null) "Create goal" else "Save changes",
@@ -1029,9 +1070,8 @@ private fun GoalEditorSheet(
                             GoalRepository.SaveResult.CurrencyLocked -> amountError = "A goal’s currency can’t change."
                             GoalRepository.SaveResult.NotFound -> close()
                             GoalRepository.SaveResult.NotPermitted -> nameError = "Only the Shared Space’s owner can change this."
-                            // Lucento Pro (docs/monetization/CUSTOMER_COPY.md D-2); reached only once the gates are on.
-                            is GoalRepository.SaveResult.LimitReached ->
-                                nameError = "You have ${result.used} active goals, the most on your plan. Nothing happens to the goals you have."
+                            // Lucento Pro: not a mistake in the form; said by the button, with the way out.
+                            is GoalRepository.SaveResult.LimitReached -> planLimit = result
                         }
                     }
                 },

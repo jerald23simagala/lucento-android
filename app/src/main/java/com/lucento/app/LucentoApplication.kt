@@ -172,7 +172,7 @@ class AppContainer(application: Application) {
                 sealer = com.lucento.app.data.entitlement.KeystoreSealer.create(application),
             ),
             purchases = purchaseSource,
-            remote = supabaseClient?.let { com.lucento.app.data.entitlement.SupabaseEntitlementRemote(it) },
+            remote = entitlementRemote(),
         )
         manager.observePlayUpdates(entitlementScope)
         entitlementScope.launch { manager.refresh() }
@@ -183,6 +183,25 @@ class AppContainer(application: Application) {
     }
     private val entitlementScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val purchaseSource: com.lucento.app.data.billing.FakePurchaseSource by lazy { com.lucento.app.data.billing.FakePurchaseSource() }
+
+    /** Test builds only (docs/MONETIZATION.md §5.7): switch plans without Google Play. Null in release builds. */
+    val planSimulator: com.lucento.app.data.billing.DebugPlanSimulator? by lazy {
+        if (BuildConfig.DEBUG) {
+            com.lucento.app.data.billing.DebugPlanSimulator(com.lucento.app.data.billing.PrefsSimulatorStore(application), purchaseSource)
+        } else {
+            null
+        }
+    }
+
+    /** The server's rows; while a test build simulates a plan they read as "no rows", so the two never mix. */
+    private fun entitlementRemote(): com.lucento.app.data.entitlement.EntitlementRemote? {
+        val server = supabaseClient?.let { com.lucento.app.data.entitlement.SupabaseEntitlementRemote(it) }
+        val simulator = planSimulator ?: return server
+        return com.lucento.app.data.entitlement.EntitlementRemote { if (simulator.ignoresServer) emptyList() else server?.fetch() }
+    }
+
+    /** The plan this phone last showed, for the one-time "your plan has ended" notice (device-level, like the cache). */
+    val planMemory: com.lucento.app.data.entitlement.PlanMemory by lazy { com.lucento.app.data.entitlement.DataStorePlanMemory(application) }
 
     /** Phase 2: the repositories ask the plan. The cache is loaded first, so a cold start never answers Free by accident. */
     private val planGate: EntitlementGate = EntitlementGate { feature, used ->

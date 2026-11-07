@@ -37,6 +37,8 @@ data class SyncSheetCopy(
     val action: String?,
     /** Whether the main button is a first sync, which must go through Settings (it asks before combining data). */
     val actionOpensSettings: Boolean = false,
+    /** Lucento Pro: the main button opens the Lucento Pro page (sync paused by plan). */
+    val actionOpensPro: Boolean = false,
 )
 
 fun syncSheetCopy(status: CloudStatus, details: SyncDetails, nowMillis: Long): SyncSheetCopy = when (status) {
@@ -85,8 +87,8 @@ fun syncSheetCopy(status: CloudStatus, details: SyncDetails, nowMillis: Long): S
         headline = "Cloud sync is part of Lucento Pro",
         body = "Everything you add or change is saved on this phone" + pendingSuffix(details.pendingChanges) +
             " Nothing in your account is deleted; uploads resume when your plan includes cloud sync. A backup file is always free.",
-        action = "Open Account & sync",
-        actionOpensSettings = true,
+        action = "See Lucento Pro",
+        actionOpensPro = true,
     )
     CloudStatus.SYNCED -> SyncSheetCopy(
         headline = "Synced",
@@ -124,6 +126,7 @@ fun SyncDetailsSheet(
     onDismiss: () -> Unit,
 ) {
     val copy = syncSheetCopy(status, details, System.currentTimeMillis())
+    val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier
@@ -158,8 +161,12 @@ fun SyncDetailsSheet(
             copy.action?.let { label ->
                 LucentoPrimaryButton(
                     text = label,
-                    icon = if (copy.actionOpensSettings) null else Icons.Outlined.Sync,
-                    onClick = if (copy.actionOpensSettings) onOpenAccountSettings else onSyncNow,
+                    icon = if (copy.actionOpensSettings || copy.actionOpensPro) null else Icons.Outlined.Sync,
+                    onClick = when {
+                        copy.actionOpensPro -> { { onDismiss(); openPro(com.lucento.app.domain.entitlement.ProFeature.CLOUD_SYNC) } }
+                        copy.actionOpensSettings -> onOpenAccountSettings
+                        else -> onSyncNow
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(Spacing.xs))

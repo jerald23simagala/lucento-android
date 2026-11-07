@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.lucento.app.domain.entitlement.DisplayPlan
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import java.io.IOException
@@ -39,5 +40,36 @@ class DataStoreSnapshotStore(private val context: Context) : SnapshotStore {
             it[Keys.payload] = snapshot.payload
             it[Keys.seal] = snapshot.seal
         }
+    }
+}
+
+/**
+ * The plan this phone last showed, so the one-time "your plan has ended" notice ([com.lucento.app.domain.entitlement.PlanNotices])
+ * is told once and only after a real change. Device-level, like the snapshot: an account switch doesn't reset it.
+ */
+interface PlanMemory {
+    suspend fun lastSeen(): DisplayPlan?
+    suspend fun remember(plan: DisplayPlan)
+}
+
+class DataStorePlanMemory(private val context: Context) : PlanMemory {
+    private val key = stringPreferencesKey("last_seen_plan")
+
+    override suspend fun lastSeen(): DisplayPlan? {
+        val stored = context.entitlementDataStore.data
+            .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+            .first()[key] ?: return null
+        return DisplayPlan.entries.firstOrNull { it.name == stored }
+    }
+
+    override suspend fun remember(plan: DisplayPlan) {
+        context.entitlementDataStore.edit { it[key] = plan.name }
+    }
+}
+
+class InMemoryPlanMemory(var value: DisplayPlan? = null) : PlanMemory {
+    override suspend fun lastSeen(): DisplayPlan? = value
+    override suspend fun remember(plan: DisplayPlan) {
+        value = plan
     }
 }

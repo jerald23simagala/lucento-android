@@ -528,6 +528,7 @@ private fun ReportSheet(
     pdfLocked: Boolean = false,
 ) {
     val context = LocalContext.current
+    val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
     var report by remember(initial) { mutableStateOf(initial) }
     var message by remember { mutableStateOf<String?>(null) }
     val current = remember { YearMonth.now() }
@@ -559,7 +560,11 @@ private fun ReportSheet(
                 Spacer(Modifier.height(Spacing.sm))
             }
             if (pdfLocked) {
-                com.lucento.app.core.designsystem.component.InfoNote("Saving or sharing this statement as a PDF is part of Lucento Pro. Everything on this screen is always free.")
+                com.lucento.app.feature.pro.ProNote(
+                    com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.PDF_STATEMENTS),
+                    from = com.lucento.app.domain.entitlement.ProFeature.PDF_STATEMENTS,
+                    open = { feature -> onDismiss(); openPro(feature) },
+                )
                 Spacer(Modifier.height(Spacing.lg))
                 return@Column
             }

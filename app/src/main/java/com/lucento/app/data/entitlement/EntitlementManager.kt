@@ -28,6 +28,9 @@ fun interface EntitlementRemote {
     suspend fun fetch(): List<Entitlement>?
 }
 
+/** What a [EntitlementManager.refresh] could reach: Restore purchases words its answer from this (customer copy D-8). */
+data class RefreshOutcome(val playReached: Boolean, val serverReached: Boolean)
+
 /**
  * Owns the one observable truth about plans ([state]) and combines its three inputs in a fixed order (docs §5.1):
  * the cached snapshot first (first frame, offline), then Google Play's local reading, then the server's. A source that
@@ -44,6 +47,13 @@ class EntitlementManager(
     private val _state = MutableStateFlow(EntitlementState.FREE)
     val state: StateFlow<EntitlementState> get() = _state
 
+    /**
+     * True once a refresh has run in this process (whatever it reached). Until then [state] is the cache at best, so a
+     * "your plan has ended" notice must wait for it — a cold start reads Free for a moment before the cache loads.
+     */
+    private val _ready = MutableStateFlow(false)
+    val ready: StateFlow<Boolean> get() = _ready
+
     private val lock = Mutex()
     private var loaded = false
 
@@ -55,17 +65,21 @@ class EntitlementManager(
     }
 
     /** Asks Play, then the server, and persists whatever changed. Safe to call often; concurrent calls queue. */
-    suspend fun refresh() {
+    suspend fun refresh(): RefreshOutcome {
         loadCached()
-        lock.withLock {
+        return lock.withLock {
             val now = clock()
             var rows = _state.value.entitlements
-            when (val play = purchases.queryPurchases()) {
+            val play = purchases.queryPurchases()
+            when (play) {
                 is PurchaseQuery.Success -> rows = EntitlementMerge.reconcilePlay(rows, PurchaseInterpreter.entitlements(play.purchases, now), now)
                 is PurchaseQuery.Failed -> Unit // Play unreachable: the cached reading stands (L-2)
             }
-            remote?.fetch()?.let { server -> rows = EntitlementMerge.reconcileServer(rows, server) }
+            val server = remote?.fetch()
+            server?.let { rows = EntitlementMerge.reconcileServer(rows, it) }
             publish(rows)
+            _ready.value = true
+            RefreshOutcome(playReached = play is PurchaseQuery.Success, serverReached = server != null)
         }
     }
 
