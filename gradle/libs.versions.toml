@@ -1,5 +1,7 @@
 [versions]
-agp = "8.7.3"
+# 8.10.1: the first line that builds against compileSdk 36 on this project's Gradle 8.11.1 (AGP 8.9.1+ is the minimum for
+# API 36; 8.11+ would need Gradle 8.13). Google Play requires targetSdk 36 for new apps and updates since 31 Aug 2026.
+agp = "8.10.1"
 kotlin = "2.0.21"
 ksp = "2.0.21-1.0.28"
 coreKtx = "1.15.0"
