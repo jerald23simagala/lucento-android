@@ -1,5 +1,8 @@
 package com.lucento.app.feature.pro
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Column
@@ -14,11 +17,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +50,7 @@ import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
+import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.component.StatusPill
@@ -54,17 +60,16 @@ import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.data.billing.ProductPrice
 import com.lucento.app.data.billing.SimulatedPlan
-import com.lucento.app.domain.entitlement.DisplayPlan
 import com.lucento.app.domain.entitlement.EntitlementSource
 import com.lucento.app.domain.entitlement.PlanCatalog
-import com.lucento.app.domain.entitlement.PlayProducts
 import com.lucento.app.domain.entitlement.ProFeature
 
 /**
  * The Lucento Pro page (docs/MONETIZATION.md §5.5, customer copy A–D): the plan this phone holds, what each plan
  * includes (generated from [PlanCatalog], so it can't disagree with the gates), the plans with Google Play's prices,
  * what Lifetime means, and Restore purchases. It is the only place that offers a plan; locks elsewhere link here.
- * Until Lucento Pro is on sale there are no prices and no buy buttons — it says so instead.
+ * Which plans it offers, and how each button reads, is [ProOffers] (pure, tested). Until Lucento Pro is on sale there are
+ * no prices and no buy buttons — it says so instead.
  */
 @Composable
 fun ProScreen(
@@ -75,7 +80,6 @@ fun ProScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val now = System.currentTimeMillis()
-    val plan = state.entitlements.displayPlan(now)
     val status = ProCopy.planStatus(state.entitlements, now)
     val ext = LucentoTheme.extendedColors
     val context = LocalContext.current
@@ -123,30 +127,23 @@ fun ProScreen(
         }
 
         SectionHeader("Plans", Modifier.padding(top = Spacing.section))
-        PlanCard(
-            title = "Lucento Pro",
-            body = "Everything in Lucento, including cloud sync, Lucento Shared and the AI adviser, while you subscribe. " +
-                "Monthly or yearly; renews until you cancel in Google Play.",
-            prices = state.prices.filter { it.productId == PlayProducts.PRO_SUBSCRIPTION },
-            current = plan == DisplayPlan.PRO,
-        )
-        Spacer(Modifier.height(Spacing.md))
-        PlanCard(
-            title = "Pro Lifetime",
-            body = "Pay once. Every Pro feature that runs on your phone is yours for life, offline, with no renewal. Cloud " +
-                "sync, Lucento Shared and the AI adviser are included for the first year.",
-            prices = state.prices.filter { it.productId == PlayProducts.PRO_LIFETIME },
-            current = plan == DisplayPlan.LIFETIME || plan == DisplayPlan.LIFETIME_WITH_SERVICES,
-        )
-        // Lucento Cloud is only for people who own Lucento; shown to anyone else it would undercut Pro (D-12).
-        if (plan == DisplayPlan.LIFETIME || plan == DisplayPlan.LIFETIME_WITH_SERVICES) {
-            Spacer(Modifier.height(Spacing.md))
+        // Lucento Cloud appears only for people who own Lucento; shown to anyone else it would undercut Pro (D-12).
+        ProOffers.cards(state.entitlements, state.prices, now).forEachIndexed { i, card ->
+            if (i > 0) Spacer(Modifier.height(Spacing.md))
             PlanCard(
-                title = "Lucento Cloud",
-                body = "The online services for people who own Lucento: cloud sync, restoring from your account, Lucento " +
-                    "Shared and the AI adviser’s Pro allowance. Optional; renews until you cancel in Google Play.",
-                prices = state.prices.filter { it.productId == PlayProducts.CLOUD_ADDON },
-                current = state.entitlements.active(now).any { it.source == EntitlementSource.PLAY_CLOUD_ADDON },
+                card = card,
+                enabled = !state.purchasing,
+                onBuy = { price -> context.findActivity()?.let { viewModel.buy(it, price) } },
+            )
+        }
+        // How the purchase went, right under the button that started it (TalkBack reads it when it changes).
+        val purchaseLine = if (state.purchasing) "Waiting for Google Play…" else state.purchaseMessage
+        if (purchaseLine != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                purchaseLine,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         if (state.prices.isEmpty()) {
@@ -173,6 +170,10 @@ fun ProScreen(
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
+        state.verificationIssue?.let(ProCopy::verificationIssue)?.let {
+            Spacer(Modifier.height(Spacing.sm))
+            InfoNote(it)
+        }
         val subscribed = state.entitlements.active(now).any {
             it.source == EntitlementSource.PLAY_SUBSCRIPTION || it.source == EntitlementSource.PLAY_CLOUD_ADDON
         }
@@ -194,26 +195,58 @@ fun ProScreen(
         )
 
         if (state.simulatorAvailable) {
-            SimulatorSection(selected = state.simulated, onSelect = viewModel::simulate)
+            SimulatorSection(
+                selected = state.simulated,
+                onSelect = viewModel::simulate,
+                testStore = state.testStore,
+                onTestStore = viewModel::setTestStore,
+            )
         }
         Spacer(Modifier.height(Spacing.xxl))
     }
 }
 
 @Composable
-private fun PlanCard(title: String, body: String, prices: List<ProductPrice>, current: Boolean) {
+private fun PlanCard(card: PlanCardModel, enabled: Boolean, onBuy: (ProductPrice) -> Unit) {
+    val (title, body) = when (card.kind) {
+        PlanCardKind.PRO -> "Lucento Pro" to
+            "Everything in Lucento, including cloud sync, Lucento Shared and the AI adviser, while you subscribe. Monthly or " +
+            "yearly; renews until you cancel in Google Play."
+        PlanCardKind.LIFETIME -> "Pro Lifetime" to
+            "Pay once. Every Pro feature that runs on your phone is yours for life, offline, with no renewal. Cloud sync, " +
+            "Lucento Shared and the AI adviser are included for the first year."
+        PlanCardKind.CLOUD -> "Lucento Cloud" to
+            "The online services for people who own Lucento: cloud sync, restoring from your account, Lucento Shared and the " +
+            "AI adviser’s Pro allowance. Optional; renews until you cancel in Google Play."
+    }
     LucentoCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            if (current) StatusPill("Your plan", StatusTones.positive)
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).semantics { heading() })
+            if (card.current) StatusPill("Your plan", StatusTones.positive)
         }
         Spacer(Modifier.height(Spacing.xs))
         Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        prices.forEach { price ->
+        card.actions.forEach { action ->
+            Spacer(Modifier.height(Spacing.md))
+            Text(action.priceLine, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(Spacing.xs))
+            if (action.primary) {
+                LucentoPrimaryButton(text = action.label, onClick = { onBuy(action.price) }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+            } else {
+                LucentoSecondaryButton(text = action.label, onClick = { onBuy(action.price) }, enabled = enabled)
+            }
+        }
+        card.note?.let {
             Spacer(Modifier.height(Spacing.sm))
-            Text(ProCopy.priceLine(price), style = MaterialTheme.typography.titleSmall)
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 /** What Lifetime means (customer copy B), short by default; the whole promise on request. */
@@ -267,12 +300,37 @@ private fun PromiseItem(title: String, body: String) {
 
 /** Test builds only: switch plans without Google Play (the same purchases Play would report). Never in a release build. */
 @Composable
-private fun SimulatorSection(selected: SimulatedPlan?, onSelect: (SimulatedPlan?) -> Unit) {
+private fun SimulatorSection(
+    selected: SimulatedPlan?,
+    onSelect: (SimulatedPlan?) -> Unit,
+    testStore: Boolean,
+    onTestStore: (Boolean) -> Unit,
+) {
     SectionHeader(
         "Test builds only",
         Modifier.padding(top = Spacing.section),
         supporting = "Simulate a plan without Google Play. Release builds never show this.",
     )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = Sizes.minTouch)
+            .toggleable(value = testStore, role = Role.Switch, onValueChange = onTestStore)
+            .padding(vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Test store", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Show test prices and buy instantly, without Google Play. Nothing is charged; a test purchase lasts until " +
+                    "the app restarts.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        Switch(checked = testStore, onCheckedChange = null)
+    }
     Column(Modifier.selectableGroup()) {
         SimulatorOption("My account’s plan", "This account’s plan on the server, as a release build reads it.", selected == null) { onSelect(null) }
         SimulatedPlan.entries.forEach { plan ->

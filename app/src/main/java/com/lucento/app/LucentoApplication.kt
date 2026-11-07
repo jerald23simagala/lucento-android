@@ -1,5 +1,6 @@
 package com.lucento.app
 
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import android.app.Application
@@ -162,8 +163,8 @@ class AppContainer(application: Application) {
     /**
      * Lucento Pro (docs/MONETIZATION.md §5): the plan this phone holds — the cached snapshot first, then Google Play's
      * reading, then the server's rows (`public.entitlements`, read at start, on every sign-in change and on each return to
-     * the foreground). Google Play Billing replaces [com.lucento.app.data.billing.FakePurchaseSource] in a later phase; until
-     * then a plan comes only from the server (GRANT rows), so a signed-out phone is Free.
+     * the foreground). Release builds read Google Play Billing ([purchaseSource]) and confirm each purchase with the server
+     * ([com.lucento.app.data.billing.ProxyPurchaseVerifier]); test builds use the fake store and the plan simulator.
      */
     val entitlements: com.lucento.app.data.entitlement.EntitlementManager by lazy {
         val manager = com.lucento.app.data.entitlement.EntitlementManager(
@@ -173,21 +174,45 @@ class AppContainer(application: Application) {
             ),
             purchases = purchaseSource,
             remote = entitlementRemote(),
+            verifier = purchaseVerifier(),
         )
         manager.observePlayUpdates(entitlementScope)
         entitlementScope.launch { manager.refresh() }
         // A sign-in (or a switch) brings that account's rows; a sign-out leaves the cached snapshot, which Play-sourced
         // rows keep and server rows lose at the next successful fetch.
-        entitlementScope.launch { auth.observeUserId().collect { if (it != null) manager.refresh() } }
+        entitlementScope.launch {
+            auth.observeUserId().distinctUntilChanged().collect { if (it != null) { manager.accountChanged(); manager.refresh() } }
+        }
         manager
     }
     private val entitlementScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val purchaseSource: com.lucento.app.data.billing.FakePurchaseSource by lazy { com.lucento.app.data.billing.FakePurchaseSource() }
+    /** Test builds' store: what the plan simulator drives. Never constructed in a release build. */
+    private val fakePurchases: com.lucento.app.data.billing.FakePurchaseSource by lazy { com.lucento.app.data.billing.FakePurchaseSource() }
+
+    /**
+     * Where purchases come from: Google Play in a release built with Play's licence key; nothing in a release without it
+     * (it doesn't bill, and never removes a plan); the fake store in test builds (the `.debug` id can never bill).
+     */
+    val purchaseSource: com.lucento.app.data.billing.PurchaseSource by lazy {
+        when {
+            BuildConfig.DEBUG -> fakePurchases
+            BuildConfig.PLAY_LICENSE_KEY.isBlank() -> com.lucento.app.data.billing.UnavailablePurchaseSource
+            else -> com.lucento.app.data.billing.PlayPurchaseSource(application, entitlementScope, BuildConfig.PLAY_LICENSE_KEY)
+        }
+    }
+
+    /** Release builds only: the server checks each purchase with Play and keeps the account's copy. */
+    private fun purchaseVerifier(): com.lucento.app.data.billing.PurchaseVerifier? =
+        if (BuildConfig.DEBUG || BuildConfig.BILLING_VERIFY_URL.isBlank() || supabaseClient == null) {
+            null
+        } else {
+            com.lucento.app.data.billing.ProxyPurchaseVerifier(BuildConfig.BILLING_VERIFY_URL, BuildConfig.APPLICATION_ID, auth::accessToken)
+        }
 
     /** Test builds only (docs/MONETIZATION.md §5.7): switch plans without Google Play. Null in release builds. */
     val planSimulator: com.lucento.app.data.billing.DebugPlanSimulator? by lazy {
         if (BuildConfig.DEBUG) {
-            com.lucento.app.data.billing.DebugPlanSimulator(com.lucento.app.data.billing.PrefsSimulatorStore(application), purchaseSource)
+            com.lucento.app.data.billing.DebugPlanSimulator(com.lucento.app.data.billing.PrefsSimulatorStore(application), fakePurchases)
         } else {
             null
         }

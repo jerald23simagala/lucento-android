@@ -2,6 +2,8 @@ package com.lucento.app.data.entitlement
 
 import com.lucento.app.data.billing.PurchaseQuery
 import com.lucento.app.data.billing.PurchaseSource
+import com.lucento.app.data.billing.PurchaseVerifier
+import com.lucento.app.data.billing.VerifyOutcome
 import com.lucento.app.domain.entitlement.Access
 import com.lucento.app.domain.entitlement.Entitlement
 import com.lucento.app.domain.entitlement.EntitlementEvaluator
@@ -9,6 +11,8 @@ import com.lucento.app.domain.entitlement.EntitlementMerge
 import com.lucento.app.domain.entitlement.EntitlementState
 import com.lucento.app.domain.entitlement.ProFeature
 import com.lucento.app.domain.entitlement.PurchaseInterpreter
+import com.lucento.app.domain.entitlement.PurchaseRecord
+import com.lucento.app.domain.entitlement.Verifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,12 +40,20 @@ data class RefreshOutcome(val playReached: Boolean, val serverReached: Boolean)
  * the cached snapshot first (first frame, offline), then Google Play's local reading, then the server's. A source that
  * cannot be reached never removes anything; a source that answers replaces only the rows it owns ([EntitlementMerge]).
  *
- * No I/O of its own beyond the three collaborators, so every path is a JVM test with fakes.
+ * After every Play reading it also **confirms** what Play reported (docs/MONETIZATION.md §9): a purchase the server
+ * hasn't recorded for this account goes to [verifier] (so cloud services and a new phone know about it), then every
+ * paid purchase Play hasn't had acknowledged is acknowledged — whatever the server said, since Play itself vouches for
+ * it, and Play refunds an unacknowledged purchase after three days. A pending payment is neither (nothing is granted
+ * until Play confirms it). A failed acknowledgement is simply tried again at the next refresh.
+ *
+ * No I/O of its own beyond its collaborators, so every path is a JVM test with fakes.
  */
 class EntitlementManager(
     private val cache: EntitlementCache,
     private val purchases: PurchaseSource,
     private val remote: EntitlementRemote? = null,
+    /** Release builds with a server; null in debug (the fake store's purchases must never reach the server). */
+    private val verifier: PurchaseVerifier? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val _state = MutableStateFlow(EntitlementState.FREE)
@@ -54,8 +66,17 @@ class EntitlementManager(
     private val _ready = MutableStateFlow(false)
     val ready: StateFlow<Boolean> get() = _ready
 
+    /**
+     * Set when the server refused to record a purchase on this account (it belongs to another one, or needs support);
+     * the Pro page explains it. Play's reading still counts on this phone either way.
+     */
+    private val _verificationIssue = MutableStateFlow<VerifyOutcome?>(null)
+    val verificationIssue: StateFlow<VerifyOutcome?> get() = _verificationIssue
+
     private val lock = Mutex()
     private var loaded = false
+    /** Purchases (by token hash) the server already answered for in this process; not sent again until a restart. */
+    private val settled = mutableSetOf<String>()
 
     /** Reads the cached snapshot. Idempotent; a refresh that already ran is never undone by a late load. */
     suspend fun loadCached() = lock.withLock {
@@ -75,12 +96,50 @@ class EntitlementManager(
                 is PurchaseQuery.Success -> rows = EntitlementMerge.reconcilePlay(rows, PurchaseInterpreter.entitlements(play.purchases, now), now)
                 is PurchaseQuery.Failed -> Unit // Play unreachable: the cached reading stands (L-2)
             }
-            val server = remote?.fetch()
+            var server = remote?.fetch()
             server?.let { rows = EntitlementMerge.reconcileServer(rows, it) }
+            if (play is PurchaseQuery.Success && confirm(play.purchases, rows)) {
+                remote?.fetch()?.let { fresh -> server = fresh; rows = EntitlementMerge.reconcileServer(rows, fresh) }
+            }
             publish(rows)
             _ready.value = true
             RefreshOutcome(playReached = play is PurchaseQuery.Success, serverReached = server != null)
         }
+    }
+
+    /**
+     * Sends what the server lacks to [verifier] and acknowledges what Play hasn't had acknowledged. True when the server
+     * recorded something new, so its rows are worth reading again.
+     */
+    private suspend fun confirm(owned: List<PurchaseRecord>, rows: List<Entitlement>): Boolean {
+        val recorded = rows.filter { it.verifiedBy == Verifier.SERVER }.mapNotNull { it.purchaseTokenHash }.toSet()
+        val verifier = verifier
+        var verified = false
+        for (purchase in owned) {
+            if (purchase.pending) continue
+            val hash = PurchaseInterpreter.tokenHash(purchase.purchaseToken)
+            if (verifier != null && hash !in recorded && hash !in settled) {
+                val outcome = runCatching { verifier.verify(purchase) }.getOrDefault(VerifyOutcome.UNAVAILABLE)
+                if (outcome.settled) settled += hash
+                when (outcome) {
+                    VerifyOutcome.VERIFIED -> verified = true
+                    VerifyOutcome.LINKED_ELSEWHERE, VerifyOutcome.REVIEW_REQUIRED -> _verificationIssue.value = outcome
+                    VerifyOutcome.SIGNED_OUT, VerifyOutcome.UNAVAILABLE -> Unit
+                }
+            }
+            if (!purchase.acknowledged) runCatching { purchases.acknowledge(purchase.purchaseToken) }
+        }
+        return verified
+    }
+
+    /**
+     * A different Lucento account signed in (or the first one): what the server said about each purchase was said about
+     * the previous account, so every purchase is offered to the new one at the next refresh, and the old account's
+     * "linked elsewhere" note goes.
+     */
+    suspend fun accountChanged() = lock.withLock {
+        settled.clear()
+        _verificationIssue.value = null
     }
 
     /** Applies a change Play pushed (a purchase completing, a renewal) without a full refresh. */
@@ -89,7 +148,13 @@ class EntitlementManager(
         loadCached()
         lock.withLock {
             val now = clock()
-            publish(EntitlementMerge.reconcilePlay(_state.value.entitlements, PurchaseInterpreter.entitlements(query.purchases, now), now))
+            var rows = EntitlementMerge.reconcilePlay(_state.value.entitlements, PurchaseInterpreter.entitlements(query.purchases, now), now)
+            // The plan shows the moment Play confirms it; the server's copy follows (best effort, not waited for twice).
+            publish(rows)
+            if (confirm(query.purchases, rows)) {
+                remote?.fetch()?.let { rows = EntitlementMerge.reconcileServer(rows, it) }
+                publish(rows)
+            }
         }
     }
 

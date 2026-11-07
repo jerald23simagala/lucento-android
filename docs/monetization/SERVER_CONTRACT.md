@@ -1,16 +1,19 @@
 # Lucento Pro — server contract (Supabase + Vercel)
 
-Status: **design, written with Phase 1 (2026-11-06).** The Supabase side is the draft migration
-`supabase/migrations/20261107090000_entitlements.sql` (verified offline with `tools/sql-verify/entitlements_suite.sql`,
-38 checks; not applied anywhere). The Vercel endpoints below are **not written**; they belong to Phase 4 together with
-Google Play Billing in the app. Everything here follows [../MONETIZATION.md](../MONETIZATION.md) §5.4–§5.6.
+Status: **Phase 1–4 written.** The tables and the AI allowance are `supabase/migrations/20261107090000_entitlements.sql`
+(applied to `lucento-test` 2026-11-06; `tools/sql-verify/entitlements_suite.sql`, 38 checks). Purchases are written by
+`supabase/migrations/20261108090000_play_purchases.sql` (Phase 4, 2026-11-07; `play_purchases_suite.sql`, 30 checks; not
+applied anywhere). The Vercel endpoints of §3–§5 are on `lucento-website` branch `feature/play-billing-verify` (Phase 4,
+not deployed). The Google Play side is the owner's checklist in [PLAY_CONSOLE_SETUP.md](PLAY_CONSOLE_SETUP.md).
+Everything here follows [../MONETIZATION.md](../MONETIZATION.md) §5.4–§5.6.
 
 ## 1. What lives where
 
 | Piece | Where | Holds a secret? |
 |---|---|---|
 | `public.entitlements`, `public.purchase_links`, `lucento_private.plan_limits`, `has_capability`, plan-aware `max_partners`, `consume_ai_request` | Supabase (the migration) | No |
-| `api/billing/verify.ts`, `api/billing/rtdn.ts`, `api/billing/voided.ts` | `lucento-website` (Vercel) | Yes: `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`, `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON`, `LUCENTO_RTDN_PUSH_TOKEN` — Vercel env only, never the APK (CLAUDE.md) |
+| `public.apply_play_purchase`, `public.revoke_play_purchase` (service role only) | Supabase (Phase 4 migration) | No |
+| `api/billing/verify.ts`, `api/billing/rtdn.ts`, `api/billing/voided.ts` (shared code in `src/server/billing.ts`, `play-api.ts`, `play-state.ts`) | `lucento-website` (Vercel) | Yes: `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`, `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON`, `LUCENTO_RTDN_PUSH_TOKEN`, `CRON_SECRET` — Vercel env only, never the APK (CLAUDE.md) |
 | `api/ask.ts`, `api/interpret.ts` | `lucento-website` (existing) | Switch from `consume_ai_quota()` to `consume_ai_request()` and return its `remaining` / `limited_by` |
 
 The app never talks to the Play Developer API and never holds a service-role key. It reads `public.entitlements` under the
@@ -38,15 +41,20 @@ Steps:
 
 1. Validate the JWT with the Supabase URL + publishable key (as `ask.ts` does) → `user_id`.
 2. Call the Play Developer API with the service account: subscriptions → `purchases.subscriptionsv2.get`; one-time →
-   `purchases.productsv2.getproductpurchasev2` (fall back to `purchases.products.get` if the token predates v2 — verify
-   against the Billing 9 docs before Phase 4).
-3. **Linking rule** on `purchase_links` (`hash = sha256(purchaseToken)`):
+   `purchases.productsv2.getproductpurchasev2` (decided in Phase 4: it is the current resource, and every Lifetime token
+   is new, so there is no legacy fallback). Its purchase time is `purchaseCompletionTime` (unset while pending). Play's
+   answer is mapped by `src/server/play-state.ts` (unit-tested); a product id that doesn't match the request is `400`.
+3. **Linking rule** on `purchase_links` (`hash = sha256(purchaseToken)`) — steps 3 and 4 are one call to
+   `public.apply_play_purchase` (service role only, one transaction, so two verifications of the same purchase can't
+   interleave):
    - no row → insert for `user_id`;
    - row for `user_id` → fine;
    - row for another account → allow a re-link only if the purchase's `obfuscatedExternalAccountId == sha256(user_id)`
      **and** `linked_at` is older than 30 days; then move the row (`relinked_count + 1`) and delete the previous account's
      entitlement rows for that `(source, product_id)`; otherwise `409 linked_elsewhere`;
-   - `relinked_count > 2` within a year → `409 review_required` (support path).
+   - a third move (`relinked_count >= 2`) → `409 review_required` (support path).
+   A refunded purchase (`REVOKED`) stays refunded whatever a later verification says, and a stale purchase's ending never
+   overwrites a newer live purchase of the same product.
 4. Upsert `entitlements` rows (`verified_at = now()`):
    - `lucento_pro` → PLAY_SUBSCRIPTION, all four grants, `status` from `subscriptionState` + `autoRenewing`, `expires_at`
      from `lineItems[].expiryTime`, `base_plan_id` from `offerDetails.basePlanId`.
@@ -58,20 +66,28 @@ Steps:
 6. Response: the caller's rows (same shape the app reads from the table) so the app can apply them at once.
 
 Errors: `401 sign_in_required`, `400 bad_request`, `404 purchase_not_found` (Play), `409 linked_elsewhere`,
-`409 review_required`, `502 play_unavailable` (the app keeps its Play-local reading).
+`409 review_required`, `502 play_unavailable` / `store_unavailable` (the app keeps its Play-local reading and asks again
+at its next refresh), `503 not_configured`. The app (`ProxyPurchaseVerifier`) posts to `<site>/api/billing/verify`, derived
+from the AI proxy's address, only in release builds and only when signed in; it acknowledges the purchase with Play
+afterwards whatever the answer (`EntitlementManager`).
 
 ## 4. `POST /api/billing/rtdn`
 
-Pub/Sub push from Play's Real-Time Developer Notifications (topic configured in Play Console). Verify the push token
-(`LUCENTO_RTDN_PUSH_TOKEN` as the subscription's audience/token), decode `message.data`, then **re-verify** the purchase
+Pub/Sub push from Play's Real-Time Developer Notifications (topic configured in Play Console). The push endpoint is
+`/api/billing/rtdn?token=<LUCENTO_RTDN_PUSH_TOKEN>`; a push without the secret is `401`. Decode `message.data`, then
+**re-verify** the purchase
 token exactly as §3 step 2–4 (never trust the notification's own fields for state). Handles `subscriptionNotification`
 (renewed, cancelled, in grace, on hold, paused, revoked, expired, restarted, price-change) and
 `oneTimeProductNotification` (purchased, cancelled) plus `voidedPurchaseNotification` → `status = REVOKED`.
-Idempotent: the same message twice yields the same rows. Always `200` once stored, so Pub/Sub stops retrying.
+Idempotent: the same message twice yields the same rows. Always `200` once stored (or when there is nothing to do: a
+purchase no account has verified yet, another app's message, a test notification), so Pub/Sub stops retrying; `502` when
+Play or the database didn't answer, so it retries. A subscription notification doesn't name its product: Pro is tried,
+then the Cloud add-on.
 
 ## 5. `GET /api/billing/voided` (cron, daily)
 
-Vercel cron. Calls the Voided Purchases API for the last 30 days and sets `REVOKED` on matching
+Vercel cron (`vercel.json`, daily at 03:17 UTC, `Authorization: Bearer <CRON_SECRET>`). Calls the Voided Purchases API
+(`type=1`, subscriptions included) for the last 30 days and sets `REVOKED` on matching
 `purchase_token_hash` rows that are not already revoked. The belt to RTDN's braces (a missed push never leaves a
 refunded purchase active for more than a day).
 
@@ -124,3 +140,18 @@ for the founders' and testers' accounts by uuid, never for every user.
 The app's `EntitlementRemote` (Phase 2) does `GET /rest/v1/entitlements?select=…` under the person's JWT, maps rows to
 `Entitlement(verifiedBy = SERVER)`, and hands them to `EntitlementManager.refresh()`, which applies
 `EntitlementMerge.reconcileServer`. Null (signed out, offline, 5xx) changes nothing.
+
+## 9. Phase 4 on `lucento-test` (owner, only for a staging check)
+
+Debug builds never bill (the `.debug` id), so `lucento-test` needs `20261108090000_play_purchases.sql` only if a staging
+release build or a Vercel preview is pointed at it. Paste the file in the SQL editor (it is additive: two functions and
+their grants), then check:
+
+```sql
+select p.proname, has_function_privilege('authenticated', p.oid, 'execute') as client, has_function_privilege('service_role', p.oid, 'execute') as server
+from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('apply_play_purchase', 'revoke_play_purchase', 'lucento_write_play_row');
+-- expected: apply_play_purchase f t · revoke_play_purchase f t · lucento_write_play_row f (service role: t only under stock defaults)
+```
+
+Production gets it with the gated release, right after `20261107090000_entitlements.sql` (PLAY_CONSOLE_SETUP.md "Going
+live").
