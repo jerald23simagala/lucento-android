@@ -97,7 +97,10 @@ fun InsightsScreen(
     viewModel: InsightsViewModel = viewModel(factory = InsightsViewModel.Factory),
 ) {
     val data by viewModel.data.collectAsStateWithLifecycle()
-    var period by rememberSaveable { mutableStateOf(TrendPeriod.SIX) }
+    var chosenPeriod by rememberSaveable { mutableStateOf(TrendPeriod.SIX) }
+    // Lucento Pro: 6 and 12 months are Pro; a locked choice shows the 3-month view and says why (docs/MONETIZATION.md §3.4).
+    val period = if (data.longPeriodsLocked && chosenPeriod != TrendPeriod.THREE) TrendPeriod.THREE else chosenPeriod
+    val lockedPeriodChosen = data.longPeriodsLocked && chosenPeriod != TrendPeriod.THREE
     var currencyChoice by rememberSaveable { mutableStateOf<String?>(null) }
     val currencies = remember(data.wallets, data.transactions, data.focusCurrency) {
         (listOf(data.focusCurrency) +
@@ -121,15 +124,23 @@ fun InsightsScreen(
             Spacer(Modifier.height(Spacing.md))
         }
 
-        TrendSection(data, currency, period, onPeriod = { period = it })
+        TrendSection(data, currency, period, onPeriod = { chosenPeriod = it }, lockedChoice = lockedPeriodChosen)
         Spacer(Modifier.height(Spacing.section))
-        NetWorthSection(data, currency)
+        if (data.compositionLocked) {
+            SectionIntro("What your net worth is made of", "Your accounts and debts, by kind.")
+            Spacer(Modifier.height(Spacing.sm))
+            com.lucento.app.core.designsystem.component.InfoNote(
+                "This breakdown is part of Lucento Pro. Your net worth itself is always on Home and Wallets.",
+            )
+        } else {
+            NetWorthSection(data, currency)
+        }
         Spacer(Modifier.height(Spacing.fabClearance))
     }
 }
 
 @Composable
-private fun TrendSection(data: InsightsData, currency: String, period: TrendPeriod, onPeriod: (TrendPeriod) -> Unit) {
+private fun TrendSection(data: InsightsData, currency: String, period: TrendPeriod, onPeriod: (TrendPeriod) -> Unit, lockedChoice: Boolean = false) {
     val ext = LucentoTheme.extendedColors
     val endMonth = YearMonth.from(data.today)
     // Twice the period, so the hero can compare with the one before it.
@@ -141,12 +152,16 @@ private fun TrendSection(data: InsightsData, currency: String, period: TrendPeri
     SectionIntro("Income and expenses", "See your money flow and track your progress.")
     val colors = MaterialTheme.colorScheme
     SegmentedToggle(
-        options = TrendPeriod.entries.map { it to it.label },
+        options = TrendPeriod.entries.map { it to (if (data.longPeriodsLocked && it != TrendPeriod.THREE) "${it.label} · Pro" else it.label) },
         selected = period,
         onSelect = onPeriod,
         compact = true,
         selectedTone = { com.lucento.app.core.designsystem.theme.TonePair(colors.primary, colors.onPrimary) },
     )
+    if (lockedChoice) {
+        Spacer(Modifier.height(Spacing.sm))
+        com.lucento.app.core.designsystem.component.InfoNote("Trends over 6 and 12 months are part of Lucento Pro. Your last 3 months are always free.")
+    }
     Spacer(Modifier.height(Spacing.md))
     val hasData = months.any { !it.income.isZero || !it.expense.isZero }
     val hadData = earlier.any { !it.income.isZero || !it.expense.isZero }

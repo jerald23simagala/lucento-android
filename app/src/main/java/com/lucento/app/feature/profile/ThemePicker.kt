@@ -62,10 +62,13 @@ fun ThemePicker(
     onTheme: (ThemeId) -> Unit,
     onMode: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier,
+    /** Lucento Pro: themes this plan may not pick; marked, explained when tapped, never applied. */
+    lockedThemes: Set<ThemeId> = emptySet(),
 ) {
     val haptics = rememberHaptics()
     val modeIsDark = mode.isDark()
     val current = ThemeSpec.of(selected)
+    val lockedTapped = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ThemeSpec?>(null) }
     Column(modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -79,9 +82,13 @@ fun ThemePicker(
                     spec = spec,
                     dark = spec.isDark(modeIsDark),
                     selected = spec.id == selected,
+                    locked = spec.id in lockedThemes,
                     onSelect = {
-                        if (spec.id != selected) {
+                        if (spec.id in lockedThemes) {
+                            lockedTapped.value = spec
+                        } else if (spec.id != selected) {
                             haptics.tick()
+                            lockedTapped.value = null
                             onTheme(spec.id)
                         }
                     },
@@ -94,6 +101,10 @@ fun ThemePicker(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        lockedTapped.value?.let { spec ->
+            Spacer(Modifier.height(Spacing.sm))
+            InfoNote("${spec.displayName} is part of Lucento Pro. Sunrise and Midnight are always free.")
+        }
         Spacer(Modifier.height(Spacing.md))
         if (current.darkOnly) {
             InfoNote("${current.displayName} is always dark. Your light or dark choice comes back when you pick another theme.")
@@ -112,13 +123,14 @@ private val PreviewArtHeight = 72.dp
 
 /** One theme as a small picture of itself: its landscape, a hero bar and two action swatches, then its name. */
 @Composable
-private fun ThemePreview(spec: ThemeSpec, dark: Boolean, selected: Boolean, onSelect: () -> Unit) {
+private fun ThemePreview(spec: ThemeSpec, dark: Boolean, selected: Boolean, onSelect: () -> Unit, locked: Boolean = false) {
     val colors = spec.colors(dark)
     val ui = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(16.dp)
     val description = buildString {
         append(spec.displayName)
         append(" theme. ")
+        if (locked) append("Lucento Pro feature. ")
         append(spec.character)
     }
     Column(

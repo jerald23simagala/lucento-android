@@ -721,10 +721,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         val photoMessage by appViewModel.photoMessage.collectAsStateWithLifecycle()
         // The sheet sits outside the screens' providers; its Lucento Shared row needs to know who this ledger is shared with.
         val sheetAccess by appViewModel.sharedAccess.collectAsStateWithLifecycle()
+        val lockedThemes by appViewModel.lockedThemes.collectAsStateWithLifecycle()
         CompositionLocalProvider(com.lucento.app.feature.sharedspace.LocalSharedAccess provides sheetAccess) {
             ProfileSheet(
                 preferences = preferences,
                 signedInEmail = profileEmail,
+                lockedThemes = lockedThemes,
                 photo = ProfilePhotoState(
                     image = photo,
                     googleAvailable = googlePhoto != null,

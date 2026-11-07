@@ -29,6 +29,9 @@ data class InsightsData(
     val wallets: List<Wallet> = emptyList(),
     val categories: List<Category> = emptyList(),
     val budgets: List<Budget> = emptyList(),
+    /** Lucento Pro (docs/MONETIZATION.md §3.4): 6- and 12-month trends, and what the net worth is made of, are Pro. */
+    val longPeriodsLocked: Boolean = false,
+    val compositionLocked: Boolean = false,
 ) {
     val categoriesById: Map<Long, Category> = categories.associateBy { it.id }
 
@@ -46,6 +49,8 @@ class InsightsViewModel(
     categories: CategoryRepository,
     budgets: BudgetRepository,
     preferences: UserPreferencesRepository,
+    /** Lucento Pro: the plan this phone holds; null in tests (everything allowed). */
+    entitlements: StateFlow<com.lucento.app.domain.entitlement.EntitlementState>? = null,
 ) : ViewModel() {
     init {
         // Opening Insights earns the Financial Explorer milestone (a local flag; nothing is sent).
@@ -53,19 +58,31 @@ class InsightsViewModel(
     }
 
     val data: StateFlow<InsightsData> = combine(
-        transactions.observeTransactions(),
-        wallets.observeWallets(),
-        categories.observeCategories(),
-        budgets.observeBudgets(),
-        preferences.preferences,
-    ) { t, w, c, b, p ->
-        // Multicurrency: Insights reads everything in the main currency, FX gains as income and FX losses as expenses,
-        // each under its own category (docs/CALCULATIONS.md "Exchange rates").
-        val ledger = com.lucento.app.domain.fx.FxTranslation.translate(p.primaryCurrency, w, t)
-        InsightsData(false, LocalDate.now(), p.primaryCurrency, p.features, ledger.withFxResults, ledger.wallets, ledger.withFxCategories(c), b)
+        combine(
+            transactions.observeTransactions(),
+            wallets.observeWallets(),
+            categories.observeCategories(),
+            budgets.observeBudgets(),
+            preferences.preferences,
+        ) { t, w, c, b, p ->
+            // Multicurrency: Insights reads everything in the main currency, FX gains as income and FX losses as expenses,
+            // each under its own category (docs/CALCULATIONS.md "Exchange rates").
+            val ledger = com.lucento.app.domain.fx.FxTranslation.translate(p.primaryCurrency, w, t)
+            InsightsData(false, LocalDate.now(), p.primaryCurrency, p.features, ledger.withFxResults, ledger.wallets, ledger.withFxCategories(c), b)
+        },
+        entitlements ?: kotlinx.coroutines.flow.flowOf(null),
+    ) { data, plan ->
+        if (plan == null) data
+        else {
+            val now = System.currentTimeMillis()
+            data.copy(
+                longPeriodsLocked = !com.lucento.app.domain.entitlement.ProGates.insightsPeriodAllowed(12, plan, now),
+                compositionLocked = !com.lucento.app.domain.entitlement.ProGates.netWorthCompositionAllowed(plan, now),
+            )
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InsightsData())
 
     companion object {
-        val Factory = containerFactory { InsightsViewModel(it.transactions, it.wallets, it.categories, it.budgets, it.preferences) }
+        val Factory = containerFactory { InsightsViewModel(it.transactions, it.wallets, it.categories, it.budgets, it.preferences, it.entitlements.state) }
     }
 }
