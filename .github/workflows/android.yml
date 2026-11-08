@@ -110,6 +110,9 @@ jobs:
           LUCENTO_KEYSTORE_PASSWORD: ${{ secrets.LUCENTO_KEYSTORE_PASSWORD }}
           LUCENTO_KEY_ALIAS: ${{ secrets.LUCENTO_KEY_ALIAS }}
           LUCENTO_KEY_PASSWORD: ${{ secrets.LUCENTO_KEY_PASSWORD }}
+          # Firebase project file for crash reports (Crashlytics, off until the person turns it on; docs/QUALITY.md).
+          # Written only for this release step, so the debug build, lint and the emulator job stay without Firebase.
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           # Release configuration. The Supabase URL, the publishable key and the Google Web client id are public client
           # identifiers (they ship inside the APK; Row Level Security protects the data), so they are repository
           # *variables*, not secrets. Only the signing credentials above are secrets. With the variable
@@ -128,6 +131,12 @@ jobs:
           fi
           if [ -z "$LUCENTO_PLAY_LICENSE_KEY" ]; then
             echo "Release built **without** Google Play billing (add the LUCENTO_PLAY_LICENSE_KEY repository variable); Lucento Pro shows as not on sale." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+            echo "Release built **with** crash reporting (Firebase Crashlytics, off until the person turns it on in Settings › Privacy)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Release built **without** crash reporting (add the GOOGLE_SERVICES_JSON secret); the Privacy Policy and the Data safety form describe it." >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lucento-release.jks"

@@ -110,8 +110,13 @@ moments is reported for someone who already opted in. Turning the switch off dis
 deletes reports that have not been sent (`deleteUnsentReports`). With no Crashlytics class those calls do nothing.
 What is sent, once it is on: the stack and the exception type. `CrashReporting.sanitize` drops the exception
 message before the Crashlytics handler sees it, so an amount or text the user typed is not uploaded. The app never
-sets a Crashlytics user id, email, custom key, or log. There is no `google-services.json` in CI, so CI builds stay
-a no-op.
+sets a Crashlytics user id, email, custom key, or log.
+
+Production releases include crash reporting (owner decision, 2026-11-08). CI's release step writes
+`app/google-services.json` from the repository secret `GOOGLE_SERVICES_JSON` (the file's contents) just before
+`assembleRelease bundleRelease`, so only the release APK/AAB carry Firebase; the debug build, lint and the emulator
+job stay without it, and the run summary says which way the release was built. Without the secret, CI releases stay a
+no-op. With the plugin applied, the release build also uploads the R8 mapping file to Crashlytics.
 
 ANRs are recorded by Crashlytics itself once the SDK is on the classpath. Without the json file there is no ANR
 reporting either.
