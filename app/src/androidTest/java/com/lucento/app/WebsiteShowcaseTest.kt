@@ -93,6 +93,23 @@ class WebsiteShowcaseTest {
         waitForText("Monthly budget")
         waitForToastsGone()
 
+        // ---------------------------------------------------------------- Home with amounts shown, then hidden
+        // The same screen, same theme and data, a moment apart: the website's hide-amounts switch shows exactly what
+        // changes.
+        runBlocking {
+            container.preferences.setThemeId(ThemeId.SUNRISE)
+            container.preferences.setThemeMode(ThemeMode.LIGHT)
+        }
+        compose.waitForIdle()
+        Thread.sleep(600)
+        shot("home-shown")
+        runBlocking { container.preferences.setHideAmounts(true) }
+        compose.waitForIdle()
+        Thread.sleep(600)
+        shot("home-hidden")
+        runBlocking { container.preferences.setHideAmounts(false) }
+        compose.waitForIdle()
+
         // ---------------------------------------------------------------- the Wallets gallery in every theme
         tab("Wallets")
         waitForText("Assets")
