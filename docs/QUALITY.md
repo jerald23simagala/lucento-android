@@ -46,6 +46,16 @@ mandatory category onboarding, every dock destination, the + / More / Profile sh
 on the budget total and the mascot state — and uploads its screenshots (`ui-screenshots` artifact). No `continue-on-error` anywhere: a red job means
 something did not pass.
 
+Running the tour locally on an API 36.1 emulator (Windows host, 2026-11-07): in-guest `screencap` and UiAutomation
+screenshots abort there (`!hasReadColorBufferDma`), so the tour has an opt-in host-capture mode. Boot the AVD with
+`-gpu guest` and 3-button navigation (`adb shell cmd overlay enable-exclusive --category
+com.android.internal.systemui.navbar.threebutton`; gesture navigation keeps SurfaceFlinger aborting), start
+`tools/screenshots/host_capture.sh <out dir>`, then run `connectedDebugAndroidTest` with
+`-Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ScreenshotTourTest` and
+`-Pandroid.testInstrumentationRunnerArguments.hostCapture=true`. The test waits at each screen until the script has taken
+the frame with `adb emu screenrecord screenshot`. CI keeps the default in-guest capture. Espresso is pinned to 3.7.0
+because 3.5 (pulled by the Compose BOM) calls `InputManager.getInstance`, which API 36 removed.
+
 ## Lint policy
 - `abortOnError = true`: **errors and fatal issues block** CI. `app/lint.xml` promotes privacy/release issues
   (AllowBackup, HardcodedDebugMode, SecureRandom, TrustAllX509TrustManager, ExportedContentProvider,

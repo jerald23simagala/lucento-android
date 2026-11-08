@@ -146,6 +146,10 @@ class ScreenshotTourTest {
         // The shell user writes the capture to /data/local/tmp, which survives the app being uninstalled after the run
         // and needs no storage permission. A copy is also kept in the app's files for local debugging.
         shell("mkdir -p /data/local/tmp/lucento-shots")
+        if (hostCapture) {
+            requestHostCapture(name)
+            return
+        }
         shell("screencap -p /data/local/tmp/lucento-shots/$name.png")
         runCatching {
             val bitmap: Bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return@runCatching
@@ -154,10 +158,37 @@ class ScreenshotTourTest {
         }
     }
 
+    /**
+     * Opt-in (`-e hostCapture true`): some API 36.1 emulator hosts can't read pixels back inside the guest (screencap
+     * and UiAutomation screenshots abort on `hasReadColorBufferDma`). The tour then asks a host script
+     * (tools/screenshots/host_capture.sh) to take the frame with `adb emu screenrecord screenshot`: it leaves a request
+     * marker and waits until the host answers, so the screen can't change before the capture. Off by default (CI).
+     */
+    private val hostCapture: Boolean
+        get() = InstrumentationRegistry.getArguments().getString("hostCapture") == "true"
+
+    private fun requestHostCapture(name: String) {
+        val dir = "/data/local/tmp/lucento-shots"
+        shell("rm -f $dir/$name.done")
+        shell("touch $dir/$name.request")
+        val deadline = android.os.SystemClock.uptimeMillis() + 30_000
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            // UiAutomation runs the command without a shell (no redirection); a missing file only writes to stderr.
+            if (shellOutput("ls $dir/$name.done").contains("$name.done")) break
+            Thread.sleep(150)
+        }
+        shell("rm -f $dir/$name.request $dir/$name.done")
+    }
+
     private fun shell(command: String) {
         // Reading the output to the end waits for the command to finish; the stream closes the descriptor.
         val pfd = instrumentation.uiAutomation.executeShellCommand(command)
         android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
+    }
+
+    private fun shellOutput(command: String): String {
+        val pfd = instrumentation.uiAutomation.executeShellCommand(command)
+        return android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { String(it.readBytes()) }
     }
 
     @Test
