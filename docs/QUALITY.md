@@ -64,6 +64,14 @@ aborted once (TaskSnapshotPersister), it stays degraded (System UI and app ANRs)
 (`-no-snapshot-load`), wait a minute after boot, and set `adb shell settings put global hide_error_dialogs 1` so a
 system crash dialog can't swallow the tour's Back presses.
 
+`WebsiteShowcaseTest` takes the website's other screens from the same demo month (`DemoMonth.seed`, shared with the
+tour so the figures match): the Wallets gallery in every preset theme and mode (`theme-<id>-<mode>`) and wallets in
+US dollars, UAE dirhams and Japanese yen at fixed rates (`mc-*`). It is opt-in and skips itself in CI:
+`-Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.WebsiteShowcaseTest
+-Pandroid.testInstrumentationRunnerArguments.websiteShowcase=true` (plus `hostCapture=true` on API 36.1).
+The website's screens are dark mode: run the tour with `-Pandroid.testInstrumentationRunnerArguments.demoDark=true`
+(Sunrise, dark, from before onboarding); `WebsiteShowcaseTest` takes its Home pair and foreign wallets in dark too.
+
 ## Lint policy
 - `abortOnError = true`: **errors and fatal issues block** CI. `app/lint.xml` promotes privacy/release issues
   (AllowBackup, HardcodedDebugMode, SecureRandom, TrustAllX509TrustManager, ExportedContentProvider,
