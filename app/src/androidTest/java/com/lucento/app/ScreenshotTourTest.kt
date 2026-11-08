@@ -146,6 +146,10 @@ class ScreenshotTourTest {
         // The shell user writes the capture to /data/local/tmp, which survives the app being uninstalled after the run
         // and needs no storage permission. A copy is also kept in the app's files for local debugging.
         shell("mkdir -p /data/local/tmp/lucento-shots")
+        if (hostCapture) {
+            requestHostCapture(name)
+            return
+        }
         shell("screencap -p /data/local/tmp/lucento-shots/$name.png")
         runCatching {
             val bitmap: Bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return@runCatching
@@ -154,10 +158,64 @@ class ScreenshotTourTest {
         }
     }
 
+    /**
+     * Opt-in (`-e hostCapture true`): some API 36.1 emulator hosts can't read pixels back inside the guest (screencap
+     * and UiAutomation screenshots abort on `hasReadColorBufferDma`). The tour then asks a host script
+     * (tools/screenshots/host_capture.sh) to take the frame with `adb emu screenrecord screenshot`: it leaves a request
+     * marker and waits until the host answers, so the screen can't change before the capture. Off by default (CI).
+     */
+    private val hostCapture: Boolean
+        get() = InstrumentationRegistry.getArguments().getString("hostCapture") == "true"
+
+    /**
+     * Opt-in (`-e demoCurrency PHP`): the website's screenshots show a Philippine household, so onboarding picks pesos
+     * and every seeded amount is scaled ×10 (salary ₱42,000, rent ₱15,000, car loan ₱120,000). Off by default: CI keeps
+     * the device's currency (US dollars on the emulator) and the original figures.
+     */
+    private val demoCurrency: String?
+        get() = InstrumentationRegistry.getArguments().getString("demoCurrency")?.uppercase()?.takeIf { it.length == 3 }
+    private val demoScale: Long get() = if (demoCurrency == "PHP") 10 else 1
+
+    /** The composer message, in amounts that suit the demo currency. */
+    private val composerMessage: String
+        get() = if (demoCurrency == "PHP") "Lunch 150, groceries 1200, and paid the electricity bill"
+        else "Lunch 45, groceries 120, and paid the electricity bill"
+
+    /** Waits (up to 15 s, never failing the tour) for a milestone toast to finish, so a screenshot isn't covered. */
+    private fun waitForToastsGone() {
+        runCatching { compose.waitUntil(15_000) { !exists("Milestone:") } }
+        compose.waitForIdle()
+    }
+
+    /** Hides the keyboard if it is up (no-op otherwise), so a screenshot shows the whole screen. */
+    private fun closeKeyboard() {
+        runCatching { androidx.test.espresso.Espresso.closeSoftKeyboard() }
+        compose.waitForIdle()
+        Thread.sleep(400) // the keyboard's own hide animation
+    }
+
+    private fun requestHostCapture(name: String) {
+        val dir = "/data/local/tmp/lucento-shots"
+        shell("rm -f $dir/$name.done")
+        shell("touch $dir/$name.request")
+        val deadline = android.os.SystemClock.uptimeMillis() + 30_000
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            // UiAutomation runs the command without a shell (no redirection); a missing file only writes to stderr.
+            if (shellOutput("ls $dir/$name.done").contains("$name.done")) break
+            Thread.sleep(150)
+        }
+        shell("rm -f $dir/$name.request $dir/$name.done")
+    }
+
     private fun shell(command: String) {
         // Reading the output to the end waits for the command to finish; the stream closes the descriptor.
         val pfd = instrumentation.uiAutomation.executeShellCommand(command)
         android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
+    }
+
+    private fun shellOutput(command: String): String {
+        val pfd = instrumentation.uiAutomation.executeShellCommand(command)
+        return android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { String(it.readBytes()) }
     }
 
     @Test
@@ -185,6 +243,12 @@ class ScreenshotTourTest {
         shot("03-onboarding-review")
         click("Confirm", substring = true)
         waitForText("Currency and look")
+        demoCurrency?.let { code ->
+            compose.onAllNodes(hasSetTextAction())[0].performTextInput(code)
+            waitForText("$code ·")
+            compose.onNodeWithText("$code ·", substring = true).performClick()
+            closeKeyboard()
+        }
         shot("03b-onboarding-currency")
         click("Continue")
         waitForText("Lucento is personalized")
@@ -218,7 +282,7 @@ class ScreenshotTourTest {
         }
         val today = LocalDate.now()
         val currency = runBlocking { container.preferences.preferences.first().primaryCurrency }
-        fun money(major: Long, cents: Long = 0) = Money(major * 100 + cents, currency)
+        fun money(major: Long, cents: Long = 0) = Money((major * 100 + cents) * demoScale, currency)
         val day = { d: Int -> today.withDayOfMonth(minOf(d, today.dayOfMonth)) }
         runBlocking {
             // Part B onboarding switches on only what the focus step chose; the tour visits every module.
@@ -325,6 +389,7 @@ class ScreenshotTourTest {
         // once the bills take what's left).
         waitForText("Bills due")
         waitForText("Safe to spend")
+        waitForToastsGone()
         shot("06-home-within-budget")
         // The bell lists scheduled payments due this week (the seeded gym membership is overdue).
         compose.onNode(hasContentDescription("Upcoming payments", substring = true)).performClick()
@@ -345,12 +410,16 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Add transaction").performClick()
         waitForText("Tell me about your transaction")
         shot("08-composer-empty")
-        compose.onNode(hasSetTextAction()).performTextInput("Lunch 45, groceries 120, and paid the electricity bill")
+        compose.onNode(hasSetTextAction()).performTextInput(composerMessage)
         compose.onNodeWithContentDescription("Send").performClick()
         // The save bar is always in view (one compact line while the keyboard is up); one of the three rows needs a fix
         // before anything can be saved.
         waitForText("1 transaction is incomplete")
         shot("09-composer-rows")
+        // The same review with the keyboard down: every row, and the one that needs a look (website screenshot).
+        closeKeyboard()
+        waitForToastsGone()
+        shot("09b-composer-review")
         compose.onNodeWithContentDescription("Back").performClick()
         waitForText("Discard 3 unsaved transactions?")
         shot("10-composer-discard")
@@ -497,10 +566,25 @@ class ScreenshotTourTest {
         backUntilGone("Account and app")
         waitForText("Monthly budget")
         runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
+        waitForToastsGone()
         shot("20-home-dark")
         openBudgets()
         shot("21-budget-dark")
         tab("Home")
+        // The composer's review in dark, keyboard down (the website's Night theme pairs it with 09b).
+        compose.onNodeWithContentDescription("Add transaction").performClick()
+        waitForText("Tell me about your transaction")
+        compose.onNode(hasSetTextAction()).performTextInput(composerMessage)
+        compose.onNodeWithContentDescription("Send").performClick()
+        waitForText("1 transaction is incomplete")
+        closeKeyboard()
+        waitForToastsGone()
+        shot("21b-composer-review-dark")
+        compose.onNodeWithContentDescription("Back").performClick()
+        waitForText("Discard 3 unsaved transactions?")
+        click("Discard")
+        compose.waitForIdle()
+        waitForDescription("Add transaction")
 
         // ---------------------------------------------------------------- over in one category: it leads "To watch"
         runBlocking {

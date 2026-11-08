@@ -46,6 +46,24 @@ mandatory category onboarding, every dock destination, the + / More / Profile sh
 on the budget total and the mascot state — and uploads its screenshots (`ui-screenshots` artifact). No `continue-on-error` anywhere: a red job means
 something did not pass.
 
+Running the tour locally on an API 36.1 emulator (Windows host, 2026-11-07): in-guest `screencap` and UiAutomation
+screenshots abort there (`!hasReadColorBufferDma`), so the tour has an opt-in host-capture mode. Boot the AVD with
+`-gpu guest` and 3-button navigation (`adb shell cmd overlay enable-exclusive --category
+com.android.internal.systemui.navbar.threebutton`; gesture navigation keeps SurfaceFlinger aborting), start
+`tools/screenshots/host_capture.sh <out dir>`, then run `connectedDebugAndroidTest` with
+`-Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ScreenshotTourTest` and
+`-Pandroid.testInstrumentationRunnerArguments.hostCapture=true`. The test waits at each screen until the script has taken
+the frame with `adb emu screenrecord screenshot`. CI keeps the default in-guest capture. Espresso is pinned to 3.7.0
+because 3.5 (pulled by the Compose BOM) calls `InputManager.getInstance`, which API 36 removed.
+
+For the website's screenshots, `-Pandroid.testInstrumentationRunnerArguments.demoCurrency=PHP` picks pesos in onboarding
+and scales every seeded amount ×10 (salary ₱42,000, rent ₱15,000, car loan ₱120,000), and the tour also saves
+`09b-composer-review` and `21b-composer-review-dark` (keyboard down) and waits for milestone toasts before the Dashboard
+shots. CI passes neither argument and keeps its US-dollar figures. If the API 36.1 emulator's `system_server` has
+aborted once (TaskSnapshotPersister), it stays degraded (System UI and app ANRs): cold-boot it
+(`-no-snapshot-load`), wait a minute after boot, and set `adb shell settings put global hide_error_dialogs 1` so a
+system crash dialog can't swallow the tour's Back presses.
+
 ## Lint policy
 - `abortOnError = true`: **errors and fatal issues block** CI. `app/lint.xml` promotes privacy/release issues
   (AllowBackup, HardcodedDebugMode, SecureRandom, TrustAllX509TrustManager, ExportedContentProvider,

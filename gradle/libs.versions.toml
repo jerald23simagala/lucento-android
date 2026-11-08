@@ -20,6 +20,8 @@ lottie = "6.6.7"
 junit = "4.13.2"
 androidxTestExt = "1.2.1"
 androidxTestRunner = "1.6.2"
+# Espresso 3.7 is the first with Android 16 (API 36) support (InputManager.getInstance was removed); Compose BOM 2024.12 alone pulls 3.5.
+androidxEspresso = "3.7.0"
 # Bundled on-device text recognition (Latin). The model ships inside the APK; no download, no network.
 mlkitTextRecognition = "16.0.1"
 # Optional cloud sync (see docs/SYNC.md) — the only reason this app ever talks to the network, and only once
@@ -79,6 +81,7 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExt" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidxEspresso" }
 
 # Optional cloud sync
 supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
