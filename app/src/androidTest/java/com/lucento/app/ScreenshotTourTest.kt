@@ -176,6 +176,19 @@ class ScreenshotTourTest {
         get() = InstrumentationRegistry.getArguments().getString("demoCurrency")?.uppercase()?.takeIf { it.length == 3 }
     private val demoScale: Long get() = if (demoCurrency == "PHP") 10 else 1
 
+    /**
+     * Opt-in (`-e demoDark true`): the whole tour in dark mode (Sunrise, dark), for the website's screenshots. Set before
+     * onboarding and again after the demo month is seeded, so every capture is dark. Off by default (CI).
+     */
+    private val demoDark: Boolean
+        get() = InstrumentationRegistry.getArguments().getString("demoDark") == "true"
+
+    private fun applyDemoDark() {
+        if (!demoDark) return
+        runBlocking { container.preferences.setThemeMode(com.lucento.app.data.preferences.ThemeMode.DARK) }
+        compose.waitForIdle()
+    }
+
     /** The composer message, in amounts that suit the demo currency. */
     private val composerMessage: String
         get() = if (demoCurrency == "PHP") "Lunch 150, groceries 1200, and paid the electricity bill"
@@ -222,6 +235,7 @@ class ScreenshotTourTest {
     fun tour() {
         // ---------------------------------------------------------------- onboarding
         // Onboarding: keep your money safe (account or this phone), focus, how you pay, categories, currency, summary.
+        applyDemoDark()
         waitForText("Get started")
         shot("01-onboarding-welcome")
         click("Get started")
@@ -286,6 +300,7 @@ class ScreenshotTourTest {
         // The demo month (wallets, three months of salary and spending, budgets, goals, loan payments, schedules) is
         // shared with WebsiteShowcaseTest, so the website's screens and the tour show the same figures.
         runBlocking { DemoMonth.seed(container, currency, demoScale, today) }
+        applyDemoDark()
 
         // ---------------------------------------------------------------- dashboard: within budget (happy sun)
         val total = MoneyFormatter.format(money(2_590))

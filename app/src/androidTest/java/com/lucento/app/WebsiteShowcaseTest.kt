@@ -95,10 +95,10 @@ class WebsiteShowcaseTest {
 
         // ---------------------------------------------------------------- Home with amounts shown, then hidden
         // The same screen, same theme and data, a moment apart: the website's hide-amounts switch shows exactly what
-        // changes.
+        // changes. Sunrise in dark mode, like the website's other screens.
         runBlocking {
             container.preferences.setThemeId(ThemeId.SUNRISE)
-            container.preferences.setThemeMode(ThemeMode.LIGHT)
+            container.preferences.setThemeMode(ThemeMode.DARK)
         }
         compose.waitForIdle()
         Thread.sleep(600)
@@ -132,11 +132,11 @@ class WebsiteShowcaseTest {
         }
         runBlocking {
             container.preferences.setThemeId(ThemeId.SUNRISE)
-            container.preferences.setThemeMode(ThemeMode.LIGHT)
+            container.preferences.setThemeMode(ThemeMode.DARK)
         }
         compose.waitForIdle()
 
-        // ---------------------------------------------------------------- wallets in other currencies
+        // ---------------------------------------------------------------- wallets in other currencies (dark)
         runBlocking {
             val wallets = container.wallets
             fun saved(r: WalletRepository.SaveResult) =

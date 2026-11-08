@@ -69,6 +69,8 @@ tour so the figures match): the Wallets gallery in every preset theme and mode (
 US dollars, UAE dirhams and Japanese yen at fixed rates (`mc-*`). It is opt-in and skips itself in CI:
 `-Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.WebsiteShowcaseTest
 -Pandroid.testInstrumentationRunnerArguments.websiteShowcase=true` (plus `hostCapture=true` on API 36.1).
+The website's screens are dark mode: run the tour with `-Pandroid.testInstrumentationRunnerArguments.demoDark=true`
+(Sunrise, dark, from before onboarding); `WebsiteShowcaseTest` takes its Home pair and foreign wallets in dark too.
 
 ## Lint policy
 - `abortOnError = true`: **errors and fatal issues block** CI. `app/lint.xml` promotes privacy/release issues
