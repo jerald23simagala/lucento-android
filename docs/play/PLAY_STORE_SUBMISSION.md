@@ -77,7 +77,7 @@ because accounts, sync, AI and usage counts are all opt-in.
 | Financial info › Other financial info | Yes | App functionality | No | The synced ledger (wallets, transactions, budgets, goals, debts, schedules); figures sent to the AI features the person turns on |
 | App activity › Other user-generated content | Yes | App functionality | **Yes** | Messages and questions typed or spoken into the AI features; the server keeps no copy |
 | App activity › App interactions | Yes | Analytics | No | Usage counts, off by default: event names and timings, kept 90 days |
-| App info and performance › Crash logs | **Only if the release is built with `app/google-services.json`** | Analytics | No | Crashlytics, off by default; stacks without amounts or notes. CI builds without the file today, so CI releases don't collect it |
+| App info and performance › Crash logs | Yes (optional) | Analytics | No | Crashlytics, off by default; stacks without amounts or notes. CI releases include it once the `GOOGLE_SERVICES_JSON` secret exists (docs/QUALITY.md); check the run summary says "with crash reporting" before uploading |
 | App info and performance › Diagnostics | Yes | App functionality | No | Google Play Billing Library's own diagnostics (LP-K13). Re-check against Google's current SDK guidance when filling the form |
 | Device or other IDs | Yes | Analytics | No | The random install id attached to usage counts (and Crashlytics' installation id when it's built in) |
 

@@ -26,7 +26,7 @@ Google accounts get no metadata, because their consent is given by continuing.
 - When a feature changes what is collected, sent or kept, update the text in the same change.
 - Bump `VERSION` and `UPDATED` whenever the meaning changes.
 - The tests in `AccountFormTest` check only the structure. Accuracy is a review job.
-- The website's `/privacy` page is older and differs: it says there is no crash reporting, and it doesn't mention Lucento Shared, exchange rates or usage counts. Bring it in line when the owner approves a website change.
+- The website's `/privacy` page matches the in-app Privacy Policy (checked 2026-11-08: crash reports and usage counts, AI features, exchange rates, Lucento Shared, Google Play billing). Keep them in step whenever either changes.
 
 ## Keeping the website in step
 

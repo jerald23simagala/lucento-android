@@ -64,15 +64,24 @@ a better user-facing structure while preserving sound engineering boundaries.
 
 ## Privacy & cost
 - Core features work fully offline. No mandatory paid APIs, accounts, cloud, or bank integrations.
-- INTERNET exists **only** for optional cloud sync (docs/SYNC.md): nothing leaves the device until the user signs in
-  (Google, or an email account) and keeps sync on. Room stays the source of truth. Signing out, and switching to a
-  different account, wipes this phone’s ledger and sync binding so the next account starts clean and one user’s data
-  is never uploaded into another account; unsynced changes require confirmation before that wipe. Crash reports,
-  only when `app/google-services.json` is present at build time, send stacks without amounts or notes (docs/QUALITY.md).
-  Exchange rates (docs/MULTICURRENCY.md) are the one default-on exception, by owner decision (2026-11-06): fetched only
-  when something is recorded in another currency, sending two currency codes and a date (never an amount), and the
-  person can turn it off in Settings › Money. Any other network use needs its own explicit opt-in with clear consent. CI allow-lists release permissions. OCR uses ML Kit's
-  bundled on-device model.
+- Network use is only what the person turns on, plus two defaults. The in-app Privacy Policy
+  (`feature/legal/LegalDocuments.kt`, published at the website's /privacy) must list every path, and any summary of it
+  (website, onboarding, store listing) must either list them all or be scoped (for example "your entries") and link to it.
+  - **Opt-ins, each off until chosen:** cloud sync (docs/SYNC.md): nothing leaves the device until the user signs in
+    (Google, or an email account) and keeps sync on; Room stays the source of truth. The Gemini features through
+    Lucento's proxy: Smarter reading sends the typed or spoken message (docs/CAPTURE.md); Ask Lucento's AI answers send
+    the question with a summary of the person's finances, including recent transactions, under their own consent
+    (docs/ASK.md). Anonymous usage counts (event names and timings with a random install id, kept 90 days). Crash
+    reports via Firebase Crashlytics, stacks without amounts or notes (docs/QUALITY.md); production releases include
+    it (owner decision 2026-11-08; CI writes `app/google-services.json` from the `GOOGLE_SERVICES_JSON` secret).
+  - **On by default:** exchange rates (docs/MULTICURRENCY.md, owner decision 2026-11-06): fetched only when something
+    is recorded in another currency, sending two currency codes and a date (never an amount); off in Settings › Money.
+    In release builds, Google Play's billing component sends Google its own diagnostics. When the person buys Pro,
+    Lucento's server checks the purchase with Google (docs/MONETIZATION.md).
+  - Signing out, and switching to a different account, wipes this phone’s ledger and sync binding so the next account
+    starts clean and one user’s data is never uploaded into another account; unsynced changes require confirmation
+    before that wipe. Any other network use needs its own explicit opt-in with clear consent. CI allow-lists release
+    permissions. OCR uses ML Kit's bundled on-device model.
 - Supabase: schema changes ship as new files in `supabase/migrations/` (never edit applied DDL); every user-owned
   table has RLS (`auth.uid() = user_id`) and grants to `authenticated` only. Only the publishable key may reach the
   APK, via `local.properties`/CI env — never a service-role key or OAuth client secret.
