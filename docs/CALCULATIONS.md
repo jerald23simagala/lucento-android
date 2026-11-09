@@ -169,7 +169,10 @@ and the monthly amortization. The rate and amortization are shown on the wallet 
 - Suggested amortization (a hint the user can apply): standard annuity `P·r·(1+r)^n / ((1+r)^n − 1)` with monthly rate
   `r = yearly ÷ 12`, in `BigDecimal`, rounded half-up to the minor unit; without interest `P ÷ n` rounded **up** so the
   instalments never fall short (`DebtMath.monthlyInstallment`).
-- Interest estimate shown beside a debt payment: owed × yearly ÷ 12, half-up (`DebtMath.monthlyInterest`). Never applied.
+- Monthly interest estimate: owed × yearly ÷ 12, half-up (`DebtMath.monthlyInterest`). Used only by Ask Lucento
+  ("<debt> interest a month on what's owed now, at that rate (estimate)", `domain/ask/Ask.kt`); it is not shown beside
+  a payment and never applied. The interest in a payment always comes from the statement, entered when it is marked
+  paid (see "Debt payments (recurring)" below). Corrected 2026-11-08: this line used to say the estimate appears beside a payment.
 - Creating a card or loan creates (or restores) the expense category "Debt interest" (`CategoryRepository.ensure`).
 - A payment reminder date opens a prefilled recurring debt payment: "Monthly Payment - <debt>" for the amortization,
   first due on that date and ending after the term; "One-time Payment - <debt>" for what is owed, one date only.
