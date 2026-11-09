@@ -132,6 +132,15 @@ fun AskLucentoScreen(
     var menu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
+    // The first question this phone can't answer: suggest AI answers once, with that question ready to ask again.
+    val offered = state.messages.lastOrNull() as? AskMessage.Answer
+    LaunchedEffect(offered?.id, state.aiOfferShown, state.aiAvailable) {
+        if (offered == null || !offered.offersAi || state.aiOfferShown || !state.aiAvailable || state.aiOn || askingConsent) return@LaunchedEffect
+        consentFor = state.messages.lastOrNull { it is AskMessage.Question && it.id < offered.id }?.let { (it as AskMessage.Question).text }
+        askingConsent = true
+        viewModel.aiOfferShown()
+    }
+
     // Keep the newest message in view as the conversation grows.
     LaunchedEffect(state.messages.size, state.thinking) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1)
@@ -150,6 +159,15 @@ fun AskLucentoScreen(
             onBack = onBack,
             modifier = Modifier.padding(horizontal = Spacing.gutter),
             actions = {
+                // AI answers, always in view (owner test 2026-11-09): on asks for consent first; off is immediate.
+                if (state.aiAvailable) {
+                    com.lucento.app.core.designsystem.component.CompactSwitch(
+                        label = "Gemini",
+                        icon = Icons.Outlined.AutoAwesome,
+                        checked = state.aiOn,
+                        onCheckedChange = { on -> if (on) askingConsent = true else viewModel.setAiAnswers(false) },
+                    )
+                }
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "More options") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -161,15 +179,6 @@ fun AskLucentoScreen(
                                 viewModel.clear()
                             },
                         )
-                        if (state.aiAvailable) {
-                            DropdownMenuItem(
-                                text = { Text(if (state.aiOn) "Turn off AI answers" else "Turn on AI answers") },
-                                onClick = {
-                                    menu = false
-                                    if (state.aiOn) viewModel.setAiAnswers(false) else askingConsent = true
-                                },
-                            )
-                        }
                     }
                 }
             },

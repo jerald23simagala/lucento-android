@@ -205,7 +205,7 @@ fun ProfileSheet(
             FieldHeader("Account and app", Modifier.padding(top = Spacing.lg))
             NavRow(
                 icon = Icons.Outlined.WorkspacePremium,
-                title = "Lucento Pro",
+                title = "Lucento Plan",
                 summary = com.lucento.app.feature.pro.ProCopy.planStatus(
                     com.lucento.app.feature.pro.LocalEntitlements.current, System.currentTimeMillis(),
                 ).title,

@@ -83,6 +83,11 @@ internal data class ScheduleDraft(
     val interval: Int = 1,
     val startDate: LocalDate = LocalDate.now(),
     val endDate: LocalDate? = null,
+    /**
+     * A single date, no repeats (owner test 2026-11-09). Saved as a schedule whose end date is its first date, which
+     * the rest of the app already reads as "Once" (marking it paid finishes it).
+     */
+    val once: Boolean = false,
 )
 
 /**
@@ -129,6 +134,7 @@ internal fun PlanUiState.debtDraft(debt: Wallet, firstDue: LocalDate): ScheduleD
         frequency = Frequency.MONTHLY,
         startDate = firstDue,
         endDate = if (monthly) terms?.termMonths?.let { firstDue.plusMonths(it - 1L) } else firstDue,
+        once = !monthly,
     )
 }
 
@@ -150,6 +156,7 @@ internal fun RecurringSchedule.toDraft(): ScheduleDraft = ScheduleDraft(
     interval = interval,
     startDate = startDate,
     endDate = endDate,
+    once = endDate == startDate,
 )
 
 /**
@@ -427,27 +434,38 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
 
         Spacer(Modifier.height(Spacing.lg))
         IconFieldHeader(Icons.Outlined.EventRepeat, "Repeats")
+        // null is "Once": one date and no repeats.
         SegmentedToggle(
-            options = Frequency.entries.map { it to frequencyLabel(it, 1) },
-            selected = draft.frequency,
-            onSelect = { update(draft.copy(frequency = it)) },
+            options = listOf<Frequency?>(null).plus(Frequency.entries).map { it to (it?.let { f -> frequencyLabel(f, 1) } ?: "Once") },
+            selected = if (draft.once) null else draft.frequency,
+            onSelect = { choice ->
+                update(
+                    if (choice == null) draft.copy(once = true)
+                    // Leaving "Once": the end date that made it single is dropped, so it repeats until the person sets one.
+                    else draft.copy(once = false, frequency = choice, endDate = draft.endDate.takeIf { !draft.once }),
+                )
+            },
             compact = true,
         )
         Spacer(Modifier.height(Spacing.sm))
-        FilledDropdown(
-            label = "How often",
-            options = listOf(1, 2, 3, 6),
-            selected = draft.interval.takeIf { it in listOf(1, 2, 3, 6) } ?: 1,
-            onSelect = { update(draft.copy(interval = it)) },
-            text = { n -> frequencyLabel(draft.frequency, n).let { if (n == 1) "Every ${unitOf(draft.frequency)}" else it } },
-            leading = { _, size ->
-                IconTile(Icons.Outlined.Repeat, size = size, content = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(8.dp))
-            },
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        DateField(label = "First date", date = draft.startDate, onDate = { update(draft.copy(startDate = it ?: draft.startDate)) }, clearable = false, filled = true)
-        Spacer(Modifier.height(Spacing.sm))
-        DateField(label = "Ends (optional)", date = draft.endDate, onDate = { update(draft.copy(endDate = it)) }, emptyText = "Never", filled = true)
+        if (draft.once) {
+            DateField(label = "Date", date = draft.startDate, onDate = { update(draft.copy(startDate = it ?: draft.startDate)) }, clearable = false, filled = true)
+        } else {
+            FilledDropdown(
+                label = "How often",
+                options = listOf(1, 2, 3, 6),
+                selected = draft.interval.takeIf { it in listOf(1, 2, 3, 6) } ?: 1,
+                onSelect = { update(draft.copy(interval = it)) },
+                text = { n -> frequencyLabel(draft.frequency, n).let { if (n == 1) "Every ${unitOf(draft.frequency)}" else it } },
+                leading = { _, size ->
+                    IconTile(Icons.Outlined.Repeat, size = size, content = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(8.dp))
+                },
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            DateField(label = "First date", date = draft.startDate, onDate = { update(draft.copy(startDate = it ?: draft.startDate)) }, clearable = false, filled = true)
+            Spacer(Modifier.height(Spacing.sm))
+            DateField(label = "Ends (optional)", date = draft.endDate, onDate = { update(draft.copy(endDate = it)) }, emptyText = "Never", filled = true)
+        }
         if (!isNew) {
             Spacer(Modifier.height(Spacing.md))
             Text(
@@ -501,10 +519,10 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                         amount = money,
                         walletId = w.id,
                         categoryId = draft.categoryId,
-                        frequency = draft.frequency,
-                        interval = draft.interval,
+                        frequency = if (draft.once) Frequency.MONTHLY else draft.frequency,
+                        interval = if (draft.once) 1 else draft.interval,
                         startDate = draft.startDate,
-                        endDate = draft.endDate,
+                        endDate = if (draft.once) draft.startDate else draft.endDate,
                         toWalletId = debt?.id.takeIf { isDebt },
                     ),
                 ) { result ->

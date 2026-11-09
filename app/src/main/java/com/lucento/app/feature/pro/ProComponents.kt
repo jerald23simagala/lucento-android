@@ -17,7 +17,9 @@ import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.lucento.app.core.designsystem.component.Hairline
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -60,6 +62,65 @@ fun ProNote(text: String, from: ProFeature?, modifier: Modifier = Modifier, open
         icon = Icons.Outlined.WorkspacePremium,
         actionLabel = "See Lucento Pro",
         onAction = { (open ?: openPro)(from) },
+    )
+}
+
+/**
+ * The plan comparison as a table (owner test 2026-11-09): Feature · Free · Pro · Lifetime, one row per feature, every
+ * cell wrapping instead of truncating. At very large text sizes four columns no longer fit, so each feature falls back to
+ * its name with the three allowances underneath ([ComparisonItem]). TalkBack reads one sentence per row either way.
+ */
+@Composable
+internal fun ComparisonTable(rows: List<ComparisonRow>, modifier: Modifier = Modifier) {
+    val stacked = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
+    Column(modifier.fillMaxWidth()) {
+        if (stacked) {
+            rows.forEachIndexed { i, row ->
+                if (i > 0) Hairline()
+                ComparisonItem(row)
+            }
+            return@Column
+        }
+        // The header is visual: each row's own description names the plans.
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = Spacing.sm).clearAndSetSemantics { },
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            TableCell("Feature", Modifier.weight(1.3f), header = true)
+            TableCell("Free", Modifier.weight(1f), header = true)
+            TableCell("Pro", Modifier.weight(1f), header = true)
+            TableCell("Lifetime", Modifier.weight(1.2f), header = true)
+        }
+        Hairline()
+        rows.forEachIndexed { i, row ->
+            if (i > 0) Hairline()
+            val name = ProCopy.featureName(row.feature)
+            val free = ProCopy.cell(row.feature, row.free)
+            val pro = ProCopy.cell(row.feature, row.pro)
+            val lifetime = ProCopy.lifetimeCell(row)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = Spacing.sm)
+                    .clearAndSetSemantics { contentDescription = "$name. Free: $free. Pro: $pro. Lifetime: $lifetime." },
+            ) {
+                Text(name, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1.3f).padding(end = Spacing.xs))
+                TableCell(free, Modifier.weight(1f))
+                TableCell(pro, Modifier.weight(1f))
+                TableCell(lifetime, Modifier.weight(1.2f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TableCell(text: String, modifier: Modifier, header: Boolean = false) {
+    val muted = text == "Not included"
+    Text(
+        text,
+        style = if (header) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+        color = if (header || muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.padding(end = Spacing.xs),
     )
 }
 

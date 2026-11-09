@@ -116,7 +116,9 @@ is auto-sent; the user can fix the wording with "Edit message" or fix rows direc
 
 ## Smarter reading (Gemini) — opt-in
 
-Off by default. When the user turns on **Settings › Smarter reading** (a dialog first says what is sent and where), typed
+Off by default. When the user turns on **Settings › Smarter reading**, or the **Smarter reading** switch above the
+composer's message field (shown when signed in, in a build with the proxy), a dialog first says what is sent and where —
+the same words in both places (`feature/capture/SmartReadingCopy.kt`). Then typed
 and spoken messages go to Gemini through Lucento's own proxy; everything else — and everything while it is off — is
 read on this phone by `LocalTransactionInterpreter` (deterministic rules; never presented as AI).
 

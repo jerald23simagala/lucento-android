@@ -206,7 +206,9 @@ fun EmailAccountForm(
     var email by rememberSaveable { mutableStateOf(initialEmail) }
     // Kept in memory only (never saved state): a password must not survive into a saved instance bundle.
     var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
+    var forgot by rememberSaveable { mutableStateOf(false) }
     var agreed by rememberSaveable { mutableStateOf(false) }
     var emailTouched by rememberSaveable { mutableStateOf(false) }
     var passwordTouched by rememberSaveable { mutableStateOf(false) }
@@ -215,6 +217,8 @@ fun EmailAccountForm(
     val emailError = emailProblem(email).takeIf { emailTouched || submitted }
     val passwordError = passwordProblem(password, mode).takeIf { passwordTouched || submitted }
     val consentError = creating && submitted && !agreed
+    // A new password is typed twice (owner test 2026-11-09); the second copy is checked once the first is acceptable.
+    val confirmError = (creating && submitted && passwordError == null && confirm != password).takeIf { it }?.let { PASSWORDS_DIFFER }
     val colors = OutlinedTextFieldDefaults.colors(
         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -222,7 +226,7 @@ fun EmailAccountForm(
     )
     val submit = {
         submitted = true
-        if (emailFormProblem(email, password, mode) == null && (!creating || agreed) && !busy) {
+        if (emailFormProblem(email, password, mode) == null && (!creating || (agreed && confirm == password)) && !busy) {
             onSubmit(email.trim(), password, mode)
         }
     }
@@ -274,7 +278,11 @@ fun EmailAccountForm(
             isError = passwordError != null && !creating,
             supportingText = if (!creating) passwordError?.let { { Text(it) } } else null,
             visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done, autoCorrectEnabled = false),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = if (creating) ImeAction.Next else ImeAction.Done,
+                autoCorrectEnabled = false,
+            ),
             keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { submit() }),
             shape = MaterialTheme.shapes.small,
             colors = colors,
@@ -283,12 +291,34 @@ fun EmailAccountForm(
                 .onFocusLeft { if (password.isNotEmpty()) passwordTouched = true },
         )
         if (creating) {
+            OutlinedTextField(
+                value = confirm,
+                onValueChange = { confirm = it.take(128) },
+                label = { Text("Confirm password") },
+                leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Lock, contentDescription = null) },
+                singleLine = true,
+                enabled = !busy,
+                isError = confirmError != null,
+                supportingText = confirmError?.let { { Text(it) } },
+                visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done, autoCorrectEnabled = false),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { submit() }),
+                shape = MaterialTheme.shapes.small,
+                colors = colors,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (!creating && !busy) {
+            LucentoTextButton(text = "Forgot password?", onClick = { forgot = true })
+        }
+        if (creating) {
             // The rule as a checklist that ticks as it is met, rather than an error after the fact.
             PasswordRule(
                 met = password.length >= MIN_PASSWORD_LENGTH,
                 failed = passwordError != null,
                 text = "At least $MIN_PASSWORD_LENGTH characters",
             )
+            PasswordsMatchRule(match = confirm.isNotEmpty() && confirm == password, failed = confirmError != null)
             Text(
                 "We also check it against known data leaks — your password itself is never sent.",
                 style = MaterialTheme.typography.bodySmall,
@@ -331,6 +361,28 @@ fun EmailAccountForm(
             LucentoPrimaryButton(text = if (creating) "Create account" else "Sign in", onClick = submit)
         }
     }
+    if (forgot) {
+        ForgotPasswordSheet(
+            initialEmail = email,
+            // The new password signs in through the form's own path, with every check a sign-in runs.
+            onPasswordChanged = { resetEmail, newPassword ->
+                forgot = false
+                email = resetEmail
+                password = newPassword
+                onSubmit(resetEmail, newPassword, EmailMode.SIGN_IN)
+            },
+            onDismiss = { forgot = false },
+        )
+    }
+}
+
+/** Shown under a second password field that doesn't match the first. */
+const val PASSWORDS_DIFFER = "The passwords don’t match."
+
+/** The confirm-password check as it is met: a tick once both fields hold the same password. */
+@Composable
+internal fun PasswordsMatchRule(match: Boolean, failed: Boolean = false) {
+    PasswordRule(met = match, failed = failed, text = "Passwords match")
 }
 
 /** Calls [onLeft] when the field loses focus after having had it. */

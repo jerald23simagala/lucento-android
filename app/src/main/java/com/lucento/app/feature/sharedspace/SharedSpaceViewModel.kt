@@ -67,6 +67,11 @@ data class SharedSpaceUiState(
     val unsynced: Int = 0,
     /** Set right after an invitation was sent: the screen offers the share sheet for it. */
     val justInvited: String? = null,
+    /**
+     * Whether this account's plan lets it invite a Partner (Lucento Pro's SHARED capability; the server's
+     * `max_partners` is 0 without it). Being someone's Partner is always free, so this gates only the Owner's side.
+     */
+    val invitesIncluded: Boolean = true,
 )
 
 class SharedSpaceViewModel(
@@ -75,18 +80,20 @@ class SharedSpaceViewModel(
     partnerOf: Flow<String?>,
     displayName: Flow<String?>,
     private val pendingChanges: Flow<Int> = flowOf(0),
+    invitesIncluded: Flow<Boolean> = flowOf(true),
 ) : ViewModel() {
 
     private val local = MutableStateFlow(SharedSpaceUiState())
 
     val state: StateFlow<SharedSpaceUiState> = combine(
-        local, space.cache, partnerOf, signedInEmail, combine(displayName, pendingChanges) { name, pending -> name to pending },
-    ) { ui, cache, owner, email, (name, pending) ->
+        local, space.cache, partnerOf, signedInEmail, combine(displayName, pendingChanges, invitesIncluded) { name, pending, included -> Triple(name, pending, included) },
+    ) { ui, cache, owner, email, (name, pending, included) ->
         ui.copy(
             mode = modeOf(cache, owner, email),
             suggestedName = name?.takeIf { it.isNotBlank() } ?: email?.substringBefore('@').orEmpty(),
             myEmail = email,
             unsynced = pending,
+            invitesIncluded = included,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SharedSpaceUiState())
 
@@ -221,6 +228,9 @@ class SharedSpaceViewModel(
                 partnerOf = it.syncPreferences.sharedSpaceOwner,
                 displayName = it.preferences.preferences.map { prefs -> prefs.displayName },
                 pendingChanges = it.syncRepository.observePendingChanges(),
+                invitesIncluded = it.entitlements.state.map { plan ->
+                    plan.has(com.lucento.app.domain.entitlement.Capability.SHARED, System.currentTimeMillis())
+                },
             )
         }
     }

@@ -1,10 +1,11 @@
 # Account emails
 
-Lucento sends three emails, all about the person's own account. Nothing else: no newsletters, no marketing.
+Lucento sends four emails, all about the person's own account. Nothing else: no newsletters, no marketing.
 
 | Email | Sent by | When | Once? |
 |---|---|---|---|
 | **Verify your email** ("Welcome to Lucento — verify your email") | Supabase Auth, over SMTP through Resend (`send.lucentoapp.com`) | An email sign-up | Supabase's own rules (resend from the app's "Check your inbox") |
+| **Reset password** ("Your Lucento password reset code") | Supabase Auth, over SMTP through Resend | The person taps "Forgot password?" on the sign-in form and asks for a code | Supabase's own rate limits; "Send a new code" in the app |
 | **Welcome** ("Welcome to Lucento") | lucento-website `POST /api/account/welcome` → Resend API | The app asks after a sign-in; the site sends only when the address is verified and the account is less than 14 days old | Once per account (`public.account_emails`), whichever phone asks |
 | **Pro confirmation** ("Welcome to Lucento Pro" · "Your Lucento Pro trial has started" · "Pro Lifetime is yours" · "Lucento Cloud is on") | lucento-website `POST /api/billing/verify` → Resend API | The first verification of a new purchase (ACTIVE or TRIAL, bought in the last 3 days) | Once per purchase token: renewals, re-checks and restores send nothing |
 
@@ -12,6 +13,11 @@ Lucento sends three emails, all about the person's own account. Nothing else: no
 
 - Verify template: `supabase/templates/confirm-signup.html`, pasted into both projects (Authentication › Emails ›
   Templates › Confirm signup). Supabase fills `{{ .ConfirmationURL }}` and `{{ .Email }}`.
+- Reset template: `supabase/templates/reset-password.html`, pasted into both projects (Authentication › Emails ›
+  Templates › Reset password). It shows `{{ .Token }}`, a code the person types in the app's "Forgot password?" sheet
+  (`feature/settings/PasswordReset.kt`, `AuthRepository.sendPasswordReset` / `resetPasswordWithCode`). There is no link
+  on purpose: a reset never depends on a browser opening the app. The app accepts 6–10 digit codes (Email OTP Length).
+  After the new password is set, the short recovery session is ended and the form signs in normally.
 - Welcome and Pro templates: lucento-website `src/server/email-templates.ts` (HTML and plain text, unit-tested in
   `src/server/email.test.ts`). Images are PNGs in lucento-website `public/email/`, made from the mascot art (copies; the
   WebP originals are untouched).

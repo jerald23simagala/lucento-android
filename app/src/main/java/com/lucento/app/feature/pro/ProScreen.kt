@@ -90,7 +90,7 @@ fun ProScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.gutter),
     ) {
-        LucentoTopBar(title = "Lucento Pro", onBack = onBack)
+        LucentoTopBar(title = "Lucento Plan", onBack = onBack)
 
         // The plan this phone holds, and the mascot: its one appearance in the Pro experience.
         HeroCard {
@@ -121,10 +121,7 @@ fun ProScreen(
             supporting = "Recording, history, budgets, schedules, debts, Ask Lucento on this phone, backup files and CSV are " +
                 "free on every plan, with no limits.",
         )
-        PlanCatalog.comparisonRows().forEachIndexed { i, row ->
-            if (i > 0) Hairline()
-            ComparisonItem(row)
-        }
+        ComparisonTable(PlanCatalog.comparisonRows())
 
         SectionHeader("Plans", Modifier.padding(top = Spacing.section))
         // Lucento Cloud appears only for people who own Lucento; shown to anyone else it would undercut Pro (D-12).

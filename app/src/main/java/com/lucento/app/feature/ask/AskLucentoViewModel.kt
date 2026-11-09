@@ -79,6 +79,8 @@ data class AskUiState(
     /** The user's consent to AI answers. */
     val aiOn: Boolean = false,
     val remainingToday: Int? = null,
+    /** The one-time "turn on AI answers?" pop-up was already shown on this phone. */
+    val aiOfferShown: Boolean = true,
     val hasRecords: Boolean = false,
     /** Lucento Pro: statements as PDF are Pro; on screen they are always free (docs/MONETIZATION.md §3.4). */
     val pdfLocked: Boolean = false,
@@ -152,6 +154,7 @@ class AskLucentoViewModel(
             aiConfigured = client.isConfigured,
             signedIn = email != null,
             aiOn = prefs.askLucentoAi,
+            aiOfferShown = prefs.askAiOfferShown,
             remainingToday = chat.remaining,
             hasRecords = data != null && (data.transactions.isNotEmpty() || data.wallets.isNotEmpty()),
             pdfLocked = plan != null && !com.lucento.app.domain.entitlement.ProGates.pdfAllowed(plan, System.currentTimeMillis()),
@@ -208,6 +211,11 @@ class AskLucentoViewModel(
             preferences.setAskLucentoAi(enabled)
             if (enabled && thenAsk != null) send(thenAsk, echo = false, consented = true)
         }
+    }
+
+    /** The one-time suggestion was shown (accepted or not): it never pops up by itself again. */
+    fun aiOfferShown() {
+        viewModelScope.launch { preferences.setAskAiOfferShown() }
     }
 
     fun clear() {

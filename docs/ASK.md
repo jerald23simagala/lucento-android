@@ -109,7 +109,10 @@ sign-in details, the Gemini key.
 - **Consent (v2).** Off by default. It is turned on only from the consent sheet in Ask Lucento or the dialog in Settings ›
   Privacy, both of which list what is sent (including transactions) and what never is. Stored as `ask_lucento_ai_v2`; the
   summaries-only consent (`ask_lucento_ai`) is ignored and removed, so everyone is asked again. It is never restored
-  from a backup, and it is cleared when the account is reset.
+  from a backup, and it is cleared when the account is reset. The **Gemini** switch in Ask Lucento's top bar (shown when
+  signed in, in a build with the proxy) opens that sheet when turned on and turns AI answers off immediately when turned
+  off. The first time a question needs AI answers while they are off, the sheet opens by itself once, with that question
+  ready to ask again (`ask_ai_offer_shown`, a device flag; it never turns anything on without the person's tap).
 - **Limits.** Each question counts against the same per-user daily allowance as Smarter reading
   (`public.consume_ai_quota`, `AI_DAILY_LIMIT`, default 50). There is one request at a time (an in-flight guard), with a
   30-second timeout.

@@ -136,7 +136,9 @@ fun SharedSpaceScreen(
             .padding(horizontal = Spacing.gutter),
     ) {
         LucentoTopBar(title = "Lucento Shared", onBack = onBack)
-        state.message?.let { message ->
+        // The invite form shows its own refusal right under the button (owner test 2026-11-09: a note up here was out of
+        // view with the keyboard open, so a second tap looked like nothing happened).
+        state.message?.takeUnless { state.mode.showsInviteForm && state.invitesIncluded }?.let { message ->
             InfoNote(text = message, icon = Icons.Outlined.SyncProblem, actionLabel = "OK", onAction = viewModel::dismissMessage)
             Spacer(Modifier.height(Spacing.md))
         }
@@ -194,6 +196,14 @@ private fun ColumnScope.SoloPage(mode: SpaceMode.Solo, state: SharedSpaceUiState
             "budgets, goals, categories and scheduled payments.",
     )
     Spacer(Modifier.height(Spacing.lg))
+    if (!state.invitesIncluded) {
+        // Inviting is Pro; joining someone else's space is free, so the invitations above stay reviewable.
+        com.lucento.app.feature.pro.ProNote(
+            text = com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE),
+            from = com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE,
+        )
+        return
+    }
     var name by rememberSaveable(state.suggestedName) { mutableStateOf(state.suggestedName) }
     NameField(value = name, onValueChange = { name = it }, label = "Your name in the Shared Space")
     Spacer(Modifier.height(Spacing.md))
@@ -253,6 +263,11 @@ private fun ColumnScope.OwnerPage(snapshot: SharedSpaceSnapshot, state: SharedSp
             onShare = { shareInvitation(context, pending.email, snapshot.ownerEmail) },
             onRevoke = { viewModel.revoke(pending.id) },
         )
+        // A space made on Pro that has since lapsed: the server allows no Partner on Free.
+        !state.invitesIncluded -> com.lucento.app.feature.pro.ProNote(
+            text = com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE),
+            from = com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE,
+        )
         else -> {
             Intro(
                 title = "Your Shared Space is ready",
@@ -279,6 +294,10 @@ private fun ColumnScope.OwnerPage(snapshot: SharedSpaceSnapshot, state: SharedSp
                 enabled = valid && !state.busy,
                 onClick = { viewModel.invite(email) { email = ""; haptics.confirm() } },
             )
+            state.message?.let { message ->
+                Spacer(Modifier.height(Spacing.md))
+                InfoNote(text = message, icon = Icons.Outlined.SyncProblem, actionLabel = "OK", onAction = viewModel::dismissMessage)
+            }
             Spacer(Modifier.height(Spacing.sm))
             Text(
                 "They’ll see everything in this ledger and can add, edit and delete transactions. Wallets, budgets and " +
@@ -656,3 +675,7 @@ private fun shareInvitation(context: android.content.Context, inviteeEmail: Stri
     }
     runCatching { context.startActivity(Intent.createChooser(send, "Share invitation")) }
 }
+
+/** The Owner's invite form is on screen (no Partner, nothing pending): it shows refusals right under its button. */
+private val SpaceMode.showsInviteForm: Boolean
+    get() = this is SpaceMode.Owner && snapshot.members.isEmpty() && snapshot.pendingInvites.isEmpty()

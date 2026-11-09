@@ -90,6 +90,11 @@ data class UserPreferences(
      * Settings; never restored from a backup, so a restore can't switch sharing on.
      */
     val askLucentoAi: Boolean = false,
+    /**
+     * Ask Lucento suggested AI answers once, the first time a question needed them (owner test 2026-11-09). Only decides
+     * whether that one-time pop-up appears; consent is still [askLucentoAi], given in the sheet. A device choice.
+     */
+    val askAiOfferShown: Boolean = false,
     /** Crash reports. Off until the user turns them on in Settings. Nothing is sent while this is false. */
     val crashReports: Boolean = false,
     /** Anonymous usage counts. Off until the user opts in. Nothing is sent while this is false. */
@@ -129,6 +134,8 @@ data class UserPreferences(
     val achievementsSeen: Set<com.lucento.app.domain.Achievement>? = null,
     /** The user has opened Insights at least once (the Financial Explorer milestone). Local only. */
     val insightsVisited: Boolean = false,
+    /** App lock has been turned on at some point (the Secured award). Local only; never cleared by turning lock off. */
+    val appLockUsed: Boolean = false,
     /** The one-time "+" spotlight after setup was shown and dismissed (or + was used). A device choice. */
     val addSpotlightSeen: Boolean = false,
     /** Wallets screen: rows or card faces. A device choice, kept across sign-outs like the theme. */
@@ -203,6 +210,7 @@ class UserPreferencesRepository(
          */
         val askLucentoAi = booleanPreferencesKey("ask_lucento_ai_v2")
         val askLucentoAiV1 = booleanPreferencesKey("ask_lucento_ai")
+        val askAiOfferShown = booleanPreferencesKey("ask_ai_offer_shown")
         val crashReports = booleanPreferencesKey("crash_reports")
         val usageCounts = booleanPreferencesKey("usage_counts")
         val usageInstallId = stringPreferencesKey("usage_install_id")
@@ -222,6 +230,7 @@ class UserPreferencesRepository(
         val spendTypes = stringSetPreferencesKey("spend_types")
         val achievementsSeen = stringSetPreferencesKey("achievements_seen")
         val insightsVisited = booleanPreferencesKey("insights_visited")
+        val appLockUsed = booleanPreferencesKey("app_lock_used")
         val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
         val walletsViewMode = stringPreferencesKey("wallets_view_mode")
         val profilePhotoVersion = longPreferencesKey("profile_photo_version")
@@ -251,6 +260,7 @@ class UserPreferencesRepository(
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
                 smartReading = p[Keys.smartReading] ?: false,
                 askLucentoAi = p[Keys.askLucentoAi] ?: false,
+                askAiOfferShown = p[Keys.askAiOfferShown] ?: false,
                 crashReports = p[Keys.crashReports] ?: false,
                 usageCounts = p[Keys.usageCounts] ?: false,
                 fxRatesOnline = p[Keys.fxRatesOnline] ?: true,
@@ -263,6 +273,8 @@ class UserPreferencesRepository(
                 spendTypes = com.lucento.app.domain.SpendType.fromKeys(p[Keys.spendTypes].orEmpty()),
                 achievementsSeen = p[Keys.achievementsSeen]?.mapNotNull(com.lucento.app.domain.Achievement::fromKey)?.toSet(),
                 insightsVisited = p[Keys.insightsVisited] ?: false,
+                // Installs that turned lock on before this flag existed count too.
+                appLockUsed = p[Keys.appLockUsed] ?: (p[Keys.appLock] ?: false),
                 addSpotlightSeen = p[Keys.addSpotlightSeen] ?: false,
                 walletsViewMode = WalletsViewMode.fromKey(p[Keys.walletsViewMode]),
                 profilePhotoVersion = p[Keys.profilePhotoVersion],
@@ -354,6 +366,10 @@ class UserPreferencesRepository(
         }
     }
 
+    suspend fun setAskAiOfferShown() {
+        context.dataStore.edit { it[Keys.askAiOfferShown] = true }
+    }
+
     /** DataStore copy of the crash-report choice. Written before the synchronous mirror. */
     suspend fun writeCrashReportsPreference(enabled: Boolean) {
         context.dataStore.edit { it[Keys.crashReports] = enabled }
@@ -406,7 +422,10 @@ class UserPreferencesRepository(
     }
 
     suspend fun setAppLock(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.appLock] = enabled }
+        context.dataStore.edit {
+            it[Keys.appLock] = enabled
+            if (enabled) it[Keys.appLockUsed] = true
+        }
     }
 
     suspend fun setHideInRecents(enabled: Boolean) {
@@ -558,6 +577,7 @@ class UserPreferencesRepository(
             p.remove(Keys.spendTypes)
             p.remove(Keys.achievementsSeen)
             p.remove(Keys.insightsVisited)
+            p.remove(Keys.appLockUsed)
             p.remove(Keys.defaultWalletId)
             p.remove(Keys.displayName)
             // The photo belongs to the account like the name; its file goes with the ledger wipe (LocalLedgerReset). The

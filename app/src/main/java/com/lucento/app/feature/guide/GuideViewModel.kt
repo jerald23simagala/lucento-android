@@ -122,7 +122,7 @@ class GuideViewModel(
             transactionCount = d.transactions,
             spendTypes = p.spendTypes,
             earned = com.lucento.app.domain.Achievements.earned(
-                com.lucento.app.domain.Achievements.facts(d.all, d.wallets, d.categories, d.budgets, d.goals + d.archivedGoals, java.time.LocalDate.now(), p.insightsVisited),
+                com.lucento.app.domain.Achievements.facts(d.all, d.wallets, d.categories, d.budgets, d.goals + d.archivedGoals, java.time.LocalDate.now(), p.insightsVisited, p.appLockUsed),
             ),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GuideUiState())

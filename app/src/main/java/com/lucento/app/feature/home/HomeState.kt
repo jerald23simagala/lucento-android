@@ -434,6 +434,7 @@ object HomeStateBuilder {
         month: YearMonth = YearMonth.from(today),
         cloudStatus: CloudStatus = CloudStatus.LOCAL,
         visitedInsights: Boolean = false,
+        secured: Boolean = false,
     ): HomeUiState {
         // Multicurrency (docs/CALCULATIONS.md "Exchange rates"): every figure below is in the main currency — wallets in
         // other currencies at their carrying value, their movements at their own value. Lists of what was recorded
@@ -462,7 +463,7 @@ object HomeStateBuilder {
             .takeWhile { !it.isBefore(earliest) }
             .take(MAX_SELECTABLE_MONTHS)
             .toList()
-        val awardFacts = com.lucento.app.domain.Achievements.facts(all, wallets, categories, budgets, goals + archivedGoals, today, visitedInsights)
+        val awardFacts = com.lucento.app.domain.Achievements.facts(all, wallets, categories, budgets, goals + archivedGoals, today, visitedInsights, secured)
 
         return HomeUiState(
             loading = false,

@@ -128,6 +128,7 @@ class HomeViewModel(
             month = month ?: YearMonth.from(today),
             cloudStatus = cloudStatus,
             visitedInsights = prefs.insightsVisited,
+            secured = prefs.appLockUsed,
         ).let { built ->
             built.copy(
                 showLocalDataNotice = showLocalDataNotice(prefs.onboardingComplete, prefs.localDataNoticeSeen),
