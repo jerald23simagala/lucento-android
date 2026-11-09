@@ -14,10 +14,12 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -45,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -168,6 +171,9 @@ const val NO_SCHEDULE = -1L
 const val NO_WALLET = -1L
 
 private data class Tab(val item: DockItem, val route: Any)
+
+/** How tall the fade is where a tab's content meets the dock. */
+private val DockFade = 20.dp
 
 /**
  * The navigation dock: Home · Transactions · (+) · Budget · Wallets, with the transaction-entry button in the centre.
@@ -725,6 +731,19 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             typeHint = route.typeHint.takeIf { it.isNotEmpty() }?.let { name -> runCatching { TransactionType.valueOf(name) }.getOrNull() },
                         )
                     }
+                }
+                if (!focused) {
+                    // Content dissolves into the background above the dock instead of being cut by a hard line at the
+                    // top of its + button. Every tab's scrolling content ends with at least Spacing.xl of padding, so
+                    // nothing readable is faded at rest.
+                    val page = MaterialTheme.colorScheme.background
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(DockFade)
+                            .background(Brush.verticalGradient(listOf(page.copy(alpha = 0f), page))),
+                    )
                 }
                 ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
             }

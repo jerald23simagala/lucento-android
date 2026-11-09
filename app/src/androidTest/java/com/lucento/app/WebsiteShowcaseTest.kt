@@ -53,11 +53,33 @@ class WebsiteShowcaseTest {
     private val arguments get() = InstrumentationRegistry.getArguments()
     private val hostCapture: Boolean get() = arguments.getString("hostCapture") == "true"
 
+    /**
+     * The household's main currency (`-e showcaseCurrency USD`; pesos by default, for the website). USD gives the Play
+     * Store's global listing the same screens in dollars, at the tour's ×1 amounts, with foreign wallets in yen, euros
+     * and pesos instead of yen, dirhams and dollars.
+     */
+    private val showcaseCurrency: String
+        get() = arguments.getString("showcaseCurrency")?.uppercase()?.takeIf { it.length == 3 } ?: "PHP"
+
+    /** Three wallets in other currencies, at fixed rates (main-currency units per foreign unit), for the multicurrency shots. */
+    private data class Foreign(val name: String, val type: WalletType, val balance: Money, val rate: String)
+
+    private val foreignWallets: List<Foreign>
+        get() = if (showcaseCurrency == "USD") listOf(
+            Foreign("Euro savings", WalletType.SAVINGS, Money(1_850_00, "EUR"), "1.0850"),
+            Foreign("Manila account", WalletType.BANK, Money(42_000_00, "PHP"), "0.01730"),
+            Foreign("Japan trip yen", WalletType.CASH, Money(60_000, "JPY"), "0.006620"),
+        ) else listOf(
+            Foreign("Dollar savings", WalletType.SAVINGS, Money(1_850_00, "USD"), "57.80"),
+            Foreign("Dubai account", WalletType.BANK, Money(4_200_00, "AED"), "15.74"),
+            Foreign("Japan trip yen", WalletType.CASH, Money(60_000, "JPY"), "0.3825"),
+        )
+
     @Test
     fun showcase() {
         assumeTrue("Opt-in: -e websiteShowcase true", arguments.getString("websiteShowcase") == "true")
 
-        // ---------------------------------------------------------------- onboarding, in pesos
+        // ---------------------------------------------------------------- onboarding, in the showcase currency
         click("Get started")
         click("Keep it on this phone only")
         click("Continue")
@@ -70,9 +92,9 @@ class WebsiteShowcaseTest {
         waitForText("Rename, reorder or add more")
         click("Confirm", substring = true)
         waitForText("Currency and look")
-        compose.onAllNodes(hasSetTextAction())[0].performTextInput("PHP")
-        waitForText("PHP ·")
-        compose.onNodeWithText("PHP ·", substring = true).performClick()
+        compose.onAllNodes(hasSetTextAction())[0].performTextInput(showcaseCurrency)
+        waitForText("$showcaseCurrency ·")
+        compose.onNodeWithText("$showcaseCurrency ·", substring = true).performClick()
         closeKeyboard()
         click("Continue")
         waitForText("Lucento is personalized")
@@ -88,11 +110,12 @@ class WebsiteShowcaseTest {
             container.entitlements.refresh()
         }
         val currency = runBlocking { container.preferences.preferences.first().primaryCurrency }
-        check(currency == "PHP") { "Onboarding should have chosen pesos, got $currency" }
+        check(currency == showcaseCurrency) { "Onboarding should have chosen $showcaseCurrency, got $currency" }
         // A new award is presented in a modal ceremony, and the seeded month earns several at once: mark them all as seen
         // first so no ceremony covers a capture or blocks a tap (the tour captures the cabinet and a ceremony on purpose).
         runBlocking { container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet()) }
-        runBlocking { DemoMonth.seed(container, currency, scale = 10, today = LocalDate.now()) }
+        val scale = if (showcaseCurrency == "PHP") 10L else 1L // the tour's demoScale
+        runBlocking { DemoMonth.seed(container, currency, scale = scale, today = LocalDate.now()) }
         waitForText("Monthly budget")
         waitForToastsGone()
 
@@ -144,21 +167,20 @@ class WebsiteShowcaseTest {
             val wallets = container.wallets
             fun saved(r: WalletRepository.SaveResult) =
                 check(r is WalletRepository.SaveResult.Saved) { "foreign wallet not saved: $r" }
-            saved(wallets.create("Dollar savings", WalletType.SAVINGS, Money(1_850_00, "USD"), fxBasisRate = BigDecimal("57.80")))
-            saved(wallets.create("Dubai account", WalletType.BANK, Money(4_200_00, "AED"), fxBasisRate = BigDecimal("15.74")))
-            saved(wallets.create("Japan trip yen", WalletType.CASH, Money(60_000, "JPY"), fxBasisRate = BigDecimal("0.3825")))
+            for (f in foreignWallets) saved(wallets.create(f.name, f.type, f.balance, fxBasisRate = BigDecimal(f.rate)))
         }
+        val savingsAbroad = foreignWallets.first().name
         compose.waitForIdle()
-        waitForText("Dollar savings")
+        waitForText(savingsAbroad)
         waitForToastsGone()
         shot("mc-wallets-top")
         scrollToText("Japan trip yen")
         shot("mc-wallets-gallery")
         compose.onNodeWithContentDescription("Row view").performScrollTo().performClick()
         compose.waitForIdle()
-        scrollToText("Dollar savings")
+        scrollToText(savingsAbroad)
         shot("mc-wallets-rows")
-        openRow("Dollar savings")
+        openRow(savingsAbroad)
         waitForText("Adjust balance")
         shot("mc-wallet-usd")
         back()

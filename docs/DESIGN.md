@@ -249,8 +249,10 @@ environment (see `docs/QUALITY.md`).
   surface (24dp corners, 12dp side inset, hairline border; a soft shadow by day). The **+** is a raised 60dp brand-blue
   circle in the centre, breaking the dock's top edge, with a brand-tinted shadow: the one transaction-entry action.
   Insights, savings goals, scheduled transactions and debts open from Home's **Quick links**; categories from the
-  Budget tab. The selected tab shows its label under a tinted indicator; the others are icon-only (each keeps its
-  label as the accessibility name). Budget leaves the dock when switched off. The dock stays on secondary
+  Budget tab. Every tab shows its label (the selected one in primary under a tinted indicator) unless the longest
+  label no longer fits a tab (large font, narrow screen), when all are icon-only (each keeps its label as the
+  accessibility name). Tab content fades into the background over the last 20dp above the dock instead of being cut
+  by a hard line (`LucentoRoot`). Budget leaves the dock when switched off. The dock stays on secondary
   screens (goals, recurring, debts, account detail, categories — the tab they were opened from stays highlighted)
   and steps aside for focused workflows: the transaction composer, category setup, Settings, Enabled features.
   Tabs keep their state (save/restore on switch).
