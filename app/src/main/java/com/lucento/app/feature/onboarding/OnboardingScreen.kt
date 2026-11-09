@@ -121,6 +121,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -316,6 +317,7 @@ fun OnboardingScreen(
             onEmail = viewModel::connectEmail,
             onPrepareEmail = viewModel::prepareConnection,
             onRetry = viewModel::runRestore,
+            onPlanClosed = viewModel::planClosed,
             onSetUpAsNew = viewModel::setUpAsNew,
             onBack = viewModel::cancelRestore,
             holdsAccountData = holdsAccountData,
@@ -575,6 +577,8 @@ internal fun RestoreFlow(
     onRetry: () -> Unit,
     onSetUpAsNew: () -> Unit,
     onBack: () -> Unit,
+    /** Back from the Lucento Plan page opened on [RestoreStage.PLAN_NEEDED]: carry on if the plan now includes restoring. */
+    onPlanClosed: () -> Unit = {},
     /** Part of the account is already on this phone (an interrupted restore). */
     holdsAccountData: Boolean = false,
     /** The way out when the account can't be brought across: set Lucento up without it. */
@@ -585,6 +589,23 @@ internal fun RestoreFlow(
     invited: Boolean = false,
 ) {
     val ext = LucentoTheme.extendedColors
+    var showPlan by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    if (showPlan && stage == RestoreStage.PLAN_NEEDED) {
+        val closePlan = {
+            showPlan = false
+            onPlanClosed()
+        }
+        BackHandler(onBack = closePlan)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .safeDrawingPadding(),
+        ) {
+            com.lucento.app.feature.pro.ProScreen(onBack = closePlan, from = com.lucento.app.domain.entitlement.ProFeature.CLOUD_RESTORE)
+        }
+        return
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -695,11 +716,34 @@ internal fun RestoreFlow(
                             "finish. Nothing is lost or duplicated by trying again.",
                     )
                 }
+                RestoreStage.PLAN_NEEDED -> {
+                    // Signed in, the plan doesn't include restoring: say so plainly, not with the sign-in form again.
+                    LucentoMascot(size = 88.dp, mood = MascotMood.Curious, contentDescription = "Lucento")
+                    Spacer(Modifier.height(Spacing.md))
+                    StepTitle(
+                        "You’re signed in",
+                        "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "Your account"} is connected and your data is safe " +
+                            "in it. Bringing it to this phone is part of Lucento Pro.",
+                    )
+                    Spacer(Modifier.height(Spacing.md))
+                    InfoNote(
+                        "On the free plan, use a backup file instead: export one on your old phone from Settings › Your " +
+                            "data, then choose “Restore a backup” on the welcome screen. Or use Lucento on this phone " +
+                            "without the account.",
+                    )
+                }
                 RestoreStage.NONE -> Unit
             }
             if (message != null && stage != RestoreStage.RESTORING) {
-                Spacer(Modifier.height(Spacing.sm))
-                Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // A reason worth seeing: in a note near the top of the page's actions, not small grey text.
+                Spacer(Modifier.height(Spacing.md))
+                InfoNote(
+                    message,
+                    icon = Icons.Outlined.WarningAmber,
+                    container = ext.warningContainer,
+                    content = ext.warning,
+                    modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+                )
             }
         }
         Spacer(Modifier.height(Spacing.md))
@@ -724,6 +768,10 @@ internal fun RestoreFlow(
                 LucentoPrimaryButton(text = "Try again", onClick = onRetry)
                 // Not "set up as new": this account has data, and a second setup on top of it would duplicate it. The
                 // way out disconnects the account instead (and removes any part already downloaded), so nobody is stuck.
+                LucentoTextButton(text = "Use Lucento without this account", onClick = onLeaveAccount, modifier = Modifier.fillMaxWidth())
+            }
+            RestoreStage.PLAN_NEEDED -> {
+                LucentoPrimaryButton(text = "See Lucento Plan", onClick = { showPlan = true })
                 LucentoTextButton(text = "Use Lucento without this account", onClick = onLeaveAccount, modifier = Modifier.fillMaxWidth())
             }
             RestoreStage.RESTORING, RestoreStage.NONE -> Unit

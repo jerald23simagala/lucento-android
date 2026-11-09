@@ -24,7 +24,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** "I already have an account" on the welcome screen: reminder → sign in → download → Home (or normal setup). */
-enum class RestoreStage { NONE, WARN, SIGN_IN, RESTORING, EMPTY, FAILED }
+/**
+ * "I already have Lucento". [PLAN_NEEDED]: signed in, but bringing synced data to the phone is Lucento Pro — said on its
+ * own page, never by dropping back to the sign-in form (owner test round 2: after a password reset it looked as if
+ * signing in had failed).
+ */
+enum class RestoreStage { NONE, WARN, SIGN_IN, RESTORING, EMPTY, FAILED, PLAN_NEEDED }
 
 /**
  * Setup, in three stages people see (see [com.lucento.app.domain.SetupStage]):
@@ -596,10 +601,20 @@ class OnboardingViewModel(
     private suspend fun cloudAllowedForRestore(): Boolean {
         val allowed = planAllowsCloud ?: return true
         if (allowed()) return true
-        _restoreMessage.value = "Restoring from your account is part of Lucento Pro. You’re signed in, and your data is safe in " +
-            "your account. Restore a backup file instead, or start fresh on this phone."
-        setRestoreStage(RestoreStage.SIGN_IN)
+        _restoreMessage.value = null
+        setRestoreStage(RestoreStage.PLAN_NEEDED)
         return false
+    }
+
+    /**
+     * Back from the Lucento Plan page opened on [RestoreStage.PLAN_NEEDED]: if the plan now includes restoring (bought
+     * or restored a purchase), the restore carries on by itself; otherwise the page stays as it was.
+     */
+    fun planClosed() {
+        if (restoring || restoreStage.value != RestoreStage.PLAN_NEEDED) return
+        viewModelScope.launch {
+            if (planAllowsCloud?.invoke() != false) runRestore()
+        }
     }
 
     /** [runRestore]; [membershipChecked] when the Lucento Shared check already ran in this attempt. */
