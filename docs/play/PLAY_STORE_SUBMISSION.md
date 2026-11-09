@@ -110,7 +110,7 @@ saves them to `/data/local/tmp/lucento-shots/delete-0*.png`), plus the public pa
 | Contact email | lucentoapp@gmail.com |
 | Website | `https://www.lucentoapp.com` |
 | Privacy policy | `https://www.lucentoapp.com/privacy` |
-| Graphics | `docs/play/graphics/` (approved 2026-11-08): icon 512 × 512 (the Rising Crest `play-store-512.png` from lucento-website `brand/logo`, unchanged), feature graphic 1024 × 500, eight 1080 × 1920 screenshots built from the website's phone template and treatments (window/focus/angle/lift) on the 2026-11-08 peso dark captures (`WebsiteShowcaseTest`, tour `-e demoCurrency PHP -e demoDark true`) |
+| Graphics | `docs/play/graphics/global/` (main listing, US dollars) and `docs/play/graphics/ph/` (Philippines custom listing, pesos), same eight designs in each: one clear view, type it like a text, safe to spend, one net worth, multicurrency (Pro), insights, goals, Lucento Shared (Pro); feature graphic 1024 × 500; icon 512 × 512 (the Rising Crest `play-store-512.png` from lucento-website `brand/logo`, unchanged). Built 2026-11-08 from the website's phone template and treatments (window/focus/angle/lift) on dark captures: PH from the website's peso run, global from `ScreenshotTourTest -e demoCurrency USD -e demoDark true` and `WebsiteShowcaseTest -e showcaseCurrency USD` (`artifacts/play-global-*-usd-dark/`) |
 
 Copy rules: never promise "no ads" (ads may come to Free); never call local parsing AI; mark Pro features; no prices,
 "best" or "#1" in graphics; name no third-party brands (GCash, Maya, Meralco) in metadata, since Play can reject
