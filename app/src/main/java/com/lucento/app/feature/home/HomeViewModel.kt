@@ -135,6 +135,7 @@ class HomeViewModel(
                 moduleOffersHidden = prefs.moduleOffersHidden,
                 hideAmounts = prefs.hideAmounts,
                 milestoneToShow = com.lucento.app.domain.Achievements.toAcknowledge(built.earned, prefs.achievementsSeen),
+                milestonesAlsoNew = com.lucento.app.domain.Achievements.toAcknowledgeAll(built.earned, prefs.achievementsSeen).drop(1),
                 needsMilestoneBaseline = prefs.achievementsSeen == null,
                 showAddSpotlight = showAddSpotlight(prefs.addSpotlightSeen, prefs.guideStep != null, built.recordedCount),
             )
@@ -183,9 +184,9 @@ class HomeViewModel(
         viewModelScope.launch { clearOverridden(seen) }
     }
 
-    /** Part D: the milestone was acknowledged on screen; it is never shown again. */
-    fun acknowledgeMilestone(achievement: com.lucento.app.domain.Achievement) {
-        viewModelScope.launch { preferences.acknowledgeAchievements(setOf(achievement)) }
+    /** Part D: these awards were presented on screen (in one ceremony); none is ever presented again. */
+    fun acknowledgeMilestones(achievements: Collection<com.lucento.app.domain.Achievement>) {
+        viewModelScope.launch { preferences.acknowledgeAchievements(achievements.toSet()) }
     }
 
     /** Part D: first run with milestones — what's already earned is recorded silently. */

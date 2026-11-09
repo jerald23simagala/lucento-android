@@ -1,5 +1,37 @@
 package com.lucento.app.feature.onboarding
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.DocumentScanner
+import androidx.compose.material.icons.outlined.Mic
+import com.lucento.app.core.designsystem.component.ActionDock
+import com.lucento.app.core.designsystem.component.CheckMark
+import com.lucento.app.core.designsystem.component.ChoiceCard
+import com.lucento.app.core.designsystem.component.DockCount
+import com.lucento.app.core.designsystem.component.FactTick
+import com.lucento.app.core.designsystem.component.GroupLabel
+import com.lucento.app.core.designsystem.component.LucentoMark
+import com.lucento.app.core.designsystem.component.LucentoWordmark
+import com.lucento.app.core.designsystem.component.OptionRow
+import com.lucento.app.core.designsystem.component.OptionTile
+import com.lucento.app.core.designsystem.component.PathRail
+import com.lucento.app.core.designsystem.component.SetupTitle
+import com.lucento.app.core.designsystem.component.SpotIcon
+import com.lucento.app.core.designsystem.component.SummaryTile
+import com.lucento.app.core.designsystem.component.icon
+import com.lucento.app.core.designsystem.theme.TonePair
 import com.lucento.app.core.designsystem.component.AmountsShown
 import com.lucento.app.core.designsystem.component.SheetHeader
 import androidx.compose.foundation.clickable
@@ -296,13 +328,20 @@ fun OnboardingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding()
-            .padding(horizontal = Spacing.gutter, vertical = Spacing.lg),
+            .safeDrawingPadding(),
     ) {
         onboardingStage(step)?.let { stage ->
-            // The stage on screen, the furthest one reached (going back keeps finished stages finished) and how far
-            // through the current stage this screen is — all from the onboarding's own saved state.
-            StageIndicator(SetupProgress(stage, onboardingStage(furthestStep) ?: stage, stageProgress(step)))
+            // Sunrise Path: back, the stage on screen with its screen count ("Personalize · 2 of 5"), the furthest stage
+            // reached (going back keeps finished stages finished) and Skip on the optional questions — all from the
+            // onboarding's own saved state.
+            val (screen, screens) = onboardingScreen(step, features)
+            PathRail(
+                SetupProgress(stage, onboardingStage(furthestStep) ?: stage, stageProgress(step), screen, screens),
+                modifier = Modifier.padding(horizontal = Spacing.xs),
+                onBack = viewModel::back,
+                onSkip = if (step == OnboardingViewModel.STEP_FOCUS || step == OnboardingViewModel.STEP_SPEND) viewModel::skip else null,
+                skipDescription = "Skip to spending categories",
+            )
         }
 
         AnimatedContent(
@@ -315,6 +354,8 @@ fun OnboardingScreen(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             label = "onboarding-step",
         ) { target ->
+          // Every step but the welcome sits inside the gutter; the welcome's landscape runs edge to edge.
+          Box(Modifier.fillMaxSize().then(if (target == OnboardingViewModel.STEP_WELCOME) Modifier else Modifier.padding(horizontal = Spacing.gutter))) {
             when (target) {
                 OnboardingViewModel.STEP_WELCOME -> WelcomeStep(
                     onStartFresh = viewModel::next,
@@ -328,8 +369,8 @@ fun OnboardingScreen(
                     fileMessage = fileMessage,
                     fileBusy = fileBusy,
                 )
-                OnboardingViewModel.STEP_FOCUS -> FocusStep(focuses, viewModel::toggleFocus, viewModel::next, onSkip = viewModel::skip)
-                OnboardingViewModel.STEP_SPEND -> SpendStep(spendTypes, viewModel::toggleSpendType, viewModel::next, onSkip = viewModel::skip)
+                OnboardingViewModel.STEP_FOCUS -> FocusStep(focuses, viewModel::toggleFocus, viewModel::next)
+                OnboardingViewModel.STEP_SPEND -> SpendStep(spendTypes, viewModel::toggleSpendType, viewModel::next)
                 OnboardingViewModel.STEP_CATEGORIES -> CategoriesStep(picks, viewModel::setPicks, viewModel::next)
                 OnboardingViewModel.STEP_REVIEW -> CategoryReviewStep(
                     picks = picks,
@@ -361,18 +402,32 @@ fun OnboardingScreen(
                     path = backupPath,
                     onPath = viewModel::selectBackupPath,
                     photo = photo,
+                    onBack = viewModel::back,
                 )
                 else -> ConfirmStep(
-                    currency, theme, features, picks.count, error, signedInEmail,
+                    currency, theme, features, picks, error, signedInEmail,
                     spendTypes = spendTypes,
                     accountUnavailable = signedInEmail != null && accountCheck == AccountCheck.Unavailable,
                     holdsAccountData = holdsAccountData,
                     onLeaveAccount = onLeaveAccount,
                     onFinish = viewModel::finish,
+                    onEdit = viewModel::goTo,
                 )
             }
+          }
         }
     }
+}
+
+/**
+ * Which screen of its stage [step] is, for the path rail: Personalize is the five questions; Set up begins here with the
+ * summary (screen 1), then counts the guided-setup pages this person's modules switch on.
+ */
+private fun onboardingScreen(step: Int, features: Set<Feature>): Pair<Int, Int> = when (onboardingStage(step)) {
+    com.lucento.app.domain.SetupStage.PERSONALIZE ->
+        (step - OnboardingViewModel.STEP_FOCUS + 1) to (OnboardingViewModel.STEP_ESSENTIALS - OnboardingViewModel.STEP_FOCUS + 1)
+    com.lucento.app.domain.SetupStage.SET_UP -> 1 to com.lucento.app.domain.GuidedSetup.setUpScreens(com.lucento.app.domain.FeatureSet(features))
+    else -> 0 to 0
 }
 
 /** How far through its stage a screen is (0..1), so the current stage's bar fills as the user moves on. */
@@ -384,25 +439,14 @@ private fun stageProgress(step: Int): Float = when (onboardingStage(step)) {
     else -> 0f
 }
 
-/** A step's headline and what it's for; [icon] (decorative) sits on a tile above it, naming the step at a glance. */
+/** A step's headline and what it's for. No icon tile above it: the path rail already names the step. */
 @Composable
-private fun StepTitle(title: String, body: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
-    if (icon != null) {
-        IconTile(
-            icon,
-            container = MaterialTheme.colorScheme.primaryContainer,
-            content = MaterialTheme.colorScheme.primary,
-            size = 48.dp,
-            shape = MaterialTheme.shapes.medium,
-        )
-        Spacer(Modifier.height(Spacing.md))
-    }
-    Text(title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
-    Spacer(Modifier.height(Spacing.sm))
-    Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(Modifier.height(Spacing.lg))
+private fun StepTitle(title: String, body: String?) {
+    SetupTitle(title, body)
+    Spacer(Modifier.height(22.dp))
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WelcomeStep(
     onStartFresh: () -> Unit,
@@ -415,159 +459,102 @@ private fun WelcomeStep(
     fileMessage: String?,
     fileBusy: Boolean,
 ) {
+    val spec = LucentoTheme.spec
+    val background = MaterialTheme.colorScheme.background
     Column(Modifier.fillMaxSize()) {
-        // Short screens (or large text) shrink the artwork first; whatever still doesn't fit scrolls instead of being cut
-        // off behind the three ways in.
+        // Sunrise Path: the theme's landscape fills the top and Lucento waves from inside it. On a short screen or at
+        // large text the scene gives way first, so the words and the ways in always stay on screen.
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-        val compact = maxHeight < 520.dp
-        Column(
-            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            // The Rising Crest symbol settles in once (never blocks the button); reduced motion shows it complete.
-            LucentoStackedLockup(symbolSize = if (compact) 64.dp else 96.dp, animate = true, wordmarkModifier = Modifier.semantics { heading() })
-            Spacer(Modifier.height(Spacing.sm))
-            Text(
-                "Financial clarity without the complexity.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+            val compact = maxHeight < 300.dp
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(spec.welcomeArt),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                alignment = androidx.compose.ui.BiasAlignment(-0.24f, 1f),
+                modifier = Modifier.fillMaxSize(),
             )
-            Spacer(Modifier.height(if (compact) Spacing.md else Spacing.xl))
-            // Lucento greets the user standing in its landscape — the theme's (Sunrise: "A Brighter Little World").
-            // Decorative artwork; the mascot keeps its label. Light-painted scenes are dimmed at night.
-            val spec = LucentoTheme.spec
-            IllustratedSurface(
-                artwork = spec.welcomeArt,
-                modifier = Modifier.fillMaxWidth(),
-                containerColor = MaterialTheme.colorScheme.background,
-                overlay = if (LucentoTheme.isDark && !spec.sceneryIsNight) SolidColor(MaterialTheme.colorScheme.background.copy(alpha = 0.45f)) else null,
-                artworkAlignment = Alignment.BottomCenter,
-                contentPadding = PaddingValues(top = if (compact) Spacing.sm else Spacing.lg, bottom = Spacing.sm),
+            if (LucentoTheme.isDark && !spec.sceneryIsNight) {
+                Box(Modifier.fillMaxSize().background(background.copy(alpha = 0.45f)))
+            }
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.42f)
+                    .background(Brush.verticalGradient(listOf(background.copy(alpha = 0f), background))),
+            )
+            Row(
+                Modifier.align(Alignment.TopStart).padding(start = 24.dp, top = Spacing.lg).semantics(mergeDescendants = true) { heading() },
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LucentoMascot(size = if (compact) 104.dp else 140.dp, mood = MascotMood.Greeting, contentDescription = "Lucento, waving hello with a bright torch")
+                LucentoMark(size = 34.dp, animate = true)
+                Spacer(Modifier.width(Spacing.sm))
+                LucentoWordmark(height = 22.dp)
+            }
+            if (maxHeight >= 180.dp) {
+                LucentoMascot(
+                    size = if (compact) 104.dp else minOf(176.dp, maxHeight * 0.55f),
+                    mood = MascotMood.Greeting,
+                    contentDescription = "Lucento, waving hello with a bright torch",
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.xs),
+                )
+            }
+        }
+        Column(Modifier.padding(horizontal = 24.dp)) {
+            Text("Financial clarity, without the complexity.", style = Hierarchy.milestoneTitle)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Track what you spend and plan what’s next. Your records stay on this phone unless you turn on sync.",
+                style = Hierarchy.lead,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (fileMessage != null) {
+                Spacer(Modifier.height(Spacing.sm))
+                InfoNote(fileMessage, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
+            }
+            if (fileBusy) LucentoWorkingIndicator(label = "Reading the backup")
+            // Ways in (owner, 2026-11-06): new to Lucento; coming back to an account; invited to someone's Shared Space; a
+            // backup file. The last two are rarer, so they sit as a quiet link row under the two buttons.
+            ActionDock(fade = false) {
+                LucentoPrimaryButton(text = "Get started", onClick = onStartFresh, trailingIcon = Icons.AutoMirrored.Outlined.ArrowForward)
+                if (onSignIn != null) {
+                    com.lucento.app.core.designsystem.component.LucentoSecondaryButton(text = "I already have Lucento", onClick = onSignIn)
+                }
+                if (onInvited != null || onRestoreFile != null) {
+                    androidx.compose.foundation.layout.FlowRow(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        if (onInvited != null) QuietLink("I was invited", Icons.Outlined.Group, onInvited, spoken = "I was invited to share")
+                        // No separator glyph: when the row wraps (large text) one would be left dangling.
+                        if (onInvited != null && onRestoreFile != null) Spacer(Modifier.width(Spacing.sm))
+                        if (onRestoreFile != null) QuietLink("Restore a backup", Icons.Outlined.UploadFile, onRestoreFile, spoken = "Restore a backup file")
+                    }
                 }
             }
-            Spacer(Modifier.height(if (compact) Spacing.md else Spacing.lg))
-            Text(
-                "Track what you spend, plan what’s next. Your data stays on this phone unless you turn on cloud sync.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(Spacing.md))
-        }
-        }
-        if (fileMessage != null) {
-            InfoNote(fileMessage, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
-            Spacer(Modifier.height(Spacing.sm))
-        }
-        if (fileBusy) {
-            LucentoWorkingIndicator(label = "Reading the backup")
-            Spacer(Modifier.height(Spacing.sm))
-        }
-        // Three ways in (owner, 2026-11-06): new to Lucento; coming back to an account; invited to someone's Shared Space.
-        // The last two go straight to choosing the account. Never merged into a new setup.
-        LucentoPrimaryButton(text = "Get started", onClick = onStartFresh)
-        if (onSignIn != null) {
-            Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.core.designsystem.component.LucentoSecondaryButton(text = "I already have Lucento", onClick = onSignIn)
-        }
-        if (onInvited != null) {
-            Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.core.designsystem.component.LucentoSecondaryButton(
-                text = "I was invited to share",
-                icon = Icons.Outlined.Group,
-                onClick = onInvited,
-            )
-        }
-        if (onRestoreFile != null) {
-            LucentoTextButton(text = "Restore a backup file", onClick = onRestoreFile, modifier = Modifier.fillMaxWidth())
         }
     }
 }
 
-/**
- * One answer to "Keep your money safe": a card chosen like a radio button that, once chosen, opens to show what comes
- * next for that answer ([content]) — so the next step always follows from the choice just made.
- */
+/** A small link with its glyph (the welcome's rarer ways in). */
 @Composable
-private fun PathCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    body: String,
-    selected: Boolean,
-    onSelect: () -> Unit,
-    badge: String? = null,
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {},
-) {
-    val haptics = rememberHaptics()
-    val scheme = MaterialTheme.colorScheme
-    val border by animateColorAsState(if (selected) scheme.primary else scheme.outlineVariant, tween(160), label = "path-border")
-    val fill by animateColorAsState(
-        if (selected) scheme.primaryContainer.copy(alpha = 0.28f) else Color.Transparent,
-        tween(200),
-        label = "path-fill",
-    )
-    Column(
+private fun QuietLink(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit, spoken: String = text) {
+    Row(
         Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.large)
-            .background(fill)
-            .border(BorderStroke(if (selected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.large),
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = spoken }
+            .heightIn(min = 48.dp)
+            .padding(horizontal = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 72.dp)
-                .selectable(selected = selected, role = Role.RadioButton) {
-                    if (!selected) haptics.tick()
-                    onSelect()
-                }
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OnboardingIcon(icon)
-            Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                if (badge != null) {
-                    Spacer(Modifier.height(Spacing.xxs))
-                    Text(
-                        badge,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = scheme.onPrimaryContainer,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(scheme.primaryContainer)
-                            .padding(horizontal = Spacing.sm, vertical = 2.dp),
-                    )
-                    Spacer(Modifier.height(Spacing.xxs))
-                }
-                Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.width(Spacing.sm))
-            Icon(
-                if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                contentDescription = null,
-                tint = if (selected) scheme.primary else scheme.outline,
-            )
-        }
-        androidx.compose.animation.AnimatedVisibility(
-            visible = selected,
-            enter = androidx.compose.animation.expandVertically(tween(240)) + fadeIn(tween(240, delayMillis = 60)),
-            exit = androidx.compose.animation.shrinkVertically(tween(200)) + fadeOut(tween(120)),
-        ) {
-            Column(
-                Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                content = content,
-            )
-        }
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.primary)
     }
 }
+
 
 /**
  * "I already have an account": a reminder to sync the old phone first, sign-in, then the download. A restored account
@@ -745,70 +732,90 @@ internal fun RestoreFlow(
 }
 
 @Composable
-private fun FocusStep(selected: Set<FinancialFocus>, onToggle: (FinancialFocus) -> Unit, onContinue: () -> Unit, onSkip: () -> Unit) {
-    val haptics = rememberHaptics()
+private fun FocusStep(selected: Set<FinancialFocus>, onToggle: (FinancialFocus) -> Unit, onContinue: () -> Unit) {
+    val optional = FinancialFocus.entries.filterNot { it.mandatory }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             StepTitle(
-                "What do you want Lucento to help with?",
-                "Tracking spending and budgeting are always included. Add anything else — this only decides what’s switched on at first.",
-                icon = Icons.Outlined.TipsAndUpdates,
+                "What should Lucento help with?",
+                "Pick what matters now. This only decides what’s switched on at first — change it any time in Settings.",
             )
-            FinancialFocus.entries.forEach { focus ->
-                val isSelected = focus in selected || focus.mandatory
-                val border by animateColorAsState(
-                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                    tween(160),
-                    label = "focus-border",
-                )
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = Spacing.xs)
-                        .heightIn(min = 64.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .border(BorderStroke(if (isSelected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
-                        .toggleable(value = isSelected, enabled = !focus.mandatory, role = Role.Checkbox) {
-                            haptics.tick()
-                            onToggle(focus)
-                        }
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    OnboardingIcon(focus.icon)
-                    Spacer(Modifier.width(Spacing.md))
-                    Column(Modifier.weight(1f)) {
-                        Text(focus.title, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            if (focus.mandatory) "Always included · ${focus.description}" else focus.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Icon(
-                        if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                        contentDescription = null,
-                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            // Tracking spending and budgeting are what Lucento is for: stated plainly, apart from the real choices.
+            GroupLabel("Always included")
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.large)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .padding(vertical = Spacing.xs),
+            ) {
+                FinancialFocus.entries.filter { it.mandatory }.forEach { IncludedRow(it) }
+            }
+            Spacer(Modifier.height(Spacing.lg))
+            val added = optional.count { it in selected }
+            GroupLabel("Add if you like", trailing = if (added > 0) "$added added" else null)
+            LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
+                optional.forEachIndexed { i, focus ->
+                    OptionRow(
+                        icon = focus.icon,
+                        tone = focus.tone(),
+                        title = focus.title,
+                        body = focus.description,
+                        checked = focus in selected,
+                        onToggle = { onToggle(focus) },
                     )
+                    if (i < optional.lastIndex) Hairline(inset = Spacing.lg + Sizes.iconTile + 14.dp)
                 }
             }
+            Spacer(Modifier.height(Spacing.md))
         }
-        Spacer(Modifier.height(Spacing.md))
-        LucentoPrimaryButton(text = "Continue", onClick = onContinue)
-        SkipOptional(onSkip)
+        ActionDock { LucentoPrimaryButton(text = "Continue", onClick = onContinue, trailingIcon = Icons.AutoMirrored.Outlined.ArrowForward) }
     }
 }
 
-/** Focus and payment types are optional; spending categories are not, so Skip leads to them. */
+/** An always-on module: its glyph, its name and an "Included" tag. Information only. */
 @Composable
-private fun SkipOptional(onSkip: () -> Unit) {
-    LucentoTextButton(
-        text = "Skip",
-        onClick = onSkip,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Skip to spending categories" },
-    )
+private fun IncludedRow(focus: FinancialFocus) {
+    val tone = focus.tone()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clearAndSetSemantics { contentDescription = "${focus.title}, always included" }
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconTile(focus.icon, container = tone.container, content = tone.content, size = 32.dp, shape = MaterialTheme.shapes.small)
+        Spacer(Modifier.width(14.dp))
+        Text(focus.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(horizontal = Spacing.sm, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
+            Spacer(Modifier.width(3.dp))
+            Text("Included", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
+
+/** Each module's tone, matching the colours its screens use elsewhere. */
+@Composable
+private fun FinancialFocus.tone(): TonePair {
+    val ext = LucentoTheme.extendedColors
+    val scheme = MaterialTheme.colorScheme
+    return when (this) {
+        FinancialFocus.EVERYDAY_SPENDING, FinancialFocus.BUDGETS -> TonePair(scheme.primaryContainer, scheme.onPrimaryContainer)
+        FinancialFocus.SAVINGS -> ext.savings
+        FinancialFocus.DEBTS -> ext.credit
+        FinancialFocus.RECURRING -> ext.loan
+        FinancialFocus.TRENDS -> ext.eWallet
+    }
+}
+
 
 /** What each focus is about, with the same icons the dashboard uses for these modules. */
 private val FinancialFocus.icon: androidx.compose.ui.graphics.vector.ImageVector
@@ -821,72 +828,60 @@ private val FinancialFocus.icon: androidx.compose.ui.graphics.vector.ImageVector
         FinancialFocus.TRENDS -> Icons.Outlined.BarChart
     }
 
-/** One icon family for onboarding: an outlined glyph on a pale-sky tile, the size of the payment-type tiles beside it. */
-@Composable
-private fun OnboardingIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    IconTile(
-        icon,
-        container = MaterialTheme.colorScheme.primaryContainer,
-        content = MaterialTheme.colorScheme.onPrimaryContainer,
-        size = Sizes.iconTile,
-        shape = MaterialTheme.shapes.small,
-    )
-}
 
-/**
- * "How do you pay?": a question people can answer instead of a list of module switches. Credit cards and loans turn on
- * Debts & loans; the guided setup then suggests these account types first. Modules stay editable in Settings.
- */
 @Composable
-private fun SpendStep(selected: Set<SpendType>, onToggle: (SpendType) -> Unit, onContinue: () -> Unit, onSkip: () -> Unit) {
-    val haptics = rememberHaptics()
+private fun SpendStep(selected: Set<SpendType>, onToggle: (SpendType) -> Unit, onContinue: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            StepTitle(
-                "How do you pay?",
-                "Choose all that apply. You’ll add these accounts next; you can add others any time.",
-                icon = Icons.Outlined.Payments,
-            )
-            SpendType.entries.forEach { type ->
-                val isSelected = type in selected
-                val border by animateColorAsState(
-                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                    tween(160),
-                    label = "spend-border",
-                )
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = Spacing.xs)
-                        .heightIn(min = 64.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .border(BorderStroke(if (isSelected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
-                        .toggleable(value = isSelected, role = Role.Checkbox) {
-                            haptics.tick()
-                            onToggle(type)
-                        }
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    WalletTypeTile(type.walletType, size = 40.dp)
-                    Spacer(Modifier.width(Spacing.md))
-                    Column(Modifier.weight(1f)) {
-                        Text(type.title, style = MaterialTheme.typography.titleMedium)
-                        Text(type.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            StepTitle("How do you pay?", "Choose all that apply. We’ll suggest these accounts when you set up; you can add others any time.")
+            // Ways to pay are things you hold, so they're tiles in their wallet type's colour, two to a row.
+            SpendType.entries.chunked(2).forEach { pair ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    pair.forEach { type ->
+                        OptionTile(
+                            icon = type.walletType.icon,
+                            tone = LucentoTheme.extendedColors.tone(type.walletType),
+                            title = type.title,
+                            body = type.description,
+                            checked = type in selected,
+                            onToggle = { onToggle(type) },
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            wide = pair.size == 1,
+                        )
                     }
-                    Icon(
-                        if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                        contentDescription = null,
-                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                    )
                 }
+                Spacer(Modifier.height(12.dp))
+            }
+            Row(Modifier.padding(horizontal = Spacing.xs), verticalAlignment = Alignment.Top) {
+                Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(Spacing.sm))
+                Text("Credit cards and loans also switch on Debts & loans.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(Spacing.md))
+        }
+        ActionDock {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val chosen = SpendType.entries.filter { it in selected }
+                DockCount(
+                    if (chosen.isEmpty()) "None chosen" else "${chosen.size} chosen",
+                    if (chosen.isEmpty()) "Add accounts later" else chosen.joinToString { it.shortName }.replaceFirstChar { it.uppercase() },
+                    Modifier.widthIn(max = 150.dp),
+                )
+                LucentoPrimaryButton(text = "Continue", onClick = onContinue, modifier = Modifier.weight(1f), trailingIcon = Icons.AutoMirrored.Outlined.ArrowForward)
             }
         }
-        Spacer(Modifier.height(Spacing.md))
-        LucentoPrimaryButton(text = "Continue", onClick = onContinue)
-        SkipOptional(onSkip)
     }
 }
+
+/** A way to pay in a few words, for the dock's count line. */
+private val SpendType.shortName: String
+    get() = when (this) {
+        SpendType.CASH -> "cash"
+        SpendType.BANK -> "bank"
+        SpendType.E_WALLET -> "e-wallet"
+        SpendType.CREDIT_CARD -> "credit card"
+        SpendType.LOAN -> "loans"
+    }
 
 @Composable
 private fun CategoriesStep(picks: CategoryPicks, onChange: (CategoryPicks) -> Unit, onContinue: () -> Unit) {
@@ -894,19 +889,29 @@ private fun CategoriesStep(picks: CategoryPicks, onChange: (CategoryPicks) -> Un
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             StepTitle(
                 "What do you spend on?",
-                "Pick the categories that fit your life — your budget is built from them. We’ve started you with " +
-                    "everyday essentials; add or remove anything. You’ll set amounts later, on the Budget tab.",
-                icon = Icons.Outlined.Category,
+                "We’ve started you with everyday essentials — add or remove anything. Your budget is built from these; amounts come later.",
             )
             CategoryPresetPicker(picks = picks, onChange = onChange)
             Spacer(Modifier.height(Spacing.lg))
         }
-        Spacer(Modifier.height(Spacing.md))
-        LucentoPrimaryButton(
-            text = if (picks.count == 0) "Choose at least one category" else "Review ${picks.count} ${if (picks.count == 1) "category" else "categories"}",
-            onClick = onContinue,
-            enabled = picks.count > 0,
-        )
+        ActionDock {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val groups = com.lucento.app.domain.CategoryPresets.groups.count { g -> g.presets.any { it.key in picks.presetKeys } } +
+                    if (picks.customNames.isNotEmpty() || picks.existingIds.isNotEmpty()) 1 else 0
+                DockCount(
+                    if (picks.count == 0) "None chosen" else "${picks.count} chosen",
+                    if (picks.count == 0) "Choose at least one" else "Across $groups ${if (groups == 1) "group" else "groups"}",
+                    Modifier.widthIn(max = 150.dp),
+                )
+                LucentoPrimaryButton(
+                    text = if (picks.count == 0) "Choose one" else "Review",
+                    onClick = onContinue,
+                    enabled = picks.count > 0,
+                    modifier = Modifier.weight(1f),
+                    trailingIcon = if (picks.count > 0) Icons.AutoMirrored.Outlined.ArrowForward else null,
+                )
+            }
+        }
     }
 }
 
@@ -920,19 +925,22 @@ private fun CategoryReviewStep(
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             StepTitle(
-                "Your spending categories",
-                "Tap one to remove it. You can rename, reorder or add categories any time on the Budget tab.",
-                icon = Icons.Outlined.Checklist,
+                if (picks.count == 0) "Your categories" else "Your ${picks.count} ${if (picks.count == 1) "category" else "categories"}",
+                "Tap × to remove one. Rename, reorder or add more any time on the Budget tab.",
             )
-            CategoryReview(picks = picks, onChange = onChange, onEdit = onEdit)
-            Spacer(Modifier.height(Spacing.lg))
+            LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+                CategoryReview(picks = picks, onChange = onChange)
+            }
+            Spacer(Modifier.height(Spacing.md))
         }
-        Spacer(Modifier.height(Spacing.md))
-        LucentoPrimaryButton(
-            text = if (picks.count == 0) "Choose at least one category" else "Confirm ${picks.count} ${if (picks.count == 1) "category" else "categories"}",
-            onClick = onContinue,
-            enabled = picks.count > 0,
-        )
+        ActionDock {
+            LucentoPrimaryButton(
+                text = if (picks.count == 0) "Choose at least one category" else "Confirm ${picks.count} ${if (picks.count == 1) "category" else "categories"}",
+                onClick = onContinue,
+                enabled = picks.count > 0,
+            )
+            LucentoTextButton(text = "Add or change categories", onClick = onEdit, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -945,7 +953,8 @@ private fun EssentialsStep(
     onContinue: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().imePadding()) {
-        // The title and appearance scroll with the currencies, so even a short screen at large text has room for them.
+        // The one choice that can't be undone comes first, with its warning beside it; the full list follows search.
+        // Everything above the search scrolls with the currencies, so a short screen at large text still has room.
         CurrencyList(
             selected = currency,
             onSelect = onCurrency,
@@ -953,79 +962,121 @@ private fun EssentialsStep(
             header = {
                 item(key = "essentials-header") {
                     Column {
-                        StepTitle(
-                            "Currency and look",
-                            "Every total is in your main currency, and you can’t change it later. Wallets can still " +
-                                "use other currencies — they’re converted into it.",
-                            icon = Icons.Outlined.Public,
-                        )
-                        IconFieldHeader(Icons.Outlined.Palette, "Appearance")
-                        ThemeChoices(theme, onTheme)
-                        Spacer(Modifier.height(Spacing.md))
-                        IconFieldHeader(Icons.Outlined.Payments, "Main currency")
+                        SetupTitle("Currency and look", null)
+                        Spacer(Modifier.height(Spacing.lg))
+                        GroupLabel("Main currency")
+                        MainCurrencyCard(currency)
+                        Row(Modifier.padding(start = Spacing.xs, end = Spacing.xs, top = 10.dp), verticalAlignment = Alignment.Top) {
+                            Icon(Icons.Outlined.Lock, contentDescription = null, tint = LucentoTheme.extendedColors.accentText, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "Every total uses this currency, and it can’t be changed later. Wallets can still use other " +
+                                    "currencies — they’re converted into it.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.height(Spacing.xl))
+                        GroupLabel("Appearance")
+                        ThemePreviews(theme, onTheme)
+                        Spacer(Modifier.height(Spacing.xl))
+                        GroupLabel("Change currency")
                     }
                 }
             },
         )
-        Spacer(Modifier.height(Spacing.md))
-        LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+        ActionDock { LucentoPrimaryButton(text = "Continue", onClick = onContinue, trailingIcon = Icons.AutoMirrored.Outlined.ArrowForward) }
     }
 }
 
-/** System, Light or Dark as three tiles, each with its icon; the chosen one is tinted and outlined. */
+/** The chosen main currency as one clear card: its symbol, its name and its code. */
 @Composable
-private fun ThemeChoices(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+private fun MainCurrencyCard(code: String) {
+    val ext = LucentoTheme.extendedColors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .border(1.5.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large)
+            .semantics(mergeDescendants = true) {}
+            .padding(Spacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(ext.highlight), contentAlignment = Alignment.Center) {
+            Text(MoneyFormatter.currencySymbol(code), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ext.onHighlight, maxLines = 1)
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(MoneyFormatter.currencyName(code), style = MaterialTheme.typography.titleMedium)
+            Text("$code · your main currency", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Match phone, Light or Dark as three small previews of the app, so the choice is seen rather than read. */
+@Composable
+private fun ThemePreviews(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     val haptics = rememberHaptics()
-    val options = listOf(
-        Triple(ThemeMode.SYSTEM, "System", Icons.Outlined.BrightnessAuto),
-        Triple(ThemeMode.LIGHT, "Light", Icons.Outlined.LightMode),
-        Triple(ThemeMode.DARK, "Dark", Icons.Outlined.DarkMode),
-    )
-    // At large text the label alone fills a third of the row; the icon is decorative, so it steps aside.
-    val showIcons = androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.3f
-    Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        options.forEach { (mode, label, icon) ->
+    val options = listOf(ThemeMode.SYSTEM to "Match phone", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark")
+    Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        options.forEach { (mode, label) ->
             val isSelected = mode == selected
-            val scheme = MaterialTheme.colorScheme
-            val border by animateColorAsState(if (isSelected) scheme.primary else scheme.outlineVariant, tween(160), label = "theme-border")
-            val fill by animateColorAsState(
-                if (isSelected) scheme.primaryContainer.copy(alpha = 0.55f) else Color.Transparent,
-                tween(160),
-                label = "theme-fill",
-            )
-            Row(
+            val shape = RoundedCornerShape(16.dp)
+            Column(
                 Modifier
                     .weight(1f)
-                    .heightIn(min = Sizes.minTouch)
                     .clip(MaterialTheme.shapes.medium)
-                    .background(fill)
-                    .border(BorderStroke(if (isSelected) 1.5.dp else 1.dp, border), MaterialTheme.shapes.medium)
                     .selectable(selected = isSelected, role = Role.RadioButton) {
                         haptics.tick()
                         onSelect(mode)
                     }
-                    .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(bottom = Spacing.xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (showIcons) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = if (isSelected) scheme.primary else scheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(108.dp)
+                        .clip(shape)
+                        .border(
+                            if (isSelected) 2.dp else 1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else LucentoTheme.extendedColors.borderDefault,
+                            shape,
+                        ),
+                ) {
+                    when (mode) {
+                        ThemeMode.SYSTEM -> Row(Modifier.fillMaxSize()) {
+                            MiniApp(com.lucento.app.core.designsystem.theme.LightColors, Modifier.weight(1f))
+                            MiniApp(com.lucento.app.core.designsystem.theme.DarkColors, Modifier.weight(1f))
+                        }
+                        ThemeMode.LIGHT -> MiniApp(com.lucento.app.core.designsystem.theme.LightColors, Modifier.fillMaxSize())
+                        ThemeMode.DARK -> MiniApp(com.lucento.app.core.designsystem.theme.DarkColors, Modifier.fillMaxSize())
+                    }
+                    if (isSelected) CheckMark(true, Modifier.align(Alignment.BottomEnd).padding(7.dp), size = 22.dp)
                 }
+                Spacer(Modifier.height(Spacing.sm))
                 Text(
                     label,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (isSelected) FontWeight.SemiBold else null,
-                    color = if (isSelected) scheme.onSurface else scheme.onSurfaceVariant,
-                    maxLines = 1,
+                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                 )
             }
         }
+    }
+}
+
+/** A thumbnail of the app in [colors]: a header block, a line and a row. Decorative. */
+@Composable
+private fun MiniApp(colors: androidx.compose.material3.ColorScheme, modifier: Modifier) {
+    Column(modifier.fillMaxHeight().background(colors.background).padding(10.dp)) {
+        Box(Modifier.fillMaxWidth().height(26.dp).clip(RoundedCornerShape(7.dp)).background(colors.primary))
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth(0.7f).height(6.dp).clip(RoundedCornerShape(3.dp)).background(colors.outlineVariant))
+        Spacer(Modifier.height(7.dp))
+        Box(Modifier.fillMaxWidth().height(18.dp).clip(RoundedCornerShape(5.dp)).background(colors.primaryContainer))
     }
 }
 
@@ -1067,6 +1118,7 @@ private fun GooglePhotoOffer(photo: com.lucento.app.feature.profile.ProfilePhoto
  * path is for people new to Lucento; returning ones use "I already have Lucento"); **Keep it on this phone only** shows
  * Continue. Nothing leaves the phone until an account is connected, and sync itself starts when setup finishes.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SyncStep(
     available: Boolean,
@@ -1085,6 +1137,7 @@ private fun SyncStep(
     path: BackupPath?,
     onPath: (BackupPath) -> Unit,
     photo: com.lucento.app.feature.profile.ProfilePhotoState = com.lucento.app.feature.profile.ProfilePhotoState(),
+    onBack: () -> Unit = {},
 ) {
     // Without cloud sync in this build, only this phone is offered.
     val shownPath = if (!available) BackupPath.DEVICE_ONLY else path
@@ -1106,6 +1159,8 @@ private fun SyncStep(
         label = "account-page",
     ) { showForm ->
         if (showForm) {
+          Column(Modifier.fillMaxSize()) {
+            PathRail(null, onBack = if (connecting) null else ({ emailPage = false }), backDescription = "Back to the choices")
             CreateAccountPage(
                 googleAvailable = googleAvailable,
                 connecting = connecting,
@@ -1114,19 +1169,33 @@ private fun SyncStep(
                 onOpenLegal = { legal = it },
                 onBack = { emailPage = false },
             )
+          }
             return@AnimatedContent
         }
         Column(Modifier.fillMaxSize().imePadding()) {
+            PathRail(null, onBack = onBack)
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                StepTitle(
+                SetupTitle(
                     "Keep your money safe",
                     if (signedInEmail == null) {
                         "Choose where Lucento keeps your records. You can change this any time in Settings."
                     } else {
                         "Your records are backed up to your account and stay the same on every phone you use."
                     },
-                    icon = Icons.Outlined.Shield,
                 )
+                if (signedInEmail == null) {
+                    Spacer(Modifier.height(14.dp))
+                    // Facts the app guarantees whichever card is chosen.
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        FactTick("No bank login")
+                        FactTick("Works offline")
+                        FactTick("Private by default")
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
                 when {
                     signedInEmail != null && accountCheck == AccountCheck.Checking -> LucentoWorkingIndicator(label = "Checking your account")
                     signedInEmail != null && accountCheck == AccountCheck.Unavailable -> InfoNote(
@@ -1142,10 +1211,11 @@ private fun SyncStep(
                         content = LucentoTheme.extendedColors.warning,
                     )
                     signedInEmail != null -> ConnectedAccount(signedInEmail, photo)
-                    else -> Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    else -> Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (available) {
-                            PathCard(
+                            ChoiceCard(
                                 icon = Icons.Outlined.CloudSync,
+                                tone = TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
                                 title = "Sync with an account",
                                 body = "Backed up automatically and the same on every phone you use.",
                                 badge = "Recommended",
@@ -1171,8 +1241,9 @@ private fun SyncStep(
                                 }
                             }
                         }
-                        PathCard(
+                        ChoiceCard(
                             icon = Icons.Outlined.PhoneAndroid,
+                            tone = TonePair(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant),
                             title = "Keep it on this phone only",
                             body = "Nothing leaves this phone. Export a backup file any time from Settings › Your data.",
                             selected = shownPath == BackupPath.DEVICE_ONLY,
@@ -1194,7 +1265,7 @@ private fun SyncStep(
                 }
                 Spacer(Modifier.height(Spacing.md))
             }
-            Spacer(Modifier.height(Spacing.md))
+            ActionDock {
             when {
                 available && signedInEmail != null && accountCheck == AccountCheck.Unavailable -> {
                     LucentoPrimaryButton(text = "Try again", onClick = onRetryCheck)
@@ -1214,9 +1285,16 @@ private fun SyncStep(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                shownPath == BackupPath.DEVICE_ONLY -> LucentoPrimaryButton(text = "Continue", onClick = onContinue)
+                shownPath == BackupPath.DEVICE_ONLY -> LucentoPrimaryButton(text = "Continue", onClick = onContinue, trailingIcon = Icons.AutoMirrored.Outlined.ArrowForward)
                 // Sync chosen: the card above holds the next step (Google or email). Nothing chosen yet: just the cards.
-                else -> Unit
+                else -> Text(
+                    "Signing in only connects sync. Lucento never asks for your bank login.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             }
         }
     }
@@ -1252,10 +1330,7 @@ private fun ConnectedAccount(email: String, photo: com.lucento.app.feature.profi
     }
 }
 
-/**
- * "Use email instead": a page of its own for making the account — create only, since this path is for people new to
- * Lucento. The form asks for agreement to the Terms of Use and Privacy Policy; after it, "Check your inbox" takes over.
- */
+/** "Use email instead": a create-only account page. Back (the path rail above it) returns to the two choices. */
 @Composable
 private fun CreateAccountPage(
     googleAvailable: Boolean,
@@ -1267,18 +1342,10 @@ private fun CreateAccountPage(
 ) {
     Column(Modifier.fillMaxSize().imePadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            androidx.compose.material3.IconButton(
-                onClick = onBack,
-                enabled = !connecting,
-                modifier = Modifier.padding(bottom = Spacing.xs).offset(x = (-12).dp),
-            ) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back to the choices")
-            }
             StepTitle(
                 "Create your account",
                 "Use an email you can open now — we’ll send a link to verify it. Your account keeps your records backed " +
                     "up and in sync.",
-                icon = Icons.Outlined.PersonAddAlt,
             )
             com.lucento.app.feature.settings.EmailAccountForm(
                 modes = listOf(com.lucento.app.feature.settings.EmailMode.CREATE),
@@ -1296,12 +1363,13 @@ private fun CreateAccountPage(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ConfirmStep(
     currency: String,
     theme: ThemeMode,
     features: Set<Feature>,
-    categoryCount: Int,
+    picks: CategoryPicks,
     error: String?,
     signedInEmail: String?,
     spendTypes: Set<SpendType>,
@@ -1310,59 +1378,171 @@ private fun ConfirmStep(
     holdsAccountData: Boolean,
     onLeaveAccount: () -> Unit,
     onFinish: () -> Unit,
+    /** Back to an earlier step to change what it set (only backwards: [OnboardingViewModel.goTo]). */
+    onEdit: (Int) -> Unit,
 ) {
+    val ext = LucentoTheme.extendedColors
+    val scheme = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // A milestone: Lucento stands on a sunrise-tinted banner, part of the scene rather than beside the title.
+            Box(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier
+                        .padding(top = 14.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Brush.linearGradient(listOf(ext.highlight, scheme.surfaceContainerLow, scheme.primaryContainer)))
+                        .padding(start = 20.dp, top = 20.dp, bottom = 20.dp, end = 124.dp),
+                ) {
+                    Text("Lucento is personalized", style = Hierarchy.stepTitle, modifier = Modifier.semantics { heading() })
+                    Spacer(Modifier.height(6.dp))
+                    Text("Here’s how it starts. Next: your accounts and budget.", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                }
+                LucentoMascot(size = 128.dp, mood = MascotMood.Success, modifier = Modifier.align(Alignment.TopEnd))
+            }
+            Spacer(Modifier.height(14.dp))
+            val themeLabel = when (theme) {
+                ThemeMode.SYSTEM -> "Match phone"
+                ThemeMode.LIGHT -> "Light"
+                ThemeMode.DARK -> "Dark"
+            }
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SummaryTile(
+                    label = "Currency",
+                    value = "${MoneyFormatter.currencySymbol(currency)} $currency",
+                    detail = "${MoneyFormatter.currencyName(currency)} · locked",
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    marker = Icons.Outlined.Lock,
+                    markerTint = ext.accentText,
+                )
+                SummaryTile(
+                    label = "Look",
+                    value = themeLabel,
+                    detail = if (theme == ThemeMode.SYSTEM) "Light by day, dark at night" else "Always $themeLabel".lowercase().replaceFirstChar { it.uppercase() },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    marker = Icons.Outlined.Edit,
+                    onClick = { onEdit(OnboardingViewModel.STEP_ESSENTIALS) },
+                    onClickLabel = "Change the look",
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val groups = com.lucento.app.domain.CategoryPresets.groups.filter { g -> g.presets.any { it.key in picks.presetKeys } }
+                SummaryTile(
+                    label = "Categories",
+                    value = "${picks.count} chosen",
+                    detail = null,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    marker = Icons.Outlined.Edit,
+                    onClick = { onEdit(OnboardingViewModel.STEP_REVIEW) },
+                    onClickLabel = "Change categories",
+                    extra = if (groups.isEmpty()) null else {
+                        {
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                groups.take(3).forEach { g ->
+                                    val key = g.presets.first().iconKey
+                                    SpotIcon(com.lucento.app.core.designsystem.component.CategoryIcons.forKey(key), ext.categoryTone(key), size = 24.dp)
+                                }
+                                if (groups.size > 3) {
+                                    Text("+${groups.size - 3}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = scheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    },
+                )
+                val ways = SpendType.entries.filter { it in spendTypes }
+                SummaryTile(
+                    label = "You pay with",
+                    value = if (ways.isEmpty()) "Not chosen" else null,
+                    detail = if (ways.isEmpty()) "Add accounts next" else ways.joinToString { it.shortName }.replaceFirstChar { it.uppercase() },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    marker = Icons.Outlined.Edit,
+                    onClick = { onEdit(OnboardingViewModel.STEP_SPEND) },
+                    onClickLabel = "Change how you pay",
+                    extra = if (ways.isEmpty()) null else {
+                        {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                ways.take(4).forEach { w ->
+                                    val tone = LucentoTheme.extendedColors.tone(w.walletType)
+                                    IconTile(w.walletType.icon, container = tone.container, content = tone.content, size = 32.dp, shape = MaterialTheme.shapes.small)
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            val on = Feature.entries.filter { it in features }
+            LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+                Text("SWITCHED ON", style = Hierarchy.cardOverline, color = scheme.onSurfaceVariant, modifier = Modifier.semantics { contentDescription = "Switched on" })
+                Spacer(Modifier.height(10.dp))
+                if (on.isEmpty()) {
+                    Text("Just the essentials", style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        on.take(4).forEach { TagPill(it.title, featureIcon(it), highlighted = true) }
+                        if (on.size > 4) TagPill("+${on.size - 4} more", null, highlighted = false)
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.large)
+                    .background(scheme.surfaceContainerLowest)
+                    .border(1.dp, scheme.outlineVariant, MaterialTheme.shapes.large)
+                    .clickable(role = Role.Button, onClickLabel = "Change where your records live") { onEdit(OnboardingViewModel.STEP_SYNC) }
+                    .heightIn(min = 58.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconTile(
+                    if (signedInEmail != null) Icons.Outlined.CloudSync else Icons.Outlined.PhoneAndroid,
+                    container = scheme.surfaceContainerHigh,
+                    content = scheme.onSurfaceVariant,
+                    size = 32.dp,
+                    shape = MaterialTheme.shapes.small,
+                )
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Lucento is personalized", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
+                    Text(if (signedInEmail != null) "Synced with your account" else "Kept on this phone", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Here’s how it will start. Next, add the accounts you use and give your categories an amount.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (signedInEmail != null) signedInEmail.ifEmpty { "Connected" } else "Export a backup any time in Settings",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
                     )
                 }
-                LucentoMascot(size = 72.dp, mood = MascotMood.Success)
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = scheme.onSurfaceVariant)
             }
-            Spacer(Modifier.height(Spacing.lg))
-            val rows = buildList {
-                add(Triple(Icons.Outlined.Payments, "Main currency", "$currency · ${MoneyFormatter.currencyName(currency)}"))
-                add(
-                    Triple(
-                        when (theme) {
-                            ThemeMode.SYSTEM -> Icons.Outlined.BrightnessAuto
-                            ThemeMode.LIGHT -> Icons.Outlined.LightMode
-                            ThemeMode.DARK -> Icons.Outlined.DarkMode
-                        },
-                        "Appearance",
-                        when (theme) {
-                            ThemeMode.SYSTEM -> "Follows your phone"
-                            ThemeMode.LIGHT -> "Light"
-                            ThemeMode.DARK -> "Dark"
-                        },
-                    ),
-                )
-                add(Triple(Icons.Outlined.Category, "Spending categories", "$categoryCount chosen · amounts come next"))
-                if (spendTypes.isNotEmpty()) {
-                    add(Triple(Icons.Outlined.CreditCard, "You pay with", SpendType.entries.filter { it in spendTypes }.joinToString { it.title }))
-                }
-                add(Triple(Icons.Outlined.ToggleOn, "Turned on", Feature.entries.filter { it in features }.joinToString { it.title }.ifEmpty { "Just the essentials" }))
-                add(
-                    Triple(
-                        if (signedInEmail != null) Icons.Outlined.CloudSync else Icons.Outlined.PhoneAndroid,
-                        "Backups",
-                        if (signedInEmail != null) {
-                            "Cloud sync · ${signedInEmail.ifEmpty { "connected" }}"
-                        } else {
-                            "This phone only · export a backup file any time from Settings › Your data"
-                        },
-                    ),
-                )
-            }
-            LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
-                rows.forEachIndexed { i, (icon, label, value) ->
-                    SummaryRow(icon, label, value)
-                    if (i < rows.lastIndex) Hairline(inset = Spacing.md + Sizes.iconTile + Spacing.md)
+            // What the rest of Set up holds for this person (their modules decide), so the next minutes aren't a surprise.
+            val next = com.lucento.app.domain.GuidedSetup.steps(com.lucento.app.domain.FeatureSet(features))
+                .filter { it.stage == com.lucento.app.domain.SetupStage.SET_UP }
+            if (next.isNotEmpty()) {
+                Spacer(Modifier.height(Spacing.lg))
+                GroupLabel("Up next")
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    next.forEachIndexed { i, step ->
+                        val (label, icon) = when (step) {
+                            com.lucento.app.domain.GuideStep.WALLETS -> "Accounts" to Icons.Outlined.AccountBalanceWallet
+                            com.lucento.app.domain.GuideStep.DEBTS -> "Cards & loans" to Icons.Outlined.CreditCard
+                            com.lucento.app.domain.GuideStep.BUDGETS -> "Budget" to Icons.Outlined.DonutLarge
+                            else -> "Goal" to Icons.Outlined.Flag
+                        }
+                        TagPill(label, icon, highlighted = i == 0)
+                        if (i < next.lastIndex) {
+                            Icon(
+                                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = scheme.outline,
+                                modifier = Modifier.size(18.dp).align(Alignment.CenterVertically),
+                            )
+                        }
+                    }
                 }
             }
             if (accountUnavailable) {
@@ -1376,42 +1556,64 @@ private fun ConfirmStep(
                             "bringing it across — or use Lucento without this account for now. Your account keeps everything."
                     },
                     icon = Icons.Outlined.WarningAmber,
-                    container = LucentoTheme.extendedColors.warningContainer,
-                    content = LucentoTheme.extendedColors.warning,
+                    container = ext.warningContainer,
+                    content = ext.warning,
                 )
             }
             if (error != null) {
                 Spacer(Modifier.height(Spacing.md))
-                InfoNote(error, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)
+                InfoNote(error, container = scheme.errorContainer, content = scheme.onErrorContainer)
             }
+            Spacer(Modifier.height(Spacing.md))
         }
-        Spacer(Modifier.height(Spacing.md))
-        if (accountUnavailable) {
-            LucentoPrimaryButton(text = "Try again", onClick = onFinish)
-            LucentoTextButton(
-                text = if (holdsAccountData) "Use Lucento without this account" else "Finish without syncing",
-                onClick = onLeaveAccount,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            LucentoPrimaryButton(text = "Continue to set up", onClick = onFinish)
+        ActionDock {
+            if (accountUnavailable) {
+                LucentoPrimaryButton(text = "Try again", onClick = onFinish)
+                LucentoTextButton(
+                    text = if (holdsAccountData) "Use Lucento without this account" else "Finish without syncing",
+                    onClick = onLeaveAccount,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                LucentoPrimaryButton(text = "Continue to set up", onClick = onFinish, trailingIcon = Icons.AutoMirrored.Outlined.ArrowForward)
+            }
         }
     }
 }
 
-/** One line of the summary: what it is about (the same icon as on the step that set it), its name, then the choice. */
+/** A small rounded tag with an optional glyph; [highlighted] tags are pale sky. */
 @Composable
-private fun SummaryRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
+private fun TagPill(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, highlighted: Boolean) {
+    val scheme = MaterialTheme.colorScheme
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.md).semantics(mergeDescendants = true) {},
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (highlighted) scheme.primaryContainer else scheme.surfaceContainerHigh)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OnboardingIcon(icon)
-        Spacer(Modifier.width(Spacing.md))
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.bodyLarge)
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = if (highlighted) scheme.onPrimaryContainer else scheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(4.dp))
         }
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = if (highlighted) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+        )
     }
 }
+
+/** Each module's glyph, as on Home's shortcuts. */
+private fun featureIcon(feature: Feature): androidx.compose.ui.graphics.vector.ImageVector = when (feature) {
+    Feature.MULTIPLE_WALLETS -> Icons.Outlined.AccountBalanceWallet
+    Feature.BUDGETS -> Icons.Outlined.DonutLarge
+    Feature.SAVINGS_GOALS -> Icons.Outlined.TrackChanges
+    Feature.DEBTS_LOANS -> Icons.Outlined.CreditCard
+    Feature.RECURRING -> Icons.Outlined.EventRepeat
+    Feature.INSIGHTS -> Icons.Outlined.BarChart
+    Feature.RECEIPT_SCANNING -> Icons.Outlined.DocumentScanner
+    Feature.VOICE_ENTRY -> Icons.Outlined.Mic
+}
+
 

@@ -104,41 +104,99 @@ saves them to `/data/local/tmp/lucento-shots/delete-0*.png`), plus the public pa
 
 | Field | Value |
 |---|---|
-| App name | Lucento |
-| Short description (≤ 80) | Budget by typing what you spent. Offline, private, no bank login. |
+| App name (≤ 30) | Lucento: Budget Tracker (owner approved the graphics set 2026-11-08; the name puts the top search term in the field Play weighs most) |
+| Short description (≤ 80) | Type what you spent. Budgets, wallets, bills and goals. Offline, no bank login. |
 | Category / tags | Finance; tags: Budget, Personal finance, Expense tracker |
 | Contact email | lucentoapp@gmail.com |
 | Website | `https://www.lucentoapp.com` |
 | Privacy policy | `https://www.lucentoapp.com/privacy` |
-| Graphics | Icon 512 × 512 (exported from the Rising Crest source in lucento-website `brand/logo`, never overwriting the original); feature graphic 1024 × 500; 4–8 phone screenshots. The latest `ScreenshotTourTest` frames (CI artifact `ui-screenshots`) are real screens with fictional data |
+| Graphics | `docs/play/graphics/` (approved 2026-11-08): icon 512 × 512 (the Rising Crest `play-store-512.png` from lucento-website `brand/logo`, unchanged), feature graphic 1024 × 500, eight 1080 × 1920 screenshots built from the website's phone template and treatments (window/focus/angle/lift) on the 2026-11-08 peso dark captures (`WebsiteShowcaseTest`, tour `-e demoCurrency PHP -e demoDark true`) |
 
-Full description (≤ 4000):
+Copy rules: never promise "no ads" (ads may come to Free); never call local parsing AI; mark Pro features; no prices,
+"best" or "#1" in graphics; name no third-party brands (GCash, Maya, Meralco) in metadata, since Play can reject
+unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the institution count from README.
 
-> Lucento is a personal finance app for people who want a clear picture of their money without the busywork.
+### Main listing, English (global default), 2804 characters
+
+> Lucento is a budget planner and expense tracker that shows everything about your money in one clear view: wallets, budgets, bills, goals, debts and net worth. No bank login and no spreadsheets. You record it, and Lucento keeps it straight, even offline.
 >
-> Write it the way you'd text it. Type or say "lunch 250, groceries 800, salary 35000" and Lucento turns it into
-> transactions you check before anything is saved. Scan a receipt and it's read on your phone.
+> TYPE IT LIKE A TEXT
+> Log spending the way you'd text a friend: "coffee 4.50, groceries 85, salary 3000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan a receipt, which is read on your phone.
 >
-> Keep pace with the month. Set a budget for each category and Lucento shows what you've spent against how much of the
-> month has passed, and what's safe to spend today.
+> KNOW WHAT'S SAFE TO SPEND
+> Give each category a monthly budget. Lucento compares what you've spent with how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
 >
-> Everything in one place: cash, bank accounts, e-wallets, savings, credit cards and loans, with logos for 400+
-> institutions. Schedule bills and salary, save toward goals, track what you owe and what others owe you, and see your
-> net worth.
+> EVERY ACCOUNT, ONE NET WORTH
+> Cash, bank accounts, e-wallets, savings, credit cards and loans, all in one money manager. Wallets can show the logo and colours of 409 banks and providers in 48 countries, so each account looks like the card you know. Lucento adds what you have and what you owe into one net worth.
 >
-> Private by design. Lucento works fully offline, on your phone, with no bank login and no ads. An account is optional.
-> Sign in only when you want cloud sync, to share with a partner, or to use the AI features.
+> BILLS, DEBTS AND SAVINGS GOALS
+> • Schedule bills, subscriptions and salary, and confirm them when they happen.
+> • Track loans and credit cards, and money others owe you.
+> • Save toward goals with a target date and the monthly pace that gets you there.
+> • See where your money went with income and spending trends.
 >
-> Lucento Pro (optional) adds:
-> - unlimited wallets and goals;
-> - wallets in other currencies;
-> - 12-month Insights and PDF statements;
-> - cloud sync between phones;
-> - Lucento Shared, so a partner can record from their own phone;
-> - an AI adviser that answers from your own figures.
+> PRIVATE BY DESIGN
+> Lucento works fully offline. It never connects to your bank and never moves money. An account is optional: sign in only for cloud sync, to share with a partner, or to use the AI features. Hide amounts with one tap, lock the app, and back up or export to CSV whenever you like.
 >
-> Choose monthly, yearly with a 7-day free trial, or a one-time Lifetime purchase. Subscriptions renew until you cancel
-> in Google Play.
+> MULTI-CURRENCY FOR TRAVEL AND WORK ABROAD
+> Keep wallets in yen, euros, dirhams or dollars (Pro). Each keeps its own currency, with totals in your main currency.
+>
+> FREE, WITH PRO WHEN YOU WANT MORE
+> The free plan has no time limit: unlimited transactions, categories and budgets, 3 money wallets, 2 savings goals and 3 months of Insights.
+>
+> Lucento Pro adds:
+> • unlimited wallets and up to 20 goals
+> • wallets in other currencies
+> • 6- and 12-month Insights and PDF statements
+> • more themes
+> • cloud sync between phones
+> • Lucento Shared, so a partner can record from their own phone
+> • more questions for Ask Lucento, the AI adviser that answers from your own figures, and Smarter reading of what you type
+>
+> Choose monthly, yearly with a 7-day free trial, or Lifetime: one purchase that keeps Pro's on-phone features for good and includes 12 months of the online services (sync, Shared and AI). Subscriptions renew until you cancel in Google Play.
+>
+> Lucento records the money you tell it about. It doesn't connect to your bank, move money or give financial advice.
+
+### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 2902 characters
+
+Short description: Type your gastos like a text. Budget, ipon and utang in pesos, offline. (71)
+
+> Lucento is a budget app and expense tracker made for how Filipinos handle money: cash, bank accounts, e-wallets, credit cards and loans, all in one clear view. Track your gastos, ipon and utang in pesos, with no bank login. You record it, and Lucento keeps it straight, even offline.
+>
+> TYPE IT LIKE A TEXT
+> Log spending the way you'd text a friend: "jeep 13, load 100, electric bill 2450, sweldo 25000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan a receipt, which is read on your phone.
+>
+> KNOW WHAT'S SAFE TO SPEND THIS MONTH
+> Give each category a monthly budget. Lucento compares what you've spent with how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
+>
+> EVERY ACCOUNT, ONE NET WORTH
+> Cash, bank accounts, e-wallets, savings, credit cards and loans, all in one money manager. Wallets can show the logo and colours of your bank or e-wallet, from 409 providers in 48 countries, including Philippine banks and e-wallets. Lucento adds what you have and what you owe into one net worth.
+>
+> BILLS, UTANG AND IPON GOALS
+> • Schedule bills, subscriptions and sweldo, and confirm them when they happen.
+> • Track loans and credit cards, and money others owe you (pautang).
+> • Save toward goals, like an emergency fund or a trip, with a target date and the monthly pace that gets you there.
+> • See where your money went with income and spending trends.
+>
+> PRIVATE BY DESIGN
+> Lucento works fully offline. It never connects to your bank or e-wallet and never moves money. An account is optional: sign in only for cloud sync, to share with a partner, or to use the AI features. Hide amounts with one tap, lock the app, and back up or export to CSV whenever you like.
+>
+> FOR OFWs AND TRAVEL
+> Keep wallets in dollars, dirhams, riyals, yen or euros (Pro). Each keeps its own currency, with totals in pesos.
+>
+> FREE, WITH PRO WHEN YOU WANT MORE
+> The free plan has no time limit: unlimited transactions, categories and budgets, 3 money wallets, 2 savings goals and 3 months of Insights.
+>
+> Lucento Pro adds:
+> • unlimited wallets and up to 20 goals
+> • wallets in other currencies
+> • 6- and 12-month Insights and PDF statements
+> • more themes
+> • cloud sync between phones
+> • Lucento Shared, so your partner can record from their own phone
+> • more questions for Ask Lucento, the AI adviser that answers from your own figures, and Smarter reading of what you type
+>
+> Choose monthly, yearly with a 7-day free trial, or Lifetime: one purchase that keeps Pro's on-phone features for good and includes 12 months of the online services (sync, Shared and AI). Subscriptions renew until you cancel in Google Play.
 >
 > Lucento records the money you tell it about. It doesn't connect to your bank, move money or give financial advice.
 

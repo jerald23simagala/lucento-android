@@ -83,7 +83,7 @@ class ReconciliationTest {
         // "Keep your money safe" comes first (owner, 2026-11-06).
         click("Keep it on this phone only")
         click("Continue")
-        waitForText("What do you want Lucento to help with?")
+        waitForText("What should Lucento help with?")
         click("Continue")
         waitForText("How do you pay?")
         click("Continue")

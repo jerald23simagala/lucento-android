@@ -349,8 +349,12 @@ data class HomeUiState(
     val spending: List<SpendingSlice> = emptyList(),
     /** Part D: milestones earned from the user's records. */
     val earned: Set<com.lucento.app.domain.Achievement> = emptySet(),
+    /** The records behind [earned], for each award's progress in the cabinet; null until loaded. */
+    val awardFacts: com.lucento.app.domain.ProgressFacts? = null,
     /** Part D: the milestone to acknowledge now (once, after the write that earned it); null when none. */
     val milestoneToShow: com.lucento.app.domain.Achievement? = null,
+    /** Other awards earned at the same time as [milestoneToShow]; presented in the same ceremony, never queued. */
+    val milestonesAlsoNew: List<com.lucento.app.domain.Achievement> = emptyList(),
     /** Part D: first time milestones exist on this install — record what's already earned without a fuss. */
     val needsMilestoneBaseline: Boolean = false,
     /** Expenses and income recorded so far (internal movements excluded). */
@@ -458,6 +462,7 @@ object HomeStateBuilder {
             .takeWhile { !it.isBefore(earliest) }
             .take(MAX_SELECTABLE_MONTHS)
             .toList()
+        val awardFacts = com.lucento.app.domain.Achievements.facts(all, wallets, categories, budgets, goals + archivedGoals, today, visitedInsights)
 
         return HomeUiState(
             loading = false,
@@ -490,9 +495,8 @@ object HomeStateBuilder {
             categoriesById = categories.associateBy { it.id },
             cloudStatus = cloudStatus,
             spending = spending,
-            earned = com.lucento.app.domain.Achievements.earned(
-                com.lucento.app.domain.Achievements.facts(all, wallets, categories, budgets, goals + archivedGoals, today, visitedInsights),
-            ),
+            earned = com.lucento.app.domain.Achievements.earned(awardFacts),
+            awardFacts = awardFacts,
             recordedCount = all.count { com.lucento.app.domain.Achievements.countsAsRecorded(it.type) },
             monthComposition = if (wallets.isEmpty()) null else com.lucento.app.domain.BalanceHistory.compositionAt(valued, ledger.withFxResults, focus, shown, today),
             balanceHistory = history,

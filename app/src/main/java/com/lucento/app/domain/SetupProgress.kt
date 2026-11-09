@@ -24,7 +24,20 @@ data class SetupProgress(
     val current: SetupStage,
     val furthest: SetupStage = current,
     val progress: Float = 0f,
+    /** Which screen of [current] this is (1-based), for the path rail's "2 of 5"; 0 when not counted. */
+    val screen: Int = 0,
+    /** How many screens [current] has for this person (steps for modules they switched off don't count). */
+    val screens: Int = 0,
 ) {
+    /** Whether the rail can say "[screen] of [screens]". */
+    val counted: Boolean get() = screens > 0 && screen in 1..screens
+
+    /** The rail's caption: "Personalize · 2 of 5", or just the stage when screens aren't counted. */
+    val caption: String get() = if (counted) "${current.label} · $screen of $screens" else current.label
+
+    /** How full the current stage's segment is: the screens reached so far, or [progress] when not counted. */
+    val fill: Float get() = if (counted) screen.toFloat() / screens else progress.coerceIn(0f, 1f)
+
     /** The furthest stage reached, never behind [current]. */
     val reached: SetupStage get() = maxOf(current, furthest)
 
@@ -58,6 +71,7 @@ data class SetupProgress(
             return buildString {
                 append("Step ${current.ordinal + 1} of ${SetupStage.entries.size}, ${current.label}.")
                 if (done.isNotEmpty()) append(" ${done.joinToString(" and ")} done.")
+                if (counted) append(" Screen $screen of $screens.")
             }
         }
 }

@@ -140,12 +140,15 @@ can only be corrected for themselves. Spending is counted by each transaction's 
   in between (`comparableTrendPercent`): a new wallet's opening balance is not growth. The spoken comparison states the
   signed amount difference.
 
-### Milestones (redesign Part D)
+### Milestones / awards (redesign Part D)
 Worked out from stored records (`Achievements.earned`), never from counters: Money Keeper (an asset wallet), Budget
 Builder (a category with an amount this month, lifecycle rules), First Step (an expense or income recorded), Getting
 Consistent (expenses or income on 7 different days, any order — no streak), Financial Explorer (Insights opened; a
 local flag), Goal Setter (a savings goal, archived ones included). Each is acknowledged once, after the write that earned it; the first run with
-milestones records what is already earned without showing anything.
+milestones records what is already earned without showing anything. Progress (`Achievements.progress`) comes from the
+same facts, so it never disagrees with what is earned: `current` of `target`, capped at the target; only Getting
+Consistent has a target above 1 and shows a count ("3 of 7 days"). Awards earned together (`toAcknowledgeAll`: a
+restored backup, a first sync, one write that earns two) are acknowledged together and presented in one ceremony.
 
 ### Spendable now (Home, P2-1)
 The summed balances of cash, bank and e-wallet accounts in the dashboard currency (`NetWorthComposition.available`).

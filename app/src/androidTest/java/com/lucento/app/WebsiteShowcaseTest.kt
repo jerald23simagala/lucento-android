@@ -61,13 +61,13 @@ class WebsiteShowcaseTest {
         click("Get started")
         click("Keep it on this phone only")
         click("Continue")
-        waitForText("What do you want Lucento to help with?")
+        waitForText("What should Lucento help with?")
         click("Continue")
         waitForText("How do you pay?")
         click("Continue")
         waitForText("What do you spend on?")
         click("Review", substring = true)
-        waitForText("Your spending categories")
+        waitForText("Rename, reorder or add more")
         click("Confirm", substring = true)
         waitForText("Currency and look")
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("PHP")
@@ -89,6 +89,9 @@ class WebsiteShowcaseTest {
         }
         val currency = runBlocking { container.preferences.preferences.first().primaryCurrency }
         check(currency == "PHP") { "Onboarding should have chosen pesos, got $currency" }
+        // A new award is presented in a modal ceremony, and the seeded month earns several at once: mark them all as seen
+        // first so no ceremony covers a capture or blocks a tap (the tour captures the cabinet and a ceremony on purpose).
+        runBlocking { container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet()) }
         runBlocking { DemoMonth.seed(container, currency, scale = 10, today = LocalDate.now()) }
         waitForText("Monthly budget")
         waitForToastsGone()
@@ -207,7 +210,8 @@ class WebsiteShowcaseTest {
     }
 
     private fun waitForToastsGone() {
-        runCatching { compose.waitUntil(15_000) { !exists("Milestone:") } }
+        // Awards are acknowledged before seeding, so this is only a safety net: close a ceremony if one is open.
+        if (exists("Thanks, Lucento")) runCatching { compose.onNodeWithText("Thanks, Lucento").performClick() }
         compose.waitForIdle()
     }
 

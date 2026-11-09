@@ -218,7 +218,8 @@ files (`res/raw`, register in `docs/design/ANIMATION_ASSETS.md`) through two com
 | `LucentoLottieAnimation(animation, marker, iterations, playing, onFinished, fallback)` | Day/night variant by theme; one-shots hold the final frame; loops stop when disposed; reduced motion shows a still (final frame for one-shots, first for loops); parse failure → fallback. |
 | `LucentoMascot(mood, tier)` | Mascot with moods: `Happy` (idle ×3, then rests), `Curious` (empty states), `Success` (onboarding done), `Celebrate`, `Concerned` (v0.5: budget nearly or fully used — supportive, never a frown). See `docs/mascot/` for the character. |
 | `EmptyIllustration` / `LucentoEmptyState` | Empty-state illustration (200×166dp) that drops out on narrow/short layouts. |
-| `ConfirmationHost(Confirmation)` | Saved check or calm milestone with one line of text, shown **after** a committed write; does not block touches; announced as a live region. |
+| `ConfirmationHost(Confirmation)` | Saved check or calm milestone with one line of text, shown **after** a committed write; does not block touches; announced as a live region. Goal halfway/reached and a kept month's budget use it. |
+| `AwardMedal` / `AwardsSheet` / `AwardCeremony` (`feature/awards`) | Awards drawn as medals on neck ribbons in Canvas (struck gold, engraved emblem, ribbon dye per award from `AwardArtwork`; unearned = flat outline with a dashed rim and a progress arc for counted awards). The cabinet shows them two to a shelf; an earned medal replays its ceremony. The ceremony is a modal card: the mascot (Celebrate pose, open palm) presents the medal; complete from the first frame, then the medal pops and swings, a sunburst turns, confetti bursts once, a shine sweeps; confirm haptic; still under reduced motion. |
 | `LucentoWorkingIndicator` | Brand dots + label for genuine background work. |
 
 Moments: empty Transactions/Budgets/Goals/Recurring; receipt scan beam while ML Kit runs
@@ -236,7 +237,7 @@ kept within budget (once). With "Remove animations" on (`LucentoTheme.reducedMot
 - **Transactions**: All · Income · Expenses · Transfers tabs above search (type pill removed from the filter row);
   empty state with the ledger illustration, Add transaction + outlined Scan receipt / Speak transaction.
 - **Plan**: mascot enlarged beside the tagline; **Budgets/Goals/Recurring** empty states with their illustrations.
-- **Onboarding**: the Rising Crest symbol settles in above the wordmark; "You're all set" mascot plays its success expression.
+- **Onboarding**: superseded by "Getting started (Sunrise Path)" below.
 - **Receipt scan**: scanning illustration while reading, "Couldn't read this receipt" state with the curious mascot.
 Not taken from the mockup on purpose: the user name/avatar (Lucento has no account), "I already have an account"
 (no sign-in exists), notification settings (no reminders yet), and emoji in the greeting.
@@ -278,12 +279,34 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
 3. **Monthly Budget**: spent (hero) "of <total> budget", % used, a 7dp bar, a verdict chip in words (Over budget ·
    Under budget · Ahead of pace · On track), and a subtle italic "Top 2 spending categories" note above two tiles that
    open Transactions filtered to that category and month.
-4. **Shortcuts**: Goals · Insights · Milestones · Debts · Scheduled (only modules that are on; switched-off ones offer
+4. **Shortcuts**: Goals · Insights · Awards · Debts · Scheduled (only modules that are on; switched-off ones offer
    "Turn on" or "Hide").
 5. **Upcoming scheduled transactions** (≤ 3, two-line rows, never auto-recorded) and **Recent transactions** (≤ 5 in
    the shown month), each with "See all".
-Amounts on cards use the same size for whole units and decimals. Milestones (docs/CALCULATIONS.md) are celebrated
-once, after the write that earned them, through `ConfirmationHost`.
+Amounts on cards use the same size for whole units and decimals. Awards (milestones, docs/CALCULATIONS.md) are
+presented once, after the write that earned them, in the award ceremony on Home; several earned together share one
+ceremony ("Also earned"), and none is presented over the open cabinet.
+
+## Getting started (Sunrise Path, 2026-11-08)
+Onboarding and the guided setup share one structure (owner-approved mockups:
+`artifacts/onboarding-redesign/proposal-2026-11-08/`). Shared parts live in `core/designsystem/component/SetupKit.kt`.
+- **Path rail** (`PathRail`): back, the three stages as thin segments, the current stage named and counted
+  ("Personalize · 2 of 5", `SetupProgress.caption`; Set up counts the onboarding summary plus the guide pages this
+  person's modules switch on, `GuidedSetup.screenOf`), and Skip on optional steps. No icon tile above step titles.
+- **Titles**: `SetupTitle` — `Hierarchy.stepTitle` 28/34 Bold, `Hierarchy.lead` 15/22 muted; milestones 30/36.
+- **Action dock** (`ActionDock`): every step ends in the same place, with a soft fade above; steps that collect
+  choices show a running count beside the button (`DockCount`). Primary "go on" buttons carry a trailing arrow.
+- **One selected state**: pale sky + blue edge + check for chips (`SelectChip`), rows (`OptionRow`), tiles
+  (`OptionTile`) and radio cards (`ChoiceCard`); solid blue is only the primary action. Category groups and modules
+  carry their existing tones (`categoryTone`, wallet-type tones) on spot icons and tiles — never as text colour.
+- **Mascot moments** (always inside a scene): welcome (in the landscape), summary (on a sunrise banner), empty
+  accounts (`MascotMood.Pointing` beside a card stack), optional goal (a small note), the composer example (reply
+  avatar) and the finish line (theme panorama). Nowhere else in getting started.
+- **Screens**: currency first on "Currency and look" (with its lock note) and appearance as three previews; the
+  summary is a 2×2 of tiles that jump back to their step, a switched-on strip, the backup row and "Up next"; accounts
+  start empty with Cash / Bank / E-wallet quick-add rows (editor preset to the type), then a starting-balance card
+  (main currency only, never converted); the budget leads with its total, a "x of 2 set" pill and a split bar whose
+  shares are named in words (`GuidedSetup.sharePercents`); goal ideas prefill only the goal's name.
 
 ## Wallet cards (redesign Part A)
 - **Type face** (no institution): the `walletCard` colours below, a gold chip, the balance (signed for debts: −1,250.00

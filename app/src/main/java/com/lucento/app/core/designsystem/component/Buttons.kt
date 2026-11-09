@@ -44,6 +44,8 @@ fun LucentoPrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: ImageVector? = null,
+    /** After the label: an arrow for "go on" actions in getting started. Decorative. */
+    trailingIcon: ImageVector? = null,
 ) {
     val haptics = rememberHaptics()
     Button(
@@ -57,7 +59,7 @@ fun LucentoPrimaryButton(
         contentPadding = ButtonPadding,
         colors = ButtonDefaults.buttonColors(),
     ) {
-        ButtonContent(text, icon)
+        ButtonContent(text, icon, trailingIcon)
     }
 }
 
@@ -182,12 +184,16 @@ fun ActionTile(
 }
 
 @Composable
-private fun ButtonContent(text: String, icon: ImageVector?) {
+private fun ButtonContent(text: String, icon: ImageVector?, trailingIcon: ImageVector? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(Sizes.icon))
             Spacer(Modifier.width(Spacing.sm))
         }
         Text(text, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+        if (trailingIcon != null) {
+            Spacer(Modifier.width(Spacing.sm))
+            Icon(trailingIcon, contentDescription = null, modifier = Modifier.size(Sizes.icon))
+        }
     }
 }
