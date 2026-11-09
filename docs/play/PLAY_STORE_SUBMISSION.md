@@ -38,7 +38,7 @@ key's SHA-1 is registered:
 |---|---|
 | Privacy policy | `https://www.lucentoapp.com/privacy` |
 | App access | **Some functionality is restricted.** Core features need no account. Give reviewers an email account on **production** that already holds Lucento Pro: create it in the app, then add a `GRANT` row with every capability and a 90-day expiry, as in SERVER_CONTRACT.md §7. Instructions: "Open Lucento › Get started (or I already have Lucento) › Use email instead › sign in with the account below. Pro features, cloud sync and Lucento Shared are enabled on this account." |
-| Ads | **No**, the app contains no ads |
+| Ads | **No**, the app contains no ads today (change this declaration, the privacy policy and the Data safety form before any ad SDK ships) |
 | Content rating | Category *Utility, Productivity, Communication or Other*. Answer no to violence, sexuality, language, controlled substances, gambling. **Users can interact or exchange content: Yes, limited.** Lucento Shared lets an invited Partner see and add records in the Owner's ledger; nothing is public. **Shares location: No. Digital purchases: Yes** (Lucento Pro) |
 | Target audience | **18 and over.** It's a personal finance app with purchases; the Privacy Policy says it isn't directed at children |
 | News app | No |
@@ -126,7 +126,7 @@ Full description (≤ 4000):
 > institutions. Schedule bills and salary, save toward goals, track what you owe and what others owe you, and see your
 > net worth.
 >
-> Private by design. Lucento works fully offline, on your phone, with no bank login and no ads. An account is optional.
+> Private by design. Lucento works fully offline, on your phone, with no bank login. An account is optional.
 > Sign in only when you want cloud sync, to share with a partner, or to use the AI features.
 >
 > Lucento Pro (optional) adds:

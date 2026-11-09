@@ -9,8 +9,8 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-07"
-    const val UPDATED = "7 November 2026"
+    const val VERSION = "2026-11-08"
+    const val UPDATED = "8 November 2026"
 
     /** Where questions, privacy requests and account-deletion requests go (Play's privacy point of contact). */
     const val CONTACT_EMAIL = "lucentoapp@gmail.com"
@@ -147,7 +147,7 @@ object LegalDocuments {
                     "Receipt scanning reads the photo on your phone; the photo isn’t uploaded. A profile photo stays on " +
                         "your phone too.",
                     "Lucento doesn’t use Android’s automatic cloud backup, so nothing is copied to a backup you didn’t " +
-                        "choose. There are no ads.",
+                        "choose.",
                 ),
             ),
             Section(
