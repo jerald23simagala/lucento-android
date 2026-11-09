@@ -14,9 +14,12 @@ import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.ask.AnswerCheck
 import com.lucento.app.domain.ask.AskRouter
+import com.lucento.app.domain.ask.AskScope
+import com.lucento.app.domain.ask.AskTopic
 import com.lucento.app.domain.ask.AskSnapshotBuilder
 import com.lucento.app.domain.ask.CheckedAnswer
 import com.lucento.app.domain.ask.LocalAnswers
+import com.lucento.app.domain.ask.PurchaseCheck
 import com.lucento.app.domain.ask.Report
 import com.lucento.app.domain.ask.ReportBuilder
 import com.lucento.app.domain.ask.ReportInputs
@@ -242,10 +245,20 @@ class AskLucentoViewModel(
     }
 
     private suspend fun answer(text: String, data: ReportInputs, state: AskUiState, history: List<AskMessage>, aiActive: Boolean): AskMessage.Answer {
+        // Owner test round 2: a question plainly not about money is answered here, without spending the AI allowance.
+        val topic = AskScope.topic(text)
+        if (topic == AskTopic.OFF_TOPIC) return AskMessage.Answer(0, plain(AskScope.OFF_TOPIC_REPLY), AnswerSource.PHONE)
         val route = AskRouter.route(text, data.today)
-        fun local(note: String? = null): AskMessage.Answer? = route?.let {
-            val report = ReportBuilder.build(it.kind, data, state.currency, it.month, it.top)
-            AskMessage.Answer(0, plain(LocalAnswers.summary(report)), AnswerSource.PHONE, report = report, note = note)
+        suspend fun local(note: String? = null): AskMessage.Answer? {
+            if (topic == AskTopic.PURCHASE) {
+                // Whether a purchase fits, from the same figures the AI would see (PurchaseCheck); never presented as AI.
+                val figures = withContext(Dispatchers.Default) { AskSnapshotBuilder.build(data, state.currency) }
+                return AskMessage.Answer(0, PurchaseCheck.answer(figures, AskScope.price(text, state.currency)), AnswerSource.PHONE, note = note)
+            }
+            return route?.let {
+                val report = ReportBuilder.build(it.kind, data, state.currency, it.month, it.top)
+                AskMessage.Answer(0, plain(LocalAnswers.summary(report)), AnswerSource.PHONE, report = report, note = note)
+            }
         }
         if (!aiActive) {
             return local() ?: when {

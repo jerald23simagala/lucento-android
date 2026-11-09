@@ -18,6 +18,9 @@ Lucento sends four emails, all about the person's own account. Nothing else: no 
   (`feature/settings/PasswordReset.kt`, `AuthRepository.sendPasswordReset` / `resetPasswordWithCode`). There is no link
   on purpose: a reset never depends on a browser opening the app. The app accepts 6–10 digit codes (Email OTP Length).
   After the new password is set, the short recovery session is ended and the form signs in normally.
+  Supabase answers the same whether or not an address has an account, so the sheet never says "email not found" (that
+  would let anyone check who uses Lucento); it says "If … has a Lucento account, a code is on its way". It does tell
+  apart an address Supabase refuses ("doesn't look right"), being offline, and a send that failed (owner test round 2).
 - Welcome and Pro templates: lucento-website `src/server/email-templates.ts` (HTML and plain text, unit-tested in
   `src/server/email.test.ts`). Images are PNGs in lucento-website `public/email/`, made from the mascot art (copies; the
   WebP originals are untouched).

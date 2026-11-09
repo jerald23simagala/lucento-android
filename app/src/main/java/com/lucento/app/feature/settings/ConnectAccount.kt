@@ -108,7 +108,8 @@ internal fun GoogleSignInButton(onClick: () -> Unit) {
 /** What the user is doing with an email account: making one, or signing in to an existing one. */
 enum class EmailMode { CREATE, SIGN_IN }
 
-private val EmailPattern = Regex("""[^@\s]+@[^@\s]+\.[^@\s]+""")
+/** Something@domain.tld, with no empty part in the domain ("name@gmail..com" is refused by Supabase too). */
+private val EmailPattern = Regex("""[^@\s]+@[^@\s.]+(\.[^@\s.]+)+""")
 
 /** Checks an email form before it reaches the server; null when it can be sent. */
 fun emailFormProblem(email: String, password: String, mode: EmailMode): String? =

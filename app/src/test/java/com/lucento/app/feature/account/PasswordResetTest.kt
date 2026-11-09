@@ -1,10 +1,15 @@
 package com.lucento.app.feature.account
 
+import com.lucento.app.data.sync.AuthRepository.ResendResult
 import com.lucento.app.data.sync.resetFailureMessage
+import com.lucento.app.data.sync.resetSendResult
+import com.lucento.app.feature.settings.emailProblem
 import com.lucento.app.feature.settings.PasswordResetViewModel
 import io.github.jan.supabase.auth.exception.AuthErrorCode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,5 +38,20 @@ class PasswordResetTest {
     @Test
     fun `release builds never show the server's detail`() {
         assertFalse(resetFailureMessage(null, debug = false, detail = "secret detail").contains("secret detail"))
+    }
+
+    @Test
+    fun `a refused address says check it, not check your connection (owner test round 2)`() {
+        assertEquals(ResendResult.INVALID_EMAIL, resetSendResult(AuthErrorCode.ValidationFailed, "Unable to validate email address: invalid format"))
+        assertEquals(ResendResult.TOO_SOON, resetSendResult(AuthErrorCode.OverEmailSendRateLimit, ""))
+        assertEquals(ResendResult.FAILED, resetSendResult(AuthErrorCode.UnexpectedFailure, "Error sending recovery email"))
+    }
+
+    @Test
+    fun `addresses Supabase refuses are caught on the phone first`() {
+        assertNotNull(emailProblem("name@gmail..com"))
+        assertNotNull(emailProblem("name@.gmail.com"))
+        assertNotNull(emailProblem("name@gmail.com."))
+        assertNull(emailProblem("first.last@mail.example.co.uk"))
     }
 }

@@ -28,6 +28,19 @@ Gemini was busy, slow or unreachable the answer also offers **Ask Gemini again**
 session doesn't. Signed in on this phone but refused by the proxy even after a token refresh says "Your sign-in has
 expired — sign in again", not "needs your sync account".
 
+**Owner test round 2 (2026-11-09).** Before anything is sent, `AskScope.topic` reads the question on the phone:
+- **Off topic** — no money word and plainly about something else (code, spreadsheets, recipes, poems, homework…): a
+  one-line answer saying what Ask Lucento is for, on the phone, whether Gemini is on or not. It never spends the AI
+  allowance. Anything less clear-cut goes to Gemini (when on), whose instructions now refuse non-money questions in one
+  sentence and suggest a money question instead.
+- **Purchase** — "Should I buy…", "Can I afford…" (borrowing excluded): with Gemini on, Gemini answers from the person's
+  figures (yes / yes from savings / not yet, keeping about three months of spending aside, net worth when it matters;
+  a typical price it knows when none is given, marked as an estimate). With Gemini off or unreachable, `PurchaseCheck`
+  answers on the phone (docs/CALCULATIONS.md "Purchase check"), labelled "Calculated on this phone".
+- The proxy (lucento-website `src/server/gemini.ts`) also changed after the round-2 test, when every Flash model
+  answered 503 or timed out: each call except the last gets at most 11 s so another model can still answer, the newest
+  Flash-Lite is tried third, and a model that answered 404 is skipped for the function instance.
+
 ## Reports
 
 `domain/ask/Reports.kt` builds a `Report`: one currency, a headline figure, sections with columns and totals, and notes

@@ -95,7 +95,11 @@ class AuthRepository(
         UNREACHABLE,
     }
 
-    enum class ResendResult { SENT, TOO_SOON, FAILED }
+    /**
+     * How a request to send an email went. [OFFLINE] and [INVALID_EMAIL] are only given by [sendPasswordReset], so the
+     * sheet can say what actually happened instead of blaming the connection (owner test round 2).
+     */
+    enum class ResendResult { SENT, TOO_SOON, FAILED, OFFLINE, INVALID_EMAIL }
 
     /**
      * The signed-in account's email, or null. Follows the session status, so it updates once the stored session
@@ -258,20 +262,16 @@ class AuthRepository(
      */
     suspend fun sendPasswordReset(email: String): ResendResult {
         val auth = client?.auth ?: return ResendResult.FAILED
-        if (!isOnline()) return ResendResult.FAILED
+        if (!isOnline()) return ResendResult.OFFLINE
         return try {
             auth.resetPasswordForEmail(email.trim(), redirectUrl = null)
             ResendResult.SENT
         } catch (e: CancellationException) {
             throw e
         } catch (e: AuthRestException) {
-            if (e.errorCode == AuthErrorCode.OverEmailSendRateLimit || e.errorCode == AuthErrorCode.OverRequestRateLimit) {
-                ResendResult.TOO_SOON
-            } else {
-                ResendResult.FAILED
-            }
+            resetSendResult(e.errorCode, safeFailureDescription(e))
         } catch (e: Exception) {
-            ResendResult.FAILED
+            if (e is HttpRequestException || isTimeout(e)) ResendResult.OFFLINE else ResendResult.FAILED
         }
     }
 
@@ -634,6 +634,17 @@ internal fun emailFailureMessage(code: AuthErrorCode?, debug: Boolean, detail: S
         else -> emailFailureText(code)
     }
     return if (debug) "$message (debug: $detail)" else message
+}
+
+/**
+ * A refused reset email. Supabase rejects some addresses the form's own check lets through ("name@gmail..com") with
+ * `validation_failed`; an address without an account is never refused (Supabase answers the same either way, so
+ * nobody can use the form to find out who has an account).
+ */
+internal fun resetSendResult(code: AuthErrorCode?, detail: String): AuthRepository.ResendResult = when {
+    code == AuthErrorCode.OverEmailSendRateLimit || code == AuthErrorCode.OverRequestRateLimit -> AuthRepository.ResendResult.TOO_SOON
+    code == AuthErrorCode.ValidationFailed || detail.contains("email address", ignoreCase = true) -> AuthRepository.ResendResult.INVALID_EMAIL
+    else -> AuthRepository.ResendResult.FAILED
 }
 
 /** What the person is told when a reset code or new password is refused. */

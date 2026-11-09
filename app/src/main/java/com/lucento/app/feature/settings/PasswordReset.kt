@@ -86,10 +86,12 @@ class PasswordResetViewModel(private val auth: AuthRepository) : ViewModel() {
                     AuthRepository.ResendResult.SENT -> it.copy(
                         busy = false,
                         step = ResetStep.CODE,
-                        info = if (again) "We sent a new code to ${it.email}." else null,
+                        info = if (again) "If ${it.email} has a Lucento account, a new code is on its way." else null,
                     )
                     AuthRepository.ResendResult.TOO_SOON -> it.copy(busy = false, message = "An email was sent a moment ago. Wait a minute, then try again.")
-                    AuthRepository.ResendResult.FAILED -> it.copy(busy = false, message = "Couldn’t send the email. Check your connection and try again.")
+                    AuthRepository.ResendResult.OFFLINE -> it.copy(busy = false, message = "You’re offline. Connect to the internet, then try again.")
+                    AuthRepository.ResendResult.INVALID_EMAIL -> it.copy(busy = false, message = "That email address doesn’t look right. Check it and try again.")
+                    AuthRepository.ResendResult.FAILED -> it.copy(busy = false, message = "Couldn’t send the email just now. Try again in a few minutes.")
                 }
             }
         }
@@ -221,7 +223,8 @@ private fun CodeStep(
 
     SheetHeader(
         title = "Check your email",
-        subtitle = "We sent a code to ${state.email}. It can take a minute — check Spam too.",
+        // Supabase never says whether an address has an account, so neither do we (nobody can test addresses here).
+        subtitle = "If ${state.email} has a Lucento account, a code is on its way. It can take a minute — check Spam too. No email? Check the address, or sign up instead.",
         icon = Icons.Outlined.LockReset,
     )
     OutlinedTextField(
