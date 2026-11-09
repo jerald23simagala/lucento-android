@@ -65,6 +65,8 @@ class LucentoApplication : Application() {
         // SyncWorker itself immediately no-ops out of unless the preference is on (see SyncWorker.doWork).
         // Sessions a sign-out ended but the server hasn't confirmed revoking (offline, killed): retried by RevokeWorker.
         if (container.pendingRevokes.all().isNotEmpty()) com.lucento.app.data.sync.RevokeScheduler.schedule(this)
+        // The welcome email (docs/EMAILS.md): asked for once per signed-in account; nothing while signed out.
+        container.welcomeEmail.start(CoroutineScope(SupervisorJob() + Dispatchers.Default), container.auth.observeUserId())
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             container.usageCounts.retryPendingDeletion()
             observeOnline().collect { online ->
@@ -199,6 +201,16 @@ class AppContainer(application: Application) {
             BuildConfig.PLAY_LICENSE_KEY.isBlank() -> com.lucento.app.data.billing.UnavailablePurchaseSource
             else -> com.lucento.app.data.billing.PlayPurchaseSource(application, entitlementScope, BuildConfig.PLAY_LICENSE_KEY)
         }
+    }
+
+    /** Asks Lucento's site for the welcome email once per account (docs/EMAILS.md). */
+    val welcomeEmail: com.lucento.app.data.account.WelcomeEmailRequester by lazy {
+        val endpoint = if (supabaseClient == null) "" else BuildConfig.ACCOUNT_WELCOME_URL
+        com.lucento.app.data.account.WelcomeEmailRequester(
+            endpoint,
+            com.lucento.app.data.account.PrefsWelcomeMemory(application),
+            com.lucento.app.data.account.WelcomeEmailRequester.proxyAsk(endpoint, auth::accessToken),
+        )
     }
 
     /** Release builds only: the server checks each purchase with Play and keeps the account's copy. */

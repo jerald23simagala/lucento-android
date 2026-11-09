@@ -67,6 +67,9 @@ fun askUrlFor(interpretUrl: String): String =
 // Lucento Pro (docs/monetization/SERVER_CONTRACT.md §3): purchases are checked by /api/billing/verify on the same site.
 fun billingVerifyUrlFor(interpretUrl: String): String =
     if (interpretUrl.isBlank()) "" else interpretUrl.trimEnd('/').replace(Regex("/interpret$"), "") + "/billing/verify"
+// Account emails (docs/EMAILS.md): the welcome request goes to the same site, beside the AI and billing endpoints.
+fun welcomeUrlFor(interpretUrl: String): String =
+    if (interpretUrl.isBlank()) "" else interpretUrl.trimEnd('/').replace(Regex("/interpret$"), "") + "/account/welcome"
 // Google Play's licence key (Play Console › Monetization setup › Licensing), public by design: the phone checks every
 // purchase's signature with it. Without it a release doesn't bill (no prices; "not on sale yet"). Debug never bills.
 val playLicenceKey = lucentoConfig("LUCENTO_PLAY_LICENSE_KEY")
@@ -132,6 +135,7 @@ android {
             // The .debug application id can never bill: test builds use the plan simulator instead.
             buildConfigField("String", "PLAY_LICENSE_KEY", "\"\"")
             buildConfigField("String", "BILLING_VERIFY_URL", "\"\"")
+            buildConfigField("String", "ACCOUNT_WELCOME_URL", "\"${welcomeUrlFor(debugAiInterpretUrl)}\"")
         }
         release {
             buildConfigField("String", "SUPABASE_URL", "\"$releaseSupabaseUrl\"")
@@ -140,6 +144,7 @@ android {
             buildConfigField("String", "AI_ASK_URL", "\"${askUrlFor(releaseAiInterpretUrl)}\"")
             buildConfigField("String", "PLAY_LICENSE_KEY", "\"$playLicenceKey\"")
             buildConfigField("String", "BILLING_VERIFY_URL", "\"${billingVerifyUrlFor(releaseAiInterpretUrl)}\"")
+            buildConfigField("String", "ACCOUNT_WELCOME_URL", "\"${welcomeUrlFor(releaseAiInterpretUrl)}\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
