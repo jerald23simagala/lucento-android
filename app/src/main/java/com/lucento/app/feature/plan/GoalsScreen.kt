@@ -182,12 +182,18 @@ private data class GoalDraft(
 
 /** The new-goal sheet on its own, for the guided setup; [onDismiss] runs when it closes, saved or not. */
 @Composable
-internal fun NewGoalSheet(currencyCode: String, onDismiss: () -> Unit, viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory)) {
+internal fun NewGoalSheet(
+    currencyCode: String,
+    onDismiss: () -> Unit,
+    viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
+    /** A starting name (the guided setup's suggestions); the person still sets the amount. */
+    initialName: String = "",
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current.applicationContext
     val photos = remember(context) { GoalPhotos(context) }
     GoalEditorSheet(
-        initial = GoalDraft(currencyCode = currencyCode),
+        initial = GoalDraft(currencyCode = currencyCode, name = initialName),
         state = state,
         photos = photos,
         onSave = { d, money, done -> viewModel.saveGoal(d.id, d.name, money, d.targetDate, d.walletId, d.sceneKey, d.photoPath, done) },

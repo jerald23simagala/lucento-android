@@ -55,6 +55,34 @@ internal object Palette {
     val NightMuted = Color(0xFFB8C5DC)
 }
 
+/**
+ * Award medal artwork (feature/awards): struck gold, its engraving, the ribbon dyes and the confetti. Like the mascot's
+ * torch light these are illustration colours, not UI chrome — never text, never a status cue — and they look the same
+ * in every theme because a medal is an object, not a surface. Ribbons reuse the brand palette so the cabinet stays on
+ * brand; every medal also carries its own emblem and name, so colour is never the only difference.
+ */
+@Immutable
+object AwardArtwork {
+    val GoldHighlight = Color(0xFFFFF1B8)
+    val GoldLight = Color(0xFFFFDC6A)
+    val Gold = Palette.SunlightYellow
+    val GoldDeep = Color(0xFFD9930F)
+    val GoldEdge = Color(0xFFB0700A)
+    /** Engraving: the emblem and inner ring — 5.6:1 on Gold, 3.3:1 at the deepest shade of the field (non-text graphic). */
+    val Engraving = Color(0xFF6E4204)
+    val RibbonBlue = Palette.ElectricBlue
+    val RibbonTangerine = Palette.BrightTangerine
+    val RibbonGreen = Palette.Positive
+    /** Plum: the one dye outside the brand palette, because navy vanishes against the night theme. */
+    val RibbonPlum = Color(0xFF7B52D9)
+    val RibbonSky = Palette.BlueNight
+    val RibbonSun = Palette.SunlightYellow
+    val StripeIvory = Palette.SoftIvory
+    val StripeGold = Palette.SunlightYellow
+    val StripeNavy = Palette.MidnightNavy
+    val Confetti = listOf(Palette.SunlightYellow, Palette.BrightTangerine, Palette.ElectricBlue, Palette.Positive, Palette.BlueNight)
+}
+
 internal val LightColors = lightColorScheme(
     primary = Palette.ElectricBlue,
     onPrimary = Color.White,

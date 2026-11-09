@@ -50,6 +50,25 @@ class DashboardRedesignTest {
         assertTrue(Achievement.GOAL_SETTER in Achievements.earned(some.copy(goals = 1)))
     }
 
+    @Test fun `award progress agrees with what is earned, and only multi-step awards are counted`() {
+        val facts = ProgressFacts(assetWallets = 3, budgetedCategories = 0, recordedTransactions = 12, activeDays = 4, goals = 0, visitedInsights = false)
+        Achievement.entries.forEach { a ->
+            assertEquals(a.name, a in Achievements.earned(facts), Achievements.progress(a, facts).earned)
+        }
+        val consistent = Achievements.progress(Achievement.GETTING_CONSISTENT, facts)
+        assertEquals(com.lucento.app.domain.AwardProgress(4, Achievements.CONSISTENT_DAYS), consistent)
+        assertTrue(consistent.isCounted)
+        // Three wallets is still one step done of one: single-step awards never show a count or overflow.
+        assertEquals(com.lucento.app.domain.AwardProgress(1, 1), Achievements.progress(Achievement.MONEY_KEEPER, facts))
+        assertFalse(Achievements.progress(Achievement.MONEY_KEEPER, facts).isCounted)
+        // Past the target the count stops at the target.
+        assertEquals(1f, Achievements.progress(Achievement.GETTING_CONSISTENT, facts.copy(activeDays = 30)).fraction)
+    }
+
+    @Test fun `every award says how to earn it`() {
+        Achievement.entries.forEach { assertTrue(it.name, it.howTo.isNotBlank() && it.howTo != it.description) }
+    }
+
     @Test fun `an archived goal still counts as a goal set, but not in Home's savings`() {
         val reached = com.lucento.app.domain.Goal(7, "Trip", Money(50_000, "USD"), null, null, 0)
         val home = HomeStateBuilder.build(emptyList(), emptyList(), categories.values.toList(), "USD", nov.atDay(10), archivedGoals = listOf(reached))
@@ -74,6 +93,10 @@ class DashboardRedesignTest {
         assertEquals(Achievement.MONEY_KEEPER, Achievements.toAcknowledge(earned, emptySet()))
         assertEquals(Achievement.FIRST_STEP, Achievements.toAcknowledge(earned, setOf(Achievement.MONEY_KEEPER)))
         assertNull(Achievements.toAcknowledge(earned, earned))
+        // Awards that land together (a restored backup, a first sync) are presented together, in display order.
+        assertEquals(listOf(Achievement.MONEY_KEEPER, Achievement.FIRST_STEP), Achievements.toAcknowledgeAll(earned, emptySet()))
+        assertEquals(emptyList<Achievement>(), Achievements.toAcknowledgeAll(earned, acknowledged = null))
+        assertEquals(emptyList<Achievement>(), Achievements.toAcknowledgeAll(earned, earned))
     }
 
     @Test fun `the plus spotlight shows once after setup and never to someone who already records`() {

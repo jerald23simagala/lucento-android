@@ -9,7 +9,7 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-08"
+    const val VERSION = "2026-11-09"
     const val UPDATED = "8 November 2026"
 
     /** Where questions, privacy requests and account-deletion requests go (Play's privacy point of contact). */
@@ -156,8 +156,9 @@ object LegalDocuments {
                     "Creating an account stores your email address, a scrambled form of your password (never the password " +
                         "itself), when you agreed to these terms, and — for Google sign-in — the name and picture link on " +
                         "your Google account.",
-                    "We send emails only about your account, such as the link to verify your address. They’re delivered by " +
-                        "our email provider, Resend.",
+                    "We send emails only about your account: the link to verify your address, a welcome note when the " +
+                        "account is new, and a confirmation when you buy Lucento Pro. Lucento’s server reads your address " +
+                        "from your account and our email provider, Resend, delivers them. They never include your records.",
                     "When you choose a password, Lucento checks it against known data leaks by sending only the first five " +
                         "characters of a scrambled version (Have I Been Pwned). Your password is never sent there.",
                 ),

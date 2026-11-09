@@ -199,10 +199,7 @@ internal fun guideStepNumber(step: GuideStep): Int = GUIDE_FIRST_STEP_NUMBER + s
 internal const val GUIDE_FIRST_STEP_NUMBER = 9
 
 /** Guided-setup pages belong to the last two visible stages: adding accounts and amounts, then using Lucento. */
-internal fun guideStage(step: GuideStep): com.lucento.app.domain.SetupStage = when (step) {
-    GuideStep.TRANSACTIONS, GuideStep.WELCOME -> com.lucento.app.domain.SetupStage.GET_STARTED
-    else -> com.lucento.app.domain.SetupStage.SET_UP
-}
+internal fun guideStage(step: GuideStep): com.lucento.app.domain.SetupStage = step.stage
 
 /**
  * How full the current stage's bar is. Set up began in onboarding (backups, summary: the first 30%), so the guide's

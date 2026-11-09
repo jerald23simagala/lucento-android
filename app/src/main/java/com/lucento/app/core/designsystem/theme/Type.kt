@@ -80,6 +80,15 @@ object Hierarchy {
     val cardTitle = style(15, 20, FontWeight.SemiBold)
     val context = style(12, 16, FontWeight.Medium, tracking = 0.005)
     val fieldLabel = style(14, 20, FontWeight.SemiBold)
+
+    /** Getting started (onboarding and the guided setup): one title size for every step. */
+    val stepTitle = style(28, 34, FontWeight.Bold, tracking = -0.015)
+    /** Getting started's milestone screens (the finish line). */
+    val milestoneTitle = style(30, 36, FontWeight.Bold, tracking = -0.015)
+    /** The line under a step title: what the step is for. Muted. */
+    val lead = style(15, 22)
+    /** A quiet label over a group of choices ("Always included", "Main currency"). Muted. */
+    val groupLabel = style(13, 18, FontWeight.SemiBold)
 }
 
 /** Editorial overline for tiny labels (chart legends, figure captions). Uppercased by the caller. */

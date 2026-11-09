@@ -43,7 +43,11 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.component.CategoryIcons
-import com.lucento.app.core.designsystem.component.ChoicePill
+import com.lucento.app.core.designsystem.component.SearchField
+import com.lucento.app.core.designsystem.component.SelectChip
+import com.lucento.app.core.designsystem.component.SelectChipState
+import com.lucento.app.core.designsystem.component.SpotIcon
+import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoTextButton
@@ -124,35 +128,23 @@ fun CategoryPresetPicker(
     }
 
     Column(modifier) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it.take(40) },
-            placeholder = { Text("Search categories") },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            trailingIcon = if (query.isNotEmpty()) {
-                { IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, contentDescription = "Clear search") } }
-            } else {
-                null
-            },
-            singleLine = true,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(Spacing.sm))
+        SearchField(value = query, onValueChange = { query = it.take(40) }, placeholder = "Search ${CategoryPresets.all.size} categories")
+        Spacer(Modifier.height(Spacing.xs))
 
         if (existingCustom.isNotEmpty() && normalizedQuery.isEmpty()) {
             PickerGroup(
                 title = "Your categories",
                 selectedCount = existingCustom.count { it.id in picks.existingIds },
+                total = existingCustom.size,
+                iconKey = existingCustom.first().iconKey,
                 initiallyExpanded = true,
             ) {
                 existingCustom.forEach { c ->
                     val selected = c.id in picks.existingIds
-                    ChoicePill(
+                    SelectChip(
                         label = c.name,
-                        selected = selected,
-                        leadingIcon = if (selected) Icons.Filled.Check else CategoryIcons.forKey(c.iconKey),
-                        role = Role.Checkbox,
+                        icon = CategoryIcons.forKey(c.iconKey),
+                        state = if (selected) SelectChipState.CHOSEN else SelectChipState.ADD,
                         onClick = {
                             haptics.tick()
                             onChange(picks.copy(existingIds = if (selected) picks.existingIds - c.id else picks.existingIds + c.id))
@@ -170,6 +162,8 @@ fun CategoryPresetPicker(
             PickerGroup(
                 title = group.title,
                 selectedCount = group.presets.count { it.key in picks.presetKeys },
+                total = group.presets.size,
+                iconKey = group.presets.first().iconKey,
                 initiallyExpanded = normalizedQuery.isNotEmpty() ||
                     group.presets.any { it.recommended || it.key in picks.presetKeys },
                 forceExpanded = normalizedQuery.isNotEmpty(),
@@ -177,11 +171,10 @@ fun CategoryPresetPicker(
             ) {
                 presets.forEach { preset ->
                     val selected = preset.key in picks.presetKeys
-                    ChoicePill(
+                    SelectChip(
                         label = preset.name,
-                        selected = selected,
-                        leadingIcon = if (selected) Icons.Filled.Check else CategoryIcons.forKey(preset.iconKey),
-                        role = Role.Checkbox,
+                        icon = CategoryIcons.forKey(preset.iconKey),
+                        state = if (selected) SelectChipState.CHOSEN else SelectChipState.ADD,
                         onClick = { togglePreset(preset.key) },
                     )
                 }
@@ -189,14 +182,12 @@ fun CategoryPresetPicker(
         }
 
         if (picks.customNames.isNotEmpty()) {
-            PickerGroup(title = "Custom", selectedCount = picks.customNames.size, initiallyExpanded = true) {
+            PickerGroup(title = "Custom", selectedCount = picks.customNames.size, total = picks.customNames.size, iconKey = "other", initiallyExpanded = true) {
                 picks.customNames.forEach { name ->
-                    ChoicePill(
+                    SelectChip(
                         label = name,
-                        selected = true,
-                        leadingIcon = Icons.Filled.Check,
-                        trailingIcon = Icons.Filled.Close,
-                        role = Role.Checkbox,
+                        icon = CategoryIcons.forKey("other"),
+                        state = SelectChipState.CHOSEN,
                         onClick = {
                             haptics.tick()
                             onChange(picks.copy(customNames = picks.customNames - name))
@@ -242,6 +233,8 @@ fun CategoryPresetPicker(
 private fun PickerGroup(
     title: String,
     selectedCount: Int,
+    total: Int,
+    iconKey: String?,
     initiallyExpanded: Boolean,
     forceExpanded: Boolean = false,
     key: String = title,
@@ -258,21 +251,22 @@ private fun PickerGroup(
                 .semantics { stateDescription = if (open) "Expanded" else "Collapsed" },
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            SpotIcon(CategoryIcons.forKey(iconKey ?: "other"), LucentoTheme.extendedColors.categoryTone(iconKey))
+            Spacer(Modifier.width(Spacing.sm))
             Text(
                 title,
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.weight(1f).semantics { heading() },
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (selectedCount > 0) {
-                Text(
-                    "$selectedCount selected",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.width(Spacing.xs))
-            }
+            Spacer(Modifier.width(Spacing.xs))
+            Text(
+                if (selectedCount > 0) "$selectedCount of $total" else "None yet",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(Spacing.xs))
             Icon(
                 if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                 contentDescription = null,
@@ -308,11 +302,10 @@ fun CategoryReview(
     Column(modifier) {
         val ownPicked = existingCustom.filter { it.id in picks.existingIds }
         if (ownPicked.isNotEmpty()) {
-            ReviewGroup("Your categories") {
+            ReviewGroup("Your categories", ownPicked.first().iconKey, ownPicked.size) {
                 ownPicked.forEach { c ->
-                    ChoicePill(
-                        label = c.name, selected = true, leadingIcon = CategoryIcons.forKey(c.iconKey), trailingIcon = Icons.Filled.Close,
-                        role = Role.Button,
+                    SelectChip(
+                        label = c.name, icon = CategoryIcons.forKey(c.iconKey), state = SelectChipState.REMOVE,
                         onClick = { haptics.tick(); onChange(picks.copy(existingIds = picks.existingIds - c.id)) },
                     )
                 }
@@ -321,22 +314,20 @@ fun CategoryReview(
         CategoryPresets.groups.forEach { group ->
             val chosen = group.presets.filter { it.key in picks.presetKeys }
             if (chosen.isEmpty()) return@forEach
-            ReviewGroup(group.title) {
+            ReviewGroup(group.title, group.presets.first().iconKey, chosen.size) {
                 chosen.forEach { preset ->
-                    ChoicePill(
-                        label = preset.name, selected = true, leadingIcon = CategoryIcons.forKey(preset.iconKey), trailingIcon = Icons.Filled.Close,
-                        role = Role.Button,
+                    SelectChip(
+                        label = preset.name, icon = CategoryIcons.forKey(preset.iconKey), state = SelectChipState.REMOVE,
                         onClick = { haptics.tick(); onChange(picks.copy(presetKeys = picks.presetKeys - preset.key)) },
                     )
                 }
             }
         }
         if (picks.customNames.isNotEmpty()) {
-            ReviewGroup("Custom") {
+            ReviewGroup("Custom", "other", picks.customNames.size) {
                 picks.customNames.forEach { name ->
-                    ChoicePill(
-                        label = name, selected = true, leadingIcon = CategoryIcons.forKey("other"), trailingIcon = Icons.Filled.Close,
-                        role = Role.Button,
+                    SelectChip(
+                        label = name, icon = CategoryIcons.forKey("other"), state = SelectChipState.REMOVE,
                         onClick = { haptics.tick(); onChange(picks.copy(customNames = picks.customNames - name)) },
                     )
                 }
@@ -364,8 +355,13 @@ fun CategoryReview(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ReviewGroup(title: String, content: @Composable () -> Unit) {
-    Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.sm).semantics { heading() })
+private fun ReviewGroup(title: String, iconKey: String?, count: Int, content: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = Spacing.md, bottom = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+        SpotIcon(CategoryIcons.forKey(iconKey ?: "other"), LucentoTheme.extendedColors.categoryTone(iconKey))
+        Spacer(Modifier.width(Spacing.sm))
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).semantics { heading() })
+        Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
     FlowRow(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),

@@ -58,8 +58,10 @@ because 3.5 (pulled by the Compose BOM) calls `InputManager.getInstance`, which 
 
 For the website's screenshots, `-Pandroid.testInstrumentationRunnerArguments.demoCurrency=PHP` picks pesos in onboarding
 and scales every seeded amount ×10 (salary ₱42,000, rent ₱15,000, car loan ₱120,000), and the tour also saves
-`09b-composer-review` and `21b-composer-review-dark` (keyboard down) and waits for milestone toasts before the Dashboard
-shots. CI passes neither argument and keeps its US-dollar figures. If the API 36.1 emulator's `system_server` has
+`09b-composer-review` and `21b-composer-review-dark` (keyboard down). Awards are presented in a modal ceremony, so the
+tour and `WebsiteShowcaseTest` mark every award as seen before seeding the demo month (no ceremony covers a capture or
+blocks a tap); the tour captures the cabinet (`07a-awards-cabinet`) and a replayed ceremony (`07b-award-ceremony`) on
+purpose. CI passes neither argument and keeps its US-dollar figures. If the API 36.1 emulator's `system_server` has
 aborted once (TaskSnapshotPersister), it stays degraded (System UI and app ANRs): cold-boot it
 (`-no-snapshot-load`), wait a minute after boot, and set `adb shell settings put global hide_error_dialogs 1` so a
 system crash dialog can't swallow the tour's Back presses.

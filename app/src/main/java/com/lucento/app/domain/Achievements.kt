@@ -5,13 +5,18 @@ package com.lucento.app.domain
  * never from a counter that could be gamed — and none can be lost: no streaks to break, no points, no pressure, no
  * reminders that nag. A milestone is acknowledged once, after the write that earned it.
  */
-enum class Achievement(val key: String, val title: String, val description: String) {
-    MONEY_KEEPER("money_keeper", "Money Keeper", "Added the accounts you use"),
-    BUDGET_BUILDER("budget_builder", "Budget Builder", "Gave your spending categories an amount"),
-    FIRST_STEP("first_step", "First Step", "Recorded your first transaction"),
-    GETTING_CONSISTENT("getting_consistent", "Getting Consistent", "Recorded transactions on ${Achievements.CONSISTENT_DAYS} different days"),
-    FINANCIAL_EXPLORER("financial_explorer", "Financial Explorer", "Looked at where your money goes in Insights"),
-    GOAL_SETTER("goal_setter", "Goal Setter", "Set a savings goal");
+enum class Achievement(val key: String, val title: String, val description: String, val howTo: String) {
+    MONEY_KEEPER("money_keeper", "Money Keeper", "Added the accounts you use", "Add the accounts you use"),
+    BUDGET_BUILDER("budget_builder", "Budget Builder", "Gave your spending categories an amount", "Give a spending category an amount"),
+    FIRST_STEP("first_step", "First Step", "Recorded your first transaction", "Record your first transaction"),
+    GETTING_CONSISTENT(
+        "getting_consistent",
+        "Getting Consistent",
+        "Recorded transactions on ${Achievements.CONSISTENT_DAYS} different days",
+        "Record transactions on ${Achievements.CONSISTENT_DAYS} different days",
+    ),
+    FINANCIAL_EXPLORER("financial_explorer", "Financial Explorer", "Looked at where your money goes in Insights", "Open Insights to see where your money goes"),
+    GOAL_SETTER("goal_setter", "Goal Setter", "Set a savings goal", "Create a savings goal for something you want");
 
     companion object {
         fun fromKey(key: String): Achievement? = entries.firstOrNull { it.key == key }
@@ -30,17 +35,32 @@ data class ProgressFacts(
     val visitedInsights: Boolean,
 )
 
+/** How far along an award is: [current] of [target], where [current] never exceeds [target]. */
+data class AwardProgress(val current: Int, val target: Int) {
+    val earned: Boolean get() = current >= target
+    /** Worth showing as a count ("3 of 7 days") only when the award takes more than one step. */
+    val isCounted: Boolean get() = target > 1
+    val fraction: Float get() = if (target <= 0) 1f else current.toFloat() / target
+}
+
 object Achievements {
     const val CONSISTENT_DAYS = 7
 
-    fun earned(facts: ProgressFacts): Set<Achievement> = buildSet {
-        if (facts.assetWallets > 0) add(Achievement.MONEY_KEEPER)
-        if (facts.budgetedCategories > 0) add(Achievement.BUDGET_BUILDER)
-        if (facts.recordedTransactions > 0) add(Achievement.FIRST_STEP)
-        if (facts.activeDays >= CONSISTENT_DAYS) add(Achievement.GETTING_CONSISTENT)
-        if (facts.visitedInsights) add(Achievement.FINANCIAL_EXPLORER)
-        if (facts.goals > 0) add(Achievement.GOAL_SETTER)
+    /** Progress towards [achievement] from the same facts [earned] uses, so the two can never disagree. */
+    fun progress(achievement: Achievement, facts: ProgressFacts): AwardProgress {
+        fun one(count: Int) = AwardProgress(count.coerceIn(0, 1), 1)
+        return when (achievement) {
+            Achievement.MONEY_KEEPER -> one(facts.assetWallets)
+            Achievement.BUDGET_BUILDER -> one(facts.budgetedCategories)
+            Achievement.FIRST_STEP -> one(facts.recordedTransactions)
+            Achievement.GETTING_CONSISTENT -> AwardProgress(facts.activeDays.coerceIn(0, CONSISTENT_DAYS), CONSISTENT_DAYS)
+            Achievement.FINANCIAL_EXPLORER -> one(if (facts.visitedInsights) 1 else 0)
+            Achievement.GOAL_SETTER -> one(facts.goals)
+        }
     }
+
+    fun earned(facts: ProgressFacts): Set<Achievement> =
+        Achievement.entries.filterTo(LinkedHashSet()) { progress(it, facts).earned }
 
     /**
      * The milestone to acknowledge now, if any: the first earned one (in display order) not acknowledged yet. A user
@@ -48,7 +68,14 @@ object Achievements {
      * congratulations for things they did before this existed.
      */
     fun toAcknowledge(earned: Set<Achievement>, acknowledged: Set<Achievement>?): Achievement? =
-        if (acknowledged == null) null else Achievement.entries.firstOrNull { it in earned && it !in acknowledged }
+        toAcknowledgeAll(earned, acknowledged).firstOrNull()
+
+    /**
+     * Every earned award not acknowledged yet, in display order. When several land together (a restored backup, a
+     * first sync, one write that earns two) they are presented in one ceremony, never one modal after another.
+     */
+    fun toAcknowledgeAll(earned: Set<Achievement>, acknowledged: Set<Achievement>?): List<Achievement> =
+        if (acknowledged == null) emptyList() else Achievement.entries.filter { it in earned && it !in acknowledged }
 
     /** The facts behind the milestones, from stored records (budgets with the lifecycle rules for this month). */
     fun facts(

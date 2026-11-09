@@ -62,6 +62,9 @@ enum class MascotMood(val pose: MascotPose, val idleCycles: Int) {
     Success(MascotPose.Success, 1),
     /** A meaningful milestone. */
     Celebrate(MascotPose.Success, 2),
+    /** Showing where to start (the empty accounts page): points towards what to add. */
+    Pointing(MascotPose.Pointing, 1),
+
     /** Supportive concern: the month's budget is nearly or fully used. Palm out, calm — never judgement. */
     Concerned(MascotPose.Caution, 1),
 }

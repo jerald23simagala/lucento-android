@@ -74,4 +74,17 @@ class SetupProgressTest {
         assertEquals("Step 3 of 3, Get started. Personalize and Set up done.", SetupProgress(GET_STARTED).description)
         assertEquals("Step 2 of 3, Set up. Personalize done.", SetupProgress(SET_UP, furthest = GET_STARTED).description)
     }
+
+    @Test
+    fun `a counted screen gives the rail its caption, its fill and one more sentence for TalkBack`() {
+        val p = SetupProgress(current = PERSONALIZE, screen = 2, screens = 5)
+        assertEquals("Personalize · 2 of 5", p.caption)
+        assertEquals(0.4f, p.fill, 0.0001f)
+        assertEquals("Step 1 of 3, Personalize. Screen 2 of 5.", p.description)
+        // Not counted: the stage alone, and the fill falls back to the given progress.
+        val plain = SetupProgress(current = SET_UP, progress = 0.3f)
+        assertEquals("Set up", plain.caption)
+        assertEquals(0.3f, plain.fill, 0.0001f)
+        assertEquals(false, SetupProgress(current = SET_UP, screen = 6, screens = 5).counted)
+    }
 }

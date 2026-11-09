@@ -194,9 +194,10 @@ class ScreenshotTourTest {
         get() = if (demoCurrency == "PHP") "Lunch 150, groceries 1200, and paid the electricity bill"
         else "Lunch 45, groceries 120, and paid the electricity bill"
 
-    /** Waits (up to 15 s, never failing the tour) for a milestone toast to finish, so a screenshot isn't covered. */
+    /** Makes sure no award ceremony covers the next screenshot (never fails the tour). */
     private fun waitForToastsGone() {
-        runCatching { compose.waitUntil(15_000) { !exists("Milestone:") } }
+        // Awards are acknowledged before seeding, so this is only a safety net: close a ceremony if one is open.
+        if (exists("Thanks, Lucento")) runCatching { compose.onNodeWithText("Thanks, Lucento").performClick() }
         compose.waitForIdle()
     }
 
@@ -245,7 +246,7 @@ class ScreenshotTourTest {
         shot("01a-onboarding-backups")
         click("Keep it on this phone only")
         click("Continue")
-        waitForText("What do you want Lucento to help with?")
+        waitForText("What should Lucento help with?")
         shot("01b-onboarding-focus")
         click("Continue") // tracking spending and budgeting are always included
         waitForText("How do you pay?")
@@ -253,7 +254,7 @@ class ScreenshotTourTest {
         waitForText("What do you spend on?")
         shot("02-onboarding-categories")
         click("Review", substring = true)
-        waitForText("Your spending categories")
+        waitForText("Rename, reorder or add more")
         shot("03-onboarding-review")
         click("Confirm", substring = true)
         waitForText("Currency and look")
@@ -277,7 +278,7 @@ class ScreenshotTourTest {
         waitForText("Set your monthly budget")
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("250")
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("120.50")
-        waitForText("The sum of these amounts")
+        waitForText("The sum of")
         shot("04c-guide-budgets")
         // The tour seeds its own data below, so it ends the guide here the way "Go to Home" does.
         runBlocking { container.preferences.setGuideStep(null) }
@@ -299,6 +300,9 @@ class ScreenshotTourTest {
         fun money(major: Long, cents: Long = 0) = Money((major * 100 + cents) * demoScale, currency)
         // The demo month (wallets, three months of salary and spending, budgets, goals, loan payments, schedules) is
         // shared with WebsiteShowcaseTest, so the website's screens and the tour show the same figures.
+        // A new award is presented in a modal ceremony, and the seeded month earns several at once: mark them all as seen
+        // first so no ceremony covers a capture or blocks a tap (the tour captures the cabinet and a ceremony on purpose).
+        runBlocking { container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet()) }
         runBlocking { DemoMonth.seed(container, currency, demoScale, today) }
         applyDemoDark()
 
@@ -326,6 +330,17 @@ class ScreenshotTourTest {
         compose.waitForIdle()
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
+        // Awards: the cabinet (earned medals in gold, the rest as outlines with how to earn them and a count where it takes
+        // several steps), then an earned medal replays its ceremony — Lucento presenting the medal.
+        compose.onNodeWithContentDescription("Awards").performScrollTo().performClick()
+        waitForText("earned · from your own records")
+        shot("07a-awards-cabinet")
+        click("Money Keeper")
+        waitForText("Thanks, Lucento")
+        Thread.sleep(2_600) // the medal lands, the confetti settles and the shine passes
+        shot("07b-award-ceremony")
+        click("Thanks, Lucento")
+        backUntilGone("earned · from your own records")
 
         // ---------------------------------------------------------------- the composer: several transactions in one message
         compose.onNodeWithContentDescription("Add transaction").performClick()

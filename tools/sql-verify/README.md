@@ -24,6 +24,9 @@ wallets … affect 0 rows`. Run both variants: a migration must be safe whicheve
 
 ## Suites
 
+- `account_emails_suite.sql` — account emails (docs/EMAILS.md), 16 checks: only the service role claims an email; each
+  email is claimed once per account and reference (welcome, each purchase); a released claim can be taken again; bad
+  input refused; deleting the account removes its rows.
 - `account_deletion_suite.sql` — account deletion (docs/ACCOUNT_DELETION.md), 10 checks: only a signed-in account can call
   `delete_my_account`, and only for itself; nothing of it is left in any public table or `auth.users`; other accounts
   untouched; a late sync with the old token can't recreate data; a Lifetime purchase restores on a new account; a

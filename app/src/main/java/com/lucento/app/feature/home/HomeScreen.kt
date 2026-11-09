@@ -37,8 +37,6 @@ import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.lucento.app.core.designsystem.component.Confirmation
-import com.lucento.app.core.designsystem.component.ConfirmationHost
 import com.lucento.app.core.designsystem.component.HeroCard
 import com.lucento.app.core.designsystem.component.HeroPill
 import com.lucento.app.core.designsystem.component.HeroTones
@@ -293,8 +291,11 @@ private fun HomeDashboard(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
     var showSync by remember { mutableStateOf(false) }
-    var showMilestones by remember { mutableStateOf(false) }
-    var celebration by remember { mutableStateOf<Confirmation?>(null) }
+    var showAwards by remember { mutableStateOf(false) }
+    // The award being presented. Saved, so a ceremony isn't lost to rotation after its award was acknowledged.
+    var ceremony by rememberSaveable { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
+    var ceremonyAlso by rememberSaveable { mutableStateOf<List<com.lucento.app.domain.Achievement>>(emptyList()) }
+    var replaying by remember { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
 
     // Part D: milestones. The first time they exist, what's already earned is recorded quietly; after that each new
     // one is acknowledged once — this runs only when the stored records change, i.e. after a committed write.
@@ -306,10 +307,14 @@ private fun HomeDashboard(
     LaunchedEffect(state.loading, state.recordedCount > 0) {
         if (!state.loading && state.recordedCount > 0) viewModel.dismissAddSpotlight()
     }
-    LaunchedEffect(state.milestoneToShow) {
-        val milestone = state.milestoneToShow ?: return@LaunchedEffect
-        celebration = Confirmation("Milestone: ${milestone.title}", kind = Confirmation.Kind.Milestone)
-        viewModel.acknowledgeMilestone(milestone)
+    // One ceremony for whatever was earned together; anything earned while one is open (or while the cabinet is, where
+    // the person is already looking at their awards) is presented after it closes.
+    LaunchedEffect(state.milestoneToShow, ceremony == null, showAwards) {
+        val award = state.milestoneToShow ?: return@LaunchedEffect
+        if (ceremony != null || showAwards) return@LaunchedEffect
+        ceremony = award
+        ceremonyAlso = ArrayList(state.milestonesAlsoNew)
+        viewModel.acknowledgeMilestones(listOf(award) + state.milestonesAlsoNew)
     }
 
     val scroll = rememberScrollState()
@@ -391,7 +396,7 @@ private fun HomeDashboard(
                     onTurnOn = viewModel::turnOn,
                     onHideOffers = viewModel::hideModuleOffers,
                     onAddWallet = { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) },
-                    onOpenMilestones = { showMilestones = true },
+                    onOpenMilestones = { showAwards = true },
                     onDismissSpotlight = viewModel::dismissAddSpotlight,
                 )
             }
@@ -423,9 +428,28 @@ private fun HomeDashboard(
             onDismiss = { editingWallet = null },
         )
     }
-    if (showMilestones) MilestonesSheet(state.earned, onDismiss = { showMilestones = false })
-    Box(Modifier.fillMaxSize()) {
-        ConfirmationHost(confirmation = celebration, onDismissed = { celebration = null }, modifier = Modifier.align(Alignment.BottomCenter))
+    if (showAwards) {
+        com.lucento.app.feature.awards.AwardsSheet(
+            earned = state.earned,
+            facts = state.awardFacts,
+            onDismiss = { showAwards = false },
+            onReplay = { replaying = it },
+        )
+    }
+    replaying?.let { award ->
+        com.lucento.app.feature.awards.AwardCeremony(award, earnedCount = state.earned.size, onDismiss = { replaying = null })
+    }
+    ceremony?.let { award ->
+        com.lucento.app.feature.awards.AwardCeremony(
+            achievement = award,
+            alsoEarned = ceremonyAlso,
+            earnedCount = state.earned.size,
+            onDismiss = { ceremony = null },
+            onSeeAll = {
+                ceremony = null
+                showAwards = true
+            },
+        )
     }
 }
 
@@ -1851,7 +1875,7 @@ private fun ShortcutRow(
     val items = listOfNotNull(
         module(Feature.SAVINGS_GOALS, brand, actions.onOpenGoals),
         module(Feature.INSIGHTS, brand, actions.onOpenInsights),
-        Shortcut("Milestones", "Milestones", Icons.Outlined.EmojiEvents, TonePair(ext.warningContainer, ext.warning), onOpenMilestones),
+        Shortcut("Awards", "Awards", Icons.Outlined.EmojiEvents, TonePair(ext.warningContainer, ext.warning), onOpenMilestones),
         module(Feature.DEBTS_LOANS, TonePair(ext.negativeContainer, ext.negative), actions.onOpenDebts),
         module(Feature.RECURRING, TonePair(ext.positiveContainer, ext.positive)) { actions.onOpenRecurring(null) },
     )
@@ -2191,52 +2215,6 @@ private fun AddSpotlightCard(onRecord: () -> Unit, onDismiss: () -> Unit) {
         }
     }
 }
-
-/** Every milestone, earned or not yet. Worked out from the user's records; nothing to keep up and nothing to lose. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MilestonesSheet(earned: Set<com.lucento.app.domain.Achievement>, onDismiss: () -> Unit) {
-    com.lucento.app.core.designsystem.component.LucentoBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = Spacing.gutter).padding(bottom = Spacing.xl).verticalScroll(rememberScrollState())) {
-            SheetHeader(
-                title = "Milestones",
-                subtitle = "${earned.size} of ${com.lucento.app.domain.Achievement.entries.size} · from your own records. No streaks, nothing to lose.",
-                icon = Icons.Filled.EmojiEvents,
-                tone = com.lucento.app.core.designsystem.component.StatusTones.warning,
-                modifier = Modifier.padding(bottom = Spacing.xs),
-            )
-            com.lucento.app.domain.Achievement.entries.forEach { a ->
-                val done = a in earned
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                        .semantics(mergeDescendants = true) {}
-                        .padding(vertical = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconTile(
-                        icon = if (done) Icons.Filled.EmojiEvents else Icons.Outlined.EmojiEvents,
-                        size = 40.dp,
-                        container = if (done) LucentoTheme.extendedColors.accent else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        content = if (done) LucentoTheme.extendedColors.onAccent else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(Spacing.md))
-                    Column(Modifier.weight(1f)) {
-                        Text(a.title, style = MaterialTheme.typography.titleMedium)
-                        Text(a.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Text(
-                        if (done) "Earned" else "Not yet",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
 
 /** N-11: shapes where the dashboard will be, instead of a blank screen, while the first data loads. */
 @Composable

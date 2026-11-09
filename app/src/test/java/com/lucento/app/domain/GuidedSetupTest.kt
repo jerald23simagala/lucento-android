@@ -49,4 +49,46 @@ class GuidedSetupTest {
         assertEquals(Money(3_500, "JPY"), GuidedSetup.draftTotal(listOf("1500", "2000"), "JPY", '.'))
         assertEquals(Money(12_75, "EUR"), GuidedSetup.draftTotal(listOf("10,25", "2,50"), "EUR", ','))
     }
+
+    @Test
+    fun `the path rail counts set-up screens from the onboarding summary, and only the pages this person has`() {
+        // Everything on: summary, accounts, cards, budget, goal = 5; then transactions and the finish = 2.
+        assertEquals(5, GuidedSetup.setUpScreens(everything))
+        assertEquals(2 to 5, GuidedSetup.screenOf(GuideStep.WALLETS, everything))
+        assertEquals(4 to 5, GuidedSetup.screenOf(GuideStep.BUDGETS, everything))
+        assertEquals(5 to 5, GuidedSetup.screenOf(GuideStep.GOAL, everything))
+        assertEquals(1 to 2, GuidedSetup.screenOf(GuideStep.TRANSACTIONS, everything))
+        assertEquals(2 to 2, GuidedSetup.screenOf(GuideStep.WELCOME, everything))
+        // No cards or loans: the budget moves up and Set up has 4 screens.
+        val noDebts = FeatureSet(FeatureSet.ALL.enabled - Feature.DEBTS_LOANS)
+        assertEquals(4, GuidedSetup.setUpScreens(noDebts))
+        assertEquals(3 to 4, GuidedSetup.screenOf(GuideStep.BUDGETS, noDebts))
+        // Only accounts left in Set up.
+        assertEquals(2, GuidedSetup.setUpScreens(minimal))
+        assertEquals(2 to 2, GuidedSetup.screenOf(GuideStep.WALLETS, minimal))
+    }
+
+    @Test
+    fun `the starting balance adds the main-currency asset accounts only, never converting or counting debts`() {
+        fun w(id: Long, type: WalletType, minor: Long, code: String = "PHP") = Wallet(id, "W$id", type, Money(minor, code), 0L)
+        val wallets = listOf(
+            w(1, WalletType.CASH, 2_250_00),
+            w(2, WalletType.BANK, 46_000_00),
+            w(3, WalletType.E_WALLET, 3_480_50),
+            w(4, WalletType.CREDIT_CARD, 5_000_00), // owed: not part of a starting balance
+            w(5, WalletType.BANK, 100_00, "USD"), // another currency: shown on its own, never converted
+        )
+        assertEquals(Money(51_730_50, "PHP"), GuidedSetup.startingBalance(wallets, "PHP"))
+        assertEquals(3, GuidedSetup.startingBalanceAccounts(wallets, "PHP"))
+        assertEquals(Money(0, "PHP"), GuidedSetup.startingBalance(emptyList(), "PHP"))
+    }
+
+    @Test
+    fun `budget shares are whole percents that always add up to 100`() {
+        assertEquals(listOf(75, 24, 1), GuidedSetup.sharePercents(listOf(10_000_00, 3_250_50, 120_00)))
+        assertEquals(listOf(34, 33, 33), GuidedSetup.sharePercents(listOf(1, 1, 1)))
+        assertEquals(listOf(100, 0), GuidedSetup.sharePercents(listOf(500, 0)))
+        assertEquals(listOf(0, 0), GuidedSetup.sharePercents(listOf(0, 0)))
+        assertEquals(100, GuidedSetup.sharePercents(listOf(1, 2, 3, 4, 5, 6, 7)).sum())
+    }
 }

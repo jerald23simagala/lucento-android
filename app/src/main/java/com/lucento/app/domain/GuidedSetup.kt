@@ -21,6 +21,9 @@ enum class GuideStep(val key: String) {
     /** The end of the story: welcome to Lucento. */
     WELCOME("welcome");
 
+    /** The visible stage this page belongs to: adding accounts and amounts, then using Lucento. */
+    val stage: SetupStage get() = if (this == TRANSACTIONS || this == WELCOME) SetupStage.GET_STARTED else SetupStage.SET_UP
+
     companion object {
         fun fromKey(key: String?): GuideStep? = entries.firstOrNull { it.key == key }
     }
@@ -48,6 +51,51 @@ object GuidedSetup {
     /** Where to resume: [saved] if it still applies, else the next step that does. */
     fun resume(saved: GuideStep, features: FeatureSet): GuideStep =
         if (saved in steps(features)) saved else next(saved, features) ?: GuideStep.WELCOME
+
+    /**
+     * Set up starts in onboarding with the "Lucento is personalized" summary, then continues with the guide's set-up
+     * pages this person has (their modules decide which). The summary is screen 1 of [setUpScreens].
+     */
+    fun setUpScreens(features: FeatureSet): Int = 1 + steps(features).count { it.stage == SetupStage.SET_UP }
+
+    /**
+     * Where [step] sits in its stage for the path rail: "Set up · 3 of 4" (counting the onboarding summary first) or
+     * "Get started · 1 of 2". Returns screen to screens.
+     */
+    fun screenOf(step: GuideStep, features: FeatureSet): Pair<Int, Int> {
+        val inStage = steps(features).filter { it.stage == step.stage }
+        val position = inStage.indexOf(step).coerceAtLeast(0) + 1
+        return if (step.stage == SetupStage.SET_UP) (position + 1) to (inStage.size + 1) else position to inStage.size
+    }
+
+    /**
+     * The accounts page's starting balance: the asset accounts in the main [currencyCode] added up (exact, overflow
+     * throws). Accounts in other currencies are never converted here; [startingBalanceAccounts] says how many count.
+     */
+    fun startingBalance(wallets: List<Wallet>, currencyCode: String): Money =
+        Money.sum(currencyCode, wallets.filter { !it.type.isLiability && it.balance.currencyCode == currencyCode }.map { it.balance })
+
+    /** How many asset accounts [startingBalance] adds up. */
+    fun startingBalanceAccounts(wallets: List<Wallet>, currencyCode: String): Int =
+        wallets.count { !it.type.isLiability && it.balance.currencyCode == currencyCode }
+
+    /**
+     * Each amount's share of their total in whole percent, for the budget step's split bar and its legend. Shares are
+     * rounded by largest remainder, so they always add up to exactly 100 (or are all 0 when nothing is positive).
+     * Zero and negative amounts get 0.
+     */
+    fun sharePercents(amountsMinor: List<Long>): List<Int> {
+        val positive = amountsMinor.map { it.coerceAtLeast(0L) }
+        val total = positive.fold(0L) { acc, v -> Math.addExact(acc, v) }
+        if (total == 0L) return positive.map { 0 }
+        val exact = positive.map { java.math.BigDecimal(it).multiply(java.math.BigDecimal(100)).divide(java.math.BigDecimal(total), 6, java.math.RoundingMode.DOWN) }
+        val floors = exact.map { it.toInt() }.toMutableList()
+        var left = 100 - floors.sum()
+        exact.indices.sortedByDescending { exact[it] - java.math.BigDecimal(floors[it]) }.forEach { i ->
+            if (left > 0 && positive[i] > 0L) { floors[i] += 1; left -= 1 }
+        }
+        return floors
+    }
 
     /** How many categories need an amount before the budget step can be left. */
     fun budgetsRequired(expenseCategories: Int): Int = minOf(MIN_BUDGETED, expenseCategories)
