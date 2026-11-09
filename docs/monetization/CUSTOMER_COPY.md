@@ -25,7 +25,7 @@ billed differently; the table shows them as one column with a note where they di
 | **Record income and expenses** by typing, speaking or scanning, several at once from one message, and review before saving | Unlimited | Unlimited | Unlimited |
 | **See every transaction you have ever recorded** — search, filter, edit, delete | All of your history | All of your history | All of your history |
 | **Move money between your wallets** as a single transfer that never double-counts | ✔ | ✔ | ✔ |
-| **Organize spending with categories** — 90 ready-made, plus your own; rename, reorder, archive | Unlimited | Unlimited | Unlimited |
+| **Organize spending with categories** — 82 ready-made, plus your own; rename, reorder, archive | Unlimited | Unlimited | Unlimited |
 | **Set a monthly budget per category**; your total budget is their sum; see your pace, what is safe to spend today, and past months | ✔ | ✔ | ✔ |
 | **Home dashboard** — balance, budget pace, upcoming bills, goals, things to watch | ✔ | ✔ | ✔ |
 | Works **offline**, on this phone, with no account | ✔ | ✔ | ✔ |
@@ -163,7 +163,7 @@ sync or Lucento Shared.
 
 *CTA:* **Get Lucento on Google Play**
 
-*Note:* Free never expires, never shows ads, and never sells your data. Limits only apply to adding new items; what you
+*Note:* Free never expires and never sells your data. Limits only apply to adding new items; what you
 already have is always yours.
 
 ### Pro — More control, more insights
