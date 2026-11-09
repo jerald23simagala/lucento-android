@@ -32,8 +32,8 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
    Let Play convert the PHP prices for other countries, or set them by hand. The app shows Play's own price strings,
    so no price is typed into the app.
 5. **Licence key.** In Monetize with Play › Monetization setup › Licensing, copy the Base64 RSA public key into the GitHub
-   repository **variable** `LUCENTO_PLAY_LICENSE_KEY`, and into `local.properties` for local release builds. It is
-   public by design. The phone checks every purchase's signature with it, and without it a release doesn't bill.
+   repository **variable** (or secret) `LUCENTO_PLAY_LICENSE_KEY`, and into `local.properties` for local release
+   builds. CI reads the variable first, then the secret. It is public by design. The phone checks every purchase's signature with it, and without it a release doesn't bill.
 6. **Service account** for the server:
    - In Google Cloud (the project linked to Play Console), enable the *Google Play Android Developer API*.
    - Create a service account and a JSON key for it.
