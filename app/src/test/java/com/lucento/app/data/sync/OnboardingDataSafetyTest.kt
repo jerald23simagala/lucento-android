@@ -18,7 +18,9 @@ import com.lucento.app.data.repository.FakeTransactionDao
 import com.lucento.app.data.repository.FakeWalletDao
 import com.lucento.app.domain.CategoryPresets
 import com.lucento.app.domain.CategorySelection
+import com.lucento.app.feature.onboarding.RestoreStage
 import com.lucento.app.feature.onboarding.SetupRoute
+import com.lucento.app.feature.onboarding.restoreStageWithoutCloud
 import com.lucento.app.feature.onboarding.setupRoute
 import com.lucento.app.feature.settings.FirstSync
 import com.lucento.app.feature.settings.firstSyncDecision
@@ -166,6 +168,22 @@ class OnboardingDataSafetyTest {
     fun `new account with an empty cloud is detected as empty`() = runTest {
         assertEquals(AccountProbe.Empty(user), Device().probe())
         assertEquals(SetupRoute.NEW_SETUP, setupRoute(Device().probe(), confirmedNewFor = null))
+    }
+
+    @Test
+    fun `restoring on a free plan, an empty account sets up as new instead of asking for Pro`() = runTest {
+        // Owner test round 3: a Free Partner invited to a Shared Space chose "I already have Lucento" and went round in
+        // a loop between the plan page and the welcome screen. Nothing saved means nothing that needs Pro.
+        assertEquals(RestoreStage.EMPTY, restoreStageWithoutCloud(Device().probe()))
+    }
+
+    @Test
+    fun `restoring on a free plan, an account with data or an unfinished check asks for the plan`() = runTest {
+        val old = Device()
+        old.addWallet()
+        success(old.sync())
+        assertEquals(RestoreStage.PLAN_NEEDED, restoreStageWithoutCloud(Device().probe()))
+        assertEquals(RestoreStage.PLAN_NEEDED, restoreStageWithoutCloud(AccountProbe.Unavailable("offline")))
     }
 
     @Test

@@ -597,12 +597,21 @@ class OnboardingViewModel(
     /**
      * Lucento Pro: a returning account restores from the cloud only on a plan that includes it. Otherwise the person is
      * told, stays signed in, and can restore a backup file (free) or start fresh; nothing in the account is touched.
+     *
+     * The account is checked first (read-only): one with nothing saved has nothing that needs Pro, so it gets the same
+     * page as an empty download — set up as new and stay signed in — instead of the plan page (owner test round 3: a
+     * Free Partner invited to a Shared Space went round in a loop between the plan page and the welcome screen). A
+     * waiting invitation is offered either way; joining one uses the Owner's plan. A check that can't finish is never
+     * treated as "empty".
      */
-    private suspend fun cloudAllowedForRestore(): Boolean {
+    private suspend fun cloudAllowedForRestore(repository: com.lucento.app.data.sync.SyncRepository): Boolean {
         val allowed = planAllowsCloud ?: return true
         if (allowed()) return true
         _restoreMessage.value = null
-        setRestoreStage(RestoreStage.PLAN_NEEDED)
+        val probe = repository.probeAccount()
+        (probe as? com.lucento.app.data.sync.AccountProbe.Empty)?.let { savedState[KEY_NEW_FOR] = it.userId }
+        setRestoreStage(restoreStageWithoutCloud(probe))
+        offerInvitation()
         return false
     }
 
@@ -640,7 +649,7 @@ class OnboardingViewModel(
                 // Lucento Pro: after the boundary check (never before — adopting a space replaces this phone's ledger) and
                 // after the Shared check: a Partner restores on the Owner's plan; anyone else needs cloud restore.
                 val partnerOfSpace = syncPreferences?.sharedSpaceOwnerId() != null
-                if (!partnerOfSpace && !cloudAllowedForRestore()) {
+                if (!partnerOfSpace && !cloudAllowedForRestore(repository)) {
                     syncPreferences?.setEnabled(false)
                     restoring = false
                     return@launch

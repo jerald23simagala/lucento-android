@@ -705,7 +705,7 @@ internal fun RestoreFlow(
                         "Nothing to restore yet",
                         "${signedInEmail?.takeIf { it.isNotEmpty() } ?: "This account"} has no wallets, spending categories, " +
                             "transactions, budgets or scheduled payments saved yet. " +
-                            "Set Lucento up as new — you stay connected, and it syncs when you finish.",
+                            "Set Lucento up as new — you stay signed in to this account.",
                     )
                 }
                 RestoreStage.FAILED -> {
