@@ -611,7 +611,7 @@ class ScreenshotTourTest {
         waitForText("Monthly budget")
         compose.onNodeWithContentDescription("Profile and settings").performClick()
         compose.waitForIdle()
-        click("Lucento Pro")
+        click("Lucento Plan")
         waitForText("What each plan includes")
         shot("24b-pro-page-free")
         runCatching { compose.onNodeWithText("Pro Lifetime").performScrollTo() }
@@ -638,7 +638,7 @@ class ScreenshotTourTest {
         simulator.setTestStore(true)
         compose.onNodeWithContentDescription("Profile and settings").performClick()
         compose.waitForIdle()
-        click("Lucento Pro")
+        click("Lucento Plan")
         waitForText("Start 7-day free trial")
         runCatching { compose.onNodeWithText("Start 7-day free trial").performScrollTo() }
         shot("24g-pro-page-buy")
