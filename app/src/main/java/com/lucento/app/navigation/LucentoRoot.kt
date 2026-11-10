@@ -443,7 +443,14 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         CompositionLocalProvider(
             com.lucento.app.feature.fx.LocalFxDisplay provides fxDisplay,
             com.lucento.app.feature.pro.LocalOpenPro provides openPro,
-            LocalProfileChrome provides ProfileChrome(preferences.displayName, profilePhoto, sharedWith = sharedAccess.sharedWith) {
+            LocalProfileChrome provides ProfileChrome(
+                preferences.displayName,
+                profilePhoto,
+                sharedWith = sharedAccess.sharedWith,
+                member = com.lucento.app.feature.pro.ProCopy.memberMark(
+                    com.lucento.app.feature.pro.LocalEntitlements.current, System.currentTimeMillis(),
+                ),
+            ) {
                 showProfile = true
             },
             com.lucento.app.feature.sharedspace.LocalSharedAccess provides sharedAccess,

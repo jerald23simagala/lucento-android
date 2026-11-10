@@ -1,5 +1,10 @@
 package com.lucento.app.feature.pro
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -46,6 +51,43 @@ fun ProBadge(modifier: Modifier = Modifier) {
         tone = StatusTones.brand,
         modifier = modifier.clearAndSetSemantics { contentDescription = "Lucento Pro feature" },
     )
+}
+
+/**
+ * The profile menu's Lucento Pro card for the free plan (owner, 2026-11-09, option E): the member's coin, what Pro adds
+ * ([ProCopy.inviteLines]) and one button to the Lucento Pro page. It takes the plain plan row's place, so the sheet's
+ * layout doesn't change; prices stay on the Pro page, which reads them from Google Play.
+ */
+@Composable
+fun ProInviteCard(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val dark = com.lucento.app.core.designsystem.theme.LucentoTheme.isDark
+    val art = com.lucento.app.core.designsystem.theme.AwardArtwork
+    val shape = MaterialTheme.shapes.large
+    val wash = if (dark) art.GoldDeep.copy(alpha = 0.12f) else art.GoldHighlight.copy(alpha = 0.7f)
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(wash, colors.surfaceContainerLow)))
+            .border(1.dp, art.GoldEdge.copy(alpha = 0.35f), shape)
+            .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            com.lucento.app.core.designsystem.component.ProCrest(size = 28.dp)
+            Text("Lucento Pro", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+            ProCopy.inviteLines.forEach { line ->
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text("•", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.clearAndSetSemantics {})
+                    Text(line, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
+                }
+            }
+        }
+        LucentoPrimaryButton(text = "See Lucento Pro", onClick = onOpen)
+    }
 }
 
 /**

@@ -137,6 +137,7 @@ fun rememberStickySheetState(): SheetState =
  * wallet, an avatar) or a tonal [icon] — then the title (a heading for TalkBack), a short [subtitle], and optional
  * [trailing] actions. Sits inside the sheet's own horizontal padding.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SheetHeader(
     title: String,
@@ -146,6 +147,8 @@ fun SheetHeader(
     tone: TonePair = StatusTones.brand,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
+    /** A small mark after the title (the profile menu's Lucento Pro chip); it wraps under a long title. */
+    titleBadge: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier.fillMaxWidth().heightIn(min = 56.dp).padding(bottom = Spacing.sm),
@@ -162,13 +165,29 @@ fun SheetHeader(
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
-            )
+            if (titleBadge == null) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() },
+                )
+            } else {
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                ) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.align(Alignment.CenterVertically).semantics { heading() },
+                    )
+                    androidx.compose.foundation.layout.Box(Modifier.align(Alignment.CenterVertically)) { titleBadge() }
+                }
+            }
             if (subtitle != null) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

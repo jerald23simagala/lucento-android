@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,12 +33,14 @@ import java.util.Locale
 
 /**
  * What the profile button shows and does; provided once by the app shell for every primary screen. [sharedWith]: the
- * other person when this ledger is shared (Lucento Shared) — the button then carries their initial as a badge.
+ * other person when this ledger is shared (Lucento Shared) — the button then carries the "Shared" pill. [member]: the
+ * person's own Lucento Pro plan ("Pro" or "Lifetime"), shown as the [ProCrest] coin; null on the free plan.
  */
 data class ProfileChrome(
     val displayName: String?,
     val photo: ImageBitmap? = null,
     val sharedWith: String? = null,
+    val member: String? = null,
     val onOpen: () -> Unit,
 )
 
@@ -94,7 +97,7 @@ fun ProfileButton(modifier: Modifier = Modifier) {
                     chrome.onOpen()
                 }
                 .semantics {
-                    contentDescription = chrome.sharedWith?.let { "Profile and settings. Shared with $it" } ?: "Profile and settings"
+                    contentDescription = profileButtonDescription(chrome.member, chrome.sharedWith)
                 },
             contentAlignment = Alignment.Center,
         ) {
@@ -102,7 +105,21 @@ fun ProfileButton(modifier: Modifier = Modifier) {
         }
         // Outside the circular clip, so the pill isn't cut; it takes no touches, so taps on it still open the menu.
         if (chrome.sharedWith != null) SharedPill(Modifier.align(Alignment.BottomCenter).offset(y = 3.dp))
+        // Lucento Pro: the member's coin at the avatar's top-right, inside the same 48dp box (nothing around it moves), and
+        // clear of the Shared pill at the foot. A picture, not text, so it keeps its size at large font scales.
+        if (chrome.member != null) RingedCrest(MaterialTheme.colorScheme.background, Modifier.align(Alignment.TopEnd).offset(x = (-1).dp, y = 2.dp))
     }
+}
+
+/** What TalkBack says for the profile button: the plan in words, so the coin never relies on colour or shape. */
+internal fun profileButtonDescription(member: String?, sharedWith: String?): String = buildString {
+    append("Profile and settings")
+    when (member) {
+        null -> Unit
+        "Pro" -> append(". Lucento Pro")
+        else -> append(". Pro ").append(member)
+    }
+    if (sharedWith != null) append(". Shared with ").append(sharedWith)
 }
 
 /**
@@ -116,6 +133,8 @@ private fun SharedPill(modifier: Modifier = Modifier) {
     val compact = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Box(
         modifier
+            // May be a few dp wider than the 48dp button ("Shared" was cut to "Share" when held to its width).
+            .wrapContentWidth(unbounded = true)
             .clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.background)
             .padding(1.5.dp)

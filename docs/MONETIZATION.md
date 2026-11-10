@@ -518,6 +518,15 @@ dedicated **Lucento Pro** page lives in the profile menu and Settings; it is the
 The mascot appears once, on that page. Badges (`ProBadge`, "Pro") sit inline next to labels; a person who holds the
 capability never sees them. All copy is in `CUSTOMER_COPY.md` D.
 
+**Member mark and the profile menu card (owner, 2026-11-09, options A and E).** A person on Pro or Pro Lifetime sees
+the gold **crest coin** (`ProCrest`: award gold, the Rising Crest's bars engraved) at the top-right of the profile
+button on every main screen — inside the 48dp button, clear of the Shared pill — and a **"Pro" / "Lifetime" chip**
+(`MemberChip`) after their name in the profile menu, whose Lucento Plan tile turns gold. The coin is never the blue
+`ProBadge`, which means "locked". TalkBack reads the plan in words. Only the person's own plan counts
+(`ProCopy.memberMark`). On the free plan with no purchase waiting, the profile menu shows a **Lucento Pro card**
+(`ProInviteCard`: what Pro adds, one "See Lucento Pro" button) in place of the plain plan row (`ProCopy.offersPro`).
+No prices on it; nothing on Home (option G, a Home card, was not chosen).
+
 ### 6.2 Plan indicator
 
 Profile menu row and Settings header show one of: "Free plan" · "Lucento Pro · renews 6 Dec" · "Lucento Pro · ends

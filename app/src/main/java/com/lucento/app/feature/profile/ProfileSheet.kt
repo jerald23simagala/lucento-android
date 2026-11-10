@@ -154,10 +154,14 @@ fun ProfileSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
+            val entitlements = com.lucento.app.feature.pro.LocalEntitlements.current
+            val now = System.currentTimeMillis()
+            val member = com.lucento.app.feature.pro.ProCopy.memberMark(entitlements, now)
             SheetHeader(
                 title = preferences.displayName ?: "Your Lucento",
                 subtitle = profileAccountLine(signedInEmail),
                 leading = { PhotoAvatar(preferences.displayName, photo) },
+                titleBadge = member?.let { { com.lucento.app.core.designsystem.component.MemberChip(it) } },
                 trailing = if (!editingName) {
                     {
                         IconButton(onClick = { editingName = true }) {
@@ -203,14 +207,26 @@ fun ProfileSheet(
             )
 
             FieldHeader("Account and app", Modifier.padding(top = Spacing.lg))
-            NavRow(
-                icon = Icons.Outlined.WorkspacePremium,
-                title = "Lucento Plan",
-                summary = com.lucento.app.feature.pro.ProCopy.planStatus(
-                    com.lucento.app.feature.pro.LocalEntitlements.current, System.currentTimeMillis(),
-                ).title,
-                onClick = { open(ProfileDestination.PRO) },
-            )
+            if (com.lucento.app.feature.pro.ProCopy.offersPro(entitlements, now)) {
+                // Free plan: the Lucento Pro card takes the plan row's place (owner, 2026-11-09).
+                com.lucento.app.feature.pro.ProInviteCard(onOpen = { open(ProfileDestination.PRO) }, modifier = Modifier.padding(vertical = Spacing.xs))
+            } else {
+                NavRow(
+                    icon = Icons.Outlined.WorkspacePremium,
+                    title = "Lucento Plan",
+                    summary = com.lucento.app.feature.pro.ProCopy.planStatus(entitlements, now).title,
+                    onClick = { open(ProfileDestination.PRO) },
+                    // A member's plan tile is struck in the same gold as their coin.
+                    tone = if (member != null) {
+                        com.lucento.app.core.designsystem.theme.TonePair(
+                            com.lucento.app.core.designsystem.theme.AwardArtwork.Gold,
+                            com.lucento.app.core.designsystem.theme.AwardArtwork.Engraving,
+                        )
+                    } else {
+                        null
+                    },
+                )
+            }
             Hairline(inset = inset)
             NavRow(
                 icon = Icons.Outlined.Settings,

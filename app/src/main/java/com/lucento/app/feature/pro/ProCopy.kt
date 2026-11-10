@@ -143,6 +143,33 @@ object ProCopy {
         DisplayPlan.LIFETIME, DisplayPlan.LIFETIME_WITH_SERVICES -> "Pro Lifetime"
     }
 
+    /**
+     * The member mark (owner, 2026-11-09): the coin on the profile button and the chip after the name in the profile
+     * menu — "Pro", or "Lifetime" for Pro Lifetime. Null on the free plan, including while a purchase waits for Google
+     * Play. Only the person's own plan counts; a Partner using an Owner's Shared Space isn't marked.
+     */
+    fun memberMark(state: EntitlementState, now: Long): String? = when (state.displayPlan(now)) {
+        DisplayPlan.FREE -> null
+        DisplayPlan.PRO -> "Pro"
+        DisplayPlan.LIFETIME, DisplayPlan.LIFETIME_WITH_SERVICES -> "Lifetime"
+    }
+
+    /**
+     * Whether the profile menu shows the Lucento Pro card in place of the plain plan row: on the free plan with no
+     * purchase waiting (that row then says "Waiting for Google Play"). The profile menu is one of the places that may
+     * offer Pro (docs/MONETIZATION.md §6.1).
+     */
+    fun offersPro(state: EntitlementState, now: Long): Boolean =
+        state.displayPlan(now) == DisplayPlan.FREE && state.pending() == null
+
+    /** What the profile menu's Lucento Pro card lists: only what the Pro plan really adds (see [PlanCatalog]). */
+    val inviteLines: List<String> = listOf(
+        "Sync and restore across your phones",
+        "More wallets and goals, and other currencies",
+        "6- and 12-month Insights, PDF statements",
+        "More Ask Lucento answers every day",
+    )
+
     /** The plan row in the profile menu, Settings and the top of the Lucento Pro page (customer copy D-11). */
     fun planStatus(state: EntitlementState, now: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): PlanStatus {
         fun date(millis: Long): String =
