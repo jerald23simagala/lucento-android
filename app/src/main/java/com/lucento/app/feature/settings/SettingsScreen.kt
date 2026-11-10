@@ -764,7 +764,7 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
             title = "Send messages to Gemini?",
             text = "When you type or speak in the composer, Lucento sends that message, today’s date, your main currency " +
                 "and the names of your categories and accounts to Lucento’s server, which asks Google’s Gemini to read it. " +
-                "Balances and your history are not sent. Google processes the text under the Gemini API terms. Each " +
+                "Balances and your history are not sent. ${com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE} Each " +
                 "account has a daily allowance; after it, reading happens on this phone. You review every row before " +
                 "anything is saved, receipts are still read on this phone, and you can turn this off at any time.",
             confirmLabel = "Turn on",
@@ -797,7 +797,8 @@ private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
             text = "When you ask Ask Lucento a question of your own, Lucento sends it, with your figures — monthly totals, " +
                 "categories, balances, budgets, debts, goals and upcoming bills — projections worked out on this phone, and " +
                 "your transactions from the last 60 days in your main currency (date, amount, type, category, account and " +
-                "note) to Lucento’s server, which asks Google’s Gemini. Receipts, photos, older transactions and other " +
+                "note) to Lucento’s server, which asks Google’s Gemini. ${com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE} " +
+                "Receipts, photos, older transactions and other " +
                 "currencies are never sent. Every amount in an answer is worked out on this phone. Gemini's advice is " +
                 "based on your figures, but AI can be inaccurate, so check it before you act on it. Each account has a " +
                 "daily allowance, shared with Smarter reading, and you can turn this off at any time.",

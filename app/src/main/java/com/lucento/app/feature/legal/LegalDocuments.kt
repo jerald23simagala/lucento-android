@@ -9,8 +9,17 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-09"
-    const val UPDATED = "8 November 2026"
+    const val VERSION = "2026-11-10"
+    const val UPDATED = "10 November 2026"
+
+    /**
+     * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit
+     * F-05). One sentence, shown in the policy and in every AI consent. Remove it, and bump [VERSION], once the Gemini key
+     * is on the paid tier (docs/ASK.md).
+     */
+    const val GEMINI_DATA_USE =
+        "Lucento uses Gemini’s free service for now: Google may keep what Gemini receives and use it to improve " +
+            "its products, and people at Google may read it for that purpose."
 
     /** Where questions, privacy requests and account-deletion requests go (Play's privacy point of contact). */
     const val CONTACT_EMAIL = "lucentoapp@gmail.com"
@@ -212,6 +221,8 @@ object LegalDocuments {
                         "transactions, as its consent screen explains before you agree.",
                     "Lucento’s server doesn’t keep these messages; it counts requests per account per day for the daily " +
                         "allowance. You can turn either feature off at any time.",
+                    "$GEMINI_DATA_USE If that isn’t acceptable to you, leave both features off: everything else in Lucento " +
+                        "works without them.",
                 ),
             ),
             Section(

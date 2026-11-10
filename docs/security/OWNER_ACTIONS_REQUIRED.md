@@ -4,7 +4,15 @@
 [RELEASE_READINESS_CHECKLIST.md](RELEASE_READINESS_CHECKLIST.md).
 
 These steps need your consoles, your production projects or a real payment, so the engineering work couldn't do them.
-**None of them has been done.** Each section says what to do, click by click, and what evidence closes it. Put screenshots
+
+> **Owner decisions, 2026-11-10:** D-1 lenient Partner rule kept (accepted revenue leakage) · §1 Gemini stays on the free
+> tier at launch, disclosed in the policy and every AI consent (accepted risk; paid tier once there is a user base) ·
+> §2 Confirm email is ON (owner, and the catalog shows every account confirmed after sign-up, none auto-confirmed) ·
+> §6 production stays on Supabase Free for now · §8 test purchases allowed during internal testing · §13 approved: grants
+> added for jerald23simagala@gmail.com and rachelretas20@gmail.com (12 months, done 2026-11-10); the migrations are
+> applied by pasting `docs/security/PRODUCTION_APPLY_2026-11-10.sql` (the MCP calls were declined twice).
+
+**Not done yet unless the decision box above says so.** Each section says what to do, click by click, and what evidence closes it. Put screenshots
 in `docs/security/evidence/` (create the folder) with the file name given. Tick the checklist only with that evidence.
 
 **Order matters for three of them:** §13 (production migrations) → then deploy the website → then upload the app build.
@@ -207,7 +215,7 @@ checks under both privilege modes and the concurrency races on Postgres 17.
 pauses uploads with a plain message, keeping every change on the phone). Anyone who syncs today **without** a plan row
 would see uploads pause. So first:
 
-1. **Pre-check (read-only), on each project.** Ask Claude to run, or paste into the SQL Editor:
+1. **Pre-check (read-only), on each project.** *Production done 2026-11-10: 3 accounts sync, 2 had no plan → granted.* Ask Claude to run, or paste into the SQL Editor:
    ```sql
    with syncing as (
      select user_id from public.wallets union select user_id from public.transactions
@@ -222,8 +230,10 @@ would see uploads pause. So first:
 2. **lucento-test:** ask Claude to apply the four files with the Supabase MCP `apply_migration` (it records them in the
    history) — that is your authorisation for that project. Then set `allow_test_purchases` to 1 there (§8.3).
    Test a debug build: sync, a purchase on the test store, Shared invite.
-3. **Production:** same, only after step 2 looked right. Say explicitly "apply the four security migrations to
-   production". Then §14.
+3. **Production:** Supabase → project **lucento** → **SQL Editor** → **New query** → paste the whole of
+   `docs/security/PRODUCTION_APPLY_2026-11-10.sql` → **Run**. It runs all four migrations in one transaction (all or
+   nothing), records them under the repository versions, and turns test purchases on (§8). The last result lists four
+   versions. Then tell Claude "applied" for §14. (Dry-run on a copy of today's production schema: applies cleanly.)
 4. **Then** deploy the website (`security/release-hardening` merged to `main`): it sends the new `p_test_purchase`
    argument, which the old database function doesn't have, so the database must go first.
 5. **Then** upload the release build.
