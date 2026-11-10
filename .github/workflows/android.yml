@@ -122,7 +122,8 @@ jobs:
           LUCENTO_GOOGLE_WEB_CLIENT_ID: ${{ vars.LUCENTO_GOOGLE_WEB_CLIENT_ID }}
           # Lucento Pro: Google Play's licence key (public; Play Console › Monetization setup). Without it the release
           # doesn't bill and the Pro page says Lucento Pro isn't on sale (docs/monetization/PLAY_CONSOLE_SETUP.md).
-          LUCENTO_PLAY_LICENSE_KEY: ${{ vars.LUCENTO_PLAY_LICENSE_KEY }}
+          # Read from a repository variable or, failing that, a secret of the same name: either works.
+          LUCENTO_PLAY_LICENSE_KEY: ${{ vars.LUCENTO_PLAY_LICENSE_KEY || secrets.LUCENTO_PLAY_LICENSE_KEY }}
           LUCENTO_REQUIRE_RELEASE_CONFIG: ${{ vars.LUCENTO_REQUIRE_RELEASE_CONFIG || 'false' }}
         run: |
           if [ -z "$LUCENTO_SUPABASE_URL" ] || [ -z "$LUCENTO_SUPABASE_PUBLISHABLE_KEY" ]; then
@@ -130,7 +131,9 @@ jobs:
             echo "Release built **without** cloud sync settings (add the LUCENTO_SUPABASE_URL / LUCENTO_SUPABASE_PUBLISHABLE_KEY repository variables)." >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ -z "$LUCENTO_PLAY_LICENSE_KEY" ]; then
-            echo "Release built **without** Google Play billing (add the LUCENTO_PLAY_LICENSE_KEY repository variable); Lucento Pro shows as not on sale." >> "$GITHUB_STEP_SUMMARY"
+            echo "Release built **without** Google Play billing (add the LUCENTO_PLAY_LICENSE_KEY repository variable or secret); Lucento Pro shows as not on sale." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Release built **with** Google Play billing (licence key present)." >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
