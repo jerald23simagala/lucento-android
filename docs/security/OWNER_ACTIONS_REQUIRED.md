@@ -139,7 +139,17 @@ License testers buy without being charged. The server now refuses test purchases
    update lucento_private.plan_limits set value_int = 1 where key = 'allow_test_purchases';
    ```
    (On **lucento-test** run the same line once and leave it at 1.)
-4. **When testing is over, before the public release:**
+4. **When testing is over, before the public release** (about 3 minutes):
+   1. Open https://supabase.com/dashboard and sign in.
+   2. Click the project **lucento** (not lucento-test).
+   3. In the left menu click **SQL Editor** (the `>_` icon), then **+ New query** at the top left.
+   4. Paste the two statements below into the empty editor.
+   5. Click **Run** (bottom right), or press Ctrl + Enter.
+   6. Check the results panel: the first statement says `Success. 1 row affected`; the second says how many test plans it
+      ended (any number, 0 included, is fine).
+   7. Paste and run this to confirm: `select value_int from lucento_private.plan_limits where key = 'allow_test_purchases';`
+      It must show **0**. Take a screenshot of it.
+   8. Tell Claude "test purchases are off" so the checklist can be ticked.
    ```sql
    update lucento_private.plan_limits set value_int = 0 where key = 'allow_test_purchases';
    -- End the plans test purchases granted (marked test_purchase = true):
