@@ -701,6 +701,7 @@ private fun AiConsentSheet(onAccept: () -> Unit, onDismiss: () -> Unit) {
             SheetHeader(title = "Turn on AI answers?", subtitle = "Ask anything about your money and get advice, answered by Gemini.", icon = Icons.Outlined.AutoAwesome)
             ConsentPoint("Sent", AI_SENT)
             ConsentPoint("Never sent", AI_NEVER_SENT)
+            ConsentPoint("Google", com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE)
             ConsentPoint("Checked here", "Every amount in an answer is one of your figures, or a sum this phone worked out from them — shown in bold. Gemini gives you its own recommendations from your figures, but AI can misread a question or miss something only you know, so check advice before you act on it.")
             ConsentPoint("Limits", "Needs your sync account. Each account has a daily allowance, shared with Smarter reading. Turn this off any time from the menu or Settings.")
             Spacer(Modifier.height(Spacing.md))

@@ -37,6 +37,27 @@ class FakeSyncServer(var serverNow: Long = 1_000_000_000_000L) {
     val mainCurrencies = mutableMapOf<String, String>()
     var noLedgerSettings = false
 
+    /**
+     * Security audit F-01 (20261111090000_cloud_write_gate_and_quotas.sql). Null: no plan gate, as before. Otherwise the
+     * accounts holding CLOUD: an account writes its own ledger only with it, and a Partner writes the space's
+     * transactions while the Owner holds it or [lenientPartners] is on. A refused write is the database's 42501.
+     */
+    var cloud: MutableSet<String>? = null
+    var lenientPartners = true
+
+    /** Rows one account may store per table (the LU001 ceiling); null: no ceiling. */
+    var rowCeiling: Int? = null
+
+    private fun gate(table: String, account: String, env: String, newRows: Int) {
+        val holders = cloud
+        if (holders != null) {
+            val allowed = if (env == account) account in holders else lenientPartners || env in holders
+            if (!allowed) throw UploadRefusedException(UploadRefusal.PLAN)
+        }
+        val ceiling = rowCeiling
+        if (ceiling != null && rows(table, env).size + newRows > ceiling) throw UploadRefusedException(UploadRefusal.STORAGE_LIMIT)
+    }
+
     /** Every upsert batch received, by table (for tests that check what a phone sent). */
     val upserts = mutableListOf<Pair<String, List<JsonObject>>>()
 
@@ -100,6 +121,9 @@ class FakeSyncServer(var serverNow: Long = 1_000_000_000_000L) {
             }
             // Row-level security refuses the whole statement when any row may not be written.
             rows.forEach { require(canWrite(table, account, it.str("user_id"))) { "new row violates row-level security policy for table \"$table\"" } }
+            rows.groupBy { it.str("user_id") }.forEach { (env, batch) ->
+                gate(table, account, env, batch.count { tables[table]?.get(it.str("id")) == null })
+            }
             return rows.mapNotNull { incoming ->
                 write(table, incoming.str("user_id"), JsonObject(incoming - "revision" - "server_updated_at"), actor = account)
                     ?.let { JsonObject(mapOf("id" to it.getValue("id"), "revision" to it.getValue("revision"))) }
@@ -111,6 +135,7 @@ class FakeSyncServer(var serverNow: Long = 1_000_000_000_000L) {
             // An UPDATE row-level security doesn't allow touches no row (no error).
             if (!canWrite(table, account, userId)) return false
             val existing = tables[table]?.get(id)?.takeIf { it.str("user_id") == userId } ?: return false
+            gate(table, account, userId, 0)
             val patch = existing + mapOf(
                 "deleted_at" to JsonPrimitive(atIso),
                 "updated_at" to JsonPrimitive(atIso),

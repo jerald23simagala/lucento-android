@@ -47,14 +47,22 @@ Steps:
 3. **Linking rule** on `purchase_links` (`hash = sha256(purchaseToken)`) — steps 3 and 4 are one call to
    `public.apply_play_purchase` (service role only, one transaction, so two verifications of the same purchase can't
    interleave):
+   - the purchase carries an obfuscated account id that isn't `sha256(user_id)` → `409 other_account`, nothing linked or
+     written, on the first verification too (security audit F-03; the app doesn't send such a purchase at all,
+     `PurchaseInterpreter.madeForAnotherAccount`). A purchase made while signed out carries none and links to the first
+     account that verifies it;
    - no row → insert for `user_id`;
    - row for `user_id` → fine;
    - row for another account → allow a re-link only if the purchase's `obfuscatedExternalAccountId == sha256(user_id)`
      **and** `linked_at` is older than 30 days; then move the row (`relinked_count + 1`) and delete the previous account's
      entitlement rows for that `(source, product_id)`; otherwise `409 linked_elsewhere`;
    - a third move (`relinked_count >= 2`) → `409 review_required` (support path).
-   A refunded purchase (`REVOKED`) stays refunded whatever a later verification says, and a stale purchase's ending never
-   overwrites a newer live purchase of the same product.
+   A refunded purchase stays refunded whatever a later verification says — also on a new account after the refunded one
+   was deleted: `revoke_play_purchase` keeps the token's hash in `lucento_private.revoked_purchases`, which has no account
+   column and never cascades (F-02). A stale purchase's ending never overwrites a newer live purchase of the same product.
+   A license tester's purchase (`p_test_purchase`) answers `403 test_purchase_refused` unless
+   `plan_limits.allow_test_purchases` is 1; the rows it writes carry `entitlements.test_purchase` (F-12). Each account
+   may verify 60 times a UTC day (`public.consume_request_quota`, `429 rate_limited`; F-11).
 4. Upsert `entitlements` rows (`verified_at = now()`):
    - `lucento_pro` → PLAY_SUBSCRIPTION, all four grants, `status` from `subscriptionState` + `autoRenewing`, `expires_at`
      from `lineItems[].expiryTime`, `base_plan_id` from `offerDetails.basePlanId`.

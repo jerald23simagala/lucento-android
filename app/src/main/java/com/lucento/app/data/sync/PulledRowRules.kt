@@ -59,6 +59,49 @@ internal object PulledRowRules {
         }
     }
 
+    /**
+     * What a row must satisfy to be uploaded: [problem]'s rules plus the size bounds the server enforces on live rows since
+     * the security remediation (supabase/migrations/20261111090000_cloud_write_gate_and_quotas.sql, and the seed id rule
+     * of 20261111110000). Pulled rows aren't held to the bounds: older rows on the server may exceed them, and they stay
+     * readable. A row that breaks one stays pending on this phone instead of failing its whole batch.
+     */
+    fun uploadProblem(table: String, row: JsonObject): String? {
+        problem(table, row)?.let { return it }
+        if (row.isSet("deleted_at")) return null
+        return firstOf(
+            maxLength(row, "id", MAX_ID),
+            when (table) {
+                "wallets", "goals", "recurring" -> maxLength(row, "name", MAX_NAME)
+                "categories" -> firstOf(maxLength(row, "name", MAX_NAME), maxLength(row, "icon_key", MAX_CODE), seedId(row))
+                else -> null
+            },
+            when (table) {
+                "transactions" -> firstOf(maxLength(row, "note", MAX_NOTE), maxLength(row, "transfer_group", MAX_ID))
+                "goal_contributions" -> maxLength(row, "note", MAX_NOTE)
+                "goals" -> maxLength(row, "scene_key", MAX_CODE)
+                else -> null
+            },
+        )
+    }
+
+    /** Server limits (characters), as the CHECK constraints count them. */
+    const val MAX_NOTE = 500
+    const val MAX_NAME = 100
+    const val MAX_ID = 128
+    private const val MAX_CODE = 64
+
+    private fun maxLength(row: JsonObject, key: String, max: Int): String? {
+        val value = text(row, key) ?: return null
+        return if (value.codePointCount(0, value.length) <= max) null else key
+    }
+
+    /** A "seed-" id is accepted only under the account it names (categories_seed_id_owner). */
+    private fun seedId(row: JsonObject): String? {
+        val id = text(row, "id") ?: return null
+        if (!id.startsWith("seed-")) return null
+        return if (id.startsWith("seed-${text(row, "user_id")}-")) null else "id"
+    }
+
     private fun firstOf(vararg problems: String?): String? = problems.firstOrNull { it != null }
 
     private fun JsonObject.isSet(key: String) = this[key].let { it != null && it !is JsonNull }

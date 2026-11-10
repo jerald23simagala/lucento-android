@@ -15,6 +15,13 @@ enum class VerifyOutcome {
     LINKED_ELSEWHERE,
     /** The purchase moved between accounts too often; support has to look at it. */
     REVIEW_REQUIRED,
+    /**
+     * Google Play says the purchase was made for a different Lucento account (two Lucento accounts on one Google Play
+     * account). Security audit F-03: never recorded here. The app doesn't even send it when it can tell beforehand.
+     */
+    OTHER_ACCOUNT,
+    /** A license tester's purchase, which this Lucento server doesn't accept (security audit F-12). */
+    TEST_PURCHASE_REFUSED,
     /** No Lucento account is signed in, so there's nothing to record it on. Not a problem: Play's reading still counts. */
     SIGNED_OUT,
     /** No connection, the server or Play didn't answer, or this build has no server. Tried again on the next refresh. */
@@ -22,7 +29,9 @@ enum class VerifyOutcome {
     ;
 
     /** An answer that won't change by asking again in this process. */
-    val settled: Boolean get() = this == VERIFIED || this == LINKED_ELSEWHERE || this == REVIEW_REQUIRED
+    val settled: Boolean
+        get() = this == VERIFIED || this == LINKED_ELSEWHERE || this == REVIEW_REQUIRED || this == OTHER_ACCOUNT ||
+            this == TEST_PURCHASE_REFUSED
 }
 
 /** Tells the server about a purchase so it can check it with Play and keep the account's copy (`public.entitlements`). */
@@ -59,7 +68,12 @@ class ProxyPurchaseVerifier(
             401 -> VerifyOutcome.SIGNED_OUT
             409 -> when (runCatching { json.decodeFromString(VerifyError.serializer(), body.orEmpty()).error }.getOrNull()) {
                 "review_required" -> VerifyOutcome.REVIEW_REQUIRED
+                "other_account" -> VerifyOutcome.OTHER_ACCOUNT
                 else -> VerifyOutcome.LINKED_ELSEWHERE
+            }
+            403 -> when (runCatching { json.decodeFromString(VerifyError.serializer(), body.orEmpty()).error }.getOrNull()) {
+                "test_purchase_refused" -> VerifyOutcome.TEST_PURCHASE_REFUSED
+                else -> VerifyOutcome.UNAVAILABLE
             }
             else -> VerifyOutcome.UNAVAILABLE
         }

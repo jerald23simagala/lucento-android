@@ -15,6 +15,18 @@ object ProGates {
     fun syncAllowedByPlan(state: EntitlementState, partnerOfSpace: Boolean, now: Long): Boolean =
         syncAllowedByPlan(state.has(Capability.CLOUD, now), partnerOfSpace)
 
+    /**
+     * The plan rows that can carry CLOUD, as a stable string: source, product, state and end date of each — never a
+     * verification time, which changes on every re-read. Sync compares it to decide whether an upload the server refused
+     * is worth trying again before the cooldown ends (security audit F-01): a renewal or a new purchase changes it.
+     */
+    fun cloudPlanFingerprint(state: EntitlementState): String =
+        state.entitlements
+            .filter { Capability.CLOUD in it.grants }
+            .map { "${it.source}/${it.productId}/${it.status}/${it.expiresAtMillis}/${it.purchaseTokenHash}" }
+            .sorted()
+            .joinToString(";")
+
     /** Restoring from the account on a new phone: the same rule as sync (a Partner joining their space always may). */
     fun restoreAllowedByPlan(state: EntitlementState, partnerOfSpace: Boolean, now: Long): Boolean =
         syncAllowedByPlan(state, partnerOfSpace, now)
