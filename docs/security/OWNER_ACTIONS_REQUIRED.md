@@ -12,7 +12,10 @@ These steps need your consoles, your production projects or a real payment, so t
 > added for jerald23simagala@gmail.com and rachelretas20@gmail.com (12 months, done 2026-11-10); the migrations are
 > applied by pasting `docs/security/PRODUCTION_APPLY_2026-11-10.sql` (the MCP calls were declined twice).
 
-**Not done yet unless the decision box above says so.** Each section says what to do, click by click, and what evidence closes it. Put screenshots
+**Done 2026-11-10:** §13 on production (owner pasted the file) and §14 (all checks pass, see
+RELEASE_READINESS_CHECKLIST A1). lucento-test still needs the same file pasted once.
+
+**Not done yet unless the boxes above say so.** Each section says what to do, click by click, and what evidence closes it. Put screenshots
 in `docs/security/evidence/` (create the folder) with the file name given. Tick the checklist only with that evidence.
 
 **Order matters for three of them:** §13 (production migrations) → then deploy the website → then upload the app build.

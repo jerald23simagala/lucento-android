@@ -5,8 +5,9 @@
 `5d665d8`); `lucento-website` `security/release-hardening` (from `origin/main` `90566a8`).
 **Owner steps:** [OWNER_ACTIONS_REQUIRED.md](OWNER_ACTIONS_REQUIRED.md) · **Checklist:** [RELEASE_READINESS_CHECKLIST.md](RELEASE_READINESS_CHECKLIST.md)
 
-Nothing was applied to Supabase (test or production), deployed to Vercel, pushed, or bought. Production was read for
-metadata only (migration history and one catalog query, §F-14).
+**Update 2026-11-10 (later):** the owner applied the four migrations to **production** (SQL Editor) after two GRANT
+rows were added for the two accounts that synced without a plan; Claude's read-only checks all passed (checklist A1).
+Branches pushed for review. lucento-test is not migrated yet. Nothing has been bought.
 
 ---
 

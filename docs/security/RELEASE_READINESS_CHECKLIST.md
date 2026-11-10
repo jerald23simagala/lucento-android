@@ -30,9 +30,9 @@ Legend: **[B]** blocks release · **[R]** recommended before release · **[P]** 
       *Evidence: 258/258 checks in both modes, 2026-11-10 (`security_remediation_suite.sql`, 78 checks).*
 - [x] The app handles a refused write (42501) on a lapsed plan without a retry loop (unit test).
       *Evidence: `UploadRefusalTest` (8 tests), part of 1,253 passing unit tests.*
-- [ ] Applied to lucento-test, then production. Production catalog re-checked (`pg_policies`). *(OWNER_ACTIONS §13–§14)*
+- [x] Applied to lucento-test, then production. Production catalog re-checked (`pg_policies`). *Evidence: production applied by the owner (SQL Editor, `PRODUCTION_APPLY_2026-11-10.sql`) and checked read-only by Claude on 2026-11-10: 4 versions recorded; all 17 write policies of the 8 synced tables gated, no SELECT/DELETE policy gated; anon has no INSERT on usage_events and can call record_usage_event; 21 limit triggers; counters equal stored rows; refund table present; clients can’t call apply_play_purchase; no default ACL for anon/authenticated in public; 0 squatted seed ids; purge job scheduled; every syncing account holds CLOUD; security advisor: only the intended RPC warnings, private tables without policies, and leaked-password protection (still off). lucento-test not yet (no MCP access to it); apply the same file there before the next debug-build test.*
 - [ ] Owner decision recorded: stay on Supabase Free with a usage alert and the read-only runbook, or move to a paid
-      plan with a spend cap. *(OWNER_ACTIONS §5–§6)*
+      plan with a spend cap. *Decision 2026-11-10: stay on Free for now (owner). Usage alert/reminder still to set (§5).*
 
 ### A2. [B] F-02 and F-03 — Billing linking fixes, before the first real purchase (engineering)
 
@@ -42,7 +42,7 @@ Legend: **[B]** blocks release · **[R]** recommended before release · **[P]** 
 - [x] The app doesn't send a purchase whose `obfuscatedAccountId` belongs to another account.
       *Evidence: `PurchaseAccountBindingTest` (7 tests).*
 - [x] Suite cases for probes X1 and X2 pass. *Evidence: 258/258, 2026-11-10.*
-- [ ] Applied to production (with A1, OWNER_ACTIONS §13).
+- [x] Applied to production (with A1, OWNER_ACTIONS §13). *Evidence: as A1.*
 
 ### A3. [B] F-05 — Gemini key on the paid tier (owner, about 5 minutes)
 
