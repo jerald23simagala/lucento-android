@@ -177,6 +177,9 @@ class AppContainer(application: Application) {
             purchases = purchaseSource,
             remote = entitlementRemote(),
             verifier = purchaseVerifier(),
+            signedInAccountHash = {
+                auth.currentUserId()?.let(com.lucento.app.domain.entitlement.PurchaseInterpreter::obfuscatedAccountId)
+            },
         )
         manager.observePlayUpdates(entitlementScope)
         entitlementScope.launch { manager.refresh() }
@@ -367,6 +370,13 @@ class AppContainer(application: Application) {
             adoptMainCurrency = { code ->
                 if (com.lucento.app.core.money.CurrencyRules.isSupported(code)) preferences.setPrimaryCurrency(code)
             },
+            // Security audit F-01: the server refuses uploads without the CLOUD plan. The plan this phone holds decides
+            // whether a refusal is retried; the refusal itself makes the phone re-read its plan.
+            planFingerprint = {
+                entitlements.loadCached()
+                com.lucento.app.domain.entitlement.ProGates.cloudPlanFingerprint(entitlements.state.value)
+            },
+            onUploadsRefused = { refreshEntitlements() },
         )
     }
 

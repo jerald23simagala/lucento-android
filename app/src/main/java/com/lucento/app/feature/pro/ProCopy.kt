@@ -260,6 +260,11 @@ object ProCopy {
         VerifyOutcome.LINKED_ELSEWHERE ->
             "This purchase is linked to a different Lucento account. It keeps working on this phone; cloud services follow the " +
                 "account it’s linked to. To move it, contact support with your Google Play order number."
+        VerifyOutcome.OTHER_ACCOUNT ->
+            "This purchase was made with a different Lucento account on this Google Play account, so it stays with that " +
+                "account. It keeps working on this phone. To use cloud services with it, sign in with the account that bought it."
+        VerifyOutcome.TEST_PURCHASE_REFUSED ->
+            "This is a Google Play test purchase, and Lucento’s server doesn’t accept test purchases right now."
         VerifyOutcome.REVIEW_REQUIRED ->
             "This purchase has moved between Lucento accounts several times, so support needs to look at it before it moves again. " +
                 "It keeps working on this phone. Contact support with your Google Play order number."

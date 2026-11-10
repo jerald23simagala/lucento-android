@@ -23,6 +23,11 @@ data class PurchaseRecord(
     val pending: Boolean,
     val acknowledged: Boolean,
     val autoRenewing: Boolean,
+    /**
+     * Play's `accountIdentifiers.obfuscatedAccountId`: what the app passed at purchase ([PurchaseInterpreter.obfuscatedAccountId]
+     * of the Lucento account signed in then), or null for a purchase made while signed out (security audit F-03).
+     */
+    val obfuscatedAccountId: String? = null,
 )
 
 /**
@@ -111,6 +116,17 @@ object PurchaseInterpreter {
      * (docs/MONETIZATION.md §5.4); Play and Google never see the id itself.
      */
     fun obfuscatedAccountId(userId: String): String = sha256Hex(userId.trim().lowercase())
+
+    /**
+     * Security audit F-03: Play says [purchase] was made for a Lucento account other than [signedInAccountHash] (the
+     * [obfuscatedAccountId] of the account signed in now). False when either is unknown: a purchase made while signed out
+     * carries no id and may be recorded on whoever verifies it first (docs/MONETIZATION.md §5.4).
+     */
+    fun madeForAnotherAccount(purchase: PurchaseRecord, signedInAccountHash: String?): Boolean {
+        val madeFor = purchase.obfuscatedAccountId?.trim()?.lowercase() ?: return false
+        val current = signedInAccountHash?.trim()?.lowercase() ?: return false
+        return madeFor != current
+    }
 
     private fun sha256Hex(text: String): String =
         MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }

@@ -127,6 +127,7 @@ class PlayPurchaseSource(
             pending = state == Purchase.PurchaseState.PENDING,
             acknowledged = p.isAcknowledged,
             autoRenewing = p.isAutoRenewing,
+            obfuscatedAccountId = p.accountIdentifiers?.obfuscatedAccountId?.takeIf { it.isNotBlank() },
         )
     }
 

@@ -60,4 +60,13 @@ class FakeSyncPreferences(
     override suspend fun setSharedSpaceOwnerId(ownerId: String?) {
         sharedSpaceOwner = ownerId
     }
+
+    /** Security audit F-01: the last upload refusal (SyncRepository's cooldown). */
+    var refused: UploadsRefusedRecord? = null
+
+    override suspend fun uploadsRefused(): UploadsRefusedRecord? = refused
+
+    override suspend fun setUploadsRefused(record: UploadsRefusedRecord?) {
+        refused = record
+    }
 }

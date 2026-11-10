@@ -54,6 +54,12 @@ class EntitlementManager(
     private val remote: EntitlementRemote? = null,
     /** Release builds with a server; null in debug (the fake store's purchases must never reach the server). */
     private val verifier: PurchaseVerifier? = null,
+    /**
+     * Security audit F-03: [PurchaseInterpreter.obfuscatedAccountId] of the signed-in Lucento account, or null when signed
+     * out. A purchase Play says was made for a different account is never sent for this one.
+     */
+    private val signedInAccountHash: suspend () -> String? = { null },
+    // Last, so existing callers can keep passing it as a trailing lambda.
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val _state = MutableStateFlow(EntitlementState.FREE)
@@ -115,15 +121,23 @@ class EntitlementManager(
         val recorded = rows.filter { it.verifiedBy == Verifier.SERVER }.mapNotNull { it.purchaseTokenHash }.toSet()
         val verifier = verifier
         var verified = false
+        val account = if (verifier != null) runCatching { signedInAccountHash() }.getOrNull() else null
         for (purchase in owned) {
             if (purchase.pending) continue
             val hash = PurchaseInterpreter.tokenHash(purchase.purchaseToken)
-            if (verifier != null && hash !in recorded && hash !in settled) {
+            val forAnotherAccount = PurchaseInterpreter.madeForAnotherAccount(purchase, account)
+            if (verifier != null && forAnotherAccount && hash !in settled) {
+                // Bought by the other Lucento account on this Google Play account: theirs to verify (security audit F-03).
+                settled += hash
+                _verificationIssue.value = VerifyOutcome.OTHER_ACCOUNT
+            }
+            if (verifier != null && !forAnotherAccount && hash !in recorded && hash !in settled) {
                 val outcome = runCatching { verifier.verify(purchase) }.getOrDefault(VerifyOutcome.UNAVAILABLE)
                 if (outcome.settled) settled += hash
                 when (outcome) {
                     VerifyOutcome.VERIFIED -> verified = true
-                    VerifyOutcome.LINKED_ELSEWHERE, VerifyOutcome.REVIEW_REQUIRED -> _verificationIssue.value = outcome
+                    VerifyOutcome.LINKED_ELSEWHERE, VerifyOutcome.REVIEW_REQUIRED, VerifyOutcome.OTHER_ACCOUNT,
+                    VerifyOutcome.TEST_PURCHASE_REFUSED -> _verificationIssue.value = outcome
                     VerifyOutcome.SIGNED_OUT, VerifyOutcome.UNAVAILABLE -> Unit
                 }
             }
