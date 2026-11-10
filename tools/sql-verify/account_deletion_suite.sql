@@ -40,8 +40,14 @@ begin
     (v_q, 'second@lucento-test.invalid', now(), 'authenticated', 'authenticated'),
     (v_n, 'new@lucento-test.invalid', now(), 'authenticated', 'authenticated');
   -- Inviting needs the SHARED capability (20261107090000_entitlements.sql).
+  -- Writing a synced ledger needs CLOUD (20261111090000_cloud_write_gate_and_quotas.sql): every account here that syncs
+  -- holds it, as a Cloud subscriber would. The new account N only restores a purchase.
   insert into public.entitlements (user_id, source, status, grants, expires_at, note) values
-    (v_o, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '30 days', 'suite fixture');
+    (v_o, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '30 days', 'suite fixture'),
+    (v_a, 'GRANT', 'ACTIVE', array['CLOUD'], now() + interval '30 days', 'suite fixture'),
+    (v_b, 'GRANT', 'ACTIVE', array['CLOUD'], now() + interval '30 days', 'suite fixture'),
+    (v_p, 'GRANT', 'ACTIVE', array['CLOUD'], now() + interval '30 days', 'suite fixture'),
+    (v_q, 'GRANT', 'ACTIVE', array['CLOUD'], now() + interval '30 days', 'suite fixture');
 
   -- ======================================================================== fixtures
   -- A: a small ledger written through RLS, and a Lifetime purchase recorded by the service role.
@@ -122,7 +128,9 @@ begin
     insert into public.wallets (id, user_id, name, type, currency_code, opening_balance_minor, created_at, updated_at)
       values ('wa2-' || v_a, v_a, 'Late sync', 'CASH', 'PHP', 0, now(), now());
     r := r || 'FAIL D7 a late sync recreated data under the deleted account'::text;
-  exception when foreign_key_violation then r := r || 'ok  D7 a late sync from the old token cannot recreate data'::text; end;
+  -- Refused by the Cloud gate (the account's plan rows went with it) before the foreign key is even checked.
+  exception when foreign_key_violation or insufficient_privilege then
+    r := r || 'ok  D7 a late sync from the old token cannot recreate data'::text; end;
   execute 'reset role';
 
   -- The person still owns the purchase in Google Play: a new account can restore it.
