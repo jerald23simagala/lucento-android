@@ -162,3 +162,7 @@ Do not drop the recovery stash, commit, push, merge, delete branches, or modify 
 6. Never commit secrets or local credentials; `google-services.json` is not in the repo by design.
 7. Make focused, testable changes and report exactly which tests were and were not executed.
 8. Use Architect and QA agents for independent read-only reviews when useful.
+
+## Security remediation — 2026-11-10 (`security/release-remediation`, website `security/release-hardening`)
+
+All remediable audit findings fixed in code and tested offline: four migrations (`20261111090000`–`20261111120000`), app sync refusal handling and purchase account binding, website Astro 7 upgrade, headers/CSP, method guard, OIDC push check, per-account verify quota, CI and Dependabot. Results: SQL 258/258 (both privilege modes), concurrency 4/4 on Postgres 17.6, Android unit 1,253/1,253, release APK clean, OSV 0, website unit 44/44, e2e 55/55, `npm audit` high/critical 0. Nothing applied to Supabase, pushed or deployed. Decision **NOT APPROVED** until the owner steps in `docs/security/OWNER_ACTIONS_REQUIRED.md` are done. Report: `docs/security/REMEDIATION_REPORT.md`.

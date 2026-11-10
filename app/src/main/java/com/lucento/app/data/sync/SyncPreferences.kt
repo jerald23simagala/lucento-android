@@ -61,6 +61,10 @@ interface SyncPreferencesStore {
      */
     suspend fun sharedSpaceOwnerId(): String?
     suspend fun setSharedSpaceOwnerId(ownerId: String?)
+
+    /** Security audit F-01: the server's last refusal of this phone's uploads, or null (see [SyncRepository]). */
+    suspend fun uploadsRefused(): UploadsRefusedRecord? = null
+    suspend fun setUploadsRefused(record: UploadsRefusedRecord?) {}
 }
 
 /**
@@ -78,6 +82,9 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
         val initialPullDoneFor = stringPreferencesKey("initial_pull_done_for")
         val overridden = intPreferencesKey("overridden_changes")
         val sharedSpaceOwner = stringPreferencesKey("shared_space_owner_id")
+        val refusedAt = longPreferencesKey("uploads_refused_at_millis")
+        val refusedPlan = stringPreferencesKey("uploads_refused_plan")
+        val refusedReason = stringPreferencesKey("uploads_refused_reason")
     }
 
     /** Lucento Shared: the Owner whose Shared Space this phone holds as a Partner, or null. */
@@ -86,6 +93,27 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
         .map { it[Keys.sharedSpaceOwner] }
 
     override suspend fun sharedSpaceOwnerId(): String? = context.syncDataStore.data.first()[Keys.sharedSpaceOwner]
+
+    override suspend fun uploadsRefused(): UploadsRefusedRecord? {
+        val p = context.syncDataStore.data.first()
+        val at = p[Keys.refusedAt] ?: return null
+        val reason = p[Keys.refusedReason]?.let { r -> UploadRefusal.entries.firstOrNull { it.name == r } } ?: return null
+        return UploadsRefusedRecord(at, p[Keys.refusedPlan].orEmpty(), reason)
+    }
+
+    override suspend fun setUploadsRefused(record: UploadsRefusedRecord?) {
+        context.syncDataStore.edit {
+            if (record == null) {
+                it.remove(Keys.refusedAt)
+                it.remove(Keys.refusedPlan)
+                it.remove(Keys.refusedReason)
+            } else {
+                it[Keys.refusedAt] = record.atMillis
+                it[Keys.refusedPlan] = record.planFingerprint
+                it[Keys.refusedReason] = record.reason.name
+            }
+        }
+    }
 
     override suspend fun setSharedSpaceOwnerId(ownerId: String?) {
         context.syncDataStore.edit { if (ownerId == null) it.remove(Keys.sharedSpaceOwner) else it[Keys.sharedSpaceOwner] = ownerId }
@@ -164,6 +192,9 @@ class SyncPreferences(private val context: Context) : SyncPreferencesStore {
             it.remove(Keys.initialPullDoneFor)
             it.remove(Keys.overridden)
             it.remove(Keys.sharedSpaceOwner)
+            it.remove(Keys.refusedAt)
+            it.remove(Keys.refusedPlan)
+            it.remove(Keys.refusedReason)
         }
     }
 

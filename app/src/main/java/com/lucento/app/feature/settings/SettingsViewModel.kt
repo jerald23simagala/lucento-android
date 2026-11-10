@@ -457,6 +457,7 @@ class SettingsViewModel(
             SyncResult.NotConfigured -> "Cloud sync isn’t available in this version of Lucento yet."
             is SyncResult.Retryable -> "Sync couldn't finish (${result.message}) — your data is safe and it will retry."
             is SyncResult.MembershipRevoked -> "This phone is no longer part of that Shared Space."
+            is SyncResult.UploadsPaused -> "Received ${result.report.pulled}. ${result.message}"
         }
     }
 

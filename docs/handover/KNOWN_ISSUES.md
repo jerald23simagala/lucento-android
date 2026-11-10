@@ -15,6 +15,15 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Security remediation (2026-11-10, `security/release-remediation`)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| SR-1 | The four `20261111*` migrations are not on lucento-test or production; until they are, F-01/F-02/F-03/F-07/F-12/F-13 stay open in practice | `docs/security/MIGRATION_MANIFEST_2026-11-10.md` | OWNER_ACTIONS §13–§14 |
+| SR-2 | Installed builds older than this branch upload unchunked (a ledger with > 1,000 pending rows of one table gets LU002 until updated) and insert usage counts directly (now refused, silently) | Code | Internal testers only; update the build |
+| SR-3 | PostgREST's HTTP status for 42501/LU001 and the app's refusal path aren't seen on a device yet | Unit + SQL only | Debug build against lucento-test after §13 |
+| SR-4 | `lintDebug` fails locally on this PC's `local.properties` (`sdk.dir` needs `C\:`); CI unaffected | Lint report | Owner may escape the colon |
+
 ## Open — P0
 
 | ID | Issue | Evidence | Next step |
@@ -218,7 +227,7 @@ unconfigured), HomeOnTrackTest (L9).
 | LP-K2 | A Play-local **subscription** reading carries no expiry (Play's `Purchase` has none), so it is trusted for 35 days from the last successful query plus the 3-day grace; a phone that never sees Play or the server again keeps Pro that long after a lapse. The server's `expires_at` replaces it as soon as either is reachable | Code-only (`PurchaseInterpreter.LOCAL_SUBSCRIPTION_HORIZON_MILLIS`), unit-tested | Accepted (docs/MONETIZATION.md §5.3 L-1, L-4) |
 | LP-K3 | A refund with revoke reaches the phone only through the server (or Play dropping the purchase from its list). While offline after a Lifetime refund, `LOCAL_PRO` stays until the next contact | Code-only; `EntitlementMergeTest.a_revoked_server_row_is_not_overridden_by_play_while_its_dates_are_current` pins the sequence | Accepted (§4.3: exposure is one lost sale) |
 | LP-K4 | `KeystoreSealer` falls back to a SharedPreferences key when the Android Keystore refuses; the snapshot is then tamper-evident but not device-bound | Code-only; the fallback path is not exercised on a device | Try on the API 28 AVD and a Keystore-less emulator in Phase 3 |
-| LP-K6 | **Sync writes are not gated on the server.** The plan is enforced on the phone (`backgroundSyncAllowed`, Settings, onboarding) and the server only gates Shared invitations and AI. A modified client on a Free account could still push to its own ledger; Supabase storage per user is tiny, so this is a revenue leak, not a data risk. Closing it means a `has_capability(auth.uid(), 'CLOUD') or <partner of space>` clause on every sync table's write policies | Code-only | Decide before Play launch; a later migration |
+| LP-K6 | ~~Sync writes are not gated on the server~~. **Fixed in code 2026-11-10** (security audit F-01): `20261111090000_cloud_write_gate_and_quotas.sql` requires CLOUD on every sync write policy (a Partner on the Owner's plan, lenient by default), bounds sizes and rows; the app pauses uploads on 42501 without retrying (`UploadRefusalTest`). **Not applied** to lucento-test or production yet | `security_remediation_suite.sql` 78/78, `concurrency.mjs` 4/4 | OWNER_ACTIONS_REQUIRED §13 |
 | LP-K7 | **A release build needs the entitlement migration on production before it ships with these gates**: `SupabaseEntitlementRemote` reads a table that does not exist there yet (404 → "unreachable" → no plan → sync pauses for every signed-in release user). Debug builds use `lucento-test`, where it is applied | Code-only (`SupabaseEntitlementRemote`) | NEXT_TASKS LP-6: production migration + grants by uuid with the gated release; never a release with the gates and without the migration |
 | LP-K10 | ~~Phase 2: the screenshot tour waited for "Save as PDF", which the free plan replaces with a note; a refused goal restore gave a success haptic and closed the sheet~~ **Fixed in Phase 3** (tour on a simulated Pro plan; `GoalRepository.restore` result shown in the sheet) | `ScreenshotTourTest` **PASS** on the API 28 AVD (61 shots in `artifacts/lucento-pro/tour/`, new 24a–24f: plan ended, Pro page ×3, Insights on Free ×2); two earlier runs failed on the emulator's own "System UI isn't responding" dialog and two on tour steps of mine (fixed: the Pro page's top bar scrolls away, so the tour leaves with the system back) | — |
 | LP-K11 | Phase 3–4 checks not done on a device: TalkBack spoken output on the Pro page, its buy buttons and lock notes, 200% font on the comparison rows and plan cards, a large screen, the Manage subscription link (no real subscription exists yet) | Not run | Phase 5 device matrix |

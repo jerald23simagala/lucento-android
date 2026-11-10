@@ -1,13 +1,15 @@
 {
   "name": "lucento-sql-verify",
   "private": true,
-  "description": "Replays supabase/migrations on PGlite (Postgres 17 in WebAssembly) and runs SQL security suites. Dev tool only; nothing here ships in the app.",
+  "description": "Replays supabase/migrations on PGlite (Postgres 17 in WebAssembly) and runs SQL security suites; concurrency.mjs races the limits on a real Postgres server. Dev tool only; nothing here ships in the app.",
   "type": "module",
   "scripts": {
     "verify": "node run.mjs",
-    "verify:stock": "node -e \"process.env.STOCK_DEFAULTS='1'; import('./run.mjs')\""
+    "verify:stock": "node -e \"process.env.STOCK_DEFAULTS='1'; import('./run.mjs')\"",
+    "concurrency": "node concurrency.mjs"
   },
   "dependencies": {
-    "@electric-sql/pglite": "0.3.16"
+    "@electric-sql/pglite": "0.3.16",
+    "pg": "8.13.1"
   }
 }

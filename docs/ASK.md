@@ -51,6 +51,12 @@ existing `FileProvider`.
 
 ## What the AI sees, and the checks on what it says
 
+**Gemini tier (owner decision 2026-11-10, security audit F-05):** the key stays on Gemini's **free tier** at launch and
+moves to the paid tier once there is a user base. On the free tier Google may keep prompts to improve its products and
+people at Google may read them, so the privacy policy (VERSION 2026-11-10), both AI consent dialogs in Settings, the AI
+answers consent sheet and the website say so (`LegalDocuments.GEMINI_DATA_USE`). When billing is linked: remove that
+sentence, bump `LegalDocuments.VERSION`, re-run `tools/legal/export_legal.py`, and record the date here.
+
 **Sent** (`AskSnapshotBuilder`, `AskLucentoClient`, request `version: 2`), only while AI answers (v2) are on: the
 question; the last six turns of the conversation; today's date; the main currency; and up to 400 labelled figures, each
 with an id, all in the main currency and calculated on the phone:

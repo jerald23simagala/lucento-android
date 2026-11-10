@@ -87,6 +87,14 @@ class SyncRepository(
      */
     private val mainCurrency: suspend () -> String? = { null },
     private val adoptMainCurrency: suspend (String) -> Unit = {},
+    /**
+     * Security audit F-01: what this phone believes its plan is, as a short stable string (the plan rows' sources, states
+     * and end dates; never a verification time). A refused upload waits [UPLOAD_REFUSAL_COOLDOWN_MILLIS] unless this
+     * changes, so renewing resumes uploads at once while an unchanged plan isn't retried in a loop.
+     */
+    private val planFingerprint: suspend () -> String = { "" },
+    /** Called once when the server starts refusing uploads (the app re-reads the plan, so its own gate catches up). */
+    private val onUploadsRefused: suspend () -> Unit = {},
 ) {
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
@@ -181,34 +189,64 @@ class SyncRepository(
             if (!initialPullDone) preferences.setInitialPullDoneFor(env)
             assignMissingCategoryIds(env)
 
+            // Security audit F-01: uploads the server refused recently, under the same plan, wait (pull only). Any other
+            // failure still fails the cycle as before.
+            val fingerprint = planFingerprint()
+            val previous = preferences.uploadsRefused()
+            val held = previous?.takeIf { it.planFingerprint == fingerprint && clock() - it.atMillis in 0 until UPLOAD_REFUSAL_COOLDOWN_MILLIS }
+            var refusal: UploadRefusal? = held?.reason
+            var attempted = false
+            suspend fun upload(block: suspend () -> SyncReport): SyncReport {
+                if (refusal != null) return SyncReport()
+                attempted = true
+                return try {
+                    block()
+                } catch (e: UploadRefusedException) {
+                    // Nothing that failed was marked as sent: every refused row and deletion stays pending on the phone.
+                    refusal = e.reason
+                    SyncReport()
+                }
+            }
+
             val rejected = Rejected()
-            report += pushAll(r, env, rejected, partner)
+            report += upload { pushAll(r, env, rejected, partner) }
 
             val pulled = pull(r, env, rejected)
             report += pulled
             // A same-moment local edit was kept and nudged later; send it now so this cycle converges.
-            if (pulled.pendingKept > 0) report += pushAll(r, env, Rejected(), partner)
+            if (pulled.pendingKept > 0) report += upload { pushAll(r, env, Rejected(), partner) }
             // The folds below rewrite categories and budgets: the Owner's phones do them and a Partner's phone pulls the
             // result (a Partner may not change either, and would only collect changes it can never upload).
             // Copies of one category from two setups on this account fold into one; the merge's edits go up now.
             if (!partner && mergeDuplicateCategories() > 0) {
                 val again = Rejected()
-                report += pushTombstones(r, env, again)
-                report += pushBudgets(r, env, again)
-                report += pushTransactions(r, env, again)
-                report += pushRecurring(r, env, again)
+                report += upload {
+                    pushTombstones(r, env, again) + pushBudgets(r, env, again) + pushTransactions(r, env, again) +
+                        pushRecurring(r, env, again)
+                }
             }
             // Two phones that each set an amount for the same category and currency: one row is kept everywhere.
             val budgetFold = if (partner) BudgetFold(0, 0) else mergeDuplicateBudgets()
             if (budgetFold.removed > 0) {
                 report += SyncReport(overridden = budgetFold.changedHere)
                 val again = Rejected()
-                report += pushTombstones(r, env, again)
-                report += pushBudgets(r, env, again)
+                report += upload { pushTombstones(r, env, again) + pushBudgets(r, env, again) }
             }
             preferences.setLastSyncedAtMillis(clock())
-            preferences.clearLastError()
             preferences.addOverriddenChanges(report.overridden)
+            val refused = refusal
+            if (refused != null) {
+                // The pull finished (a lapsed plan still restores everything); uploads wait. Recorded once per refusal.
+                if (held == null) {
+                    preferences.setUploadsRefused(UploadsRefusedRecord(clock(), fingerprint, refused))
+                    onUploadsRefused()
+                }
+                val message = refusalMessage(refused)
+                preferences.setLastError(message)
+                return SyncResult.UploadsPaused(report, refused, message)
+            }
+            if (attempted && previous != null) preferences.setUploadsRefused(null)
+            preferences.clearLastError()
             SyncResult.Success(report)
         } catch (e: CancellationException) {
             throw e
@@ -544,17 +582,21 @@ class SyncRepository(
         // The server's CHECK constraints reject a whole batch for one bad row, so a row that breaks the same rules
         // (legacy data, say) stays dirty on this phone instead of blocking every other upload (QA note 3).
         val encoded = rows.map { it to encode(it) }
-        val (sendable, invalid) = encoded.partition { (_, json) -> PulledRowRules.problem(table, json) == null }
+        val (sendable, invalid) = encoded.partition { (_, json) -> PulledRowRules.uploadProblem(table, json) == null }
         if (sendable.isEmpty()) return SyncReport(invalidSkipped = invalid.size)
-        val acceptedRevisions = r.upsert(table, sendable.map { it.second }).associate { it.str("id") to it.revisionOrNull() }
         var pushed = 0
-        sendable.map { it.first }.forEach { row ->
-            val revision = acceptedRevisions[idOf(row)]
-            if (revision != null) {
-                markPushed(row, revision)
-                pushed++
-            } else {
-                rejected.add(table, idOf(row))
+        // At most PUSH_CHUNK rows per request: the server refuses more in one statement (security audit F-01), and each
+        // chunk that was accepted is recorded before the next one is sent.
+        sendable.chunked(PUSH_CHUNK).forEach { chunk ->
+            val acceptedRevisions = r.upsert(table, chunk.map { it.second }).associate { it.str("id") to it.revisionOrNull() }
+            chunk.map { it.first }.forEach { row ->
+                val revision = acceptedRevisions[idOf(row)]
+                if (revision != null) {
+                    markPushed(row, revision)
+                    pushed++
+                } else {
+                    rejected.add(table, idOf(row))
+                }
             }
         }
         return SyncReport(pushed = pushed, invalidSkipped = invalid.size)
@@ -1167,6 +1209,20 @@ class SyncRepository(
     companion object {
         /** Last-resort cap on one sync cycle (see [sync]). */
         const val CYCLE_TIMEOUT_MILLIS = 10 * 60_000L
+
+        /** Rows per upload request; the server refuses more than 1,000 in one statement (max_rows_per_write). */
+        const val PUSH_CHUNK = 500
+
+        /** How long refused uploads wait under an unchanged plan before one more attempt (security audit F-01). */
+        const val UPLOAD_REFUSAL_COOLDOWN_MILLIS = 30 * 60_000L
+
+        /** What Settings and the sync sheet show while uploads are paused; never a technical code. */
+        fun refusalMessage(reason: UploadRefusal): String = when (reason) {
+            UploadRefusal.PLAN ->
+                "Uploads are paused: cloud sync isn’t part of this account’s plan right now. Your changes are safe on this phone and upload once the plan includes cloud sync again."
+            UploadRefusal.STORAGE_LIMIT ->
+                "Uploads are paused: this account has reached Lucento’s cloud storage limit. Your changes are safe on this phone. Contact support to get uploads going again."
+        }
 
         const val PULL_PAGE_SIZE = 500L
         /** Covers writes stamped by the server before a pull's read but committed after it. */
