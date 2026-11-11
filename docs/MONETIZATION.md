@@ -767,6 +767,12 @@ What landed:
   - A pending payment replaces that plan's buttons with D-9.
   - Results and Play problems are worded by `ProCopy`.
   - Test builds get a **Test store** switch in the simulator: marked test prices, and buying at once through the fake.
+  - Redesign 2026-11-10: plans come first, each card a one-line promise and a short benefit list (`ProCopy.pitch`).
+    A subscription's periods are a Yearly / Monthly choice above one button; the yearly period shows "Save N%"
+    worked out from Play's own amounts (`ProCopy.yearlySavingPercent`: same currency, rounded down, at least 5 %).
+    The comparison is a Free / Pro / Lifetime table grouped *On this phone* / *Online*, with ticks, dashes and short
+    values; Lifetime's online services read "Year 1" with one footnote. At font scale 1.3 and above it falls back to
+    the worded rows. Prices are still only Play's strings.
 - **The server.** `20261108090000_play_purchases.sql`:
   - `apply_play_purchase` holds the linking rule and the row writes in one transaction. A refund is final, and a stale
     ending never undoes a newer purchase.

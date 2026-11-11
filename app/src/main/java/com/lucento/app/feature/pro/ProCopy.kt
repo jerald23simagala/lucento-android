@@ -81,6 +81,88 @@ object ProCopy {
         else -> "First year, then with Lucento Cloud"
     }
 
+    // ------------------------------------------------------------------------------------------------ comparison table
+
+    /** One cell of the Free / Pro / Lifetime table: a tick, a dash, or a short value. TalkBack reads the row's long form. */
+    sealed interface TableCell {
+        data object Included : TableCell
+        data object NotIncluded : TableCell
+        data class Value(val text: String) : TableCell
+    }
+
+    /** The table's short form of [cell]: "3", "No limit", "10/mo", "50/day", a tick or a dash. */
+    fun tableCell(feature: ProFeature, limit: Limit): TableCell = when (feature) {
+        ProFeature.EXTRA_THEMES -> TableCell.Value(if (limit == Limit.None) "2" else "All 5")
+        ProFeature.SHARED_SPACE -> when (limit) {
+            Limit.None -> TableCell.NotIncluded
+            is Limit.Count -> TableCell.Value(if (limit.max == 1) "1 Partner" else "${limit.max} Partners")
+            else -> TableCell.Included
+        }
+        else -> when (limit) {
+            Limit.Unlimited -> if (feature in COUNTED) TableCell.Value("No limit") else TableCell.Included
+            Limit.None -> TableCell.NotIncluded
+            is Limit.Count -> TableCell.Value("${limit.max}")
+            is Limit.PerMonth -> TableCell.Value("${limit.max}/mo")
+            is Limit.PerDay -> TableCell.Value("${limit.max}/day")
+        }
+    }
+
+    /** The Lifetime column: owned outright on the phone; online services are marked [FIRST_YEAR] and explained once below. */
+    fun lifetimeTableCell(row: ComparisonRow): TableCell =
+        if (row.feature.requires == Capability.LOCAL_PRO) tableCell(row.feature, row.lifetime) else TableCell.Value(FIRST_YEAR)
+
+    const val FIRST_YEAR = "Year 1"
+
+    /** The footnote under the table: what [FIRST_YEAR] means, never promising online services forever (§0). */
+    val FIRST_YEAR_NOTE: String =
+        "$FIRST_YEAR: included for your first year, then with the optional Lucento Cloud. Without it, the AI adviser keeps the " +
+            "free plan’s ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} questions a month. Everything else in Lifetime is yours for good."
+
+    /** The table's two groups: what runs on the phone, then the online services. */
+    fun comparisonGroups(rows: List<ComparisonRow>): List<Pair<String, List<ComparisonRow>>> {
+        val (local, online) = rows.partition { it.feature.requires == Capability.LOCAL_PRO }
+        return listOf("On this phone" to local, "Online" to online).filter { it.second.isNotEmpty() }
+    }
+
+    /** What TalkBack reads for one table row: every plan's allowance in words. */
+    fun comparisonDescription(row: ComparisonRow): String =
+        "${featureName(row.feature)}. Free: ${cell(row.feature, row.free)}. Pro: ${cell(row.feature, row.pro)}. " +
+            "Lifetime: ${lifetimeCell(row)}."
+
+    // ------------------------------------------------------------------------------------------------ plan cards
+
+    /** A plan card's promise: one line, then what it brings, in the order people care about. */
+    data class PlanPitch(val tagline: String, val benefits: List<String>)
+
+    fun pitch(kind: PlanCardKind): PlanPitch = when (kind) {
+        PlanCardKind.PRO -> PlanPitch(
+            "Everything in Lucento, on every phone you use.",
+            listOf(
+                "Cloud sync between your phones",
+                "Lucento Shared with a Partner",
+                "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} AI adviser questions a day",
+                "Unlimited wallets, cards and loans",
+                "12-month Insights, PDF statements and all five themes",
+            ),
+        )
+        PlanCardKind.LIFETIME -> PlanPitch(
+            "Pay once. Yours for good.",
+            listOf(
+                "Every Pro feature that runs on your phone, for life",
+                "No renewals, and it works offline",
+                "Cloud sync, Lucento Shared and the AI adviser included for the first year",
+            ),
+        )
+        PlanCardKind.CLOUD -> PlanPitch(
+            "Keep your online services going.",
+            listOf(
+                "Cloud sync and restoring from your account",
+                "Lucento Shared with a Partner",
+                "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} AI adviser questions a day",
+            ),
+        )
+    }
+
     /** Why [feature] isn't available on this plan, and what is still free: the sentence in every lock note. */
     fun lockedLine(feature: ProFeature): String = when (feature) {
         ProFeature.MONEY_WALLETS ->
@@ -208,9 +290,14 @@ object ProCopy {
     // ------------------------------------------------------------------------------------------------ prices
 
     /** "₱149.00 a month · 7-day free trial", from Google Play's own price string and periods. */
-    fun priceLine(price: ProductPrice): String {
+    fun priceLine(price: ProductPrice): String =
+        listOf(price.formattedPrice, pricePer(price)).filter { it.isNotEmpty() }.joinToString(" ") +
+            trialText(price)?.let { " · $it" }.orEmpty()
+
+    /** How often [price] is charged: "a year", "a month", "once". */
+    fun pricePer(price: ProductPrice): String {
         val period = price.billingPeriodIso?.let { runCatching { Period.parse(it) }.getOrNull() }
-        val per = when {
+        return when {
             price.billingPeriodIso == null -> "once"
             period == null -> ""
             period.years == 1 && period.months == 0 -> "a year"
@@ -219,14 +306,40 @@ object ProCopy {
             period.years > 1 -> "every ${period.years} years"
             else -> ""
         }
-        val trial = price.freeTrialPeriodIso?.let { runCatching { Period.parse(it) }.getOrNull() }?.let { p ->
+    }
+
+    /** "7-day free trial" when Play lists one on this offer. */
+    fun trialText(price: ProductPrice): String? =
+        price.freeTrialPeriodIso?.let { runCatching { Period.parse(it) }.getOrNull() }?.let { p ->
             when {
-                p.days > 0 -> " · ${p.days}-day free trial"
-                p.months > 0 -> " · ${p.months}-month free trial"
+                p.days > 0 -> "${p.days}-day free trial"
+                p.months > 0 -> "${p.months}-month free trial"
                 else -> null
             }
-        }.orEmpty()
-        return listOf(price.formattedPrice, per).filter { it.isNotEmpty() }.joinToString(" ") + trial
+        }
+
+    /** The name of a subscription's period for the plan picker: "Yearly", "Monthly"; null for a one-time price. */
+    fun periodName(price: ProductPrice): String? {
+        val period = price.billingPeriodIso?.let { runCatching { Period.parse(it) }.getOrNull() } ?: return null
+        return when {
+            period.years == 1 && period.months == 0 -> "Yearly"
+            period.years == 0 && period.months == 1 -> "Monthly"
+            else -> null
+        }
+    }
+
+    /**
+     * How much a year costs less than twelve months, as a whole percentage rounded **down** so it never overstates,
+     * from Play's own amounts. Null unless both are known in the same currency and the saving is at least 5 %.
+     */
+    fun yearlySavingPercent(yearly: ProductPrice, monthly: ProductPrice): Int? {
+        val y = yearly.priceMicros ?: return null
+        val m = monthly.priceMicros ?: return null
+        if (yearly.currencyCode == null || yearly.currencyCode != monthly.currencyCode || y <= 0 || m <= 0) return null
+        val twelve = Math.multiplyExact(m, 12L)
+        if (y >= twelve) return null
+        val percent = Math.multiplyExact(twelve - y, 100L) / twelve
+        return percent.toInt().takeIf { it >= 5 }
     }
 
     // ------------------------------------------------------------------------------------------------ restore
