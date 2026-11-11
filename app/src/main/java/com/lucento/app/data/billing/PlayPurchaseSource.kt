@@ -165,6 +165,7 @@ class PlayPurchaseSource(
                         formattedPrice = ph.formattedPrice,
                         billingPeriodIso = ph.billingPeriod,
                         recurring = ph.recurrenceMode == ProductDetails.RecurrenceMode.INFINITE_RECURRING,
+                        currencyCode = ph.priceCurrencyCode,
                     )
                 },
             )
@@ -176,7 +177,9 @@ class PlayPurchaseSource(
                 basePlanId = null,
                 offerId = o.offerId,
                 offerToken = token,
-                oneTimePrice = PricePhase(o.priceAmountMicros, o.formattedPrice, billingPeriodIso = null, recurring = false),
+                oneTimePrice = PricePhase(
+                    o.priceAmountMicros, o.formattedPrice, billingPeriodIso = null, recurring = false, currencyCode = o.priceCurrencyCode,
+                ),
             )
         }
         return subscription + oneTime

@@ -32,6 +32,13 @@ data class ProductPrice(
     val billingPeriodIso: String?,
     /** ISO 8601 length of a free trial on this offer, when there is one. */
     val freeTrialPeriodIso: String? = null,
+    /**
+     * Play's own amount for [formattedPrice], in millionths of [currencyCode]. Only used to compare two of Play's prices
+     * (the yearly saving); never shown, so the app still never writes a price of its own.
+     */
+    val priceMicros: Long? = null,
+    /** ISO 4217 code of [priceMicros], as Play reports it. */
+    val currencyCode: String? = null,
 )
 
 /**
