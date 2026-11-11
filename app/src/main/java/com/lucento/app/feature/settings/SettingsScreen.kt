@@ -34,6 +34,9 @@ import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardVoice
@@ -239,6 +242,7 @@ fun SettingsScreen(
                             context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
                         }
                     },
+                    accountEmail = current.cloudSync.signedInEmail,
                 )
             }
             current.cloudSync.prompt?.takeIf { it.kind == AccountPrompt.Kind.MERGE }?.let {
@@ -669,34 +673,32 @@ internal fun CloudSyncSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(Spacing.sm))
-                ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
-                // Google Play's account-deletion requirement (docs/ACCOUNT_DELETION.md): always here while signed in,
-                // whatever the plan, and never hidden behind sync.
-                Spacer(Modifier.height(Spacing.lg))
-                TextButton(
-                    onClick = onDeleteAccount,
-                    enabled = !state.syncing,
-                    modifier = Modifier.heightIn(min = Sizes.minTouch),
-                ) {
-                    Icon(
-                        androidx.compose.material.icons.Icons.Outlined.DeleteForever,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(
-                        com.lucento.app.feature.account.AccountDeletionCopy.ENTRY,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
-                Text(
-                    com.lucento.app.feature.account.AccountDeletionCopy.ENTRY_HINT,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // Tester round 3: the password and the account's deletion each get their own clearly marked section, so
+                // nobody mistakes one for the other.
+                SectionHeader(
+                    "Password",
+                    Modifier.padding(top = Spacing.section),
+                    supporting = "For signing in with your email. Signing in with Google doesn’t use it.",
                 )
+                Spacer(Modifier.height(Spacing.xs))
+                com.lucento.app.core.designsystem.component.LucentoCard(Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconTile(
+                            icon = Icons.Outlined.Lock,
+                            container = MaterialTheme.colorScheme.primaryContainer,
+                            content = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Spacer(Modifier.width(Spacing.md))
+                        Text("Update password", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(Spacing.sm))
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
+                    }
+                }
+                // Google Play's account-deletion requirement (docs/ACCOUNT_DELETION.md): always here while signed in,
+                // whatever the plan, and never hidden behind sync. Set apart as a danger zone in the error colours.
+                DangerZone(enabled = !state.syncing, onDeleteAccount = onDeleteAccount)
             }
         }
         // Lucento Pro: signed in, but the plan doesn't include cloud sync (docs/MONETIZATION.md §3.5). Nothing is lost.
@@ -713,6 +715,59 @@ internal fun CloudSyncSection(
         state.lastMessage?.takeIf { state.signedInEmail == null || it != state.status.lastError }?.let {
             Spacer(Modifier.height(Spacing.sm))
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * The account's danger zone: a red-bordered panel on the error container with a warning, what deleting removes, and a
+ * full-width red outlined button. The dialog behind it asks for a tick and the account email before anything happens.
+ */
+@Composable
+private fun DangerZone(enabled: Boolean, onDeleteAccount: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    SectionHeader("Danger zone", Modifier.padding(top = Spacing.section))
+    Spacer(Modifier.height(Spacing.xs))
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .background(colors.errorContainer.copy(alpha = 0.45f))
+            .border(1.5.dp, colors.error.copy(alpha = 0.7f), MaterialTheme.shapes.large)
+            .padding(Spacing.lg),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(
+                icon = Icons.Outlined.WarningAmber,
+                container = colors.error,
+                content = colors.onError,
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                com.lucento.app.feature.account.AccountDeletionCopy.ENTRY,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.onErrorContainer,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            com.lucento.app.feature.account.AccountDeletionCopy.DANGER_BODY,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onErrorContainer,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        OutlinedButton(
+            onClick = onDeleteAccount,
+            enabled = enabled,
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, colors.error),
+            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = colors.error),
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch),
+        ) {
+            Icon(Icons.Outlined.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(Spacing.xs))
+            Text("Delete my account…", style = MaterialTheme.typography.labelLarge)
         }
     }
 }

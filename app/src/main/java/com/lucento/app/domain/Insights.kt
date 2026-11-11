@@ -16,6 +16,9 @@ data class FlowMonth(val month: YearMonth, val income: Money, val expense: Money
 /** Share of a period's spending that belongs to one category. [categoryId] null means uncategorized. */
 data class CategoryShare(val categoryId: Long?, val amount: Money)
 
+/** One slice of the spending donut: a category ([categoryId] null = uncategorized), or all the smaller ones ([isOther]). */
+data class SpendingSlice(val categoryId: Long?, val amount: Money, val isOther: Boolean = false)
+
 /**
  * Deterministic, presentation-ready insights derived only from recorded transactions.
  * Every function works within a single currency; nothing is converted or estimated.
@@ -81,6 +84,29 @@ object Insights {
                     .thenBy { it.categoryId == null }
                     .thenBy { it.categoryId ?: Long.MAX_VALUE },
             )
+
+    /**
+     * The donut's slices from a [categoryBreakdown] (largest first): every category when there are at most [maxSlices],
+     * otherwise the largest [maxSlices] − 1 and one "Other" slice holding the rest, so small categories stay readable.
+     * Zero amounts are dropped. Exact money throughout; the slices add up to the breakdown's total.
+     */
+    fun spendingSlices(breakdown: List<CategoryShare>, maxSlices: Int = 6): List<SpendingSlice> {
+        require(maxSlices >= 2) { "maxSlices must be at least 2" }
+        val positive = breakdown.filter { it.amount.amountMinor > 0L }
+        if (positive.size <= maxSlices) return positive.map { SpendingSlice(it.categoryId, it.amount) }
+        val head = positive.take(maxSlices - 1).map { SpendingSlice(it.categoryId, it.amount) }
+        val rest = positive.drop(maxSlices - 1)
+        val other = SpendingSlice(null, Money.sum(rest.first().amount.currencyCode, rest.map { it.amount }), isOther = true)
+        return head + other
+    }
+
+    /** The days a [months]-month view ending in [endMonth] covers: its first day to the month's end, never past [today]. */
+    fun periodRange(endMonth: YearMonth, months: Int, today: java.time.LocalDate): DateRange {
+        require(months > 0) { "months must be positive" }
+        val start = endMonth.minusMonths((months - 1).toLong()).atDay(1)
+        val end = minOf(endMonth.atEndOfMonth(), maxOf(today, start))
+        return DateRange(start, end)
+    }
 
     /**
      * Net movement (income minus expense) per currency for a set of transactions — used for daily

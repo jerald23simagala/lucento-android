@@ -183,16 +183,6 @@ class AskLucentoViewModel(
         }
     }
 
-    /** A report tile: the report itself, on the phone, for this month. */
-    fun openReport(kind: ReportKind) {
-        if (conversation.value.thinking) return
-        val data = inputs.value ?: return
-        val state = uiState.value
-        add(AskMessage.Question(nextId(), kind.title), thinking = false)
-        val report = ReportBuilder.build(kind, data, state.currency, YearMonth.from(data.today))
-        add(AskMessage.Answer(nextId(), plain(LocalAnswers.summary(report)), AnswerSource.PHONE, report = report), thinking = false)
-    }
-
     /** The same report for another month (the report sheet's month stepper). */
     fun rebuild(report: Report, month: YearMonth): Report? {
         val data = inputs.value ?: return null
@@ -277,7 +267,7 @@ class AskLucentoViewModel(
             is AskLucentoClient.Result.Answered -> {
                 conversation.update { it.copy(remaining = result.remainingToday) }
                 val checked = AnswerCheck.check(result.answer, snapshot)
-                val kind = ReportKind.entries.firstOrNull { it.name == result.report }
+                val kind = ReportKind.entries.firstOrNull { it.name == result.report && !it.needsWallet }
                 val current = YearMonth.from(data.today)
                 val month = result.month?.let { runCatching { YearMonth.parse(it) }.getOrNull() }
                     ?.takeIf { !it.isAfter(current) && !it.isBefore(current.minusMonths(MAX_MONTHS_BACK)) } ?: current

@@ -23,7 +23,11 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,7 +51,7 @@ import com.lucento.app.core.designsystem.theme.Spacing
 
 /**
  * The one confirmation before an account is deleted (docs/ACCOUNT_DELETION.md): what goes, what a Google Play purchase
- * means, and a checkbox that must be ticked before the red button works. While the server call runs nothing can be
+ * means, and a checkbox that must be ticked and the account's email typed again before the red button works. While the server call runs nothing can be
  * dismissed, so the person never wonders whether it happened.
  */
 @Composable
@@ -56,10 +60,14 @@ fun DeleteAccountDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     onManageSubscription: () -> Unit,
+    /** The signed-in account's email, which must be typed again before the red button works. */
+    accountEmail: String?,
 ) {
     val colors = MaterialTheme.colorScheme
     val ext = LucentoTheme.extendedColors
     var acknowledged by rememberSaveable { mutableStateOf(false) }
+    var typedEmail by rememberSaveable { mutableStateOf("") }
+    val emailConfirmed = AccountDeletionCopy.emailMatches(typedEmail, accountEmail)
     AlertDialog(
         onDismissRequest = { if (!prompt.deleting) onDismiss() },
         containerColor = colors.surfaceContainerLowest,
@@ -112,6 +120,28 @@ fun DeleteAccountDialog(
                     )
                     Text(AccountDeletionCopy.ACKNOWLEDGE, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 }
+                // The second guard against a stray tap: the account's email, typed out.
+                OutlinedTextField(
+                    value = typedEmail,
+                    onValueChange = { typedEmail = it.take(320) },
+                    label = { Text(AccountDeletionCopy.TYPE_EMAIL) },
+                    placeholder = accountEmail?.let { { Text(it, maxLines = 1) } },
+                    singleLine = true,
+                    enabled = !prompt.deleting,
+                    isError = typedEmail.isNotBlank() && !emailConfirmed,
+                    supportingText = if (typedEmail.isNotBlank() && !emailConfirmed) {
+                        { Text("That isn’t this account’s email.") }
+                    } else {
+                        null
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        autoCorrectEnabled = false,
+                        imeAction = ImeAction.Done,
+                    ),
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 prompt.error?.let {
                     Text(
                         it,
@@ -125,7 +155,7 @@ fun DeleteAccountDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                enabled = acknowledged && !prompt.deleting,
+                enabled = acknowledged && emailConfirmed && !prompt.deleting,
                 colors = ButtonDefaults.buttonColors(containerColor = colors.error, contentColor = colors.onError),
                 shape = MaterialTheme.shapes.small,
             ) {

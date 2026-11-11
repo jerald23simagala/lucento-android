@@ -330,6 +330,18 @@ yours" card (choose from presets or keep their categories); a pre-0.5 overall li
 removed. Users with no categories see "Finish setting up your budget".
 
 ## Insights (v0.5)
+*Tester round 3, second pass (2026-11-11):* Ask Lucento stays on top; the built-in **reports** sit right under it as
+one list (wallet statement first), each opening the shared report sheet (headline panel, group headings, section
+cards with share bars and tinted totals, how it was calculated; PDF and Share). Ask Lucento keeps questions and the
+reports an answer produces, but no longer lists reports. Income and expenses opens with a quiet **summary card**
+(Money in / Money out side by side with bars on one scale, a "You kept" or "More went out" strip, the change against
+the period before), deliberately unlike the brand heroes.
+*Tester round 3 (2026-11-11):* the currency and period filters sit at the top and every section follows them; income
+and expenses opened with a hero in the Budget page's form (replaced in the second pass, above); then **where your money went** (expense donut, top five + Other, total in
+the middle, each slice's share and amount) and **net worth over time** (month-end line from `WalletsOverview.trend`).
+What net worth is made of moved out: Wallets already shows assets and liabilities by kind. The paragraph below is the
+earlier v0.5 description.
+
 Two questions only: **income and expenses over time** (3/6/12 months; grouped bars, legend, totals and net, plain
 summary; transfers excluded) and **what net worth is made of** (net worth figure; assets and liabilities as two
 stacked bars on one shared scale, grouped by account type with counts, shares and amounts; negative net worth shown

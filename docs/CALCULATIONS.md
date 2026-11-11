@@ -200,6 +200,12 @@ Optional per card (`debt_terms.credit_limit_minor`, `statement_day`, `due_day`; 
   currency with the most money (savings only when there is no everyday account), never another card or loan or another
   currency (`CreditCardMath.dues` / `payingWallet`). Every field stays editable; nothing is saved until the user saves.
 - The wallet card shows Credit limit, Available and Amount due ("by Nov 5", or "Overdue · Nov 5").
+- **Amount due at setup** (tester round 3): a new card with billing days may say how much of its opening balance the
+  latest statement asks for ("Amount due now", 0 ≤ due ≤ owed; empty = all of it). The card opens at that amount and the
+  rest is written in the same database transaction as **one** ADJUSTMENT_OUT dated the setup day, noted "Not yet due at
+  setup". The card still owes the full balance; the cycle above treats the setup-day row as a charge after the
+  statement, so the first reminder asks only for the amount due and the rest joins the next statement by itself. It is
+  never spending. No field is stored for it (`CardSetup.split`, `WalletRepository.create(unbilledAtSetup)`).
 
 ## Receivables (owner round 10)
 A **Receivable** wallet (`WalletType.RECEIVABLE`) is money someone owes the user — a loan in reverse.
@@ -252,6 +258,8 @@ For a loan repaid monthly with a term (`LoanMath.progress`):
   one keep working and ask for one when edited.
 
 ## Ask Lucento reports
+*Since tester round 3 these built-in reports are listed on Insights, under Ask Lucento; an Ask answer can still show one. The wallet statement is described above.*
+
 `domain/ask/Reports.kt` (`ReportBuilder`, pure, unit-tested); one currency per report, others named and never converted;
 the same `Report` is drawn on screen and written to the PDF. See docs/ASK.md for what the AI may see.
 - **Net worth statement** (a month): each wallet's balance at the month's end (today for the current month), rebuilt as
@@ -314,6 +322,28 @@ still apply on top. Adjustments have no category, appear in Transactions as "Bal
 never income, spending, budgeted spending or net flow, can be deleted but not edited as income/expense, and are
 idempotent on the sheet's client key. Equal balances write nothing. Manually valued assets are revalued in their
 editor instead. Code: `BalanceAdjustment.plan`, `WalletBalanceCalculator.balanceOn`, `TransactionRepository.adjustBalance`.
+
+### Withdrawals and external payments (tester round 3)
+Money that moves between one account and the world outside Lucento without being income, spending or a transfer
+between tracked wallets (`OutsideMovement`, `TransactionRepository.recordOutsideMovement`):
+- **Withdrawal** (cash, bank, e-wallet, savings): money taken out that isn't spending and doesn't go to a tracked
+  wallet. **One** ADJUSTMENT_OUT; the balance drops by exactly the amount.
+- **External payment** (credit card, loan): the debt paid from outside the person's wallets, e.g. a family member
+  settling it as a gift. **One** ADJUSTMENT_IN; what is owed drops by exactly the amount. A card's amount due falls with
+  it (an inflow after the statement), and a loan counts it as an instalment paid (`LoanMath.progress`).
+Both are dated today or earlier, noted "<label> · <what for>" — the reason is **required** (≤ 200 characters) because
+the wallet statement lists it — and, like every adjustment, never income, spending, budgeted spending or net flow.
+Transactions and the detail page show them by their label. Receivables and valued assets take neither. Idempotent on
+the sheet's client key.
+
+## Wallet statement (tester round 3)
+One wallet's month in its own currency (`ReportBuilder.walletStatement`; on Insights › Reports and the wallet's page):
+- **Balance at the start** = `WalletBalanceCalculator.balanceOn` at the end of the day before the month (a wallet added
+  during the month starts at its opening balance); **balance at the end** = `balanceOn` at the month's end, or today.
+- In between, every movement dated in the month, as its effect on the balance (for a card or loan, on what is owed):
+  income and expenses by category; then transfers in and out by the wallet on the other side (the other leg of the
+  transfer group); withdrawals or external payments, each with what it was for; and balance corrections.
+- **Start + every movement = end**, exactly (the summary's lines add up to the ending balance; tested).
 
 ## Transfers
 Two legs (TRANSFER_OUT on the source, TRANSFER_IN on the destination) sharing `transfer_group`, written in one Room

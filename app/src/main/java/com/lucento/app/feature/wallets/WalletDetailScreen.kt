@@ -13,6 +13,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.CallMade
+import com.lucento.app.core.designsystem.theme.Sizes
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.CurrencyExchange
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -50,6 +57,7 @@ import com.lucento.app.feature.transactions.TransactionRow
 import com.lucento.app.feature.transactions.shortDayLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -83,18 +91,24 @@ fun WalletDetailScreen(
     transfersEnabled: Boolean,
     /** After a balance adjustment is recorded (e.g. to confirm it in a snackbar). */
     onAdjusted: () -> Unit = {},
+    /** After a withdrawal or an external payment is saved (the root shows its confirmation). */
+    onOutsideRecorded: (com.lucento.app.domain.OutsideMovement) -> Unit = {},
     /** Opens a prefilled recurring payment after a debt is saved with a reminder; null when recurring is off. */
     onPlanDebtPayment: ((Long, java.time.LocalDate) -> Unit)? = null,
     /** A card with an amount due: its payment transfer, filled in (the same as Home's reminder). */
     onPayCard: (com.lucento.app.domain.CardDue) -> Unit = { onTransfer(it.payFromWalletId, it.wallet.id) },
     viewModel: WalletDetailViewModel = viewModel(key = "wallet-$walletId", factory = WalletDetailViewModel.factory(walletId)),
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
+    reports: com.lucento.app.feature.reports.ReportsViewModel = viewModel(factory = com.lucento.app.feature.reports.ReportsViewModel.Factory),
 ) {
     val fmt = amountFormat()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val walletsState by walletsViewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
     var adjusting by remember { mutableStateOf(false) }
+    var outsideSheet by remember { mutableStateOf<com.lucento.app.domain.OutsideMovement?>(null) }
+    var statement by remember { mutableStateOf<com.lucento.app.domain.ask.Report?>(null) }
+    val reportsState by reports.uiState.collectAsStateWithLifecycle()
     val wallet = state.wallet
     val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
 
@@ -202,19 +216,38 @@ fun WalletDetailScreen(
                 Modifier.fillMaxWidth().padding(top = Spacing.md).height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                if (transfersEnabled) {
-                    when {
-                        loan -> MoveMoneyCard("Repay loan", "From your bank or cash", Icons.Outlined.Payments, { onTransfer(state.payFromWalletId, wallet.id) }, Modifier.weight(0.38f).fillMaxHeight())
-                        // An instalment they paid back: from this receivable into the user's account (owner round 10).
-                        receivable -> MoveMoneyCard("Record payment", "Money they paid back", Icons.Outlined.Payments, { onTransfer(wallet.id, state.receiveIntoWalletId) }, Modifier.weight(0.38f).fillMaxHeight())
-                        liability -> MoveMoneyCard(
-                            "Payment",
-                            "Pay this card",
-                            Icons.Outlined.Payments,
-                            { state.cardDue?.let(onPayCard) ?: onTransfer(state.payFromWalletId, wallet.id) },
-                            Modifier.weight(0.38f).fillMaxHeight(),
+                val left = Modifier.weight(0.46f).fillMaxHeight()
+                when {
+                    // Tester round 3: a card or loan is paid from a wallet (a transfer) or from outside (an external
+                    // payment: someone settling it for you); one card holds both.
+                    liability -> RecordPaymentCard(
+                        fromWallet = if (transfersEnabled) {
+                            {
+                                if (loan) onTransfer(state.payFromWalletId, wallet.id)
+                                else state.cardDue?.let(onPayCard) ?: onTransfer(state.payFromWalletId, wallet.id)
+                            }
+                        } else {
+                            null
+                        },
+                        external = { outsideSheet = com.lucento.app.domain.OutsideMovement.EXTERNAL_PAYMENT },
+                        modifier = left,
+                    )
+                    // An instalment they paid back: from this receivable into the user's account (owner round 10).
+                    receivable -> if (transfersEnabled) {
+                        MoveMoneyCard("Record payment", "Money they paid back", Icons.Outlined.Payments, { onTransfer(wallet.id, state.receiveIntoWalletId) }, left)
+                    }
+                    // Tester round 3: Transfer and Withdrawal share the height of the Adjust card beside them.
+                    else -> Column(left, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        if (transfersEnabled) {
+                            CompactMoveCard("Transfer", "Between your wallets", Icons.Outlined.SwapHoriz, { onTransfer(wallet.id, null) }, Modifier.weight(1f).fillMaxWidth())
+                        }
+                        CompactMoveCard(
+                            com.lucento.app.domain.OutsideMovement.WITHDRAWAL.label,
+                            "Not spending",
+                            Icons.Outlined.CallMade,
+                            { outsideSheet = com.lucento.app.domain.OutsideMovement.WITHDRAWAL },
+                            Modifier.weight(1f).fillMaxWidth(),
                         )
-                        else -> MoveMoneyCard("Transfer", "Between your wallets", Icons.Outlined.SwapHoriz, { onTransfer(wallet.id, null) }, Modifier.weight(0.38f).fillMaxHeight())
                     }
                 }
                 ReconcileCard(
@@ -230,9 +263,15 @@ fun WalletDetailScreen(
                         else -> "Bank says otherwise? Enter the real balance — the gap is recorded as an adjustment, not income or spending."
                     },
                     onClick = { adjusting = true },
-                    modifier = Modifier.weight(0.62f).fillMaxHeight(),
+                    modifier = Modifier.weight(0.54f).fillMaxHeight(),
                 )
             }
+            // Tester round 3: this wallet's month as a statement — start, every movement, end.
+            LucentoTextButton(
+                text = "View monthly statement",
+                onClick = { reports.open(com.lucento.app.domain.ask.ReportKind.WALLET_STATEMENT, wallet.id)?.let { statement = it } },
+                modifier = Modifier.padding(top = Spacing.xxs),
+            )
             if (loan) {
                 // A loan has no purchases; interest and fees are expenses recorded on it.
                 LucentoTextButton(
@@ -273,8 +312,17 @@ fun WalletDetailScreen(
             return@LazyColumn
         }
 
+        // The history starts right under the statement link on a money account (owner, 2026-11-11: less space there);
+        // a card's, loan's or receivable's note above it keeps the usual gap.
+        val historyTop = if (wallet.type.hasTerms) Spacing.lg else 0.dp
         if (state.history.isEmpty()) {
-            item(key = "history-header") { SectionHeader("History", Modifier.padding(top = Spacing.lg)) }
+            item(key = "history-header") {
+                SectionHeader(
+                    "History",
+                    Modifier.padding(top = historyTop, bottom = if (historyTop == 0.dp) Spacing.sm else 0.dp),
+                    minHeight = if (historyTop == 0.dp) 0.dp else Sizes.minTouch,
+                )
+            }
             item(key = "empty") {
                 EmptyState(
                     title = "Nothing recorded yet",
@@ -283,9 +331,15 @@ fun WalletDetailScreen(
             }
         }
         // History by month, each on one card of compact rows (as on Transactions), newest first.
-        state.history.groupBy { java.time.YearMonth.from(it.date) }.forEach { (month, rows) ->
+        state.history.groupBy { java.time.YearMonth.from(it.date) }.entries.forEachIndexed { index, (month, rows) ->
             item(key = "month-head-$month") {
-                SectionHeader(monthTitle(month, state.today), Modifier.padding(top = Spacing.lg)) {
+                // Only a count beside it: right under the statement link it hugs its text, with a little room below.
+                val tight = index == 0 && historyTop == 0.dp
+                SectionHeader(
+                    monthTitle(month, state.today),
+                    Modifier.padding(top = if (index == 0) historyTop else Spacing.lg, bottom = if (tight) Spacing.sm else 0.dp),
+                    minHeight = if (tight) 0.dp else Sizes.minTouch,
+                ) {
                     Text(
                         if (rows.size == 1) "1 movement" else "${rows.size} movements",
                         style = MaterialTheme.typography.labelMedium,
@@ -344,6 +398,32 @@ fun WalletDetailScreen(
         )
     }
 
+    val outside = outsideSheet
+    if (outside != null && wallet != null && outside.allowedFor(wallet.type)) {
+        OutsideMovementSheet(
+            kind = outside,
+            wallet = wallet,
+            history = state.history,
+            onSave = viewModel::recordOutside,
+            onSaved = {
+                outsideSheet = null
+                onOutsideRecorded(outside)
+            },
+            onDismiss = { outsideSheet = null },
+        )
+    }
+
+    statement?.let { report ->
+        com.lucento.app.feature.reports.ReportSheet(
+            initial = report,
+            rebuild = reports::rebuild,
+            onSave = reports::savePdf,
+            onShare = reports::pdfForSharing,
+            onDismiss = { statement = null },
+            pdfLocked = reportsState.pdfLocked,
+        )
+    }
+
     if (adjusting && wallet != null && !wallet.type.isValuedManually) {
         AdjustBalanceSheet(
             wallet = wallet,
@@ -383,6 +463,82 @@ private fun MoveMoneyCard(label: String, caption: String, icon: ImageVector, onC
         Spacer(Modifier.weight(1f).heightIn(min = Spacing.sm))
         Text(label, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(caption, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 2)
+    }
+}
+
+/**
+ * A smaller money-moving action for two stacked in the height of the Adjust card (tester round 3): a small brand circle
+ * beside the verb and what it does. The whole card is one touch target, never under 48dp.
+ */
+@Composable
+private fun CompactMoveCard(label: String, caption: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val haptics = rememberHaptics()
+    val colors = MaterialTheme.colorScheme
+    LucentoCard(
+        modifier = modifier.heightIn(min = Sizes.minTouch),
+        onClick = {
+            haptics.tick()
+            onClick()
+        },
+        contentPadding = Spacing.sm + Spacing.xxs,
+    ) {
+        Spacer(Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(30.dp).clip(CircleShape).background(colors.primary), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(16.dp))
+            }
+            Spacer(Modifier.width(Spacing.sm))
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(caption, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 2)
+            }
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+/**
+ * A card's or loan's payment (tester round 3): one card, "Record payment", with its two ways — From wallet (the usual
+ * transfer, prefilled) and External payment (paid from outside your wallets, e.g. a family member settling it). Each way
+ * is its own 48dp row.
+ */
+@Composable
+private fun RecordPaymentCard(fromWallet: (() -> Unit)?, external: () -> Unit, modifier: Modifier = Modifier) {
+    val haptics = rememberHaptics()
+    LucentoCard(modifier = modifier, contentPadding = Spacing.sm + Spacing.xxs) {
+        Text(
+            "Record payment",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+            modifier = Modifier.padding(horizontal = Spacing.xxs).semantics { heading() },
+        )
+        Spacer(Modifier.weight(1f).heightIn(min = Spacing.xs))
+        if (fromWallet != null) {
+            PaymentOption("From wallet", Icons.Outlined.Payments) { haptics.tick(); fromWallet() }
+            Hairline()
+        }
+        PaymentOption("External payment", Icons.Outlined.VolunteerActivism) { haptics.tick(); external() }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun PaymentOption(label: String, icon: ImageVector, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = Sizes.minTouch)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = Spacing.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(28.dp).clip(CircleShape).background(colors.primary), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(15.dp))
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(18.dp))
     }
 }
 

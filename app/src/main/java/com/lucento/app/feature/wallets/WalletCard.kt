@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.semantics.contentDescription
 import com.lucento.app.core.banks.Institution
 import com.lucento.app.core.designsystem.component.CardChip
+import com.lucento.app.core.designsystem.component.drawCardFinish
 import com.lucento.app.core.designsystem.component.InstitutionCardMark
 import com.lucento.app.core.designsystem.component.institution
 import com.lucento.app.core.designsystem.component.markSpellsName
@@ -82,9 +84,10 @@ private const val CardRatio = 1.586f
 /**
  * A wallet as a bank card: its name (with a debt's yearly rate) and currency where the issuer sits, the type mark
  * top-right where a card network's logo would be, a chip, the balance as the card's main line, and the opening balance
- * and movement count along the bottom edge. Each type has its own solid brand face
- * ([com.lucento.app.core.designsystem.theme.LucentoExtendedColors.walletCard]); two faint circles in the card's ink are
- * the only decoration — flat, no gradients.
+ * and movement count along the bottom edge. Each type has its own brand face
+ * ([com.lucento.app.core.designsystem.theme.LucentoExtendedColors.walletCard]) with two faint circles in the card's ink,
+ * finished like a physical card ([drawCardFinish]: light, a metallic sheen and a glass edge; tester round 3) and lifted
+ * by a soft shadow in the day theme.
  *
  * An instalment loan ([loan]) reads Remaining over a bar of its instalments, with Principal, Paid and the monthly
  * amortization along the bottom. A credit card shows its Credit limit, Available credit and the Amount due on its
@@ -111,11 +114,17 @@ fun WalletCard(
     val valued = wallet.type.isValuedManually
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val minHeight = maxWidth / CardRatio
-        Surface(shape = RoundedCornerShape(20.dp), color = face.container, contentColor = ink, modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = face.container,
+            contentColor = ink,
+            modifier = Modifier.fillMaxWidth().cardLift(RoundedCornerShape(20.dp), 6.dp),
+        ) {
             Box {
                 Canvas(Modifier.matchParentSize()) {
                     drawCircle(ink.copy(alpha = 0.07f), radius = size.height * 0.8f, center = Offset(size.width * 1.02f, size.height * 1.08f))
                     drawCircle(ink.copy(alpha = 0.05f), radius = size.height * 0.55f, center = Offset(size.width * 0.72f, size.height * 1.2f))
+                    drawCardFinish(ink, 20.dp.toPx())
                 }
                 Column(
                     Modifier.fillMaxWidth().heightIn(min = minHeight).padding(Spacing.lg),
@@ -359,11 +368,15 @@ private fun InstitutionWalletCard(
         Box(
             Modifier
                 .fillMaxWidth()
+                .cardLift(RoundedCornerShape(20.dp), 6.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(brush)
                 .semantics(mergeDescendants = true) { contentDescription = spoken },
         ) {
-            Canvas(Modifier.matchParentSize()) { drawTemplate(card.template, ink, accent, liability) }
+            Canvas(Modifier.matchParentSize()) {
+                drawTemplate(card.template, ink, accent, liability)
+                drawCardFinish(ink, 20.dp.toPx())
+            }
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -446,9 +459,9 @@ private fun DrawScope.drawTemplate(template: String, ink: Color, accent: Color, 
     }
 }
 
-/** The account type on an institution card: filled for assets, a dashed outline for debts. */
+/** The account type on an institution card: filled for assets, a dashed outline for debts. [compact] on gallery faces. */
 @Composable
-private fun TypeChip(type: WalletType, ink: Color, label: String = type.label) {
+private fun TypeChip(type: WalletType, ink: Color, label: String = type.label, compact: Boolean = false) {
     val shape = RoundedCornerShape(50)
     val chip = Modifier
         .then(
@@ -467,10 +480,18 @@ private fun TypeChip(type: WalletType, ink: Color, label: String = type.label) {
                 Modifier.background(ink.copy(alpha = 0.14f), shape)
             }
         )
-        .padding(horizontal = Spacing.sm + Spacing.xxs, vertical = Spacing.xxs + 1.dp)
+        .padding(
+            horizontal = if (compact) 6.dp else Spacing.sm + Spacing.xxs,
+            vertical = if (compact) 1.dp else Spacing.xxs + 1.dp,
+        )
     Text(
         label.uppercase(),
-        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Bold),
+        style = MaterialTheme.typography.labelSmall.copy(
+            letterSpacing = if (compact) 0.6.sp else 1.sp,
+            fontWeight = FontWeight.Bold,
+            fontSize = if (compact) 9.sp else MaterialTheme.typography.labelSmall.fontSize,
+            lineHeight = if (compact) 12.sp else MaterialTheme.typography.labelSmall.lineHeight,
+        ),
         color = ink,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
@@ -531,6 +552,7 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
         modifier
             .fillMaxWidth()
             .heightIn(min = 118.dp)
+            .cardLift(shape, 3.dp)
             .clip(shape)
             .background(background)
             .clickable(role = Role.Button, onClickLabel = "Open wallet", onClick = onClick)
@@ -541,6 +563,7 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
             drawCircle(ink.copy(alpha = 0.12f), radius = 75.dp.toPx(), center = Offset(size.width + 15.dp.toPx(), 5.dp.toPx()), style = ring)
             drawCircle(ink.copy(alpha = 0.12f), radius = 45.dp.toPx(), center = Offset(size.width - 25.dp.toPx(), size.height + 5.dp.toPx()), style = ring)
             if (liability) drawTemplate("", ink, ink, liability = true)
+            drawCardFinish(ink, 16.dp.toPx())
         }
         Column(
             Modifier
@@ -551,9 +574,11 @@ fun CompactWalletFace(wallet: Wallet, onClick: () -> Unit, modifier: Modifier = 
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = Spacing.sm)) {
-                if (institution != null) InstitutionAvatar(institution, size = 28.dp) else CardChip(Modifier.size(width = 22.dp, height = 16.dp))
+                // Tester round 3: the bank's own logo, as on its big card; a plain wallet keeps the chip.
+                if (institution != null) InstitutionCardMark(institution, compact = true) else CardChip(Modifier.size(width = 22.dp, height = 16.dp))
                 Spacer(Modifier.weight(1f).widthIn(min = Spacing.xs))
-                TypeChip(wallet.type, ink, label = wallet.type.shortLabel)
+                // Tester round 3: a smaller pill on the gallery faces, so the name and balance lead.
+                TypeChip(wallet.type, ink, label = wallet.type.shortLabel, compact = true)
             }
             Column {
             // Two lines before anything is cut (owner, 2026-11-06: "Bank of Commerce" read "Bank of …").
@@ -646,4 +671,15 @@ private fun CardField(label: String, value: String, muted: Color, ink: Color, mo
         Text(label.uppercase(), style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp), color = muted, maxLines = 2)
         Text(value, style = AmountStyles.row, color = ink, maxLines = 1)
     }
+}
+
+/**
+ * The soft shadow that lifts a wallet face off the page in the day theme (navy-tinted, as on cards); none at night, where
+ * the faces already stand out against the dark canvas.
+ */
+@Composable
+private fun Modifier.cardLift(shape: androidx.compose.ui.graphics.Shape, elevation: androidx.compose.ui.unit.Dp): Modifier {
+    if (LucentoTheme.isDark) return this
+    val tint = LucentoTheme.extendedColors.shadow
+    return this.shadow(elevation, shape, clip = false, ambientColor = tint.copy(alpha = 0.18f), spotColor = tint.copy(alpha = 0.28f))
 }

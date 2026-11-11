@@ -19,8 +19,6 @@ enum class ProFeature(val requires: Capability) {
     SAVINGS_GOALS(Capability.LOCAL_PRO),
     /** Insights over 6 and 12 months (3 months is free). */
     INSIGHTS_LONG_PERIODS(Capability.LOCAL_PRO),
-    /** Insights: what the net worth is made of. */
-    NET_WORTH_COMPOSITION(Capability.LOCAL_PRO),
     /** Ask Lucento's statements saved or shared as PDF (on screen they are free). */
     PDF_STATEMENTS(Capability.LOCAL_PRO),
     /** Grove, Mono and Aurora (Sunrise and Midnight are free). */

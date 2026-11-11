@@ -42,6 +42,17 @@ object AccountDeletionCopy {
     const val DELETING = "Deleting…"
     const val MANAGE_SUBSCRIPTION = "Manage subscription in Google Play"
     const val DONE = "Your Lucento account and its cloud data have been deleted."
+    const val DANGER_BODY = "Permanently deletes your Lucento account, its cloud data and this phone’s records. It can’t be undone."
+    const val TYPE_EMAIL = "Type your account email to confirm"
+
+    /**
+     * The second guard against an accidental tap (tester round 3): the email typed must be the signed-in account's,
+     * ignoring case and surrounding spaces. Nothing typed, or no account email to compare, never matches.
+     */
+    fun emailMatches(typed: String, accountEmail: String?): Boolean {
+        val expected = accountEmail?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        return typed.trim().equals(expected, ignoreCase = true)
+    }
 
     fun paragraphs(plan: DeletionPlan): List<String> = buildList {
         add(

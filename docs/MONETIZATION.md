@@ -226,7 +226,7 @@ Pro-sized life.
 | Feature | Status | F | S | L | Offline | Gate |
 |---|---|---|---|---|---|---|
 | Insights: income vs expenses, net flow, monthly comparison | Shipped | **Last 3 months** | 3 / 6 / 12 months | 3 / 6 / 12 months | Yes | `InsightsViewModel` period selection: 6 and 12 → `Locked`; chips stay visible with a Pro badge (D-4) |
-| Insights: what your net worth is made of (by kind, shares) | Shipped | — | ✔ | ✔ | Yes | section renders a locked preview (totals hidden, structure shown) |
+| ~~Insights: what your net worth is made of~~ | Retired 2026-11-11 (tester round 3): removed from Insights; Wallets shows assets and liabilities by kind on every plan | — | — | — | — | `ProFeature.NET_WORTH_COMPOSITION` deleted |
 | Insights: FX gains and losses | Shipped (v13) | — (no foreign wallets on Free; existing ones still show) | ✔ | ✔ | Yes | follows the data |
 | Ask Lucento: on-phone answers, four statements on screen (net worth, cash flow, budget vs actual, debts), top categories | Shipped | ✔ | ✔ | ✔ | Yes | none |
 | Ask Lucento: **statements as PDF** (save / share) | Shipped | — | ✔ | ✔ | Yes | `AskLucentoViewModel` PDF actions → `ProRequired` |
@@ -378,7 +378,7 @@ data class EntitlementState(val entitlements: List<Entitlement>, val evaluatedAt
 }
 
 enum class ProFeature(val requires: Capability) { MONEY_WALLETS, DEBT_ACCOUNTS, RECEIVABLES, VALUED_ASSETS, FOREIGN_CURRENCY_WALLETS,
-    SAVINGS_GOALS, INSIGHTS_LONG_PERIODS, NET_WORTH_COMPOSITION, PDF_STATEMENTS, EXTRA_THEMES,
+    SAVINGS_GOALS, INSIGHTS_LONG_PERIODS, PDF_STATEMENTS, EXTRA_THEMES,
     CLOUD_SYNC, CLOUD_RESTORE, AI_ADVISER, SMART_READING, SHARED_SPACE }   // "ProFeature": domain/Features.kt already owns "Feature" (module toggles)
 
 object PlanCatalog {                                      // data: the whole matrix in one tested object

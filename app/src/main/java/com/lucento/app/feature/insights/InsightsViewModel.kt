@@ -29,9 +29,8 @@ data class InsightsData(
     val wallets: List<Wallet> = emptyList(),
     val categories: List<Category> = emptyList(),
     val budgets: List<Budget> = emptyList(),
-    /** Lucento Pro (docs/MONETIZATION.md §3.4): 6- and 12-month trends, and what the net worth is made of, are Pro. */
+    /** Lucento Pro (docs/MONETIZATION.md §3.4): 6- and 12-month views are Pro. */
     val longPeriodsLocked: Boolean = false,
-    val compositionLocked: Boolean = false,
 ) {
     val categoriesById: Map<Long, Category> = categories.associateBy { it.id }
 
@@ -77,7 +76,6 @@ class InsightsViewModel(
             val now = System.currentTimeMillis()
             data.copy(
                 longPeriodsLocked = !com.lucento.app.domain.entitlement.ProGates.insightsPeriodAllowed(12, plan, now),
-                compositionLocked = !com.lucento.app.domain.entitlement.ProGates.netWorthCompositionAllowed(plan, now),
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InsightsData())

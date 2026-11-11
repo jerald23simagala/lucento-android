@@ -102,6 +102,8 @@ fun TransactionDetailScreen(
         LucentoTopBar(
             title = when {
                 transaction?.isTransfer == true -> "Transfer"
+                transaction != null && com.lucento.app.domain.OutsideMovement.of(transaction) != null ->
+                    com.lucento.app.domain.OutsideMovement.of(transaction)!!.label
                 transaction?.isAdjustment == true -> "Balance adjustment"
                 else -> "Transaction"
             },
@@ -118,6 +120,7 @@ fun TransactionDetailScreen(
         val isTransfer = transaction.isTransfer
         val isIncome = transaction.type == TransactionType.INCOME
         val isAdjustment = transaction.isAdjustment
+        val outside = com.lucento.app.domain.OutsideMovement.of(transaction)
         val tone = when {
             isTransfer -> TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
             isAdjustment -> TonePair(ext.warningContainer, ext.warning)
@@ -134,6 +137,7 @@ fun TransactionDetailScreen(
         }
         val kindLabel = when {
             isTransfer -> "Transfer"
+            outside != null -> outside.label
             isAdjustment -> "Balance adjustment"
             isIncome -> "Income"
             else -> "Expense"
@@ -291,7 +295,22 @@ fun TransactionDetailScreen(
                     if (index < lines.lastIndex) Hairline(inset = DetailTileSize + Spacing.md)
                 }
             }
-            if (isAdjustment) {
+            if (outside == com.lucento.app.domain.OutsideMovement.WITHDRAWAL) {
+                InfoNote(
+                    "Money taken out of this account that isn’t spending and didn’t go to another wallet in Lucento. " +
+                        "It lowers the balance but isn’t counted as spending. To undo it, delete it from Transactions.",
+                )
+            } else if (outside == com.lucento.app.domain.OutsideMovement.EXTERNAL_PAYMENT) {
+                InfoNote(
+                    "A payment that didn’t come from one of your wallets, such as someone settling it for you. It lowers " +
+                        "what you owe and isn’t counted as income or spending. To undo it, delete it from Transactions.",
+                )
+            } else if (com.lucento.app.domain.CardSetup.isUnbilledOpening(transaction)) {
+                InfoNote(
+                    "Part of what you owed when you added this card that wasn’t due yet. It goes on your next statement, " +
+                        "so the first reminder asked only for the amount due. It isn’t a purchase or spending.",
+                )
+            } else if (isAdjustment) {
                 InfoNote(
                     "Recorded when this wallet's balance was set by hand: the gap between what Lucento tracked and the " +
                         "actual balance. It isn't counted as income or spending. A large one usually means transactions " +

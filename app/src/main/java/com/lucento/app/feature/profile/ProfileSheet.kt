@@ -37,7 +37,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material.icons.outlined.SwapHoriz
@@ -243,6 +246,38 @@ fun ProfileSheet(
                     onClick = { open(ProfileDestination.SWITCH_ACCOUNT) },
                 )
             }
+            // Lucento's public pages open in the browser only on a tap; sharing goes through the phone's own share sheet.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            fun browse(url: String) {
+                runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))) }
+            }
+            FieldHeader("Community", Modifier.padding(top = Spacing.lg))
+            NavRow(
+                icon = Icons.Outlined.Forum,
+                title = "Lucento Community",
+                summary = "Tips, questions and updates on Facebook",
+                onClick = { browse(com.lucento.app.core.LucentoLinks.COMMUNITY) },
+            )
+            Hairline(inset = inset)
+            NavRow(
+                icon = Icons.Outlined.Language,
+                title = "Lucento website",
+                summary = "lucentoapp.com",
+                onClick = { browse(com.lucento.app.core.LucentoLinks.WEBSITE) },
+            )
+            Hairline(inset = inset)
+            NavRow(
+                icon = Icons.Outlined.Share,
+                title = "Share Lucento",
+                summary = "Tell a friend about Lucento",
+                onClick = {
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, com.lucento.app.core.LucentoLinks.shareMessage())
+                    }
+                    runCatching { context.startActivity(android.content.Intent.createChooser(send, "Share Lucento")) }
+                },
+            )
             Spacer(Modifier.height(Spacing.lg))
             Text(
                 "Lucento ${BuildConfig.VERSION_NAME} · Financial clarity without the complexity.",

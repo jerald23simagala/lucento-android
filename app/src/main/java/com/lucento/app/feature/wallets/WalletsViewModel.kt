@@ -76,6 +76,11 @@ data class WalletDraft(
     val creditLimitText: String = "",
     val statementDayText: String = "",
     val dueDayText: String = "",
+    /**
+     * A new credit card with billing days (tester round 3): what the latest statement asks to pay, as typed. Empty means
+     * the whole balance is due. The rest of the balance is billed next statement ([com.lucento.app.domain.CardSetup]).
+     */
+    val amountDueText: String = "",
     /** Bank or provider from the bundled registry (display only); never kept for cash. */
     val institutionId: String? = null,
     /** Multicurrency: for a wallet in another currency, 1 unit = this many of the main currency, as typed ("63.69"). */
@@ -107,6 +112,10 @@ sealed interface DraftError {
     data object BillingDaysInvalid : DraftError
     /** Multicurrency: a wallet in another currency needs its rate into the main currency. */
     data object RateRequired : DraftError
+    /** The amount due isn't a number this currency accepts. */
+    data object AmountDueInvalid : DraftError
+    /** The amount due is more than the card's balance. */
+    data object AmountDueTooHigh : DraftError
 }
 
 /** Plain-language explanation of what still uses a wallet, e.g. "3 transactions and 1 recurring payment". */
@@ -198,6 +207,23 @@ class WalletsViewModel(
             null
         }
 
+        // A new card's amount due (tester round 3): only with billing days, where reminders use it.
+        val unbilled = if (draft.id == null && draft.type == WalletType.CREDIT_CARD && debt?.statementDay != null &&
+            draft.amountDueText.isNotBlank()
+        ) {
+            val due = when (val parsed = MoneyParser.parse(draft.amountDueText, draft.currencyCode, decimalSeparator)) {
+                is MoneyParser.Result.Success -> parsed.money
+                else -> return onResult(DraftError.AmountDueInvalid, null)
+            }
+            when (val split = com.lucento.app.domain.CardSetup.split(amount, due)) {
+                com.lucento.app.domain.CardSetup.Split.AllDue -> null
+                is com.lucento.app.domain.CardSetup.Split.PartlyDue -> split.unbilled
+                com.lucento.app.domain.CardSetup.Split.TooHigh -> return onResult(DraftError.AmountDueTooHigh, null)
+            }
+        } else {
+            null
+        }
+
         saving = true
         viewModelScope.launch {
             // Multicurrency: a wallet in another currency is valued at a rate into the main currency (required).
@@ -210,7 +236,7 @@ class WalletsViewModel(
             val result = try {
                 val institution = draft.institutionId.takeIf { draft.type != WalletType.CASH }
                 if (draft.id == null) {
-                    wallets.create(draft.name, draft.type, amount, debt, institution, fxBasisRate = rate)
+                    wallets.create(draft.name, draft.type, amount, debt, institution, fxBasisRate = rate, unbilledAtSetup = unbilled)
                 } else {
                     wallets.update(draft.id, draft.name, draft.type, amount, debt, institution).also { saved ->
                         if (saved is WalletRepository.SaveResult.Saved && rate != null) wallets.setFxBasis(draft.id, rate)

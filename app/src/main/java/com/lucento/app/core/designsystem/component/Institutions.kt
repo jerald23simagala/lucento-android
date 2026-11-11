@@ -136,11 +136,13 @@ val Institution.markSpellsName: Boolean get() = card.logo?.slot == "wide" && Ins
 
 /** The institution's mark on a wallet card face: its logo (on a plate where the design says so, never recoloured) or its monogram. */
 @Composable
-fun InstitutionCardMark(institution: Institution, modifier: Modifier = Modifier) {
+fun InstitutionCardMark(institution: Institution, modifier: Modifier = Modifier, compact: Boolean = false) {
     val logo: CardLogo? = institution.card.logo
     val res = InstitutionArt.logos[institution.id]
     if (logo == null || res == null) {
-        MonogramTile(institution.card.monogram, 36.dp, RoundedCornerShape(10.dp), modifier)
+        // No card logo in the library: the square app icon reads better than a monogram on a gallery face.
+        if (compact) InstitutionAvatar(institution, modifier, size = 26.dp)
+        else MonogramTile(institution.card.monogram, 36.dp, RoundedCornerShape(10.dp), modifier)
         return
     }
     val wide = logo.slot == "wide"
@@ -153,11 +155,20 @@ fun InstitutionCardMark(institution: Institution, modifier: Modifier = Modifier)
     val image = @Composable { m: Modifier ->
         Image(painterResource(res), contentDescription = null, contentScale = ContentScale.Fit, colorFilter = tint, modifier = m)
     }
-    val markModifier = if (wide) Modifier.heightIn(max = 22.dp).widthIn(max = 180.dp) else Modifier.size(30.dp)
+    // Compact: the same logo on a gallery face (tester round 3), small enough to sit beside the type pill.
+    val markModifier = when {
+        wide && compact -> Modifier.heightIn(max = 15.dp).widthIn(max = 84.dp)
+        wide -> Modifier.heightIn(max = 22.dp).widthIn(max = 180.dp)
+        compact -> Modifier.size(22.dp)
+        else -> Modifier.size(30.dp)
+    }
     if (plate != null) {
         Box(
-            modifier.clip(RoundedCornerShape(8.dp)).background(plate)
-                .padding(horizontal = if (wide) 8.dp else 4.dp, vertical = if (wide) 5.dp else 4.dp),
+            modifier.clip(RoundedCornerShape(if (compact) 6.dp else 8.dp)).background(plate)
+                .padding(
+                    horizontal = if (wide) (if (compact) 6.dp else 8.dp) else (if (compact) 3.dp else 4.dp),
+                    vertical = if (wide) (if (compact) 4.dp else 5.dp) else (if (compact) 3.dp else 4.dp),
+                ),
         ) { image(markModifier) }
     } else {
         image(modifier.then(markModifier))

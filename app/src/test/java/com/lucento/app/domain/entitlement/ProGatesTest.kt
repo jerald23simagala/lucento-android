@@ -28,13 +28,11 @@ class ProGatesTest {
         assertTrue(ProGates.restoreAllowedByPlan(free, partnerOfSpace = true, now = now))
     }
 
-    @Test fun insights_three_months_are_free_longer_periods_and_composition_are_local_pro() {
+    @Test fun insights_three_months_are_free_longer_periods_are_local_pro() {
         assertTrue(ProGates.insightsPeriodAllowed(3, free, now))
         assertFalse(ProGates.insightsPeriodAllowed(6, free, now))
         assertFalse(ProGates.insightsPeriodAllowed(12, free, now))
         assertTrue(ProGates.insightsPeriodAllowed(12, lifetimeOnly, now))
-        assertFalse(ProGates.netWorthCompositionAllowed(free, now))
-        assertTrue(ProGates.netWorthCompositionAllowed(lifetimeOnly, now))
         assertEquals(3, ProGates.FREE_INSIGHTS_MONTHS)
     }
 
