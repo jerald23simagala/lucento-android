@@ -166,3 +166,14 @@ Do not drop the recovery stash, commit, push, merge, delete branches, or modify 
 ## Security remediation — 2026-11-10 (`security/release-remediation`, website `security/release-hardening`)
 
 All remediable audit findings fixed in code and tested offline: four migrations (`20261111090000`–`20261111120000`), app sync refusal handling and purchase account binding, website Astro 7 upgrade, headers/CSP, method guard, OIDC push check, per-account verify quota, CI and Dependabot. Results: SQL 258/258 (both privilege modes), concurrency 4/4 on Postgres 17.6, Android unit 1,253/1,253, release APK clean, OSV 0, website unit 44/44, e2e 55/55, `npm audit` high/critical 0. Nothing applied to Supabase, pushed or deployed. Decision **NOT APPROVED** until the owner steps in `docs/security/OWNER_ACTIONS_REQUIRED.md` are done. Report: `docs/security/REMEDIATION_REPORT.md`.
+
+## Play purchases never granting Pro — 2026-11-11 (`fix/play-licence-key-check`)
+
+Owner's internal-track test of 0.5.2 (vc 7): the 7-day trial and the yearly plan both completed in Google Play, but the
+app stayed on Free. Cause (verified): CI's secret `LUCENTO_PLAY_LICENSE_KEY` holds a SHA-1 certificate fingerprint, not
+Play's Base64 RSA licence key, so every purchase failed `PurchaseSignature` and the whole Play reading was discarded:
+no Pro, no server verification, no acknowledgement (Google then refunds). Evidence: the fingerprint is the
+`const-string` R8 propagated into `PlayPurchaseSource` in the 0.5.2 AAB; production has no `purchase_links` and no Play
+`entitlements` rows. Fix: owner replaces the secret (NEXT_TASKS OT-23); `app/build.gradle.kts` now fails any build whose
+key doesn't decode as an RSA public key (checked locally: fingerprint and split key fail, a real 2048-bit key and an
+empty key pass). Version 0.5.3 (vc 8). KNOWN_ISSUES PB-1.

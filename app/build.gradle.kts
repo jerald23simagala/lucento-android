@@ -1,4 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.security.KeyFactory
+import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import java.util.Properties
 
@@ -73,6 +75,20 @@ fun welcomeUrlFor(interpretUrl: String): String =
 // Google Play's licence key (Play Console › Monetization setup › Licensing), public by design: the phone checks every
 // purchase's signature with it. Without it a release doesn't bill (no prices; "not on sale yet"). Debug never bills.
 val playLicenceKey = lucentoConfig("LUCENTO_PLAY_LICENSE_KEY")
+// A wrong value is worse than none: the release still shows prices and takes payments, but every purchase then fails
+// its signature check (PurchaseSignature), so no plan is granted and nothing is acknowledged, and Google refunds it.
+// 0.5.2 shipped that way with a SHA-1 certificate fingerprint in the setting. Decoded exactly as PurchaseSignature does.
+fun isRsaPublicKey(base64: String): Boolean = runCatching {
+    KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(base64.trim())))
+}.isSuccess
+if (playLicenceKey.isNotBlank() && !isRsaPublicKey(playLicenceKey)) {
+    throw GradleException(
+        "LUCENTO_PLAY_LICENSE_KEY isn't Google Play's licence key (length ${playLicenceKey.trim().length}). It must be the " +
+            "Base64 RSA public key from Play Console › Monetize with Play › Monetization setup › Licensing: one line, " +
+            "starting MIIB. A SHA-1 or SHA-256 fingerprint from the App signing page is not it. " +
+            "See docs/monetization/PLAY_CONSOLE_SETUP.md step 5.",
+    )
+}
 if (debugAiInterpretUrl.trimEnd('/').equals(releaseAiInterpretUrl.trimEnd('/'), ignoreCase = true)) {
     throw GradleException("LUCENTO_DEBUG_AI_INTERPRET_URL is the production proxy. Debug builds must use a test proxy or none.")
 }
