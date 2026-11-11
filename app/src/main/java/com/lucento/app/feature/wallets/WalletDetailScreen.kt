@@ -312,8 +312,17 @@ fun WalletDetailScreen(
             return@LazyColumn
         }
 
+        // The history starts right under the statement link on a money account (owner, 2026-11-11: less space there);
+        // a card's, loan's or receivable's note above it keeps the usual gap.
+        val historyTop = if (wallet.type.hasTerms) Spacing.lg else 0.dp
         if (state.history.isEmpty()) {
-            item(key = "history-header") { SectionHeader("History", Modifier.padding(top = Spacing.lg)) }
+            item(key = "history-header") {
+                SectionHeader(
+                    "History",
+                    Modifier.padding(top = historyTop, bottom = if (historyTop == 0.dp) Spacing.sm else 0.dp),
+                    minHeight = if (historyTop == 0.dp) 0.dp else Sizes.minTouch,
+                )
+            }
             item(key = "empty") {
                 EmptyState(
                     title = "Nothing recorded yet",
@@ -322,9 +331,15 @@ fun WalletDetailScreen(
             }
         }
         // History by month, each on one card of compact rows (as on Transactions), newest first.
-        state.history.groupBy { java.time.YearMonth.from(it.date) }.forEach { (month, rows) ->
+        state.history.groupBy { java.time.YearMonth.from(it.date) }.entries.forEachIndexed { index, (month, rows) ->
             item(key = "month-head-$month") {
-                SectionHeader(monthTitle(month, state.today), Modifier.padding(top = Spacing.lg)) {
+                // Only a count beside it: right under the statement link it hugs its text, with a little room below.
+                val tight = index == 0 && historyTop == 0.dp
+                SectionHeader(
+                    monthTitle(month, state.today),
+                    Modifier.padding(top = if (index == 0) historyTop else Spacing.lg, bottom = if (tight) Spacing.sm else 0.dp),
+                    minHeight = if (tight) 0.dp else Sizes.minTouch,
+                ) {
                     Text(
                         if (rows.size == 1) "1 movement" else "${rows.size} movements",
                         style = MaterialTheme.typography.labelMedium,
