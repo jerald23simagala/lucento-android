@@ -33,6 +33,27 @@
 | OT-19 | **Account emails** (docs/EMAILS.md › Setup): apply `20261110090000_account_emails.sql` to lucento-test, then production; create a Resend key with sending access to `send.lucentoapp.com`; Vercel Production env `LUCENTO_RESEND_API_KEY` and `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`; redeploy the site; then sign up on a phone and check the welcome arrives once. OT-13 (Confirm signup template, refreshed 2026-11-08 without the "no ads" line) and the SMTP sender fix belong to the same pass | Open (owner) | Until then `/api/account/welcome` answers 503 (the app retries at the next launch) and purchases get no confirmation email; nothing else changes |
 | OT-22 | **Security remediation (2026-11-10)**: work through `docs/security/OWNER_ACTIONS_REQUIRED.md` §1–§14 — Gemini paid tier, Confirm email, plan decision, then apply the four `20261111*` migrations (lucento-test → production), deploy the website branch `security/release-hardening`, internal-track purchase and refund checks | **Open** | The release stays NOT APPROVED until §1, §2, §5/§6, §13 and §14 are done (`docs/security/REMEDIATION_REPORT.md`) |
 
+## Tester round 3 — follow-ups (2026-11-11, `feature/tester-round-3`)
+
+- **Second pass done (owner comments 1–5)**: reports moved to Insights under Ask Lucento with the shared, restyled
+  report sheet; a new wallet statement (Insights and each wallet's page); a quieter income and expenses summary;
+  Transfer + Withdrawal stacked beside Adjust; cards and loans get Record payment (From wallet / External payment);
+  "What for" required; the bank's card logo on gallery faces.
+- **Decided 2026-11-11 (owner)**: Withdrawal stays on cash, bank, e-wallet and savings — not "Other asset" wallets
+  (valued by hand, no movements) or receivables.
+
+- **Item 3 visual polish done** (owner chose "visual polish only for now", 2026-11-11): `drawCardFinish` (light, sheen, glass edge) on every wallet face, a soft day-theme shadow, a smaller type pill in the gallery.
+- **Later, card networks**: a second PR. Needs a wallet `card_network` column (Room v14 + migration test,
+  Supabase migration applied to production *before* the app that writes it, PulledRowRules, backup). Logos from
+  `lucento-bank-assets/Global-Banking-Assets/card-networks` (Visa, Mastercard, JCB, Amex, Discover, UnionPay; owner
+  accepted trademark use 2026-11-01). **No BancNet logo in the library**: the owner supplies an official file or it
+  shows as text. Don't copy another app's card designs (the tester's reference is a mood, not a template).
+- **Website**: `src/data/plans.ts` still lists "What your net worth is made of" as Pro, and `index.astro` mentions it;
+  update both to the new Insights (donut, net worth over time) when this merges.
+- **Play listing public**: flip `LucentoLinks.PLAY_LISTING_PUBLIC` to true so "Share Lucento" sends the Play link.
+- Ask Lucento PDFs print the website and Community links as text (PdfDocument can't add link annotations); viewers
+  auto-link them.
+
 ## Onboarding "Sunrise Path" — follow-ups (2026-11-08, `feature/onboarding-sunrise-path`, committed `221983f`)
 
 | # | Task | Priority | Notes |

@@ -27,7 +27,7 @@ object PlanCatalog {
             ProFeature.AI_ADVISER -> if (unlocked) Limit.PerDay(PRO_AI_QUESTIONS_PER_DAY) else Limit.PerMonth(FREE_AI_QUESTIONS_PER_MONTH)
             ProFeature.SHARED_SPACE -> if (unlocked) Limit.Count(PRO_PARTNERS) else Limit.None
             ProFeature.RECEIVABLES, ProFeature.VALUED_ASSETS, ProFeature.FOREIGN_CURRENCY_WALLETS,
-            ProFeature.INSIGHTS_LONG_PERIODS, ProFeature.NET_WORTH_COMPOSITION, ProFeature.PDF_STATEMENTS,
+            ProFeature.INSIGHTS_LONG_PERIODS, ProFeature.PDF_STATEMENTS,
             ProFeature.EXTRA_THEMES, ProFeature.CLOUD_SYNC, ProFeature.CLOUD_RESTORE, ProFeature.SMART_READING,
             -> if (unlocked) Limit.Unlimited else Limit.None
         }

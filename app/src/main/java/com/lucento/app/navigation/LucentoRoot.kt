@@ -563,6 +563,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             onEditTransaction = { view(it) },
                             transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
                             onAdjusted = { notify("Balance adjusted") },
+                            onOutsideRecorded = { notify("${it.label} recorded") },
                             onPlanDebtPayment = planDebtPayment,
                             onPayCard = { openCardPayment(it) },
                         )

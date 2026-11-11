@@ -443,8 +443,11 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         waitForText("Income and expenses")
+        // Tester round 3: where the money went (donut), then net worth over time (month ends).
+        runCatching { compose.onNodeWithText("Where your money went").performScrollTo() }
+        shot("14-insights-spending")
         runCatching { compose.onNodeWithText("Savings goals aren’t added here", substring = true).performScrollTo() }
-        shot("14-insights-net-worth")
+        shot("14b-insights-net-worth")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         openBudgets()

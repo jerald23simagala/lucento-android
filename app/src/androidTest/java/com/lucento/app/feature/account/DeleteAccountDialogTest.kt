@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -39,6 +42,7 @@ class DeleteAccountDialogTest {
                         onConfirm = { taps += "confirm" },
                         onDismiss = { taps += "dismiss" },
                         onManageSubscription = { taps += "manage" },
+                        accountEmail = EMAIL,
                     )
                 }
             }
@@ -47,7 +51,7 @@ class DeleteAccountDialogTest {
     }
 
     @Test
-    fun deleteStaysOff_untilTheCheckboxIsTicked() {
+    fun deleteStaysOff_untilTheCheckboxIsTicked_andTheEmailIsTyped() {
         show(DeleteAccountPrompt(DeletionPlan()))
         compose.onNodeWithText(AccountDeletionCopy.TITLE).assertExists()
         compose.onNodeWithText("permanently deletes your account", substring = true).assertExists()
@@ -55,6 +59,14 @@ class DeleteAccountDialogTest {
         compose.onNodeWithText(AccountDeletionCopy.CONFIRM).assertIsNotEnabled()
         shot("delete-01-confirm")
         compose.onNodeWithText(AccountDeletionCopy.ACKNOWLEDGE).performScrollTo().performClick()
+        // Tester round 3: the tick alone isn't enough; the account's email must be typed too.
+        compose.onNodeWithText(AccountDeletionCopy.CONFIRM).assertIsNotEnabled()
+        compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("someone@else.com")
+        compose.onNodeWithText("That isn’t this account’s email.").assertExists()
+        compose.onNodeWithText(AccountDeletionCopy.CONFIRM).assertIsNotEnabled()
+        compose.onNode(hasSetTextAction()).performTextClearance()
+        compose.onNode(hasSetTextAction()).performTextInput(" Tester@Example.com ")
+        shot("delete-01b-email-typed")
         compose.onNodeWithText(AccountDeletionCopy.CONFIRM).assertIsEnabled().performClick()
         assertEquals("confirm", taps.last())
         compose.onNodeWithText("Cancel").performClick()
@@ -86,6 +98,10 @@ class DeleteAccountDialogTest {
         compose.onNodeWithText(DeleteAccountFailures.OFFLINE).performScrollTo().assertExists()
         compose.onNodeWithText(AccountDeletionCopy.CONFIRM).assertIsNotEnabled()
         shot("delete-04-offline-dark")
+    }
+
+    private companion object {
+        const val EMAIL = "tester@example.com"
     }
 
     private fun shot(name: String) {

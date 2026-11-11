@@ -7,6 +7,7 @@ import com.lucento.app.data.local.TransactionEntity
 import com.lucento.app.data.local.WalletDao
 import com.lucento.app.data.local.acceptsTransactions
 import com.lucento.app.domain.BalanceAdjustment
+import com.lucento.app.domain.OutsideMovement
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.WalletBalanceCalculator
@@ -309,6 +310,59 @@ class TransactionRepository(
         return result
     }
 
+    sealed interface OutsideResult {
+        data class Recorded(val id: Long) : OutsideResult
+        data object WalletNotFound : OutsideResult
+        /** Withdrawals are for money accounts, external payments for cards and loans ([OutsideMovement.allowedFor]). */
+        data object NotAllowed : OutsideResult
+        data object CurrencyMismatch : OutsideResult
+        data object NotPositive : OutsideResult
+        data object FutureDate : OutsideResult
+        /** "What for" is required: every statement lists it. */
+        data object ReasonRequired : OutsideResult
+    }
+
+    /**
+     * Records [amount] as a withdrawal from, or an external payment on, wallet [walletId] (tester round 3): one balance
+     * adjustment row of [kind]'s type, noted "<label> · <reason>", so budgets, Insights and net flow never count it and
+     * the balance (or what is owed) moves by exactly [amount]. Creation is idempotent on [clientUuid].
+     */
+    suspend fun recordOutsideMovement(
+        kind: OutsideMovement,
+        walletId: Long,
+        amount: Money,
+        date: LocalDate,
+        reason: String,
+        clientUuid: String,
+        today: LocalDate = LocalDate.now(),
+    ): OutsideResult {
+        if (date.isAfter(today)) return OutsideResult.FutureDate
+        if (amount.amountMinor <= 0L) return OutsideResult.NotPositive
+        if (!OutsideMovement.reasonValid(reason)) return OutsideResult.ReasonRequired
+        val wallet = wallets.getById(walletId) ?: return OutsideResult.WalletNotFound
+        val type = runCatching { WalletType.valueOf(wallet.type) }.getOrNull() ?: return OutsideResult.NotAllowed
+        if (!wallet.acceptsTransactions || !kind.allowedFor(type)) return OutsideResult.NotAllowed
+        if (wallet.currencyCode != amount.currencyCode) return OutsideResult.CurrencyMismatch
+        transactions.findByClientUuid(clientUuid)?.let { return OutsideResult.Recorded(it.id) }
+        val now = clock()
+        val id = transactions.insert(
+            TransactionEntity(
+                type = kind.type.name,
+                amountMinor = amount.amountMinor,
+                currencyCode = amount.currencyCode,
+                walletId = walletId,
+                categoryId = null,
+                occurredOn = date.toEpochDay(),
+                note = kind.note(reason),
+                clientUuid = clientUuid,
+                createdAt = now,
+                updatedAt = now,
+                createdBy = actor(),
+            )
+        )
+        return OutsideResult.Recorded(id)
+    }
+
     /** One new transaction or transfer in a batch written by [saveBatch]. */
     sealed interface BatchEntry {
         data class Single(val input: Input) : BatchEntry
@@ -489,6 +543,22 @@ suspend fun TransactionRepository.saveOrNull(input: TransactionRepository.Input)
 suspend fun TransactionRepository.saveBatchOrNull(entries: List<TransactionRepository.BatchEntry>): TransactionRepository.BatchResult? =
     try {
         saveBatch(entries)
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        null
+    }
+
+/** [TransactionRepository.recordOutsideMovement] that returns null instead of throwing (constraint failure, disk full). */
+suspend fun TransactionRepository.recordOutsideMovementOrNull(
+    kind: OutsideMovement,
+    walletId: Long,
+    amount: Money,
+    date: LocalDate,
+    reason: String,
+    clientUuid: String,
+): TransactionRepository.OutsideResult? =
+    try {
+        recordOutsideMovement(kind, walletId, amount, date, reason, clientUuid)
     } catch (e: Exception) {
         if (e is kotlinx.coroutines.CancellationException) throw e
         null

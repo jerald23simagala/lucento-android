@@ -53,7 +53,7 @@ billed differently; the table shows them as one column with a note where they di
 | What you can do | Free | Pro | Pro Lifetime |
 |---|---|---|---|
 | **Insights** — income against expenses, month by month, with the change against last period | Last **3 months** | Last 3, 6 or **12 months** | Last 3, 6 or **12 months** |
-| **What your net worth is made of** — your accounts and debts by kind, with each one's share | — | ✔ | ✔ |
+| **Where your money went and net worth over time** — expenses by category and month-end net worth, for the period you pick (3 months free) | ✔ | ✔ | ✔ |
 | **Ask Lucento** — answers from your own figures, on this phone, no internet: net worth, cash flow, budget against actual, debts, top categories | ✔ | ✔ | ✔ |
 | **Save or share a statement as a PDF** | — | ✔ | ✔ |
 | **AI adviser** — ask Gemini about your numbers and get plans and recommendations (needs sign-in, consent and internet; Lucento sends figures, never your name) | **10 questions a month** | **50 questions a day** | 50 a day for the **first 12 months**, then 10 a month — or 50 a day with Lucento Cloud |
@@ -103,7 +103,7 @@ Lucento's servers:
 - Unlimited money wallets, unlimited cards and loans, receivables, and things you own at a value you set.
 - Wallets in other currencies, with exchange gains and losses worked out for you.
 - Up to 20 active savings goals.
-- Insights over 3, 6 or 12 months, and the breakdown of what your net worth is made of.
+- Insights over 3, 6 or 12 months.
 - Statements as PDF.
 - All five themes.
 - Every Pro feature we add later that runs on the phone. If a future feature needs servers, it is an online service,
@@ -177,7 +177,7 @@ adviser who knows your numbers.
 - Unlimited money wallets, cards and loans; receivables; things you own at a value you set.
 - Wallets in other currencies, with today's rates and your exchange gains and losses.
 - Up to 20 active savings goals.
-- Insights over 6 and 12 months, and what your net worth is made of.
+- Insights over 6 and 12 months.
 - Statements as PDF.
 - Cloud sync between your phones, and restore from your account on a new one.
 - Lucento Shared: one Partner sees and records in your ledger from their own phone.
@@ -204,7 +204,7 @@ a subscription and without our servers.
 - Unlimited money wallets, cards and loans; receivables; things you own at a value you set.
 - Wallets in other currencies, with exchange gains and losses.
 - Up to 20 active savings goals.
-- Insights over 3, 6 and 12 months, and what your net worth is made of.
+- Insights over 3, 6 and 12 months.
 - Statements as PDF.
 - All five themes.
 - Every future Pro feature that runs on the phone.
@@ -272,7 +272,7 @@ is opened only by the tap that would have used the feature; "Not now" is remembe
 
 **D-3 Insights locked (6 / 12 months, composition)**
 > **Longer trends are part of Lucento Pro**
-> See 6 and 12 months of income against expenses, and what your net worth is made of. Your 3-month view is always free.
+> See 6 and 12 months of income against expenses, where your money went and how your net worth moved. Your 3-month view is always free.
 > [ See plans ]  [ Not now ]
 
 **D-4 Cloud sync locked**

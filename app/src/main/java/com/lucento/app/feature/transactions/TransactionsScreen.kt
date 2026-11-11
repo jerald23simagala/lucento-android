@@ -341,6 +341,8 @@ fun TransactionsScreen(
                                         onClickLabel = when {
                                             revealedId == transaction.id -> "Hide actions"
                                             transaction.isTransfer -> "View transfer"
+                                            com.lucento.app.domain.OutsideMovement.of(transaction) != null ->
+                                                "View ${com.lucento.app.domain.OutsideMovement.of(transaction)!!.label.lowercase()}"
                                             transaction.isAdjustment -> "View balance adjustment"
                                             else -> "View transaction"
                                         },
@@ -419,6 +421,7 @@ private fun RevealableRow(
 
     val noun = when {
         transaction.isTransfer -> "transfer"
+        com.lucento.app.domain.OutsideMovement.of(transaction) != null -> com.lucento.app.domain.OutsideMovement.of(transaction)!!.label.lowercase()
         transaction.isAdjustment -> "balance adjustment"
         else -> "transaction"
     }

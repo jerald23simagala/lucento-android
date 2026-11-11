@@ -40,7 +40,6 @@ object ProCopy {
         ProFeature.FOREIGN_CURRENCY_WALLETS -> "Wallets in other currencies"
         ProFeature.SAVINGS_GOALS -> "Active savings goals"
         ProFeature.INSIGHTS_LONG_PERIODS -> "Insights over 6 and 12 months"
-        ProFeature.NET_WORTH_COMPOSITION -> "What your net worth is made of"
         ProFeature.PDF_STATEMENTS -> "Statements as PDF"
         ProFeature.EXTRA_THEMES -> "Themes"
         ProFeature.CLOUD_SYNC -> "Cloud sync between phones"
@@ -95,7 +94,6 @@ object ProCopy {
         ProFeature.SAVINGS_GOALS ->
             "The free plan has ${PlanCatalog.FREE_ACTIVE_GOALS} active savings goals. Pro and Pro Lifetime allow ${PlanCatalog.PRO_ACTIVE_GOALS}."
         ProFeature.INSIGHTS_LONG_PERIODS -> "Trends over 6 and 12 months are part of Lucento Pro. Your last 3 months are always free."
-        ProFeature.NET_WORTH_COMPOSITION -> "This breakdown is part of Lucento Pro. Your net worth itself is always on Home and Wallets."
         ProFeature.PDF_STATEMENTS ->
             "Saving or sharing a statement as a PDF is part of Lucento Pro. Everything on this screen is always free."
         ProFeature.EXTRA_THEMES -> "Grove, Mono and Aurora are part of Lucento Pro. Sunrise and Midnight are always free."

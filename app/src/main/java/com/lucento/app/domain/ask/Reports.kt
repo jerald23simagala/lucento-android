@@ -20,13 +20,23 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 
-/** The reports Ask Lucento can prepare. Every figure in them is calculated on the phone from the user's records. */
+/**
+ * The built-in reports (on Insights since tester round 3; Ask Lucento answers can still show one). Every figure in them
+ * is calculated on the phone from the user's records.
+ */
 enum class ReportKind(val title: String) {
     NET_WORTH("Net worth statement"),
     CASH_FLOW("Cash flow statement"),
     BUDGET_VS_ACTUAL("Budget vs actual"),
     DEBTS("Debts & loans summary"),
     TOP_CATEGORIES("Top spending categories"),
+
+    /** One wallet's month: beginning balance, every movement grouped, ending balance (tester round 3). Needs a wallet. */
+    WALLET_STATEMENT("Wallet statement"),
+    ;
+
+    /** Reports that are about one wallet, so they can't be asked for without choosing it. */
+    val needsWallet: Boolean get() = this == WALLET_STATEMENT
 }
 
 /**
@@ -38,6 +48,10 @@ data class ReportLine(
     val values: List<Money?> = emptyList(),
     val detail: String? = null,
     val emphasis: Boolean = false,
+    /** Its share of the section's total (0..1), drawn as a thin bar under the label. Display only, from exact money. */
+    val share: Float? = null,
+    /** A movement shown with its sign, + as well as − (a statement's summary): what it did to the balance. */
+    val signed: Boolean = false,
 )
 
 data class ReportSection(
@@ -47,6 +61,8 @@ data class ReportSection(
     val total: ReportLine? = null,
     /** Shown in place of the lines when there are none. */
     val emptyText: String = "Nothing here.",
+    /** A heading over a run of sections ("Income and expenses"), printed once where it changes. */
+    val group: String? = null,
 )
 
 /**
@@ -65,8 +81,12 @@ data class Report(
     val month: YearMonth,
     /** The period as it reads inside a sentence: "November 2026 so far", "October 2026", "as of November 3, 2026". */
     val phrase: String = period,
+    /** A wallet statement's wallet: kept so the month stepper can build the same statement for another month. */
+    val walletId: Long? = null,
+    /** What the report is about when it is one thing (a wallet statement's wallet name). */
+    val subject: String? = null,
 ) {
-    val title: String get() = kind.title
+    val title: String get() = subject?.let { "${kind.title} · $it" } ?: kind.title
 }
 
 /** Everything a report is calculated from; all of it already on the phone. */
@@ -91,12 +111,14 @@ data class ReportInputs(
  */
 object ReportBuilder {
 
-    fun build(kind: ReportKind, inputs: ReportInputs, currency: String, month: YearMonth, top: Int = 5): Report = when (kind) {
+    /** [walletId] is required for [ReportKind.WALLET_STATEMENT] (and ignored otherwise). */
+    fun build(kind: ReportKind, inputs: ReportInputs, currency: String, month: YearMonth, top: Int = 5, walletId: Long? = null): Report = when (kind) {
         ReportKind.NET_WORTH -> netWorth(inputs, currency, month)
         ReportKind.CASH_FLOW -> cashFlow(inputs, currency, month)
         ReportKind.BUDGET_VS_ACTUAL -> budgetVsActual(inputs, currency, month)
         ReportKind.DEBTS -> debts(inputs, currency)
         ReportKind.TOP_CATEGORIES -> topCategories(inputs, currency, month, top)
+        ReportKind.WALLET_STATEMENT -> walletStatement(inputs, requireNotNull(walletId) { "A wallet statement needs a wallet" }, month)
     }
 
     /**
@@ -166,6 +188,7 @@ object ReportBuilder {
                     s.categoryId?.let(names::get) ?: "Uncategorized",
                     listOf(s.amount),
                     Insights.percentOf(s.amount, total)?.let { "$it% of ${if (type == TransactionType.INCOME) "income" else "expenses"}" },
+                    share = Insights.fraction(s.amount, total),
                 )
             } to total
         }
@@ -307,7 +330,12 @@ object ReportBuilder {
         val total = Money.sum(currency, shares.map { it.amount })
         val count = top.coerceIn(1, 20)
         val lines = shares.take(count).mapIndexed { i, s ->
-            ReportLine("${i + 1}. ${s.categoryId?.let(names::get) ?: "Uncategorized"}", listOf(s.amount), Insights.percentOf(s.amount, total)?.let { "$it% of spending" })
+            ReportLine(
+                "${i + 1}. ${s.categoryId?.let(names::get) ?: "Uncategorized"}",
+                listOf(s.amount),
+                Insights.percentOf(s.amount, total)?.let { "$it% of spending" },
+                share = Insights.fraction(s.amount, total),
+            )
         }
         val rest = Money.sum(currency, shares.drop(count).map { it.amount })
         return Report(
@@ -327,6 +355,154 @@ object ReportBuilder {
             ),
             notes = listOf("Expenses in $currency, ${rangeLabel(range)}. Transfers and balance adjustments aren’t spending."),
             month = month,
+        )
+    }
+
+    /**
+     * One wallet's month (tester round 3): its balance at the start; every movement, grouped — income and expenses by
+     * category, then what isn't income or spending: transfers in and out by the wallet on the other side, withdrawals or
+     * external payments with what they were for, and balance corrections — and its balance at the end. Start + every
+     * movement = end, exactly: both ends come from [com.lucento.app.domain.WalletBalanceCalculator.balanceOn], the rule
+     * every balance in the app uses. In the wallet's own currency, never converted. For a card or loan the balance is
+     * what is owed: charges add to it, payments take from it.
+     */
+    fun walletStatement(inputs: ReportInputs, walletId: Long, month: YearMonth): Report {
+        val wallet = inputs.wallets.first { it.id == walletId }
+        val code = wallet.currencyCode
+        val range = monthRange(month, inputs.today)
+        val owed = wallet.type.isLiability
+        val receivable = wallet.type == WalletType.RECEIVABLE
+        val mine = inputs.transactions.filter { it.walletId == walletId && it.currencyCode == code }
+        val inRange = mine.filter { it.date in range }
+        fun balanceAt(date: LocalDate) =
+            com.lucento.app.domain.WalletBalanceCalculator.balanceOn(wallet.openingBalance, wallet.type, walletId, inputs.transactions, date)
+        val beginning = balanceAt(range.start.minusDays(1))
+        val ending = balanceAt(range.endInclusive)
+        // How a row moves this wallet's balance — for a card or loan, what is owed.
+        fun effect(t: Transaction): Money = if (owed) -t.signedAmount else t.signedAmount
+        fun effects(rows: List<Transaction>): Money = Money.sum(code, rows.map(::effect))
+
+        val names = inputs.categories.associate { it.id to it.name }
+        fun categoryLines(type: TransactionType): List<ReportLine> {
+            val shares = Insights.categoryBreakdown(mine, code, range, type)
+            val total = Money.sum(code, shares.map { it.amount })
+            return shares.map { share ->
+                ReportLine(
+                    share.categoryId?.let(names::get) ?: "Uncategorized",
+                    listOf(share.amount),
+                    Insights.percentOf(share.amount, total)?.let { "$it%" },
+                    share = Insights.fraction(share.amount, total),
+                )
+            }
+        }
+
+        // A transfer's other side is the other leg of its group.
+        val legs = inputs.transactions.filter { it.transferGroup != null }.groupBy { it.transferGroup }
+        val walletNames = inputs.wallets.associate { it.id to it.name }
+        fun counterpart(t: Transaction): String =
+            legs[t.transferGroup].orEmpty().firstOrNull { it.id != t.id && it.walletId != walletId }?.walletId?.let(walletNames::get)
+                ?: "Another wallet"
+        fun transferLines(type: TransactionType): List<ReportLine> {
+            val rows = inRange.filter { it.type == type }
+            val total = Money.sum(code, rows.map { it.amount })
+            return rows.groupBy(::counterpart)
+                .map { (name, list) -> Triple(name, Money.sum(code, list.map { it.amount }), list.size) }
+                .sortedByDescending { it.second.amountMinor }
+                .map { (name, amount, count) ->
+                    ReportLine(name, listOf(amount), if (count == 1) "1 transfer" else "$count transfers", share = Insights.fraction(amount, total))
+                }
+        }
+
+        val incomeRows = inRange.filter { it.type == TransactionType.INCOME }
+        val expenseRows = inRange.filter { it.type == TransactionType.EXPENSE }
+        val inRows = inRange.filter { it.type == TransactionType.TRANSFER_IN }
+        val outRows = inRange.filter { it.type == TransactionType.TRANSFER_OUT }
+        val adjustments = inRange.filter { it.type.isAdjustment }.sortedWith(compareBy({ it.date }, { it.id }))
+        val outside = adjustments.filter { com.lucento.app.domain.OutsideMovement.of(it) != null }
+        val corrections = adjustments.filter { com.lucento.app.domain.OutsideMovement.of(it) == null }
+
+        // The words for this kind of wallet.
+        val startLabel = when { owed -> "Owed at the start"; receivable -> "Owed to you at the start"; else -> "Balance at the start" }
+        val endLabel = when { owed -> "Owed at the end"; receivable -> "Owed to you at the end"; else -> "Balance at the end" }
+        val incomeTitle = when { owed -> "Refunds and credits"; receivable -> "Interest and income"; else -> "Income" }
+        val expenseTitle = if (owed) "Charges and fees" else "Expenses"
+        val inTitle = when { owed -> "Payments from your wallets"; receivable -> "Lent from your wallets"; else -> "Transfers in" }
+        val outTitle = when { owed -> "Moved to your wallets"; receivable -> "Paid back into your wallets"; else -> "Transfers out" }
+        val outsideTitle = if (owed) "External payments" else "Withdrawals"
+        val showIncome = !owed || incomeRows.isNotEmpty()
+        val showOut = !owed || outRows.isNotEmpty()
+        val offersOutside = com.lucento.app.domain.OutsideMovement.entries.any { it.allowedFor(wallet.type) }
+
+        val created = java.time.Instant.ofEpochMilli(wallet.createdAtEpochMillis).atZone(inputs.zone).toLocalDate()
+        val startDetail = if (!created.isBefore(range.start)) "Opening balance when you added it on ${shortDate(created)}"
+        else "At the end of ${longDate(range.start.minusDays(1))}"
+        val summary = listOfNotNull(
+            ReportLine(startLabel, listOf(beginning), startDetail),
+            ReportLine(incomeTitle, listOf(effects(incomeRows)), signed = true).takeIf { showIncome },
+            ReportLine(expenseTitle, listOf(effects(expenseRows)), signed = true),
+            ReportLine(inTitle, listOf(effects(inRows)), signed = true),
+            ReportLine(outTitle, listOf(effects(outRows)), signed = true).takeIf { showOut },
+            ReportLine(outsideTitle, listOf(effects(outside)), if (outside.size == 1) "1 entry" else "${outside.size} entries", signed = true)
+                .takeIf { outside.isNotEmpty() },
+            ReportLine("Balance adjustments", listOf(effects(corrections)), "Corrections to match the real balance", signed = true)
+                .takeIf { corrections.isNotEmpty() },
+        )
+        val firstGroup = if (owed) "Spending and refunds" else "Income and expenses"
+        val otherGroup = "Not income or spending"
+        fun total(rows: List<Transaction>) =
+            ReportLine("Total", listOf(Money.sum(code, rows.map { it.amount })), emphasis = true).takeIf { rows.isNotEmpty() }
+        val sections = listOfNotNull(
+            ReportSection("Summary", listOf("Amount"), summary, ReportLine(endLabel, listOf(ending), emphasis = true)),
+            ReportSection(incomeTitle, listOf("Amount"), categoryLines(TransactionType.INCOME), total(incomeRows), "None this month.", group = firstGroup)
+                .takeIf { showIncome },
+            ReportSection(expenseTitle, listOf("Amount"), categoryLines(TransactionType.EXPENSE), total(expenseRows), "None this month.", group = firstGroup),
+            ReportSection(inTitle, listOf("Amount"), transferLines(TransactionType.TRANSFER_IN), total(inRows), "None this month.", group = otherGroup),
+            ReportSection(outTitle, listOf("Amount"), transferLines(TransactionType.TRANSFER_OUT), total(outRows), "None this month.", group = otherGroup)
+                .takeIf { showOut },
+            ReportSection(
+                outsideTitle,
+                listOf("Amount"),
+                outside.map { t ->
+                    ReportLine(
+                        com.lucento.app.domain.OutsideMovement.reasonOf(t).ifBlank { "No reason given" },
+                        listOf(t.amount),
+                        "${com.lucento.app.domain.OutsideMovement.of(t)!!.label} · ${shortDate(t.date)}",
+                    )
+                },
+                total(outside),
+                "None this month.",
+                group = otherGroup,
+            ).takeIf { offersOutside || outside.isNotEmpty() },
+            ReportSection(
+                "Balance adjustments",
+                listOf("Amount"),
+                corrections.map { t -> ReportLine(t.note.ifBlank { "Balance adjustment" }, listOf(effect(t)), shortDate(t.date), signed = true) },
+                ReportLine("Total", listOf(effects(corrections)), emphasis = true, signed = true),
+                group = otherGroup,
+            ).takeIf { corrections.isNotEmpty() },
+        )
+        val change = ending - beginning
+        return Report(
+            kind = ReportKind.WALLET_STATEMENT,
+            currencyCode = code,
+            period = periodLabel(month, inputs.today),
+            phrase = periodPhrase(month, inputs.today),
+            headline = ReportLine(
+                endLabel,
+                listOf(ending),
+                "${startLabel.removeSuffix(" at the start")} at the start ${Figures.plain(beginning)} · change ${Figures.signed(change)}",
+                emphasis = true,
+            ),
+            sections = sections,
+            notes = listOfNotNull(
+                "Movements of ${wallet.name} recorded in Lucento, in $code, ${rangeLabel(range)}. The start plus every movement equals the end.",
+                "For a card or loan the balance is what you owe: charges add to it, and payments, refunds and external payments take from it."
+                    .takeIf { owed },
+                "Transfers, withdrawals, external payments and balance adjustments aren’t income or spending: they only move this balance.",
+            ),
+            month = month,
+            walletId = walletId,
+            subject = wallet.name,
         )
     }
 

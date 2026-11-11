@@ -35,8 +35,6 @@ object ProGates {
     fun insightsPeriodAllowed(months: Int, state: EntitlementState, now: Long): Boolean =
         months <= FREE_INSIGHTS_MONTHS || state.has(Capability.LOCAL_PRO, now)
 
-    fun netWorthCompositionAllowed(state: EntitlementState, now: Long): Boolean = state.has(Capability.LOCAL_PRO, now)
-
     fun pdfAllowed(state: EntitlementState, now: Long): Boolean = state.has(Capability.LOCAL_PRO, now)
 
     /**
