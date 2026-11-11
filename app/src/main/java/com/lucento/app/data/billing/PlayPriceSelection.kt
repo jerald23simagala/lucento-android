@@ -10,6 +10,8 @@ data class PricePhase(
     val billingPeriodIso: String?,
     /** INFINITE_RECURRING in Play's terms: the price that repeats until the person cancels. */
     val recurring: Boolean,
+    /** ISO 4217 code of [priceMicros]. */
+    val currencyCode: String? = null,
 )
 
 /** One offer Play lists for this person: a subscription base plan or offer, or a one-time purchase option. */
@@ -46,7 +48,11 @@ object PlayPriceSelection {
             .groupBy { it.productId }
             .mapNotNull { (_, group) ->
                 val best = group.minByOrNull { it.oneTimePrice!!.priceMicros } ?: return@mapNotNull null
-                ProductPrice(best.productId, null, best.offerToken, best.oneTimePrice!!.formattedPrice, billingPeriodIso = null)
+                val price = best.oneTimePrice!!
+                ProductPrice(
+                    best.productId, null, best.offerToken, price.formattedPrice, billingPeriodIso = null,
+                    priceMicros = price.priceMicros, currencyCode = price.currencyCode,
+                )
             }
         return (subscriptions + oneTime).sortedWith(
             compareBy<ProductPrice>({ PRODUCT_ORDER.indexOf(it.productId) }, { periodRank(it.billingPeriodIso) }),
@@ -68,6 +74,8 @@ object PlayPriceSelection {
             formattedPrice = price.formattedPrice,
             billingPeriodIso = price.billingPeriodIso,
             freeTrialPeriodIso = trial(pick)?.billingPeriodIso,
+            priceMicros = price.priceMicros,
+            currencyCode = price.currencyCode,
         )
     }
 
