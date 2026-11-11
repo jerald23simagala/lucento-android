@@ -34,6 +34,12 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
 5. **Licence key.** In Monetize with Play › Monetization setup › Licensing, copy the Base64 RSA public key into the GitHub
    repository **variable** (or secret) `LUCENTO_PLAY_LICENSE_KEY`, and into `local.properties` for local release
    builds. CI reads the variable first, then the secret. It is public by design. The phone checks every purchase's signature with it, and without it a release doesn't bill.
+   - **What it looks like:** one line of about 390 letters, digits, `+` and `/`, starting `MIIBIjAN`. It is **not** a
+     certificate fingerprint from Test and release › App integrity › App signing (`37:CE:29:…`, pairs separated by colons).
+   - **Why it matters:** 0.5.2 (vc 7) was built with a SHA-1 fingerprint here. It showed prices and took payments, but
+     every purchase failed its signature check, so the app never granted Pro or acknowledged the purchase, and Google
+     refunded each test order minutes later (3 days for real customers). The release build now stops with
+     "LUCENTO_PLAY_LICENSE_KEY isn't Google Play's licence key" when the value doesn't decode as an RSA public key.
 6. **Service account** for the server:
    - In Google Cloud (the project linked to Play Console), enable the *Google Play Android Developer API*.
    - Create a service account and a JSON key for it.

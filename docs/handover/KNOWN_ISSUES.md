@@ -15,6 +15,12 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Play billing licence key (2026-11-11, `fix/play-licence-key-check`)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| PB-1 | 0.5.2 (vc 7) and earlier Play-signed builds carry a SHA-1 certificate fingerprint as `PLAY_LICENSE_KEY` (GitHub secret `LUCENTO_PLAY_LICENSE_KEY`, set 2026-11-09). Prices and payment work, but every purchase fails `PurchaseSignature`, so the Play reading is discarded: no Pro, no `/api/billing/verify` call, no acknowledgement, and Google refunds the order (minutes for testers, 3 days for real buyers). Owner's trial and yearly test purchases on 2026-11-11 hit this | Verified: `const-string` in the 0.5.2 AAB's dex (dexdump); production has no `purchase_links` and no Play `entitlements` rows | Owner replaces the secret with the Base64 RSA key (PLAY_CONSOLE_SETUP step 5); build 0.5.3; retest. The build now refuses a key that isn't an RSA public key. **Never promote vc 7 or older to a public track** |
+
 ## Security remediation (2026-11-10, `security/release-remediation`)
 
 | ID | Issue | Evidence | Next step |
