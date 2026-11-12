@@ -310,15 +310,15 @@ studio `lab/pro-reveal.html` / `lab/pro-reveal-art.html`. Reports: `critic/repor
 
 **What's built**, in `feature/pro/welcome/`:
 - `ProReveal.kt`: the stage and the deck.
-  - The stage has one dim (0.92 in light, 0.94 in dark) that takes stray touches. It lies beside the content, never
-    around it.
+  - The stage is solid (it was a 0.92 dim until critic round 3) and takes stray touches. It lies beside the content,
+    never around it. While it is up, the status and navigation bars draw light icons.
   - The deck: a gold band with the approved symbol; turns at 90°; one burst; swipe; Previous, Next and Skip. TalkBack
-    hears a line per card.
+    hears a line per card from the counter, the welcome's one live region.
 - `PerkCard.kt`: the two faces.
   - The back carries the approved `lucento_symbol` on an ivory disc.
   - The face: the scene, the title, what changed (a `FlowRow` that wraps at large text), the term, where it lives,
-    and the sentence. Where and the sentence sit at the card's foot when there is room; beyond the card the words
-    scroll, with a "More" pill.
+    and the sentence. The words take the height they need and the scene takes the rest (no gap); beyond the card the
+    words scroll, with a "More" pill on a solid band.
 - `PerkArt.kt`: ten scenes drawn in Compose, using new `AwardArtwork` card colours.
 - `ProCollection.kt`: the plan's own line first, then each card with its gain or end date.
 - `ProWelcomeHost.kt`: the phases REVEAL → COLLECTION → MEDAL → FLIGHT. The award is the existing ceremony.
@@ -345,3 +345,35 @@ Net worth and Smarter reading no longer wait for a wallet. The Pro page's button
   - `ProRevealDeckFingerTest`: the band, Next, Previous and Skip, with a layer beneath that counted 0 leaks.
 - `ProRevealCaptureTest` takes opt-in captures. ScreenshotTourTest's welcome frames were rewritten (25a–25l); the
   emulator CI runs them.
+
+**Critic round 3** (on the app's captures): **REJECT, 3.1**. Two gates failed: the dark collection's plan title
+(1.56 : 1), and the deck's controls at 200 % text ("Previou / s", "See your"). The loop's three rounds are spent, so the
+owner decides next (NEXT_TASKS). Fixed since, all on `feature/pro-reveal`:
+- **The dark title:** the plan panel is a `Surface`, so its title takes the theme's ink.
+- **The buttons:**
+  - `DeckButtons` measures the deck's own labels and stacks Next above Previous when one won't fit on a line.
+  - Next keeps one place and one size from the closed deck to the last card.
+  - App-wide, `ButtonContent` (primary, secondary and quick-action buttons) wraps a label that doesn't fit instead of
+    cutting it off, with 8 dp of vertical padding. At default text nothing changes.
+- **The band:** placed by layout under the crest and clamped inside the card; its label grows only to 1.3×. It speaks
+  the count for TalkBack, and the line above no longer repeats it.
+- **The card face:** the scene takes the height the words leave (one layout pass with `maxIntrinsicHeight`), so there
+  is no gap. "More" sits on a solid band.
+- **TalkBack:** one live region, the counter ("2 of 10. Title.").
+- **The collection's rows:** the gain sits at the row's end while it fits beside the name, and drops under the name
+  when it doesn't (a `FlowRow`; this replaced the fixed 130 % rule).
+- **The stage:** solid, with light system-bar icons while it is up.
+- **Copy:**
+  - "Tap Add at the top right of …"; "Choose 6 or 12 months above the charts in Insights."; statements "In Insights,
+    under Reports."; themes no longer repeat the three names.
+  - A fifth chapter, *Beyond this phone*, for Sync and Lucento Shared (`AwardArtwork.GlowBeyond`).
+- **Typography:** headlines grow only to 1.5×; the collection says "You're Pro" from 130 % text; counts and dates use
+  no-break spaces, including the Pro page's `planStatus`.
+- **Insights scene:** redrawn as up-and-down months in a widening window.
+- **Taps during a turn:** kept and acted on once the card has turned; a double tap within 250 ms counts once. Haptics:
+  the button's own, plus a tick for swipes only.
+- **Tests:** 1,333 JVM tests, 0 failures. `lintDebug`: 0 errors.
+- **Captures:** 15 emulator runs in studio `qa/out/reveal-app-r3/` (the opt-in capture test now names the width and
+  reduced motion).
+- **Not verified:** TalkBack, haptics and Android 14+ large text, which need a real phone; the "confirming" state,
+  which needs a signed-in account (its copy is JVM-tested).

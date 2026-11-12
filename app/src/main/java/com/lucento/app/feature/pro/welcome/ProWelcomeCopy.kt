@@ -47,8 +47,8 @@ object ProWelcomeCopy {
 
     fun revealBody(count: Int): String = "Your Pro deck holds ${perks(count)}."
 
-    /** The gold band around the deck: "Lucento Pro · 10 perks". */
-    fun band(count: Int): String = "Lucento Pro · ${perks(count)}"
+    /** The gold band around the deck: "Lucento Pro · 10 perks", breaking (at large text) only after the dot. */
+    fun band(count: Int): String = "Lucento\u00A0Pro\u00A0· ${perks(count)}"
 
     /** "3 of 10". */
     fun progress(index: Int, total: Int): String = "${index + 1} of $total"
@@ -68,7 +68,8 @@ object ProWelcomeCopy {
     /** What TalkBack says for a row of what changed: the free plan's allowance, then this plan's. */
     fun spokenChange(change: Change): String = "${change.label}: ${change.before} on the free plan, ${change.after} now"
 
-    private fun perks(count: Int): String = if (count == 1) "1 perk" else "$count perks"
+    /** "6 perks", the number bound to its noun so a line never ends on it (critic round 3: "holds 6 / perks."). */
+    private fun perks(count: Int): String = if (count == 1) "1\u00A0perk" else "$count\u00A0perks"
 
     // ------------------------------------------------------------------------------------------------ the cards
 
@@ -87,7 +88,7 @@ object ProWelcomeCopy {
         ProTourStop.WALLETS -> StopCopy(
             title = "Add every account you use",
             body = "Cash, banks, e-wallets, savings, cards and loans: as many as you have.",
-            where = if (hasWallets) "Add is at the top right of Wallets." else "Add wallet is in the middle of Wallets.",
+            where = if (hasWallets) "Tap Add at the top right of Wallets." else "Tap Add wallet in the middle of Wallets.",
             changes = listOf(
                 Change(ProCopy.featureName(ProFeature.MONEY_WALLETS), "${PlanCatalog.FREE_MONEY_WALLETS}", NO_LIMIT),
                 Change(ProCopy.featureName(ProFeature.DEBT_ACCOUNTS), "${PlanCatalog.FREE_DEBT_ACCOUNTS}", NO_LIMIT),
@@ -122,7 +123,7 @@ object ProWelcomeCopy {
         ProTourStop.GOALS -> StopCopy(
             title = "Save for more at once",
             body = "Keep several savings goals going side by side.",
-            where = if (hasGoals) "Add is at the top right of Goals." else "Create a goal is in the middle of Goals.",
+            where = if (hasGoals) "Tap Add at the top right of Goals." else "Tap Create a goal in the middle of Goals.",
             changes = listOf(Change(ProCopy.featureName(ProFeature.SAVINGS_GOALS), "${PlanCatalog.FREE_ACTIVE_GOALS}", "${PlanCatalog.PRO_ACTIVE_GOALS}")),
             short = "More savings goals",
             gain = "${PlanCatalog.PRO_ACTIVE_GOALS} goals",
@@ -130,7 +131,7 @@ object ProWelcomeCopy {
         ProTourStop.INSIGHTS_PERIODS -> StopCopy(
             title = "Look further back",
             body = "See 6 and 12 months of income against expenses, where your money went and how your net worth moved.",
-            where = "6 and 12 months are above your charts in Insights.",
+            where = "Choose 6 or 12 months above the charts in Insights.",
             changes = listOf(Change("Trends", "${ProGates.FREE_INSIGHTS_MONTHS} months", "12 months")),
             short = "Longer trends",
             gain = "12 months",
@@ -138,7 +139,7 @@ object ProWelcomeCopy {
         ProTourStop.STATEMENTS -> StopCopy(
             title = "Keep your statements",
             body = "Save or share any report as a PDF.",
-            where = "Reports are in Insights; save or share one from inside it.",
+            where = "In Insights, under Reports.",
             short = "PDF statements",
         )
         ProTourStop.AI_ANSWERS -> {
@@ -193,7 +194,7 @@ object ProWelcomeCopy {
         )
         ProTourStop.THEMES -> StopCopy(
             title = "Three new themes",
-            body = "Grove, Mono and Aurora are yours.",
+            body = "Each one recolours the whole app, in light and dark.",
             where = "Themes are in your profile, behind your picture at the top right.",
             themes = true,
             short = "Three new themes",
@@ -233,14 +234,16 @@ object ProWelcomeCopy {
 
     // ------------------------------------------------------------------------------------------------ the collection
 
-    fun collectionTitle(mode: ProWelcomeMode, restored: Boolean = false): String = when {
+    /** [compact]: at large text, a title short enough that no word has to break across lines. */
+    fun collectionTitle(mode: ProWelcomeMode, restored: Boolean = false, compact: Boolean = false): String = when {
         mode == ProWelcomeMode.REPLAY -> "What Pro gives you"
         mode == ProWelcomeMode.RETURNING || restored -> "Welcome back to Pro"
+        compact -> "You’re Pro"
         else -> "Congratulations, you’re Pro"
     }
 
     /** "Your Pro collection · 10 perks". */
-    fun collectionEyebrow(count: Int): String = "Your Pro collection · ${perks(count)}"
+    fun collectionEyebrow(count: Int): String = "Your Pro collection\u00A0· ${perks(count)}"
 
     fun collectionButton(mode: ProWelcomeMode): String = if (mode.medal) "Collect your award" else "Done"
 

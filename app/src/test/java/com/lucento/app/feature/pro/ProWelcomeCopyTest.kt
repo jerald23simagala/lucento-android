@@ -125,9 +125,10 @@ class ProWelcomeCopyTest {
     }
 
     @Test fun empty_pages_are_pointed_at_the_button_they_really_have() {
-        assertEquals("Create a goal is in the middle of Goals.", ProWelcomeCopy.stop(ProTourStop.GOALS, all, true, false, hasGoals = false).where)
-        assertEquals("Add is at the top right of Goals.", ProWelcomeCopy.stop(ProTourStop.GOALS, all, true, false).where)
-        assertEquals("Add wallet is in the middle of Wallets.", ProWelcomeCopy.stop(ProTourStop.WALLETS, all, true, false, hasWallets = false).where)
+        assertEquals("Tap Create a goal in the middle of Goals.", ProWelcomeCopy.stop(ProTourStop.GOALS, all, true, false, hasGoals = false).where)
+        assertEquals("Tap Add at the top right of Goals.", ProWelcomeCopy.stop(ProTourStop.GOALS, all, true, false).where)
+        assertEquals("Tap Add wallet in the middle of Wallets.", ProWelcomeCopy.stop(ProTourStop.WALLETS, all, true, false, hasWallets = false).where)
+        assertEquals("Tap Add at the top right of Wallets.", ProWelcomeCopy.stop(ProTourStop.WALLETS, all, true, false).where)
         assertEquals("In Wallets, under Add at the top right.", ProWelcomeCopy.stop(ProTourStop.NET_WORTH, all, true, false).where)
         assertEquals("In Wallets, under Add wallet in the middle.", ProWelcomeCopy.stop(ProTourStop.NET_WORTH, all, true, false, hasWallets = false).where)
     }
@@ -182,9 +183,36 @@ class ProWelcomeCopyTest {
     @Test fun counts_and_progress_read_naturally() {
         assertEquals("1 of 8", ProWelcomeCopy.progress(0, 8))
         assertEquals("8 of 8", ProWelcomeCopy.progress(7, 8))
-        assertEquals("Your Pro deck holds 10 perks.", ProWelcomeCopy.revealBody(10))
-        assertEquals("Your Pro deck holds 1 perk.", ProWelcomeCopy.revealBody(1))
-        assertEquals("Lucento Pro · 10 perks", ProWelcomeCopy.band(10))
-        assertEquals("Your Pro collection · 6 perks", ProWelcomeCopy.collectionEyebrow(6))
+        // A number stays with its noun ("holds 6 / perks" split at 200 % text: critic round 3).
+        assertEquals("Your Pro deck holds 10\u00A0perks.", ProWelcomeCopy.revealBody(10))
+        assertEquals("Your Pro deck holds 1\u00A0perk.", ProWelcomeCopy.revealBody(1))
+        assertEquals("Your Pro collection\u00A0· 6\u00A0perks", ProWelcomeCopy.collectionEyebrow(6))
+        // The band breaks only after its dot: "Lucento Pro ·" / "10 perks".
+        assertEquals("Lucento\u00A0Pro\u00A0· 10\u00A0perks", ProWelcomeCopy.band(10))
+        assertEquals(1, ProWelcomeCopy.band(10).count { it == ' ' })
+    }
+
+    @Test fun at_large_text_the_collection_title_is_short_enough_not_to_break() {
+        assertEquals("You’re Pro", ProWelcomeCopy.collectionTitle(ProWelcomeMode.FIRST, compact = true))
+        // A welcome back and a replay are short already.
+        assertEquals("Welcome back to Pro", ProWelcomeCopy.collectionTitle(ProWelcomeMode.FIRST, restored = true, compact = true))
+        assertEquals("What Pro gives you", ProWelcomeCopy.collectionTitle(ProWelcomeMode.REPLAY, compact = true))
+    }
+
+    @Test fun a_card_says_each_thing_once() {
+        // Critic round 3: "save or share" twice on the statements card; the three theme names twice on the themes card
+        // (the swatches already name them).
+        val statements = ProWelcomeCopy.stop(ProTourStop.STATEMENTS, all, signedIn = true, aiAnswersOn = false)
+        assertEquals(1, Regex("save or share", RegexOption.IGNORE_CASE).findAll(statements.body + " " + statements.where).count())
+        val themes = ProWelcomeCopy.stop(ProTourStop.THEMES, all, signedIn = true, aiAnswersOn = false)
+        for (name in listOf("Grove", "Mono", "Aurora")) assertFalse(name, (themes.body + " " + themes.where).contains(name))
+        assertEquals("Choose 6 or 12 months above the charts in Insights.", ProWelcomeCopy.stop(ProTourStop.INSIGHTS_PERIODS, all, true, false).where)
+    }
+
+    @Test fun sync_and_shared_have_their_own_chapter() {
+        // Not "Make it yours": they reach other phones (critic round 3).
+        assertEquals("Beyond this phone", ProWelcomeCopy.stop(ProTourStop.SYNC, all, true, false).chapter)
+        assertEquals("Beyond this phone", ProWelcomeCopy.stop(ProTourStop.SHARED, all, true, false).chapter)
+        assertEquals("Make it yours", ProWelcomeCopy.stop(ProTourStop.THEMES, all, true, false).chapter)
     }
 }

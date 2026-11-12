@@ -34,7 +34,7 @@ import com.lucento.app.data.preferences.ThemeId
 import com.lucento.app.domain.entitlement.ProTourChapter
 import com.lucento.app.domain.entitlement.ProTourStop
 
-/** The art band's drawing space: each scene is drawn in 300 × 116 and scaled to the card's width. */
+/** The art band's drawing space and its usual proportions: each scene is drawn in 300 × 116 and scaled to fit the band. */
 internal const val PerkArtAspect = 300f / 116f
 
 /**
@@ -56,9 +56,13 @@ internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier) {
         drawRect(Brush.linearGradient(listOf(AwardArtwork.CardBlue, AwardArtwork.CardBlueDeep), start = Offset.Zero, end = Offset(size.width * 0.6f, size.height * 1.6f)))
         drawRect(Brush.radialGradient(listOf(glow(stop.chapter), Color.Transparent), center = Offset(size.width / 2f, size.height * 1.25f), radius = size.width * 0.62f))
         rings(this)
-        val k = size.width / 300f
-        scale(k, k, pivot = Offset.Zero) {
-            Pen(this, paths, measurer, family).scene(stop, themes)
+        // The scene keeps its proportions, as large as the band allows and centred: a card with words to spare gives
+        // its band more height (more sky around the scene); large text gives it less (a smaller scene, never cropped).
+        val k = minOf(size.width / 300f, size.height / 116f)
+        translate((size.width - 300f * k) / 2f, (size.height - 116f * k) / 2f) {
+            scale(k, k, pivot = Offset.Zero) {
+                Pen(this, paths, measurer, family).scene(stop, themes)
+            }
         }
     }
 }
@@ -78,6 +82,7 @@ private fun glow(chapter: ProTourChapter): Color = when (chapter) {
     ProTourChapter.YOUR_MONEY -> AwardArtwork.GlowMoney
     ProTourChapter.YOUR_GOALS -> AwardArtwork.GlowGoals
     ProTourChapter.YOUR_INSIGHTS -> AwardArtwork.GlowInsights
+    ProTourChapter.BEYOND_THIS_PHONE -> AwardArtwork.GlowBeyond
     ProTourChapter.MAKE_IT_YOURS -> AwardArtwork.GlowYours
 }
 
@@ -96,6 +101,10 @@ private class Pen(val d: DrawScope, val paths: HashMap<String, Path>, val measur
 
     fun rr(x: Float, y: Float, w: Float, h: Float, r: Float, c: Color) =
         d.drawRoundRect(c, topLeft = Offset(x, y), size = Size(w, h), cornerRadius = CornerRadius(r, r))
+
+    /** A rounded outline. */
+    fun frame(x: Float, y: Float, w: Float, h: Float, r: Float, c: Color, width: Float) =
+        d.drawRoundRect(c, topLeft = Offset(x, y), size = Size(w, h), cornerRadius = CornerRadius(r, r), style = Stroke(width = width))
 
     fun dot(cx: Float, cy: Float, r: Float, c: Color) = d.drawCircle(c, radius = r, center = Offset(cx, cy))
 
@@ -169,7 +178,8 @@ private class Pen(val d: DrawScope, val paths: HashMap<String, Path>, val measur
         }
         ProTourStop.GOALS -> at(150f, 70f) {
             dot(-104f, -30f, 13f, sun)
-            fill("M-130 46c34-30 70-34 104-16s66 12 100-8 56-8 56-8v32H-130z", AwardArtwork.GlowGoals.copy(alpha = 1f), alpha = 0.6f)
+            // The hills run on past every edge, so they meet the bottom however tall the band is.
+            fill("M-400 46H-130c34-30 70-34 104-16s66 12 100-8 56-8 56-8H400v300H-400z", AwardArtwork.GlowGoals.copy(alpha = 1f), alpha = 0.6f)
             stroke("M-62 30V-16", paper, 3f)
             fill("M-62 -16l24 8-24 8z", sun)
             stroke("M2 22V-40", paper, 3f)
@@ -177,12 +187,18 @@ private class Pen(val d: DrawScope, val paths: HashMap<String, Path>, val measur
             stroke("M64 26V-18", paper, 3f)
             fill("M64 -18l22 8-22 8z", paper)
         }
-        ProTourStop.INSIGHTS_PERIODS -> at(150f, 100f) {
-            // Twelve months of bars: the nine Pro opened in gold, the last three (always free) in paper.
-            listOf(22f, 28f, 26f, 34f, 38f, 36f, 44f, 50f, 48f, 56f, 62f, 70f).forEachIndexed { i, h ->
-                rr(-94f + i * 16f, -h, 11f, h, 3f, if (i < 9) gold else paper.copy(alpha = 0.7f))
+        ProTourStop.INSIGHTS_PERIODS -> at(150f, 58f) {
+            // Twelve months as months really go, up and down (never a line that only climbs: critic round 3): the last
+            // three, which the free plan shows, in paper inside their small window; the nine more that Pro opens, in
+            // gold inside the wide one; the arrow says the window now reaches further back.
+            rr(-102f, -30f, 204f, 76f, 10f, paper.copy(alpha = 0.08f))
+            frame(-102f, -30f, 204f, 76f, 10f, gold, 2.4f)
+            rr(47f, -30f, 55f, 76f, 10f, paper.copy(alpha = 0.2f))
+            listOf(30f, 44f, 24f, 40f, 54f, 34f, 48f, 26f, 42f, 36f, 50f, 32f).forEachIndexed { i, h ->
+                rr(-94f + i * 16f, 38f - h, 11f, h, 3f, if (i < 9) gold else paper)
             }
-            dot(98f, -84f, 9f, sun)
+            stroke("M40 -42H-88", gold, 3f)
+            stroke("M-80 -49l-8 7 8 7", gold, 3f)
         }
         ProTourStop.STATEMENTS -> at(150f, 58f) {
             turned(-7f) { rr(-44f, -46f, 74f, 94f, 8f, shade) }

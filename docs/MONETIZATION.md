@@ -570,26 +570,33 @@ only after a committed write: never for a pending payment, a renewal, or a trial
 `domain/entitlement/ProWelcome.kt` (JVM-tested); screens: `feature/pro/welcome/`.
 
 1. **The deck.** The owner chose "Deck, unwrapped" on 2026-11-12, after the spotlight tour's buttons failed on real
-   phones (KNOWN_ISSUES PW-1). It shows up to ten cards in four chapters, one per thing Pro opened, held in a gold band
+   phones (KNOWN_ISSUES PW-1). It shows up to ten cards in five chapters, one per thing Pro opened, held in a gold band
    with the Lucento symbol.
    - "Open your Pro deck" slides the band off and turns the first card, with the welcome's only burst. After that it's
      one card at a time:
      - Next, or a swipe left.
      - Previous, or a swipe right.
      - Skip to the collection.
+   - Next stays in one place from the closed deck to the last card: Previous keeps its room, and Next is as tall as its
+     longest label needs. When a label wouldn't fit on one line (large text, a narrow phone), the buttons stack, Next
+     above Previous. A tap that lands while a card is turning is kept and acted on once it has turned; a second tap
+     within 250 ms of a step is the same tap twice and is ignored, so a double tap never skips a card.
    - A welcome back and the replay open on the plain deck ("Reveal your first perk").
    - Each card has:
-     - a small illustrated scene (the "Scenes" art, `PerkArt.kt`), on the card back's blue with its chapter's glow;
+     - a small illustrated scene (the "Scenes" art, `PerkArt.kt`), on the card back's blue with its chapter's glow.
+       The scene takes the height the words leave (at least 300 : 84, at most three quarters of the width), so a card
+       never has a gap; at the largest text it gives way;
      - then, in this order, so the numbers stay in view at large text: the title, what changed (free plan → this plan,
        from `PlanCatalog`), how long an online service is included, where it lives in the app, and a sentence;
-     - beyond the card the words scroll, with a "More" pill.
-   - "Where it lives" is said in words ("Add is at the top right of Wallets"). On an empty page it names the button the
-     page really has.
+     - beyond the card the words scroll, with a "More" pill on a solid band (it never sits over words).
+   - "Where it lives" is said in words ("Tap Add at the top right of Wallets"). On an empty page it names the button
+     the page really has.
    - The chapters:
      - *Your money*: wallets, net worth, and Smarter reading with Gemini.
      - *Your goals*.
      - *Your insights*: 6 and 12 months, PDF statements, and AI answers with Gemini.
-     - *Make it yours*: sync and restore, Lucento Shared, and the three themes.
+     - *Beyond this phone*: sync and restore, and Lucento Shared.
+     - *Make it yours*: the three themes.
 
    Rules for the cards:
    - **What's left out:**
@@ -610,17 +617,21 @@ only after a committed write: never for a pending payment, a renewal, or a trial
    - **No side effects:** nothing in the deck changes data or consents, and it never moves through the app's screens.
    - **Touches:** it takes every touch that lands on the dim, and the screen under it is hidden from TalkBack and focus.
      The touch blocker lies beside the cards, never around them (PW-1).
-   - **TalkBack** hears each card as it turns ("2 of 10. Count everything you have.").
-   - **The dim** is the same for every moment, 0.92 in light and 0.94 in dark, so nothing beneath can be read.
+   - **TalkBack** hears each card as it turns ("2 of 10. Count everything you have."). The counter is the welcome's one
+     live region, so nothing is heard twice.
+   - **The dim** is the same for every moment, 0.97 in every theme, so nothing beneath can be read even at 200 % text.
+     While it is up, the status and navigation bars draw light icons.
 2. **The collection.**
-   - **Title:** "Congratulations, you're Pro"; "Welcome back to Pro" for a returning or restored plan; "What Pro gives
-     you" on a replay.
+   - **Title:** "Congratulations, you're Pro" ("You're Pro" from 130 % text, so no word breaks); "Welcome back to Pro"
+     for a returning or restored plan; "What Pro gives you" on a replay. Stage headlines grow with the text size up to
+     1.5×, as Android's own large text does.
    - **Then:**
      - the plan's own line first (`ProCopy.planStatus`): "Pro Lifetime · you own it", and until when the online
        services are included;
      - while the server hasn't confirmed the plan, where the online services stand;
-     - every card as one line, with its gain ("No limit", "20 goals", "12 months", "50 a day") or its end date. From
-       130 % text the gain moves under the name.
+     - every card as one line, with its gain ("No limit", "20 goals", "12 months", "50 a day") or its end date. When
+       the name and its gain don't fit on one line (a date on a narrow phone, large text), the gain moves under the
+       name.
    - **Back** leaves the welcome: the award is still given and the badge appears.
 3. **Award**: the Lucento Pro medal on the award ceremony's stage. It is membership, not progress, so it stands on its
    own Membership shelf and doesn't count in "x of 6". It is given once per person and kept for good.

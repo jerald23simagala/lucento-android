@@ -7,13 +7,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,12 +43,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.lucento.app.core.designsystem.component.LucentoMark
@@ -60,16 +60,18 @@ import com.lucento.app.core.designsystem.theme.ThemeSpec
 import com.lucento.app.data.preferences.ThemeId
 import com.lucento.app.domain.entitlement.ProTourStop
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /** A perk card's corners: the same on both faces, so the turn reads as one object. */
 internal val PerkCardShape: Shape = RoundedCornerShape(22.dp)
 
 /**
  * A card's back: the cards' blue, rings rising from below, and the approved Lucento symbol on an ivory disc (shown as
- * supplied, never recoloured), with "Lucento Pro" under it. Decorative: TalkBack hears the cards only once they turn.
+ * supplied, never recoloured), with "Lucento Pro" under it, except while the deck's band says it ([showLabel] false: at
+ * large text the band would cover it). Decorative: TalkBack hears the cards only once they turn.
  */
 @Composable
-internal fun PerkCardBack(modifier: Modifier = Modifier) {
+internal fun PerkCardBack(modifier: Modifier = Modifier, showLabel: Boolean = true) {
     Box(
         modifier
             .clip(PerkCardShape)
@@ -90,112 +92,136 @@ internal fun PerkCardBack(modifier: Modifier = Modifier) {
                     .background(AwardArtwork.Paper),
                 contentAlignment = Alignment.Center,
             ) { LucentoMark(size = 52.dp, animate = false) }
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                "LUCENTO PRO",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 0.24.em),
-                color = AwardArtwork.GoldHighlight,
-            )
+            if (showLabel) {
+                Spacer(Modifier.height(Spacing.md))
+                Text(
+                    "LUCENTO PRO",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 0.24.em),
+                    color = AwardArtwork.GoldHighlight,
+                )
+            }
         }
     }
 }
 
+/** The scene's band is never smaller than its large-text proportions (300 : 84). */
+private const val ArtLeastAspect = 300f / 84f
+
 /**
  * A card's face: its scene, then what Pro opened in the order a person needs it at any text size (the critic's round 2):
  * the title, what changed (free plan first), how long an online service is included, where it lives in the app, and
- * last the sentence that explains it. Beyond the card's height the words scroll, with a "More" pill to say so.
+ * last the sentence that explains it. The words take the height they need and the scene takes the rest, so a card with
+ * few words shows a larger scene instead of a gap (critic round 3); the scene gives way at the largest text. Beyond the
+ * card's height the words scroll, with a "More" pill on a solid band to say so.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, modifier: Modifier = Modifier) {
-    val fontScale = LocalDensity.current.fontScale
+    val withArt = LocalDensity.current.fontScale < 1.75f
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val surface = MaterialTheme.colorScheme.surfaceContainerLowest
     Surface(
         shape = PerkCardShape,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        color = surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier,
     ) {
-        Column {
-            // The scene shrinks at large text and gives way at the largest, so the words keep the room.
-            if (fontScale < 1.75f) {
-                PerkArt(stop, Modifier.fillMaxWidth().aspectRatio(if (fontScale >= 1.3f) 300f / 84f else PerkArtAspect))
-            }
-            Box(Modifier.weight(1f)) {
-                // When there is room, where it lives and the sentence sit at the card's foot, like the text box of a
-                // printed card; when there isn't (large text), everything flows in order and scrolls.
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val viewport = maxHeight
-                    Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = viewport)
-                                .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md, bottom = Spacing.lg),
-                            verticalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                                Text(copy.chapter, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(
-                                    copy.title,
-                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                    modifier = Modifier.semantics { heading() },
-                                )
-                                if (copy.changes.isNotEmpty()) Changes(copy.changes)
-                                copy.term?.let { Term(it) }
-                                if (copy.themes) ThemeSwatches()
-                            }
-                            Column(Modifier.padding(top = Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Icon(
-                                        Icons.Outlined.Place,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(top = 2.dp).size(18.dp),
-                                    )
-                                    Spacer(Modifier.width(Spacing.xs))
-                                    Text(copy.where, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                                }
-                                Text(copy.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
+        Box {
+            Layout(
+                content = {
+                    if (withArt) PerkArt(stop)
+                    Box(Modifier.verticalScroll(scroll)) { CardWords(copy) }
+                },
+            ) { measurables, constraints ->
+                val w = constraints.maxWidth
+                val h = constraints.maxHeight
+                val words = measurables.last()
+                val art = if (withArt) {
+                    val least = (w / ArtLeastAspect).roundToInt()
+                    measurables.first().measure(Constraints.fixed(w, (h - words.maxIntrinsicHeight(w)).coerceAtLeast(least)))
+                } else {
+                    null
                 }
-                if (scroll.canScrollForward) {
-                    val surface = MaterialTheme.colorScheme.surfaceContainerLowest
+                val top = art?.height ?: 0
+                val text = words.measure(Constraints(minWidth = w, maxWidth = w, minHeight = 0, maxHeight = (h - top).coerceAtLeast(0)))
+                layout(w, h) {
+                    art?.place(0, 0)
+                    text.place(0, top)
+                }
+            }
+            if (scroll.canScrollForward) {
+                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
                     Box(
                         Modifier
-                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .height(24.dp)
                             .background(Brush.verticalGradient(listOf(surface.copy(alpha = 0f), surface))),
                     )
-                    // "More": scrolls the rest into view. TalkBack reads the whole card anyway, so it isn't spoken.
+                    // "More", on a solid band so it never sits over words (critic round 3): it scrolls the rest into
+                    // view. TalkBack reads the whole card anyway, so it isn't spoken.
                     Box(
                         Modifier
-                            .align(Alignment.BottomCenter)
-                            .heightIn(min = 48.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .clickable { scope.launch { scroll.animateScrollTo(scroll.maxValue) } }
-                            .clearAndSetSemantics {}
-                            .padding(horizontal = Spacing.md),
+                            .fillMaxWidth()
+                            .background(surface)
+                            .padding(bottom = Spacing.xs),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Row(
+                        Box(
                             Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.secondaryContainer)
-                                .padding(horizontal = Spacing.md, vertical = Spacing.xs),
-                            verticalAlignment = Alignment.CenterVertically,
+                                .heightIn(min = 48.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .clickable { scope.launch { scroll.animateScrollTo(scroll.maxValue) } }
+                                .clearAndSetSemantics {}
+                                .padding(horizontal = Spacing.md),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Text("More", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(18.dp))
+                            Row(
+                                Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("More", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** The card's words, in reading order: chapter, title, what changed, the term, where it lives, the sentence. */
+@Composable
+private fun CardWords(copy: ProWelcomeCopy.StopCopy) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md, bottom = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Text(copy.chapter, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            copy.title,
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.semantics { heading() },
+        )
+        if (copy.changes.isNotEmpty()) Changes(copy.changes)
+        copy.term?.let { Term(it) }
+        if (copy.themes) ThemeSwatches()
+        Row(Modifier.padding(top = Spacing.xs), verticalAlignment = Alignment.Top) {
+            Icon(
+                Icons.Outlined.Place,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 2.dp).size(18.dp),
+            )
+            Spacer(Modifier.width(Spacing.xs))
+            Text(copy.where, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+        }
+        Text(copy.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -132,11 +132,13 @@ enum class ProWelcomeMode(
     REPLAY(reveal = true, medal = false, flight = false),
 }
 
-/** The cards' four chapters, in order. */
+/** The cards' five chapters, in order. */
 enum class ProTourChapter(val title: String) {
     YOUR_MONEY("Your money"),
     YOUR_GOALS("Your goals"),
     YOUR_INSIGHTS("Your insights"),
+    /** Sync and Lucento Shared: what reaches other phones (not personalisation; critic round 3). */
+    BEYOND_THIS_PHONE("Beyond this phone"),
     MAKE_IT_YOURS("Make it yours"),
 }
 
@@ -164,10 +166,10 @@ enum class ProTourStop(val chapter: ProTourChapter) {
     AI_ANSWERS(ProTourChapter.YOUR_INSIGHTS),
 
     /** Settings › Account & sync: sync between phones and restore from your account. */
-    SYNC(ProTourChapter.MAKE_IT_YOURS),
+    SYNC(ProTourChapter.BEYOND_THIS_PHONE),
 
     /** Settings › Lucento Shared: inviting one Partner. */
-    SHARED(ProTourChapter.MAKE_IT_YOURS),
+    SHARED(ProTourChapter.BEYOND_THIS_PHONE),
 
     /** The profile picture: Grove, Mono and Aurora, chosen from the profile. */
     THEMES(ProTourChapter.MAKE_IT_YOURS),

@@ -20,7 +20,8 @@ import java.time.LocalDate
 /**
  * Captures Lucento Pro's welcome for design review (CI doesn't run it): the closed deck, every card, the collection, the
  * award and the ring, as PNGs in /data/local/tmp/lucento-reveal. Pull them with `adb pull`. `-e revealDark true` takes
- * them in the dark theme; Android's text size is whatever the device has (set it with `settings put system font_scale`).
+ * them in the dark theme; the text size, the screen width (`wm size` / `wm density`) and reduced motion (animator scale
+ * 0) are whatever the device has, and each name says them ("w360-dark-text200-…").
  */
 @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -38,8 +39,14 @@ class ProRevealCaptureTest {
         // `-e revealRestored true`: a Lifetime the phone finds already bought (a new phone, a reinstall): "Welcome back"
         // and the plain deck, without the band.
         val restored = InstrumentationRegistry.getArguments().getString("revealRestored") == "true"
-        val scale = instrumentation.targetContext.resources.configuration.fontScale
-        val tag = (if (dark) "dark" else "light") + "-text" + (scale * 100).toInt() + (if (restored) "-restored" else "")
+        val configuration = instrumentation.targetContext.resources.configuration
+        val reduced = android.provider.Settings.Global.getFloat(
+            instrumentation.targetContext.contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+        val tag = "w${configuration.screenWidthDp}-" + (if (dark) "dark" else "light") + "-text" +
+            kotlin.math.round(configuration.fontScale * 100).toInt() + (if (restored) "-restored" else "") + (if (reduced) "-reduced" else "")
         shell("mkdir -p /data/local/tmp/lucento-reveal")
         onboardAndSeed()
         if (dark) runBlocking { container.preferences.setThemeMode(ThemeMode.DARK) }
@@ -62,7 +69,8 @@ class ProRevealCaptureTest {
             compose.onNodeWithText("Buy Lifetime").performScrollTo().performClick()
         }
         waitForText(open, 20_000)
-        shot("$tag-00-deck")
+        // The deck can be in the tree a moment before it reaches the screen (round 3's dark shot caught the Pro page).
+        shot("$tag-00-deck", settle = 1_500)
         click(open)
         var card = 1
         while (card < 20) {
@@ -91,19 +99,22 @@ class ProRevealCaptureTest {
             10_000,
         )
         shot("$tag-22-ring")
-        // The Lucento Pro page offers the cards again.
-        compose.onNodeWithContentDescription("Profile and settings").performClick()
-        compose.waitForIdle()
-        click("Lucento Pro")
-        waitForText("See your Pro cards", 15_000)
-        runCatching { compose.onNodeWithText("See your Pro cards").performScrollTo() }
-        shot("$tag-23-pro-page")
+        // The Lucento Pro page offers the cards again (kept apart: a miss here doesn't cost the shots before it).
+        runCatching {
+            compose.waitUntilExactlyOneExists(androidx.compose.ui.test.hasContentDescription("Profile and settings"), 10_000)
+            compose.onNodeWithContentDescription("Profile and settings").performClick()
+            compose.waitForIdle()
+            click("Lucento Pro")
+            waitForText("See your Pro cards", 15_000)
+            runCatching { compose.onNodeWithText("See your Pro cards").performScrollTo() }
+            shot("$tag-23-pro-page")
+        }
         simulator.setTestStore(false)
     }
 
-    private fun shot(name: String) {
+    private fun shot(name: String, settle: Long = 300) {
         compose.waitForIdle()
-        Thread.sleep(300)
+        Thread.sleep(settle)
         shell("screencap -p /data/local/tmp/lucento-reveal/$name.png")
     }
 

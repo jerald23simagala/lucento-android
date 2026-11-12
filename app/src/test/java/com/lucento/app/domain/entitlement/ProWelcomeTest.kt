@@ -113,7 +113,7 @@ class ProWelcomeTest {
         manages: Boolean = true,
     ) = ProTourContext(capabilities, wallets, goals, insights, manages)
 
-    @Test fun the_full_deck_has_ten_cards_in_four_chapters() {
+    @Test fun the_full_deck_has_ten_cards_in_five_chapters() {
         val stops = ProWelcome.stops(context())
         assertEquals(ProTourStop.entries.toList(), stops)
         assertEquals(ProTourChapter.entries.toList(), stops.map { it.chapter }.distinct())

@@ -35,7 +35,8 @@ import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 
-private val ButtonPadding = PaddingValues(horizontal = 24.dp)
+// The vertical room only shows once a label needs a second line (one line stays inside the 52 dp minimum).
+private val ButtonPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
 
 @Composable
 fun LucentoPrimaryButton(
@@ -190,7 +191,9 @@ private fun ButtonContent(text: String, icon: ImageVector?, trailingIcon: ImageV
             Icon(icon, contentDescription = null, modifier = Modifier.size(Sizes.icon))
             Spacer(Modifier.width(Spacing.sm))
         }
-        Text(text, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+        // A label that doesn't fit wraps onto centred lines and the button grows; it is never cut off (at 200 % text a
+        // one-line label read "See your": critic round 3, Pro welcome).
+        Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         if (trailingIcon != null) {
             Spacer(Modifier.width(Spacing.sm))
             Icon(trailingIcon, contentDescription = null, modifier = Modifier.size(Sizes.icon))

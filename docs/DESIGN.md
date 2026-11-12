@@ -32,7 +32,8 @@ The night-theme primary is `#7C9AFF` rather than the proposed `#5278FF`: white o
 
 ### Palette in components
 - **Buttons:** primary = Electric Blue fill, white label; secondary = pale-sky fill (night: `#202E4D`) with ink label,
-  no outline; text buttons in primary; destructive confirmations use `error`.
+  no outline; text buttons in primary; destructive confirmations use `error`. A label that doesn't fit wraps onto
+  centred lines and the button grows (at least 52 dp); it is never cut off.
 - **Chips / pills** (`ChoicePill`): selected = solid primary with `onPrimary`; unselected = white (night: lowest
   surface) with a hairline and ink label.
 - **Navigation dock:** selected tab in primary tones on a pale-sky indicator; others muted ink.

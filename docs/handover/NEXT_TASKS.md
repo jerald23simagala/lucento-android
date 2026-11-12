@@ -42,10 +42,22 @@ keeping the excitement of the upgrade and the badge award. The fix on `fix/pro-t
 **held**: it ships with the reveal in one release (owner's choice). Nothing is pushed until then.
 
 **Status (2026-11-12):** steps 1–3 are built on `feature/pro-reveal`, which is local and not pushed. The owner
-picked "Deck, unwrapped" with "Scenes" art. Next:
-- (a) critic round 3 on the app's captures;
-- (b) the owner decides push, PR and release: one release with #55's refund guards, the PW-1 fix and the reveal;
-- (c) the owner tries it on the Galaxy S8 from internal testing.
+picked "Deck, unwrapped" with "Scenes" art.
+
+Critic round 3 on the app's captures returned REJECT, 3.1. Two gates failed: the dark plan title, and the controls at
+200 % text. Every P0 and P1 is fixed and re-captured (studio `critic/reports/2026-11-12-pro-reveal-r3*`,
+`qa/out/reveal-app-r3/`). Three rounds without APPROVE end the loop, so it is with the owner.
+
+Next:
+- (a) the owner decides: a fourth critic round, and/or push, PR and release (one release with #55's refund guards, the
+  PW-1 fix and the reveal);
+- (b) on the Galaxy S8 from internal testing, check:
+  - TalkBack: Next three times, then Previous once; one announcement per card;
+  - how dense the haptics feel;
+  - the swipe;
+  - large text, where Android 14+ scales differently from API 28;
+- (c) the owner's calls from round 3: the "AI adviser" name, the solid stage, ten cards one at a time, and the medal's
+  rosette.
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
    picks one.

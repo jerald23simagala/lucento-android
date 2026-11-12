@@ -203,6 +203,13 @@ recurring-schedule sync, syncing preferences.
   - Then the collection, the award and the badge.
   - The spotlight tour, its curtain and the summary are retired, and "See your Pro cards" on the Pro page replays the
     deck (MONETIZATION §6.5).
+  - After critic round 3 (REJECT, 3.1):
+    - the dark plan title is readable;
+    - the buttons stay whole and in place at any text size (they stack when a label won't fit);
+    - the band stays on the card; the scene fills the card instead of leaving a gap;
+    - the stage is solid; there is one TalkBack announcement per card;
+    - a fifth chapter, "Beyond this phone".
+    - App-wide: a button label that doesn't fit now wraps instead of being cut off.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.

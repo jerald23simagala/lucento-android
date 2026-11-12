@@ -240,8 +240,8 @@ object ProCopy {
 
     /** The plan row in the profile menu, Settings and the top of the Lucento Pro page (customer copy D-11). */
     fun planStatus(state: EntitlementState, now: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): PlanStatus {
-        fun date(millis: Long): String =
-            Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy", locale))
+        // The date never splits across lines ("Nov 12, / 2027": critic round 3), as on the welcome's cards.
+        fun date(millis: Long): String = termDate(millis, zone, locale)
         val active = state.active(now)
         return when (state.displayPlan(now)) {
             DisplayPlan.FREE -> if (state.pending() != null) {

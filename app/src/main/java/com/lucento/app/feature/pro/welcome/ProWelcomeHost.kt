@@ -1,5 +1,8 @@
 package com.lucento.app.feature.pro.welcome
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -8,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -25,8 +29,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import com.lucento.app.core.designsystem.component.SpotlightKeys
 import com.lucento.app.core.designsystem.component.SpotlightRegistry
 import com.lucento.app.core.designsystem.component.rememberHaptics
@@ -159,6 +165,9 @@ fun ProWelcomeHost(
     }
 
     if (paused || state.phase == ProWelcomePhase.DONE) return
+    // Light status and navigation bar icons on the dim, in every theme, until the badge flies over the app again
+    // (critic round 3: the light theme's dark icons sat on the dim, then turned white for the award).
+    LightSystemBars(state.phase != ProWelcomePhase.FLIGHT)
     val now = System.currentTimeMillis()
     val capabilities = entitlements.capabilities(now)
     val online = ProWelcome.onlineStatus(entitlements, now, signedIn, syncAvailable)
@@ -192,7 +201,8 @@ fun ProWelcomeHost(
             val plan = ProCopy.planStatus(entitlements, now)
             ProCollection(
                 eyebrow = ProWelcomeCopy.collectionEyebrow(cards.size),
-                title = ProWelcomeCopy.collectionTitle(run.mode, run.restored),
+                // At large text the short title, so no word breaks across lines (critic round 3: "Congratula- / tions").
+                title = ProWelcomeCopy.collectionTitle(run.mode, run.restored, compact = LocalDensity.current.fontScale >= 1.3f),
                 plan = plan.title,
                 planDetail = plan.detail,
                 status = ProWelcomeCopy.onlineStatus(online),
@@ -207,7 +217,7 @@ fun ProWelcomeHost(
                 onDismiss = { if (run.mode.flight) state.phase = ProWelcomePhase.FLIGHT else finish() },
                 onClose = ::leave,
                 // The same dim as the cards, so the screen doesn't brighten between the moments.
-                dim = welcomeScrimAlpha(),
+                dim = WelcomeDim,
             )
         }
         ProWelcomePhase.FLIGHT -> BadgeFlight(
@@ -287,4 +297,32 @@ private fun BadgeFlight(
         delay(if (reduced) 0 else 700)
         onDone()
     }
+}
+
+/**
+ * While [on], the status and navigation bars draw light icons (the welcome's dim is dark in every theme); when the
+ * welcome moves on, they go back to what the app had.
+ */
+@Composable
+private fun LightSystemBars(on: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(on, view) {
+        val window = view.context.findActivity()?.window
+        if (!on || window == null || view.isInEditMode) return@DisposableEffect onDispose {}
+        val bars = WindowCompat.getInsetsController(window, view)
+        val status = bars.isAppearanceLightStatusBars
+        val navigation = bars.isAppearanceLightNavigationBars
+        bars.isAppearanceLightStatusBars = false
+        bars.isAppearanceLightNavigationBars = false
+        onDispose {
+            bars.isAppearanceLightStatusBars = status
+            bars.isAppearanceLightNavigationBars = navigation
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

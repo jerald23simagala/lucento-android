@@ -97,10 +97,14 @@ object AwardArtwork {
     val Lilac = Color(0xFF9DB3FF)
     val CoinSide = Color(0xFFE5A50A)
     val CoinLine = Color(0xFFC88A06)
-    /** Each chapter's glow at the foot of the art: money gold, goals green, insights lilac, make-it-yours tangerine. */
+    /**
+     * Each chapter's glow at the foot of the art: money gold, goals green, insights lilac, beyond-this-phone sky,
+     * make-it-yours tangerine.
+     */
     val GlowMoney = Color(0x9EFFC928)
     val GlowGoals = Color(0x803DD68C)
     val GlowInsights = Color(0x8CB9A2FF)
+    val GlowBeyond = Color(0x8C7FD8FF)
     val GlowYours = Color(0x94FF8A24)
 }
 
