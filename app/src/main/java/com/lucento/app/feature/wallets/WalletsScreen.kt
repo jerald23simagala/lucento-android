@@ -78,6 +78,8 @@ import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.ProfileButton
+import com.lucento.app.core.designsystem.component.SpotlightKeys
+import com.lucento.app.core.designsystem.component.spotlightTarget
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.StatTile
 import com.lucento.app.core.designsystem.component.StatTileLayout
@@ -144,7 +146,12 @@ fun WalletsScreen(
                 onBack = onBack,
                 actions = {
                     if (state.wallets.isNotEmpty() && canAdd) {
-                        com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = { editing = newDraft() }, contentDescription = "Add wallet")
+                        com.lucento.app.core.designsystem.component.AddPillButton(
+                            "Add",
+                            onClick = { editing = newDraft() },
+                            contentDescription = "Add wallet",
+                            modifier = Modifier.spotlightTarget(SpotlightKeys.WALLETS_ADD),
+                        )
                     }
                     if (onBack == null) ProfileButton()
                 },
@@ -158,7 +165,13 @@ fun WalletsScreen(
                     body = "Add the cash, bank accounts, e-wallets, savings and cards you use. " +
                         "Balances are entered by you and stay on this device — no bank connection needed.",
                     illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
-                    action = if (canAdd) ({ LucentoPrimaryButton(text = "Add wallet", onClick = { editing = newDraft() }) }) else null,
+                    action = if (canAdd) ({
+                        LucentoPrimaryButton(
+                            text = "Add wallet",
+                            onClick = { editing = newDraft() },
+                            modifier = Modifier.spotlightTarget(SpotlightKeys.WALLETS_ADD),
+                        )
+                    }) else null,
                 )
             }
         }
@@ -166,7 +179,7 @@ fun WalletsScreen(
         val summary = state.summary
         val net = state.heroTotal
         if (summary != null && net != null) {
-            item(key = "summary") { NetWorthCard(net, summary, state.trend) }
+            item(key = "summary") { androidx.compose.foundation.layout.Box(Modifier.spotlightTarget(SpotlightKeys.NET_WORTH)) { NetWorthCard(net, summary, state.trend) } }
             item(key = "split") { AssetsLiabilitiesSplit(net.currencyCode, summary) }
         }
 

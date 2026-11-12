@@ -292,6 +292,8 @@ class ScreenshotTourTest {
         // locks, the plan-ended notice and the Pro page are captured at the end.
         val simulator = checkNotNull(container.planSimulator) { "Test builds have the plan simulator" }
         runBlocking {
+            // The welcome to Pro would cover the tour here; it is captured at the end, after the test-store purchase.
+            DemoMonth.skipProWelcome(container, com.lucento.app.data.billing.SimulatedPlan.PRO_MONTHLY)
             simulator.select(com.lucento.app.data.billing.SimulatedPlan.PRO_MONTHLY)
             container.entitlements.refresh()
         }
@@ -638,6 +640,11 @@ class ScreenshotTourTest {
         // results comes through the same entitlement manager a real Play purchase does.
         back()
         waitForText("Monthly budget")
+        runBlocking {
+            // The welcome's screens show figures; and this purchase is a first Pro plan, so the medal is presented again.
+            container.preferences.setHideAmounts(false)
+            container.preferences.setProMemberSince(null)
+        }
         simulator.setTestStore(true)
         compose.onNodeWithContentDescription("Profile and settings").performClick()
         compose.waitForIdle()
@@ -646,9 +653,53 @@ class ScreenshotTourTest {
         runCatching { compose.onNodeWithText("Start 7-day free trial").performScrollTo() }
         shot("24g-pro-page-buy")
         compose.onNodeWithText("Buy Lifetime").performScrollTo().performClick()
-        waitForText("Pro Lifetime is yours")
-        runCatching { compose.onNodeWithText("Pro Lifetime is yours", substring = true).performScrollTo() }
-        shot("24h-bought-lifetime")
+
+        // ---------------------------------------------------------------- Lucento Pro's welcome (owner, 2026-11-12)
+        // Straight after Google Play confirms: a curtain, a tour of the real screens Pro opened (each control lit up in
+        // turn), the summary of higher limits and online services, the medal, and its flight to the profile picture.
+        waitForText("You’re on Lucento Pro")
+        shot("24h-pro-welcome")
+        runCatching { if (exists("Show me")) click("Show me") } // it also moves on by itself
+        buildList {
+            add("Add every account you use" to "25a-pro-tour-wallets")
+            add("Count everything you have" to "25b-pro-tour-net-worth")
+            // Gemini and Lucento Shared need a Lucento account: only in a build with cloud sync (CI's test build has none).
+            if (com.lucento.app.data.sync.SupabaseModule.isConfigured) add("Smarter reading, with Gemini" to "25b2-pro-tour-smart-reading")
+            add("Save for more at once" to "25c-pro-tour-goals")
+            add("Look further back" to "25d-pro-tour-insights")
+            add("Keep your statements" to "25e-pro-tour-statements")
+            // Only in a build with cloud sync (CI's test build has none): both need a Lucento account.
+            if (com.lucento.app.data.sync.SupabaseModule.isConfigured) {
+                add("AI answers, with Gemini" to "25f-pro-tour-ai")
+                add("Your money on every phone" to "25g-pro-tour-sync")
+                add("Share with a Partner" to "25g2-pro-tour-shared")
+            }
+            add("Three new themes" to "25h-pro-tour-themes")
+        }.forEach { (title, name) ->
+            waitForText(title)
+            Thread.sleep(900) // the screen arrives and the control it shows is lit
+            shot(name)
+            click(if (name.endsWith("themes")) "See what changed" else "Next")
+        }
+        waitForText("Congratulations, you’re Pro")
+        shot("25i-pro-privileges")
+        click("Collect your award")
+        waitForText("Membership award")
+        shot("25j-pro-medal")
+        click("See your Pro badge")
+        // The badge lands on the profile picture: drawn (its crest), and said to TalkBack (the button's state).
+        compose.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasTestTag("pro-badge"), 10_000)
+        compose.waitUntilAtLeastOneExists(
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Lucento Pro"),
+            10_000,
+        )
+        shot("25k-pro-ring")
+        // The Lucento Pro page offers the tour again, without the medal.
+        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        compose.waitForIdle()
+        click("Lucento Pro")
+        waitForText("Replay the Pro tour")
+        shot("25l-pro-page-replay")
         simulator.setTestStore(false)
     }
 }

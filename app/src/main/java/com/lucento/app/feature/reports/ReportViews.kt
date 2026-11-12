@@ -129,14 +129,20 @@ fun ReportKind.tone(): TonePair = when (this) {
  * statement needs a wallet money moves through, so it is offered only once there is one ([canOpen]).
  */
 @Composable
-fun ReportList(onOpen: (ReportKind) -> Unit, modifier: Modifier = Modifier, canOpen: (ReportKind) -> Boolean = { true }) {
+fun ReportList(
+    onOpen: (ReportKind) -> Unit,
+    modifier: Modifier = Modifier,
+    canOpen: (ReportKind) -> Boolean = { true },
+    /** For the first report's row only (Lucento Pro's tour lights it). */
+    firstRowModifier: Modifier = Modifier,
+) {
     LucentoCard(modifier.fillMaxWidth(), contentPadding = 0.dp) {
         ReportKindsOnInsights.forEachIndexed { i, kind ->
             if (i > 0) Hairline(inset = Spacing.md + 40.dp + Spacing.md)
             val enabled = canOpen(kind)
             val tone = kind.tone()
             Row(
-                Modifier
+                (if (i == 0) firstRowModifier else Modifier)
                     .fillMaxWidth()
                     .heightIn(min = 68.dp)
                     .clickable(enabled = enabled, onClickLabel = "Open ${kind.title}", role = Role.Button) { onOpen(kind) }

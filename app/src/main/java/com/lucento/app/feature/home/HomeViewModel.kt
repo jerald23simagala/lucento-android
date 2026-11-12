@@ -137,6 +137,7 @@ class HomeViewModel(
                 milestoneToShow = com.lucento.app.domain.Achievements.toAcknowledge(built.earned, prefs.achievementsSeen),
                 milestonesAlsoNew = com.lucento.app.domain.Achievements.toAcknowledgeAll(built.earned, prefs.achievementsSeen).drop(1),
                 needsMilestoneBaseline = prefs.achievementsSeen == null,
+                proMemberSince = prefs.proMemberSince,
                 showAddSpotlight = showAddSpotlight(prefs.addSpotlightSeen, prefs.guideStep != null, built.recordedCount),
             )
         }

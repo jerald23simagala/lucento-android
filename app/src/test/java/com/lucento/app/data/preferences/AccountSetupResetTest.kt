@@ -69,6 +69,19 @@ class AccountSetupResetTest {
     }
 
     @Test
+    fun `lucento pro's welcome and medal belong to the person, so the next account starts without them`() {
+        val welcomed = stringSetPreferencesKey("pro_welcomed")
+        val memberSince = longPreferencesKey("pro_member_since")
+        val p = accountASetUp().apply {
+            this[welcomed] = setOf("PLAY_SUBSCRIPTION:abc")
+            this[memberSince] = 1_762_000_000_000L
+        }
+        UserPreferencesRepository.resetAccountSetup(p)
+        assertNull(p[welcomed])
+        assertNull(p[memberSince])
+    }
+
+    @Test
     fun `a wipe after a finished onboarding starts a new setup generation, so that run is never reused`() {
         val p = accountASetUp()
         UserPreferencesRepository.resetAccountSetup(p)

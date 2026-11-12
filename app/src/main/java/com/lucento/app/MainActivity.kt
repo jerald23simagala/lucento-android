@@ -158,6 +158,8 @@ class MainActivity : FragmentActivity() {
                                 com.lucento.app.feature.fx.LocalMainCurrency provides ready.preferences.primaryCurrency,
                                 com.lucento.app.feature.fx.LocalFxRates provides (application as LucentoApplication).container.fxRates,
                                 com.lucento.app.feature.pro.LocalEntitlements provides entitlements,
+                                // Overlays that would sit above the lock screen or the launch logo (Lucento Pro's welcome) wait.
+                                com.lucento.app.navigation.LocalAppObscured provides (locked || launching),
                             ) {
                                 LucentoRoot(preferences = ready.preferences)
                             }

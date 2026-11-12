@@ -2,6 +2,7 @@ package com.lucento.app.feature.capture
 
 import com.lucento.app.feature.fx.FxOfflineChoice
 import com.lucento.app.core.designsystem.component.AmountsShown
+import com.lucento.app.core.designsystem.component.spotlightTarget
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import com.lucento.app.core.designsystem.component.SheetHeader
 import android.app.Activity
@@ -415,7 +416,12 @@ fun TransactionComposerScreen(
 
         // ---------------------------------------------------------------- composer
         // One raised bar: scan and voice as soft tiles, the message field, and send — every control the same height.
-        ChatInputBar(Modifier.background(MaterialTheme.colorScheme.background).padding(horizontal = Spacing.gutter, vertical = Spacing.sm)) {
+        ChatInputBar(
+            Modifier
+                .spotlightTarget(com.lucento.app.core.designsystem.component.SpotlightKeys.COMPOSER)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = Spacing.gutter, vertical = Spacing.sm),
+        ) {
             if (scanEnabled) {
                 Box {
                     ChatToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt or statement", onClick = { scanMenu = true })

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -50,6 +51,12 @@ fun awardArt(achievement: Achievement): AwardArt = when (achievement) {
     Achievement.GOAL_SETTER -> AwardArt(Icons.Filled.Flag, AwardArtwork.RibbonSun, AwardArtwork.StripeNavy)
 }
 
+/**
+ * The Lucento Pro medal (membership, not progress): presented once when someone joins Pro and kept for good. Its own
+ * emblem and a ribbon no progress award wears.
+ */
+val ProMedalArt = AwardArt(Icons.Filled.WorkspacePremium, AwardArtwork.RibbonBlue, AwardArtwork.StripeTangerine)
+
 /** A medal is [size] wide and this much taller, the ribbon above the disc. */
 const val MedalAspect = 1.22f
 
@@ -70,8 +77,18 @@ fun AwardMedal(
     size: Dp = 88.dp,
     progress: Float? = null,
     shine: Float = -1f,
+) = AwardMedal(awardArt(achievement), earned, modifier, size, progress, shine)
+
+/** A medal drawn from its [art] (see the overload taking an [Achievement]). */
+@Composable
+fun AwardMedal(
+    art: AwardArt,
+    earned: Boolean,
+    modifier: Modifier = Modifier,
+    size: Dp = 88.dp,
+    progress: Float? = null,
+    shine: Float = -1f,
 ) {
-    val art = awardArt(achievement)
     val painter = rememberVectorPainter(art.emblem)
     val colors = MaterialTheme.colorScheme
     val ghost = GhostTones(

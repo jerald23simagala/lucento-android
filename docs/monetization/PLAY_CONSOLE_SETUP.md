@@ -45,7 +45,14 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
    - Create a service account and a JSON key for it.
    - In Play Console › Users and permissions, invite the service account's email with app permissions **View
      financial data** and **Manage orders and subscriptions**.
-   - Paste the whole JSON key, on one line, into Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (Production).
+   - Paste the whole JSON key file into Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (Production), exactly as it
+     is. Open the downloaded `.json` in Notepad, Ctrl+A, Ctrl+C. Several lines are fine; don't edit it. It starts
+     with `{` and contains `"type": "service_account"`, `"client_email"` and `"private_key"`. Then redeploy production,
+     because settings only reach a new deployment.
+   - What goes wrong otherwise (2026-11-12): the server logs `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON is not a service
+     account key` on every `/api/billing/verify`. The phone still grants Pro and acknowledges the purchase, so Google
+     doesn't refund it, but the server never records it: no `purchase_links` row, and the server-enforced perks (the
+     AI allowance, sync on the plan, Lucento Shared) still see the free plan.
 7. **Supabase service-role key** of the **same** project the website's `LUCENTO_SUPABASE_URL` points to. Put it in Vercel
    env `LUCENTO_SUPABASE_SERVICE_ROLE_KEY` (Production). It is the only key allowed to call `apply_play_purchase` and
    `revoke_play_purchase`. It never goes into the APK, GitHub or the repository.

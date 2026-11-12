@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,6 +53,9 @@ fun AwardsSheet(
     facts: ProgressFacts?,
     onDismiss: () -> Unit,
     onReplay: (Achievement) -> Unit,
+    /** When the Lucento Pro medal was presented (epoch millis); null before. It stands on its own Membership shelf. */
+    proMemberSince: Long? = null,
+    onReplayPro: () -> Unit = {},
 ) {
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -72,11 +76,67 @@ fun AwardsSheet(
                 Shelf(shelf, earned, facts, onReplay)
                 Spacer(Modifier.height(Spacing.lg))
             }
+            // Membership isn't progress, so it isn't counted with the awards above: a shelf of its own.
+            if (proMemberSince != null) {
+                Text(
+                    "Membership",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = Spacing.sm).semantics { heading() },
+                )
+                MembershipShelf(memberSinceLabel(proMemberSince), onReplayPro)
+                Spacer(Modifier.height(Spacing.lg))
+            }
         }
     }
 }
 
 private val CabinetMedal = 96.dp
+
+/** "Nov 2026": the month a membership began, in the person's language. */
+fun memberSinceLabel(millis: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault(), locale: java.util.Locale = java.util.Locale.getDefault()): String =
+    java.time.Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+        .format(java.time.format.DateTimeFormatter.ofPattern("MMM yyyy", locale))
+
+/** The Lucento Pro medal on its own shelf: kept for good, replayed on tap. */
+@Composable
+private fun MembershipShelf(since: String, onReplay: () -> Unit) {
+    Box(Modifier.fillMaxWidth()) {
+        Box(
+            Modifier
+                .padding(top = CabinetMedal * MedalAspect - 5.dp)
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(MaterialTheme.shapes.medium)
+                    .clickable(role = Role.Button, onClickLabel = "Replay the award") { onReplay() }
+                    .heightIn(min = 48.dp)
+                    .padding(bottom = Spacing.xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                AwardMedal(art = ProMedalArt, earned = true, size = CabinetMedal)
+                Spacer(Modifier.height(Spacing.md))
+                Text("Lucento Pro", style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(Spacing.xxs))
+                Text("Member since $since", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(Spacing.xxs))
+                Text(
+                    "Joined Lucento Pro. Yours to keep.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = Spacing.xs),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
 
 @Composable
 private fun Shelf(awards: List<Achievement>, earned: Set<Achievement>, facts: ProgressFacts?, onReplay: (Achievement) -> Unit) {

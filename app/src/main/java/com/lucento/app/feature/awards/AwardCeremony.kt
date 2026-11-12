@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -93,12 +94,143 @@ fun AwardCeremony(
     /** Awards earned at the same moment, shown small beneath the main one rather than as ceremonies of their own. */
     alsoEarned: List<Achievement> = emptyList(),
 ) {
-    val dismiss by rememberUpdatedState(onDismiss)
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    CeremonyDialog(
+        art = awardArt(achievement),
+        medalTitle = achievement.title,
+        seed = achievement.ordinal + 7,
+        paneTitle = "New award",
+        onDismiss = onDismiss,
+    ) {
+        Text(
+            if (onSeeAll != null) "New award" else "Your award",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            achievement.title,
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() },
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            "You " + achievement.description.replaceFirstChar { it.lowercase() } + ".",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (alsoEarned.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.md))
+            AlsoEarned(alsoEarned)
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            "$earnedCount of ${Achievement.entries.size} awards earned",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        LucentoPrimaryButton(text = "Thanks, Lucento", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+        if (onSeeAll != null) {
+            Spacer(Modifier.height(Spacing.xs))
+            LucentoTextButton(text = "See all awards", onClick = onSeeAll, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/**
+ * The Lucento Pro medal's ceremony: presented once, when someone joins Pro (after Google Play confirmed the plan), on the
+ * same stage as every award. A [replay] from the award cabinet dates the membership with [memberSince]; the first
+ * presentation ends with the badge flying to the profile picture ([onDismiss] starts it).
+ */
+@Composable
+fun ProMedalCeremony(
+    onDismiss: () -> Unit,
+    replay: Boolean = false,
+    memberSince: String? = null,
+    /** Back or a tap outside, when it should differ from the button (the welcome ends there instead of carrying on). */
+    onClose: (() -> Unit)? = null,
+    /** How dark the screen goes behind the card (the welcome matches its tour); null: the platform's default. */
+    dim: Float? = null,
+) {
+    CeremonyDialog(
+        art = ProMedalArt,
+        medalTitle = "Lucento Pro",
+        seed = 113,
+        paneTitle = if (replay) "Your award" else "New award",
+        onDismiss = onDismiss,
+        onDismissRequest = onClose ?: onDismiss,
+        // In the welcome, a stray tap beside the card doesn't skip the moment (Back still closes it).
+        dismissOnTapOutside = onClose == null,
+        dim = dim,
+    ) {
+        Text(
+            if (replay) "Your membership" else "Membership award",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            "Lucento Pro",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { heading() },
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            if (replay && memberSince != null) {
+                "A member since $memberSince. Thank you for supporting Lucento."
+            } else {
+                "Thank you for supporting Lucento."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            "Your profile picture wears the Pro badge while your plan is active. The award is yours to keep.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        LucentoPrimaryButton(
+            text = if (replay) "Thanks, Lucento" else "See your Pro badge",
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * The ceremony's frame: a modal card over the screen with the medal's stage on top and [content] beneath. It waits for
+ * the person (the card's button, a tap outside it, or Back) and never repeats on its own.
+ */
+@Composable
+private fun CeremonyDialog(
+    art: AwardArt,
+    medalTitle: String,
+    seed: Int,
+    paneTitle: String,
+    onDismiss: () -> Unit,
+    onDismissRequest: () -> Unit = onDismiss,
+    dismissOnTapOutside: Boolean = true,
+    dim: Float? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val dismiss by rememberUpdatedState(onDismissRequest)
+    val tapOutside by rememberUpdatedState(dismissOnTapOutside)
+    Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        if (dim != null) {
+            val window = (androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+            androidx.compose.runtime.SideEffect { window?.setDimAmount(dim) }
+        }
         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            // Tapping outside the card closes it (Back and Thanks do too). A gesture beneath the card, not a button, so
-            // screen readers don't announce the backdrop; the card's Surface keeps its own taps from reaching it.
-            Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { dismiss() } })
+            // Tapping outside the card closes it (Back and the button do too). A gesture beneath the card, not a button,
+            // so screen readers don't announce the backdrop; the card's Surface keeps its own taps from reaching it.
+            Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { if (tapOutside) dismiss() } })
             val compact = maxHeight < 600.dp
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
@@ -108,7 +240,7 @@ fun AwardCeremony(
                     .padding(horizontal = Spacing.gutter, vertical = Spacing.xl)
                     .fillMaxWidth()
                     .widthIn(max = 380.dp)
-                    .semantics { paneTitle = "New award" },
+                    .semantics { this.paneTitle = paneTitle },
             ) {
                 Column(
                     Modifier
@@ -116,42 +248,8 @@ fun AwardCeremony(
                         .padding(start = Spacing.xl, end = Spacing.xl, bottom = Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    CeremonyStage(achievement, stageHeight = if (compact) 176.dp else 236.dp)
-                    Text(
-                        if (onSeeAll != null) "New award" else "Your award",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                    Spacer(Modifier.height(Spacing.xs))
-                    Text(
-                        achievement.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.semantics { heading() },
-                    )
-                    Spacer(Modifier.height(Spacing.xs))
-                    Text(
-                        "You " + achievement.description.replaceFirstChar { it.lowercase() } + ".",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                    if (alsoEarned.isNotEmpty()) {
-                        Spacer(Modifier.height(Spacing.md))
-                        AlsoEarned(alsoEarned)
-                    }
-                    Spacer(Modifier.height(Spacing.sm))
-                    Text(
-                        "$earnedCount of ${Achievement.entries.size} awards earned",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(Spacing.lg))
-                    LucentoPrimaryButton(text = "Thanks, Lucento", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
-                    if (onSeeAll != null) {
-                        Spacer(Modifier.height(Spacing.xs))
-                        LucentoTextButton(text = "See all awards", onClick = onSeeAll, modifier = Modifier.fillMaxWidth())
-                    }
+                    CeremonyStage(art, medalTitle, seed, stageHeight = if (compact) 176.dp else 236.dp)
+                    content()
                 }
             }
         }
@@ -186,7 +284,7 @@ private fun AlsoEarned(awards: List<Achievement>) {
 
 /** Sunburst, medal, mascot and confetti, choreographed once on entry. */
 @Composable
-private fun CeremonyStage(achievement: Achievement, stageHeight: Dp) {
+private fun CeremonyStage(art: AwardArt, medalTitle: String, seed: Int, stageHeight: Dp) {
     val reduced = LucentoTheme.reducedMotion
     val haptics = rememberHaptics()
     val drop = remember { Animatable(if (reduced) 1f else 0f) }
@@ -211,17 +309,9 @@ private fun CeremonyStage(achievement: Achievement, stageHeight: Dp) {
         shine.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
         shine.snapTo(-1f)
     }
-    val turn = if (reduced) {
-        0f
-    } else {
-        val spin by rememberInfiniteTransition(label = "sunburst").animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(36_000, easing = LinearEasing), RepeatMode.Restart),
-            label = "sunburst-turn",
-        )
-        spin
-    }
+    val rays = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { if (!reduced) rays.animateTo(24f, tween(4_000, easing = FastOutSlowInEasing)) }
+    val turn = rays.value
     val compact = stageHeight < 200.dp
     val medalWidth = if (compact) 92.dp else 118.dp
     val mascotSize = if (compact) 92.dp else 120.dp
@@ -229,13 +319,13 @@ private fun CeremonyStage(achievement: Achievement, stageHeight: Dp) {
     val medalTop = Spacing.md
     // The medal disc's centre within the stage, for the sunburst and the confetti origin.
     val discCenterY = medalTop + medalWidth * (MedalAspect - MedalRadius)
-    val particles = remember(achievement) { confetti(Random(achievement.ordinal + 7)) }
+    val particles = remember(seed) { confetti(Random(seed)) }
     val sun = AwardArtwork.Gold
     Box(
         Modifier
             .fillMaxWidth()
             .height(stageHeight)
-            .clearAndSetSemantics { contentDescription = "Lucento presents the ${achievement.title} medal" },
+            .clearAndSetSemantics { contentDescription = "Lucento presents the $medalTitle medal" },
     ) {
         Canvas(Modifier.fillMaxSize()) {
             val c = Offset(size.width / 2f + medalShift.toPx(), discCenterY.toPx())
@@ -271,7 +361,7 @@ private fun CeremonyStage(achievement: Achievement, stageHeight: Dp) {
             )
         }
         AwardMedal(
-            achievement = achievement,
+            art = art,
             earned = true,
             size = medalWidth,
             shine = shine.value,

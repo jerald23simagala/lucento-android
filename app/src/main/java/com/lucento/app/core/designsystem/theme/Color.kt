@@ -80,6 +80,8 @@ object AwardArtwork {
     val StripeIvory = Palette.SoftIvory
     val StripeGold = Palette.SunlightYellow
     val StripeNavy = Palette.MidnightNavy
+    /** The Lucento Pro medal's stripe: tangerine on blue, a pairing no progress award uses. */
+    val StripeTangerine = Palette.BrightTangerine
     val Confetti = listOf(Palette.SunlightYellow, Palette.BrightTangerine, Palette.ElectricBlue, Palette.Positive, Palette.BlueNight)
 }
 

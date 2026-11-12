@@ -177,3 +177,73 @@ no Pro, no server verification, no acknowledgement (Google then refunds). Eviden
 `entitlements` rows. Fix: owner replaces the secret (NEXT_TASKS OT-23); `app/build.gradle.kts` now fails any build whose
 key doesn't decode as an RSA public key (checked locally: fingerprint and split key fail, a real 2048-bit key and an
 empty key pass). Version 0.5.3 (vc 8). KNOWN_ISSUES PB-1.
+
+## Welcome to Pro — 2026-11-12 (`feature/pro-welcome`)
+
+The owner found the upgrade "too silent" and approved a storyline: live tour on real screens, all eight stops, the
+medal kept for good with the ring following the plan, starting straight after Play confirms. Built:
+
+- `domain/entitlement/ProWelcome.kt` decides what plays and when. It plays once per plan and never for a pending
+  payment, a renewal or a trial turning paid. A returning member gets no ceremony. If the medal was interrupted, the
+  medal alone plays next time. It also picks the stops for the plan and modules, and lists the summary's privileges and
+  online status.
+- `feature/pro/welcome/` has the copy, curtain, tour overlay, summary dialog, state machine and badge flight.
+  `core/designsystem/component/Spotlight.kt` holds `SpotlightRegistry` and `Modifier.spotlightTarget`, plus the scrim
+  with a lit window.
+- Awards: `ProMedalCeremony` shares the ceremony's stage, and the Membership shelf in the cabinet replays it on tap.
+  ProfileButton has the Pro ring. ProScreen has **Replay the Pro tour**.
+- Preferences `pro_welcomed` and `pro_member_since` are cleared by the account wipe and kept when returning to one's
+  own ledger.
+- Tests:
+  - JVM: `ProWelcomeTest` (20), `ProWelcomeCopyTest` (16) and the account-reset case. Full suite: 1,316 tests, 0
+    failures. `lintDebug`: 0 errors, and no warnings in the new code.
+  - `ScreenshotTourTest` now captures `24h-pro-welcome`, `25a`–`25l` after the test-store purchase (`25g`, the sync
+    stop, only in builds with cloud sync). That run and `WebsiteShowcaseTest` skip the welcome for their simulated
+    plan (`DemoMonth.skipProWelcome`).
+- Found and fixed on the local API 28 emulator:
+  - The profile button keeps its label "Profile and settings"; Pro is its state description. Changing the label had
+    broken the tour's lookups.
+  - The tour no longer waits on a timer before lighting a control. A second stop on an unchanged screen stayed unlit
+    under the test clock.
+  - A control is brought into view clear of the dock, and the lit window stays out of the status bar.
+  - The summary's button stays in view.
+  - Builds without cloud sync leave out the sync stop and say the online services aren't available there.
+- Design critic, round 1: **REJECT** (lucento-studio `critic/reports/2026-11-12-pro-welcome-r1.md`). The response is in
+  `…-r2-response.md`. Fixed:
+  - The summary claimed online services before the server confirmed them.
+  - The AI stop offered a button that wasn't there.
+  - Hiding the app from TalkBack under the tour had never actually applied.
+  - The ring crossed the status bar.
+  - The curtain moved on by itself even with TalkBack on.
+  - The dock highlighted the wrong tab.
+  - Copy, contrast and the replay button.
+- Design critic, round 2: **REJECT** (`…-r2.md`); response in `…-r3-response.md`.
+  - Investigated and guarded: the missing badge in 25k didn't reproduce with flight logging, and the test now waits for
+    the crest to be drawn.
+  - Every stop says where its feature lives.
+  - Summary rows are two lines, the plan line no longer claims online services, and unconfirmed services are a plain
+    list.
+  - System Back matches the card's Back, and stray taps don't skip the award.
+  - The award is dated from the plan's real start, and a restored plan is "Welcome back".
+  - The statements stop lights the first report.
+- Design critic, round 3: **REVISE** at 3.3 / 5, with all hard gates passing (`…-r3.md`). After round 3 (not
+  re-reviewed; the workflow stops at three rounds and goes to the owner):
+  - Back always leads out.
+  - The caption card scrolls with its buttons pinned.
+  - The AI allowance shows only once the server confirms.
+  - Empty pages get the right button named, and there's no net-worth stop without a wallet.
+  - The "where" line is announced.
+  - "No limit", as on the Pro page.
+  - An "Also yours" line in the summary.
+  - The ring is outlined on light backgrounds.
+  - The ceremony's sunburst rests after its entrance (WCAG 2.2.2).
+  - The dialogs dim like the tour.
+  - The Pro page says "Plans" for owners.
+- Owner review of the frames (2026-11-12): Gemini and Lucento Shared were under-shown, because the test build has no
+  sync, so those stops were absent, and even with sync Gemini wasn't named.
+  - Added: a "Smarter reading, with Gemini" stop (the composer's input), Gemini named on "AI answers, with Gemini", and
+    a "Share with a Partner" stop (the Lucento Shared page's main button).
+  - Both show to signed-out people with a sign-in note.
+  - Up to ten stops in a build with sync.
+  - Captured from a debug build with lucento-test sync settings (local.properties, git-ignored).
+- The owner chose "PR, merge when green". Version 0.5.4 (vc 9).
