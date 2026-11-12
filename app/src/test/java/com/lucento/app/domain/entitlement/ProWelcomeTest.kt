@@ -42,7 +42,7 @@ class ProWelcomeTest {
         val run = ProWelcome.toStart(state(row()), now, welcomed = emptySet(), memberSince = null)!!
         assertEquals(ProWelcomeMode.FIRST, run.mode)
         assertEquals(setOf("PLAY_SUBSCRIPTION:tok-a"), run.planKeys)
-        assertTrue(run.mode.tour && run.mode.medal && run.mode.flight)
+        assertTrue(run.mode.reveal && run.mode.medal && run.mode.flight)
     }
 
     @Test fun a_plan_held_for_a_while_is_a_welcome_back_dated_from_its_start() {
@@ -113,7 +113,7 @@ class ProWelcomeTest {
         manages: Boolean = true,
     ) = ProTourContext(capabilities, wallets, goals, insights, manages)
 
-    @Test fun the_full_tour_has_ten_stops_in_four_chapters() {
+    @Test fun the_full_deck_has_ten_cards_in_four_chapters() {
         val stops = ProWelcome.stops(context())
         assertEquals(ProTourStop.entries.toList(), stops)
         assertEquals(ProTourChapter.entries.toList(), stops.map { it.chapter }.distinct())
@@ -127,12 +127,12 @@ class ProWelcomeTest {
         )
     }
 
-    @Test fun no_net_worth_stop_without_a_wallet_to_count() {
+    @Test fun cards_do_not_wait_for_a_wallet() {
+        // A card names what Pro opened; unlike the tour it replaced, it needs no control on screen to point at.
         val stops = ProWelcome.stops(context().copy(hasWallets = false))
         assertTrue(ProTourStop.WALLETS in stops)
-        assertTrue(ProTourStop.NET_WORTH !in stops)
-        // The composer needs a wallet to record into.
-        assertTrue(ProTourStop.SMART_READING !in stops)
+        assertTrue(ProTourStop.NET_WORTH in stops)
+        assertTrue(ProTourStop.SMART_READING in stops)
     }
 
     @Test fun a_partner_is_not_shown_adding_wallets() {
@@ -156,29 +156,6 @@ class ProWelcomeTest {
         assertTrue(ProTourStop.AI_ANSWERS !in stops && ProTourStop.SYNC !in stops)
         assertTrue(ProTourStop.SMART_READING !in stops && ProTourStop.SHARED !in stops)
         assertEquals(ProTourStop.THEMES, stops.last())
-    }
-
-    @Test fun privileges_say_free_then_plan_from_the_catalog() {
-        val rows = ProWelcome.privileges(all)
-        val ai = rows.single { it.feature == ProFeature.AI_ADVISER }
-        assertEquals(Limit.PerMonth(PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH), ai.free)
-        assertEquals(Limit.PerDay(PlanCatalog.PRO_AI_QUESTIONS_PER_DAY), ai.plan)
-        val goals = rows.single { it.feature == ProFeature.SAVINGS_GOALS }
-        assertEquals(Limit.Count(PlanCatalog.FREE_ACTIVE_GOALS), goals.free)
-        assertEquals(Limit.Count(PlanCatalog.PRO_ACTIVE_GOALS), goals.plan)
-        assertEquals(Limit.None, rows.single { it.feature == ProFeature.SHARED_SPACE }.free)
-        assertEquals(PrivilegeGroup.ONLINE, rows.single { it.feature == ProFeature.CLOUD_SYNC }.group)
-        // The server enforces the AI allowance: it is an online service, claimed only once the server has the plan.
-        assertEquals(PrivilegeGroup.ONLINE, ai.group)
-        val trends = rows.single { it.feature == ProFeature.INSIGHTS_LONG_PERIODS }
-        assertEquals(PrivilegeGroup.LIMITS, trends.group)
-        assertEquals(Limit.None, trends.free)
-    }
-
-    @Test fun privileges_leave_out_what_the_plan_does_not_hold() {
-        val rows = ProWelcome.privileges(setOf(Capability.LOCAL_PRO))
-        assertTrue(rows.all { it.group == PrivilegeGroup.LIMITS })
-        assertTrue(rows.none { it.feature == ProFeature.AI_ADVISER })
     }
 
     @Test fun online_services_are_claimed_only_once_the_server_has_the_plan() {

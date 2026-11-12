@@ -1,7 +1,5 @@
 package com.lucento.app.feature.settings
 
-import com.lucento.app.core.designsystem.component.SpotlightKeys
-import com.lucento.app.core.designsystem.component.spotlightTarget
 import androidx.compose.material.icons.outlined.Restore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -469,9 +467,7 @@ private fun SettingsContent(
       }
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
       SettingsPage.SHARED, SettingsPage.PRO -> Unit
-      SettingsPage.ACCOUNT -> androidx.compose.foundation.layout.Box(
-          Modifier.spotlightTarget(SpotlightKeys.SYNC),
-      ) {
+      SettingsPage.ACCOUNT -> androidx.compose.foundation.layout.Box {
           CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword, showHeader = false, onDeleteAccount = onDeleteAccount)
       }
       SettingsPage.DATA -> {

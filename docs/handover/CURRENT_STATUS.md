@@ -295,3 +295,53 @@ same way. They only looked fine because the curtain moves on by itself (KNOWN_IS
     - `assembleDebug` and the instrumented-test compile pass.
 - **Owner decision (2026-11-12):** retire the spotlight tour for an unboxing reveal. This fix is held, committed
   locally and not pushed, and ships with the reveal in one release (NEXT_TASKS).
+
+## Pro welcome: the unboxing reveal — 2026-11-12 (`feature/pro-reveal`, from `fix/pro-tour-real-taps`)
+
+The owner retired the spotlight tour, whose buttons failed on real phones (PW-1). The reveal had to keep the
+excitement of the upgrade and the badge award.
+
+**Design.** Three tappable prototypes in the studio went through two critic rounds:
+- r1: REJECT; the Deck scored best at 3.0.
+- r2: REJECT at 3.1; "Deck, unwrapped" recommended.
+
+The owner then picked **Deck, unwrapped** with **Scenes** card art. Prototypes: the artifact "Lucento Pro Reveal" and
+studio `lab/pro-reveal.html` / `lab/pro-reveal-art.html`. Reports: `critic/reports/2026-11-12-pro-reveal-r1/r2*`.
+
+**What's built**, in `feature/pro/welcome/`:
+- `ProReveal.kt`: the stage and the deck.
+  - The stage has one dim (0.92 in light, 0.94 in dark) that takes stray touches. It lies beside the content, never
+    around it.
+  - The deck: a gold band with the approved symbol; turns at 90°; one burst; swipe; Previous, Next and Skip. TalkBack
+    hears a line per card.
+- `PerkCard.kt`: the two faces.
+  - The back carries the approved `lucento_symbol` on an ivory disc.
+  - The face: the scene, the title, what changed (a `FlowRow` that wraps at large text), the term, where it lives,
+    and the sentence. Where and the sentence sit at the card's foot when there is room; beyond the card the words
+    scroll, with a "More" pill.
+- `PerkArt.kt`: ten scenes drawn in Compose, using new `AwardArtwork` card colours.
+- `ProCollection.kt`: the plan's own line first, then each card with its gain or end date.
+- `ProWelcomeHost.kt`: the phases REVEAL → COLLECTION → MEDAL → FLIGHT. The award is the existing ceremony.
+
+**Copy** (`ProWelcomeCopy`, `ProCopy.serviceTerm`):
+- No card says "here".
+- Online services say "Included until Nov 12, 2027", "While you subscribe" or "With Lucento Cloud".
+- The AI card says "50 a day until …, then 10 a month".
+- Dates stay on one line.
+
+**Retired:**
+- `ProTourOverlay.kt` and `ProPrivilegesDialog.kt`;
+- the screens' spotlight hooks (the profile picture keeps one, for the flight);
+- `showTourStop`;
+- `ProWelcome.privileges`.
+
+Net worth and Smarter reading no longer wait for a wallet. The Pro page's button is now "See your Pro cards".
+
+**Tests:**
+- JVM: 1,330 tests, 0 failures. New: no "here", terms, AI term, collection tags, `serviceTerm`.
+- `lintDebug`: 0 errors. `assembleDebug` and the instrumented-test compile pass.
+- On the API 28 emulator, both passed:
+  - `ProWelcomeRealTapTest`: the deck over the real app — open, Next, Previous, a tap on the dim, Skip, Back.
+  - `ProRevealDeckFingerTest`: the band, Next, Previous and Skip, with a layer beneath that counted 0 leaks.
+- `ProRevealCaptureTest` takes opt-in captures. ScreenshotTourTest's welcome frames were rewritten (25a–25l); the
+  emulator CI runs them.

@@ -569,47 +569,62 @@ straight after Google Play confirms a plan (a purchase, a trial, or the first re
 only after a committed write: never for a pending payment, a renewal, or a trial turning paid. Rules:
 `domain/entitlement/ProWelcome.kt` (JVM-tested); screens: `feature/pro/welcome/`.
 
-1. **Curtain**: "You're on Lucento Pro". It moves on to the tour by itself after a moment, but never while TalkBack is
-   on, and otherwise stretched to Android's "time to take action" setting. "Skip the tour" goes to the summary.
-2. **Tour**: up to ten stops in four chapters, each on the real screen where the unlocked feature lives, with that
-   control lit (`Modifier.spotlightTarget`):
-   - *Your money*: Wallets (Add; net worth); the composer's input (Smarter reading, with Gemini).
-   - *Your goals*: Goals.
-   - *Your insights*: 6 and 12 months; the first report (PDF); Ask Lucento (AI answers, with Gemini).
-   - *Make it yours*: Settings › Account & sync; Lucento Shared (invite a Partner, owner 2026-11-12); the profile
-     picture (Grove, Mono and Aurora).
+1. **The deck.** The owner chose "Deck, unwrapped" on 2026-11-12, after the spotlight tour's buttons failed on real
+   phones (KNOWN_ISSUES PW-1). It shows up to ten cards in four chapters, one per thing Pro opened, held in a gold band
+   with the Lucento symbol.
+   - "Open your Pro deck" slides the band off and turns the first card, with the welcome's only burst. After that it's
+     one card at a time:
+     - Next, or a swipe left.
+     - Previous, or a swipe right.
+     - Skip to the collection.
+   - A welcome back and the replay open on the plain deck ("Reveal your first perk").
+   - Each card has:
+     - a small illustrated scene (the "Scenes" art, `PerkArt.kt`), on the card back's blue with its chapter's glow;
+     - then, in this order, so the numbers stay in view at large text: the title, what changed (free plan → this plan,
+       from `PlanCatalog`), how long an online service is included, where it lives in the app, and a sentence;
+     - beyond the card the words scroll, with a "More" pill.
+   - "Where it lives" is said in words ("Add is at the top right of Wallets"). On an empty page it names the button the
+     page really has.
+   - The chapters:
+     - *Your money*: wallets, net worth, and Smarter reading with Gemini.
+     - *Your goals*.
+     - *Your insights*: 6 and 12 months, PDF statements, and AI answers with Gemini.
+     - *Make it yours*: sync and restore, Lucento Shared, and the three themes.
 
-   Rules for the tour:
-   - Left out: stops for modules that are switched off and for capabilities the plan lacks. A build without cloud sync
-     (no Lucento account possible) also drops the Gemini, sync and Lucento Shared stops. A Partner's phone has no
-     Lucento Shared stop, and the composer stop needs a wallet.
-   - The Gemini and Lucento Shared stops also show to people who aren't signed in: they say plainly that the feature
-     uses a Lucento account, and where to sign in (owner, 2026-11-12). Smarter reading stays opt-in; its stop says
-     where to turn it on, never that it is on.
-   - The AI stop says what the screen can do now: sign in, wait for the server, or turn answers on (still the person's
-     choice).
-   - Every stop also says in words where the feature lives ("Add is at the top right of Wallets"; on an empty page, the
-     button it really has). It is announced to TalkBack with the title, since TalkBack can't see the lit control.
-   - The AI stop shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan.
-   - The card scrolls when the text is large, and its buttons stay in view.
-   - System Back on a stop goes one stop back, like the card's Back; from the first stop it returns to the curtain.
-     "End tour" goes to the summary.
-   - The tour never changes data or consents.
-   - It takes every touch except its own buttons, and the screen under it is hidden from TalkBack and focus.
-3. **Summary**:
-   - The plan's name only; availability is said once, by the online status.
-   - Higher limits on this phone, free plan → this plan, from `PlanCatalog`: wallets, cards and loans, goals, trends.
-     Each row is two lines (name, then values), so it holds at 360 dp and at large text.
-   - The online services the server enforces: AI questions, sync, restore, Smarter reading, Lucento Shared. Where they
-     stand comes first. Their allowances are listed only once the server has confirmed the plan; until then they are a
-     plain list under one sentence.
-   - A line names what the sections don't list (PDF statements, the themes, the other wallet kinds) and that the tour
-     can be watched again.
-   - Back leaves the welcome: the award is still given and the badge appears. A tap beside the card does nothing.
-     Pressing Back always leads out.
-4. **Award**: the Lucento Pro medal on the award ceremony's stage. It is membership, not progress, so it stands on its
+   Rules for the cards:
+   - **What's left out:**
+     - cards for modules that are switched off, and for capabilities the plan lacks;
+     - in a build without cloud sync (no Lucento account possible), the Gemini, sync and Lucento Shared cards;
+     - on a Partner's phone, the wallets and Lucento Shared cards.
+   - **Signed-out buyers** still see the Gemini, sync and Lucento Shared cards. They say plainly that the feature uses a
+     Lucento account, and where to sign in.
+   - **Opt-in stays opt-in.** Smarter reading and AI answers say where to turn them on, never that they are on.
+   - **Terms for online services** (`ProCopy.serviceTerm`):
+     - "Included until Nov 12, 2027" for a Lifetime's included year, with the date read from its entitlement;
+     - "While you subscribe" for a subscription;
+     - "With Lucento Cloud" for the add-on.
+   - **The AI card** says "50 a day until Nov 12, 2027, then 10 a month": the allowance falls back to the free plan's;
+     it doesn't stop. It shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan.
+   - **What runs on the phone** never carries a term: it's owned.
+   - **Back:** the system Back key goes to the collection.
+   - **No side effects:** nothing in the deck changes data or consents, and it never moves through the app's screens.
+   - **Touches:** it takes every touch that lands on the dim, and the screen under it is hidden from TalkBack and focus.
+     The touch blocker lies beside the cards, never around them (PW-1).
+   - **TalkBack** hears each card as it turns ("2 of 10. Count everything you have.").
+   - **The dim** is the same for every moment, 0.92 in light and 0.94 in dark, so nothing beneath can be read.
+2. **The collection.**
+   - **Title:** "Congratulations, you're Pro"; "Welcome back to Pro" for a returning or restored plan; "What Pro gives
+     you" on a replay.
+   - **Then:**
+     - the plan's own line first (`ProCopy.planStatus`): "Pro Lifetime · you own it", and until when the online
+       services are included;
+     - while the server hasn't confirmed the plan, where the online services stand;
+     - every card as one line, with its gain ("No limit", "20 goals", "12 months", "50 a day") or its end date. From
+       130 % text the gain moves under the name.
+   - **Back** leaves the welcome: the award is still given and the badge appears.
+3. **Award**: the Lucento Pro medal on the award ceremony's stage. It is membership, not progress, so it stands on its
    own Membership shelf and doesn't count in "x of 6". It is given once per person and kept for good.
-5. **Pro badge**: the medal flies to the profile picture, which wears the Pro badge while Pro is active. It is a gold
+4. **Pro badge**: the medal flies to the profile picture, which wears the Pro badge while Pro is active. It is a gold
    ring with a crest, outlined in the medal's deep edge on light backgrounds. TalkBack reads "Lucento Pro" as the
    button's state.
 
@@ -619,11 +634,11 @@ nothing.
 The award is dated from when the person's Pro plan began. A plan older than 24 hours when first seen on this phone (a
 new phone or a reinstall) is a welcome back ("Welcome back to Lucento Pro"), not a congratulation.
 
-A new plan for someone who already has the award (back after a lapse, or Lifetime after a subscription) gets the tour,
-the summary and the badge, without the ceremony. If the app closes before the award, the award alone comes next time.
-**Replay the Pro tour**, under the plan card on the Lucento Pro page, plays the tour and summary again without the
-award. The welcome waits while the app lock or the launch logo covers the app. Under reduced motion the lit window and
-the badge appear without movement.
+A new plan for someone who already has the award (back after a lapse, or Lifetime after a subscription) gets the cards,
+the collection and the badge, without the ceremony. If the app closes before the award, the award alone comes next time.
+**See your Pro cards**, under the plan card on the Lucento Pro page, plays the cards and the collection again without
+the award. The welcome waits while the app lock or the launch logo covers the app. Under reduced motion the cards cross-fade
+instead of turning, and the badge appears without movement.
 
 ## 7. Decisions (approved by the owner, 2026-11-06)
 

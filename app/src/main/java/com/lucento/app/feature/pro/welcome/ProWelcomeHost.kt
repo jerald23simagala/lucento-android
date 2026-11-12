@@ -24,8 +24,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalAccessibilityManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -42,22 +40,23 @@ import com.lucento.app.feature.awards.AwardMedal
 import com.lucento.app.feature.awards.MedalAspect
 import com.lucento.app.feature.awards.ProMedalArt
 import com.lucento.app.feature.awards.ProMedalCeremony
+import com.lucento.app.feature.pro.ProCopy
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
-/** Where Lucento Pro's welcome is: the curtain, a tour stop, the summary, the medal, the badge's flight. */
-enum class ProWelcomePhase { CURTAIN, TOUR, SUMMARY, MEDAL, FLIGHT, DONE }
+/** Where Lucento Pro's welcome is: the deck of cards, the collection, the medal, the badge's flight. */
+enum class ProWelcomePhase { REVEAL, COLLECTION, MEDAL, FLIGHT, DONE }
 
 /**
- * The welcome's progress, saved across rotation (the run itself lives in AppViewModel). [coversScreen]: the curtain, a
- * tour stop or the flight is drawn over the app, which is then hidden from TalkBack. [ringHeld]: the Pro ring waits for
- * the badge to land before it appears.
+ * The welcome's progress, saved across rotation (the run itself lives in AppViewModel). [index]: the card face up on top,
+ * -1 while the deck is closed. [coversScreen]: the deck, the collection or the flight is drawn over the app, which is
+ * then hidden from TalkBack. [ringHeld]: the Pro ring waits for the badge to land before it appears.
  */
 @Stable
 class ProWelcomeState internal constructor(val run: ProWelcomeRun?, phase: String, index: Int, landed: Boolean) {
-    var phase by mutableStateOf(ProWelcomePhase.valueOf(phase))
+    var phase by mutableStateOf(ProWelcomePhase.entries.firstOrNull { it.name == phase } ?: ProWelcomePhase.REVEAL)
         internal set
     var index by mutableIntStateOf(index)
         internal set
@@ -65,7 +64,7 @@ class ProWelcomeState internal constructor(val run: ProWelcomeRun?, phase: Strin
         internal set
 
     val coversScreen: Boolean
-        get() = run != null && (phase == ProWelcomePhase.CURTAIN || phase == ProWelcomePhase.TOUR || phase == ProWelcomePhase.FLIGHT)
+        get() = run != null && (phase == ProWelcomePhase.REVEAL || phase == ProWelcomePhase.COLLECTION || phase == ProWelcomePhase.FLIGHT)
 
     val ringHeld: Boolean get() = run != null && run.mode.flight && !landed && phase != ProWelcomePhase.DONE
 }
@@ -73,9 +72,9 @@ class ProWelcomeState internal constructor(val run: ProWelcomeRun?, phase: Strin
 @Composable
 fun rememberProWelcomeState(run: ProWelcomeRun?): ProWelcomeState {
     val key = run?.let { "${it.mode.name}|${it.planKeys.joinToString(",")}" }
-    val start = if (run?.mode?.tour == false) ProWelcomePhase.MEDAL else ProWelcomePhase.CURTAIN
+    val start = if (run?.mode?.reveal == false) ProWelcomePhase.MEDAL else ProWelcomePhase.REVEAL
     var phase by rememberSaveable(key) { mutableStateOf(start.name) }
-    var index by rememberSaveable(key) { mutableIntStateOf(0) }
+    var index by rememberSaveable(key) { mutableIntStateOf(-1) }
     var landed by rememberSaveable(key) { mutableStateOf(false) }
     val state = remember(key) { ProWelcomeState(run, phase, index, landed) }
     // Mirrors the live state into the saved values (read back after a rotation).
@@ -90,10 +89,12 @@ fun rememberProWelcomeState(run: ProWelcomeRun?): ProWelcomeState {
 }
 
 /**
- * Lucento Pro's welcome (owner, 2026-11-12), drawn over the whole app: a curtain, a tour of the real screens Pro opened
- * (each stop navigates there and lights the control up), the summary of higher limits and online services, the Lucento
- * Pro medal, and its flight to the profile picture. [paused] while the app lock is showing: nothing is drawn (dialogs
- * would sit above the lock) and the curtain's timer waits.
+ * Lucento Pro's welcome (owner, 2026-11-12), drawn over the whole app: a deck of cards, one per thing Pro opened, turned
+ * over one at a time; the collection of them all with the plan's terms; the Lucento Pro medal; and its flight to the
+ * profile picture. Nothing in it moves through the app's screens (the tour it replaced did, and its buttons failed on
+ * real phones: KNOWN_ISSUES PW-1). [paused] while the app lock is showing: nothing is drawn (dialogs would sit above the
+ * lock). The system Back key always leads out: from the cards to the collection, and from there out of the welcome
+ * (the award is still given and the badge appears).
  */
 @Composable
 fun ProWelcomeHost(
@@ -107,12 +108,10 @@ fun ProWelcomeHost(
     /** Whether wallets and goals exist, so the words name the control that is really there. */
     hasWallets: Boolean = true,
     hasGoals: Boolean = true,
-    /** Whether Smarter reading is already on (its stop says so instead of where to turn it on). */
+    /** Whether Smarter reading is already on (its card says so instead of where to turn it on). */
     smartReadingOn: Boolean = false,
     paused: Boolean,
     registry: SpotlightRegistry,
-    /** Navigates to [ProTourStop]'s screen (nothing when already there). */
-    onShowStop: (ProTourStop) -> Unit,
     /** Back to Home, where the profile picture waits for the badge. */
     onGoHome: () -> Unit,
     /** The run began: its plans are stored as welcomed (once, so it never loops). */
@@ -131,12 +130,15 @@ fun ProWelcomeHost(
     LaunchedEffect(run) { onStarted(run) }
 
     fun finish() {
-        registry.active = null
         state.phase = ProWelcomePhase.DONE
         finished()
     }
 
-    fun afterSummary() {
+    fun toCollection() {
+        state.phase = ProWelcomePhase.COLLECTION
+    }
+
+    fun afterCollection() {
         state.phase = when {
             run.mode.medal -> ProWelcomePhase.MEDAL
             run.mode.flight -> ProWelcomePhase.FLIGHT
@@ -145,13 +147,8 @@ fun ProWelcomeHost(
         if (state.phase == ProWelcomePhase.DONE) finish()
     }
 
-    fun skipTour() {
-        registry.active = null
-        state.phase = ProWelcomePhase.SUMMARY
-    }
-
-    // Back (or a tap outside) on the summary or the award: the welcome ends there. A first award is still given, and
-    // the badge simply appears on the profile picture; nothing pushes the person into the next moment.
+    // Back on the collection or the award: the welcome ends there. A first award is still given, and the badge simply
+    // appears on the profile picture; nothing pushes the person into the next moment.
     fun leave() {
         if (run.mode.medal && state.phase != ProWelcomePhase.MEDAL) onMedalPresented()
         if (run.mode.flight) {
@@ -164,92 +161,53 @@ fun ProWelcomeHost(
     if (paused || state.phase == ProWelcomePhase.DONE) return
     val now = System.currentTimeMillis()
     val capabilities = entitlements.capabilities(now)
+    val online = ProWelcome.onlineStatus(entitlements, now, signedIn, syncAvailable)
+    val term = ProCopy.serviceTerm(entitlements, now)
+    val cards = remember(stops, capabilities, signedIn, aiAnswersOn, online, hasWallets, hasGoals, smartReadingOn, term) {
+        stops.map { stop ->
+            RevealCard(stop, ProWelcomeCopy.stop(stop, capabilities, signedIn, aiAnswersOn, online, hasWallets, hasGoals, smartReadingOn, term))
+        }
+    }
 
     when (state.phase) {
-        ProWelcomePhase.CURTAIN -> {
-            if (stops.isEmpty()) {
-                LaunchedEffect(Unit) { state.phase = ProWelcomePhase.SUMMARY }
+        ProWelcomePhase.REVEAL -> {
+            if (cards.isEmpty()) {
+                LaunchedEffect(Unit) { toCollection() }
                 return
             }
-            BackHandler { skipTour() }
-            ProTourCurtain(
-                title = ProWelcomeCopy.curtainTitle(run.mode, run.restored),
-                body = if (run.mode == ProWelcomeMode.REPLAY) ProWelcomeCopy.replayBody(stops.size) else ProWelcomeCopy.curtainBody(stops.size, run.restored),
-                celebrate = run.mode != ProWelcomeMode.REPLAY,
-                onShowMe = {
-                    state.index = 0
-                    state.phase = ProWelcomePhase.TOUR
-                },
-                onSkip = ::skipTour,
-            )
-            // On its own after a moment (the owner wanted the welcome to start with the screens themselves), but never
-            // while TalkBack is on, and stretched to the person's "time to take action" setting otherwise (WCAG 2.2.1).
-            val context = LocalContext.current
-            val touchExploration = remember(context) {
-                context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
-            }
-            val a11y = LocalAccessibilityManager.current
-            if (!touchExploration) {
-                LaunchedEffect(Unit) {
-                    delay(a11y?.calculateRecommendedTimeoutMillis(CurtainMillis, containsIcons = true, containsText = true, containsControls = true) ?: CurtainMillis)
-                    if (state.phase == ProWelcomePhase.CURTAIN) {
-                        state.index = 0
-                        state.phase = ProWelcomePhase.TOUR
-                    }
-                }
-            }
-        }
-        ProWelcomePhase.TOUR -> {
-            val index = state.index.coerceIn(0, (stops.size - 1).coerceAtLeast(0))
-            val stop = stops.getOrNull(index)
-            if (stop == null) {
-                LaunchedEffect(Unit) { skipTour() }
-                return
-            }
-            LaunchedEffect(stop) {
-                onShowStop(stop)
-                registry.active = stop.spotlightKey
-            }
-            // One stop back, like the card's Back; from the first stop, back to the curtain (whose Back goes on to the
-            // summary, whose Back leaves): pressing Back always leads out.
-            BackHandler { if (index > 0) state.index = index - 1 else state.phase = ProWelcomePhase.CURTAIN }
-            ProTourStopOverlay(
-                stop = stop,
-                index = index,
-                total = stops.size,
-                copy = ProWelcomeCopy.stop(
-                    stop, capabilities, signedIn, aiAnswersOn,
-                    ProWelcome.onlineStatus(entitlements, now, signedIn, syncAvailable), hasWallets, hasGoals, smartReadingOn,
-                ),
-                registry = registry,
-                // The primary button gives its own confirm haptic.
-                onNext = { if (index + 1 < stops.size) state.index = index + 1 else skipTour() },
-                onBack = if (index > 0) ({
-                    haptics.tick()
-                    state.index = index - 1
-                }) else null,
-                onSkip = ::skipTour,
-                lastStop = index == stops.size - 1,
+            BackHandler { toCollection() }
+            ProRevealDeck(
+                cards = cards,
+                title = ProWelcomeCopy.revealTitle(run.mode, run.restored),
+                body = ProWelcomeCopy.revealBody(cards.size),
+                // The band is for a first purchase; a welcome back or a replay opens on the plain deck.
+                unwrap = run.mode == ProWelcomeMode.FIRST && !run.restored,
+                index = state.index,
+                onIndex = { state.index = it },
+                onCollection = ::toCollection,
             )
         }
-        ProWelcomePhase.SUMMARY -> ProPrivilegesDialog(
-            mode = run.mode,
-            restored = run.restored,
-            entitlements = entitlements,
-            privileges = ProWelcome.privileges(capabilities),
-            onlineStatus = ProWelcome.onlineStatus(entitlements, now, signedIn, syncAvailable),
-            onDone = ::afterSummary,
-            alsoYours = ProWelcomeCopy.alsoYours(capabilities, replay = run.mode == ProWelcomeMode.REPLAY),
-            // Back leaves the welcome (the award is still given and the badge appears); a tap outside does nothing.
-            onBack = ::leave,
-        )
+        ProWelcomePhase.COLLECTION -> {
+            BackHandler { leave() }
+            val plan = ProCopy.planStatus(entitlements, now)
+            ProCollection(
+                eyebrow = ProWelcomeCopy.collectionEyebrow(cards.size),
+                title = ProWelcomeCopy.collectionTitle(run.mode, run.restored),
+                plan = plan.title,
+                planDetail = plan.detail,
+                status = ProWelcomeCopy.onlineStatus(online),
+                items = cards.map { CollectionItem(it.stop, it.copy.short, ProWelcomeCopy.collectionTag(it.stop, it.copy, term)) },
+                button = ProWelcomeCopy.collectionButton(run.mode),
+                onDone = ::afterCollection,
+            )
+        }
         ProWelcomePhase.MEDAL -> {
             LaunchedEffect(Unit) { onMedalPresented() }
             ProMedalCeremony(
                 onDismiss = { if (run.mode.flight) state.phase = ProWelcomePhase.FLIGHT else finish() },
                 onClose = ::leave,
-                // The same dim as the tour, so the screen doesn't brighten between the moments.
-                dim = tourScrimAlpha(),
+                // The same dim as the cards, so the screen doesn't brighten between the moments.
+                dim = welcomeScrimAlpha(),
             )
         }
         ProWelcomePhase.FLIGHT -> BadgeFlight(
@@ -266,23 +224,6 @@ fun ProWelcomeHost(
         ProWelcomePhase.DONE -> Unit
     }
 }
-
-private const val CurtainMillis = 2_600L
-
-/** The control each stop lights up (see [SpotlightKeys]). */
-val ProTourStop.spotlightKey: String
-    get() = when (this) {
-        ProTourStop.WALLETS -> SpotlightKeys.WALLETS_ADD
-        ProTourStop.NET_WORTH -> SpotlightKeys.NET_WORTH
-        ProTourStop.SMART_READING -> SpotlightKeys.COMPOSER
-        ProTourStop.GOALS -> SpotlightKeys.GOALS_ADD
-        ProTourStop.INSIGHTS_PERIODS -> SpotlightKeys.INSIGHTS_PERIOD
-        ProTourStop.STATEMENTS -> SpotlightKeys.REPORTS
-        ProTourStop.AI_ANSWERS -> SpotlightKeys.AI_STATUS
-        ProTourStop.SYNC -> SpotlightKeys.SYNC
-        ProTourStop.SHARED -> SpotlightKeys.SHARED
-        ProTourStop.THEMES -> SpotlightKeys.PROFILE
-    }
 
 /**
  * The badge's flight: the medal, small now, rises from where the ceremony stood and arcs into the profile picture, where

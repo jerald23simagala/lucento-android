@@ -17,8 +17,10 @@ import com.lucento.app.feature.pro.ProCopy
 object ProWelcomeCopy {
 
     /**
-     * One stop's caption. [where]: where the feature lives, in words, for everyone (and for TalkBack, which can't see the
-     * lit control). [changes]: what Pro changed, free plan first. [themes]: show the three Pro themes.
+     * One card. [chapter]: the group it belongs to ("Your money"). [where]: where the feature lives, in words (the card
+     * can't point at it). [changes]: what Pro changed, free plan first. [term]: how long an online service is included,
+     * on the online services' cards. [themes]: show the three Pro themes. [short] and [gain]: the card as the collection
+     * lists it ("Every account", "No limit").
      */
     data class StopCopy(
         val title: String,
@@ -26,25 +28,49 @@ object ProWelcomeCopy {
         val where: String,
         val changes: List<Change> = emptyList(),
         val themes: Boolean = false,
+        val chapter: String = "",
+        val short: String = "",
+        val gain: String? = null,
+        val term: String? = null,
     )
 
-    /** "Money wallets: 3 → Unlimited". */
+    /** "Money wallets: 3 → No limit". */
     data class Change(val label: String, val before: String, val after: String)
 
-    /** The curtain before the tour. */
-    fun curtainTitle(mode: ProWelcomeMode, restored: Boolean = false): String = when {
-        mode == ProWelcomeMode.REPLAY -> "Your Pro tour"
+    // ------------------------------------------------------------------------------------------------ the deck
+
+    fun revealTitle(mode: ProWelcomeMode, restored: Boolean = false): String = when {
+        mode == ProWelcomeMode.REPLAY -> "Your Pro cards"
         mode == ProWelcomeMode.RETURNING || restored -> "Welcome back to Lucento Pro"
         else -> "You’re on Lucento Pro"
     }
 
-    fun curtainBody(stops: Int, restored: Boolean = false): String =
-        if (restored) "Here’s where everything Pro opens lives, in $stops quick stops." else "Here’s what just opened up, in $stops quick stops."
+    fun revealBody(count: Int): String = "Your Pro deck holds ${perks(count)}."
 
-    fun replayBody(stops: Int): String = "Everything Lucento Pro opens, in $stops quick stops."
+    /** The gold band around the deck: "Lucento Pro · 10 perks". */
+    fun band(count: Int): String = "Lucento Pro · ${perks(count)}"
 
-    /** "Your money · 1 of 8". */
-    fun progress(stop: ProTourStop, index: Int, total: Int): String = "${stop.chapter.title} · ${index + 1} of $total"
+    /** "3 of 10". */
+    fun progress(index: Int, total: Int): String = "${index + 1} of $total"
+
+    const val OPEN_DECK = "Open your Pro deck"
+
+    /** The deck without its band (a welcome back, a replay): the first card waits face down. */
+    const val REVEAL_FIRST = "Reveal your first perk"
+    const val NEXT = "Next"
+
+    /** The card before; not "Back", which the system key uses to leave the deck. */
+    const val PREVIOUS = "Previous"
+    const val TO_COLLECTION = "See your collection"
+    const val SKIP = "Skip"
+    const val SKIP_SPOKEN = "Skip to your collection"
+
+    /** What TalkBack says for a row of what changed: the free plan's allowance, then this plan's. */
+    fun spokenChange(change: Change): String = "${change.label}: ${change.before} on the free plan, ${change.after} now"
+
+    private fun perks(count: Int): String = if (count == 1) "1 perk" else "$count perks"
+
+    // ------------------------------------------------------------------------------------------------ the cards
 
     fun stop(
         stop: ProTourStop,
@@ -55,6 +81,8 @@ object ProWelcomeCopy {
         hasWallets: Boolean = true,
         hasGoals: Boolean = true,
         smartReadingOn: Boolean = false,
+        /** On what terms the online services are included ([ProCopy.serviceTerm]); said on their cards only. */
+        term: ProCopy.ServiceTerm? = null,
     ): StopCopy = when (stop) {
         ProTourStop.WALLETS -> StopCopy(
             title = "Add every account you use",
@@ -64,75 +92,92 @@ object ProWelcomeCopy {
                 Change(ProCopy.featureName(ProFeature.MONEY_WALLETS), "${PlanCatalog.FREE_MONEY_WALLETS}", NO_LIMIT),
                 Change(ProCopy.featureName(ProFeature.DEBT_ACCOUNTS), "${PlanCatalog.FREE_DEBT_ACCOUNTS}", NO_LIMIT),
             ),
+            short = "Every account",
+            gain = NO_LIMIT,
         )
         ProTourStop.NET_WORTH -> StopCopy(
             title = "Count everything you have",
-            body = "Add money owed to you, things you own at a value you set, and wallets in other currencies. " +
-                "Your net worth counts them all.",
-            where = "You add them with Add, at the top right of Wallets.",
+            body = "Money owed to you, things you own at a value you set, and wallets in other currencies all count in " +
+                "your net worth.",
+            where = if (hasWallets) "In Wallets, under Add at the top right." else "In Wallets, under Add wallet in the middle.",
+            short = "Everything you own",
         )
         ProTourStop.SMART_READING -> StopCopy(
             title = "Smarter reading, with Gemini",
             body = when {
                 online == OnlineStatus.SIGN_IN_NEEDED ->
-                    "Gemini reads what you type or say here and fills in the details. It uses your Lucento account: sign in " +
-                        "from Settings › Account & sync, then turn it on in Settings › Privacy & security."
+                    "Gemini fills in the details from what you type or say in the composer. It uses your Lucento account: " +
+                        "sign in from Settings › Account & sync, then turn it on in Settings › Privacy & security."
                 online == OnlineStatus.CONFIRMING ->
-                    "Gemini reads what you type or say here and fills in the details. It starts as soon as your Lucento " +
-                        "account confirms Pro."
-                smartReadingOn -> "Smarter reading is on: Gemini reads what you type or say here."
-                else -> "Gemini reads what you type or say here and fills in the details. Turn it on in Settings › " +
-                    "Privacy & security when you want it; nothing is sent until you do."
+                    "Gemini fills in the details from what you type or say in the composer. It starts as soon as your " +
+                        "Lucento account confirms Pro."
+                smartReadingOn -> "Smarter reading is on: Gemini fills in the details from what you type or say in the composer."
+                else -> "Gemini fills in the details from what you type or say in the composer. Turn it on in Settings › " +
+                    "Privacy & security; nothing is sent until you do."
             },
             where = "The composer opens from + in the middle of the bar.",
+            short = "Smarter reading",
+            term = term?.let(::serviceTermText),
         )
         ProTourStop.GOALS -> StopCopy(
             title = "Save for more at once",
             body = "Keep several savings goals going side by side.",
             where = if (hasGoals) "Add is at the top right of Goals." else "Create a goal is in the middle of Goals.",
             changes = listOf(Change(ProCopy.featureName(ProFeature.SAVINGS_GOALS), "${PlanCatalog.FREE_ACTIVE_GOALS}", "${PlanCatalog.PRO_ACTIVE_GOALS}")),
+            short = "More savings goals",
+            gain = "${PlanCatalog.PRO_ACTIVE_GOALS} goals",
         )
         ProTourStop.INSIGHTS_PERIODS -> StopCopy(
             title = "Look further back",
-            body = "See your trends over 6 and 12 months, as well as your last 3 months.",
+            body = "See 6 and 12 months of income against expenses, where your money went and how your net worth moved.",
             where = "6 and 12 months are above your charts in Insights.",
             changes = listOf(Change("Trends", "${ProGates.FREE_INSIGHTS_MONTHS} months", "12 months")),
+            short = "Longer trends",
+            gain = "12 months",
         )
         ProTourStop.STATEMENTS -> StopCopy(
             title = "Keep your statements",
-            body = "Save or share a report like this one as a PDF.",
+            body = "Save or share any report as a PDF.",
             where = "Reports are in Insights; save or share one from inside it.",
+            short = "PDF statements",
         )
-        ProTourStop.AI_ANSWERS -> StopCopy(
-            title = "AI answers, with Gemini",
-            body = when {
-                online == OnlineStatus.SIGN_IN_NEEDED ->
-                    "Gemini answers your questions about your money. It uses your Lucento account: sign in from Settings › " +
-                        "Account & sync, then turn AI answers on here."
-                online == OnlineStatus.CONFIRMING ->
-                    "Gemini answers your questions about your money. Your daily allowance starts as soon as your Lucento " +
-                        "account confirms Pro."
-                aiAnswersOn -> "AI answers from Gemini are on. Smarter reading shares the same daily allowance."
-                else -> "Gemini answers your questions about your money. Turn AI answers on here when you want them; " +
-                    "nothing is sent until you do."
-            },
-            where = "Ask Lucento is at the top of Insights.",
-            changes = if (online == OnlineStatus.CONFIRMED) {
-                listOf(
-                    Change(
-                        ProCopy.featureName(ProFeature.AI_ADVISER),
-                        limitText(ProFeature.AI_ADVISER, free(ProFeature.AI_ADVISER)),
-                        limitText(ProFeature.AI_ADVISER, PlanCatalog.limit(ProFeature.AI_ADVISER, capabilities)),
-                    ),
-                )
-            } else {
-                emptyList()
-            },
-        )
+        ProTourStop.AI_ANSWERS -> {
+            // The allowance is the server's to give: said only once the server has confirmed the plan.
+            val confirmed = online == OnlineStatus.CONFIRMED
+            val allowance = limitText(ProFeature.AI_ADVISER, PlanCatalog.limit(ProFeature.AI_ADVISER, capabilities))
+            StopCopy(
+                title = "AI answers, with Gemini",
+                body = when {
+                    online == OnlineStatus.SIGN_IN_NEEDED ->
+                        "Gemini answers your questions about your money. It uses your Lucento account: sign in from " +
+                            "Settings › Account & sync, then turn AI answers on in Ask Lucento."
+                    online == OnlineStatus.CONFIRMING ->
+                        "Gemini answers your questions about your money. Your daily allowance starts as soon as your " +
+                            "Lucento account confirms Pro."
+                    aiAnswersOn -> "AI answers from Gemini are on. Smarter reading shares the same daily allowance."
+                    else -> "Gemini answers your questions about your money. Turn it on in Ask Lucento; nothing is sent until you do."
+                },
+                where = "Ask Lucento is at the top of Insights.",
+                changes = if (confirmed) {
+                    listOf(Change(ProCopy.featureName(ProFeature.AI_ADVISER), limitText(ProFeature.AI_ADVISER, free(ProFeature.AI_ADVISER)), allowance))
+                } else {
+                    emptyList()
+                },
+                short = "AI answers",
+                gain = if (confirmed) allowance else null,
+                term = term?.let(::aiTermText),
+            )
+        }
         ProTourStop.SYNC -> StopCopy(
             title = "Your money on every phone",
-            body = if (signedIn) "Sync between phones and restore from your account." else "Sign in here to sync between phones and restore from your account.",
+            body = if (signedIn) {
+                "Sync between phones and restore from your account."
+            } else {
+                "Sign in from Settings › Account & sync to sync between phones and restore from your account."
+            },
             where = "In Settings › Account & sync.",
+            short = "Sync and restore",
+            term = term?.let(::serviceTermText),
         )
         ProTourStop.SHARED -> StopCopy(
             title = "Share with a Partner",
@@ -143,49 +188,66 @@ object ProWelcomeCopy {
                     "account: sign in from Settings › Account & sync first."
             },
             where = "Lucento Shared is in your profile and in Settings.",
+            short = "Share with a Partner",
+            term = term?.let(::serviceTermText),
         )
         ProTourStop.THEMES -> StopCopy(
             title = "Three new themes",
             body = "Grove, Mono and Aurora are yours.",
             where = "Themes are in your profile, behind your picture at the top right.",
             themes = true,
+            short = "Three new themes",
         )
+    }.copy(chapter = stop.chapter.title)
+
+    /** The online services' term on their cards: "Included until Nov 12, 2027", "While you subscribe". */
+    fun serviceTermText(term: ProCopy.ServiceTerm): String = when (term) {
+        ProCopy.ServiceTerm.Subscription -> "While you subscribe"
+        ProCopy.ServiceTerm.Cloud -> "With Lucento Cloud"
+        is ProCopy.ServiceTerm.Until -> "Included until ${term.date}"
+        ProCopy.ServiceTerm.Included -> "Included"
     }
 
-    // ------------------------------------------------------------------------------------------------ the summary
+    /**
+     * The AI adviser's term: after a Lifetime's included year the allowance falls back to the free plan's, it doesn't
+     * stop ("50 a day until Nov 12, 2027, then 10 a month", as the Lucento Pro page's comparison says it).
+     */
+    fun aiTermText(term: ProCopy.ServiceTerm): String = when (term) {
+        is ProCopy.ServiceTerm.Until ->
+            "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day until ${term.date}, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} a month"
+        else -> serviceTermText(term)
+    }
 
-    fun summaryTitle(mode: ProWelcomeMode, restored: Boolean = false): String = when {
+    /**
+     * What the collection shows beside a card's name: its gain ("No limit", "50 a day"), or for an online service with an
+     * end date, that date ("Until Nov 12, 2027"). The AI adviser shows its allowance, never a date (it carries on after).
+     */
+    fun collectionTag(stop: ProTourStop, copy: StopCopy, term: ProCopy.ServiceTerm?): String? = when {
+        copy.gain != null -> copy.gain
+        stop == ProTourStop.AI_ANSWERS -> null
+        stop in ServiceStops && term is ProCopy.ServiceTerm.Until -> "Until ${term.date}"
+        else -> null
+    }
+
+    private val ServiceStops = setOf(ProTourStop.SMART_READING, ProTourStop.AI_ANSWERS, ProTourStop.SYNC, ProTourStop.SHARED)
+
+    // ------------------------------------------------------------------------------------------------ the collection
+
+    fun collectionTitle(mode: ProWelcomeMode, restored: Boolean = false): String = when {
         mode == ProWelcomeMode.REPLAY -> "What Pro gives you"
         mode == ProWelcomeMode.RETURNING || restored -> "Welcome back to Pro"
         else -> "Congratulations, you’re Pro"
     }
 
-    /** The tour's way out, on every stop but the last (where the next step is the summary anyway). */
-    const val END_TOUR = "End tour"
+    /** "Your Pro collection · 10 perks". */
+    fun collectionEyebrow(count: Int): String = "Your Pro collection · ${perks(count)}"
+
+    fun collectionButton(mode: ProWelcomeMode): String = if (mode.medal) "Collect your award" else "Done"
 
     /** The Lucento Pro page's word for a limit that is gone (its comparison table says the same). */
     const val NO_LIMIT = "No limit"
 
-    /**
-     * What the summary's sections don't list but the plan includes (for anyone who ended the tour early), and that the
-     * tour can be watched again. Null for a plan without Pro's phone features.
-     */
-    fun alsoYours(capabilities: Set<Capability>, replay: Boolean): String? {
-        if (Capability.LOCAL_PRO !in capabilities) return null
-        val also = "Also yours: statements as PDF, three more themes, and money owed to you, things you own and wallets " +
-            "in other currencies."
-        return if (replay) also else "$also Watch this tour again from Lucento Pro in your profile."
-    }
-
-    fun summaryButton(mode: ProWelcomeMode): String = if (mode.medal) "Collect your award" else "Done"
-
-    /** The last stop's button, on to the summary. */
-    const val LAST_STOP_BUTTON = "See what changed"
-
-    const val LIMITS_TITLE = "Higher limits"
-    const val ONLINE_TITLE = "Online services"
-
-    /** A limit in words for the summary: "3", "Unlimited", "10 a month", "50 a day", "1 Partner", "Included". */
+    /** A limit in words: "3", "No limit", "10 a month", "50 a day", "1 Partner", "Included". */
     fun limitText(feature: ProFeature, limit: Limit): String = when (feature) {
         ProFeature.INSIGHTS_LONG_PERIODS -> if (limit == Limit.None) "${ProGates.FREE_INSIGHTS_MONTHS} months" else "12 months"
         ProFeature.SHARED_SPACE -> when (limit) {
@@ -202,48 +264,18 @@ object ProWelcomeCopy {
         }
     }
 
-    /**
-     * An online service's value in the summary: this plan's allowance only once the server has confirmed the plan;
-     * otherwise what is still needed. [confirmed] tells the row how to show it (the plan's value is emphasised).
-     */
-    fun onlineValue(feature: ProFeature, limit: Limit, status: OnlineStatus): String = when (status) {
-        OnlineStatus.CONFIRMED, OnlineStatus.NOT_IN_PLAN -> limitText(feature, limit)
-        OnlineStatus.CONFIRMING -> "Starting soon"
-        OnlineStatus.SIGN_IN_NEEDED -> "Needs sign-in"
-        OnlineStatus.NOT_IN_THIS_BUILD -> "Not in this version"
-    }
-
-    /** What TalkBack says for a summary row: the free plan's allowance, then what this plan gives (or still needs). */
-    fun spokenRow(name: String, before: String, after: String, confirmed: Boolean): String =
-        if (confirmed) "$name: $before on the free plan, $after now" else "$name: $before on the free plan; $after"
-
-    /** A row's name in the summary: the plan catalog's, except Trends, named as on its tour stop. */
-    fun rowName(feature: ProFeature): String =
-        if (feature == ProFeature.INSIGHTS_LONG_PERIODS) "Trends" else ProCopy.featureName(feature)
-
-    /** The free plan's value as shown: "—" where the free plan has none of it (said "Not included" to TalkBack). */
-    fun freeShown(feature: ProFeature, limit: Limit): String =
-        if (limit == Limit.None && feature != ProFeature.INSIGHTS_LONG_PERIODS) "—" else limitText(feature, limit)
-
-    /** A second line under a row whose name needs explaining. */
-    fun rowDetail(feature: ProFeature): String? = when (feature) {
-        ProFeature.SMART_READING -> "Gemini reads what you type or say"
-        ProFeature.AI_ADVISER -> "Answers from Ask Lucento, by Gemini"
-        else -> null
-    }
-
-    /** Where the online services stand, in words; null when this plan has none. */
+    /** Where the online services stand, in words; null when this plan has none or the server has confirmed them. */
     fun onlineStatus(status: OnlineStatus): String? = when (status) {
-        OnlineStatus.CONFIRMED -> "Confirmed with your Lucento account."
-        OnlineStatus.CONFIRMING -> "Confirming with your Lucento account. These switch on as soon as it’s done."
-        OnlineStatus.SIGN_IN_NEEDED -> "These need your Lucento account. Sign in from Settings › Account & sync."
+        OnlineStatus.CONFIRMED -> null
+        OnlineStatus.CONFIRMING -> "Confirming with your Lucento account. Online services switch on as soon as it’s done."
+        OnlineStatus.SIGN_IN_NEEDED -> "Online services need your Lucento account. Sign in from Settings › Account & sync."
         OnlineStatus.NOT_IN_PLAN -> null
-        OnlineStatus.NOT_IN_THIS_BUILD -> "This version of Lucento can’t connect to a Lucento account yet, so these aren’t available here."
+        OnlineStatus.NOT_IN_THIS_BUILD -> "This version of Lucento can’t connect to a Lucento account yet, so online services aren’t available here."
     }
 
     private fun free(feature: ProFeature): Limit = PlanCatalog.limit(feature, PlanCatalog.FREE_CAPABILITIES)
 
-    /** Features measured as a count of things (wallets, goals), where "unlimited" is the word; the rest are included or not. */
+    /** Features measured as a count of things (wallets, goals), where "no limit" is the word; the rest are included or not. */
     private val ProFeature.counted: Boolean
         get() = this == ProFeature.MONEY_WALLETS || this == ProFeature.DEBT_ACCOUNTS || this == ProFeature.SAVINGS_GOALS
 }

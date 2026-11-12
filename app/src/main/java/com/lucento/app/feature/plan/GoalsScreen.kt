@@ -1,7 +1,5 @@
 package com.lucento.app.feature.plan
 
-import com.lucento.app.core.designsystem.component.SpotlightKeys
-import com.lucento.app.core.designsystem.component.spotlightTarget
 import com.lucento.app.core.designsystem.component.WalletChoicePill
 import com.lucento.app.core.designsystem.component.AmountsShown
 import com.lucento.app.core.designsystem.component.AmountFormat
@@ -249,7 +247,6 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                             "Add",
                             onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
                             contentDescription = "Add goal",
-                            modifier = Modifier.spotlightTarget(SpotlightKeys.GOALS_ADD),
                         )
                     }
                 })
@@ -278,7 +275,6 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                             LucentoPrimaryButton(
                                 text = "Create a goal",
                                 onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
-                                modifier = Modifier.spotlightTarget(SpotlightKeys.GOALS_ADD),
                             )
                         }) else null,
                     )

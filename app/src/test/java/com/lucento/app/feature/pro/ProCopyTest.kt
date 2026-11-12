@@ -108,6 +108,22 @@ class ProCopyTest {
         assertTrue(status(EntitlementState(listOf(lifetime, cloud))).detail.startsWith("With Lucento Cloud"))
     }
 
+    @Test fun service_terms_say_how_long_the_online_services_last() {
+        fun term(vararg rows: Entitlement) = ProCopy.serviceTerm(EntitlementState(rows.toList()), now, ZoneOffset.UTC, Locale.US)
+        val lifetime = row(EntitlementSource.PLAY_LIFETIME, setOf(Capability.LOCAL_PRO), expiresAt = null)
+        // Owned for good, and no online services in the plan: nothing to put a term on.
+        assertEquals(null, term(lifetime))
+        val year = row(EntitlementSource.PLAY_LIFETIME_SERVICES, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = now + 100 * day, verifiedBy = Verifier.PLAY_LOCAL)
+        // The included year's end, read from its entitlement, kept on one line.
+        assertEquals(ProCopy.ServiceTerm.Until("Apr 25, 2027"), term(lifetime, year))
+        val cloud = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED))
+        assertEquals(ProCopy.ServiceTerm.Cloud, term(lifetime, cloud))
+        assertEquals(ProCopy.ServiceTerm.Subscription, term(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet())))
+        // A courtesy grant lasts until the owner set it to, or has no end.
+        assertEquals(ProCopy.ServiceTerm.Until("Feb 14, 2027"), term(row(EntitlementSource.GRANT, Capability.entries.toSet())))
+        assertEquals(ProCopy.ServiceTerm.Included, term(row(EntitlementSource.GRANT, Capability.entries.toSet(), expiresAt = null)))
+    }
+
     @Test fun price_lines_use_plays_own_strings_and_periods() {
         assertEquals("₱149.00 a month", ProCopy.priceLine(ProductPrice("lucento_pro", "monthly", "t", "₱149.00", "P1M")))
         assertEquals("₱1,190.00 a year · 7-day free trial", ProCopy.priceLine(ProductPrice("lucento_pro", "annual", "t", "₱1,190.00", "P1Y", "P7D")))

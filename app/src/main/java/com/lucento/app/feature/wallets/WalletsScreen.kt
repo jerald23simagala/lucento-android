@@ -78,8 +78,6 @@ import com.lucento.app.core.designsystem.component.LucentoTopBar
 import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.ProfileButton
-import com.lucento.app.core.designsystem.component.SpotlightKeys
-import com.lucento.app.core.designsystem.component.spotlightTarget
 import com.lucento.app.core.designsystem.component.SegmentedToggle
 import com.lucento.app.core.designsystem.component.StatTile
 import com.lucento.app.core.designsystem.component.StatTileLayout
@@ -150,7 +148,6 @@ fun WalletsScreen(
                             "Add",
                             onClick = { editing = newDraft() },
                             contentDescription = "Add wallet",
-                            modifier = Modifier.spotlightTarget(SpotlightKeys.WALLETS_ADD),
                         )
                     }
                     if (onBack == null) ProfileButton()
@@ -169,7 +166,6 @@ fun WalletsScreen(
                         LucentoPrimaryButton(
                             text = "Add wallet",
                             onClick = { editing = newDraft() },
-                            modifier = Modifier.spotlightTarget(SpotlightKeys.WALLETS_ADD),
                         )
                     }) else null,
                 )
@@ -179,7 +175,7 @@ fun WalletsScreen(
         val summary = state.summary
         val net = state.heroTotal
         if (summary != null && net != null) {
-            item(key = "summary") { androidx.compose.foundation.layout.Box(Modifier.spotlightTarget(SpotlightKeys.NET_WORTH)) { NetWorthCard(net, summary, state.trend) } }
+            item(key = "summary") { NetWorthCard(net, summary, state.trend) }
             item(key = "split") { AssetsLiabilitiesSplit(net.currencyCode, summary) }
         }
 

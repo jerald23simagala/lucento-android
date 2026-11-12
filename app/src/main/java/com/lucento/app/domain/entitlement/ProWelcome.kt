@@ -1,9 +1,10 @@
 package com.lucento.app.domain.entitlement
 
 /**
- * Lucento Pro's welcome (owner, 2026-11-12): right after Google Play confirms a plan, a short tour of the real screens
- * that just opened, a summary of the higher limits and online services, then the Lucento Pro medal, which flies to the
- * profile picture. These are the rules behind it: pure, so every decision is a JVM test.
+ * Lucento Pro's welcome (owner, 2026-11-12): right after Google Play confirms a plan, a deck of cards, one per thing
+ * Pro opened, turned over one at a time; the collection of them all; then the Lucento Pro medal, which flies to the
+ * profile picture. (It replaced a tour of the real screens, whose buttons failed on real phones: KNOWN_ISSUES PW-1.)
+ * These are the rules behind it: pure, so every decision is a JVM test.
  *
  * - It plays once per new plan: a renewal, a trial turning paid, or a re-read keep the same purchase and stay quiet.
  * - It never plays for a pending payment (a pending purchase grants nothing).
@@ -51,19 +52,20 @@ object ProWelcome {
         }
     }
 
-    /** The tour's stops for this plan and these modules, in order. Stops for something this plan doesn't hold are left out. */
+    /**
+     * The cards for this plan and these modules, in order. A card for something this plan doesn't hold is left out, and so
+     * is one this phone can't act on (a Partner's phone doesn't add wallets).
+     */
     fun stops(context: ProTourContext): List<ProTourStop> {
         val local = Capability.LOCAL_PRO in context.capabilities
         val wallets = local && context.walletsEnabled && context.managesStructure
         return buildList {
             if (wallets) {
                 add(ProTourStop.WALLETS)
-                // Net worth is a card on Wallets only once there is a wallet: no card, nothing to light.
-                if (context.hasWallets) add(ProTourStop.NET_WORTH)
+                add(ProTourStop.NET_WORTH)
             }
-            // Gemini reads what is typed or said in the composer: it needs a Lucento account (a build with sync), and the
-            // composer needs a wallet to record into.
-            if (Capability.AI_PRO in context.capabilities && context.syncAvailable && context.hasWallets) add(ProTourStop.SMART_READING)
+            // Gemini reads what is typed or said in the composer: it needs a Lucento account (a build with sync).
+            if (Capability.AI_PRO in context.capabilities && context.syncAvailable) add(ProTourStop.SMART_READING)
             if (local && context.goalsEnabled) add(ProTourStop.GOALS)
             if (local && context.insightsEnabled) {
                 add(ProTourStop.INSIGHTS_PERIODS)
@@ -76,34 +78,6 @@ object ProWelcome {
             if (local) add(ProTourStop.THEMES)
         }
     }
-
-    /**
-     * The summary's rows: each limit or service as the free plan has it and as this plan has it. Only what this plan
-     * holds, so a Lifetime owner after the included year isn't shown online services they no longer have.
-     */
-    fun privileges(capabilities: Set<Capability>): List<ProPrivilege> =
-        PrivilegeOrder.mapNotNull { (feature, group) ->
-            if (feature.requires !in capabilities) return@mapNotNull null
-            ProPrivilege(
-                feature = feature,
-                group = group,
-                free = PlanCatalog.limit(feature, PlanCatalog.FREE_CAPABILITIES),
-                plan = PlanCatalog.limit(feature, capabilities),
-            )
-        }
-
-    private val PrivilegeOrder: List<Pair<ProFeature, PrivilegeGroup>> = listOf(
-        ProFeature.MONEY_WALLETS to PrivilegeGroup.LIMITS,
-        ProFeature.DEBT_ACCOUNTS to PrivilegeGroup.LIMITS,
-        ProFeature.SAVINGS_GOALS to PrivilegeGroup.LIMITS,
-        ProFeature.INSIGHTS_LONG_PERIODS to PrivilegeGroup.LIMITS,
-        // The server enforces the AI allowance, so it is an online service: claimed only once the server has the plan.
-        ProFeature.AI_ADVISER to PrivilegeGroup.ONLINE,
-        ProFeature.CLOUD_SYNC to PrivilegeGroup.ONLINE,
-        ProFeature.CLOUD_RESTORE to PrivilegeGroup.ONLINE,
-        ProFeature.SMART_READING to PrivilegeGroup.ONLINE,
-        ProFeature.SHARED_SPACE to PrivilegeGroup.ONLINE,
-    )
 
     /**
      * Whether the online services are confirmed by Lucento's server for this plan: they are server-enforced (the AI
@@ -138,27 +112,27 @@ data class ProWelcomeRun(
 )
 
 enum class ProWelcomeMode(
-    /** The tour of the screens that opened, then the summary. */
-    val tour: Boolean,
+    /** The deck of cards and the collection. */
+    val reveal: Boolean,
     /** The Lucento Pro medal's ceremony. */
     val medal: Boolean,
     /** The badge flies to the profile picture, where the Pro ring appears. */
     val flight: Boolean,
 ) {
-    /** A first plan: tour, summary, medal, flight. */
-    FIRST(tour = true, medal = true, flight = true),
+    /** A first plan: cards, collection, medal, flight. */
+    FIRST(reveal = true, medal = true, flight = true),
 
     /** A new plan for someone who already holds the medal (back after a lapse, or Lifetime after a subscription). */
-    RETURNING(tour = true, medal = false, flight = true),
+    RETURNING(reveal = true, medal = false, flight = true),
 
     /** The sequence stopped before the medal: the medal and its flight, nothing else. */
-    MEDAL_ONLY(tour = false, medal = true, flight = true),
+    MEDAL_ONLY(reveal = false, medal = true, flight = true),
 
-    /** "Replay the Pro tour" on the Lucento Pro page: the tour and the summary, without the medal (owner). */
-    REPLAY(tour = true, medal = false, flight = false),
+    /** "See your Pro cards" on the Lucento Pro page: the cards and the collection again, without the medal (owner). */
+    REPLAY(reveal = true, medal = false, flight = false),
 }
 
-/** The tour's four chapters, in order. */
+/** The cards' four chapters, in order. */
 enum class ProTourChapter(val title: String) {
     YOUR_MONEY("Your money"),
     YOUR_GOALS("Your goals"),
@@ -166,7 +140,7 @@ enum class ProTourChapter(val title: String) {
     MAKE_IT_YOURS("Make it yours"),
 }
 
-/** One stop of the tour: a real screen, and the control there that Pro opened. */
+/** One card of the welcome: one thing Pro opened, and where it lives in the app. */
 enum class ProTourStop(val chapter: ProTourChapter) {
     /** Wallets › Add: as many wallets, cards and loans as you use. */
     WALLETS(ProTourChapter.YOUR_MONEY),
@@ -199,7 +173,7 @@ enum class ProTourStop(val chapter: ProTourChapter) {
     THEMES(ProTourChapter.MAKE_IT_YOURS),
 }
 
-/** What decides the tour's stops: the plan, the modules switched on, and whether this phone may change the wallets. */
+/** What decides the cards: the plan, the modules switched on, and whether this phone may change the wallets. */
 data class ProTourContext(
     val capabilities: Set<Capability>,
     /** Several wallets ([com.lucento.app.domain.Feature.MULTIPLE_WALLETS]): adding wallets is possible at all. */
@@ -208,18 +182,13 @@ data class ProTourContext(
     val insightsEnabled: Boolean,
     /** False on a Partner's phone in Lucento Shared: the Owner manages the wallets. */
     val managesStructure: Boolean,
-    /** False in a build without cloud sync (no Lucento account possible): the sync stop is left out. */
+    /** False in a build without cloud sync (no Lucento account possible): the online services' cards are left out. */
     val syncAvailable: Boolean = true,
-    /** Whether any wallet exists (an empty Wallets page has no Add pill and no net-worth card). */
+    /** Whether any wallet exists: an empty Wallets page has no Add pill, so its card says where Add wallet is instead. */
     val hasWallets: Boolean = true,
-    /** Whether any goal exists (an empty Goals page has no Add pill, only "Create a goal"). */
+    /** Whether any goal exists: an empty Goals page has no Add pill, only "Create a goal". */
     val hasGoals: Boolean = true,
 )
-
-enum class PrivilegeGroup { LIMITS, ONLINE }
-
-/** One row of the summary: [free] is the free plan's allowance, [plan] this plan's. */
-data class ProPrivilege(val feature: ProFeature, val group: PrivilegeGroup, val free: Limit, val plan: Limit)
 
 /** Where the online services stand with Lucento's server (they are enforced there). */
 enum class OnlineStatus {

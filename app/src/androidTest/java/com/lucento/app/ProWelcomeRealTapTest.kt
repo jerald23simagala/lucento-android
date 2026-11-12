@@ -23,10 +23,10 @@ import org.junit.runner.RunWith
 import java.time.LocalDate
 
 /**
- * Lucento Pro's tour over the real app, pressed with a [Finger]: down, a pixel or two of drift, up, as a person taps.
- * `performClick` never moves, and that hid a bug which left the welcome's buttons dead on real phones (owner's report,
- * 2026-11-12, Galaxy S8: Next did nothing, nothing else could be tapped, only Back worked). The curtain's own buttons are
- * pressed in `ProTourCurtainFingerTest`, away from the curtain's timer.
+ * Lucento Pro's welcome over the real app, pressed with a [Finger]: down, a pixel or two of drift, up, as a person taps.
+ * `performClick` never moves, and that hid a bug which left the old tour's buttons dead on real phones (owner's report,
+ * 2026-11-12, Galaxy S8). The deck that replaced the tour is pressed the same way here; `ProRevealDeckFingerTest` presses
+ * it on its own, with a layer beneath that counts any touch that leaks through.
  */
 @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -38,15 +38,13 @@ class ProWelcomeRealTapTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val container get() = (instrumentation.targetContext.applicationContext as LucentoApplication).container
 
-    private val stopOne = hasText("Add every account you use", substring = true)
-    private val stopTwo = hasText("Count everything you have", substring = true)
-    private val summary = hasText("Congratulations, you’re Pro", substring = true) or hasText("Welcome back to Pro", substring = true)
+    private val cardOne = hasText("Add every account you use", substring = true)
+    private val cardTwo = hasText("Count everything you have", substring = true)
+    private val collection = hasText("Congratulations, you’re Pro", substring = true) or hasText("Welcome back to Pro", substring = true)
 
     @Test
-    fun the_tour_answers_a_finger() {
+    fun the_welcome_answers_a_finger() {
         onboardAndSeed()
-        // Where the dock's Home tab is (the app is hidden from accessibility while the tour covers it, so it is found now).
-        val home = point(hasText("Home") and isSelectable())
         // A Lifetime that Google Play already lists: the welcome starts at once, as on the owner's phone.
         val simulator = checkNotNull(container.planSimulator) { "Test builds have the plan simulator" }
         runBlocking {
@@ -55,37 +53,41 @@ class ProWelcomeRealTapTest {
             container.entitlements.refresh()
         }
 
-        // The curtain moves on to the first stop by itself.
-        await(stopOne, "The tour's first stop never came.", timeout = 20_000)
-        Thread.sleep(1_500) // the card arrives and the control it points at is lit, as a person would wait
-
-        // The card's buttons answer a finger: the owner's report was that Next did nothing.
+        // The deck opens and the first card turns over (the plain deck here: a plan the simulator lists counts as one
+        // restored on this phone; ProRevealDeckFingerTest opens the band).
+        tap(hasText("Open your Pro deck") or hasText("Reveal your first perk"))
+        await(cardOne, "The first card never turned over.", timeout = 15_000)
+        Thread.sleep(700)
         tap(hasText("Next"))
-        await(stopTwo, "Next didn't move the tour on.")
-        Thread.sleep(800)
-        tap(hasText("Back"))
-        await(stopOne, "Back didn't go back a stop.")
-        Thread.sleep(800)
+        await(cardTwo, "Next didn't bring the second card.")
+        Thread.sleep(700)
+        tap(hasText("Previous"))
+        await(cardOne, "Previous didn't bring the first card back.")
+        Thread.sleep(700)
 
-        // A finger on the dimmed page changes nothing beneath it. Checked once the welcome is over: the dock stays on
-        // Wallets, where the first stop took it, rather than going Home.
-        Finger.tapAt(home.first, home.second)
+        // A finger on the dim (the top corner, clear of every button) moves nothing. ProRevealDeckFingerTest counts what
+        // leaks beneath; here the deck must simply stay where it is, and the welcome must not have left Home.
+        val origin = IntArray(2)
+        compose.runOnUiThread { compose.activity.window.decorView.getLocationOnScreen(origin) }
+        val density = instrumentation.targetContext.resources.displayMetrics.density
+        Finger.tapAt(origin[0] + 12 * density, origin[1] + 56 * density)
         compose.waitForIdle()
         Thread.sleep(500)
-        await(stopOne, "A tap on the dimmed dock moved the tour.")
-        tap(hasText("End tour"))
-        await(summary, "End tour didn't end the tour.")
+        await(cardOne, "A tap on the dim moved the deck.")
 
-        // Back on the summary ends the welcome (the award is still given).
+        tap(hasText("Skip"))
+        await(collection, "Skip didn't lead to the collection.")
+
+        // Back on the collection ends the welcome (the award is still given).
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         compose.waitForIdle()
         val gone = SystemClock.uptimeMillis() + 10_000
-        while (compose.onAllNodes(summary).fetchSemanticsNodes().isNotEmpty()) {
-            if (SystemClock.uptimeMillis() > gone) throw AssertionError("Back didn't close the summary.\n" + screenReport())
+        while (compose.onAllNodes(collection).fetchSemanticsNodes().isNotEmpty()) {
+            if (SystemClock.uptimeMillis() > gone) throw AssertionError("Back didn't close the collection.\n" + screenReport())
             Thread.sleep(200)
         }
-        compose.onNode(hasText("Wallets") and isSelectable()).assertIsSelected()
-        compose.onNode(hasText("Home") and isSelectable()).assertIsNotSelected()
+        compose.onNode(hasText("Home") and isSelectable()).assertIsSelected()
+        compose.onNode(hasText("Wallets") and isSelectable()).assertIsNotSelected()
     }
 
     private fun point(matcher: SemanticsMatcher): Pair<Float, Float> = try {

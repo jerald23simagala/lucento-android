@@ -655,34 +655,34 @@ class ScreenshotTourTest {
         compose.onNodeWithText("Buy Lifetime").performScrollTo().performClick()
 
         // ---------------------------------------------------------------- Lucento Pro's welcome (owner, 2026-11-12)
-        // Straight after Google Play confirms: a curtain, a tour of the real screens Pro opened (each control lit up in
-        // turn), the summary of higher limits and online services, the medal, and its flight to the profile picture.
+        // Straight after Google Play confirms: a deck of cards in a gold band, one per thing Pro opened, turned over one at
+        // a time; the collection with the plan's terms; the medal; and its flight to the profile picture.
         waitForText("You’re on Lucento Pro")
         shot("24h-pro-welcome")
-        runCatching { if (exists("Show me")) click("Show me") } // it also moves on by itself
+        click("Open your Pro deck")
         buildList {
-            add("Add every account you use" to "25a-pro-tour-wallets")
-            add("Count everything you have" to "25b-pro-tour-net-worth")
+            add("Add every account you use" to "25a-pro-card-wallets")
+            add("Count everything you have" to "25b-pro-card-net-worth")
             // Gemini and Lucento Shared need a Lucento account: only in a build with cloud sync (CI's test build has none).
-            if (com.lucento.app.data.sync.SupabaseModule.isConfigured) add("Smarter reading, with Gemini" to "25b2-pro-tour-smart-reading")
-            add("Save for more at once" to "25c-pro-tour-goals")
-            add("Look further back" to "25d-pro-tour-insights")
-            add("Keep your statements" to "25e-pro-tour-statements")
+            if (com.lucento.app.data.sync.SupabaseModule.isConfigured) add("Smarter reading, with Gemini" to "25b2-pro-card-smart-reading")
+            add("Save for more at once" to "25c-pro-card-goals")
+            add("Look further back" to "25d-pro-card-insights")
+            add("Keep your statements" to "25e-pro-card-statements")
             // Only in a build with cloud sync (CI's test build has none): both need a Lucento account.
             if (com.lucento.app.data.sync.SupabaseModule.isConfigured) {
-                add("AI answers, with Gemini" to "25f-pro-tour-ai")
-                add("Your money on every phone" to "25g-pro-tour-sync")
-                add("Share with a Partner" to "25g2-pro-tour-shared")
+                add("AI answers, with Gemini" to "25f-pro-card-ai")
+                add("Your money on every phone" to "25g-pro-card-sync")
+                add("Share with a Partner" to "25g2-pro-card-shared")
             }
-            add("Three new themes" to "25h-pro-tour-themes")
+            add("Three new themes" to "25h-pro-card-themes")
         }.forEach { (title, name) ->
             waitForText(title)
-            Thread.sleep(900) // the screen arrives and the control it shows is lit
+            Thread.sleep(700) // the card has turned over
             shot(name)
-            click(if (name.endsWith("themes")) "See what changed" else "Next")
+            click(if (name.endsWith("themes")) "See your collection" else "Next")
         }
         waitForText("Congratulations, you’re Pro")
-        shot("25i-pro-privileges")
+        shot("25i-pro-collection")
         click("Collect your award")
         waitForText("Membership award")
         shot("25j-pro-medal")
@@ -694,11 +694,11 @@ class ScreenshotTourTest {
             10_000,
         )
         shot("25k-pro-ring")
-        // The Lucento Pro page offers the tour again, without the medal.
+        // The Lucento Pro page offers the cards again, without the medal.
         compose.onNodeWithContentDescription("Profile and settings").performClick()
         compose.waitForIdle()
         click("Lucento Pro")
-        waitForText("Replay the Pro tour")
+        waitForText("See your Pro cards")
         shot("25l-pro-page-replay")
         simulator.setTestStore(false)
     }
