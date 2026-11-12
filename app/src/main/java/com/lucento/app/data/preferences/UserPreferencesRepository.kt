@@ -142,6 +142,13 @@ data class UserPreferences(
     val profilePhotoChoice: ProfilePhotoChoice = ProfilePhotoChoice.GOOGLE,
     /** The colour theme. A device choice: kept across sign-outs, never in backups. */
     val themeId: ThemeId = ThemeId.SUNRISE,
+    /**
+     * Lucento Pro's welcome: the plans already welcomed on this phone (keys from
+     * [com.lucento.app.domain.entitlement.ProWelcome.planKeys]), so a renewal or a re-read never replays it.
+     */
+    val proWelcomed: Set<String> = emptySet(),
+    /** When the Lucento Pro medal was presented (epoch millis); null before. The medal is kept for good. */
+    val proMemberSince: Long? = null,
 )
 
 /**
@@ -227,6 +234,8 @@ class UserPreferencesRepository(
         val profilePhotoVersion = longPreferencesKey("profile_photo_version")
         val profilePhotoChoice = stringPreferencesKey("profile_photo_choice")
         val themeId = stringPreferencesKey("theme_id")
+        val proWelcomed = stringSetPreferencesKey("pro_welcomed")
+        val proMemberSince = longPreferencesKey("pro_member_since")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -268,6 +277,8 @@ class UserPreferencesRepository(
                 profilePhotoVersion = p[Keys.profilePhotoVersion],
                 profilePhotoChoice = ProfilePhotoChoice.fromKey(p[Keys.profilePhotoChoice]),
                 themeId = ThemeId.fromKey(p[Keys.themeId]),
+                proWelcomed = p[Keys.proWelcomed].orEmpty(),
+                proMemberSince = p[Keys.proMemberSince],
             )
         }
 
@@ -288,6 +299,8 @@ class UserPreferencesRepository(
             val smart = p[Keys.smartReading]
             val ai = p[Keys.askLucentoAi]
             val aiV1 = p[Keys.askLucentoAiV1]
+            val welcomed = p[Keys.proWelcomed]
+            val memberSince = p[Keys.proMemberSince]
             resetAccountSetup(p)
             name?.let { p[Keys.displayName] = it }
             photo?.let { p[Keys.profilePhotoVersion] = it }
@@ -295,6 +308,9 @@ class UserPreferencesRepository(
             smart?.let { p[Keys.smartReading] = it }
             ai?.let { p[Keys.askLucentoAi] = it }
             aiV1?.let { p[Keys.askLucentoAiV1] = it }
+            // The same person: their Lucento Pro welcome and medal stay.
+            welcomed?.let { p[Keys.proWelcomed] = it }
+            memberSince?.let { p[Keys.proMemberSince] = it }
         }
     }
 
@@ -508,6 +524,17 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.addSpotlightSeen] = true }
     }
 
+    /** Lucento Pro's welcome: these plans have been welcomed (stored when it starts, so it never loops). */
+    suspend fun markProWelcomed(planKeys: Set<String>) {
+        if (planKeys.isEmpty()) return
+        context.dataStore.edit { it[Keys.proWelcomed] = it[Keys.proWelcomed].orEmpty() + planKeys }
+    }
+
+    /** The Lucento Pro medal was presented at [millis] (kept for good); null forgets it (test builds' tour only). */
+    suspend fun setProMemberSince(millis: Long?) {
+        context.dataStore.edit { p -> if (millis == null) p.remove(Keys.proMemberSince) else if (p[Keys.proMemberSince] == null) p[Keys.proMemberSince] = millis }
+    }
+
     suspend fun setPrimaryCurrency(code: String) {
         require(CurrencyRules.isSupported(code))
         context.dataStore.edit { it[Keys.primaryCurrency] = code }
@@ -558,6 +585,9 @@ class UserPreferencesRepository(
             p.remove(Keys.spendTypes)
             p.remove(Keys.achievementsSeen)
             p.remove(Keys.insightsVisited)
+            // Lucento Pro's welcome and medal belong to the person, like the name: the next account starts without them.
+            p.remove(Keys.proWelcomed)
+            p.remove(Keys.proMemberSince)
             p.remove(Keys.defaultWalletId)
             p.remove(Keys.displayName)
             // The photo belongs to the account like the name; its file goes with the ledger wipe (LocalLedgerReset). The

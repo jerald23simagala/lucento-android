@@ -58,6 +58,8 @@ class AppViewModel(
     entitlementsReady: Flow<Boolean> = flowOf(false),
     /** The plan this phone last showed; null in tests (no notice). */
     private val planMemory: com.lucento.app.data.entitlement.PlanMemory? = null,
+    /** Goals, for Lucento Pro's tour (null in tests). */
+    goals: com.lucento.app.data.repository.GoalRepository? = null,
 ) : ViewModel() {
     /** Lucento Pro: the one-time "your plan has ended" notice (docs/MONETIZATION.md §6.3 rule 7); null when there is none. */
     private val _planNotice = MutableStateFlow<com.lucento.app.domain.entitlement.PlanNotice?>(null)
@@ -80,6 +82,80 @@ class AppViewModel(
                     }
             }
         }
+    }
+
+    /** Lucento Pro's tour: whether any wallet / goal exists (an empty page has a different button to point at). */
+    val hasWallets: StateFlow<Boolean> = (wallets?.observeWallets()?.map { it.isNotEmpty() } ?: flowOf(true))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val hasGoals: StateFlow<Boolean> = (goals?.observeGoals()?.map { it.isNotEmpty() } ?: flowOf(true))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** Lucento Pro: the plan this phone holds right now (FREE in tests without one). */
+    val plan: StateFlow<com.lucento.app.domain.entitlement.EntitlementState> =
+        entitlements ?: MutableStateFlow(com.lucento.app.domain.entitlement.EntitlementState.FREE)
+
+    /** Lucento Pro's welcome (owner, 2026-11-12): what to play now, or null. See [com.lucento.app.domain.entitlement.ProWelcome]. */
+    private val _proWelcome = MutableStateFlow<com.lucento.app.domain.entitlement.ProWelcomeRun?>(null)
+    val proWelcome: StateFlow<com.lucento.app.domain.entitlement.ProWelcomeRun?> = _proWelcome
+
+    // What was started or presented in this process, before its stored copy lands: never played twice in a row.
+    private val welcomedThisProcess = mutableSetOf<String>()
+    private var medalPresentedThisProcess = false
+    private var latestForWelcome: Triple<com.lucento.app.domain.entitlement.EntitlementState, Boolean, UserPreferences>? = null
+
+    init {
+        if (entitlements != null) {
+            viewModelScope.launch {
+                combine(entitlements, entitlementsReady, preferences.preferences) { plan, ready, prefs -> Triple(plan, ready, prefs) }
+                    .collect { latest ->
+                        latestForWelcome = latest
+                        considerProWelcome()
+                    }
+            }
+        }
+    }
+
+    /**
+     * Starts the welcome when one is due: only once the plan has been re-read in this process (a stale cache never
+     * welcomes anyone), after onboarding and the guided setup, and never over a welcome already playing.
+     */
+    private fun considerProWelcome() {
+        val (plan, ready, prefs) = latestForWelcome ?: return
+        if (!ready || _proWelcome.value != null) return
+        if (!prefs.onboardingComplete || prefs.guideStep != null) return
+        _proWelcome.value = com.lucento.app.domain.entitlement.ProWelcome.toStart(
+            state = plan,
+            now = System.currentTimeMillis(),
+            welcomed = prefs.proWelcomed + welcomedThisProcess,
+            memberSince = prefs.proMemberSince,
+            presentedThisProcess = medalPresentedThisProcess,
+        )
+    }
+
+    /** The welcome began: its plans are welcomed for good (stored now, so a crash mid-tour can never loop it). */
+    fun proWelcomeStarted(run: com.lucento.app.domain.entitlement.ProWelcomeRun) {
+        if (run.planKeys.isEmpty()) return
+        welcomedThisProcess += run.planKeys
+        viewModelScope.launch { preferences.markProWelcomed(run.planKeys) }
+    }
+
+    /** The Lucento Pro medal is on screen: its date is kept (once; the medal stays even if Pro later ends). */
+    fun proMedalPresented() {
+        medalPresentedThisProcess = true
+        // Dated from when Pro began (a restore on a new phone keeps the person's real "member since").
+        val since = _proWelcome.value?.since ?: System.currentTimeMillis()
+        viewModelScope.launch { preferences.setProMemberSince(since) }
+    }
+
+    fun finishProWelcome() {
+        _proWelcome.value = null
+        considerProWelcome()
+    }
+
+    /** "Replay the Pro tour" on the Lucento Pro page: the tour and the summary, without the medal (owner). */
+    fun replayProTour() {
+        if (_proWelcome.value != null) return
+        _proWelcome.value = com.lucento.app.domain.entitlement.ProWelcomeRun(com.lucento.app.domain.entitlement.ProWelcomeMode.REPLAY, emptySet())
     }
 
     fun dismissPlanNotice() {
@@ -269,7 +345,7 @@ class AppViewModel(
         const val SPACE_FRESH_MILLIS = 60_000L
 
         val Factory = containerFactory {
-            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions, it.entitlements.state, it.entitlements.ready, it.planMemory)
+            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions, it.entitlements.state, it.entitlements.ready, it.planMemory, it.goals)
         }
     }
 }

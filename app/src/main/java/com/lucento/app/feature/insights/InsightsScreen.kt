@@ -1,5 +1,7 @@
 package com.lucento.app.feature.insights
 
+import com.lucento.app.core.designsystem.component.SpotlightKeys
+import com.lucento.app.core.designsystem.component.spotlightTarget
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -144,6 +146,7 @@ fun InsightsScreen(
         com.lucento.app.feature.reports.ReportList(
             onOpen = { kind -> reports.open(kind)?.let { openReport = it } },
             canOpen = { kind -> !kind.needsWallet || reportsState.statementWallets.isNotEmpty() },
+            firstRowModifier = Modifier.spotlightTarget(SpotlightKeys.REPORTS),
         )
         Spacer(Modifier.height(Spacing.section))
         if (data.loading) return@Column
@@ -154,13 +157,15 @@ fun InsightsScreen(
             Spacer(Modifier.height(Spacing.sm))
         }
         val colors = MaterialTheme.colorScheme
-        SegmentedToggle(
-            options = TrendPeriod.entries.map { it to (if (locked && it != TrendPeriod.THREE) "${it.label} · Pro" else it.label) },
-            selected = period,
-            onSelect = { chosenPeriod = it },
-            compact = true,
-            selectedTone = { com.lucento.app.core.designsystem.theme.TonePair(colors.primary, colors.onPrimary) },
-        )
+        Box(Modifier.spotlightTarget(SpotlightKeys.INSIGHTS_PERIOD)) {
+            SegmentedToggle(
+                options = TrendPeriod.entries.map { it to (if (locked && it != TrendPeriod.THREE) "${it.label} · Pro" else it.label) },
+                selected = period,
+                onSelect = { chosenPeriod = it },
+                compact = true,
+                selectedTone = { com.lucento.app.core.designsystem.theme.TonePair(colors.primary, colors.onPrimary) },
+            )
+        }
         if (lockedPeriodChosen) {
             Spacer(Modifier.height(Spacing.sm))
             com.lucento.app.feature.pro.ProNote(

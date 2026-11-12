@@ -22,6 +22,20 @@ import java.util.UUID
  * schedules. [scale] multiplies every amount (×10 for the website's peso figures; ×1 in CI).
  */
 object DemoMonth {
+    /**
+     * Lucento Pro's welcome plays straight after a plan arrives and covers the screen: a run that switches on a simulated
+     * plan to show every module marks that plan as already welcomed, with the medal presented, so nothing covers its
+     * captures. (The tour captures the welcome on purpose, after its test-store purchase.)
+     */
+    suspend fun skipProWelcome(container: AppContainer, plan: com.lucento.app.data.billing.SimulatedPlan) {
+        val now = System.currentTimeMillis()
+        val state = com.lucento.app.domain.entitlement.EntitlementState(
+            com.lucento.app.domain.entitlement.PurchaseInterpreter.entitlements(plan.purchases(now), now),
+        )
+        container.preferences.markProWelcomed(com.lucento.app.domain.entitlement.ProWelcome.planKeys(state, now))
+        container.preferences.setProMemberSince(now)
+    }
+
     suspend fun seed(container: AppContainer, currency: String, scale: Long, today: LocalDate) {
         fun money(major: Long, cents: Long = 0) = Money((major * 100 + cents) * scale, currency)
         val day = { d: Int -> today.withDayOfMonth(minOf(d, today.dayOfMonth)) }

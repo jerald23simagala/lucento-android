@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AllInclusive
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
@@ -90,6 +91,8 @@ fun ProScreen(
     onBack: () -> Unit,
     /** The feature whose lock led here; its sentence is shown first. */
     from: ProFeature? = null,
+    /** "Replay the Pro tour": the welcome's tour and summary again, without the medal (shown while Pro is active). */
+    onReplayTour: (() -> Unit)? = null,
     viewModel: ProViewModel = viewModel(factory = ProViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -124,12 +127,20 @@ fun ProScreen(
                 LucentoMascot(size = 64.dp, mood = MascotMood.Happy, animate = false)
             }
         }
+        // While Pro is active: the welcome's tour and summary again, without the medal.
+        if (onReplayTour != null && state.entitlements.has(com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, now)) {
+            Spacer(Modifier.height(Spacing.md))
+            LucentoSecondaryButton(text = "Replay the Pro tour", onClick = onReplayTour, icon = Icons.Outlined.Replay)
+        }
         if (from != null && !state.entitlements.has(from.requires, now)) {
             Spacer(Modifier.height(Spacing.md))
             InfoNote(ProCopy.lockedLine(from), icon = Icons.Outlined.WorkspacePremium)
         }
 
-        SectionHeader("Choose your plan", Modifier.padding(top = Spacing.section))
+        SectionHeader(
+            if (state.entitlements.has(com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, now)) "Plans" else "Choose your plan",
+            Modifier.padding(top = Spacing.section),
+        )
         // Lucento Cloud appears only for people who own Lucento; shown to anyone else it would undercut Pro (D-12).
         ProOffers.cards(state.entitlements, state.prices, now).forEachIndexed { i, card ->
             if (i > 0) Spacer(Modifier.height(Spacing.md))

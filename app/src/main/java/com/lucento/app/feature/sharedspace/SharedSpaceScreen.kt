@@ -1,5 +1,6 @@
 package com.lucento.app.feature.sharedspace
 
+import com.lucento.app.core.designsystem.component.spotlightTarget
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -151,7 +152,13 @@ fun SharedSpaceScreen(
                 body = "Lucento Shared connects two Lucento accounts to one set of finances. Sign in or create an account first — " +
                     "your data stays on this phone until you do.",
                 illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
-                action = { LucentoPrimaryButton(text = "Connect an account", onClick = onOpenAccount) },
+                action = {
+                    LucentoPrimaryButton(
+                        text = "Connect an account",
+                        onClick = onOpenAccount,
+                        modifier = Modifier.spotlightTarget(com.lucento.app.core.designsystem.component.SpotlightKeys.SHARED),
+                    )
+                },
             )
             is SpaceMode.Solo -> SoloPage(mode, state, viewModel)
             is SpaceMode.Owner -> OwnerPage(mode.snapshot, state, viewModel)
@@ -200,6 +207,7 @@ private fun ColumnScope.SoloPage(mode: SpaceMode.Solo, state: SharedSpaceUiState
     LucentoPrimaryButton(
         text = "Create a Shared Space",
         icon = Icons.Outlined.Group,
+        modifier = Modifier.spotlightTarget(com.lucento.app.core.designsystem.component.SpotlightKeys.SHARED),
         enabled = !state.busy,
         onClick = { viewModel.createSpace(name) },
     )
@@ -384,7 +392,12 @@ private fun PendingInviteCard(invite: SpaceInvite, busy: Boolean, onShare: () ->
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(Spacing.md))
-        LucentoPrimaryButton(text = "Share invitation", icon = Icons.Outlined.Share, onClick = onShare)
+        LucentoPrimaryButton(
+            text = "Share invitation",
+            icon = Icons.Outlined.Share,
+            onClick = onShare,
+            modifier = Modifier.spotlightTarget(com.lucento.app.core.designsystem.component.SpotlightKeys.SHARED),
+        )
         LucentoTextButton(text = "Withdraw invitation", enabled = !busy, onClick = onRevoke, modifier = Modifier.fillMaxWidth())
     }
 }

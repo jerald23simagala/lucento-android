@@ -106,6 +106,7 @@ class WebsiteShowcaseTest {
         // ---------------------------------------------------------------- the demo month, on a simulated Pro plan
         val simulator = checkNotNull(container.planSimulator) { "Test builds have the plan simulator" }
         runBlocking {
+            DemoMonth.skipProWelcome(container, com.lucento.app.data.billing.SimulatedPlan.PRO_MONTHLY)
             simulator.select(com.lucento.app.data.billing.SimulatedPlan.PRO_MONTHLY)
             container.entitlements.refresh()
         }

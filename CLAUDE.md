@@ -27,7 +27,8 @@ app/src/main/java/com/lucento/app/
   navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · (+) · Budget · Wallets; the centre +
                        opens the transaction composer in feature/capture; Insights, goals, scheduled and debts open from
                        Home's Quick links, categories from Budget), profile menu (Settings lives there); a new user's
-                       guided setup (feature/guide) follows onboarding
+                       guided setup (feature/guide) follows onboarding; Lucento Pro's welcome (feature/pro/welcome:
+                       a tour over the real screens via Modifier.spotlightTarget) plays after a confirmed plan
 ```
 This tree and the navigation notes above describe the current implementation. They are
 not mandatory UX or information-architecture constraints. Claude may propose and implement

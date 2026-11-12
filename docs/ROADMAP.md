@@ -184,6 +184,10 @@ recurring-schedule sync, syncing preferences.
   offline (`tools/sql-verify`, 30/30).
 - Before the first sale: target SDK 36 (`chore/target-sdk-36`), release signing, and Play Console products
   (docs/monetization/PLAY_CONSOLE_SETUP.md). Then Phase 5: the device matrix, website pricing pages and legal pages.
+- 2026-11-12 (`feature/pro-welcome`): Welcome to Pro after a confirmed purchase (docs/MONETIZATION.md §6.5). It is a
+  tour of up to ten stops over the real screens Pro opened, including Gemini (AI answers, Smarter reading) and Lucento
+  Shared. Then a summary of limits and online services, the Lucento Pro award on a Membership shelf, and the Pro badge
+  on the profile picture. "Replay the Pro tour" is on the Pro page. Version 0.5.4 (vc 9).
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
