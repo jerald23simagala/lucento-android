@@ -113,30 +113,44 @@ class EntitlementEvaluatorTest {
 
     @Test fun a_lifetime_nobody_has_confirmed_for_a_month_is_paused_not_ended() {
         val checkedAt = now - 1000 // the row's verifiedAt; checkedAt defaults to it
-        val justInside = checkedAt + Entitlement.LIFETIME_RECHECK_MILLIS - 1
+        val justInside = checkedAt + Entitlement.RECHECK_MILLIS - 1
         assertTrue("just inside the month", lifetimeOnly.has(Capability.LOCAL_PRO, justInside))
-        assertFalse(lifetimeOnly.lifetimeAwaitingCheck(justInside))
-        val month = checkedAt + Entitlement.LIFETIME_RECHECK_MILLIS
+        assertFalse(lifetimeOnly.awaitingCheck(justInside))
+        val month = checkedAt + Entitlement.RECHECK_MILLIS
         assertFalse(lifetimeOnly.has(Capability.LOCAL_PRO, month))
         assertEquals(DisplayPlan.FREE, lifetimeOnly.displayPlan(month))
-        assertTrue("paused, not refunded", lifetimeOnly.lifetimeAwaitingCheck(month))
+        assertTrue("paused, not refunded", lifetimeOnly.awaitingCheck(month))
         assertTrue(EntitlementEvaluator.access(lifetimeOnly, ProFeature.FOREIGN_CURRENCY_WALLETS, 0, month) is Access.Locked)
         // A refunded Lifetime is not waiting for anything.
         val revoked = EntitlementState(listOf(row(EntitlementSource.PLAY_LIFETIME, setOf(Capability.LOCAL_PRO), status = EntitlementStatus.REVOKED, expiresAt = null)))
-        assertFalse(revoked.lifetimeAwaitingCheck(month))
+        assertFalse(revoked.awaitingCheck(month))
     }
 
-    @Test fun the_monthly_check_applies_to_lifetime_rows_only() {
-        val month = now + Entitlement.LIFETIME_RECHECK_MILLIS
+    @Test fun the_monthly_check_covers_everything_bought_through_play_but_not_grants() {
+        val month = now + Entitlement.RECHECK_MILLIS
         val services = row(EntitlementSource.PLAY_LIFETIME_SERVICES, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = now + 300 * day)
+        val sub = row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), expiresAt = now + 300 * day)
+        val addon = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD), expiresAt = now + 300 * day)
         assertFalse("the included year pauses with it", services.covers(Capability.CLOUD, month))
-        // A subscription, the Cloud add-on or a grant keeps its own dates (L-1).
-        val sub = row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), expiresAt = now + 60 * day)
-        val addon = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD), expiresAt = now + 60 * day)
-        val grant = row(EntitlementSource.GRANT, setOf(Capability.LOCAL_PRO), expiresAt = now + 60 * day)
-        assertTrue(sub.covers(Capability.LOCAL_PRO, month))
-        assertTrue(addon.covers(Capability.CLOUD, month))
+        assertFalse("a year's subscription unheard of for a month", sub.covers(Capability.LOCAL_PRO, month))
+        assertFalse(addon.covers(Capability.CLOUD, month))
+        // Heard of within the month, a subscription runs to its own end (L-1).
+        assertTrue(sub.copy(checkedAtMillis = month - day).covers(Capability.LOCAL_PRO, month))
+        // A grant is the owner's, server-only, and keeps its own dates.
+        val grant = row(EntitlementSource.GRANT, setOf(Capability.LOCAL_PRO), expiresAt = now + 300 * day)
         assertTrue(grant.covers(Capability.LOCAL_PRO, month))
+    }
+
+    @Test fun a_subscription_waiting_for_a_check_is_paused_but_one_past_its_real_end_has_ended() {
+        val month = now + Entitlement.RECHECK_MILLIS
+        val serverSub = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), expiresAt = now + 300 * day)))
+        assertEquals(DisplayPlan.FREE, serverSub.displayPlan(month))
+        assertTrue("paused: its paid period runs on", serverSub.awaitingCheck(month))
+        val ended = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), expiresAt = now + 10 * day)))
+        assertFalse("the server's end date passed: it ended", ended.awaitingCheck(month))
+        // Play's reading carries only a read-again-by date, so past it the plan is still unknown, not ended.
+        val playSub = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), expiresAt = now + 10 * day, verifiedBy = Verifier.PLAY_LOCAL)))
+        assertTrue(playSub.awaitingCheck(month))
     }
 
     @Test fun lifetime_with_its_included_year_or_the_cloud_addon_shows_as_lifetime_with_services() {
@@ -152,6 +166,7 @@ class EntitlementEvaluatorTest {
         assertFalse(checked.has(Capability.CLOUD, later))
 
         val addon = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = later + 30 * day)
+            .copy(checkedAtMillis = later - day)
         assertEquals(DisplayPlan.LIFETIME_WITH_SERVICES, EntitlementState(checked.entitlements + addon).displayPlan(later))
     }
 

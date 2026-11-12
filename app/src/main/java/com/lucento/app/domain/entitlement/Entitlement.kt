@@ -88,8 +88,8 @@ data class Entitlement(
 
     /**
      * Whether this row grants [capability] at [now]. A row with an expiry is honoured for [offlineGraceMillis] past it,
-     * so a phone that could not re-check for a few days keeps working (docs §5.3 L-1). A Lifetime has no expiry, but it
-     * needs a fresh check at least every [LIFETIME_RECHECK_DAYS] days ([awaitsCheck], L-2).
+     * so a phone that could not re-check for a few days keeps working (docs §5.3 L-1). Anything bought through Google
+     * Play also needs a fresh check at least every [RECHECK_DAYS] days ([awaitsCheck], L-2), a Lifetime included.
      */
     fun covers(capability: Capability, now: Long, offlineGraceMillis: Long = OFFLINE_GRACE_MILLIS): Boolean =
         capability in grants && status.grantsAccess &&
@@ -97,18 +97,24 @@ data class Entitlement(
             !awaitsCheck(now)
 
     /**
-     * A Lifetime row nobody has confirmed for [LIFETIME_RECHECK_DAYS] days (owner decision 2026-11-12, docs §5.3 L-2). A
-     * refund reaches the phone through Google Play or Lucento's server. A phone that stops letting Lucento hear from
-     * both can't keep a refunded Lifetime for good. An owner keeps it as long as either source answers once a month.
+     * A row bought through Google Play that nobody has confirmed for [RECHECK_DAYS] days (owner decisions 2026-11-12, docs
+     * §5.3 L-2). A refund reaches the phone through Google Play or Lucento's server. A phone that stops letting Lucento
+     * hear from both can't keep a refunded plan, a Lifetime or a year's subscription, past the month. A buyer keeps it as
+     * long as either source answers once a month. Grants are the owner's, server-only, and keep their own dates.
      */
     fun awaitsCheck(now: Long): Boolean =
-        source in LIFETIME_SOURCES && now >= Math.addExact(checkedAtMillis, LIFETIME_RECHECK_MILLIS)
+        source in PLAY_SOURCES && now >= Math.addExact(checkedAtMillis, RECHECK_MILLIS)
 
     companion object {
         const val OFFLINE_GRACE_MILLIS: Long = 3L * 24 * 60 * 60 * 1000
-        const val LIFETIME_RECHECK_DAYS: Int = 30
-        const val LIFETIME_RECHECK_MILLIS: Long = LIFETIME_RECHECK_DAYS * 24L * 60 * 60 * 1000
-        private val LIFETIME_SOURCES = setOf(EntitlementSource.PLAY_LIFETIME, EntitlementSource.PLAY_LIFETIME_SERVICES)
+        const val RECHECK_DAYS: Int = 30
+        const val RECHECK_MILLIS: Long = RECHECK_DAYS * 24L * 60 * 60 * 1000
+        private val PLAY_SOURCES = setOf(
+            EntitlementSource.PLAY_SUBSCRIPTION,
+            EntitlementSource.PLAY_LIFETIME,
+            EntitlementSource.PLAY_LIFETIME_SERVICES,
+            EntitlementSource.PLAY_CLOUD_ADDON,
+        )
     }
 }
 
@@ -144,15 +150,16 @@ data class EntitlementState(val entitlements: List<Entitlement>) {
     fun pending(): Entitlement? = entitlements.firstOrNull { it.status == EntitlementStatus.PENDING }
 
     /**
-     * A Pro Lifetime that stopped counting only because nobody has confirmed it for a month ([Entitlement.awaitsCheck]):
-     * paused, not refunded. Google Play or the server answering once brings it back.
+     * Pro stopped counting only because nobody has confirmed the purchase for a month ([Entitlement.awaitsCheck]):
+     * paused, not ended. Google Play or the server answering once brings it back. A Play reading's end date is only
+     * the date it must be read again by, so it doesn't count as the plan ending; a server row past its real end does.
      */
-    fun lifetimeAwaitingCheck(now: Long): Boolean =
-        entitlements.none { it.source == EntitlementSource.PLAY_LIFETIME && it.covers(Capability.LOCAL_PRO, now) } &&
-            entitlements.any {
-                it.source == EntitlementSource.PLAY_LIFETIME && Capability.LOCAL_PRO in it.grants && it.status.grantsAccess &&
-                    it.awaitsCheck(now)
-            }
+    fun awaitingCheck(now: Long): Boolean =
+        !has(Capability.LOCAL_PRO, now) && entitlements.any {
+            Capability.LOCAL_PRO in it.grants && it.status.grantsAccess && it.awaitsCheck(now) &&
+                (it.verifiedBy == Verifier.PLAY_LOCAL || it.expiresAtMillis == null ||
+                    now < Math.addExact(it.expiresAtMillis, Entitlement.OFFLINE_GRACE_MILLIS))
+        }
 
     companion object {
         val FREE = EntitlementState(emptyList())

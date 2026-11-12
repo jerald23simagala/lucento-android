@@ -132,7 +132,7 @@ class ProViewModel(
                 val before = entitlements.state.value.displayPlan(clock())
                 val outcome = runCatching { entitlements.refresh() }.getOrElse { RefreshOutcome(playReached = false, serverReached = false) }
                 val after = entitlements.state.value.displayPlan(clock())
-                val awaitingCheck = entitlements.state.value.lifetimeAwaitingCheck(clock())
+                val awaitingCheck = entitlements.state.value.awaitingCheck(clock())
                 local.update { it.copy(message = ProCopy.restoreMessage(before, after, outcome, awaitingCheck)) }
             } finally {
                 local.update { it.copy(restoring = false) }

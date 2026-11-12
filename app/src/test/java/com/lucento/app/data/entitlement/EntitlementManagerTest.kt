@@ -81,17 +81,17 @@ class EntitlementManagerTest {
         assertTrue("a failed Play query removes nothing", m.state.value.has(Capability.LOCAL_PRO, now))
         assertEquals(DisplayPlan.LIFETIME_WITH_SERVICES, m.state.value.displayPlan(now))
 
-        now = readAt + Entitlement.LIFETIME_RECHECK_MILLIS     // a month without a word from Play or the server (L-2)
+        now = readAt + Entitlement.RECHECK_MILLIS     // a month without a word from Play or the server (L-2)
         m.refresh()
         assertFalse(m.state.value.has(Capability.LOCAL_PRO, now))
         assertEquals(DisplayPlan.FREE, m.state.value.displayPlan(now))
-        assertTrue("paused, not refunded", m.state.value.lifetimeAwaitingCheck(now))
+        assertTrue("paused, not refunded", m.state.value.awaitingCheck(now))
         assertTrue(m.check(ProFeature.FOREIGN_CURRENCY_WALLETS, 0) is Access.Locked)
 
         play.failure = null                                   // Play answers again
         m.refresh()
         assertTrue(m.state.value.has(Capability.LOCAL_PRO, now))
-        assertFalse(m.state.value.lifetimeAwaitingCheck(now))
+        assertFalse(m.state.value.awaitingCheck(now))
     }
 
     @Test fun past_the_included_year_local_pro_stays_while_play_keeps_confirming_it() = runTest {
@@ -116,7 +116,7 @@ class EntitlementManagerTest {
         val heardAt = now
 
         serverRows = null                                     // the server unreachable from here on
-        now = heardAt + Entitlement.LIFETIME_RECHECK_MILLIS - 1
+        now = heardAt + Entitlement.RECHECK_MILLIS - 1
         m.refresh()
         assertTrue("within the month", m.state.value.has(Capability.LOCAL_PRO, now))
         // And after a restart, from the cache.
@@ -124,13 +124,50 @@ class EntitlementManagerTest {
         restarted.loadCached()
         assertTrue(restarted.state.value.has(Capability.LOCAL_PRO, now))
 
-        now = heardAt + Entitlement.LIFETIME_RECHECK_MILLIS
+        now = heardAt + Entitlement.RECHECK_MILLIS
         assertFalse(m.state.value.has(Capability.LOCAL_PRO, now))
-        assertTrue(m.state.value.lifetimeAwaitingCheck(now))
+        assertTrue(m.state.value.awaitingCheck(now))
 
         serverRows = listOf(serverLifetime(verifiedAt = heardAt - 200 * day)) // the server answers again
         m.refresh()
         assertTrue(m.state.value.has(Capability.LOCAL_PRO, now))
+    }
+
+    private fun serverSubscription(verifiedAt: Long, expiresAt: Long, tokenHash: String? = null) = Entitlement(
+        source = EntitlementSource.PLAY_SUBSCRIPTION, status = EntitlementStatus.ACTIVE, grants = Capability.entries.toSet(),
+        startsAtMillis = verifiedAt, expiresAtMillis = expiresAt, productId = PlayProducts.PRO_SUBSCRIPTION, basePlanId = "annual",
+        purchaseTokenHash = tokenHash, verifiedAtMillis = verifiedAt, verifiedBy = Verifier.SERVER, autoRenewing = true,
+    )
+
+    @Test fun a_refunded_annual_subscriber_who_blocks_the_server_is_paused_within_a_month() = runTest {
+        play.setPurchases(listOf(subscriptionPurchase()))
+        serverRows = listOf(serverSubscription(verifiedAt = now, expiresAt = now + 360 * day))
+        val m = manager()
+        m.refresh()
+        assertEquals(DisplayPlan.PRO, m.state.value.displayPlan(now))
+        val heardAt = now
+
+        play.setPurchases(emptyList())                        // refunded with revoke: Play no longer lists it
+        serverRows = null                                     // and Lucento's server is blocked from here on
+        now = heardAt + Entitlement.RECHECK_MILLIS - 1
+        m.refresh()
+        assertTrue("the cached server row, within the month", m.state.value.has(Capability.LOCAL_PRO, now))
+        now = heardAt + Entitlement.RECHECK_MILLIS
+        assertFalse("not the rest of the paid year", m.state.value.has(Capability.LOCAL_PRO, now))
+        assertTrue(m.state.value.awaitingCheck(now))
+    }
+
+    @Test fun an_honest_subscriber_stays_pro_past_a_month_while_play_keeps_confirming_even_with_the_server_down() = runTest {
+        play.setPurchases(listOf(subscriptionPurchase()))
+        serverRows = listOf(serverSubscription(verifiedAt = now, expiresAt = now + 360 * day))
+        val m = manager()
+        m.refresh()
+        serverRows = null                                     // the server unreachable for two months
+        now += 60 * day
+        m.refresh()                                           // but Play answers
+        assertTrue(m.state.value.has(Capability.LOCAL_PRO, now))
+        assertEquals(DisplayPlan.PRO, m.state.value.displayPlan(now))
+        assertFalse(m.state.value.awaitingCheck(now))
     }
 
     @Test fun a_purchase_the_server_revoked_stays_off_while_plays_copy_on_the_phone_still_lists_it() = runTest {

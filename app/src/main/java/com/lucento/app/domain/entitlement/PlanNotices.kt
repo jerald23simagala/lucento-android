@@ -16,28 +16,31 @@ enum class PlanNotice {
 
     /** A Pro Lifetime nobody could confirm for a month: paused until Google Play or the server answers (docs §5.3 L-2). */
     LIFETIME_NEEDS_CHECK,
+
+    /** A subscription nobody could confirm for a month: paused until Google Play or the server answers (docs §5.3 L-2). */
+    PRO_NEEDS_CHECK,
 }
 
 object PlanNotices {
     /**
      * What to tell the person when the plan last seen on this phone was [previous] and it is now [current].
-     * [lifetimeAwaitingCheck]: a Lifetime only paused for want of a check ([EntitlementState.lifetimeAwaitingCheck]).
+     * [awaitingCheck]: Pro only paused for want of a check ([EntitlementState.awaitingCheck]).
      */
-    fun after(previous: DisplayPlan?, current: DisplayPlan, lifetimeAwaitingCheck: Boolean = false): PlanNotice? {
+    fun after(previous: DisplayPlan?, current: DisplayPlan, awaitingCheck: Boolean = false): PlanNotice? {
         if (previous == null || previous == current) return null
         return when (previous) {
             DisplayPlan.FREE -> null
             DisplayPlan.PRO -> when (current) {
-                DisplayPlan.FREE -> PlanNotice.PRO_ENDED
+                DisplayPlan.FREE -> if (awaitingCheck) PlanNotice.PRO_NEEDS_CHECK else PlanNotice.PRO_ENDED
                 DisplayPlan.LIFETIME -> PlanNotice.SERVICES_ENDED
                 else -> null
             }
             DisplayPlan.LIFETIME -> when (current) {
-                DisplayPlan.FREE -> lifetimeEnded(lifetimeAwaitingCheck)
+                DisplayPlan.FREE -> lifetimeEnded(awaitingCheck)
                 else -> null
             }
             DisplayPlan.LIFETIME_WITH_SERVICES -> when (current) {
-                DisplayPlan.FREE -> lifetimeEnded(lifetimeAwaitingCheck)
+                DisplayPlan.FREE -> lifetimeEnded(awaitingCheck)
                 DisplayPlan.LIFETIME -> PlanNotice.SERVICES_ENDED
                 else -> null
             }

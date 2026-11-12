@@ -73,7 +73,7 @@ class AppViewModel(
                 combine(entitlements, entitlementsReady) { plan, ready ->
                     if (ready) {
                         val now = System.currentTimeMillis()
-                        plan.displayPlan(now) to plan.lifetimeAwaitingCheck(now)
+                        plan.displayPlan(now) to plan.awaitingCheck(now)
                     } else {
                         null
                     }

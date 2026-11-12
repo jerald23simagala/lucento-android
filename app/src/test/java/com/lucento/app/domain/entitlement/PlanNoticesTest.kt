@@ -31,8 +31,9 @@ class PlanNoticesTest {
     }
 
     @Test fun a_lifetime_paused_for_want_of_a_check_says_so_and_not_that_it_was_refunded() {
-        assertEquals(PlanNotice.LIFETIME_NEEDS_CHECK, PlanNotices.after(DisplayPlan.LIFETIME, DisplayPlan.FREE, lifetimeAwaitingCheck = true))
-        assertEquals(PlanNotice.LIFETIME_NEEDS_CHECK, PlanNotices.after(DisplayPlan.LIFETIME_WITH_SERVICES, DisplayPlan.FREE, lifetimeAwaitingCheck = true))
-        assertNull(PlanNotices.after(DisplayPlan.FREE, DisplayPlan.FREE, lifetimeAwaitingCheck = true))
+        assertEquals(PlanNotice.LIFETIME_NEEDS_CHECK, PlanNotices.after(DisplayPlan.LIFETIME, DisplayPlan.FREE, awaitingCheck = true))
+        assertEquals(PlanNotice.LIFETIME_NEEDS_CHECK, PlanNotices.after(DisplayPlan.LIFETIME_WITH_SERVICES, DisplayPlan.FREE, awaitingCheck = true))
+        assertNull(PlanNotices.after(DisplayPlan.FREE, DisplayPlan.FREE, awaitingCheck = true))
+        assertEquals(PlanNotice.PRO_NEEDS_CHECK, PlanNotices.after(DisplayPlan.PRO, DisplayPlan.FREE, awaitingCheck = true))
     }
 }

@@ -407,7 +407,7 @@ One Boolean cannot say any of that. Why not an enum `FREE | PRO | LIFETIME`: the
 3. **Cached snapshot** (DataStore) — what the UI shows in the first frame and whenever 1 and 2 are unavailable.
 
 Rule: a newer verified reading replaces an older one **per source**. An unreachable source never downgrades anything,
-except that a Lifetime needs one check a month (L-2). A `REVOKED` from the server or a purchase missing from Play's
+except that anything bought through Google Play needs one check a month (L-2). A `REVOKED` from the server or a purchase missing from Play's
 list *after a successful query* does. A purchase the server revoked stays revoked on the phone while Play's copy still
 lists it (same purchase token, offline and on Play's pushes too), and a new purchase counts at once (owner decision
 2026-11-12: Play's copy on the phone can lag behind a refund).
@@ -437,8 +437,8 @@ verification and is ignored.
 
 | Rule | Subscription sources | Lifetime (`LOCAL_PRO`) |
 |---|---|---|
-| L-1 Honoured offline | until `expiresAt` + 3 days (Play's own grace / hold states are already inside `expiresAt` once verified) | for **a month after the last check** by Play or the server. `expiresAt = null`, so one check a month keeps it for good |
-| L-2 Verification failure | no change until expiry | **paused, never ended**. After 30 days without a check (a successful Play reading that lists it, or a server fetch), it stops counting until either answers. The person sees "Lucento needs to check your Pro Lifetime" (`PlanNotice.LIFETIME_NEEDS_CHECK`). Only a successful Play query that omits the purchase, or a server `REVOKED`, ends it. Owner decision 2026-11-12: switching off the Play Store app, or blocking Lucento's server, no longer keeps a refunded Lifetime |
+| L-1 Honoured offline | until `expiresAt` + 3 days (Play's own grace / hold states are already inside `expiresAt` once verified), and at most a month after the last check by Play or the server (L-2) | for **a month after the last check** by Play or the server. `expiresAt = null`, so one check a month keeps it for good |
+| L-2 Verification failure | no change until expiry, but after 30 days without a check it is **paused** until Play or the server answers ("Lucento needs to check your Lucento Pro", `PlanNotice.PRO_NEEDS_CHECK`). Owner decision 2026-11-12: a refunded annual subscriber can't keep the rest of the paid year by blocking Lucento's server | **paused, never ended**. After 30 days without a check (a successful Play reading that lists it, or a server fetch), it stops counting until either answers. The person sees "Lucento needs to check your Pro Lifetime" (`PlanNotice.LIFETIME_NEEDS_CHECK`). Only a successful Play query that omits the purchase, or a server `REVOKED`, ends it. Owner decision 2026-11-12: switching off the Play Store app, or blocking Lucento's server, no longer keeps a refunded Lifetime |
 | L-3 Re-verification | every start (Play), every 12 h open (server) | opportunistic; informational |
 | L-4 Clock tampering | can extend a lapsed subscription offline by at most the grace; accepted | turning the clock back can stretch the month; accepted (it breaks everything else on the phone) |
 | L-5 MAC failure (tampered / copied) | entry ignored → Free until re-verified | entry ignored → Free until Play or the account restores it (one tap, needs internet once) |
@@ -446,7 +446,8 @@ verification and is ignored.
 `checkedAt` (2026-11-12) is when this phone last heard about a row from its verifier: Play's reading for a Play row,
 the latest successful server fetch for a server row. The cached snapshot stores it; a snapshot written before it
 reads as checked when verified. Play reads from its own copy on the phone and usually works offline, but that copy can
-go stale offline, so a phone with no internet for a month pauses a Lifetime until it is online once.
+go stale offline, so a phone with no internet for a month pauses a plan bought through Play until it is online
+once. Grants are server-only and keep their own dates.
 
 The Lifetime's **12-month services period** is a `PLAY_LIFETIME` entitlement granting `{CLOUD, AI_PRO, SHARED}` with
 `expiresAt = firstVerifiedAt + 365 days`, written by the **server** at first verification (so a reinstall cannot

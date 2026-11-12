@@ -49,8 +49,8 @@ object EntitlementMerge {
     }
 
     /**
-     * True while the row still allows access: a granting status, its dates with the offline grace, and (for a Lifetime)
-     * a check within the month. A server Lifetime the phone hasn't heard about for a month gives way to Play's fresh word.
+     * True while the row still allows access: a granting status, its dates with the offline grace, and a check within
+     * the month. A server row the phone hasn't heard about for a month gives way to Play's fresh word.
      */
     private fun Entitlement.stillCurrent(now: Long): Boolean =
         status.grantsAccess && (expiresAtMillis == null || now < Math.addExact(expiresAtMillis, Entitlement.OFFLINE_GRACE_MILLIS)) &&
