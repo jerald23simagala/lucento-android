@@ -90,10 +90,16 @@ private fun scrimAlpha(): Float = tourScrimAlpha()
 @Composable
 private fun cardBorder() = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
 
-/** Takes every touch, so nothing beneath the tour is changed by accident; only its own buttons respond. */
 /** The even gap between a lit control and its ring. */
 private val RingGap = 6.dp
 
+/**
+ * Takes every touch that lands on the dimmed screen, so nothing beneath the tour is changed by accident. It goes on the
+ * scrim, which lies under the cards, never on a box around them: a finger always drifts a pixel or two between down and
+ * up, and a parent that consumes that movement cancels every button inside it. Around the cards it left the welcome's
+ * buttons dead on real phones while `performClick`, which never moves, passed (owner's report, 2026-11-12, KNOWN_ISSUES
+ * PW-1; `ProWelcomeRealTapTest` presses them with a finger).
+ */
 private fun Modifier.blockTouches(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) awaitPointerEvent().changes.forEach { it.consume() }
@@ -109,13 +115,14 @@ internal fun ProTourCurtain(title: String, body: String, celebrate: Boolean, onS
     val reduced = LucentoTheme.reducedMotion
     val appear = remember { Animatable(if (reduced) 1f else 0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(420, easing = FastOutSlowInEasing)) }
-    Box(Modifier.fillMaxSize().blockTouches(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         SpotlightScrim(
             hole = null,
             scrim = MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha() * appear.value),
             ring = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().blockTouches(),
         )
+        // Above the scrim: a finger on the card reaches its buttons, and stops at the card everywhere else.
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -210,8 +217,7 @@ internal fun ProTourStopOverlay(
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .onGloballyPositioned { origin = it.boundsInWindow().topLeft }
-            .blockTouches(),
+            .onGloballyPositioned { origin = it.boundsInWindow().topLeft },
     ) {
         // Lit only where it can be seen: the window and its ring stay inside the screen, below the status bar and above
         // the navigation bar (a full-width control, like the composer's bar, is trimmed at the sides).
@@ -227,7 +233,7 @@ internal fun ProTourStopOverlay(
             padding = RingGap,
             scrim = MaterialTheme.colorScheme.scrim.copy(alpha = scrimAlpha() * appear.value),
             ring = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().blockTouches(),
         )
         val height = with(density) { maxHeight.toPx() }
         val top = WindowInsets.safeDrawing.getTop(density) + with(density) { Spacing.md.toPx() }
@@ -245,6 +251,7 @@ internal fun ProTourStopOverlay(
             animationSpec = if (reduced) androidx.compose.animation.core.snap() else tween(320, easing = FastOutSlowInEasing),
             label = "caption",
         )
+        // Above the scrim: a finger on the card reaches its buttons, and stops at the card everywhere else.
         CaptionCard(
             progress = ProWelcomeCopy.progress(stop, index, total),
             index = index,

@@ -35,6 +35,21 @@
 | OT-24 | **Switch on purchase checks and refund checks together** (owner's choice, 2026-11-12): fix Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (KNOWN_ISSUES PB-2); add `LUCENTO_RTDN_PUSH_TOKEN` with the Pub/Sub topic, the push subscription and Play's real-time developer notifications; add `CRON_SECRET` (KNOWN_ISSUES PB-3); redeploy production; then Send test notification and Restore purchases (PLAY_CONSOLE_SETUP steps 6, 8 and 9) | **Open** (owner, 2026-11-12; click-by-click steps given) | Until then the server records no purchase and never hears about a refund |
 | OT-22 | **Security remediation (2026-11-10)**: work through `docs/security/OWNER_ACTIONS_REQUIRED.md` §1–§14 — Gemini paid tier, Confirm email, plan decision, then apply the four `20261111*` migrations (lucento-test → production), deploy the website branch `security/release-hardening`, internal-track purchase and refund checks | **Open** | The release stays NOT APPROVED until §1, §2, §5/§6, §13 and §14 are done (`docs/security/REMEDIATION_REPORT.md`) |
 
+## Pro welcome: an unboxing reveal replaces the spotlight tour (owner, 2026-11-12)
+
+The tour's buttons were found dead on real phones (KNOWN_ISSUES PW-1). The owner chose to retire the spotlight tour,
+keeping the excitement of the upgrade and the badge award. The fix on `fix/pro-tour-real-taps` is committed locally and
+**held**: it ships with the reveal in one release (owner's choice). Nothing is pushed until then.
+
+1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
+   picks one.
+2. Build the pick in `feature/pro/welcome/`. Pro's perks flip open one by one as cards, each saying where it lives,
+   then the award (`ProMedalCeremony`) and the badge flight. It uses the same perks and copy as the tour's stops
+   (`ProWelcome.stops`, `ProWelcomeCopy.stop`), and the Pro page replays it. Retire `ProTourStopOverlay`, the curtain's
+   auto-advance and the screens' spotlight targets; the badge flight keeps the profile picture's.
+3. Finger-tap tests for the reveal (the shared `Finger` helper), ScreenshotTourTest frames, and docs (MONETIZATION
+   §6.5, CUSTOMER_COPY). Then one release with the fix.
+
 ## Tester round 3 — follow-ups (2026-11-11, `feature/tester-round-3`)
 
 - **Second pass done (owner comments 1–5)**: reports moved to Insights under Ask Lucento with the shared, restyled

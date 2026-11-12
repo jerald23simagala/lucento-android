@@ -15,6 +15,12 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Pro welcome on real phones (2026-11-12, `fix/pro-tour-real-taps`)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| PW-1 | On a real phone no button of the Pro welcome answered a tap: Next, Back and End tour on the tour's cards, Show me and Skip the tour on the curtain. Only the system Back key worked, and the curtain still moved on by itself. The overlay's touch blocker wrapped the cards and consumed every pointer change. A finger always drifts a pixel or two between down and up, and Compose cancels a click when something else consumes that movement. `performClick` and still down-up injections never move, so every emulator run had passed | Verified: owner's Galaxy S8 (Android 9, 0.5.4 vc 9), first run and a replay, 2026-11-12. Reproduced on the API 28 emulator with an injected finger (down, two 1–2 px moves, up): the tour stopped at Next, and the curtain's Skip the tour counted 0 presses | **Fixed on `fix/pro-tour-real-taps`**: the blocker sits on the scrim, under the cards, never around them. `ProWelcomeRealTapTest` (the tour over the real app) and `ProTourCurtainFingerTest` (the curtain) press with a finger, pass on the fix and run in CI. **Held** (owner, 2026-11-12): it ships together with the unboxing reveal that replaces the tour (NEXT_TASKS), so 0.5.4 (vc 9) keeps the bug until then. Any future overlay with buttons: put the blocker beside the content, never around it |
+
 ## Play billing licence key (2026-11-11, `fix/play-licence-key-check`)
 
 | ID | Issue | Evidence | Next step |

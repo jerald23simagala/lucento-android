@@ -193,6 +193,9 @@ recurring-schedule sync, syncing preferences.
   - Anything bought through Google Play (Lifetime or subscription) needs one check a month, from Google Play or the
     server (MONETIZATION §5.3 L-2).
   - The server's refund checks are switched on by the owner (OT-24).
+- 2026-11-12 (`fix/pro-tour-real-taps`): the Pro welcome's buttons work on real phones. Its touch blocker wrapped the
+  cards, so a finger's small drift cancelled every press (KNOWN_ISSUES PW-1). Finger-tap tests now cover the tour and
+  the curtain in CI. Held: the owner chose an unboxing reveal to replace the tour, and both ship in one release.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.

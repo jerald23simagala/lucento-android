@@ -268,3 +268,30 @@ What changed:
     server) is fixed by this.
 - Tests:
   - 14 new JVM tests, and three updated ones that encoded "a Lifetime never needs a check". Results are in the PR.
+
+## Pro welcome buttons dead on real phones — 2026-11-12 (`fix/pro-tour-real-taps`)
+
+On the owner's Galaxy S8 (Android 9, 0.5.4 vc 9), nothing on the Pro tour's card answered a tap: not Next, not End
+tour. That held on the first run and on a replay; only the system Back key worked. The curtain's buttons were dead the
+same way. They only looked fine because the curtain moves on by itself (KNOWN_ISSUES PW-1).
+
+- **Cause:**
+  - The overlay's touch blocker wrapped the cards and consumed every pointer change.
+  - A finger always drifts a pixel or two between down and up, and Compose cancels a click when something else
+    consumes that movement.
+  - The emulator runs pressed with `performClick` or a still down-up. Neither moves, so they all passed.
+- **Fix (`ProTourOverlay.kt`):** the blocker sits on the scrim, under the cards, never around them. A finger on a card
+  reaches its buttons; a finger on the dimmed screen still stops there.
+- **Tests,** through a shared `Finger` helper (down, two 1–2 px moves, up, injected into Android's input system):
+  - `ProWelcomeRealTapTest` runs the tour over the real app. Next, Back and End tour answer, and a tap on the dimmed
+    dock leaves the app on Wallets.
+  - `ProTourCurtainFingerTest` runs the curtain on its own, away from its timer. Skip the tour and Show me answer, and
+    taps on the scrim or the card's words don't reach the app beneath.
+  - **Results:**
+    - Old overlay (API 28 emulator, animations on): the tour stopped at Next, and the curtain counted 0 presses of
+      Skip the tour.
+    - Fixed overlay: both tests pass, and both are in CI's emulator job.
+    - 1,330 JVM tests with 0 failures, and `lintDebug` with 0 errors.
+    - `assembleDebug` and the instrumented-test compile pass.
+- **Owner decision (2026-11-12):** retire the spotlight tour for an unboxing reveal. This fix is held, committed
+  locally and not pushed, and ships with the reveal in one release (NEXT_TASKS).
