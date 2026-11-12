@@ -380,4 +380,28 @@ owner decides next (NEXT_TASKS). Fixed since, all on `feature/pro-reveal`:
 - **Owner (2026-11-12):**
   - "PR + review together": release 0.5.5 (version code 10), merged only if CI passes and critic round 4 finds no
     hard-gate failure;
-  - keep "AI adviser" and the rosette medal.
+  - keep "AI adviser" and the rosette medal;
+  - large text "works to 200 %, polished to 130 %": cut-off or overlapping text, or an unusable control, up to 200 % is
+    a hard fail; looks are judged at 100–130 %.
+
+**Critic round 4** (PR #56 at 9f01196): **REVISE, 3.4**, with no hard gate failing. Fixed before merging, in
+`a1c994e`:
+- **The brand name:** the first headline broke it at 360 dp ("Lu- / cento Pro"). Stage headlines no longer hyphenate,
+  and "Lucento Pro" never breaks.
+- **The online-service cards:** each says where it stands under its title ("Off · needs your Lucento account" …
+  "On"). The AI card states its allowance only once the server has confirmed it ("Included until …" before then).
+- **The top band:** 64 dp once the deck is open, so the cards get the height.
+- **Line breaks:** no-break spaces in counts, "side by side", menu paths (which break only between steps) and "Pro
+  Lifetime ·"; card titles and chips break evenly.
+- **Smaller fixes:** the band's second disc is gone; the hidden Skip is disabled; "one Partner" comes from
+  `PlanCatalog`.
+- **MONETIZATION:**
+  - the welcome's rules updated;
+  - D-13 and §5 now say the Lifetime's services year runs from the purchase, which is how the app (`PurchaseInterpreter`)
+    and the server (`20261108090000_play_purchases.sql`) compute it. The docs had said "from first verification".
+- **Tests:**
+  - 1,336 JVM tests: 1,334 passed. The 2 that failed were `ProxyCallTest` socket timeouts while the emulator booted,
+    in code untouched by this work; that class passed 8/8 when re-run alone.
+  - `lintDebug`: 0 errors.
+- **Not changed (owner's calls):** the black stage; the award's confetti and rays (the badge award is a must-keep);
+  the "AI adviser" name; the rosette.

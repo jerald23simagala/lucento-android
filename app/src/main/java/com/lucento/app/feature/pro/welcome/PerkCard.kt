@@ -306,7 +306,8 @@ private fun ServiceStatus(state: ProWelcomeCopy.ServiceState) {
             modifier = Modifier.padding(top = 2.dp).size(16.dp),
         )
         Spacer(Modifier.width(Spacing.xs))
-        Text(state.text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), color = tint)
+        // Even lines: "Off · needs your / Lucento account", never a last word alone.
+        Text(state.text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold, lineBreak = LineBreak.Heading), color = tint)
     }
 }
 

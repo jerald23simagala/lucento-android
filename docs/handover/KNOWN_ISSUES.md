@@ -15,6 +15,12 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Large text (owner rule 2026-11-12: works to 200 %, polished to 130 %)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| LT-1 | At 200 % text on a 360 dp phone, Home cuts the net-worth label ("NET WALL…") and clips the notification bell's count. Under the owner's large-text rule, cut-off text up to 200 % is a defect. | **Verified**: emulator capture `w360-*-text200-22-ring` (Pro welcome run, Home behind the badge), seen by design critic round 4. | Its own Home check: shorten or wrap the label, size the bell's badge from its text. Not part of release 0.5.5. |
+
 ## Pro welcome on real phones (2026-11-12, `fix/pro-tour-real-taps`)
 
 | ID | Issue | Evidence | Next step |

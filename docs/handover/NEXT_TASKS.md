@@ -56,8 +56,12 @@ Critic round 3 on the app's captures returned REJECT, 3.1. Two gates failed: the
 - Also decided: keep the "AI adviser" name and the medal's rosette. The solid stage and ten cards one at a time stay
   (the prototype pick).
 
+Round 4: REVISE 3.4, with no hard gate failing. Its two P1s (the brand name broken across lines; the service cards'
+conditions hidden at large text) and most P2/P3s are fixed in `a1c994e`. They are re-captured from one APK in studio
+`qa/out/reveal-app-r4/` (with `BUILD.txt`).
+
 Next:
-- (a) the PR, round 4 and the merge as above;
+- (a) push the round-4 fixes to PR #56, merge when CI is green, then the AAB from main goes to Downloads;
 - (b) on the Galaxy S8 from internal testing, check:
   - TalkBack: Next three times, then Previous once; one announcement per card;
   - how dense the haptics feel;
