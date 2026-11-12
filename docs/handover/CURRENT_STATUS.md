@@ -377,3 +377,7 @@ owner decides next (NEXT_TASKS). Fixed since, all on `feature/pro-reveal`:
   reduced motion).
 - **Not verified:** TalkBack, haptics and Android 14+ large text, which need a real phone; the "confirming" state,
   which needs a signed-in account (its copy is JVM-tested).
+- **Owner (2026-11-12):**
+  - "PR + review together": release 0.5.5 (version code 10), merged only if CI passes and critic round 4 finds no
+    hard-gate failure;
+  - keep "AI adviser" and the rosette medal.

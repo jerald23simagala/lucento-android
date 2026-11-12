@@ -48,16 +48,22 @@ Critic round 3 on the app's captures returned REJECT, 3.1. Two gates failed: the
 200 % text. Every P0 and P1 is fixed and re-captured (studio `critic/reports/2026-11-12-pro-reveal-r3*`,
 `qa/out/reveal-app-r3/`). Three rounds without APPROVE end the loop, so it is with the owner.
 
+**Owner (2026-11-12):** "PR + review together".
+- Push and open the PR as release 0.5.5 (version code 10): #55's refund guards, the PW-1 fix and the reveal.
+- A fresh critic runs round 4 while CI runs.
+- Merge only if CI passes and round 4 finds no hard-gate failure, then the AAB built from main goes to Downloads for
+  internal testing.
+- Also decided: keep the "AI adviser" name and the medal's rosette. The solid stage and ten cards one at a time stay
+  (the prototype pick).
+
 Next:
-- (a) the owner decides: a fourth critic round, and/or push, PR and release (one release with #55's refund guards, the
-  PW-1 fix and the reveal);
+- (a) the PR, round 4 and the merge as above;
 - (b) on the Galaxy S8 from internal testing, check:
   - TalkBack: Next three times, then Previous once; one announcement per card;
   - how dense the haptics feel;
   - the swipe;
   - large text, where Android 14+ scales differently from API 28;
-- (c) the owner's calls from round 3: the "AI adviser" name, the solid stage, ten cards one at a time, and the medal's
-  rosette.
+- (c) done: the owner's calls from round 3 (see above).
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
    picks one.
