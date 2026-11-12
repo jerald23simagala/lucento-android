@@ -383,9 +383,16 @@ object ProCopy {
     }
 
     /** What "Restore purchases" says afterwards (customer copy D-8). */
-    fun restoreMessage(before: DisplayPlan, after: DisplayPlan, outcome: RefreshOutcome): String = when {
+    fun restoreMessage(
+        before: DisplayPlan,
+        after: DisplayPlan,
+        outcome: RefreshOutcome,
+        awaitingCheck: Boolean = false,
+    ): String = when {
         after != DisplayPlan.FREE && before == DisplayPlan.FREE -> "Welcome back: your ${planName(after)} is restored."
         after != DisplayPlan.FREE -> "Your plan is up to date: ${planName(after)}."
+        awaitingCheck -> "Lucento still can’t confirm your purchase. Connect to the internet and make sure the Google Play " +
+            "Store app is on and signed in to the Google account you bought with, then try again."
         !outcome.playReached && !outcome.serverReached ->
             "Restoring needs an internet connection once. If you already restored on this phone, everything you own is still working."
         else -> "No purchase found. If you bought Lucento with another Google account, switch accounts in Google Play, or sign " +
@@ -417,6 +424,20 @@ object ProCopy {
             "Google Play reports this purchase as refunded or cancelled. Everything you recorded is still here, and nothing " +
                 "was removed; the free plan’s limits apply to new items. If this looks wrong, restore your purchase from the " +
                 "Lucento Pro page.",
+        )
+        PlanNotice.LIFETIME_NEEDS_CHECK -> NoticeCopy(
+            "Lucento needs to check your Pro Lifetime",
+            "Lucento hasn’t been able to confirm your purchase with Google Play or your Lucento account for " +
+                "${Entitlement.RECHECK_DAYS} days, so Pro is paused on this phone. Connect to the internet, make sure " +
+                "the Google Play Store app is on and signed in to the Google account you bought with, then tap Restore " +
+                "purchases on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.",
+        )
+        PlanNotice.PRO_NEEDS_CHECK -> NoticeCopy(
+            "Lucento needs to check your Lucento Pro",
+            "Lucento hasn’t been able to confirm your subscription with Google Play or your Lucento account for " +
+                "${Entitlement.RECHECK_DAYS} days, so Pro is paused on this phone. Connect to the internet, make sure " +
+                "the Google Play Store app is on and signed in to the Google account you subscribed with, then tap Restore " +
+                "purchases on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.",
         )
     }
 }

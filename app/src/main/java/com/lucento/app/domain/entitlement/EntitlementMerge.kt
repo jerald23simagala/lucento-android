@@ -13,6 +13,9 @@ package com.lucento.app.domain.entitlement
  * - When both verifiers hold the same key, the server's row stands while it is not past its expiry (plus the offline
  *   grace); a server row that has lapsed gives way to a fresh Play reading, which is how a renewal shows up before the
  *   server has heard of it.
+ * - Except a purchase the server **revoked** (refunded with revoke, charged back): Play's copy of that same purchase
+ *   (same token) can lag behind on the phone, so it never brings it back, offline included (owner decision 2026-11-12).
+ *   A new purchase has a new token and counts at once.
  */
 object EntitlementMerge {
 
@@ -25,7 +28,7 @@ object EntitlementMerge {
             val server = serverByKey[row.key]
             if (server == null) {
                 kept += row
-            } else if (!server.stillCurrent(now)) {
+            } else if (!server.stillCurrent(now) && !server.revoked(row)) {
                 // The server's copy has lapsed and Play says the purchase is live again: trust the newer reading.
                 replacedServerKeys += row.key
                 kept += row
@@ -34,6 +37,10 @@ object EntitlementMerge {
         return kept.filterNot { it.verifiedBy == Verifier.SERVER && it.key in replacedServerKeys }
     }
 
+    /** The server ended [play]'s own purchase: the same purchase token, revoked (a refund with revoke, a chargeback). */
+    private fun Entitlement.revoked(play: Entitlement): Boolean =
+        status == EntitlementStatus.REVOKED && purchaseTokenHash != null && purchaseTokenHash == play.purchaseTokenHash
+
     fun reconcileServer(current: List<Entitlement>, server: List<Entitlement>): List<Entitlement> {
         require(server.all { it.verifiedBy == Verifier.SERVER }) { "Server readings must be SERVER" }
         val serverKeys = server.mapTo(HashSet()) { it.key }
@@ -41,7 +48,11 @@ object EntitlementMerge {
         return server + playRows
     }
 
-    /** True while the row's own dates (not its status) still allow access, with the offline grace. */
+    /**
+     * True while the row still allows access: a granting status, its dates with the offline grace, and a check within
+     * the month. A server row the phone hasn't heard about for a month gives way to Play's fresh word.
+     */
     private fun Entitlement.stillCurrent(now: Long): Boolean =
-        status.grantsAccess && (expiresAtMillis == null || now < Math.addExact(expiresAtMillis, Entitlement.OFFLINE_GRACE_MILLIS))
+        status.grantsAccess && (expiresAtMillis == null || now < Math.addExact(expiresAtMillis, Entitlement.OFFLINE_GRACE_MILLIS)) &&
+            !awaitsCheck(now)
 }

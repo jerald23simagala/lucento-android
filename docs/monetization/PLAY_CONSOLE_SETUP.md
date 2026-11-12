@@ -66,9 +66,19 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
    - Press *Send test notification*. The endpoint answers 200 ("ignored").
 9. **Daily refund check.** Set Vercel env `CRON_SECRET` to any long random string. `vercel.json` runs
    `/api/billing/voided` once a day on the production deployment.
+   Without steps 8 and 9 the server never hears about a refund, so a refunded buyer keeps the AI allowance, sync and
+   Lucento Shared (KNOWN_ISSUES PB-3).
 10. **License testers.** In Play Console › Settings › License testing, add the testers' Google accounts. They buy with
     test cards, and subscriptions renew on Play's accelerated test schedule. Testers install from the internal-testing
     opt-in link.
+
+## Refunding an order
+
+In Play Console › Order management, open the order › **Refund**, and turn on **Remove entitlement** unless you mean
+the buyer to keep Pro. Without it, Google refunds the money but leaves the purchase with the buyer. Google doesn't list
+such a refund among voided purchases, so neither the daily check nor the instant notices see it, and Lucento keeps
+showing Pro. This was seen on 2026-11-12 with the owner's test Lifetime, and Google offers no way to remove access
+afterwards (KNOWN_ISSUES PB-4). Give **Manage orders and subscriptions** only to people you trust.
 
 ## Going live (the gated release)
 

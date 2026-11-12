@@ -70,11 +70,18 @@ class AppViewModel(
         val memory = planMemory
         if (entitlements != null && memory != null) {
             viewModelScope.launch {
-                combine(entitlements, entitlementsReady) { plan, ready -> if (ready) plan.displayPlan(System.currentTimeMillis()) else null }
+                combine(entitlements, entitlementsReady) { plan, ready ->
+                    if (ready) {
+                        val now = System.currentTimeMillis()
+                        plan.displayPlan(now) to plan.awaitingCheck(now)
+                    } else {
+                        null
+                    }
+                }
                     .filterNotNull()
                     .distinctUntilChanged()
-                    .collect { current ->
-                        val notice = com.lucento.app.domain.entitlement.PlanNotices.after(memory.lastSeen(), current)
+                    .collect { (current, awaitingCheck) ->
+                        val notice = com.lucento.app.domain.entitlement.PlanNotices.after(memory.lastSeen(), current, awaitingCheck)
                         noticeFor = current
                         _planNotice.value = notice
                         // Remembered at once when there is nothing to say; after the person has read it otherwise.

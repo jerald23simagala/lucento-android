@@ -324,6 +324,26 @@ Lifetime's year ending uses the same sheet with: *"Your Lifetime's included year
 Everything you own is unchanged. Cloud sync is paused and the AI adviser is back to 10 questions a month; keep them
 with Lucento Cloud, or carry on without."* [ Add Lucento Cloud ] [ OK ]
 
+A Lifetime refunded with revoke, or charged back:
+> **Your Pro Lifetime is no longer active**
+> Google Play reports this purchase as refunded or cancelled. Everything you recorded is still here, and nothing was
+> removed; the free plan's limits apply to new items. If this looks wrong, restore your purchase from the Lucento Pro
+> page.
+
+A Lifetime nobody could confirm for 30 days (MONETIZATION §5.3 L-2, 2026-11-12):
+> **Lucento needs to check your Pro Lifetime**
+> Lucento hasn't been able to confirm your purchase with Google Play or your Lucento account for 30 days, so Pro is
+> paused on this phone. Connect to the internet, make sure the Google Play Store app is on and signed in to the Google
+> account you bought with, then tap Restore purchases on the Lucento Pro page. Everything you recorded is still here,
+> and nothing was removed.
+
+A subscription nobody could confirm for 30 days (same rule):
+> **Lucento needs to check your Lucento Pro**
+> Lucento hasn't been able to confirm your subscription with Google Play or your Lucento account for 30 days, so Pro
+> is paused on this phone. Connect to the internet, make sure the Google Play Store app is on and signed in to the
+> Google account you subscribed with, then tap Restore purchases on the Lucento Pro page. Everything you recorded is
+> still here, and nothing was removed.
+
 **D-8 Restoring a purchase**
 Button on the Pro page: **Restore purchases**.
 > In progress: *Checking Google Play…*
@@ -333,6 +353,8 @@ Button on the Pro page: **Restore purchases**.
 > Google Play order number.
 > Offline: **Restoring needs an internet connection once.** If you already restored on this phone, everything you own
 > is still working.
+> Plan paused (MONETIZATION §5.3 L-2): **Lucento still can't confirm your purchase.** Connect to the internet and make
+> sure the Google Play Store app is on and signed in to the Google account you bought with, then try again.
 
 **D-9 Pending payment (cash through Google Play)**
 > **Waiting for Google Play to confirm your payment**

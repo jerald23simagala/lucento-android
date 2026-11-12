@@ -27,8 +27,16 @@ class EntitlementCacheTest {
 
     @Test fun round_trip_keeps_every_field() = runTest {
         val cache = SealedEntitlementCache(InMemorySnapshotStore(), HmacSealer(key))
-        cache.write(listOf(lifetime, sub))
-        assertEquals(listOf(lifetime, sub), cache.read())
+        val heard = sub.copy(checkedAtMillis = now + 7) // a server row heard from after it was verified
+        cache.write(listOf(lifetime, heard))
+        assertEquals(listOf(lifetime, heard), cache.read())
+    }
+
+    @Test fun a_snapshot_from_before_the_monthly_check_reads_as_checked_when_verified() {
+        val rows = EntitlementSnapshotCodec.decode(
+            """{"version":1,"rows":[{"source":"PLAY_LIFETIME","status":"ACTIVE","grants":["LOCAL_PRO"],"startsAt":1,"expiresAt":null,"productId":"lucento_pro_lifetime","basePlanId":null,"tokenHash":null,"verifiedAt":42,"verifiedBy":"SERVER","autoRenewing":false}]}""",
+        )
+        assertEquals(42L, rows!!.single().checkedAtMillis)
     }
 
     @Test fun nothing_stored_reads_as_unknown() = runTest {

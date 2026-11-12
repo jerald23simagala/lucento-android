@@ -122,6 +122,8 @@ class ProCopyTest {
         assertEquals("Your plan is up to date: Lucento Pro.", ProCopy.restoreMessage(DisplayPlan.PRO, DisplayPlan.PRO, reached))
         assertTrue(ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, RefreshOutcome(false, false)).startsWith("Restoring needs an internet connection"))
         assertTrue(ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, reached).startsWith("No purchase found"))
+        val paused = ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, RefreshOutcome(false, false), awaitingCheck = true)
+        assertTrue(paused, paused.startsWith("Lucento still can’t confirm your purchase"))
     }
 
     @Test fun plan_ended_notices_say_nothing_was_removed_and_quote_the_catalog() {
@@ -134,5 +136,11 @@ class ProCopyTest {
         assertTrue(ended.contains("${PlanCatalog.FREE_MONEY_WALLETS} money wallets"))
         assertTrue(ended.contains("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} questions a month"))
         assertTrue(ProCopy.notice(PlanNotice.SERVICES_ENDED).body.contains("unchanged"))
+        val paused = ProCopy.notice(PlanNotice.LIFETIME_NEEDS_CHECK).body
+        assertTrue(paused, paused.contains("${Entitlement.RECHECK_DAYS} days") && paused.contains("Restore purchases"))
+        assertFalse("paused is not refunded", paused.contains("refunded"))
+        val subPaused = ProCopy.notice(PlanNotice.PRO_NEEDS_CHECK)
+        assertTrue(subPaused.body, subPaused.body.contains("${Entitlement.RECHECK_DAYS} days") && subPaused.body.contains("Restore purchases"))
+        assertFalse("paused is not ended", subPaused.title.contains("ended"))
     }
 }

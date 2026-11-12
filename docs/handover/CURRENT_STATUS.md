@@ -247,3 +247,24 @@ medal kept for good with the ring following the plan, starting straight after Pl
   - Up to ten stops in a build with sync.
   - Captured from a debug build with lucento-test sync settings (local.properties, git-ignored).
 - The owner chose "PR, merge when green". Version 0.5.4 (vc 9).
+
+## Refund guards — 2026-11-12 (`fix/refund-guards`)
+
+The owner refunded a test Lifetime in Play Console, and Lucento kept showing it. Google's documentation says a refund
+without **Remove entitlement** leaves the buyer owning the purchase and stays out of the voided list (KNOWN_ISSUES PB-4).
+The owner asked how refunds could leak revenue, and chose:
+- switch on the server's refund checks together with the service-account fix (OT-24, PB-3);
+- build the phone-side guards (PR #55, merge when green).
+
+What changed:
+- A purchase the server revoked stays revoked on the phone while Play's copy still lists it (same token). That holds
+  offline, on Play's pushes, and after a restart. A new purchase counts at once (`EntitlementMerge`).
+- Anything bought through Google Play needs one check a month, from Google Play or the server. That covers a Lifetime
+  and a subscription; grants keep their own dates (`Entitlement.awaitsCheck`).
+  - `checkedAtMillis` is stamped on each server fetch and kept in the cached snapshot.
+  - Without a check, the plan is paused, not ended. It gets its own notice ("Lucento needs to check your Pro Lifetime" or
+    "… your Lucento Pro") and a matching Restore message.
+  - MONETIZATION §5.3 L-1/L-2 are rewritten. PB-5 (a server-verified annual plan on a phone that stops reaching the
+    server) is fixed by this.
+- Tests:
+  - 14 new JVM tests, and three updated ones that encoded "a Lifetime never needs a check". Results are in the PR.
