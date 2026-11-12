@@ -282,7 +282,7 @@ bait-and-switch in onboarding.
 | Product id | Type | Base plans / offers | Grants |
 |---|---|---|---|
 | `lucento_pro` | Subscription | `monthly` (P1M), `annual` (P1Y) + 7-day free trial offer on annual (once per account) | A + B + C + D while active |
-| `lucento_pro_lifetime` | One-time, non-consumable | single purchase option | A forever; B + C + D for 12 months from first verification |
+| `lucento_pro_lifetime` | One-time, non-consumable | single purchase option | A forever; B + C + D for 12 months from the purchase |
 | `lucento_cloud` | Subscription | `monthly` (P1M), `annual` (P1Y); **only offered to Lifetime owners** (hidden otherwise) | B + C + D while active |
 
 The app never shows two routes to the same thing: a Free user sees Pro Subscription and Pro Lifetime; a Lifetime owner
@@ -449,9 +449,10 @@ reads as checked when verified. Play reads from its own copy on the phone and us
 go stale offline, so a phone with no internet for a month pauses a plan bought through Play until it is online
 once. Grants are server-only and keep their own dates.
 
-The Lifetime's **12-month services period** is a `PLAY_LIFETIME` entitlement granting `{CLOUD, AI_PRO, SHARED}` with
-`expiresAt = firstVerifiedAt + 365 days`, written by the **server** at first verification (so a reinstall cannot
-restart the year) and cached locally under subscription rules.
+The Lifetime's **12-month services period** is a `PLAY_LIFETIME_SERVICES` entitlement granting
+`{CLOUD, AI_PRO, SHARED}` with `expiresAt = purchase time + 365 days`. The purchase time is Google's, so neither a
+reinstall nor a later first sign-in restarts the year. The server writes it at verification, the phone computes the
+same date from the purchase (`PurchaseInterpreter`), and it is cached locally under subscription rules.
 
 ### 5.4 Server side (Supabase + Vercel)
 
@@ -577,8 +578,8 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      - Next, or a swipe left.
      - Previous, or a swipe right.
      - Skip to the collection.
-   - Next stays in one place from the closed deck to the last card: Previous keeps its room, and Next is as tall as its
-     longest label needs. When a label wouldn't fit on one line (large text, a narrow phone), the buttons stack, Next
+   - Next stays in one place from the first card to the last: Previous keeps its room, and Next is as tall as its
+     longest label needs. Once the deck is open, the top band holds only the counter and Skip. When a label wouldn't fit on one line (large text, a narrow phone), the buttons stack, Next
      above Previous. A tap that lands while a card is turning is kept and acted on once it has turned; a second tap
      within 250 ms of a step is the same tap twice and is ignored, so a double tap never skips a card.
    - A welcome back and the replay open on the plain deck ("Reveal your first perk").
@@ -605,13 +606,18 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      - on a Partner's phone, the wallets and Lucento Shared cards.
    - **Signed-out buyers** still see the Gemini, sync and Lucento Shared cards. They say plainly that the feature uses a
      Lucento account, and where to sign in.
-   - **Opt-in stays opt-in.** Smarter reading and AI answers say where to turn them on, never that they are on.
+   - **Opt-in stays opt-in.** Smarter reading and AI answers say where to turn them on. They say "On" only when the
+     person has turned them on.
+   - **Where a service stands comes first**, right under the card's title: "Off · needs your Lucento account", "Waiting
+     for your account to confirm Pro", "Off until you turn it on" or "On". At large text the condition is never hidden
+     under "More" while a number shows.
    - **Terms for online services** (`ProCopy.serviceTerm`):
      - "Included until Nov 12, 2027" for a Lifetime's included year, with the date read from its entitlement;
      - "While you subscribe" for a subscription;
      - "With Lucento Cloud" for the add-on.
    - **The AI card** says "50 a day until Nov 12, 2027, then 10 a month": the allowance falls back to the free plan's;
-     it doesn't stop. It shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan.
+     it doesn't stop. It shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan, and
+     until then it says "Included until …" like the other services.
    - **What runs on the phone** never carries a term: it's owned.
    - **Back:** the system Back key goes to the collection.
    - **No side effects:** nothing in the deck changes data or consents, and it never moves through the app's screens.
@@ -619,8 +625,10 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      The touch blocker lies beside the cards, never around them (PW-1).
    - **TalkBack** hears each card as it turns ("2 of 10. Count everything you have."). The counter is the welcome's one
      live region, so nothing is heard twice.
-   - **The dim** is the same for every moment, 0.97 in every theme, so nothing beneath can be read even at 200 % text.
-     While it is up, the status and navigation bars draw light icons.
+   - **The stage** is the same for every moment, and solid, so nothing beneath shows. While it is up, the status and
+     navigation bars draw light icons.
+   - **Words:** the brand's name, counts ("10 perks", "50 a day") and menu paths ("Settings › Account & sync") never
+     break inside; stage headlines never hyphenate.
 2. **The collection.**
    - **Title:** "Congratulations, you're Pro" ("You're Pro" from 130 % text, so no word breaks); "Welcome back to Pro"
      for a returning or restored plan; "What Pro gives you" on a replay. Stage headlines grow with the text size up to
@@ -667,7 +675,7 @@ instead of turning, and the badge appears without movement.
 | D-10 | Lifetime price | — | **₱3,490** (USD 79.99); founder offer ₱2,990 for 60 days | §4.3 |
 | D-11 | Subscriber buys Lifetime | — | allowed; the person cancels the subscription in Play; no automatic credit (Play has none). Offer a support-granted Cloud extension equal to the unused months, manually, on request | avoids building proration logic Play does not support |
 | D-12 | Lucento Cloud add-on | — | **₱59 / ₱490**, offered to Lifetime owners only at launch | §4.4; a Free-tier Cloud SKU would undercut Pro |
-| D-13 | Lifetime included services | evaluate | **12 months of B/C/D from first verification**, then Free AI allowance; Cloud add-on optional | the person experiences sync and the adviser; the promise stays bounded |
+| D-13 | Lifetime included services | evaluate | **12 months of B/C/D from the purchase**, then Free AI allowance; Cloud add-on optional | the person experiences sync and the adviser; the promise stays bounded |
 | D-14 | AI monthly soft ceiling for Pro | 50 / day | **400 / month**, remote-configured, shown only when hit | §4.5 cost model |
 | D-15 | Role names | Manager / Companion | **Owner / Partner** (as approved and built) | PRODUCT_SPEC §2; a rename is a separate decision |
 | D-16 | Shared lapse policy | "do not interrupt companion" | **Lenient** (no new invites; existing Partner stays) | §6.4 |

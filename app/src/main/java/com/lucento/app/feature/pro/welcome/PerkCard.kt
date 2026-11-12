@@ -25,9 +25,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +53,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -205,9 +209,11 @@ private fun CardWords(copy: ProWelcomeCopy.StopCopy) {
         Text(copy.chapter, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             copy.title,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            // Even lines ("Add every account / you use", never a last word alone).
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, lineBreak = LineBreak.Heading),
             modifier = Modifier.semantics { heading() },
         )
+        copy.status?.let { ServiceStatus(it) }
         if (copy.changes.isNotEmpty()) Changes(copy.changes)
         copy.term?.let { Term(it) }
         if (copy.themes) ThemeSwatches()
@@ -272,7 +278,35 @@ private fun Term(text: String) {
     ) {
         Icon(Icons.Outlined.Event, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(Spacing.xs))
-        Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge.copy(lineBreak = LineBreak.Heading),
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    }
+}
+
+/**
+ * Where an online service stands ("Off · needs your Lucento account", "On"), right under the card's title, so its
+ * condition is seen before its numbers at any text size. Said in words; the icon only repeats them.
+ */
+@Composable
+private fun ServiceStatus(state: ProWelcomeCopy.ServiceState) {
+    val on = state == ProWelcomeCopy.ServiceState.ON
+    val tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(
+            when (state) {
+                ProWelcomeCopy.ServiceState.ON -> Icons.Outlined.CheckCircle
+                ProWelcomeCopy.ServiceState.WAITING -> Icons.Outlined.Schedule
+                else -> Icons.Outlined.Info
+            },
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.padding(top = 2.dp).size(16.dp),
+        )
+        Spacer(Modifier.width(Spacing.xs))
+        Text(state.text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), color = tint)
     }
 }
 

@@ -101,7 +101,7 @@ class ProCopyTest {
         assertEquals("Courtesy access until Feb\u00A014,\u00A02027.", status(grant).detail)
 
         val lifetime = row(EntitlementSource.PLAY_LIFETIME, setOf(Capability.LOCAL_PRO), expiresAt = null)
-        assertEquals("Pro Lifetime · you own it", status(EntitlementState(listOf(lifetime))).title)
+        assertEquals("Pro Lifetime\u00A0· you own it", status(EntitlementState(listOf(lifetime))).title)
         val year = row(EntitlementSource.PLAY_LIFETIME_SERVICES, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = now + 100 * day, verifiedBy = Verifier.PLAY_LOCAL)
         assertTrue(status(EntitlementState(listOf(lifetime, year))).detail.contains("included until Apr\u00A025,\u00A02027"))
         val cloud = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED))

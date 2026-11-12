@@ -19,8 +19,9 @@ object ProWelcomeCopy {
     /**
      * One card. [chapter]: the group it belongs to ("Your money"). [where]: where the feature lives, in words (the card
      * can't point at it). [changes]: what Pro changed, free plan first. [term]: how long an online service is included,
-     * on the online services' cards. [themes]: show the three Pro themes. [short] and [gain]: the card as the collection
-     * lists it ("Every account", "No limit").
+     * on the online services' cards. [status]: where an online service stands for this person, said right under the
+     * title. [themes]: show the three Pro themes. [short] and [gain]: the card as the collection lists it ("Every
+     * account", "No limit").
      */
     data class StopCopy(
         val title: String,
@@ -32,7 +33,43 @@ object ProWelcomeCopy {
         val short: String = "",
         val gain: String? = null,
         val term: String? = null,
+        val status: ServiceState? = null,
     )
+
+    /**
+     * Where an online service stands, said under its card's title so the condition is seen before the numbers (critic
+     * round 4: at large text "50 a day" showed while "sign in" and "turn it on" sat under "More").
+     */
+    enum class ServiceState(val text: String) {
+        SIGN_IN("Off · needs your Lucento account"),
+        WAITING("Waiting for your account to confirm Pro"),
+        OFF("Off until you turn it on"),
+        ON("On"),
+    }
+
+    /** [optedIn]: null for a service without its own switch (sync, Lucento Shared). */
+    private fun serviceState(online: OnlineStatus, optedIn: Boolean?): ServiceState? = when (online) {
+        OnlineStatus.SIGN_IN_NEEDED -> ServiceState.SIGN_IN
+        OnlineStatus.CONFIRMING -> ServiceState.WAITING
+        OnlineStatus.CONFIRMED -> when (optedIn) {
+            null -> null
+            true -> ServiceState.ON
+            false -> ServiceState.OFF
+        }
+        else -> null
+    }
+
+    /**
+     * A way through the app's menus. Each step's words stay together ("Account & sync"), and the arrow stays with the
+     * step before it, so a line can only break between steps.
+     */
+    private fun menu(vararg steps: String): String = steps.joinToString("\u00A0› ") { it.replace(' ', '\u00A0') }
+
+    private val accountPath = menu("Settings", "Account & sync")
+    private val privacyPath = menu("Settings", "Privacy & security")
+
+    /** "one Partner", from the catalog. */
+    private val partners = if (PlanCatalog.PRO_PARTNERS == 1) "one Partner" else "${PlanCatalog.PRO_PARTNERS} Partners"
 
     /** "Money wallets: 3 → No limit". */
     data class Change(val label: String, val before: String, val after: String)
@@ -41,8 +78,8 @@ object ProWelcomeCopy {
 
     fun revealTitle(mode: ProWelcomeMode, restored: Boolean = false): String = when {
         mode == ProWelcomeMode.REPLAY -> "Your Pro cards"
-        mode == ProWelcomeMode.RETURNING || restored -> "Welcome back to Lucento Pro"
-        else -> "You’re on Lucento Pro"
+        mode == ProWelcomeMode.RETURNING || restored -> "Welcome back to Lucento\u00A0Pro"
+        else -> "You’re on Lucento\u00A0Pro"
     }
 
     fun revealBody(count: Int): String = "Your Pro deck holds ${perks(count)}."
@@ -108,21 +145,22 @@ object ProWelcomeCopy {
             body = when {
                 online == OnlineStatus.SIGN_IN_NEEDED ->
                     "Gemini fills in the details from what you type or say in the composer. It uses your Lucento account: " +
-                        "sign in from Settings › Account & sync, then turn it on in Settings › Privacy & security."
+                        "sign in from $accountPath, then turn it on in $privacyPath."
                 online == OnlineStatus.CONFIRMING ->
                     "Gemini fills in the details from what you type or say in the composer. It starts as soon as your " +
                         "Lucento account confirms Pro."
                 smartReadingOn -> "Smarter reading is on: Gemini fills in the details from what you type or say in the composer."
-                else -> "Gemini fills in the details from what you type or say in the composer. Turn it on in Settings › " +
-                    "Privacy & security; nothing is sent until you do."
+                else -> "Gemini fills in the details from what you type or say in the composer. Turn it on in " +
+                    "$privacyPath; nothing is sent until you do."
             },
             where = "The composer opens from + in the middle of the bar.",
             short = "Smarter reading",
             term = term?.let(::serviceTermText),
+            status = serviceState(online, smartReadingOn),
         )
         ProTourStop.GOALS -> StopCopy(
             title = "Save for more at once",
-            body = "Keep several savings goals going side by side.",
+            body = "Keep several savings goals going side\u00A0by\u00A0side.",
             where = if (hasGoals) "Tap Add at the top right of Goals." else "Tap Create a goal in the middle of Goals.",
             changes = listOf(Change(ProCopy.featureName(ProFeature.SAVINGS_GOALS), "${PlanCatalog.FREE_ACTIVE_GOALS}", "${PlanCatalog.PRO_ACTIVE_GOALS}")),
             short = "More savings goals",
@@ -151,7 +189,7 @@ object ProWelcomeCopy {
                 body = when {
                     online == OnlineStatus.SIGN_IN_NEEDED ->
                         "Gemini answers your questions about your money. It uses your Lucento account: sign in from " +
-                            "Settings › Account & sync, then turn AI answers on in Ask Lucento."
+                            "$accountPath, then turn AI answers on in Ask Lucento."
                     online == OnlineStatus.CONFIRMING ->
                         "Gemini answers your questions about your money. Your daily allowance starts as soon as your " +
                             "Lucento account confirms Pro."
@@ -166,7 +204,9 @@ object ProWelcomeCopy {
                 },
                 short = "AI answers",
                 gain = if (confirmed) allowance else null,
-                term = term?.let(::aiTermText),
+                // Until the server confirms, the same term as the other services: the allowance is the server's to give.
+                term = term?.let { if (confirmed) aiTermText(it) else serviceTermText(it) },
+                status = serviceState(online, aiAnswersOn),
             )
         }
         ProTourStop.SYNC -> StopCopy(
@@ -174,21 +214,23 @@ object ProWelcomeCopy {
             body = if (signedIn) {
                 "Sync between phones and restore from your account."
             } else {
-                "Sign in from Settings › Account & sync to sync between phones and restore from your account."
+                "Sign in from $accountPath to sync between phones and restore from your account."
             },
-            where = "In Settings › Account & sync.",
+            where = "In $accountPath.",
             short = "Sync and restore",
             term = term?.let(::serviceTermText),
+            status = serviceState(online, null),
         )
         ProTourStop.SHARED -> StopCopy(
             title = "Share with a Partner",
             body = if (signedIn) {
-                "Invite one Partner to see and add to your money with you, on their own phone."
+                "Invite $partners to see and add to your money with you, on their own phone."
             } else {
-                "Invite one Partner to see and add to your money with you, on their own phone. It uses your Lucento " +
-                    "account: sign in from Settings › Account & sync first."
+                "Invite $partners to see and add to your money with you, on their own phone. It uses your Lucento " +
+                    "account: sign in from $accountPath first."
             },
             where = "Lucento Shared is in your profile and in Settings.",
+            status = serviceState(online, null),
             short = "Share with a Partner",
             term = term?.let(::serviceTermText),
         )
@@ -215,7 +257,7 @@ object ProWelcomeCopy {
      */
     fun aiTermText(term: ProCopy.ServiceTerm): String = when (term) {
         is ProCopy.ServiceTerm.Until ->
-            "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day until ${term.date}, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} a month"
+            "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day until ${term.date}, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month"
         else -> serviceTermText(term)
     }
 
@@ -262,8 +304,8 @@ object ProWelcomeCopy {
             Limit.Unlimited -> if (feature.counted) NO_LIMIT else "Included"
             Limit.None -> "Not included"
             is Limit.Count -> "${limit.max}"
-            is Limit.PerMonth -> "${limit.max} a month"
-            is Limit.PerDay -> "${limit.max} a day"
+            is Limit.PerMonth -> "${limit.max}\u00A0a\u00A0month"
+            is Limit.PerDay -> "${limit.max}\u00A0a\u00A0day"
         }
     }
 
@@ -271,7 +313,7 @@ object ProWelcomeCopy {
     fun onlineStatus(status: OnlineStatus): String? = when (status) {
         OnlineStatus.CONFIRMED -> null
         OnlineStatus.CONFIRMING -> "Confirming with your Lucento account. Online services switch on as soon as it’s done."
-        OnlineStatus.SIGN_IN_NEEDED -> "Online services need your Lucento account. Sign in from Settings › Account & sync."
+        OnlineStatus.SIGN_IN_NEEDED -> "Online services need your Lucento account. Sign in from $accountPath."
         OnlineStatus.NOT_IN_PLAN -> null
         OnlineStatus.NOT_IN_THIS_BUILD -> "This version of Lucento can’t connect to a Lucento account yet, so online services aren’t available here."
     }

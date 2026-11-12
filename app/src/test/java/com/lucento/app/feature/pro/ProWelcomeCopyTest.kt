@@ -46,9 +46,9 @@ class ProWelcomeCopyTest {
     }
 
     @Test fun a_restored_plan_is_welcomed_back_not_congratulated() {
-        assertEquals("Welcome back to Lucento Pro", ProWelcomeCopy.revealTitle(ProWelcomeMode.FIRST, restored = true))
+        assertEquals("Welcome back to Lucento\u00A0Pro", ProWelcomeCopy.revealTitle(ProWelcomeMode.FIRST, restored = true))
         assertEquals("Welcome back to Pro", ProWelcomeCopy.collectionTitle(ProWelcomeMode.FIRST, restored = true))
-        assertEquals("You’re on Lucento Pro", ProWelcomeCopy.revealTitle(ProWelcomeMode.FIRST))
+        assertEquals("You’re on Lucento\u00A0Pro", ProWelcomeCopy.revealTitle(ProWelcomeMode.FIRST))
         assertEquals("Your Pro cards", ProWelcomeCopy.revealTitle(ProWelcomeMode.REPLAY))
     }
 
@@ -61,8 +61,8 @@ class ProWelcomeCopyTest {
         assertEquals("${PlanCatalog.FREE_ACTIVE_GOALS}", goals.before)
         assertEquals("${PlanCatalog.PRO_ACTIVE_GOALS}", goals.after)
         val ai = ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, signedIn = true, aiAnswersOn = false).changes.single()
-        assertEquals("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} a month", ai.before)
-        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day", ai.after)
+        assertEquals("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month", ai.before)
+        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day", ai.after)
         assertEquals("Money wallets: 3 on the free plan, No limit now", ProWelcomeCopy.spokenChange(wallets[0]))
     }
 
@@ -90,7 +90,7 @@ class ProWelcomeCopyTest {
         }
         val confirmed = ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, signedIn = true, aiAnswersOn = false, online = OnlineStatus.CONFIRMED)
         assertEquals(1, confirmed.changes.size)
-        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day", confirmed.gain)
+        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day", confirmed.gain)
     }
 
     @Test fun online_services_say_how_long_they_are_included() {
@@ -101,7 +101,7 @@ class ProWelcomeCopyTest {
         }
         // The AI adviser carries on after a Lifetime's included year, at the free plan's allowance (as the Pro page says).
         assertEquals(
-            "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day until Nov 12, 2027, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} a month",
+            "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day until Nov\u00A012,\u00A02027, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month",
             ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, true, false, term = year).term,
         )
         // What runs on the phone is owned: never a term.
@@ -118,7 +118,7 @@ class ProWelcomeCopyTest {
         assertEquals("12 months", tag(ProTourStop.INSIGHTS_PERIODS, year))
         assertEquals("Until Nov 12, 2027", tag(ProTourStop.SYNC, year))
         // The AI adviser shows its allowance, never a date: it doesn't stop when the year ends.
-        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day", tag(ProTourStop.AI_ANSWERS, year))
+        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day", tag(ProTourStop.AI_ANSWERS, year))
         assertNull(tag(ProTourStop.AI_ANSWERS, year, OnlineStatus.CONFIRMING))
         assertNull(tag(ProTourStop.SYNC, ProCopy.ServiceTerm.Subscription))
         assertNull(tag(ProTourStop.THEMES, year))
@@ -139,7 +139,7 @@ class ProWelcomeCopyTest {
     }
 
     @Test fun sync_and_shared_ask_a_signed_out_person_to_sign_in() {
-        assertTrue(ProWelcomeCopy.stop(ProTourStop.SYNC, all, signedIn = false, aiAnswersOn = false).body.startsWith("Sign in from Settings › Account & sync"))
+        assertTrue(ProWelcomeCopy.stop(ProTourStop.SYNC, all, signedIn = false, aiAnswersOn = false).body.startsWith("Sign in from Settings\u00A0› Account\u00A0&\u00A0sync"))
         assertTrue(ProWelcomeCopy.stop(ProTourStop.SHARED, all, signedIn = false, aiAnswersOn = false).body.contains("sign in"))
         assertFalse(ProWelcomeCopy.stop(ProTourStop.SHARED, all, signedIn = true, aiAnswersOn = false).body.contains("sign in"))
     }
@@ -159,7 +159,7 @@ class ProWelcomeCopyTest {
         assertEquals("Included", ProWelcomeCopy.limitText(ProFeature.CLOUD_SYNC, Limit.Unlimited))
         assertEquals("Not included", ProWelcomeCopy.limitText(ProFeature.CLOUD_SYNC, Limit.None))
         assertEquals("1 Partner", ProWelcomeCopy.limitText(ProFeature.SHARED_SPACE, Limit.Count(1)))
-        assertEquals("10 a month", ProWelcomeCopy.limitText(ProFeature.AI_ADVISER, Limit.PerMonth(10)))
+        assertEquals("10\u00A0a\u00A0month", ProWelcomeCopy.limitText(ProFeature.AI_ADVISER, Limit.PerMonth(10)))
         assertEquals("20", ProWelcomeCopy.limitText(ProFeature.SAVINGS_GOALS, Limit.Count(20)))
     }
 
@@ -207,6 +207,42 @@ class ProWelcomeCopyTest {
         val themes = ProWelcomeCopy.stop(ProTourStop.THEMES, all, signedIn = true, aiAnswersOn = false)
         for (name in listOf("Grove", "Mono", "Aurora")) assertFalse(name, (themes.body + " " + themes.where).contains(name))
         assertEquals("Choose 6 or 12 months above the charts in Insights.", ProWelcomeCopy.stop(ProTourStop.INSIGHTS_PERIODS, all, true, false).where)
+    }
+
+    @Test fun an_online_service_says_where_it_stands_before_its_numbers() {
+        // Critic round 4: at large text "50 a day" showed while "sign in" and "turn it on" sat under "More".
+        for (stop in serviceCards) {
+            val signedOut = ProWelcomeCopy.stop(stop, all, signedIn = false, aiAnswersOn = false, online = OnlineStatus.SIGN_IN_NEEDED)
+            assertEquals(stop.name, ProWelcomeCopy.ServiceState.SIGN_IN, signedOut.status)
+            val waiting = ProWelcomeCopy.stop(stop, all, signedIn = true, aiAnswersOn = false, online = OnlineStatus.CONFIRMING)
+            assertEquals(stop.name, ProWelcomeCopy.ServiceState.WAITING, waiting.status)
+        }
+        // Confirmed: the two opt-ins say whether they are on; sync and Lucento Shared have no switch of their own here.
+        assertEquals(ProWelcomeCopy.ServiceState.OFF, ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, true, aiAnswersOn = false).status)
+        assertEquals(ProWelcomeCopy.ServiceState.ON, ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, true, aiAnswersOn = true).status)
+        assertEquals(ProWelcomeCopy.ServiceState.OFF, ProWelcomeCopy.stop(ProTourStop.SMART_READING, all, true, false, smartReadingOn = false).status)
+        assertEquals(ProWelcomeCopy.ServiceState.ON, ProWelcomeCopy.stop(ProTourStop.SMART_READING, all, true, false, smartReadingOn = true).status)
+        assertNull(ProWelcomeCopy.stop(ProTourStop.SYNC, all, true, false).status)
+        assertNull(ProWelcomeCopy.stop(ProTourStop.SHARED, all, true, false).status)
+        // What runs on the phone has nothing to wait for.
+        for (stop in ProTourStop.entries - serviceCards.toSet()) {
+            for (online in OnlineStatus.entries) assertNull(stop.name, ProWelcomeCopy.stop(stop, all, true, false, online = online).status)
+        }
+    }
+
+    @Test fun the_ai_card_states_the_allowance_only_once_the_server_has_confirmed_it() {
+        for (online in listOf(OnlineStatus.SIGN_IN_NEEDED, OnlineStatus.CONFIRMING)) {
+            val term = ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, signedIn = false, aiAnswersOn = false, online = online, term = year).term
+            assertEquals(online.name, ProWelcomeCopy.serviceTermText(year), term)
+        }
+    }
+
+    @Test fun menu_paths_and_counts_keep_their_words_together() {
+        // Critic round 4: "Account / & sync", "10 a / month", "side by / side".
+        val sync = ProWelcomeCopy.stop(ProTourStop.SYNC, all, signedIn = false, aiAnswersOn = false)
+        assertTrue(sync.body.contains("Settings\u00A0› Account\u00A0&\u00A0sync"))
+        assertTrue(ProWelcomeCopy.stop(ProTourStop.GOALS, all, true, false).body.contains("side\u00A0by\u00A0side"))
+        assertTrue(ProWelcomeCopy.stop(ProTourStop.SHARED, all, true, false).body.startsWith("Invite one Partner"))
     }
 
     @Test fun sync_and_shared_have_their_own_chapter() {

@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -70,7 +69,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.min
-import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.rememberHaptics
@@ -127,13 +125,15 @@ internal fun WelcomeStage(
     skip: (() -> Unit)? = null,
     skipShown: Boolean = skip != null,
     eyebrowSpoken: String? = null,
+    /** The top band's least height: room for a title, or (an open deck) only the counter and Skip. */
+    bandMinHeight: Dp = 112.dp,
     middle: @Composable BoxScope.() -> Unit,
     buttons: @Composable RowScope.() -> Unit,
 ) {
     val density = LocalDensity.current
     val reduced = LucentoTheme.reducedMotion
     val headline = MaterialTheme.typography.headlineSmall.capped(density.fontScale, HeadlineScaleCap)
-        .copy(fontWeight = FontWeight.ExtraBold, lineBreak = LineBreak.Heading, hyphens = Hyphens.Auto)
+        .copy(fontWeight = FontWeight.ExtraBold, lineBreak = LineBreak.Heading, hyphens = Hyphens.None)
     // The words keep clear of Skip however large the text makes it (a fixed margin let them meet at 200 %).
     val measurer = rememberTextMeasurer()
     val skipStyle = MaterialTheme.typography.labelLarge
@@ -155,7 +155,7 @@ internal fun WelcomeStage(
                 Modifier
                     .fillMaxWidth()
                     .then(if (reduced) Modifier else Modifier.animateContentSize(tween(420, easing = FastOutSlowInEasing)))
-                    .heightIn(min = 112.dp),
+                    .heightIn(min = bandMinHeight),
             ) {
                 Column(
                     Modifier
@@ -204,6 +204,8 @@ internal fun WelcomeStage(
                     LucentoTextButton(
                         text = ProWelcomeCopy.SKIP,
                         onClick = { if (skipShown) skip() },
+                        // Hidden on the last card: off, so it can't take focus either.
+                        enabled = skipShown,
                         color = OnDim,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -349,6 +351,8 @@ internal fun ProRevealDeck(
         skip = onCollection,
         skipShown = !last,
         eyebrowSpoken = if (shown >= 0) "${ProWelcomeCopy.progress(shown, count)}. ${cards[shown].copy.title}." else "",
+        // Open, the band holds only the counter and Skip, and gives the card the rest (critic round 4: 83 dp unused).
+        bandMinHeight = if (shown < 0) 112.dp else 64.dp,
         middle = {
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val width = min(380.dp, maxWidth - 32.dp)
@@ -501,9 +505,9 @@ private val TextButtonMinWidth = 58.dp
 private data class DeckButtonLayout(val stacked: Boolean, val slot: Dp, val primaryMin: Dp, val previousMin: Dp)
 
 /**
- * The deck's buttons. Next keeps one place and one size from the first card to the last (and from the closed deck), so
- * it never moves under the thumb: Previous keeps its room from the start, and Next is as tall as its longest label
- * needs. Side by side while every label fits on one line; stacked, Next above Previous and each the full width, when
+ * The deck's buttons. Next keeps one place and one size from the first card to the last, so it never moves under the
+ * thumb: Previous keeps its room from the first card on, and Next is as tall as its longest label needs. (The closed
+ * deck's one button spans the row; stacked, it also keeps Previous's room, so the card doesn't resize as it opens.) Side by side while every label fits on one line; stacked, Next above Previous and each the full width, when
  * one doesn't (large text, a narrow phone: critic round 3 found "Previou / s" and "See your" at 200 %).
  */
 @Composable
@@ -591,7 +595,7 @@ private fun TurningCard(card: RevealCard, turn: Float, reduced: Boolean, modifie
 }
 
 /**
- * The gold band around the closed deck: the approved symbol on a small ivory disc, and "Lucento Pro · 10 perks". TalkBack
+ * The gold band around the closed deck: "Lucento Pro · 10 perks" (the crest is right above it, on the card). TalkBack
  * hears [spoken] ("Your Pro deck holds 10 perks."); the printed label is a wide, spaced-out mark, so it grows with the
  * text size only up to 1.3 times.
  */
@@ -608,10 +612,6 @@ private fun Band(count: Int, spoken: String, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        Box(Modifier.size(32.dp).clip(CircleShape).background(AwardArtwork.Paper), contentAlignment = Alignment.Center) {
-            LucentoMark(size = 22.dp, animate = false)
-        }
-        Spacer(Modifier.width(Spacing.sm))
         Text(
             ProWelcomeCopy.band(count).uppercase(),
             style = MaterialTheme.typography.labelLarge.capped(fontScale, 1.3f)

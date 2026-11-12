@@ -259,7 +259,7 @@ object ProCopy {
                 }
             }
             DisplayPlan.LIFETIME -> PlanStatus(
-                "Pro Lifetime · you own it",
+                "Pro Lifetime\u00A0· you own it",
                 "Every Pro feature that runs on this phone is yours. Cloud sync, Lucento Shared and the AI adviser’s Pro " +
                     "allowance come with Lucento Cloud.",
             )
@@ -268,7 +268,7 @@ object ProCopy {
                 val year = services.firstOrNull { it.source == EntitlementSource.PLAY_LIFETIME_SERVICES }?.expiresAtMillis
                 val cloud = services.firstOrNull { it.source == EntitlementSource.PLAY_CLOUD_ADDON }
                 PlanStatus(
-                    "Pro Lifetime · you own it",
+                    "Pro Lifetime\u00A0· you own it",
                     when {
                         cloud != null -> "With Lucento Cloud: cloud sync, Lucento Shared and the AI adviser’s Pro allowance."
                         year != null -> "Cloud sync, Lucento Shared and the AI adviser’s Pro allowance are included until ${date(year)}."
