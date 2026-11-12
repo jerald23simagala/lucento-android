@@ -99,6 +99,8 @@ object EntitlementSnapshotCodec {
         val verifiedAt: Long,
         val verifiedBy: String,
         val autoRenewing: Boolean,
+        /** Added 2026-11-12 (docs §5.3 L-2). A snapshot written before it reads as checked when verified. */
+        val checkedAt: Long? = null,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -111,7 +113,7 @@ object EntitlementSnapshotCodec {
                     source = it.source.name, status = it.status.name, grants = it.grants.map(Capability::name).sorted(),
                     startsAt = it.startsAtMillis, expiresAt = it.expiresAtMillis, productId = it.productId,
                     basePlanId = it.basePlanId, tokenHash = it.purchaseTokenHash, verifiedAt = it.verifiedAtMillis,
-                    verifiedBy = it.verifiedBy.name, autoRenewing = it.autoRenewing,
+                    verifiedBy = it.verifiedBy.name, autoRenewing = it.autoRenewing, checkedAt = it.checkedAtMillis,
                 )
             },
         ),
@@ -133,6 +135,7 @@ object EntitlementSnapshotCodec {
                 verifiedAtMillis = it.verifiedAt,
                 verifiedBy = Verifier.valueOf(it.verifiedBy),
                 autoRenewing = it.autoRenewing,
+                checkedAtMillis = it.checkedAt ?: it.verifiedAt,
             )
         }
     }.getOrNull()

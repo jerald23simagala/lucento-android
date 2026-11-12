@@ -188,6 +188,10 @@ recurring-schedule sync, syncing preferences.
   tour of up to ten stops over the real screens Pro opened, including Gemini (AI answers, Smarter reading) and Lucento
   Shared. Then a summary of limits and online services, the Lucento Pro award on a Membership shelf, and the Pro badge
   on the profile picture. "Replay the Pro tour" is on the Pro page. Version 0.5.4 (vc 9).
+- 2026-11-12 (`fix/refund-guards`): refund guards on the phone.
+  - A purchase the server revoked stays revoked even while Play's copy still lists it.
+  - A Pro Lifetime needs one check a month, from Google Play or the server (MONETIZATION §5.3 L-2).
+  - The server's refund checks are switched on by the owner (OT-24).
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.

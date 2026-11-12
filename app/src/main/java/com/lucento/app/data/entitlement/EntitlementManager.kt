@@ -100,12 +100,12 @@ class EntitlementManager(
             val play = purchases.queryPurchases()
             when (play) {
                 is PurchaseQuery.Success -> rows = EntitlementMerge.reconcilePlay(rows, PurchaseInterpreter.entitlements(play.purchases, now), now)
-                is PurchaseQuery.Failed -> Unit // Play unreachable: the cached reading stands (L-2)
+                is PurchaseQuery.Failed -> Unit // Play unreachable: the cached reading stands (L-2; a Lifetime for a month)
             }
-            var server = remote?.fetch()
+            var server = remote?.fetch()?.heardAt(now)
             server?.let { rows = EntitlementMerge.reconcileServer(rows, it) }
             if (play is PurchaseQuery.Success && confirm(play.purchases, rows)) {
-                remote?.fetch()?.let { fresh -> server = fresh; rows = EntitlementMerge.reconcileServer(rows, fresh) }
+                remote?.fetch()?.heardAt(now)?.let { fresh -> server = fresh; rows = EntitlementMerge.reconcileServer(rows, fresh) }
             }
             publish(rows)
             _ready.value = true
@@ -166,11 +166,14 @@ class EntitlementManager(
             // The plan shows the moment Play confirms it; the server's copy follows (best effort, not waited for twice).
             publish(rows)
             if (confirm(query.purchases, rows)) {
-                remote?.fetch()?.let { rows = EntitlementMerge.reconcileServer(rows, it) }
+                remote?.fetch()?.heardAt(now)?.let { rows = EntitlementMerge.reconcileServer(rows, it) }
                 publish(rows)
             }
         }
     }
+
+    /** The server's rows as this phone heard them [now]: a Lifetime counts for a month from here (docs §5.3 L-2). */
+    private fun List<Entitlement>.heardAt(now: Long): List<Entitlement> = map { it.copy(checkedAtMillis = now) }
 
     /** Keeps [state] current with Play's pushed updates for as long as [scope] lives. */
     fun observePlayUpdates(scope: CoroutineScope) {
