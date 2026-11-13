@@ -37,7 +37,7 @@
 
 ## Home-screen widgets — follow-ups (2026-11-12, `feature/home-widgets`)
 
-- Merge after CI passes and the owner says "merge it". Then a device pass on Android 12+ (the S8 runs Android 9:
+- Merged as `50727be` (PR #57, 2026-11-13); not released yet. Next, a device pass on Android 12+ (the S8 runs Android 9:
   square corners, no picker preview) covering rounded corners, the preview layout and the launcher's day/night switch.
 - TalkBack pass on both widgets ("Add a transaction", "Scan a receipt", "Speak a transaction", the body's summary).
 - Parked by the owner (2026-11-12): Quick Settings tile, type-and-save notification, Share to Lucento. Their mockups are
@@ -70,14 +70,33 @@ Round 4: REVISE 3.4, with no hard gate failing. Its two P1s (the brand name brok
 conditions hidden at large text) and most P2/P3s are fixed in `a1c994e`. They are re-captured from one APK in studio
 `qa/out/reveal-app-r4/` (with `BUILD.txt`).
 
+**Shipped to main (2026-11-13):** PR #56 merged as `51fac6b`, main CI green; the 0.5.5 (vc 10) AAB went to the owner's
+Downloads for internal testing.
+
 Next:
-- (a) push the round-4 fixes to PR #56, merge when CI is green, then the AAB from main goes to Downloads;
+- (a) done: merged, AAB delivered;
 - (b) on the Galaxy S8 from internal testing, check:
   - TalkBack: Next three times, then Previous once; one announcement per card;
   - how dense the haptics feel;
   - the swipe;
   - large text, where Android 14+ scales differently from API 28;
 - (c) done: the owner's calls from round 3 (see above).
+
+## Pro perk cards: new art (owner, 2026-11-13, `design/perk-card-art`)
+
+The owner wasn't satisfied with the cards' drawn "Scenes" art and asked for better images. Three AI-generated
+directions (painterly, 3D miniature worlds, gilded engraving; critic r1: REVISE / REJECT, studio
+`critic/reports/2026-11-13-perk-art-directions-r1*`) were set aside; a flat hand-drawn 2D set with people followed, and
+the owner then asked: "Too many people. Reimagine, make it simpler but we can add our mascot to make it livelier."
+
+Then: "add subtle doodles in the background instead of plain blue … reduce empty blue spaces as much as possible …
+after that I am good." Built on the branch: each card's art band is CardBlue with faint code-drawn doodles, one
+soft-3D prop cut out of its ground, and `LucentoMascot` stepping a little in front of it in a pose per card
+(`PerkArt.kt`); ten props generated with GPT Image 2.5 (`docs/design/illustrations/perks/`, exported by
+`tools/illustrations/export_perk_art.py`, 425 KB with thumbnails); the deck decodes the next card's prop ahead of its
+turn; the collection rows show each card's prop. Shown to the owner: artifact "Lucento Pro Cards". Next:
+- (a) the owner's call on shipping (PR, critic round, release 0.5.6 — main also carries the widgets, #57);
+- (b) on a phone: the mascot's hop as each card turns, and the doodles' contrast on an OLED screen.
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
    picks one.

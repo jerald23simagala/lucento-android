@@ -159,6 +159,19 @@ logos or UI in the art.
   below the content and fading up into the panel; `MascotScene` — Lucento standing in the landscape in empty states;
   the onboarding welcome (Sunrise keeps the approved "A Brighter Little World" crop); and the theme picker previews.
   Light-painted scenes are dimmed at night; night scenes (Midnight, Aurora) show as painted.
+- **Pro perk cards** (2026-11-13; owner: "simpler, and add our mascot to make it livelier"): used only on the Pro
+  welcome deck's cards and, as small squares, in its collection. Each card's art band is `AwardArtwork.CardBlue` with
+  faint doodles (line drawings of money things, drawn in code in white at 10–16 %; the owner asked for them instead
+  of plain blue), and a little below its middle, as large as the band allows: one simple soft-3D prop for the perk (a
+  wallet, flags, a telescope…; no people) and Lucento itself (`LucentoMascot`, the approved sprites, never redrawn)
+  stepping a little in front of it, in a pose that suits the card: it waves on the first, points at the prop on most, thinks on AI answers and cheers on the last. The props
+  match the mascot's render (satin and matte materials, warm light from the upper left). `perk_art_<stop>` (640 px
+  square) and `perk_thumb_<stop>` (192 px) in `res/drawable-nodpi`; sources, prompts and provenance in
+  `docs/design/illustrations/perks/`; `tools/illustrations/export_perk_art.py` cuts each prop out of its flat
+  CardBlue ground, so the doodles show around it and no edge shows at any band height. The same in both themes (a card is an object, like the medal).
+  Rules for any new prop: one simple object or a small group, no text, numbers or logos (plain short lines stand in
+  for writing), no medium blues (they would melt into the band), calm money (no piles of coins, fanned hands of cards
+  or rays behind money). Decorative: TalkBack reads the card's words.
 
 - New-goal form: optional suggestions (Trip to Japan, Holiday, Emergency fund, New laptop) fill in the name and
   picture only; nothing is created until the user saves.
