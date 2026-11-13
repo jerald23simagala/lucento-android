@@ -109,8 +109,9 @@ microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
 - (a3) from the polish checks (critic polish r1 REVISE 3.6, r2 REVISE 3.7, no hard gate): doodles fill the free blue
   around the pair again; the gap beside a standing mascot is set from the prop's own edge (`PerkPropEdges.kt`); a
   leaving card's mascot holds still; going back never blends two poses (each card face keyed by its card);
-- (a4) polish r3 REVISE 3.6, no hard gate; its fixes: the next card is in place under a leaving card at once and a
-  swiped card leaves from where it was let go; each card's own scroll position; balanced last lines. Large text
+- (a4) polish r3 REVISE 3.6, no hard gate; merged as #62 `f7fbaf6` (2026-11-13, main CI green) and ships in 0.5.7
+  (vc 12, PR #64). Its fixes: the next card is in place under a leaving card at once and a swiped card leaves from
+  where it was let go; each card's own scroll position; balanced last lines. Large text
   re-captured (130 % light/dark, 150 %, 200 %) after the emulator's System UI froze on text-size changes (capture
   with a settle step: studio scratch `capture_lt.sh` logic). Open for the owner (three polish rounds done): doodle
   spacing refinements (bare patches beside the pair), one art window for the deck with copy trims, centring wide pairs

@@ -430,7 +430,9 @@ people, the mascot to make it livelier, faint doodles instead of plain blue, and
   green; the 0.5.6 (vc 11) AAB, upload key 56:F1:57…:95:C2, is with the owner for internal testing.
 - **Polish after r3** (owner: "Polish only", branch `design/perk-card-polish`): one short float per card
   (`LucentoMascot(idleCycles)`), no doodle over or between the pair (`doodleSpots`, unit-tested), card 7's prop
-  without the sparkle, the hand over the prop only when pointing (10 dp apart otherwise).
+  without the sparkle, the hand over the prop only when pointing (10 dp apart otherwise). Three critic polish rounds
+  (REVISE 3.6, 3.7, 3.6; no hard gate); merged as #62 `f7fbaf6`, main CI green; ships in 0.5.7 (vc 12, PR #64)
+  together with #61 and #63 (KNOWN_ISSUES PB-6).
 - **Not verified:** a real phone (the hop as each card turns, OLED contrast of the doodles, prop sharpness).
 
 ## Home-screen widgets — 2026-11-12 (`feature/home-widgets`)
