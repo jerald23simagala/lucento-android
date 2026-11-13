@@ -100,20 +100,29 @@ internal data class PairLayout(
     val propX: Float,
     val propY: Float,
 ) {
-    /** The prop and the character (head to shadow), each with [DoodleClearance] around it: no doodle goes there. */
-    fun keepClear(): List<Rect> = listOf(
-        Rect(propX, propY, propX + propWidth, propY + propHeight).inflate(DoodleClearance),
-        Rect(
-            mascotX + CharacterLeft * mascot,
-            mascotY + CharacterTop * mascot,
-            mascotX + CharacterRight * mascot,
-            mascotY + (Feet + ShadowBelow) * mascot,
-        ).inflate(DoodleClearance),
-    )
+    /**
+     * Where no doodle goes, each with [DoodleClearance] around it: the prop, and the character as three shapes measured
+     * from the approved sprites over the cards' poses (sprite fractions): the hair and the crystal with room above for
+     * the hop (x 0.21–0.96, y −0.11–0.10); the head, arms, torch and the glow's bright core (x 0.05–1.03, y 0.10–0.70);
+     * the lower body, feet and shadow (x 0.13–0.80, y 0.70–0.98). Shapes rather than one box, so doodles stay around the
+     * pair instead of most of them going (critic, polish check: one box left 4–8 per card).
+     */
+    fun keepClear(): List<Rect> = (
+        listOf(Rect(propX, propY, propX + propWidth, propY + propHeight)) +
+            CharacterShapes.map { (l, t, r, b) -> Rect(mascotX + l * mascot, mascotY + t * mascot, mascotX + r * mascot, mascotY + b * mascot) }
+        ).map { it.inflate(DoodleClearance) }
+
 }
 
 /** Room kept between the doodles and the pair, in dp. */
 private const val DoodleClearance = 6f
+
+/** The character's shapes for [PairLayout.keepClear], as left, top, right, bottom fractions of the sprite's box. */
+private val CharacterShapes = listOf(
+    listOf(0.21f, -0.11f, 0.96f, 0.10f),
+    listOf(0.05f, 0.10f, 1.03f, 0.70f),
+    listOf(0.13f, 0.70f, 0.80f, 0.98f),
+)
 
 /**
  * The pair as large as a [width] × [height] band allows, for a prop of [aspect] (width ÷ height of its visible pixels).
@@ -174,24 +183,24 @@ private const val SideRoom = 8f
 /** A little below the middle (0 is centred, 1 the foot): the gap above is at most 1.3 times the gap below. */
 private const val VerticalBias = 0.12f
 
-/** One doodle in the 140 dp tile: its centre and size in dp, and how far it is turned, in degrees. */
-private class DoodleSpec(val x: Float, val y: Float, val size: Float, val turn: Float, val bright: Boolean)
+/** One kind of doodle: its size in dp, how far it is turned (degrees), and whether it is a little brighter. */
+private class DoodleSpec(val size: Float, val turn: Float, val bright: Boolean)
 
 /**
  * The band's doodles: small line drawings of money things (a sparkle, a coin, a squiggle, a little chart, a star, a
- * plus, a leaf, a receipt and a sun) in faint white, repeated in a 140 dp tile whose rows shift by half a tile so no grid
- * shows. Drawn, not pictured: crisp at any size and nothing to download. [DoodleGlyphs] holds their shapes, in order.
+ * plus, a leaf, a receipt and a sun) in faint white. Drawn, not pictured: crisp at any size and nothing to download.
+ * [DoodleGlyphs] holds their shapes, in the same order.
  */
 private val DoodleTile = listOf(
-    DoodleSpec(18f, 20f, 16f, 0f, true), // sparkle
-    DoodleSpec(66f, 16f, 18f, 0f, false), // coin
-    DoodleSpec(114f, 28f, 20f, -12f, false), // squiggle
-    DoodleSpec(30f, 68f, 18f, 6f, false), // little chart
-    DoodleSpec(82f, 62f, 16f, 14f, true), // star
-    DoodleSpec(124f, 84f, 12f, 0f, false), // plus
-    DoodleSpec(18f, 116f, 18f, -18f, false), // leaf
-    DoodleSpec(62f, 116f, 18f, -8f, false), // receipt
-    DoodleSpec(110f, 118f, 18f, 0f, false), // sun
+    DoodleSpec(16f, 0f, true), // sparkle
+    DoodleSpec(18f, 0f, false), // coin
+    DoodleSpec(20f, -12f, false), // squiggle
+    DoodleSpec(18f, 6f, false), // little chart
+    DoodleSpec(16f, 14f, true), // star
+    DoodleSpec(12f, 0f, false), // plus
+    DoodleSpec(18f, -18f, false), // leaf
+    DoodleSpec(18f, -8f, false), // receipt
+    DoodleSpec(18f, 0f, false), // sun
 )
 
 private val DoodleGlyphs: List<Path> by lazy {
@@ -209,30 +218,39 @@ private val DoodleGlyphs: List<Path> by lazy {
     ).map { PathParser().parsePathString(it).toPath() }
 }
 
-private const val DoodleTileDp = 140f
+/** Candidate places for doodles: a staggered grid this many dp apart; accepted doodles keep [DoodleSpacing] between them. */
+private const val DoodleStep = 24f
+private const val DoodleSpacing = 34f
 
-/** A doodle placed in a band: which one ([kind], an index into the tile), and its box in dp. */
+/** A doodle placed in a band: which one ([kind], an index into the doodles), and its box in dp. */
 internal data class DoodleSpot(val kind: Int, val box: Rect)
 
 /**
- * Where the doodles go in a [width] × [height] band (dp): whole glyphs only (one the band's edge would cut is left out,
- * so no stubs along the edges), and none in [keepClear] (the pair and the room around it).
+ * Where the doodles go in a [width] × [height] band (dp): they fill the free blue around the pair, so a band keeps its
+ * texture however much of it the pair takes. Walks a staggered grid ([DoodleStep]) in reading order and keeps a doodle
+ * when it is whole (one the band's edge would cut is left out, so no stubs along the edges), clear of [keepClear], and
+ * at least [DoodleSpacing] from the ones already kept. The kinds follow the grid, so the same band always gets the same
+ * doodles.
  */
 internal fun doodleSpots(width: Float, height: Float, keepClear: List<Rect> = emptyList()): List<DoodleSpot> {
     val spots = mutableListOf<DoodleSpot>()
     var row = 0
-    var top = -DoodleTileDp / 2f
-    while (top < height) {
-        var left = if (row % 2 == 0) 0f else -DoodleTileDp / 2f
-        while (left < width) {
-            DoodleTile.forEachIndexed { kind, d ->
-                val box = Rect(left + d.x - d.size / 2f, top + d.y - d.size / 2f, left + d.x + d.size / 2f, top + d.y + d.size / 2f)
-                val whole = box.left >= 0f && box.top >= 0f && box.right <= width && box.bottom <= height
-                if (whole && keepClear.none { it.overlaps(box) }) spots += DoodleSpot(kind, box)
+    var y = DoodleStep / 2f
+    while (y < height) {
+        var x = DoodleStep / 2f + if (row % 2 == 1) DoodleStep / 2f else 0f
+        var col = 0
+        while (x < width) {
+            val kind = (row * 4 + col * 7) % DoodleTile.size
+            val half = DoodleTile[kind].size / 2f
+            val box = Rect(x - half, y - half, x + half, y + half)
+            val whole = box.left >= 0f && box.top >= 0f && box.right <= width && box.bottom <= height
+            if (whole && keepClear.none { it.overlaps(box) } && spots.none { (it.box.center - box.center).getDistance() < DoodleSpacing }) {
+                spots += DoodleSpot(kind, box)
             }
-            left += DoodleTileDp
+            x += DoodleStep
+            col++
         }
-        top += DoodleTileDp
+        y += DoodleStep * 0.866f
         row++
     }
     return spots

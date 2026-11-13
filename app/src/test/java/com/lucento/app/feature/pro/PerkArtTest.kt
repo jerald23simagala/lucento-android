@@ -114,4 +114,31 @@ class PerkArtTest {
         // And the band isn't bare: a big band keeps doodles around the pair.
         assertTrue(doodleSpots(379f, 207f, pairLayout(379f, 207f, 0.64f).keepClear()).size >= 4)
     }
+
+    // The ten props' visible width ÷ height, from the exported perk_art_* files (tools/illustrations/export_perk_art.py).
+    private val propAspects = mapOf(
+        ProTourStop.WALLETS to 548f / 850f,
+        ProTourStop.NET_WORTH to 721f / 741f,
+        ProTourStop.SMART_READING to 746f / 642f,
+        ProTourStop.GOALS to 582f / 888f,
+        ProTourStop.INSIGHTS_PERIODS to 536f / 877f,
+        ProTourStop.STATEMENTS to 560f / 807f,
+        ProTourStop.AI_ANSWERS to 748f / 587f,
+        ProTourStop.SYNC to 690f / 711f,
+        ProTourStop.SHARED to 884f / 631f,
+        ProTourStop.THEMES to 956f / 536f,
+    )
+
+    @Test
+    fun every_card_keeps_a_texture_of_doodles_around_the_pair() {
+        // The owner asked for subtle doodles instead of plain blue: keeping them off the pair must not empty the band
+        // (critic, polish check: one clear box left 4–8 per card). Bands: 411 dp and 360 dp phones, and the short band.
+        for ((stop, aspect) in propAspects) {
+            val touches = stop.mascot == MascotMood.Pointing
+            for ((w, h, least) in listOf(Triple(378f, 208f, 8), Triple(327f, 179f, 4), Triple(378f, 119f, 8))) {
+                val spots = doodleSpots(w, h, pairLayout(w, h, aspect, touches).keepClear())
+                assertTrue("$stop in a ${w}x$h band has only ${spots.size} doodles", spots.size >= least)
+            }
+        }
+    }
 }

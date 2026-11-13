@@ -172,8 +172,8 @@ logos or UI in the art.
   match the mascot's render (satin and matte materials, warm light from the upper left). `perk_art_<stop>` (640 px
   square) and `perk_thumb_<stop>` (192 px) in `res/drawable-nodpi`; sources, prompts and provenance in
   `docs/design/illustrations/perks/`; `tools/illustrations/export_perk_art.py` cuts each prop out of its flat
-  CardBlue ground, so the doodles show around it and no edge shows at any band height. No doodle sits over or
-  between the pair (6 dp clear of each). The same in both themes (a card is an object, like the medal).
+  CardBlue ground, so the doodles show around it and no edge shows at any band height. The doodles fill the free
+  blue around the pair (`doodleSpots`), never over or between it (6 dp clear of each). The same in both themes (a card is an object, like the medal).
   Rules for any new prop: one simple object or a small group, no text, numbers or logos (plain short lines stand in
   for writing), no medium blues (they would melt into the band), calm money (no piles of coins, fanned hands of cards
   or rays behind money). Decorative: TalkBack reads the card's words.
