@@ -76,8 +76,9 @@ Every prop uses one style, with only the object changing:
 climbed steadily, a growth cliché; card 3 was a speech bubble like card 7's, and card 5 a telescope beside another
 bar chart like card 6's, so each card now has a motif of its own.)
 7. two soft rounded speech bubbles in conversation, a smaller pale-sky-blue one behind on the left, and a larger warm
-   sunlight-gold one in front on the right with three short ivory lines inside it, and one tiny golden sparkle beside
-   them
+   sunlight-gold one in front on the right with three short ivory lines inside it. Nothing else: no sparkles, no
+   stars, no extra symbols. (An earlier version had a sparkle beside the bubbles; next to the thinking mascot it read
+   as a cartoon "idea!" mark, against the mascot's "no floating symbols" rule.)
 8. two rounded smartphones with ivory frames standing upright side by side a little apart, their screens glowing
    softly in warm ivory with no writing, linked above by a small arc of glowing golden dots
 9. one open ivory notebook lying flat with a few short grey lines on its pages (no writing), and two pencils resting

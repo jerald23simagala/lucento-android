@@ -101,7 +101,11 @@ the words in dark: fixed), r2 REVISE 3.45 with no hard gate; the owner then chos
 at most 0.55 of the card's width, which the pair fills: 12–20 % empty, measured). Also from r2: the pair stays
 together at every band shape, room for the hop, each prop's shape read before it decodes, new props for cards 3 (a
 microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
-- (a) CI and a critic check on the latest commit, then merge and the 0.5.6 AAB to Downloads;
+- (a) done: critic r3 REVISE 3.45 with no hard gate, CI green; merged as `af4aae4` (2026-11-13) and the 0.5.6
+  (vc 11) AAB went to the owner's Downloads;
+- (a2) owner chose "Polish only" from r3 (`design/perk-card-polish`): one short float per card, doodles kept off
+  the pair, card 7 without its sparkle, the hand on the prop only when pointing. Not chosen: one window per deck with
+  copy trims, plain card under short cards, the dark band colour;
 - (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
 - (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 

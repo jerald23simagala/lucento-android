@@ -4,6 +4,7 @@ import com.lucento.app.core.designsystem.component.MascotMood
 import com.lucento.app.core.designsystem.component.MascotPose
 import com.lucento.app.domain.entitlement.ProTourStop
 import com.lucento.app.feature.pro.welcome.art
+import com.lucento.app.feature.pro.welcome.doodleSpots
 import com.lucento.app.feature.pro.welcome.mascot
 import com.lucento.app.feature.pro.welcome.pairLayout
 import com.lucento.app.feature.pro.welcome.thumb
@@ -46,9 +47,9 @@ class PerkArtTest {
 
     @Test
     fun the_pair_and_the_torch_glow_stay_inside_every_band() {
-        for (w in widths) for (h in heights) for (a in aspects) {
-            val p = pairLayout(w, h, a)
-            val where = "band ${w}x$h, prop $a"
+        for (w in widths) for (h in heights) for (a in aspects) for (touches in listOf(true, false)) {
+            val p = pairLayout(w, h, a, touches)
+            val where = "band ${w}x$h, prop $a, touches $touches"
             assertTrue("prop starts left of the band: $where", p.propX >= 0f)
             assertTrue("prop runs past the band: $where", p.propX + p.propWidth <= w + 0.01f)
             assertTrue("glow runs past the band: $where", p.mascotX + p.mascot * (0.965f + 0.163f) <= w + 0.01f)
@@ -60,11 +61,21 @@ class PerkArtTest {
     }
 
     @Test
-    fun the_mascots_hand_reaches_over_the_prop_and_the_pair_sits_a_little_below_the_middle() {
+    fun a_pointing_hand_reaches_over_the_prop_and_other_poses_stand_beside_it() {
+        for (w in widths) for (h in heights) for (a in aspects) {
+            val where = "band ${w}x$h, prop $a"
+            val pointing = pairLayout(w, h, a, touches = true)
+            assertEquals("hand over the prop: $where", pointing.propX + pointing.propWidth - 8f, pointing.mascotX + pointing.mascot * 0.06f, 0.01f)
+            val beside = pairLayout(w, h, a, touches = false)
+            assertEquals("10 dp beside the prop: $where", beside.propX + beside.propWidth + 10f, beside.mascotX + beside.mascot * 0.06f, 0.01f)
+        }
+    }
+
+    @Test
+    fun the_pair_sits_a_little_below_the_middle_with_room_for_the_hop() {
         for (w in widths) for (h in heights) for (a in aspects) {
             val p = pairLayout(w, h, a)
             val where = "band ${w}x$h, prop $a"
-            assertEquals("hand over the prop: $where", p.propX + p.propWidth - 8f, p.mascotX + p.mascot * 0.06f, 0.01f)
             val top = minOf(p.mascotY + p.mascot * 0.03f, p.propY)
             val bottom = p.mascotY + p.mascot * 0.97f
             val above = top
@@ -73,5 +84,34 @@ class PerkArtTest {
             // The arrival hop lifts the hair about 9 % of the mascot's size: it must stay inside the band.
             assertTrue("no room for the hop: $where", p.mascotY + p.mascot * 0.03f >= 0.09f * p.mascot - 0.01f)
         }
+    }
+
+    @Test
+    fun doodles_are_whole_and_never_over_or_between_the_pair() {
+        for (w in widths) for (h in heights) for (a in aspects) for (touches in listOf(true, false)) {
+            val pair = pairLayout(w, h, a, touches)
+            val clear = pair.keepClear()
+            val spots = doodleSpots(w, h, clear)
+            val where = "band ${w}x$h, prop $a, touches $touches"
+            spots.forEach { spot ->
+                val b = spot.box
+                assertTrue("a doodle cut by the band's edge: $where", b.left >= 0f && b.top >= 0f && b.right <= w && b.bottom <= h)
+                assertTrue("a doodle over the pair: $where", clear.none { it.overlaps(b) })
+            }
+            // The gap between a standing character and its prop (10 dp wide, as tall as the prop) is inside the clear
+            // areas (6 dp around each), so no doodle sits between them.
+            if (!touches) {
+                val gapLeft = pair.propX + pair.propWidth
+                val gapRight = pair.mascotX + pair.mascot * 0.06f
+                val gapTop = pair.propY
+                val gapBottom = pair.propY + pair.propHeight
+                assertTrue(
+                    "a doodle in the gap: $where",
+                    spots.none { it.box.right > gapLeft && it.box.left < gapRight && it.box.bottom > gapTop && it.box.top < gapBottom },
+                )
+            }
+        }
+        // And the band isn't bare: a big band keeps doodles around the pair.
+        assertTrue(doodleSpots(379f, 207f, pairLayout(379f, 207f, 0.64f).keepClear()).size >= 4)
     }
 }

@@ -426,7 +426,11 @@ people, the mascot to make it livelier, faint doodles instead of plain blue, and
   r2 REVISE 3.45, no hard gate. Then the owner chose one art window per card (at most 0.55 of the card's width); the
   pair now leaves 12–20 % of the band empty at 360/411 dp and 100/130 % (was 20–46 %). Reports: studio
   `critic/reports/2026-11-13-pro-cards-app-r1*.md`, `-r2*.md`.
-- **CI:** green on PR #59 at `8f48f77` (before the art window); the latest commit runs CI again before merging.
+- **Shipped:** critic r3 REVISE 3.45, no hard gate; CI green at `7120d69`; PR #59 merged as `af4aae4`, main CI
+  green; the 0.5.6 (vc 11) AAB, upload key 56:F1:57…:95:C2, is with the owner for internal testing.
+- **Polish after r3** (owner: "Polish only", branch `design/perk-card-polish`): one short float per card
+  (`LucentoMascot(idleCycles)`), no doodle over or between the pair (`doodleSpots`, unit-tested), card 7's prop
+  without the sparkle, the hand over the prop only when pointing (10 dp apart otherwise).
 - **Not verified:** a real phone (the hop as each card turns, OLED contrast of the doodles, prop sharpness).
 
 ## Home-screen widgets — 2026-11-12 (`feature/home-widgets`)
