@@ -406,6 +406,29 @@ owner decides next (NEXT_TASKS). Fixed since, all on `feature/pro-reveal`:
 - **Not changed (owner's calls):** the black stage; the award's confetti and rays (the badge award is a must-keep);
   the "AI adviser" name; the rosette.
 
+## Pro perk cards: new art — 2026-11-13 (`design/perk-card-art`)
+
+The owner wasn't satisfied with the cards' drawn "Scenes" art. After three AI directions (critic r1, studio
+`critic/reports/2026-11-13-perk-art-directions-r1*`) and a hand-drawn set with people, the owner chose: simpler, no
+people, the mascot to make it livelier, faint doodles instead of plain blue, and as little empty blue as possible.
+
+- **Built:** `PerkArt.kt` draws each card's band in `AwardArtwork.CardBlue` with code-drawn doodles (white at 10–16 %),
+  one soft-3D prop (cut out, so the doodles run around it) and `LucentoMascot` (approved sprites, never redrawn)
+  stepping a little in front of it, with a pose per card (`ProTourStop.mascot`: waves first, cheers last). The pair
+  fills one art window per card (at most 0.55 of the card's width), the mascot's hand on the prop. `PerkArtCache` decodes the next card's
+  prop while the current one shows. The collection rows show each card's prop instead of an icon. Props: ten images
+  from GPT Image 2.5 (Figma), sources and prompts in `docs/design/illustrations/perks/`, exported by
+  `tools/illustrations/export_perk_art.py` (Pillow, numpy, scipy). Scene-only colours and the drawn scenes are gone.
+- **Verified:** the Pro unit tests (47, including `PerkArtTest`: one picture and one thumbnail per card; the mascot
+  greets first, cheers last, never shows concern) pass; `assembleDebug` succeeds; `ProRevealCaptureTest` captured on
+  the API 28 emulator at 411 dp light and dark, 360 dp, and 150 % text (studio `qa/out/perk-art-mascot-r3/`).
+- **Critic rounds on the app:** r1 REJECT (doodles drew under the words in dark theme; fixed by clipping first),
+  r2 REVISE 3.45, no hard gate. Then the owner chose one art window per card (at most 0.55 of the card's width); the
+  pair now leaves 12–20 % of the band empty at 360/411 dp and 100/130 % (was 20–46 %). Reports: studio
+  `critic/reports/2026-11-13-pro-cards-app-r1*.md`, `-r2*.md`.
+- **CI:** green on PR #59 at `8f48f77` (before the art window); the latest commit runs CI again before merging.
+- **Not verified:** a real phone (the hop as each card turns, OLED contrast of the doodles, prop sharpness).
+
 ## Home-screen widgets — 2026-11-12 (`feature/home-widgets`)
 
 The owner chose widgets only, both free; the Quick Settings tile, the type-and-save notification and Share to Lucento

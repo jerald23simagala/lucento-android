@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -49,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -272,6 +274,10 @@ internal fun ProRevealDeck(
     var queued by remember { mutableIntStateOf(0) }
     // The step came from a swipe: the deck gives the haptic itself (a button gives its own).
     var swiped by remember { mutableStateOf(false) }
+    // The pictures: the next card's is decoded while this one shows, so its face is ready the moment it turns.
+    val resources = LocalContext.current.resources
+    val art = remember(resources) { PerkArtCache(resources) }
+    LaunchedEffect(shown) { cards.getOrNull(shown + 1)?.let { art.load(it.stop.art) } }
 
     fun keep(step: Int) {
         if (SystemClock.uptimeMillis() - stepStarted >= DoubleTapMillis) queued = step
@@ -380,6 +386,7 @@ internal fun ProRevealDeck(
                         card = cards[i],
                         turn = if (up) turn.value else 0f,
                         reduced = reduced,
+                        art = art,
                         // The band says "Lucento Pro" while it is on, so the backs don't say it beneath it too.
                         backLabel = !bandOn,
                         modifier = Modifier
@@ -433,6 +440,7 @@ internal fun ProRevealDeck(
                         card = cards[l],
                         turn = 1f,
                         reduced = reduced,
+                        art = art,
                         modifier = Modifier
                             .size(width, height)
                             .clearAndSetSemantics {}
@@ -572,7 +580,14 @@ private fun DeckButtons(
 
 /** A card that turns over: its back until halfway, then its face (each face drawn the right way round). */
 @Composable
-private fun TurningCard(card: RevealCard, turn: Float, reduced: Boolean, modifier: Modifier = Modifier, backLabel: Boolean = true) {
+private fun TurningCard(
+    card: RevealCard,
+    turn: Float,
+    reduced: Boolean,
+    art: PerkArtCache,
+    modifier: Modifier = Modifier,
+    backLabel: Boolean = true,
+) {
     val density = LocalDensity.current
     Box(
         modifier.graphicsLayer {
@@ -582,14 +597,16 @@ private fun TurningCard(card: RevealCard, turn: Float, reduced: Boolean, modifie
             }
         },
     ) {
-        if (reduced) {
-            // Cross-fade: no turning for anyone who asked for less motion.
-            if (turn < 1f) PerkCardBack(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - turn }, showLabel = backLabel)
-            if (turn > 0f) PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { alpha = turn })
-        } else if (turn < 0.5f) {
-            PerkCardBack(Modifier.fillMaxSize(), showLabel = backLabel)
-        } else {
-            PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { rotationY = 180f })
+        CompositionLocalProvider(LocalPerkArtCache provides art) {
+            if (reduced) {
+                // Cross-fade: no turning for anyone who asked for less motion.
+                if (turn < 1f) PerkCardBack(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - turn }, showLabel = backLabel)
+                if (turn > 0f) PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { alpha = turn })
+            } else if (turn < 0.5f) {
+                PerkCardBack(Modifier.fillMaxSize(), showLabel = backLabel)
+            } else {
+                PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { rotationY = 180f })
+            }
         }
     }
 }
