@@ -415,15 +415,19 @@ people, the mascot to make it livelier, faint doodles instead of plain blue, and
 - **Built:** `PerkArt.kt` draws each card's band in `AwardArtwork.CardBlue` with code-drawn doodles (white at 10–16 %),
   one soft-3D prop (cut out, so the doodles run around it) and `LucentoMascot` (approved sprites, never redrawn)
   stepping a little in front of it, with a pose per card (`ProTourStop.mascot`: waves first, cheers last). The pair
-  is up to 53 % of the band's width per unit, nearly the full width on a phone. `PerkArtCache` decodes the next card's
+  fills one art window per card (at most 0.55 of the card's width), the mascot's hand on the prop. `PerkArtCache` decodes the next card's
   prop while the current one shows. The collection rows show each card's prop instead of an icon. Props: ten images
   from GPT Image 2.5 (Figma), sources and prompts in `docs/design/illustrations/perks/`, exported by
   `tools/illustrations/export_perk_art.py` (Pillow, numpy, scipy). Scene-only colours and the drawn scenes are gone.
 - **Verified:** the Pro unit tests (47, including `PerkArtTest`: one picture and one thumbnail per card; the mascot
   greets first, cheers last, never shows concern) pass; `assembleDebug` succeeds; `ProRevealCaptureTest` captured on
   the API 28 emulator at 411 dp light and dark, 360 dp, and 150 % text (studio `qa/out/perk-art-mascot-r3/`).
-- **Not verified:** a real phone (the hop as each card turns, OLED contrast of the doodles), lint and the full unit
-  suite on this branch, CI.
+- **Critic rounds on the app:** r1 REJECT (doodles drew under the words in dark theme; fixed by clipping first),
+  r2 REVISE 3.45, no hard gate. Then the owner chose one art window per card (at most 0.55 of the card's width); the
+  pair now leaves 12–20 % of the band empty at 360/411 dp and 100/130 % (was 20–46 %). Reports: studio
+  `critic/reports/2026-11-13-pro-cards-app-r1*.md`, `-r2*.md`.
+- **CI:** green on PR #59 at `8f48f77` (before the art window); the latest commit runs CI again before merging.
+- **Not verified:** a real phone (the hop as each card turns, OLED contrast of the doodles, prop sharpness).
 
 ## Home-screen widgets — 2026-11-12 (`feature/home-widgets`)
 

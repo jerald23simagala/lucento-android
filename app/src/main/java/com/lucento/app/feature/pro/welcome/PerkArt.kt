@@ -1,6 +1,7 @@
 package com.lucento.app.feature.pro.welcome
 
 import android.content.res.Resources
+import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
@@ -53,6 +54,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier) {
     val prop = rememberPerkArt(stop.art)
+    val aspect = rememberPropAspect(stop.art)
     BoxWithConstraints(
         modifier
             // Clip first: the doodles must never reach the card's words (critic, app round 1: they did, in dark).
@@ -61,7 +63,6 @@ internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier) {
             .drawBehind { drawDoodles() }
             .clearAndSetSemantics {},
     ) {
-        val aspect = prop?.let { it.width.toFloat() / it.height } ?: 1f
         val pair = pairLayout(maxWidth.value, maxHeight.value, aspect)
         if (prop != null) {
             Image(
@@ -97,14 +98,15 @@ internal data class PairLayout(
  * The pair as large as a [width] × [height] band allows, for a prop of [aspect] (width ÷ height of its visible pixels).
  * Measured from the approved sprites: the character spans 6–96.5 % of its box across, starts 3 % down and stands with
  * its feet 93 % down; its torch's glow reaches 112.8 % across. The prop stands on the same line as the feet, at most as
- * wide as the mascot's box and 86 % as tall, and the mascot's hand overlaps it by [HandOnProp]. The pair is centred on
- * what shows, a little below the middle, with the glow inside the band. A band much wider than tall (large text)
- * spreads them out: the prop centred at 30 % of the width, the mascot at 70 %.
+ * wide as the mascot's box and 86 % as tall, and the mascot's hand overlaps it by [HandOnProp]. The pair stays together
+ * at every band shape (critic, app round 2: spreading them apart on wide bands split the picture), centred on what
+ * shows, a little below the middle, with the glow inside the band. The mascot is at most 0.88 of the band's height, so
+ * its arrival hop (it rises about 9 % of its size) never takes the hair past the band's top.
  */
 internal fun pairLayout(width: Float, height: Float, aspect: Float): PairLayout {
     val propShare = minOf(1f, PropTall * aspect) // the prop's width in mascot boxes, at full size
     val fitWidth = (width - 2f * SideRoom + HandOnProp) / (propShare + (CharacterRight - CharacterLeft) + GlowBeyond)
-    val m = minOf(height * 0.96f, fitWidth).coerceAtLeast(1f)
+    val m = minOf(height * MascotMostOfHeight, fitWidth).coerceAtLeast(1f)
     val propWidth = m * propShare
     val propHeight = propWidth / aspect
     val feet = Feet * m
@@ -114,22 +116,17 @@ internal fun pairLayout(width: Float, height: Float, aspect: Float): PairLayout 
     val top = (height - (groupBottom - groupTop)) * (1f + VerticalBias) / 2f
     val mascotY = top - groupTop
     val propY = mascotY + feet - propHeight
-    val wide = width > 2.6f * height
-    val propX: Float
-    val mascotX: Float
-    if (wide) {
-        propX = width * 0.3f - propWidth / 2f
-        mascotX = width * 0.7f - m * (CharacterLeft + CharacterRight) / 2f
-    } else {
-        val shows = propWidth - HandOnProp + (CharacterRight - CharacterLeft) * m
-        val left = (width - shows) / 2f
-        // Keep the torch's glow inside the band: move the pair left if it would spill over the right edge.
-        val spill = (left + propWidth - HandOnProp - CharacterLeft * m + (CharacterRight + GlowBeyond) * m) - (width - 2f)
-        propX = (left - spill.coerceAtLeast(0f)).coerceAtLeast(SideRoom / 2f)
-        mascotX = propX + propWidth - HandOnProp - CharacterLeft * m
-    }
+    val shows = propWidth - HandOnProp + (CharacterRight - CharacterLeft) * m
+    val left = (width - shows) / 2f
+    // Keep the torch's glow inside the band: move the pair left if it would spill over the right edge.
+    val spill = (left + propWidth - HandOnProp - CharacterLeft * m + (CharacterRight + GlowBeyond) * m) - (width - 2f)
+    val propX = (left - spill.coerceAtLeast(0f)).coerceAtLeast(SideRoom / 2f)
+    val mascotX = propX + propWidth - HandOnProp - CharacterLeft * m
     return PairLayout(m, mascotX, mascotY, propWidth, propHeight, propX, propY)
 }
+
+/** The mascot's box at most this share of the band's height: room above the hair for the arrival hop. */
+private const val MascotMostOfHeight = 0.88f
 
 // The approved sprites' measurements (docs/mascot; the art is drawn as supplied).
 private const val CharacterLeft = 0.06f
@@ -218,21 +215,22 @@ private fun DrawScope.drawDoodles() {
 }
 
 /**
- * What the mascot does on each card: waves on the first, then points, thinks or simply smiles, so no two neighbouring
- * cards show the same picture, and cheers only on the last (its Success pose is kept for the end and the award).
+ * What the mascot does on each card: waves on the first, points at the prop on every other card, and between them
+ * smiles or thinks, so no two neighbouring cards show the same picture. Its cheer (the Success pose) is kept for the
+ * award that follows the cards (critic, app round 2).
  */
 internal val ProTourStop.mascot: MascotMood
     get() = when (this) {
         ProTourStop.WALLETS -> MascotMood.Greeting
         ProTourStop.NET_WORTH -> MascotMood.Pointing
-        ProTourStop.SMART_READING -> MascotMood.Curious
+        ProTourStop.SMART_READING -> MascotMood.Happy
         ProTourStop.GOALS -> MascotMood.Pointing
-        ProTourStop.INSIGHTS_PERIODS -> MascotMood.Happy
+        ProTourStop.INSIGHTS_PERIODS -> MascotMood.Curious
         ProTourStop.STATEMENTS -> MascotMood.Pointing
         ProTourStop.AI_ANSWERS -> MascotMood.Curious
-        ProTourStop.SYNC -> MascotMood.Happy
+        ProTourStop.SYNC -> MascotMood.Pointing
         ProTourStop.SHARED -> MascotMood.Greeting
-        ProTourStop.THEMES -> MascotMood.Celebrate
+        ProTourStop.THEMES -> MascotMood.Happy
     }
 
 /** Each card's prop (`perk_art_*`): from docs/design/illustrations/perks via tools/illustrations/export_perk_art.py. */
@@ -280,6 +278,17 @@ internal class PerkArtCache(private val resources: Resources) {
     suspend fun load(@DrawableRes id: Int): ImageBitmap = pictures.get(id)
         ?: withContext(Dispatchers.Default) { ImageBitmap.imageResource(resources, id).also { it.prepareToDraw() } }
             .also { pictures.put(id, it) }
+}
+
+/** A prop picture's width ÷ height, read from its file's header (nothing is decoded), so the layout never waits for it. */
+@Composable
+private fun rememberPropAspect(@DrawableRes id: Int): Float {
+    val resources = LocalContext.current.resources
+    return remember(resources, id) {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeResource(resources, id, bounds)
+        if (bounds.outWidth > 0 && bounds.outHeight > 0) bounds.outWidth.toFloat() / bounds.outHeight else 1f
+    }
 }
 
 /** The deck's cache; outside the deck each picture decodes on its own. */

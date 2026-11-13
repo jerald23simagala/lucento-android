@@ -14,14 +14,16 @@ live in the Figma file "Pro perk art — explorations".
 |---|---|---|---|
 | `wallets_source.webp` | Add every account you use | An open wallet with cards | Waves |
 | `net_worth_source.webp` | Count everything you have | A cottage and a piggy bank | Points |
-| `smart_reading_source.webp` | Smarter reading | Spoken words becoming a receipt | Thinks |
+| `smart_reading_source.webp` | Smarter reading | A microphone whose words become a receipt | Smiles |
 | `goals_source.webp` | Save for more at once | Three flags on a mound | Points |
-| `insights_periods_source.webp` | Look further back | A telescope beside bars that go up and down | Smiles |
+| `insights_periods_source.webp` | Look further back | An hourglass, most of its sand run through | Thinks |
 | `statements_source.webp` | Keep your statements | A clipped report with an up-and-down chart | Points |
 | `ai_answers_source.webp` | AI answers | Two speech bubbles | Thinks |
-| `sync_source.webp` | Your money on every phone | Two phones linked by an arc | Smiles |
+| `sync_source.webp` | Your money on every phone | Two phones linked by an arc | Points |
 | `shared_source.webp` | Share with a Partner | One notebook, two pencils | Waves |
-| `themes_source.webp` | Three new themes | Paint pots in green, grey and violet | Cheers |
+| `themes_source.webp` | Three new themes | Paint pots in green, grey and violet | Smiles |
+
+The mascot's cheer (its Success pose) is kept for the award that follows the cards.
 
 Made 2026-11-13 with GPT Image 2.5 (`gpt-image-2.5-flare`) through Figma's image generation, 1024 × 1024. Each source
 is the image exactly as generated, stored as lossless WebP. **Never edit a source**: to change a prop, generate a new
@@ -59,19 +61,20 @@ Every prop uses one style, with only the object changing:
    leaf green, ivory and pale sky blue, each with a small gold chip and no writing)
 2. a small cottage with a tangerine roof and a softly lit window, with a little ivory piggy bank sitting in front of
    it, grouped together
-3. a soft ivory speech bubble with three small sunlight-yellow dots on the left, and on the right a neat curled paper
-   receipt standing upright with a few short grey lines and a small gold tick mark, joined by a little trail of tiny
-   golden sparkles, as if spoken words were becoming a tidy record
+3. a small rounded retro desk microphone in ivory and brass on the left, and on the right a neat curled paper receipt
+   standing upright with a few short grey lines and a small gold tick mark (no writing), with a little trail of tiny
+   golden sparkles flowing from the microphone into the receipt, as if spoken words were becoming a tidy record
 4. three small pennant flags on slim wooden poles of different heights, standing in one little rounded grassy mound;
    the flags are sunlight yellow, tangerine and ivory
-5. a small brass telescope on a little wooden tripod, beside a row of five short rounded bars like a small bar chart
-   whose heights go up and down unevenly (tall, short, medium, tallest, short), in sunlight yellow and ivory
+5. a friendly rounded hourglass with a warm wooden frame and brass caps, its clear glass holding golden sand, most of
+   it already in the lower bulb, as if a long stretch of time has passed
 6. a neat little stack of ivory report pages standing slightly tilted, held together at the top by a gold binder clip;
    the front page shows a few short grey lines and a small simple bar chart of four bars whose heights go up and
    down unevenly (medium, tall, short, medium) in sunlight yellow and tangerine, with no writing
 
-(Cards 5 and 6 were made again on 2026-11-13 so their bars go up and down: an earlier pair climbed steadily, a growth
-cliché the critic flagged.)
+(Made again on 2026-11-13 after the critic's app rounds: card 6's bars now go up and down, since an earlier chart
+climbed steadily, a growth cliché; card 3 was a speech bubble like card 7's, and card 5 a telescope beside another
+bar chart like card 6's, so each card now has a motif of its own.)
 7. two soft rounded speech bubbles in conversation, a smaller pale-sky-blue one behind on the left, and a larger warm
    sunlight-gold one in front on the right with three short ivory lines inside it, and one tiny golden sparkle beside
    them

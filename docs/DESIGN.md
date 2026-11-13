@@ -165,7 +165,9 @@ logos or UI in the art.
   of plain blue), and a little below its middle, as large as the band allows: one simple soft-3D prop for the perk (a
   wallet, flags, a telescope…; no people) and Lucento itself (`LucentoMascot`, the approved sprites, never redrawn)
   with its hand on the prop, over a soft shadow (`shadow = true`), in a pose that suits the card: it waves on the
-  first, then points, thinks or smiles, never the same picture on two neighbouring cards, and cheers only on the last. The props
+  first, points on every other card, smiles or thinks between, never the same picture on two neighbouring cards, and
+  keeps its cheer for the award. Every card has the same art window (at most 0.55 of the card's width), which the
+  pair fills; a card with few words ends with plain card under its words. The props
   match the mascot's render (satin and matte materials, warm light from the upper left). `perk_art_<stop>` (640 px
   square) and `perk_thumb_<stop>` (192 px) in `res/drawable-nodpi`; sources, prompts and provenance in
   `docs/design/illustrations/perks/`; `tools/illustrations/export_perk_art.py` cuts each prop out of its flat

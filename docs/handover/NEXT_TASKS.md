@@ -94,9 +94,16 @@ after that I am good." Built on the branch: each card's art band is CardBlue wit
 soft-3D prop cut out of its ground, and `LucentoMascot` stepping a little in front of it in a pose per card
 (`PerkArt.kt`); ten props generated with GPT Image 2.5 (`docs/design/illustrations/perks/`, exported by
 `tools/illustrations/export_perk_art.py`, 425 KB with thumbnails); the deck decodes the next card's prop ahead of its
-turn; the collection rows show each card's prop. Shown to the owner: artifact "Lucento Pro Cards". Next:
-- (a) the owner's call on shipping (PR, critic round, release 0.5.6 — main also carries the widgets, #57);
-- (b) on a phone: the mascot's hop as each card turns, and the doodles' contrast on an OLED screen.
+turn; the collection rows show each card's prop. Shown to the owner: artifact "Lucento Pro Cards".
+
+Shipping (owner: "PR + review, merge when green"): PR #59, release 0.5.6 (vc 11). Critic app r1 REJECT (doodles under
+the words in dark: fixed), r2 REVISE 3.45 with no hard gate; the owner then chose a **same-size art window** (the band
+at most 0.55 of the card's width, which the pair fills: 12–20 % empty, measured). Also from r2: the pair stays
+together at every band shape, room for the hop, each prop's shape read before it decodes, new props for cards 3 (a
+microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
+- (a) CI and a critic check on the latest commit, then merge and the 0.5.6 AAB to Downloads;
+- (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
+- (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
    picks one.

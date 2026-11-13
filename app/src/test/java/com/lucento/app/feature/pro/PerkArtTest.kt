@@ -23,10 +23,11 @@ class PerkArtTest {
     }
 
     @Test
-    fun the_mascot_greets_on_the_first_card_and_cheers_on_the_last() {
+    fun the_mascot_greets_on_the_first_card_and_keeps_its_cheer_for_the_award() {
         val stops = ProTourStop.entries
         assertEquals(MascotMood.Greeting, stops.first().mascot)
-        assertEquals(MascotMood.Celebrate, stops.last().mascot)
+        // The cheering picture comes with the award after the cards, so no card shows it.
+        assertTrue(stops.none { it.mascot.pose == MascotPose.Success })
         // Supportive concern belongs to budgets, never to a reward.
         assertTrue(stops.none { it.mascot == MascotMood.Concerned })
     }
@@ -35,8 +36,6 @@ class PerkArtTest {
     fun no_two_neighbouring_cards_show_the_same_mascot_picture() {
         val poses = ProTourStop.entries.map { it.mascot.pose }
         poses.zipWithNext().forEachIndexed { i, (a, b) -> assertTrue("cards ${i + 1} and ${i + 2} both show $a", a != b) }
-        // The cheering picture is kept for the last card (and the award after it).
-        assertEquals(listOf(ProTourStop.entries.last()), ProTourStop.entries.filter { it.mascot.pose == MascotPose.Success })
     }
 
     // The bands the deck really makes: 300–380 dp wide, from the large-text minimum (300 : 84) to nearly square; props
@@ -63,7 +62,6 @@ class PerkArtTest {
     @Test
     fun the_mascots_hand_reaches_over_the_prop_and_the_pair_sits_a_little_below_the_middle() {
         for (w in widths) for (h in heights) for (a in aspects) {
-            if (w > 2.6f * h) continue // spread out on very wide bands
             val p = pairLayout(w, h, a)
             val where = "band ${w}x$h, prop $a"
             assertEquals("hand over the prop: $where", p.propX + p.propWidth - 8f, p.mascotX + p.mascot * 0.06f, 0.01f)
@@ -72,6 +70,8 @@ class PerkArtTest {
             val above = top
             val below = h - bottom
             assertTrue("gap above ($above) more than 1.3 times the gap below ($below): $where", above <= 1.3f * below + 0.5f)
+            // The arrival hop lifts the hair about 9 % of the mascot's size: it must stay inside the band.
+            assertTrue("no room for the hop: $where", p.mascotY + p.mascot * 0.03f >= 0.09f * p.mascot - 0.01f)
         }
     }
 }
