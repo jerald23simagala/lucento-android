@@ -657,7 +657,8 @@ class ScreenshotTourTest {
         // ---------------------------------------------------------------- Lucento Pro's welcome (owner, 2026-11-12)
         // Straight after Google Play confirms: a deck of cards in a gold band, one per thing Pro opened, turned over one at
         // a time; the collection with the plan's terms; the medal; and its flight to the profile picture.
-        waitForText("You’re on Lucento Pro")
+        // The brand's name is bound with a no-break space, so it never breaks across lines (critic round 4).
+        waitForText("You’re on Lucento\u00A0Pro")
         shot("24h-pro-welcome")
         click("Open your Pro deck")
         buildList {
