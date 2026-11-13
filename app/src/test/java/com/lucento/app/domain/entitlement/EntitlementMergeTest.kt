@@ -84,10 +84,33 @@ class EntitlementMergeTest {
         assertTrue(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
     }
 
-    @Test fun an_expired_server_row_still_gives_way_to_the_same_purchase_renewing() {
-        val lapsed = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.SERVER, status = EntitlementStatus.EXPIRED, expiresAt = now - 10 * day, tokenHash = "c".repeat(64))
-        val renewed = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.PLAY_LOCAL, expiresAt = now + 35 * day, tokenHash = "c".repeat(64))
-        assertEquals(listOf(renewed), EntitlementMerge.reconcilePlay(listOf(lapsed), listOf(renewed), now))
+    @Test fun a_lifetime_refund_the_server_read_as_cancelled_never_comes_back_from_plays_copy_of_it() {
+        // A Play Console refund of a one-time product: Play's server says CANCELLED, which the server stores as EXPIRED
+        // (not REVOKED), while Play's copy on the phone still lists the purchase (owner's test, 2026-11-13).
+        val ended = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.EXPIRED, expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        val stale = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        val merged = EntitlementMerge.reconcilePlay(listOf(ended), listOf(stale), now)
+        assertEquals(listOf(ended), merged)
+        assertFalse(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
+    }
+
+    @Test fun an_expired_subscription_stays_off_while_plays_copy_lags_and_a_resubscription_counts_at_once() {
+        // Google Play: buying again after a subscription expires is a new purchase with a new token, so the same token
+        // never renews once Play has called it expired. Only Play's lagging copy can still list it.
+        val expired = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.SERVER, status = EntitlementStatus.EXPIRED, expiresAt = now - 10 * day, tokenHash = "c".repeat(64))
+        val stale = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.PLAY_LOCAL, expiresAt = now + 35 * day, tokenHash = "c".repeat(64))
+        assertEquals(listOf(expired), EntitlementMerge.reconcilePlay(listOf(expired), listOf(stale), now))
+        val resubscribed = stale.copy(purchaseTokenHash = "d".repeat(64))
+        assertEquals(listOf(resubscribed), EntitlementMerge.reconcilePlay(listOf(expired), listOf(resubscribed), now))
+    }
+
+    @Test fun a_subscription_back_from_account_hold_shows_up_before_the_server_hears_of_it() {
+        // Hold and pause keep the token: the same purchase can be live again, so Play's fresh reading wins.
+        for (status in listOf(EntitlementStatus.ON_HOLD, EntitlementStatus.PAUSED)) {
+            val held = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.SERVER, status = status, expiresAt = now - day, tokenHash = "e".repeat(64))
+            val back = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.PLAY_LOCAL, expiresAt = now + 35 * day, tokenHash = "e".repeat(64))
+            assertEquals(status.name, listOf(back), EntitlementMerge.reconcilePlay(listOf(held), listOf(back), now))
+        }
     }
 
     @Test fun a_server_lifetime_unheard_of_for_a_month_gives_way_to_plays_fresh_reading() {
