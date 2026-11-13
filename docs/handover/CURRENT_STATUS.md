@@ -268,3 +268,140 @@ What changed:
     server) is fixed by this.
 - Tests:
   - 14 new JVM tests, and three updated ones that encoded "a Lifetime never needs a check". Results are in the PR.
+
+## Pro welcome buttons dead on real phones — 2026-11-12 (`fix/pro-tour-real-taps`)
+
+On the owner's Galaxy S8 (Android 9, 0.5.4 vc 9), nothing on the Pro tour's card answered a tap: not Next, not End
+tour. That held on the first run and on a replay; only the system Back key worked. The curtain's buttons were dead the
+same way. They only looked fine because the curtain moves on by itself (KNOWN_ISSUES PW-1).
+
+- **Cause:**
+  - The overlay's touch blocker wrapped the cards and consumed every pointer change.
+  - A finger always drifts a pixel or two between down and up, and Compose cancels a click when something else
+    consumes that movement.
+  - The emulator runs pressed with `performClick` or a still down-up. Neither moves, so they all passed.
+- **Fix (`ProTourOverlay.kt`):** the blocker sits on the scrim, under the cards, never around them. A finger on a card
+  reaches its buttons; a finger on the dimmed screen still stops there.
+- **Tests,** through a shared `Finger` helper (down, two 1–2 px moves, up, injected into Android's input system):
+  - `ProWelcomeRealTapTest` runs the tour over the real app. Next, Back and End tour answer, and a tap on the dimmed
+    dock leaves the app on Wallets.
+  - `ProTourCurtainFingerTest` runs the curtain on its own, away from its timer. Skip the tour and Show me answer, and
+    taps on the scrim or the card's words don't reach the app beneath.
+  - **Results:**
+    - Old overlay (API 28 emulator, animations on): the tour stopped at Next, and the curtain counted 0 presses of
+      Skip the tour.
+    - Fixed overlay: both tests pass, and both are in CI's emulator job.
+    - 1,330 JVM tests with 0 failures, and `lintDebug` with 0 errors.
+    - `assembleDebug` and the instrumented-test compile pass.
+- **Owner decision (2026-11-12):** retire the spotlight tour for an unboxing reveal. This fix is held, committed
+  locally and not pushed, and ships with the reveal in one release (NEXT_TASKS).
+
+## Pro welcome: the unboxing reveal — 2026-11-12 (`feature/pro-reveal`, from `fix/pro-tour-real-taps`)
+
+The owner retired the spotlight tour, whose buttons failed on real phones (PW-1). The reveal had to keep the
+excitement of the upgrade and the badge award.
+
+**Design.** Three tappable prototypes in the studio went through two critic rounds:
+- r1: REJECT; the Deck scored best at 3.0.
+- r2: REJECT at 3.1; "Deck, unwrapped" recommended.
+
+The owner then picked **Deck, unwrapped** with **Scenes** card art. Prototypes: the artifact "Lucento Pro Reveal" and
+studio `lab/pro-reveal.html` / `lab/pro-reveal-art.html`. Reports: `critic/reports/2026-11-12-pro-reveal-r1/r2*`.
+
+**What's built**, in `feature/pro/welcome/`:
+- `ProReveal.kt`: the stage and the deck.
+  - The stage is solid (it was a 0.92 dim until critic round 3) and takes stray touches. It lies beside the content,
+    never around it. While it is up, the status and navigation bars draw light icons.
+  - The deck: a gold band with the approved symbol; turns at 90°; one burst; swipe; Previous, Next and Skip. TalkBack
+    hears a line per card from the counter, the welcome's one live region.
+- `PerkCard.kt`: the two faces.
+  - The back carries the approved `lucento_symbol` on an ivory disc.
+  - The face: the scene, the title, what changed (a `FlowRow` that wraps at large text), the term, where it lives,
+    and the sentence. The words take the height they need and the scene takes the rest (no gap); beyond the card the
+    words scroll, with a "More" pill on a solid band.
+- `PerkArt.kt`: ten scenes drawn in Compose, using new `AwardArtwork` card colours.
+- `ProCollection.kt`: the plan's own line first, then each card with its gain or end date.
+- `ProWelcomeHost.kt`: the phases REVEAL → COLLECTION → MEDAL → FLIGHT. The award is the existing ceremony.
+
+**Copy** (`ProWelcomeCopy`, `ProCopy.serviceTerm`):
+- No card says "here".
+- Online services say "Included until Nov 12, 2027", "While you subscribe" or "With Lucento Cloud".
+- The AI card says "50 a day until …, then 10 a month".
+- Dates stay on one line.
+
+**Retired:**
+- `ProTourOverlay.kt` and `ProPrivilegesDialog.kt`;
+- the screens' spotlight hooks (the profile picture keeps one, for the flight);
+- `showTourStop`;
+- `ProWelcome.privileges`.
+
+Net worth and Smarter reading no longer wait for a wallet. The Pro page's button is now "See your Pro cards".
+
+**Tests:**
+- JVM: 1,330 tests, 0 failures. New: no "here", terms, AI term, collection tags, `serviceTerm`.
+- `lintDebug`: 0 errors. `assembleDebug` and the instrumented-test compile pass.
+- On the API 28 emulator, both passed:
+  - `ProWelcomeRealTapTest`: the deck over the real app — open, Next, Previous, a tap on the dim, Skip, Back.
+  - `ProRevealDeckFingerTest`: the band, Next, Previous and Skip, with a layer beneath that counted 0 leaks.
+- `ProRevealCaptureTest` takes opt-in captures. ScreenshotTourTest's welcome frames were rewritten (25a–25l); the
+  emulator CI runs them.
+
+**Critic round 3** (on the app's captures): **REJECT, 3.1**. Two gates failed: the dark collection's plan title
+(1.56 : 1), and the deck's controls at 200 % text ("Previou / s", "See your"). The loop's three rounds are spent, so the
+owner decides next (NEXT_TASKS). Fixed since, all on `feature/pro-reveal`:
+- **The dark title:** the plan panel is a `Surface`, so its title takes the theme's ink.
+- **The buttons:**
+  - `DeckButtons` measures the deck's own labels and stacks Next above Previous when one won't fit on a line.
+  - Next keeps one place and one size from the closed deck to the last card.
+  - App-wide, `ButtonContent` (primary, secondary and quick-action buttons) wraps a label that doesn't fit instead of
+    cutting it off, with 8 dp of vertical padding. At default text nothing changes.
+- **The band:** placed by layout under the crest and clamped inside the card; its label grows only to 1.3×. It speaks
+  the count for TalkBack, and the line above no longer repeats it.
+- **The card face:** the scene takes the height the words leave (one layout pass with `maxIntrinsicHeight`), so there
+  is no gap. "More" sits on a solid band.
+- **TalkBack:** one live region, the counter ("2 of 10. Title.").
+- **The collection's rows:** the gain sits at the row's end while it fits beside the name, and drops under the name
+  when it doesn't (a `FlowRow`; this replaced the fixed 130 % rule).
+- **The stage:** solid, with light system-bar icons while it is up.
+- **Copy:**
+  - "Tap Add at the top right of …"; "Choose 6 or 12 months above the charts in Insights."; statements "In Insights,
+    under Reports."; themes no longer repeat the three names.
+  - A fifth chapter, *Beyond this phone*, for Sync and Lucento Shared (`AwardArtwork.GlowBeyond`).
+- **Typography:** headlines grow only to 1.5×; the collection says "You're Pro" from 130 % text; counts and dates use
+  no-break spaces, including the Pro page's `planStatus`.
+- **Insights scene:** redrawn as up-and-down months in a widening window.
+- **Taps during a turn:** kept and acted on once the card has turned; a double tap within 250 ms counts once. Haptics:
+  the button's own, plus a tick for swipes only.
+- **Tests:** 1,333 JVM tests, 0 failures. `lintDebug`: 0 errors.
+- **Captures:** 15 emulator runs in studio `qa/out/reveal-app-r3/` (the opt-in capture test now names the width and
+  reduced motion).
+- **Not verified:** TalkBack, haptics and Android 14+ large text, which need a real phone; the "confirming" state,
+  which needs a signed-in account (its copy is JVM-tested).
+- **Owner (2026-11-12):**
+  - "PR + review together": release 0.5.5 (version code 10), merged only if CI passes and critic round 4 finds no
+    hard-gate failure;
+  - keep "AI adviser" and the rosette medal;
+  - large text "works to 200 %, polished to 130 %": cut-off or overlapping text, or an unusable control, up to 200 % is
+    a hard fail; looks are judged at 100–130 %.
+
+**Critic round 4** (PR #56 at 9f01196): **REVISE, 3.4**, with no hard gate failing. Fixed before merging, in
+`a1c994e`:
+- **The brand name:** the first headline broke it at 360 dp ("Lu- / cento Pro"). Stage headlines no longer hyphenate,
+  and "Lucento Pro" never breaks.
+- **The online-service cards:** each says where it stands under its title ("Off · needs your Lucento account" …
+  "On"). The AI card states its allowance only once the server has confirmed it ("Included until …" before then).
+- **The top band:** 64 dp once the deck is open, so the cards get the height.
+- **Line breaks:** no-break spaces in counts, "side by side", menu paths (which break only between steps) and "Pro
+  Lifetime ·"; card titles and chips break evenly.
+- **Smaller fixes:** the band's second disc is gone; the hidden Skip is disabled; "one Partner" comes from
+  `PlanCatalog`.
+- **MONETIZATION:**
+  - the welcome's rules updated;
+  - D-13 and §5 now say the Lifetime's services year runs from the purchase, which is how the app (`PurchaseInterpreter`)
+    and the server (`20261108090000_play_purchases.sql`) compute it. The docs had said "from first verification".
+- **Tests:**
+  - 1,336 JVM tests: 1,334 passed. The 2 that failed were `ProxyCallTest` socket timeouts while the emulator booted,
+    in code untouched by this work; that class passed 8/8 when re-run alone.
+  - `lintDebug`: 0 errors.
+- **Not changed (owner's calls):** the black stage; the award's confetti and rays (the badge award is a must-keep);
+  the "AI adviser" name; the rosette.

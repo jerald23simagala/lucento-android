@@ -83,6 +83,29 @@ object AwardArtwork {
     /** The Lucento Pro medal's stripe: tangerine on blue, a pairing no progress award uses. */
     val StripeTangerine = Palette.BrightTangerine
     val Confetti = listOf(Palette.SunlightYellow, Palette.BrightTangerine, Palette.ElectricBlue, Palette.Positive, Palette.BlueNight)
+
+    // ---- Lucento Pro's perk cards (owner, 2026-11-12: the "Scenes" art). Like a medal, a card is an object: its back
+    // and its art look the same in every theme. Illustration colours only, never text on a surface.
+    /** The cards' blue: the back and the art band, from Blue Hero down to a deep indigo. */
+    val CardBlue = Palette.BlueHero
+    val CardBlueDeep = Color(0xFF1A2C86)
+    /** Paper and its pale blue lines: wallets, receipts, documents, phone screens drawn in the scenes. */
+    val Paper = Palette.SoftIvory
+    val PaperLine = Color(0xFFC9D6F5)
+    val PaperShade = Color(0xFFDCE6FF)
+    /** A second voice in conversations (the answer bubble, the reading lines). */
+    val Lilac = Color(0xFF9DB3FF)
+    val CoinSide = Color(0xFFE5A50A)
+    val CoinLine = Color(0xFFC88A06)
+    /**
+     * Each chapter's glow at the foot of the art: money gold, goals green, insights lilac, beyond-this-phone sky,
+     * make-it-yours tangerine.
+     */
+    val GlowMoney = Color(0x9EFFC928)
+    val GlowGoals = Color(0x803DD68C)
+    val GlowInsights = Color(0x8CB9A2FF)
+    val GlowBeyond = Color(0x8C7FD8FF)
+    val GlowYours = Color(0x94FF8A24)
 }
 
 internal val LightColors = lightColorScheme(

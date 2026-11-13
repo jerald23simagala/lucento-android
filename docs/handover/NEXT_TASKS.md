@@ -32,8 +32,51 @@
 | OT-18 | **GitHub secret `GOOGLE_SERVICES_JSON`** (crash reports in CI releases): `gh secret set GOOGLE_SERVICES_JSON < app/google-services.json`. Claude's attempt was blocked by the permission classifier (secret-store write), 2026-11-08. Then confirm Crashlytics in the Firebase console after an opted-in test crash, and that the first run with it uploads the R8 mapping | Open (owner) | Without it the release AAB has no Crashlytics. `LUCENTO_GOOGLE_WEB_CLIENT_ID` was also fixed on 2026-11-08: its value began with the variable's own name (`LUCENTO_GOOGLE_WEB_CLIENT_ID=4311…`), which broke Google sign-in in every CI release |
 | OT-19 | **Account emails** (docs/EMAILS.md › Setup): apply `20261110090000_account_emails.sql` to lucento-test, then production; create a Resend key with sending access to `send.lucentoapp.com`; Vercel Production env `LUCENTO_RESEND_API_KEY` and `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`; redeploy the site; then sign up on a phone and check the welcome arrives once. OT-13 (Confirm signup template, refreshed 2026-11-08 without the "no ads" line) and the SMTP sender fix belong to the same pass | Open (owner) | Until then `/api/account/welcome` answers 503 (the app retries at the next launch) and purchases get no confirmation email; nothing else changes |
 | OT-23 | **Replace the GitHub secret `LUCENTO_PLAY_LICENSE_KEY`** with Play's Base64 RSA licence key (Play Console › Monetize with Play › Monetization setup › Licensing; `PLAY_CONSOLE_SETUP.md` step 5). It holds a SHA-1 fingerprint today (KNOWN_ISSUES PB-1). Then build 0.5.3 (vc 8), upload it to internal testing and retest a trial and a yearly purchase: Pro should show within seconds and production should get a `purchase_links` row | **Done** (secret 2026-11-11 22:27Z; 0.5.3 built and checked; Restore granted Pro on the owner's phone 2026-11-12) | — |
-| OT-24 | **Switch on purchase checks and refund checks together** (owner's choice, 2026-11-12): fix Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (KNOWN_ISSUES PB-2); add `LUCENTO_RTDN_PUSH_TOKEN` with the Pub/Sub topic, the push subscription and Play's real-time developer notifications; add `CRON_SECRET` (KNOWN_ISSUES PB-3); redeploy production; then Send test notification and Restore purchases (PLAY_CONSOLE_SETUP steps 6, 8 and 9) | **Open** (owner, 2026-11-12; click-by-click steps given) | Until then the server records no purchase and never hears about a refund |
+| OT-24 | **Switch on purchase checks and refund checks together** (owner's choice, 2026-11-12): fix Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (KNOWN_ISSUES PB-2); add `LUCENTO_RTDN_PUSH_TOKEN` with the Pub/Sub topic, the push subscription and Play's real-time developer notifications; add `CRON_SECRET` (KNOWN_ISSUES PB-3); redeploy production; then Send test notification and Restore purchases (PLAY_CONSOLE_SETUP steps 6, 8 and 9) | **Steps done, not yet working** (2026-11-12). Verified: the variables are present, production was redeployed, and the Pub/Sub test notice was acknowledged. But at 17:26Z production still had no `purchase_links` and no Play `entitlements`, after the owner had opened the app and tapped Restore. The phone's verify call either never happened or failed, and Vercel (Hobby) keeps runtime logs for one hour only. Next: the owner taps Restore purchases and says so at once, and Claude reads the verify log within the hour | Until then the server records no purchase and never hears about a refund |
 | OT-22 | **Security remediation (2026-11-10)**: work through `docs/security/OWNER_ACTIONS_REQUIRED.md` §1–§14 — Gemini paid tier, Confirm email, plan decision, then apply the four `20261111*` migrations (lucento-test → production), deploy the website branch `security/release-hardening`, internal-track purchase and refund checks | **Open** | The release stays NOT APPROVED until §1, §2, §5/§6, §13 and §14 are done (`docs/security/REMEDIATION_REPORT.md`) |
+
+## Pro welcome: an unboxing reveal replaces the spotlight tour (owner, 2026-11-12)
+
+The tour's buttons were found dead on real phones (KNOWN_ISSUES PW-1). The owner chose to retire the spotlight tour,
+keeping the excitement of the upgrade and the badge award. The fix on `fix/pro-tour-real-taps` is committed locally and
+**held**: it ships with the reveal in one release (owner's choice). Nothing is pushed until then.
+
+**Status (2026-11-12):** steps 1–3 are built on `feature/pro-reveal`, which is local and not pushed. The owner
+picked "Deck, unwrapped" with "Scenes" art.
+
+Critic round 3 on the app's captures returned REJECT, 3.1. Two gates failed: the dark plan title, and the controls at
+200 % text. Every P0 and P1 is fixed and re-captured (studio `critic/reports/2026-11-12-pro-reveal-r3*`,
+`qa/out/reveal-app-r3/`). Three rounds without APPROVE end the loop, so it is with the owner.
+
+**Owner (2026-11-12):** "PR + review together".
+- Push and open the PR as release 0.5.5 (version code 10): #55's refund guards, the PW-1 fix and the reveal.
+- A fresh critic runs round 4 while CI runs.
+- Merge only if CI passes and round 4 finds no hard-gate failure, then the AAB built from main goes to Downloads for
+  internal testing.
+- Also decided: keep the "AI adviser" name and the medal's rosette. The solid stage and ten cards one at a time stay
+  (the prototype pick).
+
+Round 4: REVISE 3.4, with no hard gate failing. Its two P1s (the brand name broken across lines; the service cards'
+conditions hidden at large text) and most P2/P3s are fixed in `a1c994e`. They are re-captured from one APK in studio
+`qa/out/reveal-app-r4/` (with `BUILD.txt`).
+
+Next:
+- (a) push the round-4 fixes to PR #56, merge when CI is green, then the AAB from main goes to Downloads;
+- (b) on the Galaxy S8 from internal testing, check:
+  - TalkBack: Next three times, then Previous once; one announcement per card;
+  - how dense the haptics feel;
+  - the swipe;
+  - large text, where Android 14+ scales differently from API 28;
+- (c) done: the owner's calls from round 3 (see above).
+
+1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
+   picks one.
+2. Build the pick in `feature/pro/welcome/`. Pro's perks flip open one by one as cards, each saying where it lives,
+   then the award (`ProMedalCeremony`) and the badge flight. It uses the same perks and copy as the tour's stops
+   (`ProWelcome.stops`, `ProWelcomeCopy.stop`), and the Pro page replays it. Retire `ProTourStopOverlay`, the curtain's
+   auto-advance and the screens' spotlight targets; the badge flight keeps the profile picture's.
+3. Finger-tap tests for the reveal (the shared `Finger` helper), ScreenshotTourTest frames, and docs (MONETIZATION
+   §6.5, CUSTOMER_COPY). Then one release with the fix.
 
 ## Tester round 3 — follow-ups (2026-11-11, `feature/tester-round-3`)
 

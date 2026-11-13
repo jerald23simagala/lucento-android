@@ -217,6 +217,21 @@ object ProCopy {
 
     data class PlanStatus(val title: String, val detail: String)
 
+    /** On what terms the online services are included ([serviceTerm]). */
+    sealed interface ServiceTerm {
+        /** Part of a Lucento Pro subscription. */
+        data object Subscription : ServiceTerm
+
+        /** Through the Lucento Cloud add-on. */
+        data object Cloud : ServiceTerm
+
+        /** Until [date] ("Nov 12, 2027"): a Lifetime's included year, or a courtesy grant's end. */
+        data class Until(val date: String) : ServiceTerm
+
+        /** Included, with no end set (a courtesy grant without an end date). */
+        data object Included : ServiceTerm
+    }
+
     fun planName(plan: DisplayPlan): String = when (plan) {
         DisplayPlan.FREE -> "Free plan"
         DisplayPlan.PRO -> "Lucento Pro"
@@ -225,8 +240,8 @@ object ProCopy {
 
     /** The plan row in the profile menu, Settings and the top of the Lucento Pro page (customer copy D-11). */
     fun planStatus(state: EntitlementState, now: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): PlanStatus {
-        fun date(millis: Long): String =
-            Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy", locale))
+        // The date never splits across lines ("Nov 12, / 2027": critic round 3), as on the welcome's cards.
+        fun date(millis: Long): String = termDate(millis, zone, locale)
         val active = state.active(now)
         return when (state.displayPlan(now)) {
             DisplayPlan.FREE -> if (state.pending() != null) {
@@ -244,7 +259,7 @@ object ProCopy {
                 }
             }
             DisplayPlan.LIFETIME -> PlanStatus(
-                "Pro Lifetime · you own it",
+                "Pro Lifetime\u00A0· you own it",
                 "Every Pro feature that runs on this phone is yours. Cloud sync, Lucento Shared and the AI adviser’s Pro " +
                     "allowance come with Lucento Cloud.",
             )
@@ -253,7 +268,7 @@ object ProCopy {
                 val year = services.firstOrNull { it.source == EntitlementSource.PLAY_LIFETIME_SERVICES }?.expiresAtMillis
                 val cloud = services.firstOrNull { it.source == EntitlementSource.PLAY_CLOUD_ADDON }
                 PlanStatus(
-                    "Pro Lifetime · you own it",
+                    "Pro Lifetime\u00A0· you own it",
                     when {
                         cloud != null -> "With Lucento Cloud: cloud sync, Lucento Shared and the AI adviser’s Pro allowance."
                         year != null -> "Cloud sync, Lucento Shared and the AI adviser’s Pro allowance are included until ${date(year)}."
@@ -263,6 +278,26 @@ object ProCopy {
             }
         }
     }
+
+    /**
+     * On what terms this plan's online services (cloud sync, restore, Lucento Shared, the AI adviser's Pro allowance,
+     * Smarter reading) are included: with a subscription, with the Lucento Cloud add-on, or until a date (a Lifetime's
+     * included year, read from its entitlement; a courtesy grant's end). Null when this plan has none, so the welcome's
+     * cards never make them sound owned for good (CUSTOMER_COPY: "not part of the one-time purchase").
+     */
+    fun serviceTerm(state: EntitlementState, now: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): ServiceTerm? {
+        val services = state.active(now).filter { Capability.CLOUD in it.grants || Capability.AI_PRO in it.grants || Capability.SHARED in it.grants }
+        if (services.any { it.source == EntitlementSource.PLAY_SUBSCRIPTION }) return ServiceTerm.Subscription
+        if (services.any { it.source == EntitlementSource.PLAY_CLOUD_ADDON }) return ServiceTerm.Cloud
+        val ending = services.firstOrNull { it.source == EntitlementSource.PLAY_LIFETIME_SERVICES }
+            ?: services.firstOrNull { it.source == EntitlementSource.GRANT }
+            ?: return null
+        return ending.expiresAtMillis?.let { ServiceTerm.Until(termDate(it, zone, locale)) } ?: ServiceTerm.Included
+    }
+
+    /** A term's date, kept on one line: "Nov 12, 2027" with no-break spaces. */
+    fun termDate(millis: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String =
+        Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy", locale)).replace(' ', '\u00A0')
 
     private fun subscriptionStatus(sub: Entitlement, date: (Long) -> String): PlanStatus {
         // A Play-local reading has no real expiry (docs §5.3); only the server's dates are shown as dates.

@@ -279,8 +279,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     val generation = preferences.setupGeneration
     val appViewModel: AppViewModel = viewModel(key = "app-$generation", factory = AppViewModel.Factory)
 
-    // Lucento Pro's welcome (owner, 2026-11-12): a tour of the real screens Pro opened, the summary, the medal and the
-    // badge's flight to the profile picture. The registry lets it find each control on whatever screen is showing.
+    // Lucento Pro's welcome (owner, 2026-11-12): a deck of cards for what Pro opened, the collection, the medal and the
+    // badge's flight to the profile picture. The registry lets the flight find the profile picture.
     val spotlight = remember { com.lucento.app.core.designsystem.component.SpotlightRegistry() }
     val welcomeRun by appViewModel.proWelcome.collectAsStateWithLifecycle()
     val plan by appViewModel.plan.collectAsStateWithLifecycle()
@@ -318,50 +318,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
 
     fun push(route: Any) {
         navController.navigate(route) { launchSingleTop = true }
-    }
-
-    /** Lucento Pro's tour: opens the screen of [stop] (Home first, as its links do), unless it is already showing. */
-    fun showTourStop(stop: com.lucento.app.domain.entitlement.ProTourStop) {
-        val current = navController.currentDestination
-        fun on(route: KClass<out Any>) = current?.hierarchy?.any { it.hasRoute(route) } == true
-        when (stop) {
-            com.lucento.app.domain.entitlement.ProTourStop.WALLETS,
-            com.lucento.app.domain.entitlement.ProTourStop.NET_WORTH,
-            -> if (!on(WalletsRoute::class)) navigateTo(WalletsRoute)
-            com.lucento.app.domain.entitlement.ProTourStop.SMART_READING -> if (!on(ComposerRoute::class)) {
-                navigateTo(HomeRoute)
-                push(ComposerRoute())
-            }
-            com.lucento.app.domain.entitlement.ProTourStop.GOALS -> if (!on(GoalsRoute::class)) {
-                selectedTab = "home"
-                navigateTo(HomeRoute)
-                push(GoalsRoute)
-            }
-            com.lucento.app.domain.entitlement.ProTourStop.INSIGHTS_PERIODS,
-            com.lucento.app.domain.entitlement.ProTourStop.STATEMENTS,
-            -> if (!on(InsightsRoute::class)) {
-                selectedTab = "home"
-                navigateTo(HomeRoute)
-                push(InsightsRoute)
-            }
-            com.lucento.app.domain.entitlement.ProTourStop.AI_ANSWERS -> if (!on(AskRoute::class)) {
-                selectedTab = "home"
-                navigateTo(HomeRoute)
-                push(InsightsRoute)
-                push(AskRoute)
-            }
-            com.lucento.app.domain.entitlement.ProTourStop.SYNC -> if (!on(SettingsRoute::class)) {
-                selectedTab = "home"
-                navigateTo(HomeRoute)
-                push(SettingsRoute(SettingsPage.ACCOUNT.key))
-            }
-            com.lucento.app.domain.entitlement.ProTourStop.SHARED -> if (!on(SharedSpaceRoute::class)) {
-                selectedTab = "home"
-                navigateTo(HomeRoute)
-                push(SharedSpaceRoute())
-            }
-            com.lucento.app.domain.entitlement.ProTourStop.THEMES -> if (!on(HomeRoute::class)) navigateTo(HomeRoute)
-        }
     }
 
     // A card or loan saved with a payment reminder opens a prefilled recurring payment (when that module is on).
@@ -834,7 +790,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             val hostAccess by appViewModel.sharedAccess.collectAsStateWithLifecycle()
             val hasWallets by appViewModel.hasWallets.collectAsStateWithLifecycle()
             val hasGoals by appViewModel.hasGoals.collectAsStateWithLifecycle()
-            val tourStops = remember(plan, features, hostAccess, hasWallets, hasGoals) {
+            val welcomeCards = remember(plan, features, hostAccess, hasWallets, hasGoals) {
                 val now = System.currentTimeMillis()
                 com.lucento.app.domain.entitlement.ProWelcome.stops(
                     com.lucento.app.domain.entitlement.ProTourContext(
@@ -851,7 +807,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             }
             com.lucento.app.feature.pro.welcome.ProWelcomeHost(
                 state = welcome,
-                stops = tourStops,
+                stops = welcomeCards,
                 entitlements = plan,
                 signedIn = signedInEmail != null,
                 aiAnswersOn = preferences.askLucentoAi,
@@ -861,7 +817,6 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 smartReadingOn = preferences.smartReading,
                 paused = LocalAppObscured.current,
                 registry = spotlight,
-                onShowStop = ::showTourStop,
                 onGoHome = { navigateTo(HomeRoute) },
                 onStarted = appViewModel::proWelcomeStarted,
                 onMedalPresented = appViewModel::proMedalPresented,

@@ -1,6 +1,5 @@
 package com.lucento.app.feature.sharedspace
 
-import com.lucento.app.core.designsystem.component.spotlightTarget
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -156,7 +155,6 @@ fun SharedSpaceScreen(
                     LucentoPrimaryButton(
                         text = "Connect an account",
                         onClick = onOpenAccount,
-                        modifier = Modifier.spotlightTarget(com.lucento.app.core.designsystem.component.SpotlightKeys.SHARED),
                     )
                 },
             )
@@ -207,7 +205,6 @@ private fun ColumnScope.SoloPage(mode: SpaceMode.Solo, state: SharedSpaceUiState
     LucentoPrimaryButton(
         text = "Create a Shared Space",
         icon = Icons.Outlined.Group,
-        modifier = Modifier.spotlightTarget(com.lucento.app.core.designsystem.component.SpotlightKeys.SHARED),
         enabled = !state.busy,
         onClick = { viewModel.createSpace(name) },
     )
@@ -396,7 +393,6 @@ private fun PendingInviteCard(invite: SpaceInvite, busy: Boolean, onShare: () ->
             text = "Share invitation",
             icon = Icons.Outlined.Share,
             onClick = onShare,
-            modifier = Modifier.spotlightTarget(com.lucento.app.core.designsystem.component.SpotlightKeys.SHARED),
         )
         LucentoTextButton(text = "Withdraw invitation", enabled = !busy, onClick = onRevoke, modifier = Modifier.fillMaxWidth())
     }

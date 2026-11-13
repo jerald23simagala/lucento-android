@@ -1,7 +1,5 @@
 package com.lucento.app.feature.ask
 
-import com.lucento.app.core.designsystem.component.SpotlightKeys
-import com.lucento.app.core.designsystem.component.spotlightTarget
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -197,7 +195,7 @@ fun AskLucentoScreen(
                         mood = if (state.messages.isEmpty()) MascotMood.Greeting else MascotMood.Happy,
                         mascotSize = 64.dp,
                     )
-                    Box(Modifier.spotlightTarget(SpotlightKeys.AI_STATUS)) {
+                    Box {
                         AiStatus(state, onTurnOn = { askingConsent = true })
                     }
                 }

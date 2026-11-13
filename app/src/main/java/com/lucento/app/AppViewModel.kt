@@ -159,7 +159,7 @@ class AppViewModel(
         considerProWelcome()
     }
 
-    /** "Replay the Pro tour" on the Lucento Pro page: the tour and the summary, without the medal (owner). */
+    /** "See your Pro cards" on the Lucento Pro page: the cards and the collection again, without the medal (owner). */
     fun replayProTour() {
         if (_proWelcome.value != null) return
         _proWelcome.value = com.lucento.app.domain.entitlement.ProWelcomeRun(com.lucento.app.domain.entitlement.ProWelcomeMode.REPLAY, emptySet())

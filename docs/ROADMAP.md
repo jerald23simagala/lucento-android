@@ -193,6 +193,23 @@ recurring-schedule sync, syncing preferences.
   - Anything bought through Google Play (Lifetime or subscription) needs one check a month, from Google Play or the
     server (MONETIZATION §5.3 L-2).
   - The server's refund checks are switched on by the owner (OT-24).
+- 2026-11-12 (`fix/pro-tour-real-taps`): the Pro welcome's buttons work on real phones. Its touch blocker wrapped the
+  cards, so a finger's small drift cancelled every press (KNOWN_ISSUES PW-1). Finger-tap tests now cover the tour and
+  the curtain in CI. Held: the owner chose an unboxing reveal to replace the tour, and both ship in one release.
+- 2026-11-12 (`feature/pro-reveal`): the Pro welcome becomes a deck of cards. The owner picked "Deck, unwrapped" with
+  "Scenes" art.
+  - One card per thing Pro opened, each with an illustrated scene, what changed, until when an online service is
+    included, and where it lives in the app.
+  - Then the collection, the award and the badge.
+  - The spotlight tour, its curtain and the summary are retired, and "See your Pro cards" on the Pro page replays the
+    deck (MONETIZATION §6.5).
+  - After critic round 3 (REJECT, 3.1):
+    - the dark plan title is readable;
+    - the buttons stay whole and in place at any text size (they stack when a label won't fit);
+    - the band stays on the card; the scene fills the card instead of leaving a gap;
+    - the stage is solid; there is one TalkBack announcement per card;
+    - a fifth chapter, "Beyond this phone".
+    - App-wide: a button label that doesn't fit now wraps instead of being cut off.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.

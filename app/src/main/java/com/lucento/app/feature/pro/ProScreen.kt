@@ -91,7 +91,7 @@ fun ProScreen(
     onBack: () -> Unit,
     /** The feature whose lock led here; its sentence is shown first. */
     from: ProFeature? = null,
-    /** "Replay the Pro tour": the welcome's tour and summary again, without the medal (shown while Pro is active). */
+    /** "See your Pro cards": the welcome's cards and collection again, without the medal (shown while Pro is active). */
     onReplayTour: (() -> Unit)? = null,
     viewModel: ProViewModel = viewModel(factory = ProViewModel.Factory),
 ) {
@@ -130,7 +130,7 @@ fun ProScreen(
         // While Pro is active: the welcome's tour and summary again, without the medal.
         if (onReplayTour != null && state.entitlements.has(com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, now)) {
             Spacer(Modifier.height(Spacing.md))
-            LucentoSecondaryButton(text = "Replay the Pro tour", onClick = onReplayTour, icon = Icons.Outlined.Replay)
+            LucentoSecondaryButton(text = "See your Pro cards", onClick = onReplayTour, icon = Icons.Outlined.Replay)
         }
         if (from != null && !state.entitlements.has(from.requires, now)) {
             Spacer(Modifier.height(Spacing.md))

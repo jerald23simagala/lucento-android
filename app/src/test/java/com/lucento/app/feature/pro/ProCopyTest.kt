@@ -90,22 +90,38 @@ class ProCopyTest {
         assertEquals("Waiting for Google Play", status(pending).title)
 
         val serverSub = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet())))
-        assertEquals("Lucento Pro · renews Feb 14, 2027", status(serverSub).title)
+        assertEquals("Lucento Pro · renews Feb\u00A014,\u00A02027", status(serverSub).title)
         val localSub = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), verifiedBy = Verifier.PLAY_LOCAL)))
         assertEquals("a Play-local horizon is never shown as a date", "Lucento Pro", status(localSub).title)
         val cancelled = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), EntitlementStatus.CANCELLED_ACTIVE)))
-        assertEquals("Lucento Pro · ends Feb 14, 2027", status(cancelled).title)
+        assertEquals("Lucento Pro · ends Feb\u00A014,\u00A02027", status(cancelled).title)
         val grace = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), EntitlementStatus.GRACE)))
         assertEquals("Lucento Pro · payment problem", status(grace).title)
         val grant = EntitlementState(listOf(row(EntitlementSource.GRANT, Capability.entries.toSet())))
-        assertEquals("Courtesy access until Feb 14, 2027.", status(grant).detail)
+        assertEquals("Courtesy access until Feb\u00A014,\u00A02027.", status(grant).detail)
 
         val lifetime = row(EntitlementSource.PLAY_LIFETIME, setOf(Capability.LOCAL_PRO), expiresAt = null)
-        assertEquals("Pro Lifetime · you own it", status(EntitlementState(listOf(lifetime))).title)
+        assertEquals("Pro Lifetime\u00A0· you own it", status(EntitlementState(listOf(lifetime))).title)
         val year = row(EntitlementSource.PLAY_LIFETIME_SERVICES, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = now + 100 * day, verifiedBy = Verifier.PLAY_LOCAL)
-        assertTrue(status(EntitlementState(listOf(lifetime, year))).detail.contains("included until Apr 25, 2027"))
+        assertTrue(status(EntitlementState(listOf(lifetime, year))).detail.contains("included until Apr\u00A025,\u00A02027"))
         val cloud = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED))
         assertTrue(status(EntitlementState(listOf(lifetime, cloud))).detail.startsWith("With Lucento Cloud"))
+    }
+
+    @Test fun service_terms_say_how_long_the_online_services_last() {
+        fun term(vararg rows: Entitlement) = ProCopy.serviceTerm(EntitlementState(rows.toList()), now, ZoneOffset.UTC, Locale.US)
+        val lifetime = row(EntitlementSource.PLAY_LIFETIME, setOf(Capability.LOCAL_PRO), expiresAt = null)
+        // Owned for good, and no online services in the plan: nothing to put a term on.
+        assertEquals(null, term(lifetime))
+        val year = row(EntitlementSource.PLAY_LIFETIME_SERVICES, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = now + 100 * day, verifiedBy = Verifier.PLAY_LOCAL)
+        // The included year's end, read from its entitlement, kept on one line.
+        assertEquals(ProCopy.ServiceTerm.Until("Apr 25, 2027"), term(lifetime, year))
+        val cloud = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED))
+        assertEquals(ProCopy.ServiceTerm.Cloud, term(lifetime, cloud))
+        assertEquals(ProCopy.ServiceTerm.Subscription, term(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet())))
+        // A courtesy grant lasts until the owner set it to, or has no end.
+        assertEquals(ProCopy.ServiceTerm.Until("Feb 14, 2027"), term(row(EntitlementSource.GRANT, Capability.entries.toSet())))
+        assertEquals(ProCopy.ServiceTerm.Included, term(row(EntitlementSource.GRANT, Capability.entries.toSet(), expiresAt = null)))
     }
 
     @Test fun price_lines_use_plays_own_strings_and_periods() {
