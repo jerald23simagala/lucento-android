@@ -9,8 +9,8 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-10"
-    const val UPDATED = "10 November 2026"
+    const val VERSION = "2026-11-13"
+    const val UPDATED = "13 November 2026"
 
     /**
      * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit
@@ -157,6 +157,17 @@ object LegalDocuments {
                         "your phone too.",
                     "Lucento doesn’t use Android’s automatic cloud backup, so nothing is copied to a backup you didn’t " +
                         "choose.",
+                ),
+            ),
+            Section(
+                "Voice input",
+                listOf(
+                    "When you tap the microphone, your phone’s speech service — Google’s on most phones, not Lucento — " +
+                        "turns what you say into text, and Lucento receives only the text. Lucento asks it to work " +
+                        "offline.",
+                    "Some phones can’t do that offline. If you turn on online voice (Lucento asks first, and you can turn " +
+                        "it off in Settings › Privacy), the speech service may send your recording to Google to turn it " +
+                        "into text, under Google’s own privacy policy.",
                 ),
             ),
             Section(

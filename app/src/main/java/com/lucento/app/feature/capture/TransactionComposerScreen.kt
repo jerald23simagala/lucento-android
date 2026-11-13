@@ -121,6 +121,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.Button
+import androidx.compose.runtime.rememberCoroutineScope
+import java.util.Locale
+import kotlinx.coroutines.launch
 
 /** How the composer opens: ready to type, listening, or taking a receipt photo. */
 enum class ComposerStart { TYPE, SPEAK, SCAN }
@@ -160,6 +163,7 @@ fun TransactionComposerScreen(
     var pendingPhoto by remember { mutableStateOf<File?>(null) }
     var scanMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(walletId, typeHint, transfersEnabled) { viewModel.configure(walletId, typeHint, transfersEnabled) }
     // Several accounts and nothing to go on (no entry wallet, no default): ask once, up front.
@@ -180,10 +184,15 @@ fun TransactionComposerScreen(
     }
 
     // ---------------------------------------------------------------- speech (the system recogniser; no permission here)
+    // Offline unless the person agreed to online voice (SpeechRequest). Saveable: the result can arrive after a rotation.
+    var listenedOffline by rememberSaveable { mutableStateOf(false) }
+    var askingOnlineVoice by rememberSaveable { mutableStateOf(false) }
     val recognizer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         when {
-            result.resultCode != Activity.RESULT_OK -> notice = "Listening stopped. You can type it instead."
+            // Cancelled and "Voice search isn't available" both come back here; offline, offer online voice.
+            result.resultCode != Activity.RESULT_OK ->
+                notice = if (listenedOffline) SpeechRequest.OFFLINE_FAILED else "Listening stopped. You can type it instead."
             heard.isNullOrBlank() -> notice = "Nothing was recognised. Try again, or type it."
             else -> {
                 notice = null
@@ -192,13 +201,14 @@ fun TransactionComposerScreen(
         }
     }
 
-    fun listen() {
-        haptics.tick()
+    fun launchRecognizer(online: Boolean) {
+        listenedOffline = !online
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            // The interpreter understands English; ask the recogniser for English and to stay on the device.
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en")
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            // The interpreter understands English: the phone's own English, or US English.
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, SpeechRequest.languageTag(Locale.getDefault()))
+            // True means offline only: phones without an offline pack then can't listen at all.
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, !online)
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Say something like “Dinner 450, parking 90”")
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
@@ -207,6 +217,11 @@ fun TransactionComposerScreen(
         } catch (e: ActivityNotFoundException) {
             notice = "This phone has no speech recogniser available. Type it instead — it works the same way."
         }
+    }
+
+    fun listen() {
+        haptics.tick()
+        scope.launch { launchRecognizer(online = viewModel.onlineVoiceAllowed()) }
     }
 
     // ---------------------------------------------------------------- receipts (system camera or photo picker; read on this phone)
@@ -403,7 +418,15 @@ fun TransactionComposerScreen(
                 },
             )
         }
-        notice?.let { InfoNote(it, modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.xs)) }
+        notice?.let { text ->
+            val offerOnline = text == SpeechRequest.OFFLINE_FAILED
+            InfoNote(
+                text,
+                modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.xs),
+                actionLabel = if (offerOnline) SpeechRequest.TRY_ONLINE else null,
+                onAction = if (offerOnline) ({ askingOnlineVoice = true }) else null,
+            )
+        }
         if (state.editingMessageId != null) {
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -513,6 +536,24 @@ fun TransactionComposerScreen(
                     }
                 }
             },
+        )
+    }
+
+    if (askingOnlineVoice) {
+        ConfirmDialog(
+            title = SpeechRequest.CONSENT_TITLE,
+            text = SpeechRequest.CONSENT_TEXT,
+            confirmLabel = "Use online voice",
+            dismissLabel = "Not now",
+            onConfirm = {
+                askingOnlineVoice = false
+                notice = null
+                viewModel.allowOnlineVoice()
+                haptics.tick()
+                // They tapped the mic to speak: listen again straight away, online this time.
+                launchRecognizer(online = true)
+            },
+            onDismiss = { askingOnlineVoice = false },
         )
     }
 

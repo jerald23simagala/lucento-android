@@ -109,9 +109,19 @@ Definitions: docs/CALCULATIONS.md "Statement scans" and "Receipt amounts". Tests
 
 ## Speech and camera
 
-Speech uses the system recogniser through `RecognizerIntent` (offline preferred). Lucento itself holds no microphone
-or camera permission: the recogniser and camera apps ask for their own. Cancel, denial and "no recogniser" all leave
-a one-line note and the keyboard. Photos are read with ML Kit's bundled on-device model and deleted afterwards. Speech
+Speech uses the system recogniser through `RecognizerIntent`, asking for English in the phone's own English region (or
+`en-US`; `SpeechRequest.languageTag`). Lucento itself holds no microphone or camera permission: the recogniser and
+camera apps ask for their own. Cancel, denial and "no recogniser" all leave a one-line note and the keyboard.
+
+**Online voice (opt-in, owner 2026-11-13).** By default the request sets `EXTRA_PREFER_OFFLINE`, which means offline
+*only*: a phone without a matching offline speech pack shows Google's "Voice search isn't available" (found on a real
+phone 2026-11-13; many phones no longer offer the download). When an offline attempt comes back without text, the note
+offers **Try online voice**; agreeing to `SpeechRequest.CONSENT_TEXT` saves `UserPreferences.onlineVoice` and listens
+again without the offline flag, so the speech service (Google's on most phones) may send the recording to Google.
+Lucento only receives the text. Settings › Privacy › Online voice shows the same consent and turns it off. A device
+choice like crash reports: kept across sign-outs, never in backups. Listed in the Privacy Policy ("Voice input").
+
+Photos are read with ML Kit's bundled on-device model and deleted afterwards. Speech
 is auto-sent; the user can fix the wording with "Edit message" or fix rows directly.
 
 ## Smarter reading (Gemini) — opt-in
