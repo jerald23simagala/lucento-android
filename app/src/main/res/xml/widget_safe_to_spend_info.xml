@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Safe to spend (feature/widget/SafeToSpendWidget.kt, docs/WIDGETS.md): this month's figure from Home, with Add.
+    Home screen only: "not_keyguard" also keeps it off Android 16's lock-screen widget pages, which otherwise offer every
+    widget. Redrawn by the app after each change and just after midnight (WidgetRefresher), never on a timer.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:targetApi="31"
+    android:description="@string/widget_safe_to_spend_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:previewImage="@drawable/lucento_symbol"
+    android:previewLayout="@layout/widget_preview_safe_to_spend"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen|not_keyguard" />

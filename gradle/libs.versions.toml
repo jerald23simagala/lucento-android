@@ -6,7 +6,9 @@ kotlin = "2.0.21"
 ksp = "2.0.21-1.0.28"
 coreKtx = "1.15.0"
 activityCompose = "1.9.3"
-composeBom = "2024.12.01"
+# 2025.02.00 = Compose 1.7.8 (Material 3 stays 1.3.1): Glance 1.2.0 needs compose-runtime 1.7.8, so the BOM moves the whole
+# Compose set to that patch instead of mixing runtime 1.7.8 with UI 1.7.6.
+composeBom = "2025.02.00"
 lifecycle = "2.8.7"
 navigation = "2.8.5"
 room = "2.6.1"
@@ -45,6 +47,10 @@ fragment = "1.8.5"
 # 9.1.0 (June 2026) is current. The plain Java artifact, not billing-ktx: data/billing/PlayPurchaseSource wraps the few
 # callbacks it uses in coroutines itself, which keeps the library's Kotlin metadata from pinning this project's compiler.
 billing = "9.1.0"
+# Home-screen widgets (Quick add, Safe to spend): Jetpack Glance, stable since 26 Aug 2026. Built against kotlin-stdlib
+# 2.0.21 (this project's Kotlin) and compose-runtime 1.7.8; uses the WorkManager and DataStore already here. No network,
+# no permission.
+glance = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -90,6 +96,7 @@ supabase-auth = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
 ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
 androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 google-id = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }

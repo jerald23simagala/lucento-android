@@ -52,6 +52,10 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,
   idempotent). Interpretation runs on the phone — no AI service, no network. See [docs/CAPTURE.md](docs/CAPTURE.md).
+- **Home-screen widgets**: **Quick add** (the composer's own scan · mic · field bar — one tap into Type, Speak or Scan)
+  and **Safe to spend** (Home's Monthly budget card in brief, with Add). Same figures and words as Home; they follow
+  Hide amounts, App lock and the chosen theme; home screen only; no permission, no network. Add them from Settings ›
+  Home-screen widgets or the launcher's widget list. See [docs/WIDGETS.md](docs/WIDGETS.md).
 - **Appearance** (profile menu): five curated themes — Sunrise (the brand), Midnight (always dark), Grove, Mono and
   Aurora — each with its own landscape, every one contrast-checked (WCAG AA) with colour-blind-safe chart colours, plus
   System / Light / Dark. Switching is instant; money colours (income, spending, warnings) never change between themes.

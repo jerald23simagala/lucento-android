@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Quick add (feature/widget/QuickAddWidget.kt, docs/WIDGETS.md): opens the composer; shows no amounts. 4×1 by default,
+    down to 2×1 (one Add). Redrawn by the app (WidgetRefresher), never on a timer.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:targetApi="31"
+    android:description="@string/widget_quick_add_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="250dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:previewImage="@drawable/lucento_symbol"
+    android:previewLayout="@layout/widget_preview_quick_add"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

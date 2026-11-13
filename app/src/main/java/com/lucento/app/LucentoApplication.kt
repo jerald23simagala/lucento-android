@@ -44,6 +44,7 @@ import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.launch
 import com.lucento.app.data.sync.uploadRequests
 
@@ -67,6 +68,8 @@ class LucentoApplication : Application() {
         if (container.pendingRevokes.all().isNotEmpty()) com.lucento.app.data.sync.RevokeScheduler.schedule(this)
         // The welcome email (docs/EMAILS.md): asked for once per signed-in account; nothing while signed out.
         container.welcomeEmail.start(CoroutineScope(SupervisorJob() + Dispatchers.Default), container.auth.observeUserId())
+        // Home-screen widgets (docs/WIDGETS.md): redrawn after every change to what they show, and just after midnight.
+        com.lucento.app.feature.widget.WidgetRefresher.start(this)
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             container.usageCounts.retryPendingDeletion()
             observeOnline().collect { online ->
@@ -296,6 +299,22 @@ class AppContainer(application: Application) {
     val goals: GoalRepository by lazy { GoalRepository(database.goalDao(), access = structureAccess, gate = planGate) }
     val recurring: RecurringRepository by lazy {
         RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner, access = structureAccess)
+    }
+
+    /**
+     * Home-screen widgets (feature/widget): fires whenever a table they read changes — a save, an edit, a delete or a
+     * sync pull — without reading anything itself; the widgets read when they redraw.
+     */
+    fun ledgerChanges(): kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.callbackFlow {
+        val observer = object : androidx.room.InvalidationTracker.Observer(
+            arrayOf("transactions", "wallets", "categories", "budgets", "recurring", "debt_terms"),
+        ) {
+            override fun onInvalidated(tables: Set<String>) {
+                trySend(Unit)
+            }
+        }
+        database.invalidationTracker.addObserver(observer)
+        awaitClose { database.invalidationTracker.removeObserver(observer) }
     }
 
     // --- optional cloud sync (see docs/SYNC.md); every value here is safe to hold even when unconfigured ---

@@ -35,6 +35,16 @@
 | OT-24 | **Switch on purchase checks and refund checks together** (owner's choice, 2026-11-12): fix Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (KNOWN_ISSUES PB-2); add `LUCENTO_RTDN_PUSH_TOKEN` with the Pub/Sub topic, the push subscription and Play's real-time developer notifications; add `CRON_SECRET` (KNOWN_ISSUES PB-3); redeploy production; then Send test notification and Restore purchases (PLAY_CONSOLE_SETUP steps 6, 8 and 9) | **Steps done, not yet working** (2026-11-12). Verified: the variables are present, production was redeployed, and the Pub/Sub test notice was acknowledged. But at 17:26Z production still had no `purchase_links` and no Play `entitlements`, after the owner had opened the app and tapped Restore. The phone's verify call either never happened or failed, and Vercel (Hobby) keeps runtime logs for one hour only. Next: the owner taps Restore purchases and says so at once, and Claude reads the verify log within the hour | Until then the server records no purchase and never hears about a refund |
 | OT-22 | **Security remediation (2026-11-10)**: work through `docs/security/OWNER_ACTIONS_REQUIRED.md` §1–§14 — Gemini paid tier, Confirm email, plan decision, then apply the four `20261111*` migrations (lucento-test → production), deploy the website branch `security/release-hardening`, internal-track purchase and refund checks | **Open** | The release stays NOT APPROVED until §1, §2, §5/§6, §13 and §14 are done (`docs/security/REMEDIATION_REPORT.md`) |
 
+## Home-screen widgets — follow-ups (2026-11-12, `feature/home-widgets`)
+
+- Merge after CI passes and the owner says "merge it". Then a device pass on Android 12+ (the S8 runs Android 9:
+  square corners, no picker preview) covering rounded corners, the preview layout and the launcher's day/night switch.
+- TalkBack pass on both widgets ("Add a transaction", "Scan a receipt", "Speak a transaction", the body's summary).
+- Parked by the owner (2026-11-12): Quick Settings tile, type-and-save notification, Share to Lucento. Their mockups are
+  on the "Lucento Quick Add" canvas.
+- Optional: a critic round on real widget captures (design-review-loop). The mockup rounds stopped at r2 REVISE when
+  the scope changed.
+
 ## Pro welcome: an unboxing reveal replaces the spotlight tour (owner, 2026-11-12)
 
 The tour's buttons were found dead on real phones (KNOWN_ISSUES PW-1). The owner chose to retire the spotlight tour,
