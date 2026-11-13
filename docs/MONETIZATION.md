@@ -585,10 +585,10 @@ only after a committed write: never for a pending payment, a renewal, or a trial
    - A welcome back and the replay open on the plain deck ("Reveal your first perk").
    - Each card has:
      - its art (`PerkArt.kt`; owner, 2026-11-13: "simpler, and add our mascot", then "subtle doodles instead of plain
-       blue"): Lucento, the mascot, stepping a little in front of one simple prop for the perk, on the cards' blue
-       with faint doodles. The mascot hops in as the card turns and takes a pose that suits
-       the card (waves on the first, points at the prop, thinks on AI answers, cheers on the last); reduced motion
-       shows it still. The band takes the height the words leave (at least 300 : 84) and the pair stands a little below
+       blue"): Lucento, the mascot, with its hand on one simple prop for the perk, on the cards' blue with faint
+       doodles. The mascot hops in as the card turns, over a soft shadow, and takes a pose that suits the card (it
+       waves on the first, then points, thinks or smiles, never the same picture twice in a row, and cheers on the
+       last); reduced motion shows it still. The band takes the height the words leave (at least 300 : 84) and the pair stands a little below
        its middle, as large as the band allows (nearly its full width on a phone), so a card never has a gap or a cropped prop; at the largest text it gives way. The
        next card's prop is decoded while the current card shows, so a face is ready the moment it turns;
      - then, in this order, so the numbers stay in view at large text: the title, what changed (free plan → this plan,

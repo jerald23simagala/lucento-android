@@ -14,12 +14,12 @@ live in the Figma file "Pro perk art — explorations".
 |---|---|---|---|
 | `wallets_source.webp` | Add every account you use | An open wallet with cards | Waves |
 | `net_worth_source.webp` | Count everything you have | A cottage and a piggy bank | Points |
-| `smart_reading_source.webp` | Smarter reading | Spoken words becoming a receipt | Presents |
+| `smart_reading_source.webp` | Smarter reading | Spoken words becoming a receipt | Thinks |
 | `goals_source.webp` | Save for more at once | Three flags on a mound | Points |
-| `insights_periods_source.webp` | Look further back | A telescope beside a bar chart | Points |
-| `statements_source.webp` | Keep your statements | A clipped report with a chart | Presents |
+| `insights_periods_source.webp` | Look further back | A telescope beside bars that go up and down | Smiles |
+| `statements_source.webp` | Keep your statements | A clipped report with an up-and-down chart | Points |
 | `ai_answers_source.webp` | AI answers | Two speech bubbles | Thinks |
-| `sync_source.webp` | Your money on every phone | Two phones linked by an arc | Points |
+| `sync_source.webp` | Your money on every phone | Two phones linked by an arc | Smiles |
 | `shared_source.webp` | Share with a Partner | One notebook, two pencils | Waves |
 | `themes_source.webp` | Three new themes | Paint pots in green, grey and violet | Cheers |
 
@@ -36,10 +36,11 @@ python tools/illustrations/export_perk_art.py                                   
 
 The export cuts each prop out of its flat `#2F56E8` ground (`AwardArtwork.CardBlue`): the ground becomes transparent, a
 soft shadow becomes a soft partly transparent shadow, and a ground-coloured patch walled in by the prop stays opaque,
-so a prop never has a hole. It frames the prop in a square with the same room around it and its foot at the same
-height on every card, and writes `app/src/main/res/drawable-nodpi/perk_art_<stop>.webp` (640 px with alpha,
-33–48 KB) and `perk_thumb_<stop>.webp` (192 px, on the blue). The app paints the band blue with faint doodles and
-stands the mascot a little in front of the prop. Needs Pillow, numpy and scipy.
+so a prop never has a hole. It trims the prop to its visible pixels (shadow included) at the source's own
+resolution, and writes `app/src/main/res/drawable-nodpi/perk_art_<stop>.webp` (with alpha, 21–40 KB) and
+`perk_thumb_<stop>.webp` (192 px, centred on the blue). The app paints the band blue with faint doodles and lays the
+pair out by what shows (`pairLayout` in `PerkArt.kt`): the mascot's hand over the prop, the torch's glow inside the
+band. Needs Pillow, numpy and scipy.
 
 ## Prompts
 
@@ -63,11 +64,14 @@ Every prop uses one style, with only the object changing:
    golden sparkles, as if spoken words were becoming a tidy record
 4. three small pennant flags on slim wooden poles of different heights, standing in one little rounded grassy mound;
    the flags are sunlight yellow, tangerine and ivory
-5. a small brass telescope on a little wooden tripod, beside four short rounded bars of different heights in sunlight
-   yellow and ivory standing in a row like a small bar chart
+5. a small brass telescope on a little wooden tripod, beside a row of five short rounded bars like a small bar chart
+   whose heights go up and down unevenly (tall, short, medium, tallest, short), in sunlight yellow and ivory
 6. a neat little stack of ivory report pages standing slightly tilted, held together at the top by a gold binder clip;
-   the front page shows a few short grey lines and a small simple bar chart in sunlight yellow and tangerine, with no
-   writing
+   the front page shows a few short grey lines and a small simple bar chart of four bars whose heights go up and
+   down unevenly (medium, tall, short, medium) in sunlight yellow and tangerine, with no writing
+
+(Cards 5 and 6 were made again on 2026-11-13 so their bars go up and down: an earlier pair climbed steadily, a growth
+cliché the critic flagged.)
 7. two soft rounded speech bubbles in conversation, a smaller pale-sky-blue one behind on the left, and a larger warm
    sunlight-gold one in front on the right with three short ivory lines inside it, and one tiny golden sparkle beside
    them

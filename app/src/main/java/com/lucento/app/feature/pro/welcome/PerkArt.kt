@@ -3,27 +3,20 @@ package com.lucento.app.feature.pro.welcome
 import android.content.res.Resources
 import android.util.LruCache
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -37,7 +30,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.unit.min
+import androidx.compose.ui.unit.dp
 import com.lucento.app.R
 import com.lucento.app.core.designsystem.component.LucentoMascot
 import com.lucento.app.core.designsystem.component.MascotMood
@@ -48,56 +41,115 @@ import kotlinx.coroutines.withContext
 
 /**
  * A card's art (owner, 2026-11-13: "simpler, and add our mascot to make it livelier"; then "subtle doodles instead of
- * plain blue, and as little empty blue as possible"): Lucento, the approved mascot, stepping a little in front of one
- * simple prop for the perk, on the cards' blue with faint doodles. The mascot is the app's own [LucentoMascot] (the
- * approved sprites, never redrawn), so it hops in as the card turns, floats a little and rests, in a pose that suits
- * the card ([mascot]); its shadow stays on the ground while it floats. The props are soft-3D cut-outs made to match it
- * (docs/design/illustrations/perks, tools/illustrations/export_perk_art.py), so the doodles show around them. The pair
- * is as large as the band allows (nearly its full width on a phone) and sits a little below the middle. Like the
- * medal, a card is an object: its art looks the same in every theme. Decorative: the card's words say everything it
- * shows, so TalkBack skips it.
+ * plain blue, and as little empty blue as possible"): Lucento, the approved mascot, with its hand on one simple prop
+ * for the perk, on the cards' blue with faint doodles. The mascot is the app's own [LucentoMascot] (the approved
+ * sprites, never redrawn), so it hops in as the card turns, floats a little and rests, in a pose that suits the card
+ * ([mascot]), over a soft shadow that shrinks as it rises. The props are soft-3D cut-outs trimmed to what is visible
+ * (docs/design/illustrations/perks, tools/illustrations/export_perk_art.py), so the pair is sized and placed by what
+ * really shows ([pairLayout]): as large as the band allows, centred a little below the middle, the torch's glow kept
+ * inside the band. Like the medal, a card is an object: its art looks the same in every theme. Decorative: the card's
+ * words say everything it shows, so TalkBack skips it.
  */
 @Composable
 internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier) {
     val prop = rememberPerkArt(stop.art)
     BoxWithConstraints(
         modifier
+            // Clip first: the doodles must never reach the card's words (critic, app round 1: they did, in dark).
+            .clipToBounds()
             .background(AwardArtwork.CardBlue)
             .drawBehind { drawDoodles() }
-            .clipToBounds()
             .clearAndSetSemantics {},
-        contentAlignment = BiasAlignment(0f, 0.35f),
     ) {
-        // The pair's width is the prop, plus the mascot, less the step in front: 1.8 times the prop's square.
-        val unit = min(maxHeight * 0.9f, maxWidth * 0.53f)
-        val mascot = unit * MascotScale
-        Box(Modifier.width(unit * (1f + MascotScale - MascotStep)).height(unit)) {
-            Box(Modifier.size(unit).align(Alignment.BottomStart)) {
-                prop?.let {
-                    Image(bitmap = it, contentDescription = null, filterQuality = FilterQuality.High, modifier = Modifier.fillMaxSize())
-                }
-            }
-            Box(Modifier.size(mascot).align(Alignment.BottomEnd)) {
-                Canvas(Modifier.fillMaxSize()) {
-                    // Under the feet (the sprites' feet span 31 to 62 % across and end 93 % down).
-                    val w = size.width * 0.42f
-                    val h = size.height * 0.07f
-                    drawOval(MascotShadow, topLeft = Offset(size.width * 0.465f - w / 2f, size.height * 0.93f - h / 2f), size = Size(w, h))
-                }
-                LucentoMascot(size = mascot, mood = stop.mascot)
-            }
+        val aspect = prop?.let { it.width.toFloat() / it.height } ?: 1f
+        val pair = pairLayout(maxWidth.value, maxHeight.value, aspect)
+        if (prop != null) {
+            Image(
+                bitmap = prop,
+                contentDescription = null,
+                filterQuality = FilterQuality.High,
+                modifier = Modifier
+                    .offset(pair.propX.dp, pair.propY.dp)
+                    .size(pair.propWidth.dp, pair.propHeight.dp),
+            )
         }
+        LucentoMascot(
+            modifier = Modifier.offset(pair.mascotX.dp, pair.mascotY.dp),
+            size = pair.mascot.dp,
+            mood = stop.mascot,
+            shadow = true,
+        )
     }
 }
 
-/** The mascot beside its prop: a little smaller than the prop's square, so the pair reads as one picture. */
-private const val MascotScale = 0.92f
+/** Where the prop and the mascot go in a band, in dp from its top left; the mascot's numbers are its sprite's box. */
+internal data class PairLayout(
+    val mascot: Float,
+    val mascotX: Float,
+    val mascotY: Float,
+    val propWidth: Float,
+    val propHeight: Float,
+    val propX: Float,
+    val propY: Float,
+)
 
-/** How far the mascot steps in front of its prop, as a share of the prop's square: it touches the prop, never hides it. */
-private const val MascotStep = 0.12f
+/**
+ * The pair as large as a [width] × [height] band allows, for a prop of [aspect] (width ÷ height of its visible pixels).
+ * Measured from the approved sprites: the character spans 6–96.5 % of its box across, starts 3 % down and stands with
+ * its feet 93 % down; its torch's glow reaches 112.8 % across. The prop stands on the same line as the feet, at most as
+ * wide as the mascot's box and 86 % as tall, and the mascot's hand overlaps it by [HandOnProp]. The pair is centred on
+ * what shows, a little below the middle, with the glow inside the band. A band much wider than tall (large text)
+ * spreads them out: the prop centred at 30 % of the width, the mascot at 70 %.
+ */
+internal fun pairLayout(width: Float, height: Float, aspect: Float): PairLayout {
+    val propShare = minOf(1f, PropTall * aspect) // the prop's width in mascot boxes, at full size
+    val fitWidth = (width - 2f * SideRoom + HandOnProp) / (propShare + (CharacterRight - CharacterLeft) + GlowBeyond)
+    val m = minOf(height * 0.96f, fitWidth).coerceAtLeast(1f)
+    val propWidth = m * propShare
+    val propHeight = propWidth / aspect
+    val feet = Feet * m
+    // The group's own top and bottom, from the mascot box's top: the higher of the head and the prop; the shadow.
+    val groupTop = minOf(CharacterTop * m, feet - propHeight)
+    val groupBottom = feet + ShadowBelow * m
+    val top = (height - (groupBottom - groupTop)) * (1f + VerticalBias) / 2f
+    val mascotY = top - groupTop
+    val propY = mascotY + feet - propHeight
+    val wide = width > 2.6f * height
+    val propX: Float
+    val mascotX: Float
+    if (wide) {
+        propX = width * 0.3f - propWidth / 2f
+        mascotX = width * 0.7f - m * (CharacterLeft + CharacterRight) / 2f
+    } else {
+        val shows = propWidth - HandOnProp + (CharacterRight - CharacterLeft) * m
+        val left = (width - shows) / 2f
+        // Keep the torch's glow inside the band: move the pair left if it would spill over the right edge.
+        val spill = (left + propWidth - HandOnProp - CharacterLeft * m + (CharacterRight + GlowBeyond) * m) - (width - 2f)
+        propX = (left - spill.coerceAtLeast(0f)).coerceAtLeast(SideRoom / 2f)
+        mascotX = propX + propWidth - HandOnProp - CharacterLeft * m
+    }
+    return PairLayout(m, mascotX, mascotY, propWidth, propHeight, propX, propY)
+}
 
-/** A soft shadow of the band's own blue, darker. */
-private val MascotShadow = Color(0x5C0B1A66)
+// The approved sprites' measurements (docs/mascot; the art is drawn as supplied).
+private const val CharacterLeft = 0.06f
+private const val CharacterRight = 0.965f
+private const val CharacterTop = 0.03f
+private const val Feet = 0.93f
+private const val GlowBeyond = 0.163f // the torch's glow past the character's right edge
+private const val ShadowBelow = 0.04f
+
+/** The prop at most 86 % as tall as the mascot's box: it stands beside the character, never over it. */
+private const val PropTall = 0.86f
+
+/** How far the mascot's hand reaches over the prop, in dp. */
+private const val HandOnProp = 8f
+
+/** Room kept between the pair and the band's sides, in dp. */
+private const val SideRoom = 8f
+
+/** A little below the middle (0 is centred, 1 the foot): the gap above is at most 1.3 times the gap below. */
+private const val VerticalBias = 0.12f
 
 /** One doodle: a 24-unit glyph placed in the 140 dp tile (centre x, y and size in dp, turned by [turn] degrees). */
 private class Doodle(val path: Path, val x: Float, val y: Float, val size: Float, val turn: Float, val bright: Boolean)
@@ -143,6 +195,8 @@ private fun DrawScope.drawDoodles() {
                 val scale = side / 24f
                 val x = left + d.x * density - side / 2f
                 val y = top + d.y * density - side / 2f
+                // Whole doodles only: one the band's edge would cut is left out (no stubs along the edges).
+                if (x < 0f || y < 0f || x + side > size.width || y + side > size.height) return@forEach
                 withTransform({
                     translate(x, y)
                     rotate(d.turn, pivot = Offset(side / 2f, side / 2f))
@@ -164,19 +218,19 @@ private fun DrawScope.drawDoodles() {
 }
 
 /**
- * What the mascot does on each card: waves on the first, points at the prop on most, thinks on the questions, presents
- * the reports and cheers on the last.
+ * What the mascot does on each card: waves on the first, then points, thinks or simply smiles, so no two neighbouring
+ * cards show the same picture, and cheers only on the last (its Success pose is kept for the end and the award).
  */
 internal val ProTourStop.mascot: MascotMood
     get() = when (this) {
         ProTourStop.WALLETS -> MascotMood.Greeting
         ProTourStop.NET_WORTH -> MascotMood.Pointing
-        ProTourStop.SMART_READING -> MascotMood.Success
+        ProTourStop.SMART_READING -> MascotMood.Curious
         ProTourStop.GOALS -> MascotMood.Pointing
-        ProTourStop.INSIGHTS_PERIODS -> MascotMood.Pointing
-        ProTourStop.STATEMENTS -> MascotMood.Success
+        ProTourStop.INSIGHTS_PERIODS -> MascotMood.Happy
+        ProTourStop.STATEMENTS -> MascotMood.Pointing
         ProTourStop.AI_ANSWERS -> MascotMood.Curious
-        ProTourStop.SYNC -> MascotMood.Pointing
+        ProTourStop.SYNC -> MascotMood.Happy
         ProTourStop.SHARED -> MascotMood.Greeting
         ProTourStop.THEMES -> MascotMood.Celebrate
     }

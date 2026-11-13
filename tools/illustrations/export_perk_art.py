@@ -14,7 +14,8 @@ is the card's place in the deck; the words after it are ignored), and stores eac
 docs/design/illustrations/perks/<stop>_source.webp (lossless). Never edit a source; generate a new one instead.
 
 Needs Python 3 with Pillow, numpy and scipy. Outputs (committed; the build never needs Python):
-  app/src/main/res/drawable-nodpi/perk_art_<stop>.webp    the prop cut out (transparent around it), ART_SIZE px square
+  app/src/main/res/drawable-nodpi/perk_art_<stop>.webp    the prop cut out and trimmed to what is visible, at the
+                                                          source's own resolution (never scaled up)
   app/src/main/res/drawable-nodpi/perk_thumb_<stop>.webp  the prop on the cards' blue for the collection, THUMB_SIZE px
 
 The export
@@ -23,8 +24,9 @@ The export
   2. cuts the prop out of its ground: pixels within FLAT of BLUE are ground (transparent), pixels between FLAT and BLEND
      are partly transparent (a soft shadow fades out without a ring), and any ground-coloured pixel enclosed by the
      prop stays opaque, so a prop never has a hole; the band's doodles show around the prop, never through it;
-  3. frames the prop in a square with the same room around it on every card and its foot at the same height, so the
-     props and the mascot stand on one line in the app. The thumbnail is the same square on the cards' blue.
+  3. trims the prop to its visible pixels (its soft shadow included), so the app can size and place it by what is
+     really there: the pair then fills the band, and the mascot's hand reaches the prop (critic, app round 1). The
+     thumbnail is a square around the same pixels, with room around them, on the cards' blue.
 """
 from __future__ import annotations
 
@@ -51,8 +53,9 @@ STOPS = [
 BLUE = np.array([0x2F, 0x56, 0xE8], dtype=np.float32)  # AwardArtwork.CardBlue
 FLAT = 8      # within this many levels (per channel, max) of BLUE: the ground itself
 BLEND = 36    # from FLAT to BLEND: blends towards BLUE (shadow tails, edge fringes)
-MARGIN = 0.04  # room around the prop, as a share of the square's side (the app's shadows need a little)
-ART_SIZE = 640  # the prop is drawn at most ~180 dp wide: 640 px covers 3.5x
+VISIBLE = 12  # alpha (0-255) above which a pixel counts as visible when trimming (3 in a row or column to count)
+PAD = 4  # pixels kept around the visible box, so a shadow's last faint pixels aren't cut
+THUMB_MARGIN = 0.08  # room around the prop in its thumbnail, as a share of the square's side
 THUMB_SIZE = 192  # 48 dp at 4x
 QUALITY = 86
 
@@ -65,6 +68,9 @@ def cut_out(src: Image.Image) -> np.ndarray:
     a = np.clip(a + (BLUE - np.median(edges, axis=0)), 0, 255)
     distance = np.abs(a - BLUE).max(axis=2)
     alpha = np.clip((distance - FLAT) / (BLEND - FLAT), 0, 1)
+    alpha[alpha < 0.05] = 0  # the ground's grain: specks too faint to see, which would stop the trim
+    alpha[:2] = alpha[-2:] = 0  # the image's outermost pixels are ground (some sources carry a stray edge line)
+    alpha[:, :2] = alpha[:, -2:] = 0
     # A hole is ground-coloured but walled in by the prop (blue light on its underside): keep it opaque. The outside is
     # whatever low-alpha region the image's border reaches.
     regions, _ = ndimage.label(alpha < 0.5)
@@ -76,32 +82,27 @@ def cut_out(src: Image.Image) -> np.ndarray:
     return rgba
 
 
-def prop_box(rgba: np.ndarray) -> tuple[int, int, int, int]:
-    solid = rgba[..., 3] > 128
-    rows = np.where(solid.sum(axis=1) > 3)[0]
-    cols = np.where(solid.sum(axis=0) > 3)[0]
+def visible_box(rgba: np.ndarray) -> tuple[int, int, int, int]:
+    seen = rgba[..., 3] > VISIBLE
+    rows = np.where(seen.sum(axis=1) >= 3)[0]
+    cols = np.where(seen.sum(axis=0) >= 3)[0]
     if rows.size == 0 or cols.size == 0:
         raise SystemExit("no prop found: is the ground flat #2F56E8?")
-    return int(cols.min()), int(rows.min()), int(cols.max()) + 1, int(rows.max()) + 1
+    h, w = seen.shape
+    return max(0, int(cols.min()) - PAD), max(0, int(rows.min()) - PAD), min(w, int(cols.max()) + 1 + PAD), min(h, int(rows.max()) + 1 + PAD)
 
 
-def framed(rgba: np.ndarray, box) -> Image.Image:
-    """A square around the prop: centred across, its foot MARGIN above the bottom, transparent where the source ends."""
+def thumbnail(rgba: np.ndarray, box) -> Image.Image:
+    """A square around the prop, centred, with THUMB_MARGIN of room, on the cards' blue."""
     x0, y0, x1, y1 = box
-    side = max(x1 - x0, y1 - y0) / (1 - 2 * MARGIN)
-    left = (x0 + x1) / 2 - side / 2
-    bottom = y1 + side * MARGIN
-    top = bottom - side
-    left, top, side = round(left), round(top), round(side)
-    canvas = Image.new("RGBA", (side, side), tuple(int(v) for v in BLUE) + (0,))
-    canvas.paste(Image.fromarray(rgba, "RGBA"), (-left, -top))
-    return canvas
-
-
-def on_blue(im: Image.Image) -> Image.Image:
-    ground = Image.new("RGBA", im.size, tuple(int(v) for v in BLUE) + (255,))
-    ground.alpha_composite(im)
-    return ground.convert("RGB")
+    side = round(max(x1 - x0, y1 - y0) / (1 - 2 * THUMB_MARGIN))
+    left = round((x0 + x1) / 2 - side / 2)
+    top = round((y0 + y1) / 2 - side / 2)
+    layer = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    layer.paste(Image.fromarray(rgba, "RGBA"), (-left, -top))
+    canvas = Image.new("RGBA", (side, side), tuple(int(v) for v in BLUE) + (255,))
+    canvas.alpha_composite(layer)
+    return canvas.convert("RGB").resize((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
 
 
 def encode(im: Image.Image) -> bytes:
@@ -112,15 +113,13 @@ def encode(im: Image.Image) -> bytes:
 
 def export(stop: str) -> dict[str, bytes]:
     rgba = cut_out(Image.open(SOURCES / f"{stop}_source.webp"))
-    box = prop_box(rgba)
-    square = framed(rgba, box)
-    art = square.resize((ART_SIZE, ART_SIZE), Image.LANCZOS)
-    thumb = on_blue(square).resize((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
-    files = {f"perk_art_{stop}.webp": encode(art), f"perk_thumb_{stop}.webp": encode(thumb)}
+    box = visible_box(rgba)
+    art = Image.fromarray(rgba, "RGBA").crop(box)
+    files = {f"perk_art_{stop}.webp": encode(art), f"perk_thumb_{stop}.webp": encode(thumbnail(rgba, box))}
     h, w = rgba.shape[:2]
-    edge = box[0] <= 1 or box[1] <= 1 or box[2] >= w - 1 or box[3] >= h - 1
+    edge = box[0] <= 0 or box[1] <= 0 or box[2] >= w or box[3] >= h
     warn = "  ! the prop touches the image's edge: generate a new one" if edge else ""
-    print(f"{stop:17s} prop {box} in {w}x{h}  art {len(files[f'perk_art_{stop}.webp']) // 1024} KB{warn}")
+    print(f"{stop:17s} visible {box} -> {art.size[0]}x{art.size[1]}  art {len(files[f'perk_art_{stop}.webp']) // 1024} KB{warn}")
     return files
 
 
