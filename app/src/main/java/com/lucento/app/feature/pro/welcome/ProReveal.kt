@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -264,6 +265,8 @@ internal fun ProRevealDeck(
     val enter = remember { Animatable(0f) }
     val leave = remember { Animatable(1f) }
     var leaving by remember { mutableStateOf<Int?>(null) }
+    // Where the leaving card was let go (a swipe's offset in px; 0 for a tap).
+    var leaveFrom by remember { mutableFloatStateOf(0f) }
     val band = remember { Animatable(if (unwrap && shown < 0) 0f else 1f) }
     val burst = remember { Animatable(1f) }
     var burstPlayed by rememberSaveable { mutableStateOf(shown >= 0) }
@@ -307,7 +310,14 @@ internal fun ProRevealDeck(
                     if (reduced) band.snapTo(1f) else launch { band.animateTo(1f, tween(420, easing = FastOutLinearInEasing)) }
                 }
             } else {
+                // The leaving copy starts where the card was let go (a swipe's offset and tilt, or the middle for a tap),
+                // and the next card is in place under it at once, so the deck never shows the leaving card twice (critic,
+                // polish round 3: for 140 ms the original stayed face up under its copy, its mascot mid-float).
+                leaveFrom = drag.value
                 leaving = from
+                drag.snapTo(0f)
+                shown = target
+                turn.snapTo(0f)
                 launch {
                     leave.snapTo(0f)
                     leave.animateTo(1f, tween(if (reduced) 180 else 380, easing = FastOutLinearInEasing))
@@ -450,8 +460,9 @@ internal fun ProRevealDeck(
                                 val p = leave.value
                                 alpha = 1f - p
                                 if (!reduced) {
-                                    translationX = -1.3f * size.width * p
-                                    rotationZ = -10f * p
+                                    translationX = leaveFrom + (-1.3f * size.width - leaveFrom) * p
+                                    val tilt = leaveFrom / 28f / density.density
+                                    rotationZ = tilt + (-10f - tilt) * p
                                 }
                             },
                     )
