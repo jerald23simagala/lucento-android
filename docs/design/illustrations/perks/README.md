@@ -42,7 +42,8 @@ so a prop never has a hole. It trims the prop to its visible pixels (shadow incl
 resolution, and writes `app/src/main/res/drawable-nodpi/perk_art_<stop>.webp` (with alpha, 21–40 KB) and
 `perk_thumb_<stop>.webp` (192 px, centred on the blue). The app paints the band blue with faint doodles and lays the
 pair out by what shows (`pairLayout` in `PerkArt.kt`): the mascot's hand over the prop, the torch's glow inside the
-band. Needs Pillow, numpy and scipy.
+band. It also writes `PerkPropEdges.kt` (where each prop itself ends on the right; its blue shadow runs further), so
+the app sets the 10 dp gap beside a standing mascot by what is seen. Needs Pillow, numpy and scipy.
 
 ## Prompts
 

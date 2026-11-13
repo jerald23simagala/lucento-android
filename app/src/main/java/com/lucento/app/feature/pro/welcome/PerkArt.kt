@@ -40,6 +40,7 @@ import com.lucento.app.core.designsystem.theme.AwardArtwork
 import com.lucento.app.domain.entitlement.ProTourStop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.hypot
 
 /**
  * A card's art (owner, 2026-11-13: "simpler, and add our mascot to make it livelier"; then "subtle doodles instead of
@@ -53,21 +54,26 @@ import kotlinx.coroutines.withContext
  * words say everything it shows, so TalkBack skips it.
  */
 @Composable
-internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier) {
+internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier, still: Boolean = false) {
     val prop = rememberPerkArt(stop.art)
     val aspect = rememberPropAspect(stop.art)
-    // Only a pointing hand reaches the prop; in other poses Lucento stands just beside it (critic, app round 3).
+    // Only a pointing hand reaches the prop; in other poses Lucento stands just beside it (critic, app round 3), the gap
+    // measured from what shows: the prop's own right edge (its shadow runs further) to the pose's left edge.
     val touches = stop.mascot == MascotMood.Pointing
+    val objectRight = stop.propObjectRight
+    val poseLeft = stop.mascot.leftEdge
     BoxWithConstraints(
         modifier
             // Clip first: the doodles must never reach the card's words (critic, app round 1: they did, in dark).
             .clipToBounds()
             .background(AwardArtwork.CardBlue)
             // No doodle over or between the pair (critic, app round 3: stray doodles sat in the gaps).
-            .drawBehind { drawDoodles(pairLayout(size.width / density, size.height / density, aspect, touches).keepClear()) }
+            .drawBehind {
+                drawDoodles(pairLayout(size.width / density, size.height / density, aspect, touches, objectRight, poseLeft).keepClear())
+            }
             .clearAndSetSemantics {},
     ) {
-        val pair = pairLayout(maxWidth.value, maxHeight.value, aspect, touches)
+        val pair = pairLayout(maxWidth.value, maxHeight.value, aspect, touches, objectRight, poseLeft)
         if (prop != null) {
             Image(
                 bitmap = prop,
@@ -81,6 +87,8 @@ internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier) {
         LucentoMascot(
             modifier = Modifier.offset(pair.mascotX.dp, pair.mascotY.dp),
             size = pair.mascot.dp,
+            // A card that is leaving holds still: it was already shown, and a hop as it slides away is noise.
+            animate = !still,
             mood = stop.mascot,
             shadow = true,
             // A short visit: the arrival, then one float (none after a wave, which already rocks), so the art is still
@@ -129,15 +137,26 @@ private val CharacterShapes = listOf(
  * Measured from the approved sprites: the character spans 6–96.5 % of its box across, starts 3 % down and stands with
  * its feet 93 % down; its torch's glow reaches 112.8 % across. The prop stands on the same line as the feet, at most as
  * wide as the mascot's box and 86 % as tall. When [touches] (the pointing pose) the hand overlaps it by [HandOnProp];
- * otherwise the character stands [BesideProp] from it, so a hair tip or an elbow never grazes it. The pair stays together
+ * otherwise the character stands [BesideProp] from it, measured from where the prop itself ends ([objectRight] of its
+ * picture's width: a baked shadow runs further) to where the pose's character starts ([poseLeft] of its box), so a hair
+ * tip or an elbow never grazes it and no card leaves a wide stripe between them. The pair stays together
  * at every band shape (critic, app round 2: spreading them apart on wide bands split the picture), centred on what
  * shows, a little below the middle, with the glow inside the band. The mascot is at most 0.88 of the band's height, so
  * its arrival hop (it rises about 9 % of its size) never takes the hair past the band's top.
  */
-internal fun pairLayout(width: Float, height: Float, aspect: Float, touches: Boolean = true): PairLayout {
+internal fun pairLayout(
+    width: Float,
+    height: Float,
+    aspect: Float,
+    touches: Boolean = true,
+    objectRight: Float = 1f,
+    poseLeft: Float = CharacterLeft,
+): PairLayout {
     val reach = if (touches) HandOnProp else -BesideProp // how far the character comes over the prop (negative: a gap)
+    val solid = if (touches) 1f else objectRight // where the prop ends, as a share of its picture's width
+    val start = if (touches) CharacterLeft else poseLeft // where the character starts, as a share of its box
     val propShare = minOf(1f, PropTall * aspect) // the prop's width in mascot boxes, at full size
-    val fitWidth = (width - 2f * SideRoom + reach) / (propShare + (CharacterRight - CharacterLeft) + GlowBeyond)
+    val fitWidth = (width - 2f * SideRoom + reach) / (propShare * solid + (CharacterRight - start) + GlowBeyond)
     val m = minOf(height * MascotMostOfHeight, fitWidth).coerceAtLeast(1f)
     val propWidth = m * propShare
     val propHeight = propWidth / aspect
@@ -148,12 +167,12 @@ internal fun pairLayout(width: Float, height: Float, aspect: Float, touches: Boo
     val top = (height - (groupBottom - groupTop)) * (1f + VerticalBias) / 2f
     val mascotY = top - groupTop
     val propY = mascotY + feet - propHeight
-    val shows = propWidth - reach + (CharacterRight - CharacterLeft) * m
+    val shows = propWidth * solid - reach + (CharacterRight - start) * m
     val left = (width - shows) / 2f
     // Keep the torch's glow inside the band: move the pair left if it would spill over the right edge.
-    val spill = (left + propWidth - reach - CharacterLeft * m + (CharacterRight + GlowBeyond) * m) - (width - 2f)
+    val spill = (left + propWidth * solid - reach - start * m + (CharacterRight + GlowBeyond) * m) - (width - 2f)
     val propX = (left - spill.coerceAtLeast(0f)).coerceAtLeast(SideRoom / 2f)
-    val mascotX = propX + propWidth - reach - CharacterLeft * m
+    val mascotX = propX + propWidth * solid - reach - start * m
     return PairLayout(m, mascotX, mascotY, propWidth, propHeight, propX, propY)
 }
 
@@ -176,6 +195,16 @@ private const val HandOnProp = 8f
 
 /** The gap between the character and the prop in every other pose, in dp. */
 private const val BesideProp = 10f
+
+/** Where each pose's character starts on the left, as a share of the sprite's box (measured from the approved art). */
+internal val MascotMood.leftEdge: Float
+    get() = when (this) {
+        MascotMood.Greeting -> 0.068f
+        MascotMood.Pointing -> 0.049f
+        MascotMood.Happy -> 0.074f
+        MascotMood.Curious -> 0.084f
+        else -> CharacterLeft
+    }
 
 /** Room kept between the pair and the band's sides, in dp. */
 private const val SideRoom = 8f
@@ -234,27 +263,58 @@ internal data class DoodleSpot(val kind: Int, val box: Rect)
  */
 internal fun doodleSpots(width: Float, height: Float, keepClear: List<Rect> = emptyList()): List<DoodleSpot> {
     val spots = mutableListOf<DoodleSpot>()
+    // A doodle near one of the card's rounded top corners stays [CornerClear] inside its curve.
+    fun inCorner(box: Rect): Boolean {
+        val r = CardCorner
+        val left = box.left < r && box.top < r && hypot(r - box.left, r - box.top) > r - CornerClear
+        val right = box.right > width - r && box.top < r && hypot(box.right - (width - r), r - box.top) > r - CornerClear
+        return left || right
+    }
+
+    fun place(kind: Int, x: Float, y: Float) {
+        val half = DoodleTile[kind].size / 2f
+        val box = Rect(x - half, y - half, x + half, y + half)
+        val whole = box.left >= EdgeClear && box.top >= EdgeClear && box.right <= width - EdgeClear && box.bottom <= height - FootClear
+        val free = whole && keepClear.none { it.overlaps(box) } && !inCorner(box)
+        if (free && spots.none { (it.box.center - box.center).getDistance() < DoodleSpacing }) spots += DoodleSpot(kind, box)
+    }
+
     var row = 0
     var y = DoodleStep / 2f
     while (y < height) {
         var x = DoodleStep / 2f + if (row % 2 == 1) DoodleStep / 2f else 0f
         var col = 0
         while (x < width) {
-            val kind = (row * 4 + col * 7) % DoodleTile.size
-            val half = DoodleTile[kind].size / 2f
-            val box = Rect(x - half, y - half, x + half, y + half)
-            val whole = box.left >= 0f && box.top >= 0f && box.right <= width && box.bottom <= height
-            if (whole && keepClear.none { it.overlaps(box) } && spots.none { (it.box.center - box.center).getDistance() < DoodleSpacing }) {
-                spots += DoodleSpot(kind, box)
-            }
+            place((row * 4 + col * 7) % DoodleTile.size, x, y)
             x += DoodleStep
             col++
         }
         y += DoodleStep * 0.866f
         row++
     }
+    // A second pass along the middle of the free strips above and below the pair, which the grid can step over when
+    // they are thin (a narrow phone: critic, polish round 2).
+    if (keepClear.isNotEmpty()) {
+        val above = keepClear.minOf { it.top }
+        val below = keepClear.maxOf { it.bottom }
+        listOf(above / 2f, (below + height - FootClear) / 2f).forEachIndexed { line, middle ->
+            var x = DoodleSpacing / 2f
+            var i = 0
+            while (x < width) {
+                place((line * 5 + i * 3) % DoodleTile.size, x, middle)
+                x += DoodleSpacing / 2f
+                i++
+            }
+        }
+    }
     return spots
 }
+
+/** Room kept bare at the band's edges, inside the card's rounded top corners, and above the seam at its foot, in dp. */
+private const val EdgeClear = 2f
+private const val CardCorner = 22f // PerkCardShape's radius
+private const val CornerClear = 6f
+private const val FootClear = 6f
 
 private fun DrawScope.drawDoodles(keepClear: List<Rect>) {
     doodleSpots(size.width / density, size.height / density, keepClear).forEach { spot ->

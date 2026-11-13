@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -126,7 +127,7 @@ private const val ArtMostShare = 0.55f
  * scroll, with a "More" pill on a solid band to say so.
  */
 @Composable
-internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, modifier: Modifier = Modifier) {
+internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, modifier: Modifier = Modifier, still: Boolean = false) {
     val withArt = LocalDensity.current.fontScale < 1.75f
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
@@ -140,7 +141,9 @@ internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, mod
         Box {
             Layout(
                 content = {
-                    if (withArt) PerkArt(stop)
+                    // Keyed by the card: going back reuses this place for another card, and its mascot must arrive
+                    // fresh, never cross-fade from the last card's pose (critic, polish round 2).
+                    if (withArt) key(stop) { PerkArt(stop, still = still) }
                     Box(Modifier.verticalScroll(scroll)) { CardWords(copy) }
                 },
             ) { measurables, constraints ->

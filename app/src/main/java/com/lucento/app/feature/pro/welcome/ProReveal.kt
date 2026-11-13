@@ -441,6 +441,8 @@ internal fun ProRevealDeck(
                         turn = 1f,
                         reduced = reduced,
                         art = art,
+                        // A fresh copy of the card that just left: its mascot holds still instead of hopping again.
+                        still = true,
                         modifier = Modifier
                             .size(width, height)
                             .clearAndSetSemantics {}
@@ -587,6 +589,7 @@ private fun TurningCard(
     art: PerkArtCache,
     modifier: Modifier = Modifier,
     backLabel: Boolean = true,
+    still: Boolean = false,
 ) {
     val density = LocalDensity.current
     Box(
@@ -601,11 +604,11 @@ private fun TurningCard(
             if (reduced) {
                 // Cross-fade: no turning for anyone who asked for less motion.
                 if (turn < 1f) PerkCardBack(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - turn }, showLabel = backLabel)
-                if (turn > 0f) PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { alpha = turn })
+                if (turn > 0f) PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { alpha = turn }, still = still)
             } else if (turn < 0.5f) {
                 PerkCardBack(Modifier.fillMaxSize(), showLabel = backLabel)
             } else {
-                PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { rotationY = 180f })
+                PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { rotationY = 180f }, still = still)
             }
         }
     }

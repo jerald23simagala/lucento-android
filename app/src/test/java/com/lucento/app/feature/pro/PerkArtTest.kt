@@ -5,6 +5,8 @@ import com.lucento.app.core.designsystem.component.MascotPose
 import com.lucento.app.domain.entitlement.ProTourStop
 import com.lucento.app.feature.pro.welcome.art
 import com.lucento.app.feature.pro.welcome.doodleSpots
+import com.lucento.app.feature.pro.welcome.leftEdge
+import com.lucento.app.feature.pro.welcome.propObjectRight
 import com.lucento.app.feature.pro.welcome.mascot
 import com.lucento.app.feature.pro.welcome.pairLayout
 import com.lucento.app.feature.pro.welcome.thumb
@@ -66,8 +68,16 @@ class PerkArtTest {
             val where = "band ${w}x$h, prop $a"
             val pointing = pairLayout(w, h, a, touches = true)
             assertEquals("hand over the prop: $where", pointing.propX + pointing.propWidth - 8f, pointing.mascotX + pointing.mascot * 0.06f, 0.01f)
-            val beside = pairLayout(w, h, a, touches = false)
-            assertEquals("10 dp beside the prop: $where", beside.propX + beside.propWidth + 10f, beside.mascotX + beside.mascot * 0.06f, 0.01f)
+            // Measured from what shows: where the prop itself ends to where the pose's character starts.
+            for (objectRight in listOf(0.88f, 0.93f, 1f)) for (poseLeft in listOf(0.068f, 0.084f)) {
+                val beside = pairLayout(w, h, a, touches = false, objectRight = objectRight, poseLeft = poseLeft)
+                assertEquals(
+                    "10 dp beside the prop ($objectRight, $poseLeft): $where",
+                    beside.propX + beside.propWidth * objectRight + 10f,
+                    beside.mascotX + beside.mascot * poseLeft,
+                    0.01f,
+                )
+            }
         }
     }
 
@@ -97,6 +107,10 @@ class PerkArtTest {
                 val b = spot.box
                 assertTrue("a doodle cut by the band's edge: $where", b.left >= 0f && b.top >= 0f && b.right <= w && b.bottom <= h)
                 assertTrue("a doodle over the pair: $where", clear.none { it.overlaps(b) })
+                // At least 6 dp inside the card's rounded top corners (22 dp), and clear of the seam at the band's foot.
+                if (b.left < 22f && b.top < 22f) assertTrue("a doodle in a corner: $where", kotlin.math.hypot(22f - b.left, 22f - b.top) <= 16.01f)
+                if (b.right > w - 22f && b.top < 22f) assertTrue("a doodle in a corner: $where", kotlin.math.hypot(b.right - (w - 22f), 22f - b.top) <= 16.01f)
+                assertTrue("a doodle on the seam: $where", b.bottom <= h - 6f)
             }
             // The gap between a standing character and its prop (10 dp wide, as tall as the prop) is inside the clear
             // areas (6 dp around each), so no doodle sits between them.
@@ -133,12 +147,17 @@ class PerkArtTest {
     fun every_card_keeps_a_texture_of_doodles_around_the_pair() {
         // The owner asked for subtle doodles instead of plain blue: keeping them off the pair must not empty the band
         // (critic, polish check: one clear box left 4–8 per card). Bands: 411 dp and 360 dp phones, and the short band.
-        for ((stop, aspect) in propAspects) {
-            val touches = stop.mascot == MascotMood.Pointing
-            for ((w, h, least) in listOf(Triple(378f, 208f, 8), Triple(327f, 179f, 4), Triple(378f, 119f, 8))) {
-                val spots = doodleSpots(w, h, pairLayout(w, h, aspect, touches).keepClear())
-                assertTrue("$stop in a ${w}x$h band has only ${spots.size} doodles", spots.size >= least)
+        // Where the pair fills most of the band (wide props) there is little blue left to texture, so the floor per card
+        // is 4; across the deck at 411 dp the bands average at least 8.
+        for ((w, h) in listOf(378f to 208f, 327f to 179f, 378f to 119f)) {
+            val counts = propAspects.map { (stop, aspect) ->
+                val touches = stop.mascot == MascotMood.Pointing
+                val pair = pairLayout(w, h, aspect, touches, stop.propObjectRight, stop.mascot.leftEdge)
+                val n = doodleSpots(w, h, pair.keepClear()).size
+                assertTrue("$stop in a ${w}x$h band has only $n doodles", n >= 4)
+                n
             }
+            if (w == 378f && h == 208f) assertTrue("the deck averages ${counts.average()} doodles at 411 dp", counts.average() >= 8.0)
         }
     }
 }

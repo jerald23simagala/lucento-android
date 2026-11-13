@@ -106,6 +106,9 @@ microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
 - (a2) owner chose "Polish only" from r3 (`design/perk-card-polish`): one short float per card, doodles kept off
   the pair, card 7 without its sparkle, the hand on the prop only when pointing. Not chosen: one window per deck with
   copy trims, plain card under short cards, the dark band colour;
+- (a3) from the polish checks (critic polish r1 REVISE 3.6, r2 REVISE 3.7, no hard gate): doodles fill the free blue
+  around the pair again; the gap beside a standing mascot is set from the prop's own edge (`PerkPropEdges.kt`); a
+  leaving card's mascot holds still; going back never blends two poses (each card face keyed by its card);
 - (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
 - (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 
