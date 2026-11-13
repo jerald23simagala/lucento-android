@@ -19,15 +19,21 @@ package com.lucento.app.domain.entitlement
  *   back: offline, on Play's pushes, or after signing out (owner decision 2026-11-12). Neither state comes back for the
  *   same token, since buying again after expiry is a new purchase with a new token, and that counts at once. Account
  *   hold and pause keep their token, so Play's reading still wins there.
+ * - What the phone already knew about the same purchase (same key, same token) stays with Play's new reading (L-6). That
+ *   covers an ending the purchase check reported, which Play's copy can't undo, and Lucento's last confirmation, taken
+ *   from the account's own row for that purchase when it still grants. It also covers when the check last answered.
  */
 object EntitlementMerge {
 
     fun reconcilePlay(current: List<Entitlement>, play: List<Entitlement>, now: Long): List<Entitlement> {
         require(play.all { it.verifiedBy == Verifier.PLAY_LOCAL }) { "Play readings must be PLAY_LOCAL" }
         val serverByKey = current.filter { it.verifiedBy == Verifier.SERVER }.associateBy { it.key }
+        val before = current.filter { it.verifiedBy == Verifier.PLAY_LOCAL && it.purchaseTokenHash != null }
+            .associateBy { it.key to it.purchaseTokenHash }
         val kept = current.filter { it.verifiedBy == Verifier.SERVER }.toMutableList()
         val replacedServerKeys = HashSet<EntitlementKey>()
-        for (row in play) {
+        for (reading in play) {
+            val row = reading.carriedFrom(before[reading.key to reading.purchaseTokenHash], serverByKey[reading.key])
             val server = serverByKey[row.key]
             if (server == null) {
                 kept += row
@@ -45,9 +51,24 @@ object EntitlementMerge {
      * lapsed date are not endings: the same token can be live again.
      */
     private fun Entitlement.ended(play: Entitlement): Boolean =
-        status in ENDED && purchaseTokenHash != null && purchaseTokenHash == play.purchaseTokenHash
+        status in Entitlement.ENDED && purchaseTokenHash != null && purchaseTokenHash == play.purchaseTokenHash
 
-    private val ENDED = setOf(EntitlementStatus.REVOKED, EntitlementStatus.EXPIRED)
+    /**
+     * Play's new reading of a purchase, keeping what this phone already knew about the same purchase ([before], the same
+     * key and token): an ending the purchase check reported, and Lucento's latest confirmation. That's the check's,
+     * or the account's own [server] row for the same token while it grants. It also keeps when the check last answered.
+     * A reading without a token can't be matched and stays as it is.
+     */
+    private fun Entitlement.carriedFrom(before: Entitlement?, server: Entitlement?): Entitlement {
+        if (purchaseTokenHash == null) return this
+        val account = server?.takeIf { it.purchaseTokenHash == purchaseTokenHash && it.status.grantsAccess }
+        val confirmed = listOfNotNull(confirmedAtMillis, before?.confirmedAtMillis, account?.checkedAtMillis).maxOrNull()
+        return copy(
+            status = if (before != null && before.status in Entitlement.ENDED) before.status else status,
+            confirmedAtMillis = confirmed,
+            lucentoCheckedAtMillis = listOfNotNull(lucentoCheckedAtMillis, before?.lucentoCheckedAtMillis).maxOrNull(),
+        )
+    }
 
     fun reconcileServer(current: List<Entitlement>, server: List<Entitlement>): List<Entitlement> {
         require(server.all { it.verifiedBy == Verifier.SERVER }) { "Server readings must be SERVER" }

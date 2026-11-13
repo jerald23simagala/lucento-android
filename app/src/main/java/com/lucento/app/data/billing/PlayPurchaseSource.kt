@@ -128,6 +128,8 @@ class PlayPurchaseSource(
             acknowledged = p.isAcknowledged,
             autoRenewing = p.isAutoRenewing,
             obfuscatedAccountId = p.accountIdentifiers?.obfuscatedAccountId?.takeIf { it.isNotBlank() },
+            signedData = p.originalJson,
+            signature = p.signature,
         )
     }
 
