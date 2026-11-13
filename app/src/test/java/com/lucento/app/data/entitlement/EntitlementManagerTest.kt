@@ -196,6 +196,34 @@ class EntitlementManagerTest {
         assertEquals(DisplayPlan.LIFETIME_WITH_SERVICES, m.state.value.displayPlan(now))
     }
 
+    @Test fun a_refunded_lifetime_stays_off_after_signing_out_while_plays_copy_still_lists_it() = runTest {
+        // The owner's test (2026-11-13): a Lifetime refunded in Play Console. Play's server says CANCELLED (stored as
+        // EXPIRED, not REVOKED); Play's copy on the phone still lists the purchase.
+        play.setPurchases(listOf(lifetimePurchase()))
+        val hash = PurchaseInterpreter.tokenHash("tok-life")
+        serverRows = listOf(
+            serverLifetime(verifiedAt = now, status = EntitlementStatus.EXPIRED, tokenHash = hash),
+            serverLifetime(verifiedAt = now, status = EntitlementStatus.EXPIRED, tokenHash = hash, source = EntitlementSource.PLAY_LIFETIME_SERVICES),
+        )
+        val m = manager()
+        m.refresh()                                           // signed in: the server's word
+        assertEquals(DisplayPlan.FREE, m.state.value.displayPlan(now))
+
+        serverRows = null                                     // signed out: the server is never asked again
+        m.refresh()
+        assertEquals("still off after signing out", DisplayPlan.FREE, m.state.value.displayPlan(now))
+        assertFalse(m.state.value.has(Capability.CLOUD, now))
+        m.applyPlayUpdate(PurchaseQuery.Success(listOf(lifetimePurchase())))
+        assertEquals("still off after a Play push", DisplayPlan.FREE, m.state.value.displayPlan(now))
+        val restarted = manager()
+        restarted.refresh()
+        assertEquals("still off after a restart", DisplayPlan.FREE, restarted.state.value.displayPlan(now))
+
+        play.setPurchases(listOf(lifetimePurchase().copy(purchaseToken = "tok-life-2"))) // bought again
+        restarted.refresh()
+        assertEquals(DisplayPlan.LIFETIME_WITH_SERVICES, restarted.state.value.displayPlan(now))
+    }
+
     @Test fun a_successful_play_query_listing_nothing_drops_the_phones_rows_but_not_the_servers() = runTest {
         play.setPurchases(listOf(subscriptionPurchase()))
         serverRows = listOf(serverGrant())

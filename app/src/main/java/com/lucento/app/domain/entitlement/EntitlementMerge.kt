@@ -13,9 +13,12 @@ package com.lucento.app.domain.entitlement
  * - When both verifiers hold the same key, the server's row stands while it is not past its expiry (plus the offline
  *   grace); a server row that has lapsed gives way to a fresh Play reading, which is how a renewal shows up before the
  *   server has heard of it.
- * - Except a purchase the server **revoked** (refunded with revoke, charged back): Play's copy of that same purchase
- *   (same token) can lag behind on the phone, so it never brings it back, offline included (owner decision 2026-11-12).
- *   A new purchase has a new token and counts at once.
+ * - Except a purchase the server says has **ended**: revoked (refunded with revoke, charged back) or expired (Play's
+ *   own server called it cancelled or expired — a Play Console refund of a Lifetime arrives this way, owner's test
+ *   2026-11-13). Play's copy of that same purchase (same token) can lag behind on the phone, so it never brings it
+ *   back: offline, on Play's pushes, or after signing out (owner decision 2026-11-12). Neither state comes back for the
+ *   same token, since buying again after expiry is a new purchase with a new token, and that counts at once. Account
+ *   hold and pause keep their token, so Play's reading still wins there.
  */
 object EntitlementMerge {
 
@@ -28,7 +31,7 @@ object EntitlementMerge {
             val server = serverByKey[row.key]
             if (server == null) {
                 kept += row
-            } else if (!server.stillCurrent(now) && !server.revoked(row)) {
+            } else if (!server.stillCurrent(now) && !server.ended(row)) {
                 // The server's copy has lapsed and Play says the purchase is live again: trust the newer reading.
                 replacedServerKeys += row.key
                 kept += row
@@ -37,9 +40,14 @@ object EntitlementMerge {
         return kept.filterNot { it.verifiedBy == Verifier.SERVER && it.key in replacedServerKeys }
     }
 
-    /** The server ended [play]'s own purchase: the same purchase token, revoked (a refund with revoke, a chargeback). */
-    private fun Entitlement.revoked(play: Entitlement): Boolean =
-        status == EntitlementStatus.REVOKED && purchaseTokenHash != null && purchaseTokenHash == play.purchaseTokenHash
+    /**
+     * The server ended [play]'s own purchase for good: the same purchase token, revoked or expired. Hold, pause and a
+     * lapsed date are not endings: the same token can be live again.
+     */
+    private fun Entitlement.ended(play: Entitlement): Boolean =
+        status in ENDED && purchaseTokenHash != null && purchaseTokenHash == play.purchaseTokenHash
+
+    private val ENDED = setOf(EntitlementStatus.REVOKED, EntitlementStatus.EXPIRED)
 
     fun reconcileServer(current: List<Entitlement>, server: List<Entitlement>): List<Entitlement> {
         require(server.all { it.verifiedBy == Verifier.SERVER }) { "Server readings must be SERVER" }
