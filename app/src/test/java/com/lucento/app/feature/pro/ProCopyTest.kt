@@ -153,10 +153,12 @@ class ProCopyTest {
         assertTrue(ended.contains("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} questions a month"))
         assertTrue(ProCopy.notice(PlanNotice.SERVICES_ENDED).body.contains("unchanged"))
         val paused = ProCopy.notice(PlanNotice.LIFETIME_NEEDS_CHECK).body
-        assertTrue(paused, paused.contains("${Entitlement.RECHECK_DAYS} days") && paused.contains("Restore purchases"))
+        // Either pause (a month without a word, or Lucento's server not confirming Play's reading, L-6) reads the same.
+        assertTrue(paused, paused.contains("until Lucento can confirm your purchase again") && paused.contains("Restore purchases"))
+        assertTrue(paused, paused.contains("Connect to the internet"))
         assertFalse("paused is not refunded", paused.contains("refunded"))
         val subPaused = ProCopy.notice(PlanNotice.PRO_NEEDS_CHECK)
-        assertTrue(subPaused.body, subPaused.body.contains("${Entitlement.RECHECK_DAYS} days") && subPaused.body.contains("Restore purchases"))
+        assertTrue(subPaused.body, subPaused.body.contains("until Lucento can confirm your subscription again") && subPaused.body.contains("Restore purchases"))
         assertFalse("paused is not ended", subPaused.title.contains("ended"))
     }
 }

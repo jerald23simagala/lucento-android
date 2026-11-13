@@ -39,6 +39,25 @@ class EntitlementCacheTest {
         assertEquals(42L, rows!!.single().checkedAtMillis)
     }
 
+    @Test fun the_purchase_checks_fields_survive_a_restart_including_not_yet_confirmed() = runTest {
+        val cache = SealedEntitlementCache(InMemorySnapshotStore(), HmacSealer(key))
+        val unconfirmed = lifetime.copy(confirmedAtMillis = null, lucentoCheckedAtMillis = null)
+        val confirmed = lifetime.copy(source = EntitlementSource.PLAY_LIFETIME_SERVICES, confirmedAtMillis = now - 9, lucentoCheckedAtMillis = now - 9)
+        val ended = lifetime.copy(purchaseTokenHash = "cd".repeat(32), status = EntitlementStatus.EXPIRED, confirmedAtMillis = null, lucentoCheckedAtMillis = now - 3)
+        cache.write(listOf(unconfirmed, confirmed, ended))
+        assertEquals(listOf(unconfirmed, confirmed, ended), cache.read())
+    }
+
+    @Test fun a_snapshot_from_before_the_purchase_check_reads_as_confirmed_when_verified() {
+        // L-6 (2026-11-13): the update itself pauses nobody. A cached reading counts as confirmed when it was taken.
+        val rows = EntitlementSnapshotCodec.decode(
+            """{"version":1,"rows":[{"source":"PLAY_LIFETIME","status":"ACTIVE","grants":["LOCAL_PRO"],"startsAt":1,"expiresAt":null,"productId":"lucento_pro_lifetime","basePlanId":null,"tokenHash":"${"ab".repeat(32)}","verifiedAt":42,"verifiedBy":"PLAY_LOCAL","autoRenewing":false,"checkedAt":42}]}""",
+        )
+        val row = rows!!.single()
+        assertEquals(42L, row.confirmedAtMillis)
+        assertNull(row.lucentoCheckedAtMillis)
+    }
+
     @Test fun nothing_stored_reads_as_unknown() = runTest {
         assertNull(SealedEntitlementCache(InMemorySnapshotStore(), HmacSealer(key)).read())
     }

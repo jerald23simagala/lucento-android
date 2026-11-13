@@ -69,6 +69,9 @@ fun askUrlFor(interpretUrl: String): String =
 // Lucento Pro (docs/monetization/SERVER_CONTRACT.md §3): purchases are checked by /api/billing/verify on the same site.
 fun billingVerifyUrlFor(interpretUrl: String): String =
     if (interpretUrl.isBlank()) "" else interpretUrl.trimEnd('/').replace(Regex("/interpret$"), "") + "/billing/verify"
+// The purchase check, needing no account (SERVER_CONTRACT.md §3b, MONETIZATION §5.3 L-6), on the same site.
+fun billingCheckUrlFor(interpretUrl: String): String =
+    if (interpretUrl.isBlank()) "" else interpretUrl.trimEnd('/').replace(Regex("/interpret$"), "") + "/billing/check"
 // Account emails (docs/EMAILS.md): the welcome request goes to the same site, beside the AI and billing endpoints.
 fun welcomeUrlFor(interpretUrl: String): String =
     if (interpretUrl.isBlank()) "" else interpretUrl.trimEnd('/').replace(Regex("/interpret$"), "") + "/account/welcome"
@@ -151,6 +154,7 @@ android {
             // The .debug application id can never bill: test builds use the plan simulator instead.
             buildConfigField("String", "PLAY_LICENSE_KEY", "\"\"")
             buildConfigField("String", "BILLING_VERIFY_URL", "\"\"")
+            buildConfigField("String", "BILLING_CHECK_URL", "\"\"")
             buildConfigField("String", "ACCOUNT_WELCOME_URL", "\"${welcomeUrlFor(debugAiInterpretUrl)}\"")
         }
         release {
@@ -160,6 +164,7 @@ android {
             buildConfigField("String", "AI_ASK_URL", "\"${askUrlFor(releaseAiInterpretUrl)}\"")
             buildConfigField("String", "PLAY_LICENSE_KEY", "\"$playLicenceKey\"")
             buildConfigField("String", "BILLING_VERIFY_URL", "\"${billingVerifyUrlFor(releaseAiInterpretUrl)}\"")
+            buildConfigField("String", "BILLING_CHECK_URL", "\"${billingCheckUrlFor(releaseAiInterpretUrl)}\"")
             buildConfigField("String", "ACCOUNT_WELCOME_URL", "\"${welcomeUrlFor(releaseAiInterpretUrl)}\"")
             isMinifyEnabled = true
             isShrinkResources = true

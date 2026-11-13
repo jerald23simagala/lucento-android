@@ -34,14 +34,21 @@ internal suspend fun postToProxy(
     return post(endpoint, body, readTimeoutMs, fresh, errorBodies)
 }
 
-private fun post(endpoint: String, body: String, readTimeoutMs: Int, token: String, errorBodies: Boolean): ProxyReply {
+/**
+ * One request to Lucento's own site that needs no account (the purchase check, docs/monetization/SERVER_CONTRACT.md §3b):
+ * no session token is sent, signed in or not.
+ */
+internal fun postWithoutAccount(endpoint: String, body: String, readTimeoutMs: Int): ProxyReply =
+    post(endpoint, body, readTimeoutMs, token = null, errorBodies = false)
+
+private fun post(endpoint: String, body: String, readTimeoutMs: Int, token: String?, errorBodies: Boolean): ProxyReply {
     val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
         requestMethod = "POST"
         connectTimeout = 8_000
         readTimeout = readTimeoutMs
         doOutput = true
         setRequestProperty("Content-Type", "application/json")
-        setRequestProperty("Authorization", "Bearer $token")
+        if (token != null) setRequestProperty("Authorization", "Bearer $token")
     }
     try {
         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }

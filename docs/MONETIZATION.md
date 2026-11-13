@@ -413,7 +413,10 @@ while Play's copy still lists it (same purchase token: offline, on Play's pushes
 snapshot is device-level), and a new purchase counts at once (owner decision 2026-11-12: Play's copy on the phone can
 lag behind a refund). "Ended" is `REVOKED` or `EXPIRED`: a Play Console refund of a Lifetime reaches the server as
 Play's `CANCELLED`, stored as `EXPIRED` (owner's test 2026-11-13), and buying again after a subscription expires is a new
-purchase with a new token. Account hold and pause keep their token, so Play's reading still wins over those.
+purchase with a new token. Account hold and pause keep their token, so Play's reading still wins over those. Without an
+account, the purchase check (SERVER_CONTRACT §3b, owner decision 2026-11-13) supplies the same server word for each
+purchase Play lists, so a phone that is signed out, cleared or reinstalled can't keep a refunded purchase either (§5.3
+L-6). Mandatory sign-in was considered and declined: it wouldn't help offline, and the purchase is enough to ask about.
 
 ### 5.2 Where gates live (and nowhere else)
 
@@ -445,6 +448,7 @@ verification and is ignored.
 | L-3 Re-verification | every start (Play), every 12 h open (server) | opportunistic; informational |
 | L-4 Clock tampering | can extend a lapsed subscription offline by at most the grace; accepted | turning the clock back can stretch the month; accepted (it breaks everything else on the phone) |
 | L-5 MAC failure (tampered / copied) | entry ignored → Free until re-verified | entry ignored → Free until Play or the account restores it (one tap, needs internet once) |
+| L-6 Lucento's confirmation (owner decisions 2026-11-13) | the same as Lifetime | Google Play's copy on the phone can lag days behind a refund, so its word alone carries a purchase only for **3 days from the purchase time** until Lucento's server confirms it, then for **90 days after each confirmation**. Then it's paused, never ended, with the same notice as L-2. Confirmation comes from the purchase check (`POST /api/billing/check`, SERVER_CONTRACT §3b), which needs no account and runs while online at most every 6 hours. The account's own row for that purchase also confirms it. A `REVOKED` or `EXPIRED` answer ends it on the phone for good, and Play's copy can't bring it back. Google signs the purchase time, so signing out, clearing data, reinstalling or switching Play profiles never restarts the 3 days. What's left is a purchase confirmed before its refund, on a phone kept away from Lucento's server: it lasts until Play's copy catches up, or 90 days at most. Builds without the check (debug, the plan simulator) take Play's word as before, and so do snapshots cached before it existed |
 
 `checkedAt` (2026-11-12) is when this phone last heard about a row from its verifier: Play's reading for a Play row,
 the latest successful server fetch for a server row. The cached snapshot stores it; a snapshot written before it

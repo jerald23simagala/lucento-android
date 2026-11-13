@@ -113,6 +113,47 @@ class EntitlementMergeTest {
         }
     }
 
+    @Test fun an_ending_the_purchase_check_reported_stays_with_plays_next_reading_of_the_same_purchase() {
+        // L-6: the check said EXPIRED; Play's lagging copy reads the same purchase as ACTIVE again.
+        val ended = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.EXPIRED, expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+            .copy(lucentoCheckedAtMillis = now - day)
+        val stale = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+            .copy(confirmedAtMillis = null)
+        val merged = EntitlementMerge.reconcilePlay(listOf(ended), listOf(stale), now).single()
+        assertEquals(EntitlementStatus.EXPIRED, merged.status)
+        assertEquals(now - day, merged.lucentoCheckedAtMillis)
+        assertFalse(EntitlementState(listOf(merged)).has(Capability.LOCAL_PRO, now))
+        // A new purchase is a new token: it starts fresh.
+        val bought = stale.copy(purchaseTokenHash = "b".repeat(64), startsAtMillis = now)
+        assertEquals(EntitlementStatus.ACTIVE, EntitlementMerge.reconcilePlay(listOf(ended), listOf(bought), now).single().status)
+    }
+
+    @Test fun lucentos_last_confirmation_stays_with_plays_next_reading_or_comes_from_the_accounts_row() {
+        val token = "c".repeat(64)
+        val earlier = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = token, verifiedAt = now - day)
+            .copy(confirmedAtMillis = now - 10 * day, lucentoCheckedAtMillis = now - 10 * day)
+        val fresh = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = token)
+            .copy(confirmedAtMillis = null)
+        val merged = EntitlementMerge.reconcilePlay(listOf(earlier), listOf(fresh), now).single()
+        assertEquals(now - 10 * day, merged.confirmedAtMillis)
+        assertEquals(now - 10 * day, merged.lucentoCheckedAtMillis)
+
+        // The account's own row for that purchase, heard from 40 days ago (past the month, so Play's reading takes over).
+        val account = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = token, verifiedAt = now - 40 * day)
+        val fromAccount = EntitlementMerge.reconcilePlay(listOf(account), listOf(fresh), now).single()
+        assertEquals(Verifier.PLAY_LOCAL, fromAccount.verifiedBy)
+        assertEquals("the account's row is Lucento's word too", now - 40 * day, fromAccount.confirmedAtMillis)
+    }
+
+    @Test fun a_lifetimes_year_ended_services_row_stays_ended_and_the_lifetime_stays() {
+        val token = "d".repeat(64)
+        val services = row(EntitlementSource.PLAY_LIFETIME_SERVICES, Verifier.PLAY_LOCAL, status = EntitlementStatus.EXPIRED, expiresAt = now - day, productId = "life", tokenHash = token)
+        val lifetime = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = token)
+        val merged = EntitlementMerge.reconcilePlay(listOf(services, lifetime), listOf(services, lifetime), now)
+        assertEquals(setOf(EntitlementStatus.EXPIRED, EntitlementStatus.ACTIVE), merged.map { it.status }.toSet())
+        assertTrue(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
+    }
+
     @Test fun a_server_lifetime_unheard_of_for_a_month_gives_way_to_plays_fresh_reading() {
         // checkedAt defaults to verifiedAt: the phone last heard from the server 40 days ago, and Play has just confirmed it.
         val unheard = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", verifiedAt = now - 40 * day)
