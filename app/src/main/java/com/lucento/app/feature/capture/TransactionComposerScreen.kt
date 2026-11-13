@@ -142,6 +142,11 @@ fun TransactionComposerScreen(
     start: ComposerStart = ComposerStart.TYPE,
     walletId: Long? = null,
     typeHint: TransactionType? = null,
+    // Speak or Scan asked again while this composer is open (a home-screen widget); handled once.
+    restart: ComposerStart? = null,
+    onRestartHandled: () -> Unit = {},
+    // The launch logo or App lock covers the app (a widget can open the composer under either): Speak and Scan wait.
+    obscured: Boolean = false,
     viewModel: ComposerViewModel = viewModel(factory = ComposerViewModel.Factory),
 ) = AmountsShown {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -239,14 +244,23 @@ fun TransactionComposerScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (started) return@LaunchedEffect
+    fun begin(mode: ComposerStart) = when (mode) {
+        ComposerStart.SPEAK -> if (voiceEnabled) listen() else Unit
+        ComposerStart.SCAN -> if (scanEnabled) launchCamera() else Unit
+        ComposerStart.TYPE -> Unit
+    }
+
+    // The microphone or camera opens only once the composer can be seen, never over the lock screen.
+    LaunchedEffect(obscured) {
+        if (started || obscured) return@LaunchedEffect
         started = true
-        when (start) {
-            ComposerStart.SPEAK -> if (voiceEnabled) listen()
-            ComposerStart.SCAN -> if (scanEnabled) launchCamera()
-            ComposerStart.TYPE -> Unit
-        }
+        begin(start)
+    }
+    LaunchedEffect(restart, obscured) {
+        val again = restart ?: return@LaunchedEffect
+        if (obscured) return@LaunchedEffect
+        onRestartHandled()
+        begin(again)
     }
 
     // Bring the newest message to the top: its bubble, then Lucento's reply card with as many of its rows as fit.

@@ -13,10 +13,15 @@ import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ToggleOn
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -102,6 +107,16 @@ internal fun SettingsHub(current: SettingsUiState, onOpenPage: (SettingsPage) ->
             summary = "${Feature.entries.count { prefs.features.isEnabled(it) }} of ${Feature.entries.size} on",
             onClick = { onOpenPage(SettingsPage.FEATURES) },
         )
+        Hairline(inset = inset)
+        var showWidgets by rememberSaveable { mutableStateOf(false) }
+        NavRow(
+            icon = Icons.Outlined.Widgets,
+            title = "Home-screen widgets",
+            summary = "Quick add and Safe to spend",
+            onClick = { showWidgets = true },
+            wrapTitle = true,
+        )
+        if (showWidgets) com.lucento.app.feature.widget.WidgetsSheet(onDismiss = { showWidgets = false })
 
         SectionHeader("About", Modifier.padding(top = Spacing.section))
         Row(verticalAlignment = Alignment.CenterVertically) {

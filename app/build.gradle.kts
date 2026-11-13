@@ -266,6 +266,9 @@ dependencies {
     // Bundled vector animations (res/raw); no runtime downloads, no network permission.
     implementation(libs.lottie.compose)
 
+    // Home-screen widgets (feature/widget): Quick add and Safe to spend. Local data only.
+    implementation(libs.androidx.glance.appwidget)
+
     // Present only when app/google-services.json exists. CrashReporting no-ops otherwise.
     if (crashlyticsConfigured) {
         implementation(platform(libs.firebase.bom))

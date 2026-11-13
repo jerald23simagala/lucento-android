@@ -405,3 +405,29 @@ owner decides next (NEXT_TASKS). Fixed since, all on `feature/pro-reveal`:
   - `lintDebug`: 0 errors.
 - **Not changed (owner's calls):** the black stage; the award's confetti and rays (the badge award is a must-keep);
   the "AI adviser" name; the rosette.
+
+## Home-screen widgets — 2026-11-12 (`feature/home-widgets`)
+
+The owner chose widgets only, both free; the Quick Settings tile, the type-and-save notification and Share to Lucento
+are parked. Spec: `docs/WIDGETS.md`.
+
+- **Built:** Quick add (the composer's scan · mic · field bar) and Safe to spend (Home's figure, its reason or the
+  per-day and bills lines, the bar and verdict; Net flow when Budgets is off). Jetpack Glance 1.2.0, Compose BOM
+  2025.02.00. Settings › Home-screen widgets pins either one. Code in `feature/widget/`; the composer's entry fixes are
+  in `TransactionComposerScreen` and `LucentoRoot`.
+- **Verified on the API 28 emulator** (`Lucento_CoreScreens_API28`):
+  - Pin dialogs work.
+  - Every tap opens the right place with a single `MainActivity`: the field, Scan (camera), Speak (recogniser), Add,
+    and the body (Home).
+  - Speak tapped while the composer is already open starts the recogniser in it.
+  - On a cold start the recogniser waits for the launch logo; under App lock it opened only after the PIN.
+  - The locked state shows no amounts.
+  - With amounts shown the widget matches Home: $0.00, "Bills due take what’s left", 99 %, Ahead of pace (Home:
+    Remaining $32.01, Bills due −$1,564.99).
+  - Text at 100, 115 and 130 % keeps the full card; at 200 % the compact card shows with nothing cut.
+  - The widget redraws live inside an open Glance session when the text size changes, and Light/Dark switch at once.
+- **Tests:** `testDebugUnitTest` ran 1,351 tests in 172 suites with 0 failures; the widget suites are 9 + 12 tests,
+  including a 6×7×7 size sweep. `lintDebug` reports 0 errors and `assembleDebug` succeeds.
+- **Not verified:**
+  - Android 12+: rounded corners, the picker's preview layout, day/night colours switched by the launcher.
+  - A Samsung One UI launcher, TalkBack reading the widgets, and landscape.

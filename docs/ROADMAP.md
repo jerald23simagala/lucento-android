@@ -4,7 +4,7 @@ Principle: each milestone ships a working, tested APK. Money stays in `Long` min
 JVM tests; every Room schema change ships a `Migration` and a migration test.
 
 ## Done — M0 Foundation (v0.1.0)
-- Gradle (AGP 8.7.3, Kotlin 2.0.21, KSP, Compose BOM 2024.12.01), wrapper 8.11.1, GitHub Actions CI → debug APK artifact.
+- Gradle (AGP 8.7.3, Kotlin 2.0.21, KSP, Compose BOM 2024.12.01 — 2025.02.00 since the widgets), wrapper 8.11.1, GitHub Actions CI → debug APK artifact.
 - Design system: palette, Inter typography, shapes/spacing, components (buttons, cards, empty states, amount text,
   currency picker, brand mark), light/dark themes, splash screen, adaptive + themed launcher icon.
 - Onboarding (welcome → principles → main currency), DataStore preferences, bottom navigation.
@@ -261,6 +261,19 @@ recurring-schedule sync, syncing preferences.
 - Play Console answers (Data safety, App content, listing, Google sign-in SHA-1s, testing tracks):
   docs/play/PLAY_STORE_SUBMISSION.md. Website refresh with pricing, terms and deletion pages (`feature/site-refresh`).
 - Owner: OT-15 (migration), OT-16 (Play Console), legal review.
+
+## Built — Home-screen widgets (2026-11-12, `feature/home-widgets`)
+- Owner chose widgets only, both free (after exploring a Quick Settings tile, a type-in-the-shade notification and
+  sharing into Lucento; those stay parked). Spec: docs/WIDGETS.md.
+- **Quick add** (4×1 → 2×1): the composer's scan · mic · field bar; taps open the composer in that mode.
+  **Safe to spend** (4×2 → 3×2): Home's figure, "a day · days left", "After … bills due", bar and verdict chip, or Home's
+  Net flow with Budgets off; Hide amounts, App lock and the theme apply; home screen only (`not_keyguard`).
+- Jetpack Glance 1.2.0 (Compose BOM moved to 2025.02.00 to keep Compose on one patch, 1.7.8). No new permission.
+- Settings › Home-screen widgets places either one (pin request). The widgets redraw after every data or preference
+  change, on text-size or dark-mode changes, and just after midnight, including inside an open Glance session.
+- Every row's height is planned (`WidgetFit.kt`), so nothing is cut at any size from 85 % to 200 % text (a test sweeps
+  6 widths × 7 heights × 7 text sizes). From a widget, Speak and Scan start in an already open composer, and the
+  microphone and camera wait for the launch logo and App lock.
 
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).

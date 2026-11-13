@@ -405,6 +405,32 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         // Finished elsewhere (or by a restore): the guide steps aside.
         if (!guidePending && onGuide) navController.popBackStack(GuideRoute, inclusive = true)
     }
+
+    // A home-screen widget tap (feature/widget, docs/WIDGETS.md): the composer, the budget, categories or Home — taken
+    // once, and never over the guided setup. Under App lock it lands behind the lock screen, as the widget says.
+    val widgetLaunch by com.lucento.app.feature.widget.WidgetLaunches.pending.collectAsStateWithLifecycle()
+    // Speak or Scan asked of a composer that is already open: push() would only bring it back as it was.
+    var composerRestart by remember { mutableStateOf<ComposerStart?>(null) }
+    LaunchedEffect(widgetLaunch, guidePending) {
+        val launch = widgetLaunch ?: return@LaunchedEffect
+        if (!com.lucento.app.feature.widget.WidgetLaunches.consume(launch) || guidePending) return@LaunchedEffect
+        when (launch) {
+            is com.lucento.app.feature.widget.WidgetLaunch.Composer -> {
+                // A widget drawn before Speak or Scan was switched off still offers it; the composer types instead.
+                val start = when {
+                    launch.start == ComposerStart.SPEAK && !features.isEnabled(Feature.VOICE_ENTRY) -> ComposerStart.TYPE
+                    launch.start == ComposerStart.SCAN && !features.isEnabled(Feature.RECEIPT_SCANNING) -> ComposerStart.TYPE
+                    else -> launch.start
+                }
+                // Already writing: what's there stays, and Speak or Scan starts in that composer.
+                if (navController.currentDestination?.hasRoute(ComposerRoute::class) == true) composerRestart = start else openComposer(start)
+            }
+            com.lucento.app.feature.widget.WidgetLaunch.Budget ->
+                navigateTo(if (features.isEnabled(Feature.BUDGETS)) BudgetRoute else HomeRoute)
+            com.lucento.app.feature.widget.WidgetLaunch.Categories -> push(CategorySetupRoute)
+            com.lucento.app.feature.widget.WidgetLaunch.Home -> navigateTo(HomeRoute)
+        }
+    }
     val back: () -> Unit = { navController.popBackStack() }
     val focused = currentDestination.isFocused()
 
@@ -765,6 +791,9 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     start = runCatching { ComposerStart.valueOf(route.start) }.getOrDefault(ComposerStart.TYPE),
                                     walletId = route.walletId.takeIf { it != NO_WALLET },
                                     typeHint = route.typeHint.takeIf { it.isNotEmpty() }?.let { name -> runCatching { TransactionType.valueOf(name) }.getOrNull() },
+                                    restart = composerRestart,
+                                    onRestartHandled = { composerRestart = null },
+                                    obscured = LocalAppObscured.current,
                                 )
                             }
                         }

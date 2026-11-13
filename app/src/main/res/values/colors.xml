@@ -5,4 +5,14 @@
     <color name="lucento_midnight">#10182B</color>
     <color name="lucento_sun">#FFC928</color>
     <color name="splash_background">@color/lucento_cream</color>
+
+    <!-- Widget picker previews only (res/layout/widget_preview_*.xml): Sunrise light, as in core/designsystem/theme. The
+         live widgets take every colour from the chosen theme (feature/widget/WidgetColors.kt). -->
+    <color name="widget_preview_surface">#FFFFFF</color>
+    <color name="widget_preview_ink">#17233F</color>
+    <color name="widget_preview_muted">#5E687D</color>
+    <color name="widget_preview_outline">#7A869F</color>
+    <color name="widget_preview_tonal">#EAF1FF</color>
+    <color name="widget_preview_on_tonal">#2447C7</color>
+    <color name="widget_preview_track">#E8EAF0</color>
 </resources>

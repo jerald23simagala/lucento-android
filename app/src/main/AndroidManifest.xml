@@ -66,5 +66,30 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Home-screen widgets (docs/WIDGETS.md): they only open Lucento and show what Home shows; no permission, no
+             network. Not exported: only the system's widget service sends to them. -->
+        <receiver
+            android:name=".feature.widget.QuickAddWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_quick_add_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_add_info" />
+        </receiver>
+        <receiver
+            android:name=".feature.widget.SafeToSpendWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_safe_to_spend_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_safe_to_spend_info" />
+        </receiver>
     </application>
 </manifest>

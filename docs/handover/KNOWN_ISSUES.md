@@ -15,6 +15,19 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Home-screen widgets (2026-11-12, `feature/home-widgets`)
+
+- **Android 9–11: square corners** (Verified, API 28). Glance's `cornerRadius` needs Android 12; older launchers draw
+  the widget as a rectangle. Accepted.
+- **Text fitting is estimated** (Verified on one emulator; Code-only elsewhere). Glance can't measure text, so
+  `WidgetFit.kt` plans from measured line boxes and generous character widths. Nothing can overflow, because each text
+  gets exactly its planned lines, but an unusually wide phone font could end a line in "…" a little early.
+- **A widget tap made under App lock waits for the unlock** (Inferred). Tap Speak, leave at the lock screen and unlock
+  later: the composer then opens listening. Harmless, since nothing is recorded without speaking, but late.
+- **Layout after a settings change while Lucento isn't running** (Inferred). A text-size or dark-mode change made while
+  Lucento's process is stopped shows on the next redraw: the next start, data change or midnight. The home screen can't
+  choose a layout itself. On Android 12+ the launcher switches day/night colours without Lucento.
+
 ## Large text (owner rule 2026-11-12: works to 200 %, polished to 130 %)
 
 | ID | Issue | Evidence | Next step |
