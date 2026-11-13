@@ -15,6 +15,16 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Sign out (2026-11-12, `feature/sign-out`)
+
+- **Not run with a real account** (Code-only + unit tests). The dialogs, the profile row and the Account page ran on the
+  API 28 emulator at 100 % and 200 %; Keep them here, Remove and sign out, Save a backup and the welcome note have JVM
+  tests for their logic but no device pass with a signed-in account on lucento-test yet.
+- **The welcome note is lost if the app dies between the wipe and onboarding reading it** (Inferred). It is read once
+  when onboarding starts; harmless, it only explains what happened.
+- **After Save a backup the person signs out again by hand** (by design): the dialog closes, the file is saved, and the
+  result shows under the account.
+
 ## Home-screen widgets (2026-11-12, `feature/home-widgets`)
 
 - **Android 9–11: square corners** (Verified, API 28). Glance's `cornerRadius` needs Android 12; older launchers draw
@@ -77,7 +87,7 @@ resolved items are kept at the bottom for traceability.
 | — | ~~Auto-refresh can re-persist a session; the launch resume path doesn't clear it~~. **Fixed locally:** auto-refresh is stopped first; launch `dropIfEnded` removes a stored session that was recorded for revoking | Verified (unit) | Owner review |
 | — | ~~Offline sign-out never revokes~~. **Fixed locally** (WorkManager retry) | Verified (device) | Owner review |
 | P0-2.1-A | ~~Account detection ignored transactions, schedules and budgets; the restore read active wallets only~~. **Fixed locally in P0-2.1:** detection covers wallets (archived included), active expense categories, transactions, schedules and budgets; the restore applies the same rule | Verified (unit tests + device O-02/O-03/O-09) | Owner review |
-| F-2 | On a never-synced phone, the sign-out prompt says it removes "the account's wallets…", but they are the phone's own never-uploaded records; "Sign out anyway" deletes them (the unsynced count is shown) | Verified (device, shot B-19) | Owner decision |
+| F-2 | ~~On a never-synced phone, the sign-out prompt says it removes "the account's wallets…", but they are the phone's own never-uploaded records; "Sign out anyway" deletes them (the unsynced count is shown)~~. Worse on a free plan: "Sync first" only closed the dialog ("Cloud sync is part of Lucento Pro"), leaving "Sign out anyway" as the only way out. **Fixed on `feature/sign-out`** (owner decision 2026-11-12): such records are "only on this phone"; the dialog offers Keep them here (no wipe) or Remove and sign out. A plan that can't upload offers Save a backup instead of Sync first | Unit-tested (`SignOutTest`, `AccountBoundaryTest`); device pass in CURRENT_STATUS | Owner review |
 | F-3 | The guided-setup welcome says the data stays only on this phone while sync is on | Verified (device, shot A-25) | P3 copy |
 | C-1 / P1-8 | ~~The combine fold keeps an arbitrary budget amount~~. **Fixed locally (owner: keep the latest edit):** a set amount beats 0, the latest `updated_at` wins, a tie goes to the smaller sync id; order-independent, also for 3+ copies (QA note 1) | Verified (unit) | Owner review |
 | P0-2-RISK-1 | **Accepted validation limitations** for the P0-2 closure (`P0_2_FINAL_ACCEPTANCE_REPORT.md` §7, §8, §4):<br>• physical-device background (saved-state) restore: **DEFERRED** (emulators restart the system process; no physical device);<br>• Settings account-check failure: **NOT VERIFIED** on device, automated coverage accepted;<br>• empty account after a switch: automated only (a third QA account isn't authorized);<br>• a second phone's typed, unused category: automated only.<br>Passed on device: E-2, O-10, F-7 returning account, process death during a restore (emulator), upgrade install. | Accepted limitation | Run the saved-state restore on the first physical device |

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.theme.LucentoTheme
+import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.designsystem.theme.TonePair
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -179,7 +181,8 @@ fun SheetHeader(
 
 /**
  * Confirmation dialog: a tonal icon (a warning for [destructive] actions, a question otherwise), the title and text,
- * then the confirm action as a filled button — red when [destructive] — beside Cancel.
+ * then the confirm action as a filled button — red when [destructive] — beside Cancel. With a [secondaryLabel] the three
+ * actions stack full width: confirm, the second action, Cancel.
  */
 @Composable
 fun ConfirmDialog(
@@ -198,6 +201,7 @@ fun ConfirmDialog(
     val colors = MaterialTheme.colorScheme
     val ext = LucentoTheme.extendedColors
     val tone = if (destructive) TonePair(ext.negativeContainer, ext.negative) else TonePair(colors.primaryContainer, colors.onPrimaryContainer)
+    val stacked = secondaryLabel != null && onSecondary != null
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = colors.surfaceContainerLowest,
@@ -211,35 +215,58 @@ fun ConfirmDialog(
             )
         },
         title = { Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center) },
-        text = { Text(text, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, textAlign = TextAlign.Center) },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = if (destructive) {
-                    ButtonDefaults.buttonColors(containerColor = colors.error, contentColor = colors.onError)
-                } else {
-                    ButtonDefaults.buttonColors()
-                },
-                shape = MaterialTheme.shapes.small,
-            ) { Text(confirmLabel, style = MaterialTheme.typography.labelLarge) }
+        // Scrolls when it can't fit (large text, a short screen): the dialog then shrinks the text, never the buttons,
+        // and without this the end of a long explanation was cut off where nobody could read it.
+        text = {
+            Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            )
         },
-        dismissButton = if (dismissLabel != null || secondaryLabel != null) {
-            {
-                Column(horizontalAlignment = Alignment.End) {
-                    if (secondaryLabel != null && onSecondary != null) {
-                        TextButton(onClick = onSecondary) {
-                            Text(
-                                secondaryLabel,
-                                color = if (secondaryDestructive) colors.error else colors.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        }
+        confirmButton = {
+            val confirmColors = if (destructive) {
+                ButtonDefaults.buttonColors(containerColor = colors.error, contentColor = colors.onError)
+            } else {
+                ButtonDefaults.buttonColors()
+            }
+            if (stacked) {
+                // Three actions stack full width, the safe one first: side by side they wrapped unevenly (a gap above
+                // the second action, Cancel cut off at the dialog's edge) once a label grew past a few words.
+                Column(Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = onConfirm,
+                        colors = confirmColors,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch),
+                    ) { Text(confirmLabel, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center) }
+                    Spacer(Modifier.height(Spacing.xs))
+                    TextButton(onClick = onSecondary!!, modifier = Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch)) {
+                        Text(
+                            secondaryLabel!!,
+                            color = if (secondaryDestructive) colors.error else colors.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                     if (dismissLabel != null) {
-                        TextButton(onClick = onDismiss) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) }
+                        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().heightIn(min = Sizes.minTouch)) {
+                            Text(dismissLabel, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
+                        }
                     }
                 }
+            } else {
+                Button(
+                    onClick = onConfirm,
+                    colors = confirmColors,
+                    shape = MaterialTheme.shapes.small,
+                ) { Text(confirmLabel, style = MaterialTheme.typography.labelLarge) }
             }
+        },
+        dismissButton = if (!stacked && dismissLabel != null) {
+            { TextButton(onClick = onDismiss) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) } }
         } else {
             null
         },

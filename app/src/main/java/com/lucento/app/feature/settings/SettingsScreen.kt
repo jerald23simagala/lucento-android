@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Article
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.outlined.CloudOff
@@ -119,6 +120,8 @@ fun SettingsScreen(
     onOpenPage: (SettingsPage) -> Unit = {},
     /** Test builds: open Google's account picker as soon as the page shows (profile menu › Switch account). */
     startAccountSwitch: Boolean = false,
+    /** Profile menu › Sign out: the Account & sync page opens with the sign-out confirmation already over it. */
+    startSignOut: Boolean = false,
     /**
      * Whose ViewModel to use: the hub's, for a page opened from it, so the hub and its pages share one account check and
      * one account prompt (QA M3). Null uses this screen's own.
@@ -143,11 +146,24 @@ fun SettingsScreen(
             viewModel.connectGoogleAccount(context)
         }
     }
+    // Same once-per-visit rule: Cancel leaves the person on the Account page, and rotating doesn't ask again.
+    var signOutStarted by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(startSignOut) {
+        if (startSignOut && !signOutStarted) {
+            signOutStarted = true
+            viewModel.requestSignOut()
+        }
+    }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) viewModel.exportCsv(context.contentResolver, uri) { exportMessage = it }
     }
     val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if (uri != null) viewModel.exportBackup(context.contentResolver, uri) { exportMessage = it }
+        // From the sign-out dialog the result belongs under the account; the Your data page shows its own.
+        if (uri != null) {
+            viewModel.exportBackup(context.contentResolver, uri) {
+                if (page == SettingsPage.ACCOUNT) viewModel.showAccountMessage(it) else exportMessage = it
+            }
+        }
     }
     val backupImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -205,7 +221,7 @@ fun SettingsScreen(
                 // LocalContext here is MainActivity, which Credential Manager needs to show the account picker.
                 onConnectGoogle = { viewModel.connectGoogleAccount(context) },
                 onConnectEmail = viewModel::connectEmailAccount,
-                onDisconnect = viewModel::disconnectAccount,
+                onSignOut = viewModel::requestSignOut,
                 onSyncNow = viewModel::syncNow,
                 onChangePassword = viewModel::changePassword,
                 onDeleteAccount = viewModel::requestDeleteAccount,
@@ -264,27 +280,39 @@ fun SettingsScreen(
                     dismissLabel = "Don’t connect",
                 )
             }
-            current.cloudSync.prompt?.takeIf { it.kind != AccountPrompt.Kind.MERGE }?.let { prompt ->
-                val unsynced = signOutUnsyncedMessage(prompt.unsyncedCount)
-                val signOutWithLoss = prompt.kind == AccountPrompt.Kind.SIGN_OUT && unsynced != null
+            current.cloudSync.prompt?.takeIf { it.kind == AccountPrompt.Kind.SWITCH }?.let { prompt ->
                 ConfirmDialog(
-                    title = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect this account?" else "Switch account?",
-                    text = if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) {
-                        "This removes the account’s wallets, transactions, budgets and goals from this phone, and " +
-                            "Lucento starts again from setup. Sign back in to download them again." +
-                            (unsynced?.let { " $it" } ?: "")
-                    } else {
-                        "This phone’s data belongs to another account. It will be removed so it is never uploaded " +
-                            "to the account you just signed in to, and Lucento then checks that account and sets it up." +
-                            if (prompt.hasUnsynced) " Changes that haven’t synced will be lost." else ""
-                    },
-                    confirmLabel = if (signOutWithLoss) "Sync first" else if (prompt.kind == AccountPrompt.Kind.SIGN_OUT) "Disconnect" else "Remove and switch",
-                    destructive = !signOutWithLoss,
-                    onConfirm = if (signOutWithLoss) viewModel::syncBeforeSignOut else viewModel::confirmAccountPrompt,
+                    title = "Switch account?",
+                    text = "This phone’s data belongs to another account. It will be removed so it is never uploaded " +
+                        "to the account you just signed in to, and Lucento then checks that account and sets it up." +
+                        if (prompt.hasUnsynced) " Changes that haven’t synced will be lost." else "",
+                    confirmLabel = "Remove and switch",
+                    destructive = true,
+                    onConfirm = viewModel::confirmAccountPrompt,
                     onDismiss = viewModel::dismissAccountPrompt,
-                    secondaryLabel = if (signOutWithLoss) "Sign out anyway" else null,
-                    onSecondary = if (signOutWithLoss) viewModel::confirmAccountPrompt else null,
-                    secondaryDestructive = true,
+                )
+            }
+            current.cloudSync.prompt?.takeIf { it.kind == AccountPrompt.Kind.SIGN_OUT }?.let { prompt ->
+                val case = prompt.signOut ?: com.lucento.app.feature.account.signOutCase(
+                    phoneOnly = false, pendingChanges = prompt.unsyncedCount, canUpload = true,
+                )
+                SignOutConfirmation(
+                    case = case,
+                    email = current.cloudSync.signedInEmail,
+                    pendingChanges = prompt.unsyncedCount,
+                    onConfirm = when (case) {
+                        com.lucento.app.feature.account.SignOutCase.SAFE_IN_ACCOUNT -> viewModel::confirmAccountPrompt
+                        com.lucento.app.feature.account.SignOutCase.UNSYNCED_CAN_SYNC -> viewModel::syncBeforeSignOut
+                        com.lucento.app.feature.account.SignOutCase.UNSYNCED_NEEDS_BACKUP -> {
+                            {
+                                viewModel.dismissAccountPrompt()
+                                backupExporter.launch("lucento-backup-${LocalDate.now()}.json")
+                            }
+                        }
+                        com.lucento.app.feature.account.SignOutCase.PHONE_ONLY -> viewModel::keepRecordsAndSignOut
+                    },
+                    onRemove = viewModel::confirmAccountPrompt,
+                    onDismiss = viewModel::dismissAccountPrompt,
                 )
             }
         }
@@ -399,7 +427,7 @@ private fun SettingsContent(
     exportMessage: String?,
     onConnectGoogle: () -> Unit,
     onConnectEmail: (String, String, EmailMode) -> Unit,
-    onDisconnect: () -> Unit,
+    onSignOut: () -> Unit,
     onSyncNow: () -> Unit,
     onChangePassword: (String) -> Unit,
     onDeleteAccount: () -> Unit,
@@ -468,7 +496,7 @@ private fun SettingsContent(
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
       SettingsPage.SHARED, SettingsPage.PRO -> Unit
       SettingsPage.ACCOUNT -> androidx.compose.foundation.layout.Box {
-          CloudSyncSection(current.cloudSync, onConnectGoogle, onDisconnect, onSyncNow, onConnectEmail, onChangePassword, showHeader = false, onDeleteAccount = onDeleteAccount)
+          CloudSyncSection(current.cloudSync, onConnectGoogle, onSignOut, onSyncNow, onConnectEmail, onChangePassword, showHeader = false, onDeleteAccount = onDeleteAccount)
       }
       SettingsPage.DATA -> {
         NavRow(
@@ -588,6 +616,33 @@ private fun SettingsContent(
 }
 
 /**
+ * The sign-out confirmation (owner decision 2026-11-12, F-2; docs/SYNC.md). [onConfirm] is always the choice that loses
+ * nothing (Sign out when everything is safe, Sync first, Save a backup, Keep them here); [onRemove] is the red second
+ * action that removes records from this phone, shown only when the case has one.
+ */
+@Composable
+internal fun SignOutConfirmation(
+    case: com.lucento.app.feature.account.SignOutCase,
+    email: String?,
+    pendingChanges: Int,
+    onConfirm: () -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val copy = com.lucento.app.feature.account.SignOutCopy.dialog(case, email, pendingChanges)
+    ConfirmDialog(
+        title = copy.title,
+        text = copy.text,
+        confirmLabel = copy.confirmLabel,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        secondaryLabel = copy.secondaryLabel,
+        onSecondary = if (copy.secondaryLabel != null) onRemove else null,
+        secondaryDestructive = true,
+    )
+}
+
+/**
  * Optional Google Sign-In + cloud sync (see docs/SYNC.md). Every core feature works without this section
  * ever being touched — it only explains and controls something extra, never something required.
  */
@@ -595,7 +650,7 @@ private fun SettingsContent(
 internal fun CloudSyncSection(
     state: CloudSyncUiState,
     onConnectGoogle: () -> Unit,
-    onDisconnect: () -> Unit,
+    onSignOut: () -> Unit,
     onSyncNow: () -> Unit,
     onConnectEmail: (String, String, EmailMode) -> Unit = { _, _, _ -> },
     onChangePassword: (String) -> Unit = {},
@@ -644,17 +699,16 @@ internal fun CloudSyncSection(
                     }
                 }
                 Spacer(Modifier.height(Spacing.sm))
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    OutlinedButton(onClick = onSyncNow, enabled = !state.syncing) {
-                        if (state.syncing) {
-                            CircularProgressIndicator(Modifier.size(Sizes.iconTile / 2), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(Spacing.xs))
-                            Text("Sync now")
-                        }
+                // Sync now stands alone here: signing out removes records, so it sits with the account's other
+                // lasting actions further down rather than beside an everyday button.
+                OutlinedButton(onClick = onSyncNow, enabled = !state.syncing, modifier = Modifier.heightIn(min = Sizes.minTouch)) {
+                    if (state.syncing) {
+                        CircularProgressIndicator(Modifier.size(Sizes.iconTile / 2), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(Spacing.xs))
+                        Text("Sync now")
                     }
-                    OutlinedButton(onClick = onDisconnect, enabled = !state.syncing) { Text("Disconnect") }
                 }
                 // Test builds only: one tap to Google's account picker. Signing in as another account is the ordinary
                 // account switch (AccountBoundary): this phone's ledger is removed first — after a confirmation when
@@ -698,6 +752,20 @@ internal fun CloudSyncSection(
                         ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
                     }
                 }
+                // Owner decision 2026-11-12: one name, "Sign out", everywhere (it was "Disconnect" here). Its dialog
+                // says what is safe in the account and what is only on this phone before anything is removed.
+                SectionHeader(
+                    "This phone",
+                    Modifier.padding(top = Spacing.section),
+                    supporting = com.lucento.app.feature.account.SignOutCopy.HINT,
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                com.lucento.app.core.designsystem.component.LucentoSecondaryButton(
+                    text = com.lucento.app.feature.account.SignOutCopy.ACTION,
+                    icon = Icons.AutoMirrored.Outlined.Logout,
+                    enabled = !state.syncing,
+                    onClick = onSignOut,
+                )
                 // Google Play's account-deletion requirement (docs/ACCOUNT_DELETION.md): always here while signed in,
                 // whatever the plan, and never hidden behind sync. Set apart as a danger zone in the error colours.
                 DangerZone(enabled = !state.syncing, onDeleteAccount = onDeleteAccount)

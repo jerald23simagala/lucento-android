@@ -276,7 +276,36 @@ Main currency, theme and enabled modules are device preferences (DataStore), nev
 
 ## Sign-out and switching accounts
 
-"Disconnect" asks first, then cancels background sync, turns sync off, clears the Supabase session, and **wipes**
+**Where it is.** "Sign out" (one name everywhere since 2026-11-12; it was "Disconnect") is the last row of the profile
+menu's account group while an account is signed in, and a button on Settings › Account & sync, in its own "This phone"
+section just above the danger zone, away from Sync now. The profile row opens Account & sync with the confirmation
+already over it (`SettingsRoute(signOut = true)`), so the person sees the account and its sync status behind it.
+
+**What the confirmation offers** (`feature/account/SignOut.kt`, `signOutCase`). The confirm button is always the
+choice that loses nothing; the red second action is the one that removes records.
+
+| Case | When | Confirm | Second action |
+|---|---|---|---|
+| Safe in the account | the account's records, nothing waiting | Sign out (wipe) | — |
+| Unsynced, can sync | changes waiting, the plan can upload | Sync first (then asks again) | Sign out anyway (wipe) |
+| Unsynced, needs a backup | changes waiting, the plan can't upload (Pro lapsed) | Save a backup (JSON file) | Sign out anyway (wipe) |
+| Only on this phone | no account or Shared Space ever claimed the records | Keep them here (no wipe) | Remove and sign out (wipe) |
+
+"Only on this phone" (owner decision 2026-11-12, F-2) is `AccountBoundary.ledgerIsPhoneOnly`: no `synced_user_id`
+(claimed before anything is pulled or pushed) and no Shared Space owner. It is typically a free-plan person who signed
+in for Smarter reading or a Shared invitation; their records were never uploaded, so the wipe would have deleted them
+for good while the old dialog said "Sign back in to download them again". **Keep them here** runs
+`AccountBoundary.signOutKeepingLedger`: under the sync lock it checks again that no account claimed the records, then
+ends the session (recorded for the server revoke first, as below), cancels background sync, turns sync off, and
+forgets what the phone cached about the account (Lucento Shared's cached space and invitations; Smarter reading and Ask
+Lucento's AI answers are switched off, `forgetAccountConsents`). The ledger, onboarding, name and photo stay, and no
+wipe marker is set. If a first sync claimed the records in between, nothing changes and the dialog asks again.
+
+After a wipe the welcome screen says what happened, once (`SignOutNotice`, written just before the wipe and cleared if
+it fails): signed out and the account can bring the records back; signed out and the phone-only records were removed;
+or the account was deleted.
+
+**The wipe.** It cancels background sync, turns sync off, clears the Supabase session, and **wipes**
 the local ledger (wallets, categories, transactions, budgets, goals, contributions, schedules, debt terms, goal
 photos, the profile photo) plus the sync binding (which account, the pull cursor, the last error). Income categories are seeded
 again, as on a fresh install, and the account's setup is reset in one preference edit (F-7,
@@ -289,7 +318,7 @@ usage-count consent and notices already seen stay. Each wipe also bumps `setup_g
 and the main screen's Activity-scoped ViewModels so the next account never sees the previous run's state. The wipe
 runs to the end even if the screen that started it is closed (`runWipe` is not cancellable), so its marker is never
 left behind to wipe the next account on a later launch. Anything that had not synced is lost —
-the confirmation says so. The stored session is cleared before that wipe, including when the logout
+the confirmation says so, with the count. The stored session is cleared before that wipe, including when the logout
 request fails offline, so the next launch is signed out. Sync now then requires sign-in and downloads nothing.
 If the app is killed while the ledger is being removed, no usable session remains.
 
@@ -459,7 +488,7 @@ Without step 4 the Settings section says connecting an account isn't available a
 
 Use a test Google account and test records only. Device A: add a wallet and a transaction → Settings → Connect with
 Google → check the row in Supabase (Table editor → `transactions`, `user_id` = that account's id). Edit the note →
-Sync now → note updated, still one row. Sync now twice more → still one row. Disconnect → confirm; the transaction leaves A (it is still in the account,
+Sync now → note updated, still one row. Sync now twice more → still one row. Sign out → confirm; the transaction leaves A (it is still in the account,
 and comes back if A signs in again). Device B (or a clean install), same account → Connect → the wallet and
 transaction arrive with the edited note. Sign in on B with a second test account → B’s local ledger is removed
 (after a confirmation if anything on B has not synced) and nothing of account 1 is uploaded under account 2.

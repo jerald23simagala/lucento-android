@@ -152,6 +152,8 @@ import androidx.compose.ui.focus.focusProperties
     val page: String = "",
     /** Test builds: on the Account page, open Google's account picker straight away (profile menu › Switch account). */
     val switchAccount: Boolean = false,
+    /** On the Account page, open the sign-out confirmation straight away (profile menu › Sign out). */
+    val signOut: Boolean = false,
 )
 @Serializable data object FeaturesRoute
 /**
@@ -689,6 +691,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     page = SettingsPage.fromKey(entry.toRoute<SettingsRoute>().page),
                                     // Test builds: the profile menu's Switch account opens Google's account picker at once.
                                     startAccountSwitch = com.lucento.app.BuildConfig.DEBUG && entry.toRoute<SettingsRoute>().switchAccount,
+                                    startSignOut = entry.toRoute<SettingsRoute>().signOut,
                                     onOpenPage = { page ->
                                         when {
                                             page == SettingsPage.FEATURES -> push(FeaturesRoute)
@@ -895,6 +898,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         ProfileDestination.SHARED -> push(SharedSpaceRoute())
                         ProfileDestination.PRO -> push(ProRoute())
                         ProfileDestination.SWITCH_ACCOUNT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, switchAccount = true))
+                        ProfileDestination.SIGN_OUT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, signOut = true))
                     }
                 },
                 onDismiss = { showProfile = false },

@@ -236,6 +236,8 @@ class UserPreferencesRepository(
         val themeId = stringPreferencesKey("theme_id")
         val proWelcomed = stringSetPreferencesKey("pro_welcomed")
         val proMemberSince = longPreferencesKey("pro_member_since")
+        /** A [com.lucento.app.feature.account.SignOutNotice] key, written just before a sign-out wipe; read once by onboarding. */
+        val signOutNotice = stringPreferencesKey("sign_out_notice")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data
@@ -368,6 +370,34 @@ class UserPreferencesRepository(
             it[Keys.askLucentoAi] = enabled
             it.remove(Keys.askLucentoAiV1)
         }
+    }
+
+    /**
+     * Signing out but keeping this phone's own records (owner decision 2026-11-12, F-2): the setup stays, but Smarter
+     * reading and Ask Lucento's AI answers were agreed to while signed in, so they're switched off as the sign-out wipe
+     * does ([resetAccountSetup]). Signing in again asks afresh.
+     */
+    suspend fun forgetAccountConsents() {
+        context.dataStore.edit {
+            it[Keys.smartReading] = false
+            it[Keys.askLucentoAi] = false
+            it.remove(Keys.askLucentoAiV1)
+        }
+    }
+
+    /** The line the welcome screen shows after a sign-out wipe ([com.lucento.app.feature.account.SignOutNotice] key). */
+    suspend fun setSignOutNotice(key: String?) {
+        context.dataStore.edit { if (key == null) it.remove(Keys.signOutNotice) else it[Keys.signOutNotice] = key }
+    }
+
+    /** Reads and clears the welcome screen's sign-out line, so it is shown once. */
+    suspend fun takeSignOutNotice(): String? {
+        var key: String? = null
+        context.dataStore.edit {
+            key = it[Keys.signOutNotice]
+            it.remove(Keys.signOutNotice)
+        }
+        return key
     }
 
     /** DataStore copy of the crash-report choice. Written before the synchronous mirror. */

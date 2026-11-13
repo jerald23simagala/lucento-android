@@ -513,6 +513,13 @@ class AppContainer(application: Application) {
             },
             wipe = ledgerReset::wipe,
             signOut = auth::signOut,
+            sharedSpaceOwner = syncPreferences::sharedSpaceOwnerId,
+            // Signing out but keeping this phone's own records (F-2): what the wipe forgets about the account, minus
+            // the ledger itself. Same DataStore file as sharedSpace's store (one instance per process).
+            forgetAccount = {
+                com.lucento.app.data.sharedspace.DataStoreSharedSpaceStore(application).clearAll()
+                preferences.forgetAccountConsents()
+            },
         )
     }
 }
