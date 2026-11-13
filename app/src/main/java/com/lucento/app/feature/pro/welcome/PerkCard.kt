@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -37,7 +37,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -126,9 +128,11 @@ private const val ArtMostShare = 0.55f
  * scroll, with a "More" pill on a solid band to say so.
  */
 @Composable
-internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, modifier: Modifier = Modifier) {
+internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, modifier: Modifier = Modifier, still: Boolean = false) {
     val withArt = LocalDensity.current.fontScale < 1.75f
-    val scroll = rememberScrollState()
+    // Each card's own scroll position: going back reuses this place for another card, which must open at its top
+    // (critic, polish round 3: it opened mid-scroll at large text).
+    val scroll = rememberSaveable(stop, saver = ScrollState.Saver) { ScrollState(0) }
     val scope = rememberCoroutineScope()
     val surface = MaterialTheme.colorScheme.surfaceContainerLowest
     Surface(
@@ -140,7 +144,9 @@ internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, mod
         Box {
             Layout(
                 content = {
-                    if (withArt) PerkArt(stop)
+                    // Keyed by the card: going back reuses this place for another card, and its mascot must arrive
+                    // fresh, never cross-fade from the last card's pose (critic, polish round 2).
+                    if (withArt) key(stop) { PerkArt(stop, still = still) }
                     Box(Modifier.verticalScroll(scroll)) { CardWords(copy) }
                 },
             ) { measurables, constraints ->
@@ -233,9 +239,10 @@ private fun CardWords(copy: ProWelcomeCopy.StopCopy) {
                 modifier = Modifier.padding(top = 2.dp).size(18.dp),
             )
             Spacer(Modifier.width(Spacing.xs))
-            Text(copy.where, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+            // Even lines, never one word alone on the last (critic, polish round 3).
+            Text(copy.where, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, lineBreak = LineBreak.Heading))
         }
-        Text(copy.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(copy.body, style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Paragraph), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

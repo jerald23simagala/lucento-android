@@ -101,7 +101,21 @@ the words in dark: fixed), r2 REVISE 3.45 with no hard gate; the owner then chos
 at most 0.55 of the card's width, which the pair fills: 12–20 % empty, measured). Also from r2: the pair stays
 together at every band shape, room for the hop, each prop's shape read before it decodes, new props for cards 3 (a
 microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
-- (a) CI and a critic check on the latest commit, then merge and the 0.5.6 AAB to Downloads;
+- (a) done: critic r3 REVISE 3.45 with no hard gate, CI green; merged as `af4aae4` (2026-11-13) and the 0.5.6
+  (vc 11) AAB went to the owner's Downloads;
+- (a2) owner chose "Polish only" from r3 (`design/perk-card-polish`): one short float per card, doodles kept off
+  the pair, card 7 without its sparkle, the hand on the prop only when pointing. Not chosen: one window per deck with
+  copy trims, plain card under short cards, the dark band colour;
+- (a3) from the polish checks (critic polish r1 REVISE 3.6, r2 REVISE 3.7, no hard gate): doodles fill the free blue
+  around the pair again; the gap beside a standing mascot is set from the prop's own edge (`PerkPropEdges.kt`); a
+  leaving card's mascot holds still; going back never blends two poses (each card face keyed by its card);
+- (a4) polish r3 REVISE 3.6, no hard gate; its fixes: the next card is in place under a leaving card at once and a
+  swiped card leaves from where it was let go; each card's own scroll position; balanced last lines. Large text
+  re-captured (130 % light/dark, 150 %, 200 %) after the emulator's System UI froze on text-size changes (capture
+  with a settle step: studio scratch `capture_lt.sh` logic). Open for the owner (three polish rounds done): doodle
+  spacing refinements (bare patches beside the pair), one art window for the deck with copy trims, centring wide pairs
+  versus keeping the torch glow inside, the AI feature's name and card 7's chip wording; a phone recording of leaving,
+  swiping and going back;
 - (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
 - (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 

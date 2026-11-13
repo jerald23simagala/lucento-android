@@ -42,7 +42,8 @@ so a prop never has a hole. It trims the prop to its visible pixels (shadow incl
 resolution, and writes `app/src/main/res/drawable-nodpi/perk_art_<stop>.webp` (with alpha, 21–40 KB) and
 `perk_thumb_<stop>.webp` (192 px, centred on the blue). The app paints the band blue with faint doodles and lays the
 pair out by what shows (`pairLayout` in `PerkArt.kt`): the mascot's hand over the prop, the torch's glow inside the
-band. Needs Pillow, numpy and scipy.
+band. It also writes `PerkPropEdges.kt` (where each prop itself ends on the right; its blue shadow runs further), so
+the app sets the 10 dp gap beside a standing mascot by what is seen. Needs Pillow, numpy and scipy.
 
 ## Prompts
 
@@ -76,8 +77,9 @@ Every prop uses one style, with only the object changing:
 climbed steadily, a growth cliché; card 3 was a speech bubble like card 7's, and card 5 a telescope beside another
 bar chart like card 6's, so each card now has a motif of its own.)
 7. two soft rounded speech bubbles in conversation, a smaller pale-sky-blue one behind on the left, and a larger warm
-   sunlight-gold one in front on the right with three short ivory lines inside it, and one tiny golden sparkle beside
-   them
+   sunlight-gold one in front on the right with three short ivory lines inside it. Nothing else: no sparkles, no
+   stars, no extra symbols. (An earlier version had a sparkle beside the bubbles; next to the thinking mascot it read
+   as a cartoon "idea!" mark, against the mascot's "no floating symbols" rule.)
 8. two rounded smartphones with ivory frames standing upright side by side a little apart, their screens glowing
    softly in warm ivory with no writing, linked above by a small arc of glowing golden dots
 9. one open ivory notebook lying flat with a few short grey lines on its pages (no writing), and two pencils resting

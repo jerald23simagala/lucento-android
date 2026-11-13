@@ -164,14 +164,16 @@ logos or UI in the art.
   faint doodles (line drawings of money things, drawn in code in white at 10–16 %; the owner asked for them instead
   of plain blue), and a little below its middle, as large as the band allows: one simple soft-3D prop for the perk (a
   wallet, flags, a telescope…; no people) and Lucento itself (`LucentoMascot`, the approved sprites, never redrawn)
-  with its hand on the prop, over a soft shadow (`shadow = true`), in a pose that suits the card: it waves on the
+  pointing with its hand on the prop or standing just beside it, over a soft shadow (`shadow = true`), with one
+  short float after it hops in (`idleCycles`), in a pose that suits the card: it waves on the
   first, points on every other card, smiles or thinks between, never the same picture on two neighbouring cards, and
   keeps its cheer for the award. Every card has the same art window (at most 0.55 of the card's width), which the
   pair fills; a card with few words ends with plain card under its words. The props
   match the mascot's render (satin and matte materials, warm light from the upper left). `perk_art_<stop>` (640 px
   square) and `perk_thumb_<stop>` (192 px) in `res/drawable-nodpi`; sources, prompts and provenance in
   `docs/design/illustrations/perks/`; `tools/illustrations/export_perk_art.py` cuts each prop out of its flat
-  CardBlue ground, so the doodles show around it and no edge shows at any band height. The same in both themes (a card is an object, like the medal).
+  CardBlue ground, so the doodles show around it and no edge shows at any band height. The doodles fill the free
+  blue around the pair (`doodleSpots`), never over or between it (6 dp clear of each). The same in both themes (a card is an object, like the medal).
   Rules for any new prop: one simple object or a small group, no text, numbers or logos (plain short lines stand in
   for writing), no medium blues (they would melt into the band), calm money (no piles of coins, fanned hands of cards
   or rays behind money). Decorative: TalkBack reads the card's words.

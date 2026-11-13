@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -39,6 +40,7 @@ import com.lucento.app.core.designsystem.theme.AwardArtwork
 import com.lucento.app.domain.entitlement.ProTourStop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.hypot
 
 /**
  * A card's art (owner, 2026-11-13: "simpler, and add our mascot to make it livelier"; then "subtle doodles instead of
@@ -52,18 +54,26 @@ import kotlinx.coroutines.withContext
  * words say everything it shows, so TalkBack skips it.
  */
 @Composable
-internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier) {
+internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier, still: Boolean = false) {
     val prop = rememberPerkArt(stop.art)
     val aspect = rememberPropAspect(stop.art)
+    // Only a pointing hand reaches the prop; in other poses Lucento stands just beside it (critic, app round 3), the gap
+    // measured from what shows: the prop's own right edge (its shadow runs further) to the pose's left edge.
+    val touches = stop.mascot == MascotMood.Pointing
+    val objectRight = stop.propObjectRight
+    val poseLeft = stop.mascot.leftEdge
     BoxWithConstraints(
         modifier
             // Clip first: the doodles must never reach the card's words (critic, app round 1: they did, in dark).
             .clipToBounds()
             .background(AwardArtwork.CardBlue)
-            .drawBehind { drawDoodles() }
+            // No doodle over or between the pair (critic, app round 3: stray doodles sat in the gaps).
+            .drawBehind {
+                drawDoodles(pairLayout(size.width / density, size.height / density, aspect, touches, objectRight, poseLeft).keepClear())
+            }
             .clearAndSetSemantics {},
     ) {
-        val pair = pairLayout(maxWidth.value, maxHeight.value, aspect)
+        val pair = pairLayout(maxWidth.value, maxHeight.value, aspect, touches, objectRight, poseLeft)
         if (prop != null) {
             Image(
                 bitmap = prop,
@@ -77,8 +87,13 @@ internal fun PerkArt(stop: ProTourStop, modifier: Modifier = Modifier) {
         LucentoMascot(
             modifier = Modifier.offset(pair.mascotX.dp, pair.mascotY.dp),
             size = pair.mascot.dp,
+            // A card that is leaving holds still: it was already shown, and a hop as it slides away is noise.
+            animate = !still,
             mood = stop.mascot,
             shadow = true,
+            // A short visit: the arrival, then one float (none after a wave, which already rocks), so the art is still
+            // within about four seconds of each turn while the card's words are read (critic, app round 3).
+            idleCycles = if (stop.mascot == MascotMood.Greeting) 0 else 1,
         )
     }
 }
@@ -92,20 +107,56 @@ internal data class PairLayout(
     val propHeight: Float,
     val propX: Float,
     val propY: Float,
+) {
+    /**
+     * Where no doodle goes, each with [DoodleClearance] around it: the prop, and the character as three shapes measured
+     * from the approved sprites over the cards' poses (sprite fractions): the hair and the crystal with room above for
+     * the hop (x 0.21–0.96, y −0.11–0.10); the head, arms, torch and the glow's bright core (x 0.05–1.03, y 0.10–0.70);
+     * the lower body, feet and shadow (x 0.13–0.80, y 0.70–0.98). Shapes rather than one box, so doodles stay around the
+     * pair instead of most of them going (critic, polish check: one box left 4–8 per card).
+     */
+    fun keepClear(): List<Rect> = (
+        listOf(Rect(propX, propY, propX + propWidth, propY + propHeight)) +
+            CharacterShapes.map { (l, t, r, b) -> Rect(mascotX + l * mascot, mascotY + t * mascot, mascotX + r * mascot, mascotY + b * mascot) }
+        ).map { it.inflate(DoodleClearance) }
+
+}
+
+/** Room kept between the doodles and the pair, in dp. */
+private const val DoodleClearance = 6f
+
+/** The character's shapes for [PairLayout.keepClear], as left, top, right, bottom fractions of the sprite's box. */
+private val CharacterShapes = listOf(
+    listOf(0.21f, -0.11f, 0.96f, 0.10f),
+    listOf(0.05f, 0.10f, 1.03f, 0.70f),
+    listOf(0.13f, 0.70f, 0.80f, 0.98f),
 )
 
 /**
  * The pair as large as a [width] × [height] band allows, for a prop of [aspect] (width ÷ height of its visible pixels).
  * Measured from the approved sprites: the character spans 6–96.5 % of its box across, starts 3 % down and stands with
  * its feet 93 % down; its torch's glow reaches 112.8 % across. The prop stands on the same line as the feet, at most as
- * wide as the mascot's box and 86 % as tall, and the mascot's hand overlaps it by [HandOnProp]. The pair stays together
+ * wide as the mascot's box and 86 % as tall. When [touches] (the pointing pose) the hand overlaps it by [HandOnProp];
+ * otherwise the character stands [BesideProp] from it, measured from where the prop itself ends ([objectRight] of its
+ * picture's width: a baked shadow runs further) to where the pose's character starts ([poseLeft] of its box), so a hair
+ * tip or an elbow never grazes it and no card leaves a wide stripe between them. The pair stays together
  * at every band shape (critic, app round 2: spreading them apart on wide bands split the picture), centred on what
  * shows, a little below the middle, with the glow inside the band. The mascot is at most 0.88 of the band's height, so
  * its arrival hop (it rises about 9 % of its size) never takes the hair past the band's top.
  */
-internal fun pairLayout(width: Float, height: Float, aspect: Float): PairLayout {
+internal fun pairLayout(
+    width: Float,
+    height: Float,
+    aspect: Float,
+    touches: Boolean = true,
+    objectRight: Float = 1f,
+    poseLeft: Float = CharacterLeft,
+): PairLayout {
+    val reach = if (touches) HandOnProp else -BesideProp // how far the character comes over the prop (negative: a gap)
+    val solid = if (touches) 1f else objectRight // where the prop ends, as a share of its picture's width
+    val start = if (touches) CharacterLeft else poseLeft // where the character starts, as a share of its box
     val propShare = minOf(1f, PropTall * aspect) // the prop's width in mascot boxes, at full size
-    val fitWidth = (width - 2f * SideRoom + HandOnProp) / (propShare + (CharacterRight - CharacterLeft) + GlowBeyond)
+    val fitWidth = (width - 2f * SideRoom + reach) / (propShare * solid + (CharacterRight - start) + GlowBeyond)
     val m = minOf(height * MascotMostOfHeight, fitWidth).coerceAtLeast(1f)
     val propWidth = m * propShare
     val propHeight = propWidth / aspect
@@ -116,12 +167,12 @@ internal fun pairLayout(width: Float, height: Float, aspect: Float): PairLayout 
     val top = (height - (groupBottom - groupTop)) * (1f + VerticalBias) / 2f
     val mascotY = top - groupTop
     val propY = mascotY + feet - propHeight
-    val shows = propWidth - HandOnProp + (CharacterRight - CharacterLeft) * m
+    val shows = propWidth * solid - reach + (CharacterRight - start) * m
     val left = (width - shows) / 2f
     // Keep the torch's glow inside the band: move the pair left if it would spill over the right edge.
-    val spill = (left + propWidth - HandOnProp - CharacterLeft * m + (CharacterRight + GlowBeyond) * m) - (width - 2f)
+    val spill = (left + propWidth * solid - reach - start * m + (CharacterRight + GlowBeyond) * m) - (width - 2f)
     val propX = (left - spill.coerceAtLeast(0f)).coerceAtLeast(SideRoom / 2f)
-    val mascotX = propX + propWidth - HandOnProp - CharacterLeft * m
+    val mascotX = propX + propWidth * solid - reach - start * m
     return PairLayout(m, mascotX, mascotY, propWidth, propHeight, propX, propY)
 }
 
@@ -139,8 +190,21 @@ private const val ShadowBelow = 0.04f
 /** The prop at most 86 % as tall as the mascot's box: it stands beside the character, never over it. */
 private const val PropTall = 0.86f
 
-/** How far the mascot's hand reaches over the prop, in dp. */
+/** How far a pointing hand reaches over the prop, in dp. */
 private const val HandOnProp = 8f
+
+/** The gap between the character and the prop in every other pose, in dp. */
+private const val BesideProp = 10f
+
+/** Where each pose's character starts on the left, as a share of the sprite's box (measured from the approved art). */
+internal val MascotMood.leftEdge: Float
+    get() = when (this) {
+        MascotMood.Greeting -> 0.068f
+        MascotMood.Pointing -> 0.049f
+        MascotMood.Happy -> 0.074f
+        MascotMood.Curious -> 0.084f
+        else -> CharacterLeft
+    }
 
 /** Room kept between the pair and the band's sides, in dp. */
 private const val SideRoom = 8f
@@ -148,69 +212,129 @@ private const val SideRoom = 8f
 /** A little below the middle (0 is centred, 1 the foot): the gap above is at most 1.3 times the gap below. */
 private const val VerticalBias = 0.12f
 
-/** One doodle: a 24-unit glyph placed in the 140 dp tile (centre x, y and size in dp, turned by [turn] degrees). */
-private class Doodle(val path: Path, val x: Float, val y: Float, val size: Float, val turn: Float, val bright: Boolean)
-
-private fun glyph(data: String): Path = PathParser().parsePathString(data).toPath()
+/** One kind of doodle: its size in dp, how far it is turned (degrees), and whether it is a little brighter. */
+private class DoodleSpec(val size: Float, val turn: Float, val bright: Boolean)
 
 /**
- * The band's doodles: small line drawings of money things (a coin, a receipt, a little chart, a leaf, a sparkle and so
- * on) in faint white, repeated in a 140 dp tile whose rows shift by half a tile so no grid shows. Drawn, not pictured:
- * crisp at any size and nothing to download. Each doodle sits wholly inside its tile, so none is cut where tiles meet.
+ * The band's doodles: small line drawings of money things (a sparkle, a coin, a squiggle, a little chart, a star, a
+ * plus, a leaf, a receipt and a sun) in faint white. Drawn, not pictured: crisp at any size and nothing to download.
+ * [DoodleGlyphs] holds their shapes, in the same order.
  */
-private val DoodleTile: List<Doodle> by lazy {
+private val DoodleTile = listOf(
+    DoodleSpec(16f, 0f, true), // sparkle
+    DoodleSpec(18f, 0f, false), // coin
+    DoodleSpec(20f, -12f, false), // squiggle
+    DoodleSpec(18f, 6f, false), // little chart
+    DoodleSpec(16f, 14f, true), // star
+    DoodleSpec(12f, 0f, false), // plus
+    DoodleSpec(18f, -18f, false), // leaf
+    DoodleSpec(18f, -8f, false), // receipt
+    DoodleSpec(18f, 0f, false), // sun
+)
+
+private val DoodleGlyphs: List<Path> by lazy {
     listOf(
-        Doodle(glyph("M12 3 13.8 10.2 21 12 13.8 13.8 12 21 10.2 13.8 3 12 10.2 10.2Z"), 18f, 20f, 16f, 0f, true), // sparkle
-        Doodle(glyph("M12 4a8 8 0 1 1 0 16a8 8 0 1 1 0-16zM12 7.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 1 1 0-9z"), 66f, 16f, 18f, 0f, false), // coin
-        Doodle(glyph("M3 14c2-4 4-4 6 0s4 4 6 0 4-4 6 0"), 114f, 28f, 20f, -12f, false), // squiggle
-        Doodle(glyph("M5 19v-5M10 19V9M15 19v-7M20 19V5"), 30f, 68f, 18f, 6f, false), // little chart
-        Doodle(glyph("M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"), 82f, 62f, 16f, 14f, true), // star
-        Doodle(glyph("M12 6v12M6 12h12"), 124f, 84f, 12f, 0f, false), // plus
-        Doodle(glyph("M5 19C5 10 11 5 19 5c0 8-5 14-14 14zM5 19l8-8"), 18f, 116f, 18f, -18f, false), // leaf
-        Doodle(glyph("M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21zM9.5 8h5M9.5 11.5h5M9.5 15h3"), 62f, 116f, 18f, -8f, false), // receipt
-        Doodle(
-            glyph(
-                "M12 8.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7zM12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5" +
-                    "M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8",
-            ),
-            110f, 118f, 18f, 0f, false,
-        ), // sun
-    )
+        "M12 3 13.8 10.2 21 12 13.8 13.8 12 21 10.2 13.8 3 12 10.2 10.2Z",
+        "M12 4a8 8 0 1 1 0 16a8 8 0 1 1 0-16zM12 7.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 1 1 0-9z",
+        "M3 14c2-4 4-4 6 0s4 4 6 0 4-4 6 0",
+        "M5 19v-5M10 19V9M15 19v-7M20 19V5",
+        "M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z",
+        "M12 6v12M6 12h12",
+        "M5 19C5 10 11 5 19 5c0 8-5 14-14 14zM5 19l8-8",
+        "M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21zM9.5 8h5M9.5 11.5h5M9.5 15h3",
+        "M12 8.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7zM12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5" +
+            "M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8",
+    ).map { PathParser().parsePathString(it).toPath() }
 }
 
-private const val DoodleTileDp = 140f
+/** Candidate places for doodles: a staggered grid this many dp apart; accepted doodles keep [DoodleSpacing] between them. */
+private const val DoodleStep = 24f
+private const val DoodleSpacing = 34f
 
-private fun DrawScope.drawDoodles() {
-    val tile = DoodleTileDp * density
+/** A doodle placed in a band: which one ([kind], an index into the doodles), and its box in dp. */
+internal data class DoodleSpot(val kind: Int, val box: Rect)
+
+/**
+ * Where the doodles go in a [width] × [height] band (dp): they fill the free blue around the pair, so a band keeps its
+ * texture however much of it the pair takes. Walks a staggered grid ([DoodleStep]) in reading order and keeps a doodle
+ * when it is whole (one the band's edge would cut is left out, so no stubs along the edges), clear of [keepClear], and
+ * at least [DoodleSpacing] from the ones already kept. The kinds follow the grid, so the same band always gets the same
+ * doodles.
+ */
+internal fun doodleSpots(width: Float, height: Float, keepClear: List<Rect> = emptyList()): List<DoodleSpot> {
+    val spots = mutableListOf<DoodleSpot>()
+    // A doodle near one of the card's rounded top corners stays [CornerClear] inside its curve.
+    fun inCorner(box: Rect): Boolean {
+        val r = CardCorner
+        val left = box.left < r && box.top < r && hypot(r - box.left, r - box.top) > r - CornerClear
+        val right = box.right > width - r && box.top < r && hypot(box.right - (width - r), r - box.top) > r - CornerClear
+        return left || right
+    }
+
+    fun place(kind: Int, x: Float, y: Float) {
+        val half = DoodleTile[kind].size / 2f
+        val box = Rect(x - half, y - half, x + half, y + half)
+        val whole = box.left >= EdgeClear && box.top >= EdgeClear && box.right <= width - EdgeClear && box.bottom <= height - FootClear
+        val free = whole && keepClear.none { it.overlaps(box) } && !inCorner(box)
+        if (free && spots.none { (it.box.center - box.center).getDistance() < DoodleSpacing }) spots += DoodleSpot(kind, box)
+    }
+
     var row = 0
-    var top = -tile / 2f
-    while (top < size.height) {
-        var left = if (row % 2 == 0) 0f else -tile / 2f
-        while (left < size.width) {
-            DoodleTile.forEach { d ->
-                val side = d.size * density
-                val scale = side / 24f
-                val x = left + d.x * density - side / 2f
-                val y = top + d.y * density - side / 2f
-                // Whole doodles only: one the band's edge would cut is left out (no stubs along the edges).
-                if (x < 0f || y < 0f || x + side > size.width || y + side > size.height) return@forEach
-                withTransform({
-                    translate(x, y)
-                    rotate(d.turn, pivot = Offset(side / 2f, side / 2f))
-                    scale(scale, scale, pivot = Offset.Zero)
-                }) {
-                    drawPath(
-                        d.path,
-                        Color.White.copy(alpha = if (d.bright) 0.16f else 0.1f),
-                        // 1.4 dp on screen, whatever the doodle's size.
-                        style = Stroke(width = 1.4f * density / scale, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                    )
-                }
-            }
-            left += tile
+    var y = DoodleStep / 2f
+    while (y < height) {
+        var x = DoodleStep / 2f + if (row % 2 == 1) DoodleStep / 2f else 0f
+        var col = 0
+        while (x < width) {
+            place((row * 4 + col * 7) % DoodleTile.size, x, y)
+            x += DoodleStep
+            col++
         }
-        top += tile
+        y += DoodleStep * 0.866f
         row++
+    }
+    // A second pass along the middle of the free strips above and below the pair, which the grid can step over when
+    // they are thin (a narrow phone: critic, polish round 2).
+    if (keepClear.isNotEmpty()) {
+        val above = keepClear.minOf { it.top }
+        val below = keepClear.maxOf { it.bottom }
+        listOf(above / 2f, (below + height - FootClear) / 2f).forEachIndexed { line, middle ->
+            var x = DoodleSpacing / 2f
+            var i = 0
+            while (x < width) {
+                place((line * 5 + i * 3) % DoodleTile.size, x, middle)
+                x += DoodleSpacing / 2f
+                i++
+            }
+        }
+    }
+    return spots
+}
+
+/** Room kept bare at the band's edges, inside the card's rounded top corners, and above the seam at its foot, in dp. */
+private const val EdgeClear = 2f
+private const val CardCorner = 22f // PerkCardShape's radius
+private const val CornerClear = 6f
+private const val FootClear = 6f
+
+private fun DrawScope.drawDoodles(keepClear: List<Rect>) {
+    doodleSpots(size.width / density, size.height / density, keepClear).forEach { spot ->
+        val d = DoodleTile[spot.kind]
+        val side = d.size * density
+        val scale = side / 24f
+        val x = spot.box.left * density
+        val y = spot.box.top * density
+        withTransform({
+            translate(x, y)
+            rotate(d.turn, pivot = Offset(side / 2f, side / 2f))
+            scale(scale, scale, pivot = Offset.Zero)
+        }) {
+            drawPath(
+                DoodleGlyphs[spot.kind],
+                Color.White.copy(alpha = if (d.bright) 0.16f else 0.1f),
+                // 1.4 dp on screen, whatever the doodle's size.
+                style = Stroke(width = 1.4f * density / scale, cap = StrokeCap.Round, join = StrokeJoin.Round),
+            )
+        }
     }
 }
 

@@ -592,8 +592,9 @@ only after a committed write: never for a pending payment, a renewal, or a trial
    - A welcome back and the replay open on the plain deck ("Reveal your first perk").
    - Each card has:
      - its art (`PerkArt.kt`; owner, 2026-11-13: "simpler, and add our mascot", then "subtle doodles instead of plain
-       blue"): Lucento, the mascot, with its hand on one simple prop for the perk, on the cards' blue with faint
-       doodles. The mascot hops in as the card turns, over a soft shadow, and takes a pose that suits the card (it
+       blue"): Lucento, the mascot, beside one simple prop for the perk (its hand on it when it points), on the cards'
+       blue with faint doodles that keep clear of the pair. The mascot hops in as the card turns, over a soft
+       shadow, floats once and rests, and takes a pose that suits the card (it
        waves on the first, points on every other card, smiles or thinks between, never the same picture twice in a
        row; its cheer is kept for the award); reduced motion shows it still. Every card has the same art window, at
        most 0.55 of the card's width, which the pair fills (owner, 2026-11-13: "Same-size art window"); it gives up
