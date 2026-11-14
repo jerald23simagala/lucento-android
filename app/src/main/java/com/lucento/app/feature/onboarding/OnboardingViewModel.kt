@@ -259,6 +259,14 @@ class OnboardingViewModel(
 
     // Lucento Shared state, declared before init: its coroutine can reach it before the constructor finishes.
 
+    private val _signOutNotice = MutableStateFlow<com.lucento.app.feature.account.SignOutNotice?>(null)
+
+    /**
+     * After a sign-out or an account deletion brought this phone back to setup: one line on the welcome screen, so the
+     * person knows what happened. Read (and cleared) once when onboarding starts.
+     */
+    val signOutNotice: StateFlow<com.lucento.app.feature.account.SignOutNotice?> = _signOutNotice
+
     /** Why a Shared Space just left this phone (left, or no longer shared); shown once over onboarding. */
     val spaceNotice: StateFlow<com.lucento.app.data.sharedspace.SpaceNotice?> =
         (space?.notice ?: kotlinx.coroutines.flow.flowOf(null)).stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -289,6 +297,14 @@ class OnboardingViewModel(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     init {
+        viewModelScope.launch {
+            val key = try {
+                preferences.takeSignOutNotice()
+            } catch (e: java.io.IOException) {
+                null
+            }
+            _signOutNotice.value = com.lucento.app.feature.account.SignOutNotice.fromKey(key)
+        }
         // The app was closed mid-download: pick it up again rather than leave the spinner with nothing behind it.
         if (savedState.get<String>(KEY_RESTORE) == RestoreStage.RESTORING.name) {
             runRestore()

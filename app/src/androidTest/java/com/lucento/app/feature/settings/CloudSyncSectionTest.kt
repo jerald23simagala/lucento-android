@@ -4,12 +4,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -32,14 +35,21 @@ class CloudSyncSectionTest {
     val compose = createComposeRule()
 
     private var connects = 0
-    private var disconnects = 0
+    private var signOuts = 0
     private var syncs = 0
 
     private fun show(state: CloudSyncUiState) {
         compose.setContent {
             LucentoTheme(darkTheme = false) {
-                Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp)) {
-                    CloudSyncSection(state, onConnectGoogle = { connects++ }, onDisconnect = { disconnects++ }, onSyncNow = { syncs++ })
+                // Scrollable like the Account & sync page: Sign out sits below the password, above the danger zone.
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                ) {
+                    CloudSyncSection(state, onConnectGoogle = { connects++ }, onSignOut = { signOuts++ }, onSyncNow = { syncs++ })
                 }
             }
         }
@@ -63,7 +73,7 @@ class CloudSyncSectionTest {
     fun signedOut_explainsAndOffersGoogle() {
         show(base(email = null))
         compose.onNodeWithText("your data stays on this phone until you connect an account", substring = true).assertExists()
-        compose.onNodeWithText("Connect with Google").performClick()
+        compose.onNodeWithText("Continue with Google").performClick()
         assertEquals(1, connects)
         shot("cloud-01-signed-out")
     }
@@ -76,16 +86,18 @@ class CloudSyncSectionTest {
         compose.onNodeWithText("Synced 5 min ago").assertExists()
         compose.onNodeWithText("Synced — 12 sent, 3 received").assertExists()
         compose.onNodeWithText("Sync now").performClick()
-        compose.onNodeWithText("Disconnect").performClick()
+        // One name for it everywhere (owner decision 2026-11-12): never "Disconnect".
+        compose.onNodeWithText("Disconnect").assertDoesNotExist()
+        compose.onNodeWithText("Sign out").performScrollTo().performClick()
         assertEquals(1, syncs)
-        assertEquals(1, disconnects)
+        assertEquals(1, signOuts)
         shot("cloud-02-connected")
     }
 
     @Test
     fun syncing_disablesBothActions() {
         show(base("ada@example.com").copy(syncing = true))
-        compose.onNodeWithText("Disconnect").assertIsNotEnabled()
+        compose.onNodeWithText("Sign out").performScrollTo().assertIsNotEnabled()
         shot("cloud-03-syncing")
     }
 
@@ -107,7 +119,7 @@ class CloudSyncSectionTest {
                 .copy(lastMessage = SyncRepository.ACCOUNT_MISMATCH_MESSAGE),
         )
         // Exactly once: the status line carries it, and the identical message below is not repeated.
-        compose.onNodeWithText("Sign in with that account to keep syncing", substring = true).assertExists()
+        compose.onNodeWithText("Sign in with that account, or switch accounts", substring = true).assertExists()
         shot("cloud-05-account-mismatch")
     }
 }

@@ -423,8 +423,9 @@ the owner's review.
 - **Follow-ups (non-blocking):** QA-N1 to QA-N4 in `KNOWN_ISSUES.md`.
 - **Done:** O-10, E-2, F-7 fix, the two restore tests, process death during a restore (emulator), and the release key
   guard (failure cases executed).
-6. **F-2:** fix the never-synced sign-out copy, and consider disconnecting without a wipe when nothing was ever synced
-   (owner decision).
+6. ~~**F-2:** fix the never-synced sign-out copy, and consider disconnecting without a wipe when nothing was ever synced
+   (owner decision).~~ **Done on `feature/sign-out`** (owner decision 2026-11-12: ask keep or remove). Remaining:
+   a device pass of the four sign-out cases with a real account on lucento-test, and TalkBack on the new dialog.
 7. **F-3:** fix the guided-setup welcome copy when sync is on.
 - *Plan:* delete only same-name duplicate categories; upload uniquely named ones; probe all tables; record
   `syncedUserId` only after the first pull succeeds and re-run the pull-first branch on retry.

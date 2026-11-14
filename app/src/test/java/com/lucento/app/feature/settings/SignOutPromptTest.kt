@@ -1,7 +1,6 @@
 package com.lucento.app.feature.settings
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SignOutPromptTest {
@@ -29,18 +28,6 @@ class SignOutPromptTest {
         assertEquals(
             "Not synced yet",
             syncStatusText(lastSyncedAtMillis = null, nowMillis = now, pendingChanges = 0, lastError = null),
-        )
-    }
-
-    @Test fun theDialogNamesHowManyChangesWouldBeDeleted() {
-        assertNull(signOutUnsyncedMessage(0))
-        assertEquals(
-            "1 change hasn’t synced and will be deleted from this phone.",
-            signOutUnsyncedMessage(1),
-        )
-        assertEquals(
-            "3 changes haven’t synced and will be deleted from this phone.",
-            signOutUnsyncedMessage(3),
         )
     }
 }

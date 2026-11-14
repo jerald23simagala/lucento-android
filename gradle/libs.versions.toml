@@ -37,8 +37,8 @@ credentials = "1.3.0"
 googleid = "1.1.1"
 # Optional crash reports. Applied only when app/google-services.json is present (see docs/QUALITY.md).
 googleServices = "4.4.2"
-firebaseCrashlyticsGradle = "3.0.2"
-firebaseBom = "33.7.0"
+firebaseCrashlyticsGradle = "3.0.8"
+firebaseBom = "35.1.0"
 # Optional app lock (P2-10): BiometricPrompt accepts fingerprint, face or the phone's screen lock on API 26+, and needs
 # FragmentActivity (fragment 1.8.x pairs with activity 1.9.x). Adds the normal USE_BIOMETRIC permission (no prompt).
 biometric = "1.1.0"

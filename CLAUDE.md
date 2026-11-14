@@ -87,7 +87,9 @@ a better user-facing structure while preserving sound engineering boundaries.
     (owner decision 2026-11-13; SERVER_CONTRACT §3b). Mandatory sign-in was declined in its place.
   - Signing out, and switching to a different account, wipes this phone’s ledger and sync binding so the next account
     starts clean and one user’s data is never uploaded into another account; unsynced changes require confirmation
-    before that wipe. Any other network use needs its own explicit opt-in with clear consent. CI allow-lists release
+    before that wipe. The one exception (owner decision 2026-11-12): records no account or Shared Space ever claimed
+    are the phone’s own, so signing out asks whether to keep them or remove them (`AccountBoundary.signOutKeepingLedger`,
+    docs/SYNC.md). The action is called "Sign out" everywhere. Any other network use needs its own explicit opt-in with clear consent. CI allow-lists release
     permissions. OCR uses ML Kit's bundled on-device model.
 - Supabase: schema changes ship as new files in `supabase/migrations/` (never edit applied DDL); every user-owned
   table has RLS (`auth.uid() = user_id`) and grants to `authenticated` only. Only the publishable key may reach the

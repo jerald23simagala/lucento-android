@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Group
@@ -95,6 +96,9 @@ enum class ProfileDestination {
 
     /** The Lucento Pro page. */
     PRO,
+
+    /** Settings › Account & sync, with the sign-out confirmation already open (signed in only). */
+    SIGN_OUT,
 }
 
 /**
@@ -112,9 +116,9 @@ data class ProfilePhotoState(
 )
 
 /**
- * Profile and account menu, opened from the avatar on every primary screen. Lucento has no account: the "profile"
- * is an optional name and the user's preferences, all stored on this device. Settings lives here rather than in the
- * navigation dock.
+ * Profile and account menu, opened from the avatar on every primary screen. No account is needed: the "profile" is an
+ * optional name, photo and the user's preferences, stored on this device. When an (optional) account is signed in, its
+ * email shows under the name and Sign out is the last account row. Settings lives here rather than in the dock.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -260,6 +264,17 @@ fun ProfileSheet(
                     title = "Switch account",
                     summary = "Test builds · pick another Google account on this phone",
                     onClick = { open(ProfileDestination.SWITCH_ACCOUNT) },
+                )
+            }
+            // Where people look for it, under the account the header names. Not one tap: it opens Account & sync with the
+            // confirmation on top, which says what's safe in the account and what's only on this phone.
+            if (signedInEmail != null) {
+                Hairline(inset = inset)
+                NavRow(
+                    icon = Icons.AutoMirrored.Outlined.Logout,
+                    title = com.lucento.app.feature.account.SignOutCopy.ACTION,
+                    summary = "See what’s safe in your account first",
+                    onClick = { open(ProfileDestination.SIGN_OUT) },
                 )
             }
             // Lucento's public pages open in the browser only on a tap; sharing goes through the phone's own share sheet.

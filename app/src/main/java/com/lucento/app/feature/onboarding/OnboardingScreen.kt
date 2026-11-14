@@ -184,6 +184,7 @@ fun OnboardingScreen(
     val filePreview by viewModel.filePreview.collectAsStateWithLifecycle()
     val fileMessage by viewModel.fileMessage.collectAsStateWithLifecycle()
     val fileBusy by viewModel.fileBusy.collectAsStateWithLifecycle()
+    val signOutNotice by viewModel.signOutNotice.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     // "Restore a backup file": Android's file picker; the file is read only after the user picks it.
     val backupPicker = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -370,6 +371,7 @@ fun OnboardingScreen(
                     },
                     fileMessage = fileMessage,
                     fileBusy = fileBusy,
+                    signOutNotice = signOutNotice?.text,
                 )
                 OnboardingViewModel.STEP_FOCUS -> FocusStep(focuses, viewModel::toggleFocus, viewModel::next)
                 OnboardingViewModel.STEP_SPEND -> SpendStep(spendTypes, viewModel::toggleSpendType, viewModel::next)
@@ -460,6 +462,8 @@ private fun WelcomeStep(
     onRestoreFile: (() -> Unit)?,
     fileMessage: String?,
     fileBusy: Boolean,
+    /** After a sign-out or an account deletion: what just happened, in one line (SignOutNotice). */
+    signOutNotice: String? = null,
 ) {
     val spec = LucentoTheme.spec
     val background = MaterialTheme.colorScheme.background
@@ -510,6 +514,10 @@ private fun WelcomeStep(
                 style = Hierarchy.lead,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (signOutNotice != null) {
+                Spacer(Modifier.height(Spacing.sm))
+                InfoNote(signOutNotice, icon = Icons.Filled.CheckCircle)
+            }
             if (fileMessage != null) {
                 Spacer(Modifier.height(Spacing.sm))
                 InfoNote(fileMessage, container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer)

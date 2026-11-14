@@ -26,9 +26,4 @@ fun syncStatusText(lastSyncedAtMillis: Long?, nowMillis: Long, pendingChanges: I
     }
 }
 
-/** Plain sentence for a sign-out that would delete unsynced work. Null when nothing would be lost. */
-fun signOutUnsyncedMessage(count: Int): String? = when {
-    count <= 0 -> null
-    count == 1 -> "1 change hasn’t synced and will be deleted from this phone."
-    else -> "$count changes haven’t synced and will be deleted from this phone."
-}
+// The sign-out dialog's own words (each case, with the count of changes it would lose) live in feature/account/SignOut.kt.
