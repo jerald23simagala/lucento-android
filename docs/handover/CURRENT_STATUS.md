@@ -543,3 +543,11 @@ sentence, and its silence settings are only hints:
 
 **Owner's call (2026-11-13):** "push and merge when green". Then 0.5.8 with #65. At that release the Privacy Policy
 date goes to the release day and the website's `/privacy` is re-exported (KNOWN_ISSUES VI-3).
+
+## Release 0.5.8 (version code 13) — 2026-11-14 (`release/0.5.8`)
+
+Carries #65 (Pro Lifetime can be bought again after a refund, `360f2f7`) and #60 (voice input that works without an offline
+pack, `391e7d8`). The owner chose "Release 0.5.8 now". #58, #37 and the dependency updates go into 0.5.9.
+- The Privacy Policy is version **2026-11-14** ("Voice input": the microphone permission and online voice). The website
+  publishes the same text in lucento-website #29, with an "Online voice" row in the homepage's short privacy list.
+- Owner retest: NEXT_TASKS OT-25.
