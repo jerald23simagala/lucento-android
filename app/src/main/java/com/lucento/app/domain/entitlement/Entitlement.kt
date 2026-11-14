@@ -82,6 +82,18 @@ data class Entitlement(
      * row (the same moment as [verifiedAtMillis]), the latest successful server fetch for a [Verifier.SERVER] row.
      */
     val checkedAtMillis: Long = verifiedAtMillis,
+    /**
+     * [Verifier.PLAY_LOCAL] rows only: when Lucento's server last said this purchase is live. That's the purchase check,
+     * which needs no account, or the account's own row for the purchase. Null means not yet on this install. Google Play's
+     * word alone carries a purchase for [FIRST_CONFIRMATION_DAYS] days from its purchase time, then
+     * [CONFIRMATION_CAP_DAYS] days from Lucento's last confirmation ([awaitsLucento], owner decision 2026-11-13, docs §5.3
+     * L-6). It defaults to the reading time, so a row this phone cached before the check existed counts as confirmed then.
+     * A build without the purchase check (debug, the plan simulator) keeps that default: there, Play's word is the
+     * confirmation.
+     */
+    val confirmedAtMillis: Long? = verifiedAtMillis,
+    /** [Verifier.PLAY_LOCAL] rows only: when this phone last had an answer from the purchase check, to space the checks out. */
+    val lucentoCheckedAtMillis: Long? = null,
 ) {
     /** Rows that describe the same thing replace each other: (source, product). */
     val key: EntitlementKey get() = EntitlementKey(source, productId)
@@ -103,12 +115,39 @@ data class Entitlement(
      * long as either source answers once a month. Grants are the owner's, server-only, and keep their own dates.
      */
     fun awaitsCheck(now: Long): Boolean =
-        source in PLAY_SOURCES && now >= Math.addExact(checkedAtMillis, RECHECK_MILLIS)
+        source in PLAY_SOURCES && (now >= Math.addExact(checkedAtMillis, RECHECK_MILLIS) || awaitsLucento(now))
+
+    /**
+     * A Google Play reading that Lucento's server hasn't confirmed lately (owner decision 2026-11-13, docs §5.3 L-6).
+     * Play's copy on the phone can lag behind a refund for days, so it carries a purchase only so far:
+     * - [FIRST_CONFIRMATION_DAYS] days from the purchase time when the server hasn't confirmed it on this install. A data
+     *   clear, a reinstall or switching Play profiles can't restart that, because Google signs the purchase time.
+     * - [CONFIRMATION_CAP_DAYS] days from the server's last confirmation otherwise, so a phone kept fully offline after a
+     *   refund loses it in the end too.
+     * Paused, never ended: one answer from the server brings it back. A server row is the server's own word.
+     */
+    fun awaitsLucento(now: Long): Boolean {
+        if (verifiedBy != Verifier.PLAY_LOCAL || source !in PLAY_SOURCES) return false
+        val confirmed = confirmedAtMillis
+        return if (confirmed == null) {
+            now >= Math.addExact(startsAtMillis, FIRST_CONFIRMATION_MILLIS)
+        } else {
+            now >= Math.addExact(confirmed, CONFIRMATION_CAP_MILLIS)
+        }
+    }
 
     companion object {
         const val OFFLINE_GRACE_MILLIS: Long = 3L * 24 * 60 * 60 * 1000
         const val RECHECK_DAYS: Int = 30
         const val RECHECK_MILLIS: Long = RECHECK_DAYS * 24L * 60 * 60 * 1000
+        /** L-6: how long Google Play's word alone carries a purchase Lucento's server hasn't confirmed on this install. */
+        const val FIRST_CONFIRMATION_DAYS: Int = 3
+        const val FIRST_CONFIRMATION_MILLIS: Long = FIRST_CONFIRMATION_DAYS * 24L * 60 * 60 * 1000
+        /** L-6: how long Google Play's word alone carries a purchase after Lucento's server last confirmed it. */
+        const val CONFIRMATION_CAP_DAYS: Int = 90
+        const val CONFIRMATION_CAP_MILLIS: Long = CONFIRMATION_CAP_DAYS * 24L * 60 * 60 * 1000
+        /** Statuses that end a purchase for good: the same token never comes back from them (EntitlementMerge). */
+        val ENDED: Set<EntitlementStatus> = setOf(EntitlementStatus.REVOKED, EntitlementStatus.EXPIRED)
         private val PLAY_SOURCES = setOf(
             EntitlementSource.PLAY_SUBSCRIPTION,
             EntitlementSource.PLAY_LIFETIME,
@@ -149,10 +188,15 @@ data class EntitlementState(val entitlements: List<Entitlement>) {
     /** A pending purchase waiting for Google Play to confirm it. */
     fun pending(): Entitlement? = entitlements.firstOrNull { it.status == EntitlementStatus.PENDING }
 
+    /** A Pro Lifetime on record that has ended: refunded, cancelled or charged back (it never ends any other way). */
+    fun lifetimeEnded(): Boolean =
+        entitlements.any { it.source == EntitlementSource.PLAY_LIFETIME && it.status in Entitlement.ENDED }
+
     /**
-     * Pro stopped counting only because nobody has confirmed the purchase for a month ([Entitlement.awaitsCheck]):
-     * paused, not ended. Google Play or the server answering once brings it back. A Play reading's end date is only
-     * the date it must be read again by, so it doesn't count as the plan ending; a server row past its real end does.
+     * Pro stopped counting only because the purchase is waiting for a check ([Entitlement.awaitsCheck]): nobody has
+     * confirmed it for a month, or Lucento's server hasn't confirmed Google Play's reading lately (L-6). Paused, not
+     * ended: an answer brings it back. A Play reading's end date is only the date it must be read again by, so it doesn't
+     * count as the plan ending; a server row past its real end does.
      */
     fun awaitingCheck(now: Long): Boolean =
         !has(Capability.LOCAL_PRO, now) && entitlements.any {

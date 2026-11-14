@@ -67,6 +67,13 @@ interface PurchaseSource {
     suspend fun acknowledge(purchaseToken: String): Boolean
 
     /**
+     * Consumes a one-time purchase: Play stops listing it, and the product can be bought again. Lifetime is never consumed
+     * while it counts. Lucento consumes it only when it has ended, refunded or charged back, and Play still holds it
+     * ([com.lucento.app.domain.entitlement.LifetimeRelease]). True when Play released it.
+     */
+    suspend fun consume(purchaseToken: String): Boolean
+
+    /**
      * Opens Google Play's purchase sheet for [price] over [activity]. Null when the sheet opened; the outcome then arrives
      * on [results] and the plan on [updates]. [obfuscatedAccountId] ties the order to the signed-in Lucento account
      * (sha256 of its id, docs/MONETIZATION.md §5.4 linking rule); null when signed out.
@@ -86,6 +93,7 @@ object UnavailablePurchaseSource : PurchaseSource {
     override suspend fun queryPurchases(): PurchaseQuery = PurchaseQuery.Failed("billing not configured in this build")
     override suspend fun queryPrices(productIds: Set<String>): List<ProductPrice> = emptyList()
     override suspend fun acknowledge(purchaseToken: String): Boolean = false
+    override suspend fun consume(purchaseToken: String): Boolean = false
     override suspend fun launchPurchase(activity: Activity, price: ProductPrice, obfuscatedAccountId: String?) = BillingProblem.UNAVAILABLE
 }
 
@@ -111,6 +119,9 @@ class FakePurchaseSource(
     var failure: String? = null
     var prices: List<ProductPrice> = emptyList()
     val acknowledged = mutableListOf<String>()
+    val consumed = mutableListOf<String>()
+    /** When false, [consume] refuses, as Play may (no connection, Play's own error). */
+    var consumeSucceeds: Boolean = true
 
     override suspend fun queryPurchases(): PurchaseQuery =
         failure?.let { PurchaseQuery.Failed(it) } ?: PurchaseQuery.Success(purchases)
@@ -120,6 +131,14 @@ class FakePurchaseSource(
     override suspend fun acknowledge(purchaseToken: String): Boolean {
         acknowledged += purchaseToken
         purchases = purchases.map { if (it.purchaseToken == purchaseToken) it.copy(acknowledged = true) else it }
+        return true
+    }
+
+    /** Like Play: the purchase leaves what the account owns, and nobody is told (consuming isn't a purchase update). */
+    override suspend fun consume(purchaseToken: String): Boolean {
+        if (!consumeSucceeds || purchases.none { it.purchaseToken == purchaseToken }) return false
+        consumed += purchaseToken
+        purchases = purchases.filterNot { it.purchaseToken == purchaseToken }
         return true
     }
 

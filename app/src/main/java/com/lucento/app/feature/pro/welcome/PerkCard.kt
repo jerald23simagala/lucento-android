@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -37,7 +37,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -108,20 +110,29 @@ internal fun PerkCardBack(modifier: Modifier = Modifier, showLabel: Boolean = tr
     }
 }
 
-/** The scene's band is never smaller than its large-text proportions (300 : 84). */
+/** The art's band is never smaller than its large-text proportions (300 : 84). */
 private const val ArtLeastAspect = 300f / 84f
+
+/**
+ * Nor taller than 0.55 of the card's width: every card gets the same art window, which Lucento and the prop fill
+ * (owner, 2026-11-13: "Same-size art window", after the critic measured 31–45 % of taller bands left as empty blue).
+ */
+private const val ArtMostShare = 0.55f
 
 /**
  * A card's face: its scene, then what Pro opened in the order a person needs it at any text size (the critic's round 2):
  * the title, what changed (free plan first), how long an online service is included, where it lives in the app, and
- * last the sentence that explains it. The words take the height they need and the scene takes the rest, so a card with
- * few words shows a larger scene instead of a gap (critic round 3); the scene gives way at the largest text. Beyond the
- * card's height the words scroll, with a "More" pill on a solid band to say so.
+ * last the sentence that explains it. The art has one window on every card (at most 0.55 of the card's width, so
+ * Lucento and the prop fill it); it gives up height only when the words need it (never below 300 : 84) and gives way at
+ * the largest text. A card with few words ends with plain card under its words. Beyond the card's height the words
+ * scroll, with a "More" pill on a solid band to say so.
  */
 @Composable
-internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, modifier: Modifier = Modifier) {
+internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, modifier: Modifier = Modifier, still: Boolean = false) {
     val withArt = LocalDensity.current.fontScale < 1.75f
-    val scroll = rememberScrollState()
+    // Each card's own scroll position: going back reuses this place for another card, which must open at its top
+    // (critic, polish round 3: it opened mid-scroll at large text).
+    val scroll = rememberSaveable(stop, saver = ScrollState.Saver) { ScrollState(0) }
     val scope = rememberCoroutineScope()
     val surface = MaterialTheme.colorScheme.surfaceContainerLowest
     Surface(
@@ -133,7 +144,9 @@ internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, mod
         Box {
             Layout(
                 content = {
-                    if (withArt) PerkArt(stop)
+                    // Keyed by the card: going back reuses this place for another card, and its mascot must arrive
+                    // fresh, never cross-fade from the last card's pose (critic, polish round 2).
+                    if (withArt) key(stop) { PerkArt(stop, still = still) }
                     Box(Modifier.verticalScroll(scroll)) { CardWords(copy) }
                 },
             ) { measurables, constraints ->
@@ -142,7 +155,8 @@ internal fun PerkCardFront(stop: ProTourStop, copy: ProWelcomeCopy.StopCopy, mod
                 val words = measurables.last()
                 val art = if (withArt) {
                     val least = (w / ArtLeastAspect).roundToInt()
-                    measurables.first().measure(Constraints.fixed(w, (h - words.maxIntrinsicHeight(w)).coerceAtLeast(least)))
+                    val most = (w * ArtMostShare).roundToInt().coerceAtLeast(least)
+                    measurables.first().measure(Constraints.fixed(w, (h - words.maxIntrinsicHeight(w)).coerceIn(least, most)))
                 } else {
                     null
                 }
@@ -225,9 +239,10 @@ private fun CardWords(copy: ProWelcomeCopy.StopCopy) {
                 modifier = Modifier.padding(top = 2.dp).size(18.dp),
             )
             Spacer(Modifier.width(Spacing.xs))
-            Text(copy.where, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+            // Even lines, never one word alone on the last (critic, polish round 3).
+            Text(copy.where, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, lineBreak = LineBreak.Heading))
         }
-        Text(copy.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(copy.body, style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Paragraph), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

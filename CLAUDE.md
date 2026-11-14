@@ -78,7 +78,9 @@ a better user-facing structure while preserving sound engineering boundaries.
   - **On by default:** exchange rates (docs/MULTICURRENCY.md, owner decision 2026-11-06): fetched only when something
     is recorded in another currency, sending two currency codes and a date (never an amount); off in Settings › Money.
     In release builds, Google Play's billing component sends Google its own diagnostics. When the person buys Pro,
-    Lucento's server checks the purchase with Google (docs/MONETIZATION.md).
+    Lucento's server checks the purchase with Google (docs/MONETIZATION.md). After that, signed in or not, the app
+    sends Play's signed purchase record to `/api/billing/check` every few hours while online, so a refund ends Pro
+    (owner decision 2026-11-13; SERVER_CONTRACT §3b). Mandatory sign-in was declined in its place.
   - Signing out, and switching to a different account, wipes this phone’s ledger and sync binding so the next account
     starts clean and one user’s data is never uploaded into another account; unsynced changes require confirmation
     before that wipe. The one exception (owner decision 2026-11-12): records no account or Shared Space ever claimed

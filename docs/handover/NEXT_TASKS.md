@@ -32,12 +32,13 @@
 | OT-18 | **GitHub secret `GOOGLE_SERVICES_JSON`** (crash reports in CI releases): `gh secret set GOOGLE_SERVICES_JSON < app/google-services.json`. Claude's attempt was blocked by the permission classifier (secret-store write), 2026-11-08. Then confirm Crashlytics in the Firebase console after an opted-in test crash, and that the first run with it uploads the R8 mapping | Open (owner) | Without it the release AAB has no Crashlytics. `LUCENTO_GOOGLE_WEB_CLIENT_ID` was also fixed on 2026-11-08: its value began with the variable's own name (`LUCENTO_GOOGLE_WEB_CLIENT_ID=4311…`), which broke Google sign-in in every CI release |
 | OT-19 | **Account emails** (docs/EMAILS.md › Setup): apply `20261110090000_account_emails.sql` to lucento-test, then production; create a Resend key with sending access to `send.lucentoapp.com`; Vercel Production env `LUCENTO_RESEND_API_KEY` and `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`; redeploy the site; then sign up on a phone and check the welcome arrives once. OT-13 (Confirm signup template, refreshed 2026-11-08 without the "no ads" line) and the SMTP sender fix belong to the same pass | Open (owner) | Until then `/api/account/welcome` answers 503 (the app retries at the next launch) and purchases get no confirmation email; nothing else changes |
 | OT-23 | **Replace the GitHub secret `LUCENTO_PLAY_LICENSE_KEY`** with Play's Base64 RSA licence key (Play Console › Monetize with Play › Monetization setup › Licensing; `PLAY_CONSOLE_SETUP.md` step 5). It holds a SHA-1 fingerprint today (KNOWN_ISSUES PB-1). Then build 0.5.3 (vc 8), upload it to internal testing and retest a trial and a yearly purchase: Pro should show within seconds and production should get a `purchase_links` row | **Done** (secret 2026-11-11 22:27Z; 0.5.3 built and checked; Restore granted Pro on the owner's phone 2026-11-12) | — |
-| OT-24 | **Switch on purchase checks and refund checks together** (owner's choice, 2026-11-12): fix Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (KNOWN_ISSUES PB-2); add `LUCENTO_RTDN_PUSH_TOKEN` with the Pub/Sub topic, the push subscription and Play's real-time developer notifications; add `CRON_SECRET` (KNOWN_ISSUES PB-3); redeploy production; then Send test notification and Restore purchases (PLAY_CONSOLE_SETUP steps 6, 8 and 9) | **Steps done, not yet working** (2026-11-12). Verified: the variables are present, production was redeployed, and the Pub/Sub test notice was acknowledged. But at 17:26Z production still had no `purchase_links` and no Play `entitlements`, after the owner had opened the app and tapped Restore. The phone's verify call either never happened or failed, and Vercel (Hobby) keeps runtime logs for one hour only. Next: the owner taps Restore purchases and says so at once, and Claude reads the verify log within the hour | Until then the server records no purchase and never hears about a refund |
+| OT-24 | **Switch on purchase checks and refund checks together** (owner's choice, 2026-11-12): fix Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (KNOWN_ISSUES PB-2); add `LUCENTO_RTDN_PUSH_TOKEN` with the Pub/Sub topic, the push subscription and Play's real-time developer notifications; add `CRON_SECRET` (KNOWN_ISSUES PB-3); redeploy production; then Send test notification and Restore purchases (PLAY_CONSOLE_SETUP steps 6, 8 and 9) | **Done, working** (verified 2026-11-13, production read-only): the owner's monthly test purchase was recorded on their account and then marked `REVOKED` (22:46–22:53Z, also in `revoked_purchases`), and the purchase check answered for the refunded Lifetime (22:41Z). The service-account JSON was fixed by the owner on 2026-11-12 | — |
+| OT-25 | **Retest buying Lifetime after a refund** on the first build with `fix/refunded-lifetime-rebuy` (KNOWN_ISSUES PB-8): open Lucento Pro, tap Buy Lifetime, pay with a test card. Expect Play's sheet, not "You already own this item", and then Pro Lifetime. For later refund tests tick **Remove entitlement** in Play Console (PLAY_CONSOLE_SETUP "Refunding an order") | **Open**, waiting for the build | The first real check that Google Play releases a refunded purchase when Lucento consumes it |
 | OT-22 | **Security remediation (2026-11-10)**: work through `docs/security/OWNER_ACTIONS_REQUIRED.md` §1–§14 — Gemini paid tier, Confirm email, plan decision, then apply the four `20261111*` migrations (lucento-test → production), deploy the website branch `security/release-hardening`, internal-track purchase and refund checks | **Open** | The release stays NOT APPROVED until §1, §2, §5/§6, §13 and §14 are done (`docs/security/REMEDIATION_REPORT.md`) |
 
 ## Home-screen widgets — follow-ups (2026-11-12, `feature/home-widgets`)
 
-- Merge after CI passes and the owner says "merge it". Then a device pass on Android 12+ (the S8 runs Android 9:
+- Merged as `50727be` (PR #57, 2026-11-13); not released yet. Next, a device pass on Android 12+ (the S8 runs Android 9:
   square corners, no picker preview) covering rounded corners, the preview layout and the launcher's day/night switch.
 - TalkBack pass on both widgets ("Add a transaction", "Scan a receipt", "Speak a transaction", the body's summary).
 - Parked by the owner (2026-11-12): Quick Settings tile, type-and-save notification, Share to Lucento. Their mockups are
@@ -70,14 +71,55 @@ Round 4: REVISE 3.4, with no hard gate failing. Its two P1s (the brand name brok
 conditions hidden at large text) and most P2/P3s are fixed in `a1c994e`. They are re-captured from one APK in studio
 `qa/out/reveal-app-r4/` (with `BUILD.txt`).
 
+**Shipped to main (2026-11-13):** PR #56 merged as `51fac6b`, main CI green; the 0.5.5 (vc 10) AAB went to the owner's
+Downloads for internal testing.
+
 Next:
-- (a) push the round-4 fixes to PR #56, merge when CI is green, then the AAB from main goes to Downloads;
+- (a) done: merged, AAB delivered;
 - (b) on the Galaxy S8 from internal testing, check:
   - TalkBack: Next three times, then Previous once; one announcement per card;
   - how dense the haptics feel;
   - the swipe;
   - large text, where Android 14+ scales differently from API 28;
 - (c) done: the owner's calls from round 3 (see above).
+
+## Pro perk cards: new art (owner, 2026-11-13, `design/perk-card-art`)
+
+The owner wasn't satisfied with the cards' drawn "Scenes" art and asked for better images. Three AI-generated
+directions (painterly, 3D miniature worlds, gilded engraving; critic r1: REVISE / REJECT, studio
+`critic/reports/2026-11-13-perk-art-directions-r1*`) were set aside; a flat hand-drawn 2D set with people followed, and
+the owner then asked: "Too many people. Reimagine, make it simpler but we can add our mascot to make it livelier."
+
+Then: "add subtle doodles in the background instead of plain blue … reduce empty blue spaces as much as possible …
+after that I am good." Built on the branch: each card's art band is CardBlue with faint code-drawn doodles, one
+soft-3D prop cut out of its ground, and `LucentoMascot` stepping a little in front of it in a pose per card
+(`PerkArt.kt`); ten props generated with GPT Image 2.5 (`docs/design/illustrations/perks/`, exported by
+`tools/illustrations/export_perk_art.py`, 425 KB with thumbnails); the deck decodes the next card's prop ahead of its
+turn; the collection rows show each card's prop. Shown to the owner: artifact "Lucento Pro Cards".
+
+Shipping (owner: "PR + review, merge when green"): PR #59, release 0.5.6 (vc 11). Critic app r1 REJECT (doodles under
+the words in dark: fixed), r2 REVISE 3.45 with no hard gate; the owner then chose a **same-size art window** (the band
+at most 0.55 of the card's width, which the pair fills: 12–20 % empty, measured). Also from r2: the pair stays
+together at every band shape, room for the hop, each prop's shape read before it decodes, new props for cards 3 (a
+microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
+- (a) done: critic r3 REVISE 3.45 with no hard gate, CI green; merged as `af4aae4` (2026-11-13) and the 0.5.6
+  (vc 11) AAB went to the owner's Downloads;
+- (a2) owner chose "Polish only" from r3 (`design/perk-card-polish`): one short float per card, doodles kept off
+  the pair, card 7 without its sparkle, the hand on the prop only when pointing. Not chosen: one window per deck with
+  copy trims, plain card under short cards, the dark band colour;
+- (a3) from the polish checks (critic polish r1 REVISE 3.6, r2 REVISE 3.7, no hard gate): doodles fill the free blue
+  around the pair again; the gap beside a standing mascot is set from the prop's own edge (`PerkPropEdges.kt`); a
+  leaving card's mascot holds still; going back never blends two poses (each card face keyed by its card);
+- (a4) polish r3 REVISE 3.6, no hard gate; merged as #62 `f7fbaf6` (2026-11-13, main CI green) and ships in 0.5.7
+  (vc 12, PR #64). Its fixes: the next card is in place under a leaving card at once and a swiped card leaves from
+  where it was let go; each card's own scroll position; balanced last lines. Large text
+  re-captured (130 % light/dark, 150 %, 200 %) after the emulator's System UI froze on text-size changes (capture
+  with a settle step: studio scratch `capture_lt.sh` logic). Open for the owner (three polish rounds done): doodle
+  spacing refinements (bare patches beside the pair), one art window for the deck with copy trims, centring wide pairs
+  versus keeping the torch glow inside, the AI feature's name and card 7's chip wording; a phone recording of leaving,
+  swiping and going back;
+- (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
+- (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
    picks one.

@@ -330,19 +330,19 @@ A Lifetime refunded with revoke, or charged back:
 > removed; the free plan's limits apply to new items. If this looks wrong, restore your purchase from the Lucento Pro
 > page.
 
-A Lifetime nobody could confirm for 30 days (MONETIZATION §5.3 L-2, 2026-11-12):
+A Lifetime paused for want of a check. Either nobody confirmed it for 30 days (MONETIZATION §5.3 L-2, 2026-11-12), or
+Lucento's server hasn't confirmed Google Play's reading: within 3 days of buying, then every 90 days (L-6, 2026-11-13).
+One text covers both, because the same steps settle both:
 > **Lucento needs to check your Pro Lifetime**
-> Lucento hasn't been able to confirm your purchase with Google Play or your Lucento account for 30 days, so Pro is
-> paused on this phone. Connect to the internet, make sure the Google Play Store app is on and signed in to the Google
-> account you bought with, then tap Restore purchases on the Lucento Pro page. Everything you recorded is still here,
-> and nothing was removed.
+> Pro is paused on this phone until Lucento can confirm your purchase again. Connect to the internet, make sure the
+> Google Play Store app is on and signed in to the Google account you bought with, then tap Restore purchases on the
+> Lucento Pro page. Everything you recorded is still here, and nothing was removed.
 
-A subscription nobody could confirm for 30 days (same rule):
+A subscription paused the same way:
 > **Lucento needs to check your Lucento Pro**
-> Lucento hasn't been able to confirm your subscription with Google Play or your Lucento account for 30 days, so Pro
-> is paused on this phone. Connect to the internet, make sure the Google Play Store app is on and signed in to the
-> Google account you subscribed with, then tap Restore purchases on the Lucento Pro page. Everything you recorded is
-> still here, and nothing was removed.
+> Pro is paused on this phone until Lucento can confirm your subscription again. Connect to the internet, make sure
+> the Google Play Store app is on and signed in to the Google account you subscribed with, then tap Restore purchases
+> on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.
 
 **D-8 Restoring a purchase**
 Button on the Pro page: **Restore purchases**.
@@ -355,6 +355,20 @@ Button on the Pro page: **Restore purchases**.
 > is still working.
 > Plan paused (MONETIZATION §5.3 L-2): **Lucento still can't confirm your purchase.** Connect to the internet and make
 > sure the Google Play Store app is on and signed in to the Google account you bought with, then try again.
+> Lifetime refunded (MONETIZATION §5.3 L-7, 2026-11-13): **Google Play reports your Pro Lifetime as refunded or
+> cancelled,** so it no longer unlocks Pro. You can buy it again on this page.
+
+**D-8a Google Play says "You already own this item"** (MONETIZATION §5.3 L-7, 2026-11-13)
+Play shows its own "You already own this item". Under the plans, after Lucento reads Play and the server again (first
+match wins):
+> It's live after all: **Your Google account already owns this,** and your {Pro Lifetime | Lucento Pro} is working on
+> this phone now.
+> An ended Lifetime Play was still holding, now released: **Google Play was still holding your earlier Pro Lifetime
+> (refunded or cancelled),** so it couldn't sell you a new one. Lucento has released it: you can buy Lifetime now.
+> Not released this time: **Google Play is still holding your earlier Pro Lifetime (refunded or cancelled),** and
+> Lucento couldn't release it just now. Check your connection and try again. If it keeps happening, contact support
+> with your Google Play order number.
+> Otherwise: **Your Google account already owns this.** Tap Restore purchases to bring it back on this phone.
 
 **D-9 Pending payment (cash through Google Play)**
 > **Waiting for Google Play to confirm your payment**
