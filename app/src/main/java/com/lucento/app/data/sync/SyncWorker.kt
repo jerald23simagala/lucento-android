@@ -29,6 +29,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             SyncResult.NotSignedIn, SyncResult.NotConfigured, SyncResult.AccountMismatch -> Result.success()
             // The shared ledger is already being removed (SyncRepository's revocation callback); nothing to retry.
             is SyncResult.MembershipRevoked -> Result.success()
+            // The server refuses uploads under this plan (security audit F-01): retrying can't succeed, so never
+            // Result.retry(). The repository waits out its cooldown, or resumes when the plan changes.
+            is SyncResult.UploadsPaused -> Result.success(workDataOf(KEY_PUSHED to 0, KEY_PULLED to result.report.pulled))
             is SyncResult.Retryable -> if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
     }

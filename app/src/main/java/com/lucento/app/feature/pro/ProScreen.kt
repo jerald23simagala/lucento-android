@@ -5,7 +5,12 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -20,21 +26,30 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AllInclusive
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -42,8 +57,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.HeroCard
+import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoMascot
@@ -76,6 +91,8 @@ fun ProScreen(
     onBack: () -> Unit,
     /** The feature whose lock led here; its sentence is shown first. */
     from: ProFeature? = null,
+    /** "See your Pro cards": the welcome's cards and collection again, without the medal (shown while Pro is active). */
+    onReplayTour: (() -> Unit)? = null,
     viewModel: ProViewModel = viewModel(factory = ProViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -110,20 +127,20 @@ fun ProScreen(
                 LucentoMascot(size = 64.dp, mood = MascotMood.Happy, animate = false)
             }
         }
+        // While Pro is active: the welcome's tour and summary again, without the medal.
+        if (onReplayTour != null && state.entitlements.has(com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, now)) {
+            Spacer(Modifier.height(Spacing.md))
+            LucentoSecondaryButton(text = "See your Pro cards", onClick = onReplayTour, icon = Icons.Outlined.Replay)
+        }
         if (from != null && !state.entitlements.has(from.requires, now)) {
             Spacer(Modifier.height(Spacing.md))
             InfoNote(ProCopy.lockedLine(from), icon = Icons.Outlined.WorkspacePremium)
         }
 
         SectionHeader(
-            "What each plan includes",
+            if (state.entitlements.has(com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, now)) "Plans" else "Choose your plan",
             Modifier.padding(top = Spacing.section),
-            supporting = "Recording, history, budgets, schedules, debts, Ask Lucento on this phone, backup files and CSV are " +
-                "free on every plan, with no limits.",
         )
-        ComparisonTable(PlanCatalog.comparisonRows())
-
-        SectionHeader("Plans", Modifier.padding(top = Spacing.section))
         // Lucento Cloud appears only for people who own Lucento; shown to anyone else it would undercut Pro (D-12).
         ProOffers.cards(state.entitlements, state.prices, now).forEachIndexed { i, card ->
             if (i > 0) Spacer(Modifier.height(Spacing.md))
@@ -150,6 +167,14 @@ fun ProScreen(
                     "currency. Nothing is charged before then.",
             )
         }
+
+        SectionHeader(
+            "What each plan includes",
+            Modifier.padding(top = Spacing.section),
+            supporting = "Recording, history, budgets, schedules, debts, Ask Lucento on this phone, backup files and CSV are " +
+                "free on every plan, with no limits.",
+        )
+        PlanComparison(PlanCatalog.comparisonRows())
 
         LifetimePromise()
 
@@ -203,39 +228,154 @@ fun ProScreen(
     }
 }
 
+/**
+ * One plan: what it is in a line, what it brings as a short checklist ([ProCopy.pitch]), then how to buy it. A plan sold
+ * by the year or the month shows both periods as a radio choice — Play's prices, a trial when Play lists one, and the
+ * yearly saving worked out from Play's own amounts — above a single button for the chosen period.
+ */
 @Composable
 private fun PlanCard(card: PlanCardModel, enabled: Boolean, onBuy: (ProductPrice) -> Unit) {
-    val (title, body) = when (card.kind) {
-        PlanCardKind.PRO -> "Lucento Pro" to
-            "Everything in Lucento, including cloud sync, Lucento Shared and the AI adviser, while you subscribe. Monthly or " +
-            "yearly; renews until you cancel in Google Play."
-        PlanCardKind.LIFETIME -> "Pro Lifetime" to
-            "Pay once. Every Pro feature that runs on your phone is yours for life, offline, with no renewal. Cloud sync, " +
-            "Lucento Shared and the AI adviser are included for the first year."
-        PlanCardKind.CLOUD -> "Lucento Cloud" to
-            "The online services for people who own Lucento: cloud sync, restoring from your account, Lucento Shared and the " +
-            "AI adviser’s Pro allowance. Optional; renews until you cancel in Google Play."
+    val title = when (card.kind) {
+        PlanCardKind.PRO -> "Lucento Pro"
+        PlanCardKind.LIFETIME -> "Pro Lifetime"
+        PlanCardKind.CLOUD -> "Lucento Cloud"
     }
+    val icon = when (card.kind) {
+        PlanCardKind.PRO -> Icons.Outlined.WorkspacePremium
+        PlanCardKind.LIFETIME -> Icons.Outlined.AllInclusive
+        PlanCardKind.CLOUD -> Icons.Outlined.Cloud
+    }
+    val pitch = ProCopy.pitch(card.kind)
+    val picker = card.actions.size > 1 && card.actions.all { it.periodName != null }
+    var selected by rememberSaveable(card.kind) { mutableIntStateOf(0) }
+    val chosen = card.actions.getOrNull(selected) ?: card.actions.firstOrNull()
+
     LucentoCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).semantics { heading() })
-            if (card.current) StatusPill("Your plan", StatusTones.positive)
+            IconTile(icon, container = StatusTones.brand.container, content = StatusTones.brand.content)
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(pitch.tagline, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (card.current) {
+                Spacer(Modifier.width(Spacing.sm))
+                StatusPill("Your plan", StatusTones.positive)
+            }
         }
-        Spacer(Modifier.height(Spacing.xs))
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        card.actions.forEach { action ->
+        Spacer(Modifier.height(Spacing.md))
+        pitch.benefits.forEach { Benefit(it) }
+
+        if (picker && chosen != null) {
+            Spacer(Modifier.height(Spacing.lg))
+            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                card.actions.forEachIndexed { i, action ->
+                    PeriodOption(action, selected = action == chosen, enabled = enabled) { selected = i }
+                }
+            }
             Spacer(Modifier.height(Spacing.md))
-            Text(action.priceLine, style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(Spacing.xs))
-            if (action.primary) {
+            LucentoPrimaryButton(text = chosen.label, onClick = { onBuy(chosen.price) }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+        } else {
+            card.actions.forEach { action ->
+                Spacer(Modifier.height(Spacing.lg))
+                PriceBlock(action)
+                Spacer(Modifier.height(Spacing.md))
                 LucentoPrimaryButton(text = action.label, onClick = { onBuy(action.price) }, enabled = enabled, modifier = Modifier.fillMaxWidth())
-            } else {
-                LucentoSecondaryButton(text = action.label, onClick = { onBuy(action.price) }, enabled = enabled)
             }
         }
         card.note?.let {
             Spacer(Modifier.height(Spacing.sm))
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun Benefit(text: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.xs)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            Icons.Rounded.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = Spacing.xxs).size(18.dp),
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** A one-time price, large, with how often it is charged ("once") beside it. */
+@Composable
+private fun PriceBlock(action: OfferAction) {
+    Row(Modifier.semantics(mergeDescendants = true) { contentDescription = action.priceLine }) {
+        Text(
+            action.price.formattedPrice,
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.alignByBaseline(),
+        )
+        if (action.per.isNotEmpty()) {
+            Spacer(Modifier.width(Spacing.xs))
+            Text(
+                action.per,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.alignByBaseline(),
+            )
+        }
+    }
+    action.trial?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/** One period of a subscription in the plan picker: name, trial and saving on the left, Play's price on the right. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PeriodOption(action: OfferAction, selected: Boolean, enabled: Boolean, onSelect: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = MaterialTheme.shapes.medium
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .border(if (selected) 2.dp else 1.dp, if (selected) scheme.primary else scheme.outlineVariant, shape)
+            .background(if (selected) scheme.primaryContainer.copy(alpha = 0.35f) else Color.Transparent)
+            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect)
+            .heightIn(min = 64.dp)
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
+        Spacer(Modifier.width(Spacing.sm))
+        Column(Modifier.weight(1f)) {
+            // The saving wraps under the name when the text is large rather than being cut short.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+            ) {
+                Text(
+                    action.periodName.orEmpty(),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.align(Alignment.CenterVertically),
+                )
+                action.saving?.let { StatusPill(it, StatusTones.positive, Modifier.align(Alignment.CenterVertically)) }
+            }
+            action.trial?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = scheme.primary) }
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(action.price.formattedPrice, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+            Text(action.per, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
         }
     }
 }

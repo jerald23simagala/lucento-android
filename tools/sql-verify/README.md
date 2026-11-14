@@ -11,18 +11,33 @@ Use it before a migration goes anywhere near `lucento-test`. A migration whose s
 
 ```sh
 cd tools/sql-verify
-npm install            # once; @electric-sql/pglite is pinned in package.json
-npm run verify         # lucento-test's default privileges (new functions executable by their owner only)
-npm run verify:stock   # Supabase's stock defaults (everything new granted to anon and authenticated)
+npm ci                 # once; versions are pinned in package.json and package-lock.json
+npm run verify         # every *_suite.sql, lucento-test's default privileges (new functions executable by their owner only)
+npm run verify:stock   # the same under Supabase's stock defaults (everything new granted to anon and authenticated)
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm run concurrency   # needs a THROWAWAY Postgres 15+
 ```
 
-Exit code 0 means every check passed. The last lines list each check, for example `ok  C9 partner updates/deletes of
-wallets … affect 0 rows`. Run both variants: a migration must be safe whichever default privileges the project has.
+Exit code 0 means every check passed. Each suite runs on a fresh database; the output lists every check, for example
+`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (258 checks on 2026-11-10). Run both
+variants: a migration must be safe whichever default privileges the project has.
 
-`node run.mjs <migrations dir> <suite.sql> [skip …]` runs a different suite. By default it skips
-`usage_events_purge_schedule`, because PGlite has no `pg_cron`.
+`node run.mjs <migrations dir> <suite.sql> [skip …]` runs one suite. By default it skips `usage_events_purge_schedule`,
+because PGlite has no `pg_cron`.
+
+`concurrency.mjs` races several real sessions against one limit (PGlite has a single connection): two first inserts of a
+new account, two transactions for the last places under a row ceiling, twenty writers at once, and forty anonymous usage
+counts against the daily total. It creates and drops its own database. CI runs it against a Postgres 17 service container
+(`.github/workflows/android.yml`, job `sql-verify`); locally any throwaway server works (the `embedded-postgres` npm
+package was used on Windows). Never point it at lucento-test or production.
 
 ## Suites
+
+- `security_remediation_suite.sql` — the security remediation (docs/security/REMEDIATION_REPORT.md), 78 checks: the
+  Cloud write gate (Free refused, Pro accepted, a lapsed account reads and cleans up, renewal resumes, a Partner on the
+  Owner's plan under the lenient and the strict rule, a removed Partner, a stranger), size bounds, the batch cap and row
+  ceilings with exact counters, `record_usage_event`'s caps, permanent refunds after account deletion, account binding
+  (`other_account`), test purchases, seed-id ownership, the per-account request quota, and the new default privileges.
+  The audit's probes X1, X2, X3, X8a and X8b are named as such.
 
 - `account_emails_suite.sql` — account emails (docs/EMAILS.md), 16 checks: only the service role claims an email; each
   email is claimed once per account and reference (welcome, each purchase); a released claim can be taken again; bad

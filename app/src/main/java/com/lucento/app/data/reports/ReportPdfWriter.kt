@@ -63,6 +63,8 @@ class ReportPdfWriter(context: Context) {
         private lateinit var page: PdfDocument.Page
         private lateinit var canvas: Canvas
         private var y = 0f
+        /** The group heading last printed ("Income and expenses"), so each is printed once where it starts. */
+        private var group: String? = null
 
         // The light theme's own tokens: a printed page is always light.
         private val ink = LightColors.onSurface.toArgb()
@@ -91,6 +93,7 @@ class ReportPdfWriter(context: Context) {
             headline(report.headline)
             report.sections.forEach(::section)
             notes()
+            moreFromLucento()
             finishPage()
         }
 
@@ -108,7 +111,7 @@ class ReportPdfWriter(context: Context) {
         }
 
         private fun finishPage() {
-            val footer = "Calculated on this phone by Lucento from your own records. Not financial advice."
+            val footer = "Calculated on this phone by Lucento from your own records. Not financial advice. · lucentoapp.com"
             canvas.text(footer, MARGIN, PAGE_HEIGHT - 24f, paint(regular, 8f, muted))
             canvas.text("Page $pageNumber", PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 24f, paint(regular, 8f, muted, Paint.Align.RIGHT))
             document.finishPage(page)
@@ -136,6 +139,12 @@ class ReportPdfWriter(context: Context) {
         private fun section(section: ReportSection) {
             val columns = section.columns.size.coerceAtLeast(1)
             val labelWidth = CONTENT - columns * COLUMN
+            if (section.group != null && section.group != group) {
+                ensure(70f)
+                canvas.text(section.group.uppercase(Locale.getDefault()), MARGIN, y + 10f, paint(semibold, 8.5f, brand))
+                y += 18f
+            }
+            group = section.group
             ensure(48f)
             canvas.text(section.title, MARGIN, y + 13f, paint(bold, 13f))
             section.columns.forEachIndexed { i, header ->
@@ -164,13 +173,27 @@ class ReportPdfWriter(context: Context) {
             val detailPaint = paint(regular, 8.5f, muted)
             val label = ellipsize(line.label, labelPaint, labelWidth - 8f)
             val detail = line.detail?.let { wrap(it, detailPaint, labelWidth - 8f).take(3) }.orEmpty()
-            val height = 18f + detail.size * 11f
+            val bar = if (line.share != null) 7f else 0f
+            val height = 18f + detail.size * 11f + bar
             ensure(height)
             canvas.text(label, MARGIN, y + 13f, labelPaint)
             detail.forEachIndexed { i, text -> canvas.text(text, MARGIN, y + 25f + i * 11f, detailPaint) }
+            line.share?.let { share ->
+                // The line's share of its section, as a thin bar under the label (the amount is printed beside it).
+                val top = y + 18f + detail.size * 11f + 1f
+                val width = (labelWidth - 8f) * 0.7f
+                canvas.drawRoundRect(RectF(MARGIN, top, MARGIN + width, top + 3.5f), 2f, 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = rule })
+                canvas.drawRoundRect(
+                    RectF(MARGIN, top, MARGIN + width * share.coerceIn(0f, 1f), top + 3.5f),
+                    2f,
+                    2f,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply { color = brand },
+                )
+            }
             line.values.take(columns).forEachIndexed { i, value ->
                 if (value != null) {
-                    canvas.text(amount(value), columnRight(i, columns), y + 13f, paint(if (line.emphasis) bold else semibold, 10.5f, color(value), Paint.Align.RIGHT))
+                    val text = if (line.signed) MoneyFormatter.formatSigned(value, showPlus = true) else amount(value)
+                    canvas.text(text, columnRight(i, columns), y + 13f, paint(if (line.emphasis) bold else semibold, 10.5f, color(value), Paint.Align.RIGHT))
                 }
             }
             y += height + 4f
@@ -189,6 +212,27 @@ class ReportPdfWriter(context: Context) {
                     y += 13f
                 }
             }
+        }
+
+        /**
+         * The closing panel (tester round 3): where Lucento lives online, as full https links — PDF viewers turn them into
+         * links, which Android's PdfDocument can't add itself. Printed text only; nothing is sent from the phone.
+         */
+        private fun moreFromLucento() {
+            val lines = listOf(
+                "Lucento · Financial clarity without the complexity.",
+                "Website: ${com.lucento.app.core.LucentoLinks.WEBSITE}",
+                "Lucento Community on Facebook: ${com.lucento.app.core.LucentoLinks.COMMUNITY}",
+            )
+            val height = 24f + lines.size * 15f
+            ensure(height + 20f)
+            y += 6f
+            canvas.drawRoundRect(RectF(MARGIN, y, PAGE_WIDTH - MARGIN, y + height), 12f, 12f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tint })
+            canvas.text("MORE FROM LUCENTO", MARGIN + 16f, y + 18f, paint(semibold, 8.5f, brand))
+            lines.forEachIndexed { i, text ->
+                canvas.text(text, MARGIN + 16f, y + 34f + i * 15f, paint(if (i == 0) semibold else regular, 9.5f, if (i == 0) ink else brand))
+            }
+            y += height + 12f
         }
 
         /**

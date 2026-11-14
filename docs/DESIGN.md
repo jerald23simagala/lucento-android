@@ -32,7 +32,8 @@ The night-theme primary is `#7C9AFF` rather than the proposed `#5278FF`: white o
 
 ### Palette in components
 - **Buttons:** primary = Electric Blue fill, white label; secondary = pale-sky fill (night: `#202E4D`) with ink label,
-  no outline; text buttons in primary; destructive confirmations use `error`.
+  no outline; text buttons in primary; destructive confirmations use `error`. A label that doesn't fit wraps onto
+  centred lines and the button grows (at least 52 dp); it is never cut off.
 - **Chips / pills** (`ChoicePill`): selected = solid primary with `onPrimary`; unselected = white (night: lowest
   surface) with a hairline and ink label.
 - **Navigation dock:** selected tab in primary tones on a pale-sky indicator; others muted ink.
@@ -158,6 +159,24 @@ logos or UI in the art.
   below the content and fading up into the panel; `MascotScene` — Lucento standing in the landscape in empty states;
   the onboarding welcome (Sunrise keeps the approved "A Brighter Little World" crop); and the theme picker previews.
   Light-painted scenes are dimmed at night; night scenes (Midnight, Aurora) show as painted.
+- **Pro perk cards** (2026-11-13; owner: "simpler, and add our mascot to make it livelier"): used only on the Pro
+  welcome deck's cards and, as small squares, in its collection. Each card's art band is `AwardArtwork.CardBlue` with
+  faint doodles (line drawings of money things, drawn in code in white at 10–16 %; the owner asked for them instead
+  of plain blue), and a little below its middle, as large as the band allows: one simple soft-3D prop for the perk (a
+  wallet, flags, a telescope…; no people) and Lucento itself (`LucentoMascot`, the approved sprites, never redrawn)
+  pointing with its hand on the prop or standing just beside it, over a soft shadow (`shadow = true`), with one
+  short float after it hops in (`idleCycles`), in a pose that suits the card: it waves on the
+  first, points on every other card, smiles or thinks between, never the same picture on two neighbouring cards, and
+  keeps its cheer for the award. Every card has the same art window (at most 0.55 of the card's width), which the
+  pair fills; a card with few words ends with plain card under its words. The props
+  match the mascot's render (satin and matte materials, warm light from the upper left). `perk_art_<stop>` (640 px
+  square) and `perk_thumb_<stop>` (192 px) in `res/drawable-nodpi`; sources, prompts and provenance in
+  `docs/design/illustrations/perks/`; `tools/illustrations/export_perk_art.py` cuts each prop out of its flat
+  CardBlue ground, so the doodles show around it and no edge shows at any band height. The doodles fill the free
+  blue around the pair (`doodleSpots`), never over or between it (6 dp clear of each). The same in both themes (a card is an object, like the medal).
+  Rules for any new prop: one simple object or a small group, no text, numbers or logos (plain short lines stand in
+  for writing), no medium blues (they would melt into the band), calm money (no piles of coins, fanned hands of cards
+  or rays behind money). Decorative: TalkBack reads the card's words.
 
 - New-goal form: optional suggestions (Trip to Japan, Holiday, Emergency fund, New laptop) fill in the name and
   picture only; nothing is created until the user saves.
@@ -330,6 +349,18 @@ yours" card (choose from presets or keep their categories); a pre-0.5 overall li
 removed. Users with no categories see "Finish setting up your budget".
 
 ## Insights (v0.5)
+*Tester round 3, second pass (2026-11-11):* Ask Lucento stays on top; the built-in **reports** sit right under it as
+one list (wallet statement first), each opening the shared report sheet (headline panel, group headings, section
+cards with share bars and tinted totals, how it was calculated; PDF and Share). Ask Lucento keeps questions and the
+reports an answer produces, but no longer lists reports. Income and expenses opens with a quiet **summary card**
+(Money in / Money out side by side with bars on one scale, a "You kept" or "More went out" strip, the change against
+the period before), deliberately unlike the brand heroes.
+*Tester round 3 (2026-11-11):* the currency and period filters sit at the top and every section follows them; income
+and expenses opened with a hero in the Budget page's form (replaced in the second pass, above); then **where your money went** (expense donut, top five + Other, total in
+the middle, each slice's share and amount) and **net worth over time** (month-end line from `WalletsOverview.trend`).
+What net worth is made of moved out: Wallets already shows assets and liabilities by kind. The paragraph below is the
+earlier v0.5 description.
+
 Two questions only: **income and expenses over time** (3/6/12 months; grouped bars, legend, totals and net, plain
 summary; transfers excluded) and **what net worth is made of** (net worth figure; assets and liabilities as two
 stacked bars on one shared scale, grouped by account type with counts, shares and amounts; negative net worth shown

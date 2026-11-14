@@ -357,6 +357,8 @@ data class HomeUiState(
     val milestonesAlsoNew: List<com.lucento.app.domain.Achievement> = emptyList(),
     /** Part D: first time milestones exist on this install — record what's already earned without a fuss. */
     val needsMilestoneBaseline: Boolean = false,
+    /** When the Lucento Pro medal was presented (epoch millis), for the cabinet's Membership shelf; null before. */
+    val proMemberSince: Long? = null,
     /** Expenses and income recorded so far (internal movements excluded). */
     val recordedCount: Int = 0,
     /** Part D: the one-time "+" spotlight after setup, until the first entry or a dismissal. */

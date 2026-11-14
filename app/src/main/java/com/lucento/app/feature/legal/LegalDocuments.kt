@@ -9,8 +9,17 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-09"
-    const val UPDATED = "8 November 2026"
+    const val VERSION = "2026-11-13"
+    const val UPDATED = "13 November 2026"
+
+    /**
+     * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit
+     * F-05). One sentence, shown in the policy and in every AI consent. Remove it, and bump [VERSION], once the Gemini key
+     * is on the paid tier (docs/ASK.md).
+     */
+    const val GEMINI_DATA_USE =
+        "Lucento uses Gemini’s free service for now: Google may keep what Gemini receives and use it to improve " +
+            "its products, and people at Google may read it for that purpose."
 
     /** Where questions, privacy requests and account-deletion requests go (Play's privacy point of contact). */
     const val CONTACT_EMAIL = "lucentoapp@gmail.com"
@@ -190,7 +199,14 @@ object LegalDocuments {
                     "Lucento’s server checks each purchase with Google and keeps, with your account, the plan it gives, " +
                         "the order number and a scrambled form of the purchase token. When you buy while signed in, the " +
                         "app gives Google Play a scrambled form of your account id so the purchase can be matched to you.",
-                    "Your plan is also kept on your phone, sealed with Android’s keystore, so Pro works offline.",
+                    "Signed in or not, while you’re online the app also asks Lucento’s server every few hours whether " +
+                        "the Pro purchase on your phone is still valid, so a refunded purchase doesn’t stay unlocked. It " +
+                        "sends Google Play’s signed record of that purchase (what you bought, its order number, status, " +
+                        "dates and purchase token), never your records. The server asks Google and keeps only its answer, " +
+                        "the product and a scrambled form of the purchase token, with no account or name.",
+                    "Your plan is also kept on your phone, sealed with Android’s keystore, so Pro works offline. Lucento’s " +
+                        "server needs to confirm the purchase within 3 days of buying it, then at least once every 90 days; " +
+                        "until it can, Pro pauses on that phone. Your records are never touched.",
                     "Google Play’s billing component, built into the app, sends Google its own diagnostics, as in every " +
                         "app that sells through Google Play. Google Play keeps its own purchase records under Google’s " +
                         "privacy policy.",
@@ -213,6 +229,8 @@ object LegalDocuments {
                         "transactions, as its consent screen explains before you agree.",
                     "Lucento’s server doesn’t keep these messages; it counts requests per account per day for the daily " +
                         "allowance. You can turn either feature off at any time.",
+                    "$GEMINI_DATA_USE If that isn’t acceptable to you, leave both features off: everything else in Lucento " +
+                        "works without them.",
                 ),
             ),
             Section(

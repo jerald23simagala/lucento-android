@@ -1,5 +1,6 @@
 package com.lucento.app
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.SystemClock
@@ -44,6 +45,8 @@ import com.lucento.app.core.designsystem.theme.ThemeSpec
 import com.lucento.app.core.designsystem.theme.isDark
 import com.lucento.app.data.preferences.ThemeId
 import com.lucento.app.data.preferences.ThemeMode
+import com.lucento.app.feature.widget.WidgetLaunches
+import com.lucento.app.feature.widget.widgetLaunchFrom
 import com.lucento.app.navigation.LucentoRoot
 
 // A FragmentActivity (still a ComponentActivity) because the app lock's BiometricPrompt needs one.
@@ -68,6 +71,13 @@ class MainActivity : FragmentActivity() {
         (application as LucentoApplication).container.inForeground.set(false)
         // A rotation is not leaving the app.
         if (!isChangingConfigurations) lock.onBackground(SystemClock.elapsedRealtime())
+    }
+
+    /** A widget tap while Lucento is open: the open copy is brought forward and told here where to go. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        widgetLaunchFrom(intent)?.let(WidgetLaunches::offer)
     }
 
     /** Opens the system prompt; when the phone no longer has any screen lock, the app lock turns itself off. */
@@ -106,6 +116,8 @@ class MainActivity : FragmentActivity() {
         // Hold the system splash only until preferences are read (typically a few ms).
         splash.setKeepOnScreenCondition { appViewModel.uiState.value is AppUiState.Loading }
         enableEdgeToEdge()
+        // A home-screen widget tap (feature/widget) says where to go, once: a rotation or a restored task isn't a new tap.
+        if (savedInstanceState == null) widgetLaunchFrom(intent)?.let(WidgetLaunches::offer)
 
         setContent {
             val state by appViewModel.uiState.collectAsStateWithLifecycle()
@@ -158,6 +170,8 @@ class MainActivity : FragmentActivity() {
                                 com.lucento.app.feature.fx.LocalMainCurrency provides ready.preferences.primaryCurrency,
                                 com.lucento.app.feature.fx.LocalFxRates provides (application as LucentoApplication).container.fxRates,
                                 com.lucento.app.feature.pro.LocalEntitlements provides entitlements,
+                                // Overlays that would sit above the lock screen or the launch logo (Lucento Pro's welcome) wait.
+                                com.lucento.app.navigation.LocalAppObscured provides (locked || launching),
                             ) {
                                 LucentoRoot(preferences = ready.preferences)
                             }

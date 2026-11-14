@@ -34,12 +34,25 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
 5. **Licence key.** In Monetize with Play › Monetization setup › Licensing, copy the Base64 RSA public key into the GitHub
    repository **variable** (or secret) `LUCENTO_PLAY_LICENSE_KEY`, and into `local.properties` for local release
    builds. CI reads the variable first, then the secret. It is public by design. The phone checks every purchase's signature with it, and without it a release doesn't bill.
+   - **What it looks like:** one line of about 390 letters, digits, `+` and `/`, starting `MIIBIjAN`. It is **not** a
+     certificate fingerprint from Test and release › App integrity › App signing (`37:CE:29:…`, pairs separated by colons).
+   - **Why it matters:** 0.5.2 (vc 7) was built with a SHA-1 fingerprint here. It showed prices and took payments, but
+     every purchase failed its signature check, so the app never granted Pro or acknowledged the purchase, and Google
+     refunded each test order minutes later (3 days for real customers). The release build now stops with
+     "LUCENTO_PLAY_LICENSE_KEY isn't Google Play's licence key" when the value doesn't decode as an RSA public key.
 6. **Service account** for the server:
    - In Google Cloud (the project linked to Play Console), enable the *Google Play Android Developer API*.
    - Create a service account and a JSON key for it.
    - In Play Console › Users and permissions, invite the service account's email with app permissions **View
      financial data** and **Manage orders and subscriptions**.
-   - Paste the whole JSON key, on one line, into Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (Production).
+   - Paste the whole JSON key file into Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (Production), exactly as it
+     is. Open the downloaded `.json` in Notepad, Ctrl+A, Ctrl+C. Several lines are fine; don't edit it. It starts
+     with `{` and contains `"type": "service_account"`, `"client_email"` and `"private_key"`. Then redeploy production,
+     because settings only reach a new deployment.
+   - What goes wrong otherwise (2026-11-12): the server logs `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON is not a service
+     account key` on every `/api/billing/verify`. The phone still grants Pro and acknowledges the purchase, so Google
+     doesn't refund it, but the server never records it: no `purchase_links` row, and the server-enforced perks (the
+     AI allowance, sync on the plan, Lucento Shared) still see the free plan.
 7. **Supabase service-role key** of the **same** project the website's `LUCENTO_SUPABASE_URL` points to. Put it in Vercel
    env `LUCENTO_SUPABASE_SERVICE_ROLE_KEY` (Production). It is the only key allowed to call `apply_play_purchase` and
    `revoke_play_purchase`. It never goes into the APK, GitHub or the repository.
@@ -53,9 +66,26 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
    - Press *Send test notification*. The endpoint answers 200 ("ignored").
 9. **Daily refund check.** Set Vercel env `CRON_SECRET` to any long random string. `vercel.json` runs
    `/api/billing/voided` once a day on the production deployment.
+   Without steps 8 and 9 the server never hears about a refund, so a refunded buyer keeps the AI allowance, sync and
+   Lucento Shared (KNOWN_ISSUES PB-3).
 10. **License testers.** In Play Console › Settings › License testing, add the testers' Google accounts. They buy with
     test cards, and subscriptions renew on Play's accelerated test schedule. Testers install from the internal-testing
     opt-in link.
+
+## Refunding an order
+
+In Play Console › Order management, open the order › **Refund**, and tick **Remove entitlement**. It's off by default.
+Without it, Google refunds the money but leaves the purchase with the buyer, keeps the refund out of its voided
+purchases, and offers no way to remove the purchase afterwards (KNOWN_ISSUES PB-4).
+- **Lifetime:** Lucento ends a refunded Lifetime either way, because Google's server reports the order cancelled
+  (MONETIZATION §5.3 L-6). Without Remove entitlement, Google Play keeps the purchase in the buyer's account and refuses a
+  new one with "You already own this item". That happened with the owner's test Lifetime, refunded 2026-11-12. Lucento
+  now releases that purchase when the buyer taps Buy Lifetime (§5.3 L-7, KNOWN_ISSUES PB-8). Builds without that change
+  leave the buyer unable to buy Lifetime again on that Google account.
+- **Subscription:** Without Remove entitlement the subscription carries on, so Lucento keeps Pro while Google reports
+  it active.
+
+Give **Manage orders and subscriptions** only to people you trust.
 
 ## Going live (the gated release)
 

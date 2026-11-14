@@ -53,7 +53,7 @@ billed differently; the table shows them as one column with a note where they di
 | What you can do | Free | Pro | Pro Lifetime |
 |---|---|---|---|
 | **Insights** — income against expenses, month by month, with the change against last period | Last **3 months** | Last 3, 6 or **12 months** | Last 3, 6 or **12 months** |
-| **What your net worth is made of** — your accounts and debts by kind, with each one's share | — | ✔ | ✔ |
+| **Where your money went and net worth over time** — expenses by category and month-end net worth, for the period you pick (3 months free) | ✔ | ✔ | ✔ |
 | **Ask Lucento** — answers from your own figures, on this phone, no internet: net worth, cash flow, budget against actual, debts, top categories | ✔ | ✔ | ✔ |
 | **Save or share a statement as a PDF** | — | ✔ | ✔ |
 | **AI adviser** — ask Gemini about your numbers and get plans and recommendations (needs sign-in, consent and internet; Lucento sends figures, never your name) | **10 questions a month** | **50 questions a day** | 50 a day for the **first 12 months**, then 10 a month — or 50 a day with Lucento Cloud |
@@ -103,7 +103,7 @@ Lucento's servers:
 - Unlimited money wallets, unlimited cards and loans, receivables, and things you own at a value you set.
 - Wallets in other currencies, with exchange gains and losses worked out for you.
 - Up to 20 active savings goals.
-- Insights over 3, 6 or 12 months, and the breakdown of what your net worth is made of.
+- Insights over 3, 6 or 12 months.
 - Statements as PDF.
 - All five themes.
 - Every Pro feature we add later that runs on the phone. If a future feature needs servers, it is an online service,
@@ -177,7 +177,7 @@ adviser who knows your numbers.
 - Unlimited money wallets, cards and loans; receivables; things you own at a value you set.
 - Wallets in other currencies, with today's rates and your exchange gains and losses.
 - Up to 20 active savings goals.
-- Insights over 6 and 12 months, and what your net worth is made of.
+- Insights over 6 and 12 months.
 - Statements as PDF.
 - Cloud sync between your phones, and restore from your account on a new one.
 - Lucento Shared: one Partner sees and records in your ledger from their own phone.
@@ -204,7 +204,7 @@ a subscription and without our servers.
 - Unlimited money wallets, cards and loans; receivables; things you own at a value you set.
 - Wallets in other currencies, with exchange gains and losses.
 - Up to 20 active savings goals.
-- Insights over 3, 6 and 12 months, and what your net worth is made of.
+- Insights over 3, 6 and 12 months.
 - Statements as PDF.
 - All five themes.
 - Every future Pro feature that runs on the phone.
@@ -272,7 +272,7 @@ is opened only by the tap that would have used the feature; "Not now" is remembe
 
 **D-3 Insights locked (6 / 12 months, composition)**
 > **Longer trends are part of Lucento Pro**
-> See 6 and 12 months of income against expenses, and what your net worth is made of. Your 3-month view is always free.
+> See 6 and 12 months of income against expenses, where your money went and how your net worth moved. Your 3-month view is always free.
 > [ See plans ]  [ Not now ]
 
 **D-4 Cloud sync locked**
@@ -324,6 +324,26 @@ Lifetime's year ending uses the same sheet with: *"Your Lifetime's included year
 Everything you own is unchanged. Cloud sync is paused and the AI adviser is back to 10 questions a month; keep them
 with Lucento Cloud, or carry on without."* [ Add Lucento Cloud ] [ OK ]
 
+A Lifetime refunded with revoke, or charged back:
+> **Your Pro Lifetime is no longer active**
+> Google Play reports this purchase as refunded or cancelled. Everything you recorded is still here, and nothing was
+> removed; the free plan's limits apply to new items. If this looks wrong, restore your purchase from the Lucento Pro
+> page.
+
+A Lifetime paused for want of a check. Either nobody confirmed it for 30 days (MONETIZATION §5.3 L-2, 2026-11-12), or
+Lucento's server hasn't confirmed Google Play's reading: within 3 days of buying, then every 90 days (L-6, 2026-11-13).
+One text covers both, because the same steps settle both:
+> **Lucento needs to check your Pro Lifetime**
+> Pro is paused on this phone until Lucento can confirm your purchase again. Connect to the internet, make sure the
+> Google Play Store app is on and signed in to the Google account you bought with, then tap Restore purchases on the
+> Lucento Plan page. Everything you recorded is still here, and nothing was removed.
+
+A subscription paused the same way:
+> **Lucento needs to check your Lucento Pro**
+> Pro is paused on this phone until Lucento can confirm your subscription again. Connect to the internet, make sure
+> the Google Play Store app is on and signed in to the Google account you subscribed with, then tap Restore purchases
+> on the Lucento Plan page. Everything you recorded is still here, and nothing was removed.
+
 **D-8 Restoring a purchase**
 Button on the Pro page: **Restore purchases**.
 > In progress: *Checking Google Play…*
@@ -333,6 +353,22 @@ Button on the Pro page: **Restore purchases**.
 > Google Play order number.
 > Offline: **Restoring needs an internet connection once.** If you already restored on this phone, everything you own
 > is still working.
+> Plan paused (MONETIZATION §5.3 L-2): **Lucento still can't confirm your purchase.** Connect to the internet and make
+> sure the Google Play Store app is on and signed in to the Google account you bought with, then try again.
+> Lifetime refunded (MONETIZATION §5.3 L-7, 2026-11-13): **Google Play reports your Pro Lifetime as refunded or
+> cancelled,** so it no longer unlocks Pro. You can buy it again on this page.
+
+**D-8a Google Play says "You already own this item"** (MONETIZATION §5.3 L-7, 2026-11-13)
+Play shows its own "You already own this item". Under the plans, after Lucento reads Play and the server again (first
+match wins):
+> It's live after all: **Your Google account already owns this,** and your {Pro Lifetime | Lucento Pro} is working on
+> this phone now.
+> An ended Lifetime Play was still holding, now released: **Google Play was still holding your earlier Pro Lifetime
+> (refunded or cancelled),** so it couldn't sell you a new one. Lucento has released it: you can buy Lifetime now.
+> Not released this time: **Google Play is still holding your earlier Pro Lifetime (refunded or cancelled),** and
+> Lucento couldn't release it just now. Check your connection and try again. If it keeps happening, contact support
+> with your Google Play order number.
+> Otherwise: **Your Google account already owns this.** Tap Restore purchases to bring it back on this phone.
 
 **D-9 Pending payment (cash through Google Play)**
 > **Waiting for Google Play to confirm your payment**

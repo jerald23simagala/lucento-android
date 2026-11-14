@@ -74,7 +74,7 @@ class ProOffersTest {
         assertEquals("services included this year: nothing to buy", emptyList<OfferAction>(), inYearOne.getValue(PlanCardKind.CLOUD).actions)
 
         val afterYear = cards(state(record(PlayProducts.PRO_LIFETIME, boughtAt = now - 400 * day, renewing = false)))
-        assertEquals(listOf("Add Lucento Cloud", "Choose monthly instead"), afterYear.getValue(PlanCardKind.CLOUD).actions.map { it.label })
+        assertEquals(listOf("Add Lucento Cloud yearly", "Add Lucento Cloud monthly"), afterYear.getValue(PlanCardKind.CLOUD).actions.map { it.label })
         assertEquals(ProOffers.SUBSCRIPTION_TERMS, afterYear.getValue(PlanCardKind.CLOUD).note)
         assertNull("nothing to buy, so no terms", inYearOne.getValue(PlanCardKind.CLOUD).note)
 

@@ -27,7 +27,8 @@ app/src/main/java/com/lucento/app/
   navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · (+) · Budget · Wallets; the centre +
                        opens the transaction composer in feature/capture; Insights, goals, scheduled and debts open from
                        Home's Quick links, categories from Budget), profile menu (Settings lives there); a new user's
-                       guided setup (feature/guide) follows onboarding
+                       guided setup (feature/guide) follows onboarding; Lucento Pro's welcome (feature/pro/welcome:
+                       a tour over the real screens via Modifier.spotlightTarget) plays after a confirmed plan
 ```
 This tree and the navigation notes above describe the current implementation. They are
 not mandatory UX or information-architecture constraints. Claude may propose and implement
@@ -77,7 +78,9 @@ a better user-facing structure while preserving sound engineering boundaries.
   - **On by default:** exchange rates (docs/MULTICURRENCY.md, owner decision 2026-11-06): fetched only when something
     is recorded in another currency, sending two currency codes and a date (never an amount); off in Settings › Money.
     In release builds, Google Play's billing component sends Google its own diagnostics. When the person buys Pro,
-    Lucento's server checks the purchase with Google (docs/MONETIZATION.md).
+    Lucento's server checks the purchase with Google (docs/MONETIZATION.md). After that, signed in or not, the app
+    sends Play's signed purchase record to `/api/billing/check` every few hours while online, so a refund ends Pro
+    (owner decision 2026-11-13; SERVER_CONTRACT §3b). Mandatory sign-in was declined in its place.
   - Signing out, and switching to a different account, wipes this phone’s ledger and sync binding so the next account
     starts clean and one user’s data is never uploaded into another account; unsynced changes require confirmation
     before that wipe. Any other network use needs its own explicit opt-in with clear consent. CI allow-lists release

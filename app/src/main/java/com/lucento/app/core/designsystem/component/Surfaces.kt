@@ -137,10 +137,12 @@ fun SectionHeader(
     title: String,
     modifier: Modifier = Modifier,
     supporting: String? = null,
+    /** 48dp by default, room for a trailing action; a header with only text beside it may hug its text. */
+    minHeight: Dp = Sizes.minTouch,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().heightIn(min = Sizes.minTouch).padding(top = Spacing.xs),
+        modifier = modifier.fillMaxWidth().heightIn(min = minHeight).padding(top = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

@@ -44,6 +44,7 @@ import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.launch
 import com.lucento.app.data.sync.uploadRequests
 
@@ -67,6 +68,8 @@ class LucentoApplication : Application() {
         if (container.pendingRevokes.all().isNotEmpty()) com.lucento.app.data.sync.RevokeScheduler.schedule(this)
         // The welcome email (docs/EMAILS.md): asked for once per signed-in account; nothing while signed out.
         container.welcomeEmail.start(CoroutineScope(SupervisorJob() + Dispatchers.Default), container.auth.observeUserId())
+        // Home-screen widgets (docs/WIDGETS.md): redrawn after every change to what they show, and just after midnight.
+        com.lucento.app.feature.widget.WidgetRefresher.start(this)
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             container.usageCounts.retryPendingDeletion()
             observeOnline().collect { online ->
@@ -177,6 +180,10 @@ class AppContainer(application: Application) {
             purchases = purchaseSource,
             remote = entitlementRemote(),
             verifier = purchaseVerifier(),
+            signedInAccountHash = {
+                auth.currentUserId()?.let(com.lucento.app.domain.entitlement.PurchaseInterpreter::obfuscatedAccountId)
+            },
+            checker = purchaseChecker(),
         )
         manager.observePlayUpdates(entitlementScope)
         entitlementScope.launch { manager.refresh() }
@@ -219,6 +226,18 @@ class AppContainer(application: Application) {
             null
         } else {
             com.lucento.app.data.billing.ProxyPurchaseVerifier(BuildConfig.BILLING_VERIFY_URL, BuildConfig.APPLICATION_ID, auth::accessToken)
+        }
+
+    /**
+     * Release builds only (docs/MONETIZATION.md §5.3 L-6): the purchase check, which needs no account. It tells this
+     * phone, signed in or not, whether a purchase Google Play lists here is still live, so a refunded one can't come
+     * back while Play's copy on the phone lags behind the refund.
+     */
+    private fun purchaseChecker(): com.lucento.app.data.billing.PurchaseChecker? =
+        if (BuildConfig.DEBUG || BuildConfig.BILLING_CHECK_URL.isBlank()) {
+            null
+        } else {
+            com.lucento.app.data.billing.ProxyPurchaseChecker(BuildConfig.BILLING_CHECK_URL)
         }
 
     /** Test builds only (docs/MONETIZATION.md §5.7): switch plans without Google Play. Null in release builds. */
@@ -295,6 +314,22 @@ class AppContainer(application: Application) {
         RecurringRepository(database.recurringDao(), database.walletDao(), database.categoryDao(), transactions, runner = runner, access = structureAccess)
     }
 
+    /**
+     * Home-screen widgets (feature/widget): fires whenever a table they read changes — a save, an edit, a delete or a
+     * sync pull — without reading anything itself; the widgets read when they redraw.
+     */
+    fun ledgerChanges(): kotlinx.coroutines.flow.Flow<Unit> = kotlinx.coroutines.flow.callbackFlow {
+        val observer = object : androidx.room.InvalidationTracker.Observer(
+            arrayOf("transactions", "wallets", "categories", "budgets", "recurring", "debt_terms"),
+        ) {
+            override fun onInvalidated(tables: Set<String>) {
+                trySend(Unit)
+            }
+        }
+        database.invalidationTracker.addObserver(observer)
+        awaitClose { database.invalidationTracker.removeObserver(observer) }
+    }
+
     // --- optional cloud sync (see docs/SYNC.md); every value here is safe to hold even when unconfigured ---
 
     /** Sessions ended on this phone that the server hasn't confirmed revoking yet (R10-01). */
@@ -367,6 +402,13 @@ class AppContainer(application: Application) {
             adoptMainCurrency = { code ->
                 if (com.lucento.app.core.money.CurrencyRules.isSupported(code)) preferences.setPrimaryCurrency(code)
             },
+            // Security audit F-01: the server refuses uploads without the CLOUD plan. The plan this phone holds decides
+            // whether a refusal is retried; the refusal itself makes the phone re-read its plan.
+            planFingerprint = {
+                entitlements.loadCached()
+                com.lucento.app.domain.entitlement.ProGates.cloudPlanFingerprint(entitlements.state.value)
+            },
+            onUploadsRefused = { refreshEntitlements() },
         )
     }
 

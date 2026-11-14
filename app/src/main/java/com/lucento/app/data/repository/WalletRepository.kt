@@ -91,12 +91,23 @@ class WalletRepository(
         classification: WalletClassification? = null,
         /** Multicurrency: for a wallet in another currency, the rate its opening balance is valued at (1 unit = this many). */
         fxBasisRate: java.math.BigDecimal? = null,
+        /**
+         * A new credit card only (tester round 3): the part of [openingBalance] not due yet ([com.lucento.app.domain.CardSetup]).
+         * The card opens at the rest, and this part is written as one adjustment dated [setupDay], in the same transaction.
+         */
+        unbilledAtSetup: Money? = null,
+        setupDay: java.time.LocalDate = java.time.LocalDate.now(),
     ): SaveResult {
         if (!access.canManageStructure()) return SaveResult.NotPermitted
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = 0)?.let { return it }
         planGate(type)?.let { return it }
         foreignCurrencyGate(openingBalance.currencyCode)?.let { return it }
+        val unbilled = unbilledAtSetup?.takeIf {
+            type == WalletType.CREDIT_CARD && it.currencyCode == openingBalance.currencyCode &&
+                it.amountMinor > 0L && it.amountMinor <= openingBalance.amountMinor
+        }
+        val opening = if (unbilled != null) openingBalance - unbilled else openingBalance
         val now = clock()
         return runner.run {
             val id = dao.insert(
@@ -104,7 +115,7 @@ class WalletRepository(
                     name = trimmed,
                     type = type.name,
                     currencyCode = openingBalance.currencyCode,
-                    openingBalanceMinor = openingBalance.amountMinor,
+                    openingBalanceMinor = opening.amountMinor,
                     sortOrder = dao.maxSortOrder() + 1,
                     createdAt = now,
                     updatedAt = now,
@@ -115,6 +126,22 @@ class WalletRepository(
                 )
             )
             writeTerms(id, type, debt, now)
+            if (unbilled != null) {
+                transactionDao.insert(
+                    com.lucento.app.data.local.TransactionEntity(
+                        type = com.lucento.app.domain.TransactionType.ADJUSTMENT_OUT.name,
+                        amountMinor = unbilled.amountMinor,
+                        currencyCode = unbilled.currencyCode,
+                        walletId = id,
+                        categoryId = null,
+                        occurredOn = setupDay.toEpochDay(),
+                        note = com.lucento.app.domain.CardSetup.NOTE,
+                        clientUuid = UUID.randomUUID().toString(),
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                )
+            }
             SaveResult.Saved(id)
         }
     }

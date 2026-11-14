@@ -41,7 +41,10 @@ USE_FINGERPRINT for the app lock, `com.android.vending.BILLING` for Google Play 
 Job **migrations** (needs build): fails immediately if schema history is incomplete, otherwise boots an API 30 x86_64
 emulator (Pixel 6 profile) and runs `MigrationTest`, `ReconciliationTest` (Home, Transactions and Budget agree on a
 month's spending), `ScanOcrTest` (real on-device OCR on made-up statement, e-wallet and receipt images: a statement is
-read line by line, a receipt as one payment), then `ScreenshotTourTest` — a fresh install walked through
+read line by line, a receipt as one payment), `ProWelcomeRealTapTest` and `ProRevealDeckFingerTest` (the Pro
+welcome's deck pressed with injected finger taps that drift a pixel or two between down and up, as real ones do,
+through the shared `Finger` helper, with a layer beneath that counts any touch leaking through; `performClick` never
+moves, and that hid the old tour's dead buttons on real phones, KNOWN_ISSUES PW-1), then `ScreenshotTourTest` — a fresh install walked through
 mandatory category onboarding, every dock destination, the + / More / Profile sheets, light and dark, with assertions
 on the budget total and the mascot state — and uploads its screenshots (`ui-screenshots` artifact). No `continue-on-error` anywhere: a red job means
 something did not pass.

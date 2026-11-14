@@ -67,7 +67,13 @@ fun TransactionRow(
     val categoryName = category?.name ?: "Uncategorized"
     val title: String
     val subtitle: String
-    if (transaction.isAdjustment) {
+    val outside = com.lucento.app.domain.OutsideMovement.of(transaction)
+    if (outside != null) {
+        // "Moved to my investment · Withdrawal · BPI": what it was for as the title, the kind and account beneath.
+        val reason = com.lucento.app.domain.OutsideMovement.reasonOf(transaction)
+        title = reason.ifBlank { outside.label }
+        subtitle = listOfNotNull(outside.label.takeIf { reason.isNotBlank() }, wallet?.name).joinToString(" · ")
+    } else if (transaction.isAdjustment) {
         title = transaction.note.ifBlank { "Balance adjustment" }
         subtitle = listOfNotNull("Balance adjustment".takeIf { transaction.note.isNotBlank() }, wallet?.name).joinToString(" · ")
     } else if (isTransfer) {
@@ -91,6 +97,8 @@ fun TransactionRow(
                 role = Role.Button,
                 onClickLabel = onClickLabel ?: when {
                     isTransfer -> "Edit transfer"
+                    com.lucento.app.domain.OutsideMovement.of(transaction) != null ->
+                        "View ${com.lucento.app.domain.OutsideMovement.of(transaction)!!.label.lowercase()}"
                     transaction.isAdjustment -> "View balance adjustment"
                     else -> "Edit transaction"
                 },

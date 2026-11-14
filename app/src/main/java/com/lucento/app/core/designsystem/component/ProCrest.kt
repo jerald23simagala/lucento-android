@@ -89,15 +89,3 @@ fun MemberChip(label: String, modifier: Modifier = Modifier) {
         )
     }
 }
-
-/** The [ProCrest] ringed in [ring] (the page colour) so it stands apart from a photo or initials behind it. */
-@Composable
-internal fun RingedCrest(ring: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier, size: Dp = 18.dp) {
-    ProCrest(
-        modifier
-            .clip(CircleShape)
-            .background(ring)
-            .padding(1.5.dp),
-        size = size - 3.dp,
-    )
-}

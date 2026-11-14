@@ -456,7 +456,8 @@ fun WalletEditorSheet(
                         draft = it
                         if (error is DraftError.InterestInvalid || error is DraftError.TermInvalid || error is DraftError.InstallmentInvalid ||
                             error is DraftError.InstallmentUnclear || error is DraftError.CreditLimitInvalid ||
-                            error is DraftError.CreditLimitUnclear || error is DraftError.BillingDaysInvalid
+                            error is DraftError.CreditLimitUnclear || error is DraftError.BillingDaysInvalid ||
+                            error is DraftError.AmountDueInvalid || error is DraftError.AmountDueTooHigh
                         ) error = null
                     },
                 )
@@ -752,6 +753,36 @@ private fun CardDetails(
         },
         isError = daysError,
     )
+    // Tester round 3: a new card's balance is rarely all due at once. With both billing days, ask what the latest
+    // statement asks to pay; the rest joins the next statement (CardSetup), so the first reminder isn't the whole balance.
+    if (draft.id == null && draft.statementDayText.isNotBlank() && draft.dueDayText.isNotBlank()) {
+        val dueError = error == DraftError.AmountDueInvalid || error == DraftError.AmountDueTooHigh
+        Spacer(Modifier.height(Spacing.sm))
+        AmountTextField(
+            value = draft.amountDueText,
+            onValueChange = { onChange(draft.copy(amountDueText = it)) },
+            filter = { it.take(20) },
+            label = { Text("Amount due now (optional)") },
+            prefix = { Text(MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
+            placeholder = { Text("All of it") },
+            isError = dueError,
+            textStyle = AmountStyles.medium,
+            supportingText = {
+                Text(
+                    when (error) {
+                        DraftError.AmountDueInvalid -> "Enter the amount due, like 1250${MoneyFormatter.decimalSeparator()}00."
+                        DraftError.AmountDueTooHigh -> "The amount due can’t be more than what you owe on the card."
+                        else -> "From your latest statement: what you must pay by the due day. The rest of what you owe is " +
+                            "billed on your next statement. Leave empty if all of it is due."
+                    }
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+            shape = LucentoFields.shape,
+            colors = fieldColors,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 /** A day of the month, 1–31, typed as digits. */

@@ -166,3 +166,355 @@ Do not drop the recovery stash, commit, push, merge, delete branches, or modify 
 6. Never commit secrets or local credentials; `google-services.json` is not in the repo by design.
 7. Make focused, testable changes and report exactly which tests were and were not executed.
 8. Use Architect and QA agents for independent read-only reviews when useful.
+
+## Security remediation — 2026-11-10 (`security/release-remediation`, website `security/release-hardening`)
+
+All remediable audit findings fixed in code and tested offline: four migrations (`20261111090000`–`20261111120000`), app sync refusal handling and purchase account binding, website Astro 7 upgrade, headers/CSP, method guard, OIDC push check, per-account verify quota, CI and Dependabot. Results: SQL 258/258 (both privilege modes), concurrency 4/4 on Postgres 17.6, Android unit 1,253/1,253, release APK clean, OSV 0, website unit 44/44, e2e 55/55, `npm audit` high/critical 0. Nothing applied to Supabase, pushed or deployed. Decision **NOT APPROVED** until the owner steps in `docs/security/OWNER_ACTIONS_REQUIRED.md` are done. Report: `docs/security/REMEDIATION_REPORT.md`.
+
+## Play purchases never granting Pro — 2026-11-11 (`fix/play-licence-key-check`)
+
+Owner's internal-track test of 0.5.2 (vc 7): the 7-day trial and the yearly plan both completed in Google Play, but the
+app stayed on Free. Cause (verified): CI's secret `LUCENTO_PLAY_LICENSE_KEY` holds a SHA-1 certificate fingerprint, not
+Play's Base64 RSA licence key, so every purchase failed `PurchaseSignature` and the whole Play reading was discarded:
+no Pro, no server verification, no acknowledgement (Google then refunds). Evidence: the fingerprint is the
+`const-string` R8 propagated into `PlayPurchaseSource` in the 0.5.2 AAB; production has no `purchase_links` and no Play
+`entitlements` rows. Fix: owner replaces the secret (NEXT_TASKS OT-23); `app/build.gradle.kts` now fails any build whose
+key doesn't decode as an RSA public key (checked locally: fingerprint and split key fail, a real 2048-bit key and an
+empty key pass). Version 0.5.3 (vc 8). KNOWN_ISSUES PB-1.
+
+## Welcome to Pro — 2026-11-12 (`feature/pro-welcome`)
+
+The owner found the upgrade "too silent" and approved a storyline: live tour on real screens, all eight stops, the
+medal kept for good with the ring following the plan, starting straight after Play confirms. Built:
+
+- `domain/entitlement/ProWelcome.kt` decides what plays and when. It plays once per plan and never for a pending
+  payment, a renewal or a trial turning paid. A returning member gets no ceremony. If the medal was interrupted, the
+  medal alone plays next time. It also picks the stops for the plan and modules, and lists the summary's privileges and
+  online status.
+- `feature/pro/welcome/` has the copy, curtain, tour overlay, summary dialog, state machine and badge flight.
+  `core/designsystem/component/Spotlight.kt` holds `SpotlightRegistry` and `Modifier.spotlightTarget`, plus the scrim
+  with a lit window.
+- Awards: `ProMedalCeremony` shares the ceremony's stage, and the Membership shelf in the cabinet replays it on tap.
+  ProfileButton has the Pro ring. ProScreen has **Replay the Pro tour**.
+- Preferences `pro_welcomed` and `pro_member_since` are cleared by the account wipe and kept when returning to one's
+  own ledger.
+- Tests:
+  - JVM: `ProWelcomeTest` (20), `ProWelcomeCopyTest` (16) and the account-reset case. Full suite: 1,316 tests, 0
+    failures. `lintDebug`: 0 errors, and no warnings in the new code.
+  - `ScreenshotTourTest` now captures `24h-pro-welcome`, `25a`–`25l` after the test-store purchase (`25g`, the sync
+    stop, only in builds with cloud sync). That run and `WebsiteShowcaseTest` skip the welcome for their simulated
+    plan (`DemoMonth.skipProWelcome`).
+- Found and fixed on the local API 28 emulator:
+  - The profile button keeps its label "Profile and settings"; Pro is its state description. Changing the label had
+    broken the tour's lookups.
+  - The tour no longer waits on a timer before lighting a control. A second stop on an unchanged screen stayed unlit
+    under the test clock.
+  - A control is brought into view clear of the dock, and the lit window stays out of the status bar.
+  - The summary's button stays in view.
+  - Builds without cloud sync leave out the sync stop and say the online services aren't available there.
+- Design critic, round 1: **REJECT** (lucento-studio `critic/reports/2026-11-12-pro-welcome-r1.md`). The response is in
+  `…-r2-response.md`. Fixed:
+  - The summary claimed online services before the server confirmed them.
+  - The AI stop offered a button that wasn't there.
+  - Hiding the app from TalkBack under the tour had never actually applied.
+  - The ring crossed the status bar.
+  - The curtain moved on by itself even with TalkBack on.
+  - The dock highlighted the wrong tab.
+  - Copy, contrast and the replay button.
+- Design critic, round 2: **REJECT** (`…-r2.md`); response in `…-r3-response.md`.
+  - Investigated and guarded: the missing badge in 25k didn't reproduce with flight logging, and the test now waits for
+    the crest to be drawn.
+  - Every stop says where its feature lives.
+  - Summary rows are two lines, the plan line no longer claims online services, and unconfirmed services are a plain
+    list.
+  - System Back matches the card's Back, and stray taps don't skip the award.
+  - The award is dated from the plan's real start, and a restored plan is "Welcome back".
+  - The statements stop lights the first report.
+- Design critic, round 3: **REVISE** at 3.3 / 5, with all hard gates passing (`…-r3.md`). After round 3 (not
+  re-reviewed; the workflow stops at three rounds and goes to the owner):
+  - Back always leads out.
+  - The caption card scrolls with its buttons pinned.
+  - The AI allowance shows only once the server confirms.
+  - Empty pages get the right button named, and there's no net-worth stop without a wallet.
+  - The "where" line is announced.
+  - "No limit", as on the Pro page.
+  - An "Also yours" line in the summary.
+  - The ring is outlined on light backgrounds.
+  - The ceremony's sunburst rests after its entrance (WCAG 2.2.2).
+  - The dialogs dim like the tour.
+  - The Pro page says "Plans" for owners.
+- Owner review of the frames (2026-11-12): Gemini and Lucento Shared were under-shown, because the test build has no
+  sync, so those stops were absent, and even with sync Gemini wasn't named.
+  - Added: a "Smarter reading, with Gemini" stop (the composer's input), Gemini named on "AI answers, with Gemini", and
+    a "Share with a Partner" stop (the Lucento Shared page's main button).
+  - Both show to signed-out people with a sign-in note.
+  - Up to ten stops in a build with sync.
+  - Captured from a debug build with lucento-test sync settings (local.properties, git-ignored).
+- The owner chose "PR, merge when green". Version 0.5.4 (vc 9).
+
+## Refund guards — 2026-11-12 (`fix/refund-guards`)
+
+The owner refunded a test Lifetime in Play Console, and Lucento kept showing it. Google's documentation says a refund
+without **Remove entitlement** leaves the buyer owning the purchase and stays out of the voided list (KNOWN_ISSUES PB-4).
+The owner asked how refunds could leak revenue, and chose:
+- switch on the server's refund checks together with the service-account fix (OT-24, PB-3);
+- build the phone-side guards (PR #55, merge when green).
+
+What changed:
+- A purchase the server revoked stays revoked on the phone while Play's copy still lists it (same token). That holds
+  offline, on Play's pushes, and after a restart. A new purchase counts at once (`EntitlementMerge`).
+- Anything bought through Google Play needs one check a month, from Google Play or the server. That covers a Lifetime
+  and a subscription; grants keep their own dates (`Entitlement.awaitsCheck`).
+  - `checkedAtMillis` is stamped on each server fetch and kept in the cached snapshot.
+  - Without a check, the plan is paused, not ended. It gets its own notice ("Lucento needs to check your Pro Lifetime" or
+    "… your Lucento Pro") and a matching Restore message.
+  - MONETIZATION §5.3 L-1/L-2 are rewritten. PB-5 (a server-verified annual plan on a phone that stops reaching the
+    server) is fixed by this.
+- Tests:
+  - 14 new JVM tests, and three updated ones that encoded "a Lifetime never needs a check". Results are in the PR.
+
+## Pro welcome buttons dead on real phones — 2026-11-12 (`fix/pro-tour-real-taps`)
+
+On the owner's Galaxy S8 (Android 9, 0.5.4 vc 9), nothing on the Pro tour's card answered a tap: not Next, not End
+tour. That held on the first run and on a replay; only the system Back key worked. The curtain's buttons were dead the
+same way. They only looked fine because the curtain moves on by itself (KNOWN_ISSUES PW-1).
+
+- **Cause:**
+  - The overlay's touch blocker wrapped the cards and consumed every pointer change.
+  - A finger always drifts a pixel or two between down and up, and Compose cancels a click when something else
+    consumes that movement.
+  - The emulator runs pressed with `performClick` or a still down-up. Neither moves, so they all passed.
+- **Fix (`ProTourOverlay.kt`):** the blocker sits on the scrim, under the cards, never around them. A finger on a card
+  reaches its buttons; a finger on the dimmed screen still stops there.
+- **Tests,** through a shared `Finger` helper (down, two 1–2 px moves, up, injected into Android's input system):
+  - `ProWelcomeRealTapTest` runs the tour over the real app. Next, Back and End tour answer, and a tap on the dimmed
+    dock leaves the app on Wallets.
+  - `ProTourCurtainFingerTest` runs the curtain on its own, away from its timer. Skip the tour and Show me answer, and
+    taps on the scrim or the card's words don't reach the app beneath.
+  - **Results:**
+    - Old overlay (API 28 emulator, animations on): the tour stopped at Next, and the curtain counted 0 presses of
+      Skip the tour.
+    - Fixed overlay: both tests pass, and both are in CI's emulator job.
+    - 1,330 JVM tests with 0 failures, and `lintDebug` with 0 errors.
+    - `assembleDebug` and the instrumented-test compile pass.
+- **Owner decision (2026-11-12):** retire the spotlight tour for an unboxing reveal. This fix is held, committed
+  locally and not pushed, and ships with the reveal in one release (NEXT_TASKS).
+
+## Pro welcome: the unboxing reveal — 2026-11-12 (`feature/pro-reveal`, from `fix/pro-tour-real-taps`)
+
+The owner retired the spotlight tour, whose buttons failed on real phones (PW-1). The reveal had to keep the
+excitement of the upgrade and the badge award.
+
+**Design.** Three tappable prototypes in the studio went through two critic rounds:
+- r1: REJECT; the Deck scored best at 3.0.
+- r2: REJECT at 3.1; "Deck, unwrapped" recommended.
+
+The owner then picked **Deck, unwrapped** with **Scenes** card art. Prototypes: the artifact "Lucento Pro Reveal" and
+studio `lab/pro-reveal.html` / `lab/pro-reveal-art.html`. Reports: `critic/reports/2026-11-12-pro-reveal-r1/r2*`.
+
+**What's built**, in `feature/pro/welcome/`:
+- `ProReveal.kt`: the stage and the deck.
+  - The stage is solid (it was a 0.92 dim until critic round 3) and takes stray touches. It lies beside the content,
+    never around it. While it is up, the status and navigation bars draw light icons.
+  - The deck: a gold band with the approved symbol; turns at 90°; one burst; swipe; Previous, Next and Skip. TalkBack
+    hears a line per card from the counter, the welcome's one live region.
+- `PerkCard.kt`: the two faces.
+  - The back carries the approved `lucento_symbol` on an ivory disc.
+  - The face: the scene, the title, what changed (a `FlowRow` that wraps at large text), the term, where it lives,
+    and the sentence. The words take the height they need and the scene takes the rest (no gap); beyond the card the
+    words scroll, with a "More" pill on a solid band.
+- `PerkArt.kt`: ten scenes drawn in Compose, using new `AwardArtwork` card colours.
+- `ProCollection.kt`: the plan's own line first, then each card with its gain or end date.
+- `ProWelcomeHost.kt`: the phases REVEAL → COLLECTION → MEDAL → FLIGHT. The award is the existing ceremony.
+
+**Copy** (`ProWelcomeCopy`, `ProCopy.serviceTerm`):
+- No card says "here".
+- Online services say "Included until Nov 12, 2027", "While you subscribe" or "With Lucento Cloud".
+- The AI card says "50 a day until …, then 10 a month".
+- Dates stay on one line.
+
+**Retired:**
+- `ProTourOverlay.kt` and `ProPrivilegesDialog.kt`;
+- the screens' spotlight hooks (the profile picture keeps one, for the flight);
+- `showTourStop`;
+- `ProWelcome.privileges`.
+
+Net worth and Smarter reading no longer wait for a wallet. The Pro page's button is now "See your Pro cards".
+
+**Tests:**
+- JVM: 1,330 tests, 0 failures. New: no "here", terms, AI term, collection tags, `serviceTerm`.
+- `lintDebug`: 0 errors. `assembleDebug` and the instrumented-test compile pass.
+- On the API 28 emulator, both passed:
+  - `ProWelcomeRealTapTest`: the deck over the real app — open, Next, Previous, a tap on the dim, Skip, Back.
+  - `ProRevealDeckFingerTest`: the band, Next, Previous and Skip, with a layer beneath that counted 0 leaks.
+- `ProRevealCaptureTest` takes opt-in captures. ScreenshotTourTest's welcome frames were rewritten (25a–25l); the
+  emulator CI runs them.
+
+**Critic round 3** (on the app's captures): **REJECT, 3.1**. Two gates failed: the dark collection's plan title
+(1.56 : 1), and the deck's controls at 200 % text ("Previou / s", "See your"). The loop's three rounds are spent, so the
+owner decides next (NEXT_TASKS). Fixed since, all on `feature/pro-reveal`:
+- **The dark title:** the plan panel is a `Surface`, so its title takes the theme's ink.
+- **The buttons:**
+  - `DeckButtons` measures the deck's own labels and stacks Next above Previous when one won't fit on a line.
+  - Next keeps one place and one size from the closed deck to the last card.
+  - App-wide, `ButtonContent` (primary, secondary and quick-action buttons) wraps a label that doesn't fit instead of
+    cutting it off, with 8 dp of vertical padding. At default text nothing changes.
+- **The band:** placed by layout under the crest and clamped inside the card; its label grows only to 1.3×. It speaks
+  the count for TalkBack, and the line above no longer repeats it.
+- **The card face:** the scene takes the height the words leave (one layout pass with `maxIntrinsicHeight`), so there
+  is no gap. "More" sits on a solid band.
+- **TalkBack:** one live region, the counter ("2 of 10. Title.").
+- **The collection's rows:** the gain sits at the row's end while it fits beside the name, and drops under the name
+  when it doesn't (a `FlowRow`; this replaced the fixed 130 % rule).
+- **The stage:** solid, with light system-bar icons while it is up.
+- **Copy:**
+  - "Tap Add at the top right of …"; "Choose 6 or 12 months above the charts in Insights."; statements "In Insights,
+    under Reports."; themes no longer repeat the three names.
+  - A fifth chapter, *Beyond this phone*, for Sync and Lucento Shared (`AwardArtwork.GlowBeyond`).
+- **Typography:** headlines grow only to 1.5×; the collection says "You're Pro" from 130 % text; counts and dates use
+  no-break spaces, including the Pro page's `planStatus`.
+- **Insights scene:** redrawn as up-and-down months in a widening window.
+- **Taps during a turn:** kept and acted on once the card has turned; a double tap within 250 ms counts once. Haptics:
+  the button's own, plus a tick for swipes only.
+- **Tests:** 1,333 JVM tests, 0 failures. `lintDebug`: 0 errors.
+- **Captures:** 15 emulator runs in studio `qa/out/reveal-app-r3/` (the opt-in capture test now names the width and
+  reduced motion).
+- **Not verified:** TalkBack, haptics and Android 14+ large text, which need a real phone; the "confirming" state,
+  which needs a signed-in account (its copy is JVM-tested).
+- **Owner (2026-11-12):**
+  - "PR + review together": release 0.5.5 (version code 10), merged only if CI passes and critic round 4 finds no
+    hard-gate failure;
+  - keep "AI adviser" and the rosette medal;
+  - large text "works to 200 %, polished to 130 %": cut-off or overlapping text, or an unusable control, up to 200 % is
+    a hard fail; looks are judged at 100–130 %.
+
+**Critic round 4** (PR #56 at 9f01196): **REVISE, 3.4**, with no hard gate failing. Fixed before merging, in
+`a1c994e`:
+- **The brand name:** the first headline broke it at 360 dp ("Lu- / cento Pro"). Stage headlines no longer hyphenate,
+  and "Lucento Pro" never breaks.
+- **The online-service cards:** each says where it stands under its title ("Off · needs your Lucento account" …
+  "On"). The AI card states its allowance only once the server has confirmed it ("Included until …" before then).
+- **The top band:** 64 dp once the deck is open, so the cards get the height.
+- **Line breaks:** no-break spaces in counts, "side by side", menu paths (which break only between steps) and "Pro
+  Lifetime ·"; card titles and chips break evenly.
+- **Smaller fixes:** the band's second disc is gone; the hidden Skip is disabled; "one Partner" comes from
+  `PlanCatalog`.
+- **MONETIZATION:**
+  - the welcome's rules updated;
+  - D-13 and §5 now say the Lifetime's services year runs from the purchase, which is how the app (`PurchaseInterpreter`)
+    and the server (`20261108090000_play_purchases.sql`) compute it. The docs had said "from first verification".
+- **Tests:**
+  - 1,336 JVM tests: 1,334 passed. The 2 that failed were `ProxyCallTest` socket timeouts while the emulator booted,
+    in code untouched by this work; that class passed 8/8 when re-run alone.
+  - `lintDebug`: 0 errors.
+- **Not changed (owner's calls):** the black stage; the award's confetti and rays (the badge award is a must-keep);
+  the "AI adviser" name; the rosette.
+
+## Pro perk cards: new art — 2026-11-13 (`design/perk-card-art`)
+
+The owner wasn't satisfied with the cards' drawn "Scenes" art. After three AI directions (critic r1, studio
+`critic/reports/2026-11-13-perk-art-directions-r1*`) and a hand-drawn set with people, the owner chose: simpler, no
+people, the mascot to make it livelier, faint doodles instead of plain blue, and as little empty blue as possible.
+
+- **Built:** `PerkArt.kt` draws each card's band in `AwardArtwork.CardBlue` with code-drawn doodles (white at 10–16 %),
+  one soft-3D prop (cut out, so the doodles run around it) and `LucentoMascot` (approved sprites, never redrawn)
+  stepping a little in front of it, with a pose per card (`ProTourStop.mascot`: waves first, cheers last). The pair
+  fills one art window per card (at most 0.55 of the card's width), the mascot's hand on the prop. `PerkArtCache` decodes the next card's
+  prop while the current one shows. The collection rows show each card's prop instead of an icon. Props: ten images
+  from GPT Image 2.5 (Figma), sources and prompts in `docs/design/illustrations/perks/`, exported by
+  `tools/illustrations/export_perk_art.py` (Pillow, numpy, scipy). Scene-only colours and the drawn scenes are gone.
+- **Verified:** the Pro unit tests (47, including `PerkArtTest`: one picture and one thumbnail per card; the mascot
+  greets first, cheers last, never shows concern) pass; `assembleDebug` succeeds; `ProRevealCaptureTest` captured on
+  the API 28 emulator at 411 dp light and dark, 360 dp, and 150 % text (studio `qa/out/perk-art-mascot-r3/`).
+- **Critic rounds on the app:** r1 REJECT (doodles drew under the words in dark theme; fixed by clipping first),
+  r2 REVISE 3.45, no hard gate. Then the owner chose one art window per card (at most 0.55 of the card's width); the
+  pair now leaves 12–20 % of the band empty at 360/411 dp and 100/130 % (was 20–46 %). Reports: studio
+  `critic/reports/2026-11-13-pro-cards-app-r1*.md`, `-r2*.md`.
+- **Shipped:** critic r3 REVISE 3.45, no hard gate; CI green at `7120d69`; PR #59 merged as `af4aae4`, main CI
+  green; the 0.5.6 (vc 11) AAB, upload key 56:F1:57…:95:C2, is with the owner for internal testing.
+- **Polish after r3** (owner: "Polish only", branch `design/perk-card-polish`): one short float per card
+  (`LucentoMascot(idleCycles)`), no doodle over or between the pair (`doodleSpots`, unit-tested), card 7's prop
+  without the sparkle, the hand over the prop only when pointing (10 dp apart otherwise). Three critic polish rounds
+  (REVISE 3.6, 3.7, 3.6; no hard gate); merged as #62 `f7fbaf6`, main CI green; ships in 0.5.7 (vc 12, PR #64)
+  together with #61 and #63 (KNOWN_ISSUES PB-6).
+- **Not verified:** a real phone (the hop as each card turns, OLED contrast of the doodles, prop sharpness).
+
+## Home-screen widgets — 2026-11-12 (`feature/home-widgets`)
+
+The owner chose widgets only, both free; the Quick Settings tile, the type-and-save notification and Share to Lucento
+are parked. Spec: `docs/WIDGETS.md`.
+
+- **Built:** Quick add (the composer's scan · mic · field bar) and Safe to spend (Home's figure, its reason or the
+  per-day and bills lines, the bar and verdict; Net flow when Budgets is off). Jetpack Glance 1.2.0, Compose BOM
+  2025.02.00. Settings › Home-screen widgets pins either one. Code in `feature/widget/`; the composer's entry fixes are
+  in `TransactionComposerScreen` and `LucentoRoot`.
+- **Verified on the API 28 emulator** (`Lucento_CoreScreens_API28`):
+  - Pin dialogs work.
+  - Every tap opens the right place with a single `MainActivity`: the field, Scan (camera), Speak (recogniser), Add,
+    and the body (Home).
+  - Speak tapped while the composer is already open starts the recogniser in it.
+  - On a cold start the recogniser waits for the launch logo; under App lock it opened only after the PIN.
+  - The locked state shows no amounts.
+  - With amounts shown the widget matches Home: $0.00, "Bills due take what’s left", 99 %, Ahead of pace (Home:
+    Remaining $32.01, Bills due −$1,564.99).
+  - Text at 100, 115 and 130 % keeps the full card; at 200 % the compact card shows with nothing cut.
+  - The widget redraws live inside an open Glance session when the text size changes, and Light/Dark switch at once.
+- **Tests:** `testDebugUnitTest` ran 1,351 tests in 172 suites with 0 failures; the widget suites are 9 + 12 tests,
+  including a 6×7×7 size sweep. `lintDebug` reports 0 errors and `assembleDebug` succeeds.
+- **Not verified:**
+  - Android 12+: rounded corners, the picker's preview layout, day/night colours switched by the launcher.
+  - A Samsung One UI launcher, TalkBack reading the widgets, and landscape.
+
+## Buying Lifetime again after a refund — 2026-11-13 (`fix/refunded-lifetime-rebuy`)
+
+The owner's internal-track test of 0.5.7 (vc 12):
+1. Monthly Pro, then a chargeback test. Restore purchases correctly went back to Free. Production: `400c3170…` was
+   `REVOKED` at 22:53Z and is in `revoked_purchases`.
+2. Buying Pro Lifetime: Google Play showed "Error: You already own this item".
+
+**Cause** (verified, production read-only): the Lifetime test purchase of 2026-11-12 (`a322b4f2…`) was refunded in Play
+Console without **Remove entitlement**.
+- Google's server calls that order `CANCELLED`, which is stored as `EXPIRED`.
+- The purchase check answered `EXPIRED` for it again at 22:41Z. The phone only sends that check for a purchase Play
+  still lists.
+- So Google Play still holds the purchase on that Google account while Lucento has ended it, and nothing in the app
+  ever released it (KNOWN_ISSUES PB-8).
+
+**Fix** (MONETIZATION §5.3 L-7):
+- `domain/entitlement/LifetimeRelease` (pure) picks what may be released. That's a Lifetime Play lists whose Lifetime row
+  Lucento's server ended (`REVOKED`/`EXPIRED`, same token; a server row or the purchase check's answer). Never released:
+  a Lifetime that still counts, one paused for a check, a pending payment, a services-year ending, or a subscription.
+- `PurchaseSource.consume`: Play's `consumeAsync`, the fake store, and `false` without billing.
+- `EntitlementManager.releaseEndedLifetime()` asks the purchase check about each one again, then consumes it only on a
+  fresh `REVOKED` or `EXPIRED`, then reads Play again. With no answer nothing is released. Builds without the check
+  (debug) never consume.
+- `ProViewModel.buy` runs it before Play's sheet opens for Lifetime. Never in the background, because it can't be undone.
+- When Play still answers "already owned", the page reads Play and the server again, then releases or explains
+  (`ProCopy.alreadyOwned`, "it's working" first). That happens once per purchase attempt, because the Billing Library
+  can report it twice.
+- `PlayPurchaseSource.consume` gives up after 15 s, because it runs under the manager's lock.
+- `EntitlementMerge.reconcileServer` keeps Play's reading of a new purchase the server hasn't recorded yet when the
+  server's row for that product is about an earlier one that no longer counts (PB-9).
+- Restore purchases now says a refunded Lifetime was refunded, instead of "No purchase found".
+- An independent QA review (lucento-qa, read-only) found no path that consumes a Lifetime that should still count. Its
+  points 1–5 are fixed here. Point 4c and the 410 note are recorded as PB-10.
+- Docs: MONETIZATION §5.1, §5.3 L-7, §9 and §10; CUSTOMER_COPY D-8 and D-8a; the PLAY_CONSOLE_SETUP refund runbook;
+  KNOWN_ISSUES PB-4, PB-8, PB-9 and PB-10.
+
+**Tests** (local, JBR 21, `--no-watch-fs`):
+- `testDebugUnitTest`: 1,415/1,415 in 179 suites, 0 failures. `assembleDebug` succeeds. `lintDebug`: 0 errors, 24
+  warnings.
+- New: `LifetimeReleaseTest` 9, `LifetimeRebuyTest` 8, `ProRebuyFlowTest` 5, and new cases in `EntitlementMergeTest` and
+  `ProCopyTest`.
+- Red checks:
+  - With the release before Buy disabled, `ProRebuyFlowTest`'s main case fails.
+  - With the merge rule and the once-per-attempt guard disabled, exactly their three tests fail.
+- Gradle's daemon once crashed in `native-platform-file-events.dll` (Windows file watching, not the code). Runs with
+  `--no-watch-fs` are stable.
+
+**Not verified:** a real phone. Google documents consuming as what makes a product buyable again. Whether Play consumes a
+purchase it refunded is only reported by other developers, so the owner's test on the next build is the first real check
+(NEXT_TASKS OT-25).
+
+**Owner decision (2026-11-13):** "PR, merge when green, no bump". It ships with the next release; main stays 0.5.7
+(vc 12) until then.

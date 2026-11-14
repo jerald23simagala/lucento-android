@@ -110,12 +110,14 @@ import com.lucento.app.domain.ask.Report
 import com.lucento.app.domain.ask.ReportKind
 import com.lucento.app.domain.ask.ReportLine
 import com.lucento.app.domain.ask.ReportSection
+import com.lucento.app.feature.reports.icon
 import java.time.YearMonth
 
 /**
- * Ask Lucento: questions about the user's own money, and the preset reports as PDFs. The page opens with Lucento's
- * greeting, preset questions and the four statements; every answer says who worked it out (this phone, or Gemini with
- * figures from this phone). AI answers are off until the user agrees in the consent sheet.
+ * Ask Lucento: questions about the user's own money. The page opens with Lucento's greeting and preset questions; every
+ * answer says who worked it out (this phone, or Gemini with figures from this phone), and an answer worked out as a
+ * report opens it in full. The built-in reports themselves live on Insights (tester round 3). AI answers are off until
+ * the user agrees in the consent sheet.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -195,14 +197,16 @@ fun AskLucentoScreen(
                     MascotSpeech(
                         title = "Ask me about your money",
                         body = if (state.aiActive) {
-                            "I answer from your own records and suggest what to do next. Reports are worked out on this phone and can be saved as PDFs."
+                            "I answer from your own records and suggest what to do next. Your reports are on Insights."
                         } else {
-                            "I answer from your own records. Reports are worked out on this phone and can be saved as PDFs."
+                            "I answer from your own records, worked out on this phone. Your reports are on Insights."
                         },
                         mood = if (state.messages.isEmpty()) MascotMood.Greeting else MascotMood.Happy,
                         mascotSize = 64.dp,
                     )
-                    AiStatus(state, onTurnOn = { askingConsent = true })
+                    Box {
+                        AiStatus(state, onTurnOn = { askingConsent = true })
+                    }
                 }
             }
             if (state.messages.isEmpty()) {
@@ -226,12 +230,6 @@ fun AskLucentoScreen(
                                 ChoicePill(label = q, selected = false, onClick = { send(q) }, role = androidx.compose.ui.semantics.Role.Button)
                             }
                         }
-                    }
-                }
-                item(key = "reports") {
-                    Column {
-                        SmallLabel("Reports")
-                        ReportTiles(onOpen = { kind -> haptics.tick(); viewModel.openReport(kind) })
                     }
                 }
             } else {
@@ -262,17 +260,6 @@ fun AskLucentoScreen(
             }
         }
 
-        // Preset questions stay one tap away once the conversation has started.
-        if (state.messages.isNotEmpty()) {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Spacing.gutter, vertical = Spacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                ReportKind.entries.filter { it != ReportKind.TOP_CATEGORIES }.forEach { kind ->
-                    ChoicePill(label = kind.title, selected = false, leadingIcon = kind.icon, onClick = { viewModel.openReport(kind) }, role = androidx.compose.ui.semantics.Role.Button)
-                }
-            }
-        }
         ChatInputBar(Modifier.padding(horizontal = Spacing.gutter).padding(bottom = Spacing.sm, top = Spacing.xxs).navigationBarsPadding()) {
             ChatMessageField(
                 value = input,
@@ -300,7 +287,7 @@ fun AskLucentoScreen(
         )
     }
     openReport?.let { report ->
-        ReportSheet(
+        com.lucento.app.feature.reports.ReportSheet(
             initial = report,
             rebuild = viewModel::rebuild,
             onSave = viewModel::savePdf,
@@ -331,52 +318,8 @@ private fun AiStatus(state: AskUiState, onTurnOn: () -> Unit) {
                 Text("$it left today", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
-            StatusPill("Reports on this phone", StatusTones.neutral)
+            StatusPill("Answers on this phone", StatusTones.neutral)
             if (state.aiAvailable) LucentoTextButton(text = "Turn on AI answers", onClick = onTurnOn)
-        }
-    }
-}
-
-private val ReportKind.icon: ImageVector
-    get() = when (this) {
-        ReportKind.NET_WORTH -> Icons.Outlined.AccountBalance
-        ReportKind.CASH_FLOW -> Icons.Outlined.SwapVert
-        ReportKind.BUDGET_VS_ACTUAL -> Icons.Outlined.PieChart
-        ReportKind.DEBTS -> Icons.Outlined.CreditCard
-        ReportKind.TOP_CATEGORIES -> Icons.Outlined.Description
-    }
-
-private val ReportKind.caption: String
-    get() = when (this) {
-        ReportKind.NET_WORTH -> "Assets, debts, the change"
-        ReportKind.CASH_FLOW -> "Income and spending by category"
-        ReportKind.BUDGET_VS_ACTUAL -> "Each category against its budget"
-        ReportKind.DEBTS -> "Balances, rates, next payments"
-        ReportKind.TOP_CATEGORIES -> "Where the money went"
-    }
-
-/** The four statements as a two-by-two grid of tiles. */
-@Composable
-private fun ReportTiles(onOpen: (ReportKind) -> Unit) {
-    val kinds = listOf(ReportKind.NET_WORTH, ReportKind.CASH_FLOW, ReportKind.BUDGET_VS_ACTUAL, ReportKind.DEBTS)
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        kinds.chunked(2).forEach { pair ->
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                pair.forEach { kind ->
-                    LucentoCard(modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onOpen(kind) }, contentPadding = Spacing.md) {
-                        IconTile(
-                            kind.icon,
-                            container = MaterialTheme.colorScheme.primaryContainer,
-                            content = MaterialTheme.colorScheme.onPrimaryContainer,
-                            size = 36.dp,
-                            shape = RoundedCornerShape(11.dp),
-                        )
-                        Spacer(Modifier.height(Spacing.sm))
-                        Text(kind.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
-                        Text(kind.caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                    }
-                }
-            }
         }
     }
 }
@@ -522,183 +465,6 @@ private fun PreviewLine(line: ReportLine) {
 }
 
 /**
- * The full statement: month stepper (not for debts, which are as of today), the headline, every section and its total,
- * how it was calculated, and Save as PDF / Share. Built again on the phone for each month chosen.
- */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
-private fun ReportSheet(
-    initial: Report,
-    rebuild: (Report, YearMonth) -> Report?,
-    onSave: (Report, android.net.Uri, android.content.ContentResolver, (Boolean) -> Unit) -> Unit,
-    onShare: (Report, (java.io.File?) -> Unit) -> Unit,
-    onDismiss: () -> Unit,
-    /** Lucento Pro: the statement stays on screen; Save as PDF and Share wait for a plan that includes them. */
-    pdfLocked: Boolean = false,
-) {
-    val context = LocalContext.current
-    val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
-    var report by remember(initial) { mutableStateOf(initial) }
-    var message by remember { mutableStateOf<String?>(null) }
-    val current = remember { YearMonth.now() }
-    val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
-        if (uri != null) onSave(report, uri, context.contentResolver) { ok -> message = if (ok) "Saved as a PDF." else "The PDF couldn’t be saved. Try again." }
-    }
-    LucentoBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.gutter)
-                .navigationBarsPadding(),
-        ) {
-            SheetHeader(title = report.title, subtitle = "${report.period} · ${report.currencyCode}", icon = report.kind.icon)
-            if (report.kind != ReportKind.DEBTS) {
-                MonthStepper(
-                    month = report.month,
-                    canGoBack = report.month > current.minusMonths(24),
-                    canGoForward = report.month < current,
-                    onMonth = { m -> rebuild(report, m)?.let { report = it; message = null } },
-                )
-                Spacer(Modifier.height(Spacing.sm))
-            }
-            ReportBody(report)
-            Spacer(Modifier.height(Spacing.md))
-            message?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                Spacer(Modifier.height(Spacing.sm))
-            }
-            if (pdfLocked) {
-                com.lucento.app.feature.pro.ProNote(
-                    com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.PDF_STATEMENTS),
-                    from = com.lucento.app.domain.entitlement.ProFeature.PDF_STATEMENTS,
-                    open = { feature -> onDismiss(); openPro(feature) },
-                )
-                Spacer(Modifier.height(Spacing.lg))
-                return@Column
-            }
-            LucentoPrimaryButton(text = "Save as PDF", icon = Icons.Outlined.PictureAsPdf, onClick = { saver.launch(ReportPdfWriter.fileName(report)) })
-            Spacer(Modifier.height(Spacing.sm))
-            LucentoSecondaryButton(
-                text = "Share",
-                icon = Icons.Outlined.Share,
-                onClick = {
-                    onShare(report) { file ->
-                        if (file == null) {
-                            message = "The PDF couldn’t be prepared. Try again."
-                        } else {
-                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                            val send = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/pdf"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                putExtra(Intent.EXTRA_SUBJECT, "${report.title} · ${report.period}")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(send, "Share ${report.title}"))
-                        }
-                    }
-                },
-            )
-            Spacer(Modifier.height(Spacing.lg))
-        }
-    }
-}
-
-@Composable
-private fun MonthStepper(month: YearMonth, canGoBack: Boolean, canGoForward: Boolean, onMonth: (YearMonth) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(50)),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = { onMonth(month.minusMonths(1)) }, enabled = canGoBack) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
-        }
-        Text(
-            month.month.getDisplayName(java.time.format.TextStyle.FULL_STANDALONE, java.util.Locale.getDefault()) + " ${month.year}",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.weight(1f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-        IconButton(onClick = { onMonth(month.plusMonths(1)) }, enabled = canGoForward) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
-        }
-    }
-}
-
-/** The statement on screen: the headline on a tinted panel, then each section as rows with its total. */
-@Composable
-private fun ReportBody(report: Report) {
-    val colors = MaterialTheme.colorScheme
-    Column(
-        Modifier.fillMaxWidth().background(colors.primaryContainer.copy(alpha = 0.55f), RoundedCornerShape(18.dp)).padding(Spacing.md),
-    ) {
-        Text(report.headline.label.uppercase(), style = MaterialTheme.typography.labelSmall, color = colors.onPrimaryContainer)
-        report.headline.values.firstOrNull()?.let { MoneyText(money = it, style = AmountStyles.hero, color = colors.onSurface, fractionScale = 1f, minScale = 0.5f) }
-        report.headline.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant) }
-    }
-    report.sections.forEach { section ->
-        Spacer(Modifier.height(Spacing.md))
-        SectionTable(section)
-    }
-    Spacer(Modifier.height(Spacing.md))
-    report.notes.forEach { note ->
-        Text("• $note", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(bottom = Spacing.xxs))
-    }
-}
-
-@Composable
-private fun SectionTable(section: ReportSection) {
-    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
-        CardOverline(section.title)
-        Spacer(Modifier.height(Spacing.xs))
-        if (section.lines.isEmpty() && section.total == null) {
-            Text(section.emptyText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        section.lines.forEachIndexed { i, line ->
-            if (i > 0) Hairline()
-            TableLine(line, section.columns)
-        }
-        section.total?.let {
-            if (section.lines.isNotEmpty()) Hairline(strong = true)
-            TableLine(it, section.columns)
-        }
-    }
-}
-
-/** One row: a single figure sits at the end; several (budget, spent, left) sit under the label with their headers. */
-@Composable
-private fun TableLine(line: ReportLine, columns: List<String>) {
-    val colors = MaterialTheme.colorScheme
-    val weight = if (line.emphasis) FontWeight.Bold else FontWeight.Normal
-    Column(Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(vertical = Spacing.xs), verticalArrangement = Arrangement.Center) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(line.label, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = if (line.emphasis) FontWeight.Bold else FontWeight.Medium))
-                line.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant) }
-            }
-            if (columns.size <= 1) {
-                line.values.firstOrNull()?.let { amount ->
-                    Spacer(Modifier.width(Spacing.sm))
-                    MoneyText(money = amount, style = AmountStyles.row.copy(fontWeight = weight), color = colors.onSurface, fractionScale = 1f, minScale = 0.6f)
-                }
-            }
-        }
-        if (columns.size > 1) {
-            Row(Modifier.fillMaxWidth().padding(top = Spacing.xxs)) {
-                columns.forEachIndexed { i, header ->
-                    Column(Modifier.weight(1f), horizontalAlignment = if (i == columns.lastIndex) Alignment.End else Alignment.Start) {
-                        Text(header, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
-                        val value: Money? = line.values.getOrNull(i)
-                        if (value != null) MoneyText(money = value, style = AmountStyles.small.copy(fontWeight = weight), color = colors.onSurface, fractionScale = 1f, minScale = 0.6f)
-                        else Text("—", style = AmountStyles.small, color = colors.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
  * The consent for AI answers: what is sent, what never is, where it goes, the daily allowance and that it can be turned
  * off. Nothing is sent until "Turn on AI answers".
  */
@@ -710,6 +476,7 @@ private fun AiConsentSheet(onAccept: () -> Unit, onDismiss: () -> Unit) {
             SheetHeader(title = "Turn on AI answers?", subtitle = "Ask anything about your money and get advice, answered by Gemini.", icon = Icons.Outlined.AutoAwesome)
             ConsentPoint("Sent", AI_SENT)
             ConsentPoint("Never sent", AI_NEVER_SENT)
+            ConsentPoint("Google", com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE)
             ConsentPoint("Checked here", "Every amount in an answer is one of your figures, or a sum this phone worked out from them — shown in bold. Gemini gives you its own recommendations from your figures, but AI can misread a question or miss something only you know, so check advice before you act on it.")
             ConsentPoint("Limits", "Needs your sync account. Each account has a daily allowance, shared with Smarter reading. Turn this off any time from the menu or Settings.")
             Spacer(Modifier.height(Spacing.md))

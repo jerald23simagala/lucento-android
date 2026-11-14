@@ -655,7 +655,9 @@ class OnboardingViewModel(
                     return@launch
                 }
                 when (val result = repository.sync()) {
-                    is com.lucento.app.data.sync.SyncResult.Success -> {
+                    // UploadsPaused: the download finished; only this phone's uploads wait for the plan (security audit
+                    // F-01), so the restore is complete either way.
+                    is com.lucento.app.data.sync.SyncResult.Success, is com.lucento.app.data.sync.SyncResult.UploadsPaused -> {
                         val partner = syncPreferences?.sharedSpaceOwnerId() != null
                         val restoredWallets = wallets?.observeWallets()?.first().orEmpty()
                         val restoredCategories = categories.observeCategories().first()

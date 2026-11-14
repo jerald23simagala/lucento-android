@@ -337,6 +337,23 @@ phone is one more device of the Owner's ledger.
   insert and update also use `with check`, so a row can't be created for, or moved to, another account. The client
   filters by `user_id` too, but that is not the boundary.
 - Composite foreign keys `(user_id, parent_id)` stop a row from referencing another user's parent.
+- **The plan is enforced by the database** (security audit F-01, `20261111090000_cloud_write_gate_and_quotas.sql`): every
+  INSERT and UPDATE policy of the synced tables also needs the CLOUD capability (`lucento_private.has_capability`, read
+  from `public.entitlements`, never from the request). A Partner writes the space's transactions on the Owner's plan,
+  resolved from `space_members`; while `plan_limits.partner_sync_after_owner_lapse` is 1 (the default, the lenient rule of
+  docs/MONETIZATION.md §6.4) a Partner keeps writing after the Owner's plan lapses. SELECT and DELETE aren't gated, so a
+  lapsed account still restores everything and can clean up.
+- **Plan refusals on the phone.** A refused write (SQLSTATE 42501) or a full ledger (LU001, below) becomes
+  `UploadRefusedException` in `SupabaseSyncRemote`; `SyncRepository` stops uploading for that cycle, still pulls, keeps
+  every refused row and deletion pending, shows a plain message (`SyncResult.UploadsPaused`) and asks the app to re-read
+  its plan. Under the same plan (`ProGates.cloudPlanFingerprint`) it doesn't try to upload again for 30 minutes; a renewal
+  changes the fingerprint and uploads resume at once. `SyncWorker` never answers `retry()` for it.
+- **Bounds.** Live rows: notes ≤ 500 characters, names ≤ 100, ids ≤ 128 (CHECK, NOT VALID; a soft delete always
+  succeeds). Per account and table, a row ceiling (200,000 transactions; `lucento_private.plan_limits` `max_rows_*`)
+  kept by a counter row whose upsert lock serialises concurrent writers (`tools/sql-verify/concurrency.mjs`), and at most
+  1,000 rows per statement (LU002). The phone uploads in chunks of 500 and holds a row that breaks a bound back on its own
+  (`PulledRowRules.uploadProblem`) instead of failing its batch. A `seed-<id>-…` category id is accepted only under the
+  account it names (F-07).
 - Verified against the live project as the real `authenticated` and `anon` roles, inside transactions that were
   rolled back (throwaway `auth.users` rows; nothing persisted): user A can't write a row owned by B or move its row to
   B; B sees, updates and deletes 0 of A's rows and can't upsert onto A's id; signed-out reads are denied; a stale

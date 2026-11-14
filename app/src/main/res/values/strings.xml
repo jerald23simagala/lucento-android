@@ -3,4 +3,14 @@
     <string name="app_name">Lucento</string>
     <string name="backup_goal_photos_not_included">Goal photos aren\'t included in backups yet.</string>
     <string name="backup_file_not_encrypted">This file isn\'t encrypted. It contains your full financial history, so keep it somewhere private and don\'t share it.</string>
+
+    <!-- Home-screen widgets (docs/WIDGETS.md): names and descriptions in the widget picker, and its previews. -->
+    <string name="widget_quick_add_label">Quick add</string>
+    <string name="widget_quick_add_description">Type, speak or scan a transaction into Lucento.</string>
+    <string name="widget_safe_to_spend_label">Safe to spend</string>
+    <string name="widget_safe_to_spend_description">This month\'s Safe to spend from Home, with Add.</string>
+    <string name="widget_preview_add_a_transaction">Add a transaction</string>
+    <string name="widget_preview_safe_to_spend">SAFE TO SPEND</string>
+    <string name="widget_preview_add">Add</string>
+    <string name="widget_preview_hidden_amount">••••</string>
 </resources>

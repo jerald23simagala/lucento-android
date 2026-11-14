@@ -103,6 +103,8 @@ object LocalAnswers {
                 }
             }
             ReportKind.NET_WORTH -> "Your net worth is $figure ${report.phrase}" + (report.headline.detail?.let { ", $it." } ?: ".")
+            ReportKind.WALLET_STATEMENT -> "${report.subject ?: "This wallet"} ended ${report.phrase} at $figure" +
+                (report.headline.detail?.let { " ($it)." } ?: ".")
             ReportKind.CASH_FLOW -> "In ${report.phrase}, ${Figures.plain(total("Income"))} came in and ${Figures.plain(total("Expenses"))} went out: " +
                 "a ${report.headline.label.lowercase(Locale.getDefault())} of ${Figures.signed(head ?: zero)}."
             ReportKind.BUDGET_VS_ACTUAL -> if (report.headline.detail == "No budget set for this month") {

@@ -136,7 +136,7 @@ Checked against the eight requirements in the brief:
 | Requirement | Today | With the §5 design |
 |---|---|---|
 | 1. Opens without internet | Yes — Room is the source of truth; `AppViewModel` makes no network call on start; Shared refresh and launch sync are best-effort and only when enabled | Unchanged. Entitlement is read from DataStore first, then from Play's local cache (`queryPurchasesAsync` works offline for purchases already on the device) |
-| 2. No validation on every open | n/a | Lifetime snapshot is honoured without re-verification. Re-verification is **opportunistic** (when Play or the server happens to be reachable) and only ever *adds* information; failure to verify never removes Lifetime (§5.3 rule L-2) |
+| 2. No validation on every open | n/a | Lifetime snapshot is honoured without re-verification on each open. It needs **one** successful check a month, from Play's reading on the phone or from the server. Without one it is paused until either answers, and never ended (§5.3 rule L-2, owner decision 2026-11-12) |
 | 3. Local records accessible | Yes | Entitlement never filters data reads; it only gates *creation* and *entry points* (§6.3) |
 | 4. Budget calculations offline | Yes (`domain/`, pure) | Unchanged; no calculator reads entitlement |
 | 5. Survives Supabase being down | Sync fails gracefully today (chip shows error) | Server entitlement is a *secondary* source; Play + cache are primary for group A. Group B/C stop working when the servers are down, which is true for everyone and is stated in the promise |
@@ -226,7 +226,7 @@ Pro-sized life.
 | Feature | Status | F | S | L | Offline | Gate |
 |---|---|---|---|---|---|---|
 | Insights: income vs expenses, net flow, monthly comparison | Shipped | **Last 3 months** | 3 / 6 / 12 months | 3 / 6 / 12 months | Yes | `InsightsViewModel` period selection: 6 and 12 → `Locked`; chips stay visible with a Pro badge (D-4) |
-| Insights: what your net worth is made of (by kind, shares) | Shipped | — | ✔ | ✔ | Yes | section renders a locked preview (totals hidden, structure shown) |
+| ~~Insights: what your net worth is made of~~ | Retired 2026-11-11 (tester round 3): removed from Insights; Wallets shows assets and liabilities by kind on every plan | — | — | — | — | `ProFeature.NET_WORTH_COMPOSITION` deleted |
 | Insights: FX gains and losses | Shipped (v13) | — (no foreign wallets on Free; existing ones still show) | ✔ | ✔ | Yes | follows the data |
 | Ask Lucento: on-phone answers, four statements on screen (net worth, cash flow, budget vs actual, debts), top categories | Shipped | ✔ | ✔ | ✔ | Yes | none |
 | Ask Lucento: **statements as PDF** (save / share) | Shipped | — | ✔ | ✔ | Yes | `AskLucentoViewModel` PDF actions → `ProRequired` |
@@ -282,7 +282,7 @@ bait-and-switch in onboarding.
 | Product id | Type | Base plans / offers | Grants |
 |---|---|---|---|
 | `lucento_pro` | Subscription | `monthly` (P1M), `annual` (P1Y) + 7-day free trial offer on annual (once per account) | A + B + C + D while active |
-| `lucento_pro_lifetime` | One-time, non-consumable | single purchase option | A forever; B + C + D for 12 months from first verification |
+| `lucento_pro_lifetime` | One-time, non-consumable | single purchase option | A forever; B + C + D for 12 months from the purchase |
 | `lucento_cloud` | Subscription | `monthly` (P1M), `annual` (P1Y); **only offered to Lifetime owners** (hidden otherwise) | B + C + D while active |
 
 The app never shows two routes to the same thing: a Free user sees Pro Subscription and Pro Lifetime; a Lifetime owner
@@ -378,7 +378,7 @@ data class EntitlementState(val entitlements: List<Entitlement>, val evaluatedAt
 }
 
 enum class ProFeature(val requires: Capability) { MONEY_WALLETS, DEBT_ACCOUNTS, RECEIVABLES, VALUED_ASSETS, FOREIGN_CURRENCY_WALLETS,
-    SAVINGS_GOALS, INSIGHTS_LONG_PERIODS, NET_WORTH_COMPOSITION, PDF_STATEMENTS, EXTRA_THEMES,
+    SAVINGS_GOALS, INSIGHTS_LONG_PERIODS, PDF_STATEMENTS, EXTRA_THEMES,
     CLOUD_SYNC, CLOUD_RESTORE, AI_ADVISER, SMART_READING, SHARED_SPACE }   // "ProFeature": domain/Features.kt already owns "Feature" (module toggles)
 
 object PlanCatalog {                                      // data: the whole matrix in one tested object
@@ -406,8 +406,22 @@ One Boolean cannot say any of that. Why not an enum `FREE | PRO | LIFETIME`: the
    `PurchasesUpdatedListener`) — authoritative for *adding* A and for PENDING.
 3. **Cached snapshot** (DataStore) — what the UI shows in the first frame and whenever 1 and 2 are unavailable.
 
-Rule: a newer verified reading replaces an older one **per source**; an unreachable source never downgrades anything
-(see L-2). A `REVOKED` from the server or a purchase missing from Play's list *after a successful query* does.
+Rule: a newer verified reading replaces an older one **per source**. An unreachable source never downgrades anything,
+except that anything bought through Google Play needs one check a month (L-2). A `REVOKED` or `EXPIRED` from the server, or a
+purchase missing from Play's list *after a successful query*, does. A purchase the server ended stays ended on the phone
+while Play's copy still lists it (same purchase token: offline, on Play's pushes, and after signing out, since the cached
+snapshot is device-level), and a new purchase counts at once (owner decision 2026-11-12: Play's copy on the phone can
+lag behind a refund). "Ended" is `REVOKED` or `EXPIRED`: a Play Console refund of a Lifetime reaches the server as
+Play's `CANCELLED`, stored as `EXPIRED` (owner's test 2026-11-13), and buying again after a subscription expires is a new
+purchase with a new token. Account hold and pause keep their token, so Play's reading still wins over those. Without an
+account, the purchase check (SERVER_CONTRACT §3b, owner decision 2026-11-13) supplies the same server word for each
+purchase Play lists, so a phone that is signed out, cleared or reinstalled can't keep a refunded purchase either (§5.3
+L-6). Mandatory sign-in was considered and declined: it wouldn't help offline, and the purchase is enough to ask about.
+An ended Lifetime that Play still holds is released when the person buys Lifetime again (§5.3 L-7), so Play sells a new
+one instead of answering "You already own this item". The server's answer replaces the phone's rows for the keys it
+holds, except a different purchase of the same product while the server's row no longer counts. That's a product bought
+again after a refund or an expiry that `/verify` hasn't recorded yet: Play's reading of it stays (`EntitlementMerge`,
+KNOWN_ISSUES PB-9).
 
 ### 5.2 Where gates live (and nowhere else)
 
@@ -434,15 +448,24 @@ verification and is ignored.
 
 | Rule | Subscription sources | Lifetime (`LOCAL_PRO`) |
 |---|---|---|
-| L-1 Honoured offline | until `expiresAt` + 3 days (Play's own grace / hold states are already inside `expiresAt` once verified) | **indefinitely** — `expiresAt = null` |
-| L-2 Verification failure | no change until expiry | **no change, ever**. Only a successful Play query that omits the purchase, or a server `REVOKED`, removes it |
+| L-1 Honoured offline | until `expiresAt` + 3 days (Play's own grace / hold states are already inside `expiresAt` once verified), and at most a month after the last check by Play or the server (L-2) | for **a month after the last check** by Play or the server. `expiresAt = null`, so one check a month keeps it for good |
+| L-2 Verification failure | no change until expiry, but after 30 days without a check it is **paused** until Play or the server answers ("Lucento needs to check your Lucento Pro", `PlanNotice.PRO_NEEDS_CHECK`). Owner decision 2026-11-12: a refunded annual subscriber can't keep the rest of the paid year by blocking Lucento's server | **paused, never ended**. After 30 days without a check (a successful Play reading that lists it, or a server fetch), it stops counting until either answers. The person sees "Lucento needs to check your Pro Lifetime" (`PlanNotice.LIFETIME_NEEDS_CHECK`). Only a successful Play query that omits the purchase, or a server `REVOKED` or `EXPIRED` for that purchase, ends it. Owner decision 2026-11-12: switching off the Play Store app, or blocking Lucento's server, no longer keeps a refunded Lifetime |
 | L-3 Re-verification | every start (Play), every 12 h open (server) | opportunistic; informational |
-| L-4 Clock tampering | can extend a lapsed subscription offline by at most the grace; accepted | irrelevant |
+| L-4 Clock tampering | can extend a lapsed subscription offline by at most the grace; accepted | turning the clock back can stretch the month; accepted (it breaks everything else on the phone) |
 | L-5 MAC failure (tampered / copied) | entry ignored → Free until re-verified | entry ignored → Free until Play or the account restores it (one tap, needs internet once) |
+| L-6 Lucento's confirmation (owner decisions 2026-11-13) | the same as Lifetime | Google Play's copy on the phone can lag days behind a refund, so its word alone carries a purchase only for **3 days from the purchase time** until Lucento's server confirms it, then for **90 days after each confirmation**. Then it's paused, never ended, with the same notice as L-2. Confirmation comes from the purchase check (`POST /api/billing/check`, SERVER_CONTRACT §3b), which needs no account and runs while online at most every 6 hours. The account's own row for that purchase also confirms it. A `REVOKED` or `EXPIRED` answer ends it on the phone for good, and Play's copy can't bring it back. Google signs the purchase time, so signing out, clearing data, reinstalling or switching Play profiles never restarts the 3 days. What's left is a purchase confirmed before its refund, on a phone kept away from Lucento's server: it lasts until Play's copy catches up, or 90 days at most. Builds without the check (debug, the plan simulator) take Play's word as before, and so do snapshots cached before it existed |
+| L-7 Buying again after a refund (owner's test 2026-11-13) | n/a: Play can't consume a subscription, and it stops listing one that was revoked or has expired | A Play Console refund leaves the purchase owned in Google Play unless **Remove entitlement** is ticked, and Google can't remove it afterwards. Lucento still ends it (L-6), so Play refused a new Lifetime with "You already own this item" while Lucento showed the free plan. Now **Buy Lifetime first consumes each Lifetime that Play still lists and Lucento's server reported `REVOKED` or `EXPIRED`** for that purchase token (a server row, or the purchase check's answer), then opens Play's sheet. Consuming is Google's way to make a product buyable again. It can't be undone, so the purchase check is asked again right before, whatever this phone heard earlier. Only a fresh `REVOKED` or `EXPIRED` releases it, and no answer releases nothing. Builds without the purchase check (debug) never consume. These are never consumed: a Lifetime that still counts, one paused for a check, a pending payment, or one whose only ended row is the services year. It only runs when the person buys, never in the background. If Play still answers "already owned", the page reads Play and the server again, once per attempt. Then it says the Lifetime is working, or releases one it has just learned was refunded, or explains. The new purchase counts at once, even before the server records it (§5.1, KNOWN_ISSUES PB-9). `LifetimeRelease`, `EntitlementManager.releaseEndedLifetime`, `LifetimeRebuyTest`, `ProRebuyFlowTest` |
 
-The Lifetime's **12-month services period** is a `PLAY_LIFETIME` entitlement granting `{CLOUD, AI_PRO, SHARED}` with
-`expiresAt = firstVerifiedAt + 365 days`, written by the **server** at first verification (so a reinstall cannot
-restart the year) and cached locally under subscription rules.
+`checkedAt` (2026-11-12) is when this phone last heard about a row from its verifier: Play's reading for a Play row,
+the latest successful server fetch for a server row. The cached snapshot stores it; a snapshot written before it
+reads as checked when verified. Play reads from its own copy on the phone and usually works offline, but that copy can
+go stale offline, so a phone with no internet for a month pauses a plan bought through Play until it is online
+once. Grants are server-only and keep their own dates.
+
+The Lifetime's **12-month services period** is a `PLAY_LIFETIME_SERVICES` entitlement granting
+`{CLOUD, AI_PRO, SHARED}` with `expiresAt = purchase time + 365 days`. The purchase time is Google's, so neither a
+reinstall nor a later first sign-in restarts the year. The server writes it at verification, the phone computes the
+same date from the purchase (`PurchaseInterpreter`), and it is cached locally under subscription rules.
 
 ### 5.4 Server side (Supabase + Vercel)
 
@@ -515,7 +538,7 @@ entitlement is DataStore, server state is new Supabase tables.
 No launch interstitials, no repeated popups, no countdowns, no red badges, no pre-checked boxes. The upgrade sheet
 opens only from the tap that would have used the locked thing. "Not now" is remembered per place per session. A
 dedicated **Lucento Pro** page lives in the profile menu and Settings; it is the only place that *initiates* selling.
-The mascot appears once, on that page. Badges (`ProBadge`, "Pro") sit inline next to labels; a person who holds the
+The mascot appears on that page, and in the welcome after a purchase (§6.5). Badges (`ProBadge`, "Pro") sit inline next to labels; a person who holds the
 capability never sees them. All copy is in `CUSTOMER_COPY.md` D.
 
 **Member mark and the profile menu card (owner, 2026-11-09, options A and E).** A person on Pro or Pro Lifetime sees
@@ -545,7 +568,8 @@ Cloud until 6 Nov 2027" · "Pro Lifetime · Cloud ended" · "Courtesy access unt
 5. PDF: the on-screen statement stays; Save / Share show the lock.
 6. Data paths stay alive: foreign wallets keep quoting and translating, FX results keep showing, AI consent stays stored.
 7. The person is told **once**, on the first start after the change, which things are now restricted — one sheet,
-   one list, one "OK" (`CUSTOMER_COPY.md` D-7).
+   one list, one "OK" (`CUSTOMER_COPY.md` D-7). A Lifetime paused for want of a check (§5.3 L-2) says that instead:
+   it wasn't refunded, and one check brings it back.
 
 ### 6.4 Service lapse (B / C / D)
 
@@ -560,6 +584,109 @@ removing them or them leaving ends membership (shipped behaviour). A Partner's *
 ledger if they leave.
 
 ---
+
+### 6.5 Welcome to Pro (owner, 2026-11-12)
+
+The one moment Pro takes over the screen, because a purchase that changes nothing visible felt "too silent". It plays
+straight after Google Play confirms a plan (a purchase, a trial, or the first restore on a phone), once per plan, and
+only after a committed write: never for a pending payment, a renewal, or a trial turning paid. Rules:
+`domain/entitlement/ProWelcome.kt` (JVM-tested); screens: `feature/pro/welcome/`.
+
+1. **The deck.** The owner chose "Deck, unwrapped" on 2026-11-12, after the spotlight tour's buttons failed on real
+   phones (KNOWN_ISSUES PW-1). It shows up to ten cards in five chapters, one per thing Pro opened, held in a gold band
+   with the Lucento symbol.
+   - "Open your Pro deck" slides the band off and turns the first card, with the welcome's only burst. After that it's
+     one card at a time:
+     - Next, or a swipe left.
+     - Previous, or a swipe right.
+     - Skip to the collection.
+   - Next stays in one place from the first card to the last: Previous keeps its room, and Next is as tall as its
+     longest label needs. Once the deck is open, the top band holds only the counter and Skip. When a label wouldn't fit on one line (large text, a narrow phone), the buttons stack, Next
+     above Previous. A tap that lands while a card is turning is kept and acted on once it has turned; a second tap
+     within 250 ms of a step is the same tap twice and is ignored, so a double tap never skips a card.
+   - A welcome back and the replay open on the plain deck ("Reveal your first perk").
+   - Each card has:
+     - its art (`PerkArt.kt`; owner, 2026-11-13: "simpler, and add our mascot", then "subtle doodles instead of plain
+       blue"): Lucento, the mascot, beside one simple prop for the perk (its hand on it when it points), on the cards'
+       blue with faint doodles that keep clear of the pair. The mascot hops in as the card turns, over a soft
+       shadow, floats once and rests, and takes a pose that suits the card (it
+       waves on the first, points on every other card, smiles or thinks between, never the same picture twice in a
+       row; its cheer is kept for the award); reduced motion shows it still. Every card has the same art window, at
+       most 0.55 of the card's width, which the pair fills (owner, 2026-11-13: "Same-size art window"); it gives up
+       height only when the words need it (never below 300 : 84), and a card with few words ends with plain card
+       under its words, so a card never has a gap or a cropped prop; at the largest text it gives way. The
+       next card's prop is decoded while the current card shows, so a face is ready the moment it turns;
+     - then, in this order, so the numbers stay in view at large text: the title, what changed (free plan → this plan,
+       from `PlanCatalog`), how long an online service is included, where it lives in the app, and a sentence;
+     - beyond the card the words scroll, with a "More" pill on a solid band (it never sits over words).
+   - "Where it lives" is said in words ("Tap Add at the top right of Wallets"). On an empty page it names the button
+     the page really has.
+   - The chapters:
+     - *Your money*: wallets, net worth, and Smarter reading with Gemini.
+     - *Your goals*.
+     - *Your insights*: 6 and 12 months, PDF statements, and AI answers with Gemini.
+     - *Beyond this phone*: sync and restore, and Lucento Shared.
+     - *Make it yours*: the three themes.
+
+   Rules for the cards:
+   - **What's left out:**
+     - cards for modules that are switched off, and for capabilities the plan lacks;
+     - in a build without cloud sync (no Lucento account possible), the Gemini, sync and Lucento Shared cards;
+     - on a Partner's phone, the wallets and Lucento Shared cards.
+   - **Signed-out buyers** still see the Gemini, sync and Lucento Shared cards. They say plainly that the feature uses a
+     Lucento account, and where to sign in.
+   - **Opt-in stays opt-in.** Smarter reading and AI answers say where to turn them on. They say "On" only when the
+     person has turned them on.
+   - **Where a service stands comes first**, right under the card's title: "Off · needs your Lucento account", "Waiting
+     for your account to confirm Pro", "Off until you turn it on" or "On". At large text the condition is never hidden
+     under "More" while a number shows.
+   - **Terms for online services** (`ProCopy.serviceTerm`):
+     - "Included until Nov 12, 2027" for a Lifetime's included year, with the date read from its entitlement;
+     - "While you subscribe" for a subscription;
+     - "With Lucento Cloud" for the add-on.
+   - **The AI card** says "50 a day until Nov 12, 2027, then 10 a month": the allowance falls back to the free plan's;
+     it doesn't stop. It shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan, and
+     until then it says "Included until …" like the other services.
+   - **What runs on the phone** never carries a term: it's owned.
+   - **Back:** the system Back key goes to the collection.
+   - **No side effects:** nothing in the deck changes data or consents, and it never moves through the app's screens.
+   - **Touches:** it takes every touch that lands on the dim, and the screen under it is hidden from TalkBack and focus.
+     The touch blocker lies beside the cards, never around them (PW-1).
+   - **TalkBack** hears each card as it turns ("2 of 10. Count everything you have."). The counter is the welcome's one
+     live region, so nothing is heard twice.
+   - **The stage** is the same for every moment, and solid, so nothing beneath shows. While it is up, the status and
+     navigation bars draw light icons.
+   - **Words:** the brand's name, counts ("10 perks", "50 a day") and menu paths ("Settings › Account & sync") never
+     break inside; stage headlines never hyphenate.
+2. **The collection.**
+   - **Title:** "Congratulations, you're Pro" ("You're Pro" from 130 % text, so no word breaks); "Welcome back to Pro"
+     for a returning or restored plan; "What Pro gives you" on a replay. Stage headlines grow with the text size up to
+     1.5×, as Android's own large text does.
+   - **Then:**
+     - the plan's own line first (`ProCopy.planStatus`): "Pro Lifetime · you own it", and until when the online
+       services are included;
+     - while the server hasn't confirmed the plan, where the online services stand;
+     - every card as one line: its prop as a small square, its name, and its gain ("No limit", "20 goals",
+       "12 months", "50 a day") or its end date. When the name and its gain don't fit on one line (a date on a narrow
+       phone, large text), the gain moves under the name.
+   - **Back** leaves the welcome: the award is still given and the badge appears.
+3. **Award**: the Lucento Pro medal on the award ceremony's stage. It is membership, not progress, so it stands on its
+   own Membership shelf and doesn't count in "x of 6". It is given once per person and kept for good.
+4. **Pro badge**: the medal flies to the profile picture, which wears the Pro badge while Pro is active. It is a gold
+   ring with a crest, outlined in the medal's deep edge on light backgrounds. TalkBack reads "Lucento Pro" as the
+   button's state.
+
+Back on the award closes it: the award is still given and the badge simply appears. A stray tap beside the award does
+nothing.
+
+The award is dated from when the person's Pro plan began. A plan older than 24 hours when first seen on this phone (a
+new phone or a reinstall) is a welcome back ("Welcome back to Lucento Pro"), not a congratulation.
+
+A new plan for someone who already has the award (back after a lapse, or Lifetime after a subscription) gets the cards,
+the collection and the badge, without the ceremony. If the app closes before the award, the award alone comes next time.
+**See your Pro cards**, under the plan card on the Lucento Pro page, plays the cards and the collection again without
+the award. The welcome waits while the app lock or the launch logo covers the app. Under reduced motion the cards cross-fade
+instead of turning, and the badge appears without movement.
 
 ## 7. Decisions (approved by the owner, 2026-11-06)
 
@@ -577,7 +704,7 @@ ledger if they leave.
 | D-10 | Lifetime price | — | **₱3,490** (USD 79.99); founder offer ₱2,990 for 60 days | §4.3 |
 | D-11 | Subscriber buys Lifetime | — | allowed; the person cancels the subscription in Play; no automatic credit (Play has none). Offer a support-granted Cloud extension equal to the unused months, manually, on request | avoids building proration logic Play does not support |
 | D-12 | Lucento Cloud add-on | — | **₱59 / ₱490**, offered to Lifetime owners only at launch | §4.4; a Free-tier Cloud SKU would undercut Pro |
-| D-13 | Lifetime included services | evaluate | **12 months of B/C/D from first verification**, then Free AI allowance; Cloud add-on optional | the person experiences sync and the adviser; the promise stays bounded |
+| D-13 | Lifetime included services | evaluate | **12 months of B/C/D from the purchase**, then Free AI allowance; Cloud add-on optional | the person experiences sync and the adviser; the promise stays bounded |
 | D-14 | AI monthly soft ceiling for Pro | 50 / day | **400 / month**, remote-configured, shown only when hit | §4.5 cost model |
 | D-15 | Role names | Manager / Companion | **Owner / Partner** (as approved and built) | PRODUCT_SPEC §2; a rename is a separate decision |
 | D-16 | Shared lapse policy | "do not interrupt companion" | **Lenient** (no new invites; existing Partner stays) | §6.4 |
@@ -611,7 +738,7 @@ parked until the Android side is final (memory: website PRs deferred).
 |---|---|
 | Library | `com.android.billingclient:billing` **9.1.0** (v8+ mandatory for submissions since 31 Aug 2026; v9 shipped May 2026, 9.1.0 June 2026). The plain artifact, not billing-ktx (Phase 4 note in §11). `enablePendingPurchases`, `enableAutoServiceReconnection` |
 | Subscriptions | `queryProductDetailsAsync(SUBS)` → base plan / offer token → `launchBillingFlow` with `obfuscatedAccountId` when signed in |
-| One-time Lifetime | `queryProductDetailsAsync(INAPP)`; Billing 8+ exposes `getOneTimePurchaseOfferDetailsList()` per product — use the single purchase option's offer token ([Android Developers — one-time product purchase options and offers](https://developer.android.com/google/play/billing/one-time-product-multi-purchase-options-offers?hl=de), [RevenueCat — the purchase flow](https://www.revenuecat.com/guides/google-play-billing/the-purchase-flow)). Non-consumable: **acknowledge, never consume** |
+| One-time Lifetime | `queryProductDetailsAsync(INAPP)`; Billing 8+ exposes `getOneTimePurchaseOfferDetailsList()` per product — use the single purchase option's offer token ([Android Developers — one-time product purchase options and offers](https://developer.android.com/google/play/billing/one-time-product-multi-purchase-options-offers?hl=de), [RevenueCat — the purchase flow](https://www.revenuecat.com/guides/google-play-billing/the-purchase-flow)). Non-consumable: **acknowledge, never consume** while it counts. The one exception is a Lifetime Lucento ended (refunded, charged back) that Play still holds: it's consumed when the person buys Lifetime again (§5.3 L-7) |
 | Verification | local `Purchase` signature check with the app's Play public key; server verification when signed in; RTDN + daily Voided Purchases check keep the server current |
 | Acknowledgement | within 3 days after verification; retried on next start if it failed |
 | Pending (PH cash payments) | `PENDING` → UI state; nothing granted until `PURCHASED`; completes hours later via `queryPurchasesAsync` on start or RTDN |
@@ -619,7 +746,7 @@ parked until the Android side is final (memory: website PRs deferred).
 | Refunds / revocations | RTDN (subscription + one-time product), Voided Purchases API (30-day window — record as they arrive); server `REVOKED` → local at next contact |
 | Grace, hold, pause, cancel | `subscriptionsv2` state on the server; `isAutoRenewing` + expiry locally; plain-words copy |
 | Account identity | Play account ≠ Lucento account, handled by `purchase_links` (§5.4) |
-| Errors | `BillingProblem` set: unavailable (no Play Store), network, user cancelled, already owned, item unavailable, developer error; plain copy + Retry |
+| Errors | `BillingProblem` set: unavailable (no Play Store), network, user cancelled, already owned, item unavailable, developer error; plain copy + Retry. "Already owned" first reads Play and the server again, then words what that found (`ProCopy.alreadyOwned`, L-7) |
 | Testing | license testers, test cards, accelerated renewals, internal track; `FakePurchaseSource` for everything automatable |
 
 ---
@@ -641,6 +768,7 @@ parked until the Android side is final (memory: website PRs deferred).
 | New phone, other Google account, Lucento sign-in | Lifetime back via server mirror | two accounts |
 | Purchase token submitted from an unrelated account | `409 linked_elsewhere` | stub |
 | Refund with revoke | server REVOKED → local Free on next contact; data intact | Play Console refund |
+| Lifetime refunded **without** Remove entitlement, then bought again (L-7) | Restore says it was refunded; Buy Lifetime releases it and the new purchase goes through; a Lifetime that counts is never released | owner's internal-track test |
 | Lucento account switch / sign-out / `LocalLedgerReset` | entitlement store survives; server link unchanged | two accounts |
 | Partner when Owner lapses | Partner keeps full access; Owner cannot invite | two phones |
 | AI: Free 10 / month boundary, Pro 50 / day and 400 / month, Lifetime-without-Cloud 10 / month, Smarter reading 403 | proxy unit tests | signed-in release build |
@@ -776,6 +904,12 @@ What landed:
   - A pending payment replaces that plan's buttons with D-9.
   - Results and Play problems are worded by `ProCopy`.
   - Test builds get a **Test store** switch in the simulator: marked test prices, and buying at once through the fake.
+  - Redesign 2026-11-10: plans come first, each card a one-line promise and a short benefit list (`ProCopy.pitch`).
+    A subscription's periods are a Yearly / Monthly choice above one button; the yearly period shows "Save N%"
+    worked out from Play's own amounts (`ProCopy.yearlySavingPercent`: same currency, rounded down, at least 5 %).
+    The comparison is a Free / Pro / Lifetime table grouped *On this phone* / *Online*, with ticks, dashes and short
+    values; Lifetime's online services read "Year 1" with one footnote. At font scale 1.3 and above it falls back to
+    the worded rows. Prices are still only Play's strings.
 - **The server.** `20261108090000_play_purchases.sql`:
   - `apply_play_purchase` holds the linking rule and the row writes in one transaction. A refund is final, and a stale
     ending never undoes a newer purchase.

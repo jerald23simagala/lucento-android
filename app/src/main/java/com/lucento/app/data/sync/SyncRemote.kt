@@ -74,13 +74,18 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
     override suspend fun upsert(table: String, rows: List<JsonObject>): List<JsonObject> {
         if (rows.isEmpty()) return emptyList()
         // server_updated_at and revision are always assigned by the server; never send client values for them.
-        return client.from(table).upsert(rows.map { JsonObject(it - SERVER_UPDATED_AT - REVISION) }) {
-            onConflict = "id"
-            select(Columns.list("id", REVISION))
-        }.decodeList<JsonObject>()
+        return refusalsTyped {
+            client.from(table).upsert(rows.map { JsonObject(it - SERVER_UPDATED_AT - REVISION) }) {
+                onConflict = "id"
+                select(Columns.list("id", REVISION))
+            }.decodeList<JsonObject>()
+        }
     }
 
     override suspend fun softDelete(table: String, userId: String, id: String, baseRevision: Long?, atIso: String): Boolean =
+        refusalsTyped { softDeleteRequest(table, userId, id, baseRevision, atIso) }
+
+    private suspend fun softDeleteRequest(table: String, userId: String, id: String, baseRevision: Long?, atIso: String): Boolean =
         client.from(table).update({
             set("deleted_at", atIso)
             set("updated_at", atIso)
@@ -170,7 +175,26 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
         }
     }
 
+    /**
+     * Security audit F-01: the database's write gate answers 42501 (the plan doesn't include cloud sync) and its row ceiling
+     * LU001. Both are typed here, so [SyncRepository] pauses uploads instead of treating them as a network failure.
+     */
+    private suspend fun <T> refusalsTyped(block: suspend () -> T): T = try {
+        block()
+    } catch (e: io.github.jan.supabase.postgrest.exception.PostgrestRestException) {
+        throw when (e.code) {
+            PLAN_REFUSED -> UploadRefusedException(UploadRefusal.PLAN)
+            ROW_CEILING -> UploadRefusedException(UploadRefusal.STORAGE_LIMIT)
+            else -> e
+        }
+    }
+
     companion object {
+        /** SQLSTATE of a write the row-level security policy refused (supabase/migrations/20261111090000_…). */
+        const val PLAN_REFUSED = "42501"
+
+        /** SQLSTATE of a write past the account's row ceiling (same migration). */
+        const val ROW_CEILING = "LU001"
         const val LEDGER_SETTINGS = "ledger_settings"
         const val SERVER_UPDATED_AT = "server_updated_at"
         const val REVISION = "revision"

@@ -81,7 +81,23 @@ object AwardArtwork {
     val StripeIvory = Palette.SoftIvory
     val StripeGold = Palette.SunlightYellow
     val StripeNavy = Palette.MidnightNavy
+    /** The Lucento Pro medal's stripe: tangerine on blue, a pairing no progress award uses. */
+    val StripeTangerine = Palette.BrightTangerine
     val Confetti = listOf(Palette.SunlightYellow, Palette.BrightTangerine, Palette.ElectricBlue, Palette.Positive, Palette.BlueNight)
+
+    // ---- Lucento Pro's perk cards. Like a medal, a card is an object: its back and its art look the same in every theme.
+    // Illustration colours only, never text on a surface.
+    /**
+     * The cards' blue, from Blue Hero down to a deep indigo on the back. The art band on a card's face is flat
+     * [CardBlue] (owner, 2026-11-13: the mascot beside a prop): the export (tools/illustrations/export_perk_art.py)
+     * sets each prop's ground to exactly this colour, so no prop shows an edge.
+     */
+    val CardBlue = Palette.BlueHero
+    val CardBlueDeep = Color(0xFF1A2C86)
+    /** The ivory disc behind the Lucento symbol on a card's back. */
+    val Paper = Palette.SoftIvory
+    /** The warm glow rising from the foot of a card's back. */
+    val GlowMoney = Color(0x9EFFC928)
 }
 
 internal val LightColors = lightColorScheme(

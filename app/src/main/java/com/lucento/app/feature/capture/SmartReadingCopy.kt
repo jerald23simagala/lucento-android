@@ -10,7 +10,8 @@ object SmartReadingCopy {
     const val CONSENT_TEXT =
         "When you type or speak in the composer, Lucento sends that message, today’s date, your main currency " +
             "and the names of your categories and accounts to Lucento’s server, which asks Google’s Gemini to read it. " +
-            "Balances and your history are not sent. Google processes the text under the Gemini API terms. Each " +
+            // The free-tier disclosure every Gemini consent carries (security audit F-05), as in Settings on main.
+            "Balances and your history are not sent. " + com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE + " Each " +
             "account has a daily allowance; after it, reading happens on this phone. You review every row before " +
             "anything is saved, receipts are still read on this phone, and you can turn this off at any time."
 

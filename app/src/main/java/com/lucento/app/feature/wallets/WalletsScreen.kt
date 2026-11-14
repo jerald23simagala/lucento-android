@@ -144,7 +144,11 @@ fun WalletsScreen(
                 onBack = onBack,
                 actions = {
                     if (state.wallets.isNotEmpty() && canAdd) {
-                        com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = { editing = newDraft() }, contentDescription = "Add wallet")
+                        com.lucento.app.core.designsystem.component.AddPillButton(
+                            "Add",
+                            onClick = { editing = newDraft() },
+                            contentDescription = "Add wallet",
+                        )
                     }
                     if (onBack == null) ProfileButton()
                 },
@@ -158,7 +162,12 @@ fun WalletsScreen(
                     body = "Add the cash, bank accounts, e-wallets, savings and cards you use. " +
                         "Balances are entered by you and stay on this device — no bank connection needed.",
                     illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
-                    action = if (canAdd) ({ LucentoPrimaryButton(text = "Add wallet", onClick = { editing = newDraft() }) }) else null,
+                    action = if (canAdd) ({
+                        LucentoPrimaryButton(
+                            text = "Add wallet",
+                            onClick = { editing = newDraft() },
+                        )
+                    }) else null,
                 )
             }
         }

@@ -13,7 +13,20 @@ import java.time.Period
 enum class PlanCardKind { PRO, LIFETIME, CLOUD }
 
 /** One way to buy, as the page shows it: Google Play's price in words above a button. */
-data class OfferAction(val price: ProductPrice, val label: String, val priceLine: String, val primary: Boolean)
+data class OfferAction(
+    val price: ProductPrice,
+    val label: String,
+    val priceLine: String,
+    val primary: Boolean,
+    /** "Yearly" / "Monthly" when this is one period of a subscription; null for a one-time price. */
+    val periodName: String? = null,
+    /** How often it is charged: "a year", "a month", "once". */
+    val per: String = "",
+    /** "7-day free trial" when Play lists one. */
+    val trial: String? = null,
+    /** "Save 33%" on the yearly period, from Play's own amounts ([ProCopy.yearlySavingPercent]). */
+    val saving: String? = null,
+)
 
 data class PlanCardModel(
     val kind: PlanCardKind,
@@ -47,7 +60,8 @@ object ProOffers {
         val cards = mutableListOf<PlanCardModel>()
         if (!ownsLifetime) {
             val offers = if (plan == DisplayPlan.FREE && PlayProducts.PRO_SUBSCRIPTION !in pending) {
-                pricesOf(PlayProducts.PRO_SUBSCRIPTION).mapIndexed { i, p -> action(p, subscriptionLabel(p), primary = i == 0) }
+                val subs = pricesOf(PlayProducts.PRO_SUBSCRIPTION)
+                subs.mapIndexed { i, p -> action(p, subscriptionLabel(p), primary = i == 0, saving = saving(p, subs)) }
             } else {
                 emptyList()
             }
@@ -80,7 +94,8 @@ object ProOffers {
         )
         if (ownsLifetime) {
             val cloudOffers = if (!state.has(Capability.CLOUD, now) && PlayProducts.CLOUD_ADDON !in pending) {
-                pricesOf(PlayProducts.CLOUD_ADDON).mapIndexed { i, p -> action(p, if (i == 0) "Add Lucento Cloud" else "Choose ${periodWord(p)} instead", primary = i == 0) }
+                val cloud = pricesOf(PlayProducts.CLOUD_ADDON)
+                cloud.mapIndexed { i, p -> action(p, "Add Lucento Cloud ${periodWord(p)}", primary = i == 0, saving = saving(p, cloud)) }
             } else {
                 emptyList()
             }
@@ -108,7 +123,23 @@ object ProOffers {
     const val PENDING_NOTE = "Waiting for Google Play to confirm your payment. Finish it at the store or in Google Play; your plan " +
         "starts the moment it’s confirmed, even if Lucento is closed."
 
-    private fun action(price: ProductPrice, label: String, primary: Boolean) = OfferAction(price, label, ProCopy.priceLine(price), primary)
+    private fun action(price: ProductPrice, label: String, primary: Boolean, saving: String? = null) = OfferAction(
+        price = price,
+        label = label,
+        priceLine = ProCopy.priceLine(price),
+        primary = primary,
+        periodName = ProCopy.periodName(price),
+        per = ProCopy.pricePer(price),
+        trial = ProCopy.trialText(price),
+        saving = saving,
+    )
+
+    /** "Save 33%" for the yearly price of a product that also has a monthly one; null otherwise. */
+    private fun saving(price: ProductPrice, group: List<ProductPrice>): String? {
+        if (price.billingPeriodIso != "P1Y") return null
+        val monthly = group.firstOrNull { it.billingPeriodIso == "P1M" } ?: return null
+        return ProCopy.yearlySavingPercent(price, monthly)?.let { "Save $it%" }
+    }
 
     /** Customer copy C: "Start 7-day free trial" (annual) · "Subscribe monthly". */
     private fun subscriptionLabel(price: ProductPrice): String {

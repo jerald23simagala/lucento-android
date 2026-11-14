@@ -13,7 +13,8 @@ Everything here follows [../MONETIZATION.md](../MONETIZATION.md) §5.4–§5.6.
 |---|---|---|
 | `public.entitlements`, `public.purchase_links`, `lucento_private.plan_limits`, `has_capability`, plan-aware `max_partners`, `consume_ai_request` | Supabase (the migration) | No |
 | `public.apply_play_purchase`, `public.revoke_play_purchase` (service role only) | Supabase (Phase 4 migration) | No |
-| `api/billing/verify.ts`, `api/billing/rtdn.ts`, `api/billing/voided.ts` (shared code in `src/server/billing.ts`, `play-api.ts`, `play-state.ts`) | `lucento-website` (Vercel) | Yes: `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`, `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON`, `LUCENTO_RTDN_PUSH_TOKEN`, `CRON_SECRET` — Vercel env only, never the APK (CLAUDE.md) |
+| `public.purchase_check_status`, `public.record_purchase_check`, `lucento_private.purchase_checks` (service role only) | Supabase (`20261113120000_purchase_checks.sql`) | No |
+| `api/billing/verify.ts`, `api/billing/check.ts`, `api/billing/rtdn.ts`, `api/billing/voided.ts` (shared code in `src/server/billing.ts`, `play-api.ts`, `play-state.ts`, `purchase-check.ts`) | `lucento-website` (Vercel) | Yes: `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`, `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON`, `LUCENTO_RTDN_PUSH_TOKEN`, `CRON_SECRET` — Vercel env only, never the APK (CLAUDE.md). `LUCENTO_PLAY_LICENSE_KEY` is public (the app carries it too) |
 | `api/ask.ts`, `api/interpret.ts` | `lucento-website` (existing) | Switch from `consume_ai_quota()` to `consume_ai_request()` and return its `remaining` / `limited_by` |
 
 The app never talks to the Play Developer API and never holds a service-role key. It reads `public.entitlements` under the
@@ -47,14 +48,22 @@ Steps:
 3. **Linking rule** on `purchase_links` (`hash = sha256(purchaseToken)`) — steps 3 and 4 are one call to
    `public.apply_play_purchase` (service role only, one transaction, so two verifications of the same purchase can't
    interleave):
+   - the purchase carries an obfuscated account id that isn't `sha256(user_id)` → `409 other_account`, nothing linked or
+     written, on the first verification too (security audit F-03; the app doesn't send such a purchase at all,
+     `PurchaseInterpreter.madeForAnotherAccount`). A purchase made while signed out carries none and links to the first
+     account that verifies it;
    - no row → insert for `user_id`;
    - row for `user_id` → fine;
    - row for another account → allow a re-link only if the purchase's `obfuscatedExternalAccountId == sha256(user_id)`
      **and** `linked_at` is older than 30 days; then move the row (`relinked_count + 1`) and delete the previous account's
      entitlement rows for that `(source, product_id)`; otherwise `409 linked_elsewhere`;
    - a third move (`relinked_count >= 2`) → `409 review_required` (support path).
-   A refunded purchase (`REVOKED`) stays refunded whatever a later verification says, and a stale purchase's ending never
-   overwrites a newer live purchase of the same product.
+   A refunded purchase stays refunded whatever a later verification says — also on a new account after the refunded one
+   was deleted: `revoke_play_purchase` keeps the token's hash in `lucento_private.revoked_purchases`, which has no account
+   column and never cascades (F-02). A stale purchase's ending never overwrites a newer live purchase of the same product.
+   A license tester's purchase (`p_test_purchase`) answers `403 test_purchase_refused` unless
+   `plan_limits.allow_test_purchases` is 1; the rows it writes carry `entitlements.test_purchase` (F-12). Each account
+   may verify 60 times a UTC day (`public.consume_request_quota`, `429 rate_limited`; F-11).
 4. Upsert `entitlements` rows (`verified_at = now()`):
    - `lucento_pro` → PLAY_SUBSCRIPTION, all four grants, `status` from `subscriptionState` + `autoRenewing`, `expires_at`
      from `lineItems[].expiryTime`, `base_plan_id` from `offerDetails.basePlanId`.
@@ -70,6 +79,43 @@ Errors: `401 sign_in_required`, `400 bad_request`, `404 purchase_not_found` (Pla
 at its next refresh), `503 not_configured`. The app (`ProxyPurchaseVerifier`) posts to `<site>/api/billing/verify`, derived
 from the AI proxy's address, only in release builds and only when signed in; it acknowledges the purchase with Play
 afterwards whatever the answer (`EntitlementManager`).
+
+## 3b. `POST /api/billing/check` (no account; owner decision 2026-11-13)
+
+Why: Google Play's copy of purchases on a phone can lag days behind a refund. Before this check, a phone signed out
+(or cleared, or reinstalled) only had that copy, so a refunded Lifetime came back (KNOWN_ISSUES PB-6). This answers
+whether a purchase is still live **without an account**. The purchase itself is enough: only the buyer's phone holds
+Google's signed record of it.
+
+Request (app, no `Authorization` header, signed in or not):
+
+```json
+{ "purchaseData": "<Purchase.originalJson, exactly as Play gave it>", "signature": "<Purchase.signature>" }
+```
+
+Steps (`src/pages/api/billing/check.ts`, pure parts in `src/server/purchase-check.ts`, unit-tested):
+
+1. Check the signature (RSA, SHA-1, PKCS #1 v1.5) with Play's licence key, `LUCENTO_PLAY_LICENSE_KEY` (Vercel env; the
+   same public value the app is built with). Only data Google signed for this app gets further. A made-up token
+   never reaches the Play Developer API, so it costs no quota and reveals nothing.
+2. Read the package (must be `com.lucento.app`), the product (one of Lucento's) and the token from the signed data.
+3. `public.purchase_check_status(sha256(token))` (service role): a refund in `lucento_private.revoked_purchases` (F-02,
+   from RTDN or the daily voided check, with or without an account) answers `REVOKED` at once. Google's reading from
+   the last hour answers next, so retries cost one Play call an hour per purchase.
+4. Otherwise read the purchase from Play exactly as §3 step 2 (`readPlayPurchase`; `410` gone counts as `EXPIRED`), and
+   keep the reading with `public.record_purchase_check` (`lucento_private.purchase_checks`: token hash, product, status,
+   time; no account, no name). That function answers `REVOKED` for a refunded purchase whatever Google's reading says.
+5. Nothing is linked to an account; that stays `verify`'s job, signed in.
+
+Answer: `200 { "status": "ACTIVE" | "TRIAL" | "GRACE" | "CANCELLED_ACTIVE" | "ON_HOLD" | "PAUSED" | "PENDING" | "EXPIRED" | "REVOKED" }`.
+Errors: `400 bad_request` / `bad_signature`, `404 purchase_not_found`, `502 play_unavailable` / `store_unavailable`,
+`503 not_configured`. The app (`ProxyPurchaseChecker`) treats anything but `200` as no answer and changes nothing.
+
+The app asks for each purchase Play lists that no account row covers. It asks at once the first time, then at most every
+6 hours (`EntitlementManager.LUCENTO_CHECK_INTERVAL_MILLIS`). A live answer confirms the purchase on the phone; `REVOKED`
+or `EXPIRED` ends it there for good. The phone's rules are MONETIZATION §5.3 L-6: Play's word alone carries a purchase
+for 3 days from its purchase time, then for 90 days after each confirmation. Migration
+`20261113120000_purchase_checks.sql`; suite `tools/sql-verify/purchase_checks_suite.sql` (14 checks).
 
 ## 4. `POST /api/billing/rtdn`
 

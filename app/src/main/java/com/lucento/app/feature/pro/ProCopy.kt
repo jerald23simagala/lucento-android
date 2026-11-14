@@ -5,6 +5,7 @@ import com.lucento.app.data.billing.ProductPrice
 import com.lucento.app.data.billing.PurchaseResult
 import com.lucento.app.data.billing.VerifyOutcome
 import com.lucento.app.data.entitlement.RefreshOutcome
+import com.lucento.app.data.entitlement.ReleaseOutcome
 import com.lucento.app.domain.entitlement.Capability
 import com.lucento.app.domain.entitlement.ComparisonRow
 import com.lucento.app.domain.entitlement.DisplayPlan
@@ -40,7 +41,6 @@ object ProCopy {
         ProFeature.FOREIGN_CURRENCY_WALLETS -> "Wallets in other currencies"
         ProFeature.SAVINGS_GOALS -> "Active savings goals"
         ProFeature.INSIGHTS_LONG_PERIODS -> "Insights over 6 and 12 months"
-        ProFeature.NET_WORTH_COMPOSITION -> "What your net worth is made of"
         ProFeature.PDF_STATEMENTS -> "Statements as PDF"
         ProFeature.EXTRA_THEMES -> "Themes"
         ProFeature.CLOUD_SYNC -> "Cloud sync between phones"
@@ -82,6 +82,88 @@ object ProCopy {
         else -> "First year, then with Lucento Cloud"
     }
 
+    // ------------------------------------------------------------------------------------------------ comparison table
+
+    /** One cell of the Free / Pro / Lifetime table: a tick, a dash, or a short value. TalkBack reads the row's long form. */
+    sealed interface TableCell {
+        data object Included : TableCell
+        data object NotIncluded : TableCell
+        data class Value(val text: String) : TableCell
+    }
+
+    /** The table's short form of [cell]: "3", "No limit", "10/mo", "50/day", a tick or a dash. */
+    fun tableCell(feature: ProFeature, limit: Limit): TableCell = when (feature) {
+        ProFeature.EXTRA_THEMES -> TableCell.Value(if (limit == Limit.None) "2" else "All 5")
+        ProFeature.SHARED_SPACE -> when (limit) {
+            Limit.None -> TableCell.NotIncluded
+            is Limit.Count -> TableCell.Value(if (limit.max == 1) "1 Partner" else "${limit.max} Partners")
+            else -> TableCell.Included
+        }
+        else -> when (limit) {
+            Limit.Unlimited -> if (feature in COUNTED) TableCell.Value("No limit") else TableCell.Included
+            Limit.None -> TableCell.NotIncluded
+            is Limit.Count -> TableCell.Value("${limit.max}")
+            is Limit.PerMonth -> TableCell.Value("${limit.max}/mo")
+            is Limit.PerDay -> TableCell.Value("${limit.max}/day")
+        }
+    }
+
+    /** The Lifetime column: owned outright on the phone; online services are marked [FIRST_YEAR] and explained once below. */
+    fun lifetimeTableCell(row: ComparisonRow): TableCell =
+        if (row.feature.requires == Capability.LOCAL_PRO) tableCell(row.feature, row.lifetime) else TableCell.Value(FIRST_YEAR)
+
+    const val FIRST_YEAR = "Year 1"
+
+    /** The footnote under the table: what [FIRST_YEAR] means, never promising online services forever (§0). */
+    val FIRST_YEAR_NOTE: String =
+        "$FIRST_YEAR: included for your first year, then with the optional Lucento Cloud. Without it, the AI adviser keeps the " +
+            "free plan’s ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} questions a month. Everything else in Lifetime is yours for good."
+
+    /** The table's two groups: what runs on the phone, then the online services. */
+    fun comparisonGroups(rows: List<ComparisonRow>): List<Pair<String, List<ComparisonRow>>> {
+        val (local, online) = rows.partition { it.feature.requires == Capability.LOCAL_PRO }
+        return listOf("On this phone" to local, "Online" to online).filter { it.second.isNotEmpty() }
+    }
+
+    /** What TalkBack reads for one table row: every plan's allowance in words. */
+    fun comparisonDescription(row: ComparisonRow): String =
+        "${featureName(row.feature)}. Free: ${cell(row.feature, row.free)}. Pro: ${cell(row.feature, row.pro)}. " +
+            "Lifetime: ${lifetimeCell(row)}."
+
+    // ------------------------------------------------------------------------------------------------ plan cards
+
+    /** A plan card's promise: one line, then what it brings, in the order people care about. */
+    data class PlanPitch(val tagline: String, val benefits: List<String>)
+
+    fun pitch(kind: PlanCardKind): PlanPitch = when (kind) {
+        PlanCardKind.PRO -> PlanPitch(
+            "Everything in Lucento, on every phone you use.",
+            listOf(
+                "Cloud sync between your phones",
+                "Lucento Shared with a Partner",
+                "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} AI adviser questions a day",
+                "Unlimited wallets, cards and loans",
+                "12-month Insights, PDF statements and all five themes",
+            ),
+        )
+        PlanCardKind.LIFETIME -> PlanPitch(
+            "Pay once. Yours for good.",
+            listOf(
+                "Every Pro feature that runs on your phone, for life",
+                "No renewals, and it works offline",
+                "Cloud sync, Lucento Shared and the AI adviser included for the first year",
+            ),
+        )
+        PlanCardKind.CLOUD -> PlanPitch(
+            "Keep your online services going.",
+            listOf(
+                "Cloud sync and restoring from your account",
+                "Lucento Shared with a Partner",
+                "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} AI adviser questions a day",
+            ),
+        )
+    }
+
     /** Why [feature] isn't available on this plan, and what is still free: the sentence in every lock note. */
     fun lockedLine(feature: ProFeature): String = when (feature) {
         ProFeature.MONEY_WALLETS ->
@@ -95,7 +177,6 @@ object ProCopy {
         ProFeature.SAVINGS_GOALS ->
             "The free plan has ${PlanCatalog.FREE_ACTIVE_GOALS} active savings goals. Pro and Pro Lifetime allow ${PlanCatalog.PRO_ACTIVE_GOALS}."
         ProFeature.INSIGHTS_LONG_PERIODS -> "Trends over 6 and 12 months are part of Lucento Pro. Your last 3 months are always free."
-        ProFeature.NET_WORTH_COMPOSITION -> "This breakdown is part of Lucento Pro. Your net worth itself is always on Home and Wallets."
         ProFeature.PDF_STATEMENTS ->
             "Saving or sharing a statement as a PDF is part of Lucento Pro. Everything on this screen is always free."
         ProFeature.EXTRA_THEMES -> "Grove, Mono and Aurora are part of Lucento Pro. Sunrise and Midnight are always free."
@@ -137,6 +218,21 @@ object ProCopy {
 
     data class PlanStatus(val title: String, val detail: String)
 
+    /** On what terms the online services are included ([serviceTerm]). */
+    sealed interface ServiceTerm {
+        /** Part of a Lucento Pro subscription. */
+        data object Subscription : ServiceTerm
+
+        /** Through the Lucento Cloud add-on. */
+        data object Cloud : ServiceTerm
+
+        /** Until [date] ("Nov 12, 2027"): a Lifetime's included year, or a courtesy grant's end. */
+        data class Until(val date: String) : ServiceTerm
+
+        /** Included, with no end set (a courtesy grant without an end date). */
+        data object Included : ServiceTerm
+    }
+
     fun planName(plan: DisplayPlan): String = when (plan) {
         DisplayPlan.FREE -> "Free plan"
         DisplayPlan.PRO -> "Lucento Pro"
@@ -170,10 +266,10 @@ object ProCopy {
         "More Ask Lucento answers every day",
     )
 
-    /** The plan row in the profile menu, Settings and the top of the Lucento Pro page (customer copy D-11). */
+    /** The plan row in the profile menu, Settings and the top of the Lucento Plan page (customer copy D-11). */
     fun planStatus(state: EntitlementState, now: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): PlanStatus {
-        fun date(millis: Long): String =
-            Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy", locale))
+        // The date never splits across lines ("Nov 12, / 2027": critic round 3), as on the welcome's cards.
+        fun date(millis: Long): String = termDate(millis, zone, locale)
         val active = state.active(now)
         return when (state.displayPlan(now)) {
             DisplayPlan.FREE -> if (state.pending() != null) {
@@ -191,7 +287,7 @@ object ProCopy {
                 }
             }
             DisplayPlan.LIFETIME -> PlanStatus(
-                "Pro Lifetime · you own it",
+                "Pro Lifetime\u00A0· you own it",
                 "Every Pro feature that runs on this phone is yours. Cloud sync, Lucento Shared and the AI adviser’s Pro " +
                     "allowance come with Lucento Cloud.",
             )
@@ -200,7 +296,7 @@ object ProCopy {
                 val year = services.firstOrNull { it.source == EntitlementSource.PLAY_LIFETIME_SERVICES }?.expiresAtMillis
                 val cloud = services.firstOrNull { it.source == EntitlementSource.PLAY_CLOUD_ADDON }
                 PlanStatus(
-                    "Pro Lifetime · you own it",
+                    "Pro Lifetime\u00A0· you own it",
                     when {
                         cloud != null -> "With Lucento Cloud: cloud sync, Lucento Shared and the AI adviser’s Pro allowance."
                         year != null -> "Cloud sync, Lucento Shared and the AI adviser’s Pro allowance are included until ${date(year)}."
@@ -210,6 +306,26 @@ object ProCopy {
             }
         }
     }
+
+    /**
+     * On what terms this plan's online services (cloud sync, restore, Lucento Shared, the AI adviser's Pro allowance,
+     * Smarter reading) are included: with a subscription, with the Lucento Cloud add-on, or until a date (a Lifetime's
+     * included year, read from its entitlement; a courtesy grant's end). Null when this plan has none, so the welcome's
+     * cards never make them sound owned for good (CUSTOMER_COPY: "not part of the one-time purchase").
+     */
+    fun serviceTerm(state: EntitlementState, now: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): ServiceTerm? {
+        val services = state.active(now).filter { Capability.CLOUD in it.grants || Capability.AI_PRO in it.grants || Capability.SHARED in it.grants }
+        if (services.any { it.source == EntitlementSource.PLAY_SUBSCRIPTION }) return ServiceTerm.Subscription
+        if (services.any { it.source == EntitlementSource.PLAY_CLOUD_ADDON }) return ServiceTerm.Cloud
+        val ending = services.firstOrNull { it.source == EntitlementSource.PLAY_LIFETIME_SERVICES }
+            ?: services.firstOrNull { it.source == EntitlementSource.GRANT }
+            ?: return null
+        return ending.expiresAtMillis?.let { ServiceTerm.Until(termDate(it, zone, locale)) } ?: ServiceTerm.Included
+    }
+
+    /** A term's date, kept on one line: "Nov 12, 2027" with no-break spaces. */
+    fun termDate(millis: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String =
+        Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().format(DateTimeFormatter.ofPattern("MMM d, yyyy", locale)).replace(' ', '\u00A0')
 
     private fun subscriptionStatus(sub: Entitlement, date: (Long) -> String): PlanStatus {
         // A Play-local reading has no real expiry (docs §5.3); only the server's dates are shown as dates.
@@ -237,9 +353,14 @@ object ProCopy {
     // ------------------------------------------------------------------------------------------------ prices
 
     /** "₱149.00 a month · 7-day free trial", from Google Play's own price string and periods. */
-    fun priceLine(price: ProductPrice): String {
+    fun priceLine(price: ProductPrice): String =
+        listOf(price.formattedPrice, pricePer(price)).filter { it.isNotEmpty() }.joinToString(" ") +
+            trialText(price)?.let { " · $it" }.orEmpty()
+
+    /** How often [price] is charged: "a year", "a month", "once". */
+    fun pricePer(price: ProductPrice): String {
         val period = price.billingPeriodIso?.let { runCatching { Period.parse(it) }.getOrNull() }
-        val per = when {
+        return when {
             price.billingPeriodIso == null -> "once"
             period == null -> ""
             period.years == 1 && period.months == 0 -> "a year"
@@ -248,14 +369,40 @@ object ProCopy {
             period.years > 1 -> "every ${period.years} years"
             else -> ""
         }
-        val trial = price.freeTrialPeriodIso?.let { runCatching { Period.parse(it) }.getOrNull() }?.let { p ->
+    }
+
+    /** "7-day free trial" when Play lists one on this offer. */
+    fun trialText(price: ProductPrice): String? =
+        price.freeTrialPeriodIso?.let { runCatching { Period.parse(it) }.getOrNull() }?.let { p ->
             when {
-                p.days > 0 -> " · ${p.days}-day free trial"
-                p.months > 0 -> " · ${p.months}-month free trial"
+                p.days > 0 -> "${p.days}-day free trial"
+                p.months > 0 -> "${p.months}-month free trial"
                 else -> null
             }
-        }.orEmpty()
-        return listOf(price.formattedPrice, per).filter { it.isNotEmpty() }.joinToString(" ") + trial
+        }
+
+    /** The name of a subscription's period for the plan picker: "Yearly", "Monthly"; null for a one-time price. */
+    fun periodName(price: ProductPrice): String? {
+        val period = price.billingPeriodIso?.let { runCatching { Period.parse(it) }.getOrNull() } ?: return null
+        return when {
+            period.years == 1 && period.months == 0 -> "Yearly"
+            period.years == 0 && period.months == 1 -> "Monthly"
+            else -> null
+        }
+    }
+
+    /**
+     * How much a year costs less than twelve months, as a whole percentage rounded **down** so it never overstates,
+     * from Play's own amounts. Null unless both are known in the same currency and the saving is at least 5 %.
+     */
+    fun yearlySavingPercent(yearly: ProductPrice, monthly: ProductPrice): Int? {
+        val y = yearly.priceMicros ?: return null
+        val m = monthly.priceMicros ?: return null
+        if (yearly.currencyCode == null || yearly.currencyCode != monthly.currencyCode || y <= 0 || m <= 0) return null
+        val twelve = Math.multiplyExact(m, 12L)
+        if (y >= twelve) return null
+        val percent = Math.multiplyExact(twelve - y, 100L) / twelve
+        return percent.toInt().takeIf { it >= 5 }
     }
 
     // ------------------------------------------------------------------------------------------------ restore
@@ -268,6 +415,33 @@ object ProCopy {
         BillingProblem.ALREADY_OWNED -> "Your Google account already owns this. Tap Restore purchases to bring it back on this phone."
         BillingProblem.ITEM_UNAVAILABLE -> "Google Play doesn’t offer this plan here right now. Nothing was charged."
         BillingProblem.DEVELOPER, BillingProblem.OTHER -> "Something went wrong with Google Play. Nothing was charged; please try again."
+    }
+
+    /**
+     * What the page says when Google Play refused a purchase because this Google account already owns [productId]. By
+     * then Lucento has read Play and the server again ([plan]) and tried to release a Lifetime it had ended ([release],
+     * MONETIZATION §5.3 L-7).
+     */
+    fun alreadyOwned(productId: String?, plan: DisplayPlan, release: ReleaseOutcome): String = when {
+        // A plan that works says so first, whatever happened to an older purchase.
+        ownedPlanShows(productId, plan) ->
+            "Your Google account already owns this, and your ${planName(plan)} is working on this phone now."
+        release.released > 0 ->
+            "Google Play was still holding your earlier Pro Lifetime (refunded or cancelled), so it couldn’t sell you a new " +
+                "one. Lucento has released it: you can buy Lifetime now."
+        release.found > 0 ->
+            "Google Play is still holding your earlier Pro Lifetime (refunded or cancelled), and Lucento couldn’t release it " +
+                "just now. Check your connection and try again. If it keeps happening, contact support with your Google Play " +
+                "order number."
+        else -> billingProblem(BillingProblem.ALREADY_OWNED)
+    }
+
+    /** Whether [plan] is what owning [productId] gives, so the purchase Play refused is already working here. */
+    private fun ownedPlanShows(productId: String?, plan: DisplayPlan): Boolean = when (productId) {
+        PlayProducts.PRO_LIFETIME -> plan == DisplayPlan.LIFETIME || plan == DisplayPlan.LIFETIME_WITH_SERVICES
+        PlayProducts.PRO_SUBSCRIPTION -> plan != DisplayPlan.FREE
+        PlayProducts.CLOUD_ADDON -> plan == DisplayPlan.LIFETIME_WITH_SERVICES
+        else -> false
     }
 
     /** What the page says after a purchase it started (customer copy D-9); null when there is nothing to say (cancelled). */
@@ -287,6 +461,11 @@ object ProCopy {
         VerifyOutcome.LINKED_ELSEWHERE ->
             "This purchase is linked to a different Lucento account. It keeps working on this phone; cloud services follow the " +
                 "account it’s linked to. To move it, contact support with your Google Play order number."
+        VerifyOutcome.OTHER_ACCOUNT ->
+            "This purchase was made with a different Lucento account on this Google Play account, so it stays with that " +
+                "account. It keeps working on this phone. To use cloud services with it, sign in with the account that bought it."
+        VerifyOutcome.TEST_PURCHASE_REFUSED ->
+            "This is a Google Play test purchase, and Lucento’s server doesn’t accept test purchases right now."
         VerifyOutcome.REVIEW_REQUIRED ->
             "This purchase has moved between Lucento accounts several times, so support needs to look at it before it moves again. " +
                 "It keeps working on this phone. Contact support with your Google Play order number."
@@ -294,11 +473,22 @@ object ProCopy {
     }
 
     /** What "Restore purchases" says afterwards (customer copy D-8). */
-    fun restoreMessage(before: DisplayPlan, after: DisplayPlan, outcome: RefreshOutcome): String = when {
+    fun restoreMessage(
+        before: DisplayPlan,
+        after: DisplayPlan,
+        outcome: RefreshOutcome,
+        awaitingCheck: Boolean = false,
+        /** A Pro Lifetime on record that Google Play reports as refunded or cancelled ([EntitlementState.lifetimeEnded]). */
+        lifetimeEnded: Boolean = false,
+    ): String = when {
         after != DisplayPlan.FREE && before == DisplayPlan.FREE -> "Welcome back: your ${planName(after)} is restored."
         after != DisplayPlan.FREE -> "Your plan is up to date: ${planName(after)}."
+        awaitingCheck -> "Lucento still can’t confirm your purchase. Connect to the internet and make sure the Google Play " +
+            "Store app is on and signed in to the Google account you bought with, then try again."
         !outcome.playReached && !outcome.serverReached ->
             "Restoring needs an internet connection once. If you already restored on this phone, everything you own is still working."
+        lifetimeEnded -> "Google Play reports your Pro Lifetime as refunded or cancelled, so it no longer unlocks Pro. You can " +
+            "buy it again on this page."
         else -> "No purchase found. If you bought Lucento with another Google account, switch accounts in Google Play, or sign " +
             "in to the Lucento account you used before. Still stuck? Contact support with your Google Play order number."
     }
@@ -327,7 +517,21 @@ object ProCopy {
             "Your Pro Lifetime is no longer active",
             "Google Play reports this purchase as refunded or cancelled. Everything you recorded is still here, and nothing " +
                 "was removed; the free plan’s limits apply to new items. If this looks wrong, restore your purchase from the " +
-                "Lucento Pro page.",
+                "Lucento Plan page.",
+        )
+        PlanNotice.LIFETIME_NEEDS_CHECK -> NoticeCopy(
+            "Lucento needs to check your Pro Lifetime",
+            // Paused for either reason (MONETIZATION §5.3 L-2, L-6): no word for a month, or Lucento's server hasn't
+            // confirmed Google Play's reading lately. The same steps settle both.
+            "Pro is paused on this phone until Lucento can confirm your purchase again. Connect to the internet, make " +
+                "sure the Google Play Store app is on and signed in to the Google account you bought with, then tap " +
+                "Restore purchases on the Lucento Plan page. Everything you recorded is still here, and nothing was removed.",
+        )
+        PlanNotice.PRO_NEEDS_CHECK -> NoticeCopy(
+            "Lucento needs to check your Lucento Pro",
+            "Pro is paused on this phone until Lucento can confirm your subscription again. Connect to the internet, make " +
+                "sure the Google Play Store app is on and signed in to the Google account you subscribed with, then tap " +
+                "Restore purchases on the Lucento Plan page. Everything you recorded is still here, and nothing was removed.",
         )
     }
 }

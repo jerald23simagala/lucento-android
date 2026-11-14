@@ -1,7 +1,9 @@
 package com.lucento.app.feature.pro
 
+import com.lucento.app.data.billing.BillingProblem
 import com.lucento.app.data.billing.ProductPrice
 import com.lucento.app.data.entitlement.RefreshOutcome
+import com.lucento.app.data.entitlement.ReleaseOutcome
 import com.lucento.app.domain.entitlement.Capability
 import com.lucento.app.domain.entitlement.DisplayPlan
 import com.lucento.app.domain.entitlement.Entitlement
@@ -11,6 +13,7 @@ import com.lucento.app.domain.entitlement.EntitlementStatus
 import com.lucento.app.domain.entitlement.Limit
 import com.lucento.app.domain.entitlement.PlanCatalog
 import com.lucento.app.domain.entitlement.PlanNotice
+import com.lucento.app.domain.entitlement.PlayProducts
 import com.lucento.app.domain.entitlement.ProFeature
 import com.lucento.app.domain.entitlement.Verifier
 import org.junit.Assert.assertEquals
@@ -90,22 +93,38 @@ class ProCopyTest {
         assertEquals("Waiting for Google Play", status(pending).title)
 
         val serverSub = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet())))
-        assertEquals("Lucento Pro · renews Feb 14, 2027", status(serverSub).title)
+        assertEquals("Lucento Pro · renews Feb\u00A014,\u00A02027", status(serverSub).title)
         val localSub = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), verifiedBy = Verifier.PLAY_LOCAL)))
         assertEquals("a Play-local horizon is never shown as a date", "Lucento Pro", status(localSub).title)
         val cancelled = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), EntitlementStatus.CANCELLED_ACTIVE)))
-        assertEquals("Lucento Pro · ends Feb 14, 2027", status(cancelled).title)
+        assertEquals("Lucento Pro · ends Feb\u00A014,\u00A02027", status(cancelled).title)
         val grace = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet(), EntitlementStatus.GRACE)))
         assertEquals("Lucento Pro · payment problem", status(grace).title)
         val grant = EntitlementState(listOf(row(EntitlementSource.GRANT, Capability.entries.toSet())))
-        assertEquals("Courtesy access until Feb 14, 2027.", status(grant).detail)
+        assertEquals("Courtesy access until Feb\u00A014,\u00A02027.", status(grant).detail)
 
         val lifetime = row(EntitlementSource.PLAY_LIFETIME, setOf(Capability.LOCAL_PRO), expiresAt = null)
-        assertEquals("Pro Lifetime · you own it", status(EntitlementState(listOf(lifetime))).title)
+        assertEquals("Pro Lifetime\u00A0· you own it", status(EntitlementState(listOf(lifetime))).title)
         val year = row(EntitlementSource.PLAY_LIFETIME_SERVICES, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = now + 100 * day, verifiedBy = Verifier.PLAY_LOCAL)
-        assertTrue(status(EntitlementState(listOf(lifetime, year))).detail.contains("included until Apr 25, 2027"))
+        assertTrue(status(EntitlementState(listOf(lifetime, year))).detail.contains("included until Apr\u00A025,\u00A02027"))
         val cloud = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED))
         assertTrue(status(EntitlementState(listOf(lifetime, cloud))).detail.startsWith("With Lucento Cloud"))
+    }
+
+    @Test fun service_terms_say_how_long_the_online_services_last() {
+        fun term(vararg rows: Entitlement) = ProCopy.serviceTerm(EntitlementState(rows.toList()), now, ZoneOffset.UTC, Locale.US)
+        val lifetime = row(EntitlementSource.PLAY_LIFETIME, setOf(Capability.LOCAL_PRO), expiresAt = null)
+        // Owned for good, and no online services in the plan: nothing to put a term on.
+        assertEquals(null, term(lifetime))
+        val year = row(EntitlementSource.PLAY_LIFETIME_SERVICES, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = now + 100 * day, verifiedBy = Verifier.PLAY_LOCAL)
+        // The included year's end, read from its entitlement, kept on one line.
+        assertEquals(ProCopy.ServiceTerm.Until("Apr 25, 2027"), term(lifetime, year))
+        val cloud = row(EntitlementSource.PLAY_CLOUD_ADDON, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED))
+        assertEquals(ProCopy.ServiceTerm.Cloud, term(lifetime, cloud))
+        assertEquals(ProCopy.ServiceTerm.Subscription, term(row(EntitlementSource.PLAY_SUBSCRIPTION, Capability.entries.toSet())))
+        // A courtesy grant lasts until the owner set it to, or has no end.
+        assertEquals(ProCopy.ServiceTerm.Until("Feb 14, 2027"), term(row(EntitlementSource.GRANT, Capability.entries.toSet())))
+        assertEquals(ProCopy.ServiceTerm.Included, term(row(EntitlementSource.GRANT, Capability.entries.toSet(), expiresAt = null)))
     }
 
     @Test fun price_lines_use_plays_own_strings_and_periods() {
@@ -122,6 +141,38 @@ class ProCopyTest {
         assertEquals("Your plan is up to date: Lucento Pro.", ProCopy.restoreMessage(DisplayPlan.PRO, DisplayPlan.PRO, reached))
         assertTrue(ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, RefreshOutcome(false, false)).startsWith("Restoring needs an internet connection"))
         assertTrue(ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, reached).startsWith("No purchase found"))
+        val paused = ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, RefreshOutcome(false, false), awaitingCheck = true)
+        assertTrue(paused, paused.startsWith("Lucento still can’t confirm your purchase"))
+        // A refunded Lifetime is a purchase found, not "no purchase found" (owner's test 2026-11-13).
+        val refunded = ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, reached, lifetimeEnded = true)
+        assertTrue(refunded, refunded.startsWith("Google Play reports your Pro Lifetime as refunded or cancelled"))
+        assertTrue(refunded, refunded.contains("buy it again"))
+        assertEquals(
+            "a plan that works wins over an old refund",
+            "Your plan is up to date: Lucento Pro.",
+            ProCopy.restoreMessage(DisplayPlan.PRO, DisplayPlan.PRO, reached, lifetimeEnded = true),
+        )
+    }
+
+    @Test fun already_owned_says_what_reading_again_found() {
+        val none = ReleaseOutcome.NOTHING
+        val released = ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.FREE, ReleaseOutcome(found = 1, released = 1))
+        assertTrue(released, released.startsWith("Google Play was still holding your earlier Pro Lifetime (refunded or cancelled)"))
+        assertTrue(released, released.endsWith("you can buy Lifetime now."))
+        val stuck = ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.FREE, ReleaseOutcome(found = 1, released = 0))
+        assertTrue(stuck, stuck.startsWith("Google Play is still holding your earlier Pro Lifetime (refunded or cancelled)"))
+        assertTrue(stuck, stuck.contains("Google Play order number"))
+        val working = "Your Google account already owns this, and your Pro Lifetime is working on this phone now."
+        assertEquals(working, ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.LIFETIME, none))
+        // A Lifetime that works is said first, even beside an older ended one Play still holds (QA review 2026-11-13).
+        assertEquals(working, ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.LIFETIME, ReleaseOutcome(found = 1, released = 0)))
+        assertEquals(
+            "Your Google account already owns this, and your Lucento Pro is working on this phone now.",
+            ProCopy.alreadyOwned(PlayProducts.PRO_SUBSCRIPTION, DisplayPlan.PRO, none),
+        )
+        // Nothing settled it: the old advice (Restore purchases), unchanged.
+        assertEquals(ProCopy.billingProblem(BillingProblem.ALREADY_OWNED), ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.FREE, none))
+        assertEquals(ProCopy.billingProblem(BillingProblem.ALREADY_OWNED), ProCopy.alreadyOwned(PlayProducts.CLOUD_ADDON, DisplayPlan.LIFETIME, none))
     }
 
     @Test fun plan_ended_notices_say_nothing_was_removed_and_quote_the_catalog() {
@@ -134,6 +185,14 @@ class ProCopyTest {
         assertTrue(ended.contains("${PlanCatalog.FREE_MONEY_WALLETS} money wallets"))
         assertTrue(ended.contains("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} questions a month"))
         assertTrue(ProCopy.notice(PlanNotice.SERVICES_ENDED).body.contains("unchanged"))
+        val paused = ProCopy.notice(PlanNotice.LIFETIME_NEEDS_CHECK).body
+        // Either pause (a month without a word, or Lucento's server not confirming Play's reading, L-6) reads the same.
+        assertTrue(paused, paused.contains("until Lucento can confirm your purchase again") && paused.contains("Restore purchases"))
+        assertTrue(paused, paused.contains("Connect to the internet"))
+        assertFalse("paused is not refunded", paused.contains("refunded"))
+        val subPaused = ProCopy.notice(PlanNotice.PRO_NEEDS_CHECK)
+        assertTrue(subPaused.body, subPaused.body.contains("until Lucento can confirm your subscription again") && subPaused.body.contains("Restore purchases"))
+        assertFalse("paused is not ended", subPaused.title.contains("ended"))
     }
 
     @Test fun the_member_mark_shows_only_for_the_persons_own_pro_or_lifetime() {

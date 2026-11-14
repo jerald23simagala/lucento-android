@@ -292,6 +292,8 @@ class ScreenshotTourTest {
         // locks, the plan-ended notice and the Pro page are captured at the end.
         val simulator = checkNotNull(container.planSimulator) { "Test builds have the plan simulator" }
         runBlocking {
+            // The welcome to Pro would cover the tour here; it is captured at the end, after the test-store purchase.
+            DemoMonth.skipProWelcome(container, com.lucento.app.data.billing.SimulatedPlan.PRO_MONTHLY)
             simulator.select(com.lucento.app.data.billing.SimulatedPlan.PRO_MONTHLY)
             container.entitlements.refresh()
         }
@@ -443,8 +445,11 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         waitForText("Income and expenses")
+        // Tester round 3: where the money went (donut), then net worth over time (month ends).
+        runCatching { compose.onNodeWithText("Where your money went").performScrollTo() }
+        shot("14-insights-spending")
         runCatching { compose.onNodeWithText("Savings goals aren’t added here", substring = true).performScrollTo() }
-        shot("14-insights-net-worth")
+        shot("14b-insights-net-worth")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         openBudgets()
@@ -611,7 +616,8 @@ class ScreenshotTourTest {
         waitForText("Monthly budget")
         compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
-        click("Lucento Plan")
+        // On the free plan the profile menu shows the Lucento Pro card in place of the plan row (owner, 2026-11-09).
+        click("See Lucento Pro")
         waitForText("What each plan includes")
         shot("24b-pro-page-free")
         runCatching { compose.onNodeWithText("Pro Lifetime").performScrollTo() }
@@ -635,17 +641,67 @@ class ScreenshotTourTest {
         // results comes through the same entitlement manager a real Play purchase does.
         back()
         waitForText("Monthly budget")
+        runBlocking {
+            // The welcome's screens show figures; and this purchase is a first Pro plan, so the medal is presented again.
+            container.preferences.setHideAmounts(false)
+            container.preferences.setProMemberSince(null)
+        }
         simulator.setTestStore(true)
         compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
-        click("Lucento Plan")
+        click("See Lucento Pro")
         waitForText("Start 7-day free trial")
         runCatching { compose.onNodeWithText("Start 7-day free trial").performScrollTo() }
         shot("24g-pro-page-buy")
         compose.onNodeWithText("Buy Lifetime").performScrollTo().performClick()
-        waitForText("Pro Lifetime is yours")
-        runCatching { compose.onNodeWithText("Pro Lifetime is yours", substring = true).performScrollTo() }
-        shot("24h-bought-lifetime")
+
+        // ---------------------------------------------------------------- Lucento Pro's welcome (owner, 2026-11-12)
+        // Straight after Google Play confirms: a deck of cards in a gold band, one per thing Pro opened, turned over one at
+        // a time; the collection with the plan's terms; the medal; and its flight to the profile picture.
+        // The brand's name is bound with a no-break space, so it never breaks across lines (critic round 4).
+        waitForText("You’re on Lucento\u00A0Pro")
+        shot("24h-pro-welcome")
+        click("Open your Pro deck")
+        buildList {
+            add("Add every account you use" to "25a-pro-card-wallets")
+            add("Count everything you have" to "25b-pro-card-net-worth")
+            // Gemini and Lucento Shared need a Lucento account: only in a build with cloud sync (CI's test build has none).
+            if (com.lucento.app.data.sync.SupabaseModule.isConfigured) add("Smarter reading, with Gemini" to "25b2-pro-card-smart-reading")
+            add("Save for more at once" to "25c-pro-card-goals")
+            add("Look further back" to "25d-pro-card-insights")
+            add("Keep your statements" to "25e-pro-card-statements")
+            // Only in a build with cloud sync (CI's test build has none): both need a Lucento account.
+            if (com.lucento.app.data.sync.SupabaseModule.isConfigured) {
+                add("AI answers, with Gemini" to "25f-pro-card-ai")
+                add("Your money on every phone" to "25g-pro-card-sync")
+                add("Share with a Partner" to "25g2-pro-card-shared")
+            }
+            add("Three new themes" to "25h-pro-card-themes")
+        }.forEach { (title, name) ->
+            waitForText(title)
+            Thread.sleep(700) // the card has turned over
+            shot(name)
+            click(if (name.endsWith("themes")) "See your collection" else "Next")
+        }
+        waitForText("Congratulations, you’re Pro")
+        shot("25i-pro-collection")
+        click("Collect your award")
+        waitForText("Membership award")
+        shot("25j-pro-medal")
+        click("See your Pro badge")
+        // The badge lands on the profile picture: drawn (its crest), and said to TalkBack (the button's state).
+        compose.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasTestTag("pro-badge"), 10_000)
+        compose.waitUntilAtLeastOneExists(
+            androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Lucento Pro"),
+            10_000,
+        )
+        shot("25k-pro-ring")
+        // The Lucento Pro page offers the cards again, without the medal.
+        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        compose.waitForIdle()
+        click("Lucento Plan")
+        waitForText("See your Pro cards")
+        shot("25l-pro-page-replay")
         simulator.setTestStore(false)
     }
 }

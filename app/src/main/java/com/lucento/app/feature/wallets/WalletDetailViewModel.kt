@@ -8,6 +8,7 @@ import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.data.repository.adjustBalanceOrNull
+import com.lucento.app.data.repository.recordOutsideMovementOrNull
 import com.lucento.app.domain.CardCycle
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.CreditCardMath
@@ -77,6 +78,8 @@ sealed interface AdjustError {
     data object Unchanged : AdjustError
     /** The wallet is gone, or the database refused the write. */
     data object Failed : AdjustError
+    /** A withdrawal or external payment needs to say what it was for. */
+    data object ReasonRequired : AdjustError
 }
 
 class WalletDetailViewModel(
@@ -158,6 +161,53 @@ class WalletDetailViewModel(
                     is TransactionRepository.AdjustResult.Adjusted -> null
                     TransactionRepository.AdjustResult.Unchanged -> AdjustError.Unchanged
                     TransactionRepository.AdjustResult.FutureDate -> AdjustError.FutureDate
+                    else -> AdjustError.Failed
+                }
+            )
+        }
+    }
+
+    private var recordingOutside = false
+
+    /**
+     * Records [amountText] as a withdrawal or an external payment of [kind] on [date] (tester round 3): not income,
+     * spending or a transfer. [reason] is required. The same idempotency key per sheet as [adjust]; [onResult] receives
+     * null on success.
+     */
+    fun recordOutside(
+        kind: com.lucento.app.domain.OutsideMovement,
+        amountText: String,
+        decimalSeparator: Char,
+        date: LocalDate,
+        reason: String,
+        clientUuid: String,
+        onResult: (AdjustError?) -> Unit,
+    ) {
+        if (recordingOutside) return
+        val wallet = uiState.value.wallet ?: return onResult(AdjustError.Failed)
+        val amount = when (val parsed = MoneyParser.parse(amountText, wallet.currencyCode, decimalSeparator)) {
+            is MoneyParser.Result.Success -> parsed.money
+            MoneyParser.Result.Empty, MoneyParser.Result.Invalid -> return onResult(AdjustError.AmountInvalid)
+            is MoneyParser.Result.TooManyDecimals -> return onResult(AdjustError.AmountTooPrecise(parsed.allowed))
+            MoneyParser.Result.TooLarge -> return onResult(AdjustError.AmountTooLarge)
+            is MoneyParser.Result.Ambiguous, is MoneyParser.Result.WrongCurrency ->
+                return onResult(AdjustError.AmountUnclear(MoneyParser.clarification(parsed, decimalSeparator).orEmpty()))
+        }
+        if (amount.amountMinor <= 0L) return onResult(AdjustError.AmountInvalid)
+        if (!com.lucento.app.domain.OutsideMovement.reasonValid(reason)) return onResult(AdjustError.ReasonRequired)
+        recordingOutside = true
+        viewModelScope.launch {
+            val result = try {
+                transactions.recordOutsideMovementOrNull(kind, walletId, amount, date, reason, clientUuid)
+            } finally {
+                recordingOutside = false
+            }
+            onResult(
+                when (result) {
+                    is TransactionRepository.OutsideResult.Recorded -> null
+                    TransactionRepository.OutsideResult.FutureDate -> AdjustError.FutureDate
+                    TransactionRepository.OutsideResult.NotPositive -> AdjustError.AmountInvalid
+                    TransactionRepository.OutsideResult.ReasonRequired -> AdjustError.ReasonRequired
                     else -> AdjustError.Failed
                 }
             )

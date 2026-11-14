@@ -21,9 +21,10 @@ SOURCE = os.path.join(HERE, "..", "..", "app", "src", "main", "java", "com", "lu
 
 def main(out_path):
     src = io.open(SOURCE, encoding="utf-8").read()
-    consts = dict(re.findall(r'const val (\w+) = "([^"]*)"', src))
     # Join "a" + "b" across lines into one literal, then expand $CONSTANT templates.
     joined = re.sub(r'"\s*\+\s*\n\s*"', "", src)
+    # Constants may start on the line after "=" and span several joined literals (GEMINI_DATA_USE).
+    consts = dict(re.findall(r'const val (\w+) =\s*"((?:[^"\\]|\\.)*)"', joined))
 
     def expand(text):
         return re.sub(r"\$(\w+)", lambda m: consts[m.group(1)], text)

@@ -152,7 +152,10 @@ object LoanMath {
         val repaid = principal - remaining
         // A loan is repaid by transfers into it; a receivable by transfers out of it into the user's accounts.
         val repayment = if (wallet.type == WalletType.RECEIVABLE) TransactionType.TRANSFER_OUT else TransactionType.TRANSFER_IN
-        val payments = transactions.count { it.walletId == wallet.id && it.type == repayment }
+        // An external payment (someone outside your wallets paid an instalment, tester round 3) is a payment too.
+        val payments = transactions.count {
+            it.walletId == wallet.id && (it.type == repayment || OutsideMovement.of(it) == OutsideMovement.EXTERNAL_PAYMENT)
+        }
         return LoanProgress(
             principal = principal,
             paid = if (repaid.isNegative) Money.zero(principal.currencyCode) else repaid,

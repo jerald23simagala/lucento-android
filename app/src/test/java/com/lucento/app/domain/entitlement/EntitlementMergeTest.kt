@@ -19,9 +19,10 @@ class EntitlementMergeTest {
         expiresAt: Long? = now + 30 * day,
         productId: String? = "p",
         verifiedAt: Long = now,
+        tokenHash: String? = null,
     ) = Entitlement(
         source = source, status = status, grants = grants, startsAtMillis = now - day, expiresAtMillis = expiresAt,
-        productId = productId, verifiedAtMillis = verifiedAt, verifiedBy = verifiedBy,
+        productId = productId, purchaseTokenHash = tokenHash, verifiedAtMillis = verifiedAt, verifiedBy = verifiedBy,
     )
 
     @Test fun a_successful_play_query_replaces_the_phones_own_rows_and_drops_what_play_no_longer_lists() {
@@ -52,17 +53,114 @@ class EntitlementMergeTest {
         assertEquals(listOf(play), EntitlementMerge.reconcilePlay(listOf(lapsed), listOf(play), now))
     }
 
-    @Test fun a_revoked_server_row_is_not_overridden_by_play_while_its_dates_are_current() {
-        // Refund with revoke: the server says REVOKED (dates still in the future); Play's cache may still list the purchase.
+    @Test fun a_revoked_server_row_with_no_purchase_to_match_gives_way_to_play_until_the_server_settles_it() {
+        // A REVOKED row without a token can't be matched to Play's purchase (the same purchase is covered below).
         val revoked = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.REVOKED, expiresAt = null, productId = "life")
         val play = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life")
         // stillCurrent() is false for REVOKED, so the Play reading wins here — this is the one case where the phone can be
         // more generous than the server until the next server fetch, which reconcileServer settles. Pin the behaviour.
         val afterPlay = EntitlementMerge.reconcilePlay(listOf(revoked), listOf(play), now)
         assertEquals(listOf(play), afterPlay)
-        val afterServer = EntitlementMerge.reconcileServer(afterPlay, listOf(revoked))
+        val afterServer = EntitlementMerge.reconcileServer(afterPlay, listOf(revoked), now)
         assertEquals(listOf(revoked), afterServer)
         assertFalse(EntitlementState(afterServer).has(Capability.LOCAL_PRO, now))
+    }
+
+    @Test fun a_purchase_the_server_revoked_never_comes_back_from_plays_copy_of_it() {
+        // Refund with revoke: the server says REVOKED, while Play's copy on the phone still lists the same purchase.
+        val revoked = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.REVOKED, expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        val stale = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        // Offline, or on a Play push, no server answer follows to settle it: the revocation has to hold by itself.
+        val merged = EntitlementMerge.reconcilePlay(listOf(revoked), listOf(stale), now)
+        assertEquals(listOf(revoked), merged)
+        assertFalse(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
+    }
+
+    @Test fun a_new_purchase_after_a_revoked_one_counts_at_once() {
+        val revoked = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.REVOKED, expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        val bought = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = "b".repeat(64))
+        val merged = EntitlementMerge.reconcilePlay(listOf(revoked), listOf(bought), now)
+        assertEquals(listOf(bought), merged)
+        assertTrue(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
+    }
+
+    @Test fun a_lifetime_refund_the_server_read_as_cancelled_never_comes_back_from_plays_copy_of_it() {
+        // A Play Console refund of a one-time product: Play's server says CANCELLED, which the server stores as EXPIRED
+        // (not REVOKED), while Play's copy on the phone still lists the purchase (owner's test, 2026-11-13).
+        val ended = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.EXPIRED, expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        val stale = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        val merged = EntitlementMerge.reconcilePlay(listOf(ended), listOf(stale), now)
+        assertEquals(listOf(ended), merged)
+        assertFalse(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
+    }
+
+    @Test fun an_expired_subscription_stays_off_while_plays_copy_lags_and_a_resubscription_counts_at_once() {
+        // Google Play: buying again after a subscription expires is a new purchase with a new token, so the same token
+        // never renews once Play has called it expired. Only Play's lagging copy can still list it.
+        val expired = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.SERVER, status = EntitlementStatus.EXPIRED, expiresAt = now - 10 * day, tokenHash = "c".repeat(64))
+        val stale = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.PLAY_LOCAL, expiresAt = now + 35 * day, tokenHash = "c".repeat(64))
+        assertEquals(listOf(expired), EntitlementMerge.reconcilePlay(listOf(expired), listOf(stale), now))
+        val resubscribed = stale.copy(purchaseTokenHash = "d".repeat(64))
+        assertEquals(listOf(resubscribed), EntitlementMerge.reconcilePlay(listOf(expired), listOf(resubscribed), now))
+    }
+
+    @Test fun a_subscription_back_from_account_hold_shows_up_before_the_server_hears_of_it() {
+        // Hold and pause keep the token: the same purchase can be live again, so Play's fresh reading wins.
+        for (status in listOf(EntitlementStatus.ON_HOLD, EntitlementStatus.PAUSED)) {
+            val held = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.SERVER, status = status, expiresAt = now - day, tokenHash = "e".repeat(64))
+            val back = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.PLAY_LOCAL, expiresAt = now + 35 * day, tokenHash = "e".repeat(64))
+            assertEquals(status.name, listOf(back), EntitlementMerge.reconcilePlay(listOf(held), listOf(back), now))
+        }
+    }
+
+    @Test fun an_ending_the_purchase_check_reported_stays_with_plays_next_reading_of_the_same_purchase() {
+        // L-6: the check said EXPIRED; Play's lagging copy reads the same purchase as ACTIVE again.
+        val ended = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.EXPIRED, expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+            .copy(lucentoCheckedAtMillis = now - day)
+        val stale = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+            .copy(confirmedAtMillis = null)
+        val merged = EntitlementMerge.reconcilePlay(listOf(ended), listOf(stale), now).single()
+        assertEquals(EntitlementStatus.EXPIRED, merged.status)
+        assertEquals(now - day, merged.lucentoCheckedAtMillis)
+        assertFalse(EntitlementState(listOf(merged)).has(Capability.LOCAL_PRO, now))
+        // A new purchase is a new token: it starts fresh.
+        val bought = stale.copy(purchaseTokenHash = "b".repeat(64), startsAtMillis = now)
+        assertEquals(EntitlementStatus.ACTIVE, EntitlementMerge.reconcilePlay(listOf(ended), listOf(bought), now).single().status)
+    }
+
+    @Test fun lucentos_last_confirmation_stays_with_plays_next_reading_or_comes_from_the_accounts_row() {
+        val token = "c".repeat(64)
+        val earlier = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = token, verifiedAt = now - day)
+            .copy(confirmedAtMillis = now - 10 * day, lucentoCheckedAtMillis = now - 10 * day)
+        val fresh = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = token)
+            .copy(confirmedAtMillis = null)
+        val merged = EntitlementMerge.reconcilePlay(listOf(earlier), listOf(fresh), now).single()
+        assertEquals(now - 10 * day, merged.confirmedAtMillis)
+        assertEquals(now - 10 * day, merged.lucentoCheckedAtMillis)
+
+        // The account's own row for that purchase, heard from 40 days ago (past the month, so Play's reading takes over).
+        val account = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = token, verifiedAt = now - 40 * day)
+        val fromAccount = EntitlementMerge.reconcilePlay(listOf(account), listOf(fresh), now).single()
+        assertEquals(Verifier.PLAY_LOCAL, fromAccount.verifiedBy)
+        assertEquals("the account's row is Lucento's word too", now - 40 * day, fromAccount.confirmedAtMillis)
+    }
+
+    @Test fun a_lifetimes_year_ended_services_row_stays_ended_and_the_lifetime_stays() {
+        val token = "d".repeat(64)
+        val services = row(EntitlementSource.PLAY_LIFETIME_SERVICES, Verifier.PLAY_LOCAL, status = EntitlementStatus.EXPIRED, expiresAt = now - day, productId = "life", tokenHash = token)
+        val lifetime = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = token)
+        val merged = EntitlementMerge.reconcilePlay(listOf(services, lifetime), listOf(services, lifetime), now)
+        assertEquals(setOf(EntitlementStatus.EXPIRED, EntitlementStatus.ACTIVE), merged.map { it.status }.toSet())
+        assertTrue(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
+    }
+
+    @Test fun a_server_lifetime_unheard_of_for_a_month_gives_way_to_plays_fresh_reading() {
+        // checkedAt defaults to verifiedAt: the phone last heard from the server 40 days ago, and Play has just confirmed it.
+        val unheard = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", verifiedAt = now - 40 * day)
+        val play = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life")
+        val merged = EntitlementMerge.reconcilePlay(listOf(unheard), listOf(play), now)
+        assertEquals(listOf(play), merged)
+        assertTrue(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
     }
 
     @Test fun the_server_replaces_its_own_rows_and_the_phones_rows_for_keys_it_knows() {
@@ -70,16 +168,32 @@ class EntitlementMergeTest {
         val playLifetimeOffline = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life")
         val oldGrant = row(EntitlementSource.GRANT, Verifier.SERVER, productId = null, verifiedAt = now - 5 * day)
         val serverSub = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.SERVER, expiresAt = now + 12 * day)
-        val merged = EntitlementMerge.reconcileServer(listOf(playSub, playLifetimeOffline, oldGrant), listOf(serverSub))
+        val merged = EntitlementMerge.reconcileServer(listOf(playSub, playLifetimeOffline, oldGrant), listOf(serverSub), now)
         // The grant the server no longer lists is gone; the subscription is the server's reading; the Lifetime bought
         // offline and not yet verified stays as the phone's reading.
         assertEquals(setOf(serverSub, playLifetimeOffline), merged.toSet())
     }
 
+    @Test fun a_new_purchase_the_server_hasnt_recorded_survives_its_answer_about_an_earlier_one() {
+        // A Lifetime refunded (token a, EXPIRED on the server) and bought again (token b) before verify recorded b (PB-9).
+        val earlier = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.EXPIRED, expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        val bought = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = "b".repeat(64))
+        val merged = EntitlementMerge.reconcileServer(listOf(bought), listOf(earlier), now)
+        assertEquals(setOf(earlier, bought), merged.toSet())
+        assertTrue(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
+
+        // Play's copy of the ended purchase itself stays the server's to end.
+        val stale = bought.copy(purchaseTokenHash = "a".repeat(64))
+        assertEquals(listOf(earlier), EntitlementMerge.reconcileServer(listOf(stale), listOf(earlier), now))
+        // A server row that still counts keeps its key, as before.
+        val live = earlier.copy(status = EntitlementStatus.ACTIVE)
+        assertEquals(listOf(live), EntitlementMerge.reconcileServer(listOf(bought), listOf(live), now))
+    }
+
     @Test fun an_empty_server_answer_removes_server_rows_but_keeps_play_rows() {
         val play = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.PLAY_LOCAL)
         val grant = row(EntitlementSource.GRANT, Verifier.SERVER, productId = null)
-        assertEquals(listOf(play), EntitlementMerge.reconcileServer(listOf(play, grant), emptyList()))
+        assertEquals(listOf(play), EntitlementMerge.reconcileServer(listOf(play, grant), emptyList(), now))
     }
 
     @Test fun readings_must_carry_their_verifier() {
@@ -88,7 +202,7 @@ class EntitlementMergeTest {
         try { EntitlementMerge.reconcilePlay(emptyList(), listOf(wrong), now) } catch (e: IllegalArgumentException) { threw = true }
         assertTrue(threw)
         threw = false
-        try { EntitlementMerge.reconcileServer(emptyList(), listOf(row(EntitlementSource.GRANT, Verifier.PLAY_LOCAL))) } catch (e: IllegalArgumentException) { threw = true }
+        try { EntitlementMerge.reconcileServer(emptyList(), listOf(row(EntitlementSource.GRANT, Verifier.PLAY_LOCAL)), now) } catch (e: IllegalArgumentException) { threw = true }
         assertTrue(threw)
     }
 }

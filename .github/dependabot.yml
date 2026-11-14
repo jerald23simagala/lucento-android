@@ -1,0 +1,36 @@
+# Dependency update pull requests (security audit F-15). Updates are proposals: each one runs CI and is reviewed and
+# merged by hand. Versions stay mutually compatible (CLAUDE.md "Stack": AGP <-> Gradle <-> Kotlin <-> KSP <-> Compose), so
+# the Kotlin toolchain group is one pull request, never a piecemeal bump.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      kotlin-toolchain:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "com.google.devtools.ksp*"
+          - "com.android.tools.build*"
+          - "com.android.application"
+          - "com.android.library"
+      androidx:
+        patterns:
+          - "androidx.*"
+    labels: ["dependencies"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies"]
+
+  - package-ecosystem: npm
+    directory: "/tools/sql-verify"
+    schedule:
+      interval: monthly
+    labels: ["dependencies"]

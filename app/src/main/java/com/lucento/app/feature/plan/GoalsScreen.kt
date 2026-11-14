@@ -271,7 +271,12 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                             "Your finished goals are under Archived. Set a new target whenever you’re ready."
                         },
                         illustration = { EmptyIllustration(LucentoAnimation.EmptyGoals) },
-                        action = if (canEdit) ({ LucentoPrimaryButton(text = "Create a goal", onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) }) }) else null,
+                        action = if (canEdit) ({
+                            LucentoPrimaryButton(
+                                text = "Create a goal",
+                                onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
+                            )
+                        }) else null,
                     )
                 }
             }

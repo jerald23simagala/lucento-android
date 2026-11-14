@@ -379,7 +379,30 @@ sealed interface SyncResult {
      * refuses this account. The shared ledger is removed from the phone next ([SyncRepository]'s revocation callback).
      */
     data class MembershipRevoked(val spaceOwnerId: String) : SyncResult
+
+    /**
+     * Security audit F-01 (supabase/migrations/20261111090000_cloud_write_gate_and_quotas.sql): the pull finished, but the
+     * server refuses this phone's uploads for [reason] — the plan doesn't include cloud sync (now), or the account reached
+     * its storage ceiling. Every local change stays on the phone, pending; nothing was lost and nothing is retried until
+     * [SyncRepository.UPLOAD_REFUSAL_COOLDOWN_MILLIS] has passed or the plan changes. Retrying sooner can't succeed.
+     */
+    data class UploadsPaused(val report: SyncReport, val reason: UploadRefusal, val message: String) : SyncResult
 }
+
+/** Why the server refuses uploads it will keep refusing (never a network failure). */
+enum class UploadRefusal {
+    /** SQLSTATE 42501: the write policy requires the CLOUD capability (the account's own, or its Shared Space Owner's). */
+    PLAN,
+
+    /** SQLSTATE LU001: the account holds the most rows of a kind one account may store. */
+    STORAGE_LIMIT,
+}
+
+/** Thrown by a [SyncRemote] write the server refused for [reason]; carries no request detail. */
+class UploadRefusedException(val reason: UploadRefusal) : Exception("Upload refused: $reason")
+
+/** The last refusal this phone saw, and the plan it held then ([SyncRepository]'s cooldown). */
+data class UploadsRefusedRecord(val atMillis: Long, val planFingerprint: String, val reason: UploadRefusal)
 
 /**
  * A short, safe description of a failure, for anything that is shown, stored or logged. Never use `Throwable.message`
@@ -393,6 +416,7 @@ internal fun safeFailureDescription(e: Throwable): String = when (e) {
     is io.github.jan.supabase.exceptions.HttpRequestException -> "Couldn't reach the server"
     is SyncRepository.SyncTimedOut -> "Sync took too long and stopped"
     is AuthNotReady -> "Couldn't confirm your sign-in"
+    is UploadRefusedException -> SyncRepository.refusalMessage(e.reason)
     is SyncFlight.Busy -> "Another sync is still running"
     else -> e::class.simpleName ?: "Unexpected error"
 }

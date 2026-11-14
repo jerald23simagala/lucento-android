@@ -17,7 +17,7 @@ class PlanCatalogTest {
         assertEquals(Limit.PerMonth(10), PlanCatalog.limit(ProFeature.AI_ADVISER, free))
         for (f in listOf(
             ProFeature.RECEIVABLES, ProFeature.VALUED_ASSETS, ProFeature.FOREIGN_CURRENCY_WALLETS, ProFeature.INSIGHTS_LONG_PERIODS,
-            ProFeature.NET_WORTH_COMPOSITION, ProFeature.PDF_STATEMENTS, ProFeature.EXTRA_THEMES, ProFeature.CLOUD_SYNC,
+            ProFeature.PDF_STATEMENTS, ProFeature.EXTRA_THEMES, ProFeature.CLOUD_SYNC,
             ProFeature.CLOUD_RESTORE, ProFeature.SMART_READING, ProFeature.SHARED_SPACE,
         )) {
             assertEquals("$f is not on Free", Limit.None, PlanCatalog.limit(f, free))

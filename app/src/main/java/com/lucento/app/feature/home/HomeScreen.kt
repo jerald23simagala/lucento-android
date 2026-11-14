@@ -296,6 +296,7 @@ private fun HomeDashboard(
     var ceremony by rememberSaveable { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
     var ceremonyAlso by rememberSaveable { mutableStateOf<List<com.lucento.app.domain.Achievement>>(emptyList()) }
     var replaying by remember { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
+    var replayingPro by remember { mutableStateOf(false) }
 
     // Part D: milestones. The first time they exist, what's already earned is recorded quietly; after that each new
     // one is acknowledged once — this runs only when the stored records change, i.e. after a committed write.
@@ -434,10 +435,19 @@ private fun HomeDashboard(
             facts = state.awardFacts,
             onDismiss = { showAwards = false },
             onReplay = { replaying = it },
+            proMemberSince = state.proMemberSince,
+            onReplayPro = { replayingPro = true },
         )
     }
     replaying?.let { award ->
         com.lucento.app.feature.awards.AwardCeremony(award, earnedCount = state.earned.size, onDismiss = { replaying = null })
+    }
+    if (replayingPro) {
+        com.lucento.app.feature.awards.ProMedalCeremony(
+            onDismiss = { replayingPro = false },
+            replay = true,
+            memberSince = state.proMemberSince?.let { com.lucento.app.feature.awards.memberSinceLabel(it) },
+        )
     }
     ceremony?.let { award ->
         com.lucento.app.feature.awards.AwardCeremony(

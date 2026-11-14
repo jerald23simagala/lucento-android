@@ -4,7 +4,7 @@ Principle: each milestone ships a working, tested APK. Money stays in `Long` min
 JVM tests; every Room schema change ships a `Migration` and a migration test.
 
 ## Done — M0 Foundation (v0.1.0)
-- Gradle (AGP 8.7.3, Kotlin 2.0.21, KSP, Compose BOM 2024.12.01), wrapper 8.11.1, GitHub Actions CI → debug APK artifact.
+- Gradle (AGP 8.7.3, Kotlin 2.0.21, KSP, Compose BOM 2024.12.01 — 2025.02.00 since the widgets), wrapper 8.11.1, GitHub Actions CI → debug APK artifact.
 - Design system: palette, Inter typography, shapes/spacing, components (buttons, cards, empty states, amount text,
   currency picker, brand mark), light/dark themes, splash screen, adaptive + themed launcher icon.
 - Onboarding (welcome → principles → main currency), DataStore preferences, bottom navigation.
@@ -184,6 +184,42 @@ recurring-schedule sync, syncing preferences.
   offline (`tools/sql-verify`, 30/30).
 - Before the first sale: target SDK 36 (`chore/target-sdk-36`), release signing, and Play Console products
   (docs/monetization/PLAY_CONSOLE_SETUP.md). Then Phase 5: the device matrix, website pricing pages and legal pages.
+- 2026-11-12 (`feature/pro-welcome`): Welcome to Pro after a confirmed purchase (docs/MONETIZATION.md §6.5). It is a
+  tour of up to ten stops over the real screens Pro opened, including Gemini (AI answers, Smarter reading) and Lucento
+  Shared. Then a summary of limits and online services, the Lucento Pro award on a Membership shelf, and the Pro badge
+  on the profile picture. "Replay the Pro tour" is on the Pro page. Version 0.5.4 (vc 9).
+- 2026-11-12 (`fix/refund-guards`): refund guards on the phone.
+  - A purchase the server revoked stays revoked even while Play's copy still lists it.
+  - Anything bought through Google Play (Lifetime or subscription) needs one check a month, from Google Play or the
+    server (MONETIZATION §5.3 L-2).
+  - The server's refund checks are switched on by the owner (OT-24).
+- 2026-11-13 (`fix/refund-stays-off`, #61; `feature/purchase-check`): a refund stays off on every phone.
+  - A purchase the server called expired (how a Play Console refund arrives) stays off after signing out, like a
+    revoked one.
+  - The purchase check needs no account: signed out, cleared or reinstalled, the phone asks Lucento's site about each
+    Google Play purchase (`/api/billing/check`). Play's word alone carries a purchase for 3 days from buying it, then
+    for 90 days after each confirmation (MONETIZATION §5.3 L-6). Mandatory sign-in was declined in its place.
+- 2026-11-13 (`fix/refunded-lifetime-rebuy`): Pro Lifetime can be bought again after a refund. A Play Console refund
+  without Remove entitlement leaves the purchase in Google Play, which then refused a new one ("You already own this
+  item"). Buy Lifetime now first releases a Lifetime that Lucento's server reported refunded or charged back
+  (MONETIZATION §5.3 L-7, KNOWN_ISSUES PB-8).
+- 2026-11-12 (`fix/pro-tour-real-taps`): the Pro welcome's buttons work on real phones. Its touch blocker wrapped the
+  cards, so a finger's small drift cancelled every press (KNOWN_ISSUES PW-1). Finger-tap tests now cover the tour and
+  the curtain in CI. Held: the owner chose an unboxing reveal to replace the tour, and both ship in one release.
+- 2026-11-12 (`feature/pro-reveal`): the Pro welcome becomes a deck of cards. The owner picked "Deck, unwrapped" with
+  "Scenes" art.
+  - One card per thing Pro opened, each with an illustrated scene, what changed, until when an online service is
+    included, and where it lives in the app.
+  - Then the collection, the award and the badge.
+  - The spotlight tour, its curtain and the summary are retired, and "See your Pro cards" on the Pro page replays the
+    deck (MONETIZATION §6.5).
+  - After critic round 3 (REJECT, 3.1):
+    - the dark plan title is readable;
+    - the buttons stay whole and in place at any text size (they stack when a label won't fit);
+    - the band stays on the card; the scene fills the card instead of leaving a gap;
+    - the stage is solid; there is one TalkBack announcement per card;
+    - a fifth chapter, "Beyond this phone".
+    - App-wide: a button label that doesn't fit now wraps instead of being cut off.
 
 ## M2 — Transfers between wallets (same-currency done in v0.3.0)
 - Transfer = one DB transaction writing two linked legs (`transfer_group_id`); excluded from income/expense totals.
@@ -235,6 +271,19 @@ recurring-schedule sync, syncing preferences.
 - Play Console answers (Data safety, App content, listing, Google sign-in SHA-1s, testing tracks):
   docs/play/PLAY_STORE_SUBMISSION.md. Website refresh with pricing, terms and deletion pages (`feature/site-refresh`).
 - Owner: OT-15 (migration), OT-16 (Play Console), legal review.
+
+## Built — Home-screen widgets (2026-11-12, `feature/home-widgets`)
+- Owner chose widgets only, both free (after exploring a Quick Settings tile, a type-in-the-shade notification and
+  sharing into Lucento; those stay parked). Spec: docs/WIDGETS.md.
+- **Quick add** (4×1 → 2×1): the composer's scan · mic · field bar; taps open the composer in that mode.
+  **Safe to spend** (4×2 → 3×2): Home's figure, "a day · days left", "After … bills due", bar and verdict chip, or Home's
+  Net flow with Budgets off; Hide amounts, App lock and the theme apply; home screen only (`not_keyguard`).
+- Jetpack Glance 1.2.0 (Compose BOM moved to 2025.02.00 to keep Compose on one patch, 1.7.8). No new permission.
+- Settings › Home-screen widgets places either one (pin request). The widgets redraw after every data or preference
+  change, on text-size or dark-mode changes, and just after midnight, including inside an open Glance session.
+- Every row's height is planned (`WidgetFit.kt`), so nothing is cut at any size from 85 % to 200 % text (a test sweeps
+  6 widths × 7 heights × 7 text sizes). From a widget, Speak and Scan start in an already open composer, and the
+  microphone and camera wait for the launch logo and App lock.
 
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
