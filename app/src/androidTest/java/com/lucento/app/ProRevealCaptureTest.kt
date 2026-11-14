@@ -64,7 +64,7 @@ class ProRevealCaptureTest {
             simulator.setTestStore(true)
             compose.onNodeWithContentDescription("Profile and settings").performClick()
             compose.waitForIdle()
-            click("Lucento Pro")
+            click("See Lucento Pro") // the free plan's card
             waitForText("Buy Lifetime", 15_000)
             compose.onNodeWithText("Buy Lifetime").performScrollTo().performClick()
         }
@@ -104,7 +104,7 @@ class ProRevealCaptureTest {
             compose.waitUntilExactlyOneExists(androidx.compose.ui.test.hasContentDescription("Profile and settings"), 10_000)
             compose.onNodeWithContentDescription("Profile and settings").performClick()
             compose.waitForIdle()
-            click("Lucento Pro")
+            click("Lucento Plan") // a member's plan row
             waitForText("See your Pro cards", 15_000)
             runCatching { compose.onNodeWithText("See your Pro cards").performScrollTo() }
             shot("$tag-23-pro-page")

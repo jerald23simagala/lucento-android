@@ -239,7 +239,34 @@ object ProCopy {
         DisplayPlan.LIFETIME, DisplayPlan.LIFETIME_WITH_SERVICES -> "Pro Lifetime"
     }
 
-    /** The plan row in the profile menu, Settings and the top of the Lucento Pro page (customer copy D-11). */
+    /**
+     * The member mark (owner, 2026-11-09): the coin on the profile button and the chip after the name in the profile
+     * menu — "Pro", or "Lifetime" for Pro Lifetime. Null on the free plan, including while a purchase waits for Google
+     * Play. Only the person's own plan counts; a Partner using an Owner's Shared Space isn't marked.
+     */
+    fun memberMark(state: EntitlementState, now: Long): String? = when (state.displayPlan(now)) {
+        DisplayPlan.FREE -> null
+        DisplayPlan.PRO -> "Pro"
+        DisplayPlan.LIFETIME, DisplayPlan.LIFETIME_WITH_SERVICES -> "Lifetime"
+    }
+
+    /**
+     * Whether the profile menu shows the Lucento Pro card in place of the plain plan row: on the free plan with no
+     * purchase waiting (that row then says "Waiting for Google Play"). The profile menu is one of the places that may
+     * offer Pro (docs/MONETIZATION.md §6.1).
+     */
+    fun offersPro(state: EntitlementState, now: Long): Boolean =
+        state.displayPlan(now) == DisplayPlan.FREE && state.pending() == null
+
+    /** What the profile menu's Lucento Pro card lists: only what the Pro plan really adds (see [PlanCatalog]). */
+    val inviteLines: List<String> = listOf(
+        "Sync and restore across your phones",
+        "More wallets and goals, and other currencies",
+        "6- and 12-month Insights, PDF statements",
+        "More Ask Lucento answers every day",
+    )
+
+    /** The plan row in the profile menu, Settings and the top of the Lucento Plan page (customer copy D-11). */
     fun planStatus(state: EntitlementState, now: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): PlanStatus {
         // The date never splits across lines ("Nov 12, / 2027": critic round 3), as on the welcome's cards.
         fun date(millis: Long): String = termDate(millis, zone, locale)
@@ -490,7 +517,7 @@ object ProCopy {
             "Your Pro Lifetime is no longer active",
             "Google Play reports this purchase as refunded or cancelled. Everything you recorded is still here, and nothing " +
                 "was removed; the free plan’s limits apply to new items. If this looks wrong, restore your purchase from the " +
-                "Lucento Pro page.",
+                "Lucento Plan page.",
         )
         PlanNotice.LIFETIME_NEEDS_CHECK -> NoticeCopy(
             "Lucento needs to check your Pro Lifetime",
@@ -498,13 +525,13 @@ object ProCopy {
             // confirmed Google Play's reading lately. The same steps settle both.
             "Pro is paused on this phone until Lucento can confirm your purchase again. Connect to the internet, make " +
                 "sure the Google Play Store app is on and signed in to the Google account you bought with, then tap " +
-                "Restore purchases on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.",
+                "Restore purchases on the Lucento Plan page. Everything you recorded is still here, and nothing was removed.",
         )
         PlanNotice.PRO_NEEDS_CHECK -> NoticeCopy(
             "Lucento needs to check your Lucento Pro",
             "Pro is paused on this phone until Lucento can confirm your subscription again. Connect to the internet, make " +
                 "sure the Google Play Store app is on and signed in to the Google account you subscribed with, then tap " +
-                "Restore purchases on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.",
+                "Restore purchases on the Lucento Plan page. Everything you recorded is still here, and nothing was removed.",
         )
     }
 }

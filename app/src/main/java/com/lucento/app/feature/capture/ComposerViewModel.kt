@@ -31,6 +31,7 @@ import com.lucento.app.domain.capture.RowEdit
 import com.lucento.app.domain.capture.RowStatus
 import com.lucento.app.domain.capture.TransactionInterpreter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -97,6 +98,10 @@ data class ComposerState(
      */
     val fxNeedsChoice: Boolean = false,
     val fxOffline: com.lucento.app.domain.fx.FxSource = com.lucento.app.domain.fx.FxSource.LAST_RATE,
+    /** Smarter reading can be switched on here: signed in, in a build with Lucento's reading proxy. */
+    val smartReadingOffered: Boolean = false,
+    /** The person's Smarter reading consent (docs/CAPTURE.md); messages go to Gemini only while it is on. */
+    val smartReading: Boolean = false,
 )
 
 /**
@@ -116,6 +121,8 @@ class ComposerViewModel(
     private val today: () -> LocalDate = LocalDate::now,
     /** Multicurrency: the day's exchange rates (null in tests: rows then use the offline choice). */
     private val fxRates: com.lucento.app.data.fx.FxRateSource? = null,
+    /** Whether Smarter reading can be offered on this phone (signed in, with a proxy); false in tests. */
+    smartReadingOffered: Flow<Boolean> = flowOf(false),
 ) : ViewModel() {
 
     private data class Session(
@@ -148,9 +155,9 @@ class ComposerViewModel(
         wallets.observeWallets(),
         categories.observeCategories(),
         transactions.observeTransactions(),
-        preferences?.preferences?.map { it.defaultWalletId to it.primaryCurrency } ?: flowOf(null to null),
-        session,
-    ) { allWallets, categoryList, history, (savedDefault, main), s ->
+        preferences?.preferences?.map { Triple(it.defaultWalletId, it.primaryCurrency, it.smartReading) } ?: flowOf(Triple(null, null, false)),
+        combine(session, smartReadingOffered) { s, offered -> s to offered },
+    ) { allWallets, categoryList, history, (savedDefault, main, smart), (s, offered) ->
         val walletList = allWallets.transactable()
         val ids = walletList.map { it.id }.toSet()
         val defaultId = savedDefault?.takeIf { it in ids }
@@ -192,6 +199,8 @@ class ComposerViewModel(
             fx = fx,
             fxNeedsChoice = needsChoice,
             fxOffline = s.fxOffline,
+            smartReadingOffered = offered,
+            smartReading = smart,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ComposerState())
 
@@ -487,12 +496,23 @@ class ComposerViewModel(
         }
     }
 
+    /** Smarter reading from the composer's switch; turning it on follows the same consent as Settings. */
+    fun setSmartReading(enabled: Boolean) {
+        val prefs = preferences ?: return
+        viewModelScope.launch { prefs.setSmartReading(enabled) }
+    }
+
     companion object {
         /** The user's side of the chat for a scanned image (a receipt, a statement or an app's history). */
         const val SCAN_LABEL = "Scanned image"
 
         val Factory = containerFactory {
-            ComposerViewModel(it.transactions, it.wallets, it.categories, it.interpreter, it.preferences, fxRates = it.fxRates)
+            ComposerViewModel(
+                it.transactions, it.wallets, it.categories, it.interpreter, it.preferences, fxRates = it.fxRates,
+                smartReadingOffered = it.auth.observeSignedInEmail().map { email ->
+                    email != null && com.lucento.app.BuildConfig.AI_INTERPRET_URL.isNotBlank()
+                },
+            )
         }
 
         /** True when the phone writes short dates day first (03/11 for 3 November). */

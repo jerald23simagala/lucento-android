@@ -180,7 +180,8 @@ object LegalDocuments {
                         "itself), when you agreed to these terms, and — for Google sign-in — the name and picture link on " +
                         "your Google account.",
                     "We send emails only about your account: the link to verify your address, a welcome note when the " +
-                        "account is new, and a confirmation when you buy Lucento Pro. Lucento’s server reads your address " +
+                        "account is new, a code to reset your password when you ask for one, and a confirmation when you " +
+                        "buy Lucento Pro. Lucento’s server reads your address " +
                         "from your account and our email provider, Resend, delivers them. They never include your records.",
                     "When you choose a password, Lucento checks it against known data leaks by sending only the first five " +
                         "characters of a scrambled version (Have I Been Pwned). Your password is never sent there.",

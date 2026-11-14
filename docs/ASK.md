@@ -28,6 +28,19 @@ Gemini was busy, slow or unreachable the answer also offers **Ask Gemini again**
 session doesn't. Signed in on this phone but refused by the proxy even after a token refresh says "Your sign-in has
 expired — sign in again", not "needs your sync account".
 
+**Owner test round 2 (2026-11-09).** Before anything is sent, `AskScope.topic` reads the question on the phone:
+- **Off topic** — no money word and plainly about something else (code, spreadsheets, recipes, poems, homework…): a
+  one-line answer saying what Ask Lucento is for, on the phone, whether Gemini is on or not. It never spends the AI
+  allowance. Anything less clear-cut goes to Gemini (when on), whose instructions now refuse non-money questions in one
+  sentence and suggest a money question instead.
+- **Purchase** — "Should I buy…", "Can I afford…" (borrowing excluded): with Gemini on, Gemini answers from the person's
+  figures (yes / yes from savings / not yet, keeping about three months of spending aside, net worth when it matters;
+  a typical price it knows when none is given, marked as an estimate). With Gemini off or unreachable, `PurchaseCheck`
+  answers on the phone (docs/CALCULATIONS.md "Purchase check"), labelled "Calculated on this phone".
+- The proxy (lucento-website `src/server/gemini.ts`) also changed after the round-2 test, when every Flash model
+  answered 503 or timed out: each call except the last gets at most 11 s so another model can still answer, the newest
+  Flash-Lite is tried third, and a model that answered 404 is skipped for the function instance.
+
 ## Reports
 
 `domain/ask/Reports.kt` builds a `Report`: one currency, a headline figure, sections with columns and totals, and notes
@@ -115,7 +128,10 @@ sign-in details, the Gemini key.
 - **Consent (v2).** Off by default. It is turned on only from the consent sheet in Ask Lucento or the dialog in Settings ›
   Privacy, both of which list what is sent (including transactions) and what never is. Stored as `ask_lucento_ai_v2`; the
   summaries-only consent (`ask_lucento_ai`) is ignored and removed, so everyone is asked again. It is never restored
-  from a backup, and it is cleared when the account is reset.
+  from a backup, and it is cleared when the account is reset. The **Gemini** switch in Ask Lucento's top bar (shown when
+  signed in, in a build with the proxy) opens that sheet when turned on and turns AI answers off immediately when turned
+  off. The first time a question needs AI answers while they are off, the sheet opens by itself once, with that question
+  ready to ask again (`ask_ai_offer_shown`, a device flag; it never turns anything on without the person's tap).
 - **Limits.** Each question counts against the same per-user daily allowance as Smarter reading
   (`public.consume_ai_quota`, `AI_DAILY_LIMIT`, default 50). There is one request at a time (an in-flight guard), with a
   30-second timeout.

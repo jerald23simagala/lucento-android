@@ -132,11 +132,12 @@ class EmailVerification(
                     notice = when (result) {
                         ResendResult.SENT -> Notice.SENT_AGAIN
                         ResendResult.TOO_SOON -> Notice.TOO_SOON
-                        ResendResult.FAILED -> Notice.SEND_FAILED
+                        ResendResult.FAILED, ResendResult.INVALID_EMAIL -> Notice.SEND_FAILED
+                        ResendResult.OFFLINE -> Notice.OFFLINE
                     },
                 )
             }
-            if (result != ResendResult.FAILED) startCooldown()
+            if (result == ResendResult.SENT || result == ResendResult.TOO_SOON) startCooldown()
         }
     }
 

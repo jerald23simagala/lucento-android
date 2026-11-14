@@ -16,7 +16,9 @@ enum class Achievement(val key: String, val title: String, val description: Stri
         "Record transactions on ${Achievements.CONSISTENT_DAYS} different days",
     ),
     FINANCIAL_EXPLORER("financial_explorer", "Financial Explorer", "Looked at where your money goes in Insights", "Open Insights to see where your money goes"),
-    GOAL_SETTER("goal_setter", "Goal Setter", "Set a savings goal", "Create a savings goal for something you want");
+    GOAL_SETTER("goal_setter", "Goal Setter", "Set a savings goal", "Create a savings goal for something you want"),
+    /** Owner test 2026-11-09: a secured setup. Kept once earned, like every award (see [ProgressFacts.secured]). */
+    SECURED("secured", "Secured", "Locked Lucento with your phone’s screen lock", "Turn on Lock Lucento in Settings › Privacy & security");
 
     companion object {
         fun fromKey(key: String): Achievement? = entries.firstOrNull { it.key == key }
@@ -33,6 +35,8 @@ data class ProgressFacts(
     val activeDays: Int,
     val goals: Int,
     val visitedInsights: Boolean,
+    /** App lock is on, or was turned on at some point (a local flag: an award is never taken away). */
+    val secured: Boolean = false,
 )
 
 /** How far along an award is: [current] of [target], where [current] never exceeds [target]. */
@@ -56,6 +60,7 @@ object Achievements {
             Achievement.GETTING_CONSISTENT -> AwardProgress(facts.activeDays.coerceIn(0, CONSISTENT_DAYS), CONSISTENT_DAYS)
             Achievement.FINANCIAL_EXPLORER -> one(if (facts.visitedInsights) 1 else 0)
             Achievement.GOAL_SETTER -> one(facts.goals)
+            Achievement.SECURED -> one(if (facts.secured) 1 else 0)
         }
     }
 
@@ -86,6 +91,7 @@ object Achievements {
         goals: List<Goal>,
         today: java.time.LocalDate,
         visitedInsights: Boolean,
+        secured: Boolean = false,
     ): ProgressFacts {
         val recorded = all.filter { countsAsRecorded(it.type) }
         return ProgressFacts(
@@ -95,6 +101,7 @@ object Achievements {
             activeDays = recorded.map { it.date }.distinct().size,
             goals = goals.size,
             visitedInsights = visitedInsights,
+            secured = secured,
         )
     }
 

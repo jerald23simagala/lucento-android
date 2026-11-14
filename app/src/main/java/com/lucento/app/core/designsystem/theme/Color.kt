@@ -57,8 +57,9 @@ internal object Palette {
 
 /**
  * Award medal artwork (feature/awards): struck gold, its engraving, the ribbon dyes and the confetti. Like the mascot's
- * torch light these are illustration colours, not UI chrome — never text, never a status cue — and they look the same
- * in every theme because a medal is an object, not a surface. Ribbons reuse the brand palette so the cabinet stays on
+ * torch light these are illustration colours, not UI chrome — never body text, never a status cue on their own — and
+ * they look the same in every theme because a medal is an object, not a surface. The one other object struck in this
+ * gold is the Lucento Pro member's coin (`ProCrest`, `MemberChip`), always paired with the plan in words. Ribbons reuse the brand palette so the cabinet stays on
  * brand; every medal also carries its own emblem and name, so colour is never the only difference.
  */
 @Immutable

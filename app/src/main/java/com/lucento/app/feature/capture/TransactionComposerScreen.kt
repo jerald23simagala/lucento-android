@@ -43,6 +43,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Edit
@@ -168,6 +169,7 @@ fun TransactionComposerScreen(
     var started by rememberSaveable { mutableStateOf(false) }
     var pendingPhoto by remember { mutableStateOf<File?>(null) }
     var scanMenu by remember { mutableStateOf(false) }
+    var askingSmartReading by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -509,6 +511,28 @@ fun TransactionComposerScreen(
             }
         }
 
+        // ---------------------------------------------------------------- Smarter reading (owner test 2026-11-09)
+        // Next to where the message is typed, since that's what it changes. On asks for the same consent as Settings.
+        if (state.smartReadingOffered) {
+            Row(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(start = Spacing.gutter, end = Spacing.gutter - Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    SmartReadingCopy.status(state.smartReading),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                com.lucento.app.core.designsystem.component.CompactSwitch(
+                    label = "Smarter reading",
+                    icon = Icons.Outlined.AutoAwesome,
+                    checked = state.smartReading,
+                    onCheckedChange = { on -> if (on) askingSmartReading = true else viewModel.setSmartReading(false) },
+                )
+            }
+        }
+
         // ---------------------------------------------------------------- composer
         // One raised bar: scan and voice as soft tiles, the message field, and send — every control the same height.
         ChatInputBar(
@@ -552,6 +576,19 @@ fun TransactionComposerScreen(
             )
             ChatSendButton(enabled = input.isNotBlank() && state.loaded && state.wallets.isNotEmpty(), onClick = { submit() })
         }
+    }
+
+    if (askingSmartReading) {
+        com.lucento.app.core.designsystem.component.ConfirmDialog(
+            title = SmartReadingCopy.CONSENT_TITLE,
+            text = SmartReadingCopy.CONSENT_TEXT,
+            confirmLabel = "Turn on",
+            onConfirm = {
+                askingSmartReading = false
+                viewModel.setSmartReading(true)
+            },
+            onDismiss = { askingSmartReading = false },
+        )
     }
 
     pickingDateFor?.let { key ->
@@ -800,7 +837,7 @@ private fun ComposerIntro(transfersAllowed: Boolean, onExample: (String) -> Unit
         }
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            "Read on this phone. Nothing is sent unless you turn on cloud sync, crash reports, or Smarter reading.",
+            "Nothing is sent unless you turn on cloud sync, crash reports, or Smarter reading.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

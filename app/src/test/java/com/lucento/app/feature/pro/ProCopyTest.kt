@@ -194,4 +194,41 @@ class ProCopyTest {
         assertTrue(subPaused.body, subPaused.body.contains("until Lucento can confirm your subscription again") && subPaused.body.contains("Restore purchases"))
         assertFalse("paused is not ended", subPaused.title.contains("ended"))
     }
+
+    @Test fun the_member_mark_shows_only_for_the_persons_own_pro_or_lifetime() {
+        assertEquals(null, ProCopy.memberMark(EntitlementState.FREE, now))
+        val pro = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, setOf(Capability.LOCAL_PRO, Capability.CLOUD, Capability.AI_PRO, Capability.SHARED))))
+        assertEquals("Pro", ProCopy.memberMark(pro, now))
+        val lifetime = EntitlementState(listOf(row(EntitlementSource.PLAY_LIFETIME, setOf(Capability.LOCAL_PRO), expiresAt = null)))
+        assertEquals("Lifetime", ProCopy.memberMark(lifetime, now))
+        // The owner's 30-day test grant reads like Pro; after it ends (plus the 3-day offline grace every expiring plan
+        // gets) the mark goes.
+        val grant = EntitlementState(listOf(row(EntitlementSource.GRANT, setOf(Capability.LOCAL_PRO, Capability.CLOUD))))
+        assertEquals("Pro", ProCopy.memberMark(grant, now))
+        assertEquals("Pro", ProCopy.memberMark(grant, now + 31 * day))
+        assertEquals(null, ProCopy.memberMark(grant, now + 34 * day))
+    }
+
+    @Test fun the_profile_menu_offers_pro_only_on_the_free_plan_with_nothing_waiting() {
+        assertTrue(ProCopy.offersPro(EntitlementState.FREE, now))
+        val pro = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, setOf(Capability.LOCAL_PRO))))
+        assertFalse(ProCopy.offersPro(pro, now))
+        val pending = EntitlementState(listOf(row(EntitlementSource.PLAY_SUBSCRIPTION, setOf(Capability.LOCAL_PRO), status = EntitlementStatus.PENDING)))
+        assertFalse(ProCopy.offersPro(pending, now))
+    }
+
+    @Test fun the_pro_card_lists_only_what_the_pro_plan_adds() {
+        // Each line names something Free doesn't fully have (PlanCatalog): cloud, wallet/goal counts, foreign wallets,
+        // long Insights, PDF, the AI allowance.
+        fun free(f: ProFeature) = PlanCatalog.limit(f, PlanCatalog.FREE_CAPABILITIES)
+        fun pro(f: ProFeature) = PlanCatalog.limit(f, PlanCatalog.PRO_CAPABILITIES)
+        for (f in listOf(ProFeature.CLOUD_SYNC, ProFeature.CLOUD_RESTORE, ProFeature.FOREIGN_CURRENCY_WALLETS, ProFeature.INSIGHTS_LONG_PERIODS, ProFeature.PDF_STATEMENTS)) {
+            assertEquals(Limit.None, free(f))
+            assertEquals(Limit.Unlimited, pro(f))
+        }
+        assertEquals(Limit.Unlimited, pro(ProFeature.MONEY_WALLETS))
+        assertTrue((pro(ProFeature.SAVINGS_GOALS) as Limit.Count).max > (free(ProFeature.SAVINGS_GOALS) as Limit.Count).max)
+        assertTrue(free(ProFeature.AI_ADVISER) is Limit.PerMonth && pro(ProFeature.AI_ADVISER) is Limit.PerDay)
+        assertEquals(4, ProCopy.inviteLines.size)
+    }
 }

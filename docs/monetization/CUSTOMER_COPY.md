@@ -336,13 +336,13 @@ One text covers both, because the same steps settle both:
 > **Lucento needs to check your Pro Lifetime**
 > Pro is paused on this phone until Lucento can confirm your purchase again. Connect to the internet, make sure the
 > Google Play Store app is on and signed in to the Google account you bought with, then tap Restore purchases on the
-> Lucento Pro page. Everything you recorded is still here, and nothing was removed.
+> Lucento Plan page. Everything you recorded is still here, and nothing was removed.
 
 A subscription paused the same way:
 > **Lucento needs to check your Lucento Pro**
 > Pro is paused on this phone until Lucento can confirm your subscription again. Connect to the internet, make sure
 > the Google Play Store app is on and signed in to the Google account you subscribed with, then tap Restore purchases
-> on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.
+> on the Lucento Plan page. Everything you recorded is still here, and nothing was removed.
 
 **D-8 Restoring a purchase**
 Button on the Pro page: **Restore purchases**.
