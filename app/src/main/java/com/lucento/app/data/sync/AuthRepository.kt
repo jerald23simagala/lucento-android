@@ -33,6 +33,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import java.security.MessageDigest
@@ -450,6 +451,21 @@ class AuthRepository(
      * when signed out). Stamped on rows this phone writes so "Added by" reads right before the next sync.
      */
     fun signedInUserIdNow(): String? = runCatching { client?.auth?.currentUserOrNull()?.id }.getOrNull()
+
+    /**
+     * Each time this phone ends up with nobody signed in: a sign-out (every path), a session the server ended, or a start
+     * with nobody signed in (2026-11-14, KNOWN_ISSUES PB-12). Only `NotAuthenticated` counts. A token refresh failing
+     * offline (`RefreshFailure`) is still the same account, although [observeUserId] and [currentUserId] read null then:
+     * supabase-kt returns a session only while it is `Authenticated`.
+     */
+    fun observeSignedOut(): Flow<Unit> {
+        val auth = client?.auth ?: return kotlinx.coroutines.flow.emptyFlow()
+        return auth.sessionStatus
+            .map { it is SessionStatus.NotAuthenticated }
+            .distinctUntilChanged()
+            .filter { it }
+            .map { }
+    }
 
     /** Lucento Shared: the signed-in account's id as it changes (for "Added by you"). */
     fun observeUserId(): Flow<String?> {

@@ -184,14 +184,17 @@ class AppContainer(application: Application) {
                 auth.currentUserId()?.let(com.lucento.app.domain.entitlement.PurchaseInterpreter::obfuscatedAccountId)
             },
             checker = purchaseChecker(),
+            planMemory = planMemory,
         )
         manager.observePlayUpdates(entitlementScope)
         entitlementScope.launch { manager.refresh() }
-        // A sign-in (or a switch) brings that account's rows; a sign-out leaves the cached snapshot, which Play-sourced
-        // rows keep and server rows lose at the next successful fetch.
+        // A sign-in (or a switch) brings that account's rows.
         entitlementScope.launch {
             auth.observeUserId().distinctUntilChanged().collect { if (it != null) { manager.accountChanged(); manager.refresh() } }
         }
+        // Nobody signed in (a sign-out, a session the server ended, a start signed out): the account's rows from the
+        // server leave this phone; Google Play's reading and what ended stay (2026-11-14, KNOWN_ISSUES PB-12).
+        entitlementScope.launch { auth.observeSignedOut().collect { manager.signedOut() } }
         manager
     }
     private val entitlementScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

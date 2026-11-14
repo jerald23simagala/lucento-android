@@ -75,6 +75,26 @@ object EntitlementMerge {
         )
     }
 
+    /**
+     * Google Play's readings of purchases whose server rows just left with their account (a sign-out, 2026-11-14): each
+     * keeps the server's last word on that purchase ([confirmedAt], by token hash) as Lucento's confirmation, as
+     * [carriedFrom] does while the account's row is there (L-6). Without it, the payer's own Play purchase, older than
+     * three days, paused right after signing out on a phone that couldn't reach Lucento.
+     */
+    fun keepConfirmations(rows: List<Entitlement>, confirmedAt: Map<String, Long>): List<Entitlement> =
+        if (confirmedAt.isEmpty()) {
+            rows
+        } else {
+            rows.map { row ->
+                val at = row.purchaseTokenHash?.let(confirmedAt::get)
+                if (row.verifiedBy == Verifier.PLAY_LOCAL && at != null) {
+                    row.copy(confirmedAtMillis = maxOf(row.confirmedAtMillis ?: at, at))
+                } else {
+                    row
+                }
+            }
+        }
+
     fun reconcileServer(current: List<Entitlement>, server: List<Entitlement>, now: Long): List<Entitlement> {
         require(server.all { it.verifiedBy == Verifier.SERVER }) { "Server readings must be SERVER" }
         val serverByKey = server.groupBy { it.key }
