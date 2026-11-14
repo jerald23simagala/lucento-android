@@ -13,6 +13,7 @@ import com.lucento.app.data.billing.SimulatedPlan
 import com.lucento.app.data.billing.VerifyOutcome
 import com.lucento.app.data.entitlement.EntitlementManager
 import com.lucento.app.data.entitlement.RefreshOutcome
+import com.lucento.app.data.entitlement.ReleaseOutcome
 import com.lucento.app.domain.entitlement.EntitlementState
 import com.lucento.app.domain.entitlement.PlayProducts
 import com.lucento.app.domain.entitlement.PurchaseInterpreter
@@ -24,6 +25,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class ProUiState(
     val entitlements: EntitlementState = EntitlementState.FREE,
@@ -67,9 +70,13 @@ class ProViewModel(
         val purchaseMessage: String? = null,
         /** The product of the purchase in flight, so its result can be worded. */
         val buying: String? = null,
+        /** Counts purchases started here, so an answer meant for one that's already settled is never applied twice. */
+        val attempt: Int = 0,
     )
 
     private val local = MutableStateFlow(Local())
+    /** Settling "already owned" reads Play and the server and may release a purchase: one at a time, once per attempt. */
+    private val settling = Mutex()
 
     val state: StateFlow<ProUiState> = combine(
         entitlements.state,
@@ -96,6 +103,11 @@ class ProViewModel(
         loadPrices()
         viewModelScope.launch {
             purchases.results.collect { result ->
+                if (result == PurchaseResult.Failed(BillingProblem.ALREADY_OWNED)) {
+                    // Play can report it twice: as launchPurchase's answer and here. Whichever comes first settles it.
+                    settleAlreadyOwned(local.value.attempt)
+                    return@collect
+                }
                 local.update { it.copy(purchasing = false, buying = null, purchaseMessage = ProCopy.purchaseResult(result, it.buying)) }
                 // A completed purchase is already on its way through Play's update; a refresh also asks the server.
                 if (result == PurchaseResult.Completed) runCatching { entitlements.refresh() }
@@ -113,14 +125,46 @@ class ProViewModel(
     /** Opens Google Play's purchase sheet for [price]. One at a time; how it went arrives from Play. */
     fun buy(activity: Activity, price: ProductPrice) {
         if (local.value.purchasing) return
-        local.update { it.copy(purchasing = true, buying = price.productId, purchaseMessage = null, message = null) }
+        local.update {
+            it.copy(purchasing = true, buying = price.productId, purchaseMessage = null, message = null, attempt = it.attempt + 1)
+        }
+        val attempt = local.value.attempt
         viewModelScope.launch {
+            // Google Play refuses a new Lifetime while it still holds one Lucento ended (a refund that didn't remove it).
+            if (price.productId == PlayProducts.PRO_LIFETIME) runCatching { entitlements.releaseEndedLifetime() }
             val account = runCatching { currentUserId() }.getOrNull()?.let(PurchaseInterpreter::obfuscatedAccountId)
-            val problem = runCatching { purchases.launchPurchase(activity, price, account) }.getOrDefault(BillingProblem.OTHER)
-            if (problem != null) {
-                local.update { it.copy(purchasing = false, buying = null, purchaseMessage = ProCopy.billingProblem(problem)) }
+            when (val problem = runCatching { purchases.launchPurchase(activity, price, account) }.getOrDefault(BillingProblem.OTHER)) {
+                null -> Unit
+                BillingProblem.ALREADY_OWNED -> settleAlreadyOwned(attempt)
+                else -> local.update { it.copy(purchasing = false, buying = null, purchaseMessage = ProCopy.billingProblem(problem)) }
             }
         }
+    }
+
+    /**
+     * Words Play's "already owned" for [attempt], once: nothing happens when that attempt has already been settled or a
+     * newer one has started. The buttons keep waiting meanwhile.
+     */
+    private suspend fun settleAlreadyOwned(attempt: Int) = settling.withLock {
+        val current = local.value
+        if (!current.purchasing || current.attempt != attempt) return@withLock
+        val message = alreadyOwned(current.buying)
+        local.update { if (it.attempt == attempt) it.copy(purchasing = false, buying = null, purchaseMessage = message) else it }
+    }
+
+    /**
+     * Google Play says this Google account already owns [productId]. Reading Play and the server again settles what that is:
+     * a purchase this phone hadn't heard of yet, now restored, or a Lifetime Lucento ended that Play still holds, released
+     * here so it can be bought again (MONETIZATION §5.3 L-7).
+     */
+    private suspend fun alreadyOwned(productId: String?): String {
+        runCatching { entitlements.refresh() }
+        val release = if (productId == PlayProducts.PRO_LIFETIME) {
+            runCatching { entitlements.releaseEndedLifetime() }.getOrDefault(ReleaseOutcome.NOTHING)
+        } else {
+            ReleaseOutcome.NOTHING
+        }
+        return ProCopy.alreadyOwned(productId, entitlements.state.value.displayPlan(clock()), release)
     }
 
     /** Re-reads Google Play and the server. One at a time; the answer says what it found. */
@@ -133,7 +177,8 @@ class ProViewModel(
                 val outcome = runCatching { entitlements.refresh() }.getOrElse { RefreshOutcome(playReached = false, serverReached = false) }
                 val after = entitlements.state.value.displayPlan(clock())
                 val awaitingCheck = entitlements.state.value.awaitingCheck(clock())
-                local.update { it.copy(message = ProCopy.restoreMessage(before, after, outcome, awaitingCheck)) }
+                val lifetimeEnded = entitlements.state.value.lifetimeEnded()
+                local.update { it.copy(message = ProCopy.restoreMessage(before, after, outcome, awaitingCheck, lifetimeEnded)) }
             } finally {
                 local.update { it.copy(restoring = false) }
             }

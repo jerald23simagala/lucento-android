@@ -460,3 +460,57 @@ are parked. Spec: `docs/WIDGETS.md`.
 - **Not verified:**
   - Android 12+: rounded corners, the picker's preview layout, day/night colours switched by the launcher.
   - A Samsung One UI launcher, TalkBack reading the widgets, and landscape.
+
+## Buying Lifetime again after a refund — 2026-11-13 (`fix/refunded-lifetime-rebuy`)
+
+The owner's internal-track test of 0.5.7 (vc 12):
+1. Monthly Pro, then a chargeback test. Restore purchases correctly went back to Free. Production: `400c3170…` was
+   `REVOKED` at 22:53Z and is in `revoked_purchases`.
+2. Buying Pro Lifetime: Google Play showed "Error: You already own this item".
+
+**Cause** (verified, production read-only): the Lifetime test purchase of 2026-11-12 (`a322b4f2…`) was refunded in Play
+Console without **Remove entitlement**.
+- Google's server calls that order `CANCELLED`, which is stored as `EXPIRED`.
+- The purchase check answered `EXPIRED` for it again at 22:41Z. The phone only sends that check for a purchase Play
+  still lists.
+- So Google Play still holds the purchase on that Google account while Lucento has ended it, and nothing in the app
+  ever released it (KNOWN_ISSUES PB-8).
+
+**Fix** (MONETIZATION §5.3 L-7):
+- `domain/entitlement/LifetimeRelease` (pure) picks what may be released. That's a Lifetime Play lists whose Lifetime row
+  Lucento's server ended (`REVOKED`/`EXPIRED`, same token; a server row or the purchase check's answer). Never released:
+  a Lifetime that still counts, one paused for a check, a pending payment, a services-year ending, or a subscription.
+- `PurchaseSource.consume`: Play's `consumeAsync`, the fake store, and `false` without billing.
+- `EntitlementManager.releaseEndedLifetime()` asks the purchase check about each one again, then consumes it only on a
+  fresh `REVOKED` or `EXPIRED`, then reads Play again. With no answer nothing is released. Builds without the check
+  (debug) never consume.
+- `ProViewModel.buy` runs it before Play's sheet opens for Lifetime. Never in the background, because it can't be undone.
+- When Play still answers "already owned", the page reads Play and the server again, then releases or explains
+  (`ProCopy.alreadyOwned`, "it's working" first). That happens once per purchase attempt, because the Billing Library
+  can report it twice.
+- `PlayPurchaseSource.consume` gives up after 15 s, because it runs under the manager's lock.
+- `EntitlementMerge.reconcileServer` keeps Play's reading of a new purchase the server hasn't recorded yet when the
+  server's row for that product is about an earlier one that no longer counts (PB-9).
+- Restore purchases now says a refunded Lifetime was refunded, instead of "No purchase found".
+- An independent QA review (lucento-qa, read-only) found no path that consumes a Lifetime that should still count. Its
+  points 1–5 are fixed here. Point 4c and the 410 note are recorded as PB-10.
+- Docs: MONETIZATION §5.1, §5.3 L-7, §9 and §10; CUSTOMER_COPY D-8 and D-8a; the PLAY_CONSOLE_SETUP refund runbook;
+  KNOWN_ISSUES PB-4, PB-8, PB-9 and PB-10.
+
+**Tests** (local, JBR 21, `--no-watch-fs`):
+- `testDebugUnitTest`: 1,415/1,415 in 179 suites, 0 failures. `assembleDebug` succeeds. `lintDebug`: 0 errors, 24
+  warnings.
+- New: `LifetimeReleaseTest` 9, `LifetimeRebuyTest` 8, `ProRebuyFlowTest` 5, and new cases in `EntitlementMergeTest` and
+  `ProCopyTest`.
+- Red checks:
+  - With the release before Buy disabled, `ProRebuyFlowTest`'s main case fails.
+  - With the merge rule and the once-per-attempt guard disabled, exactly their three tests fail.
+- Gradle's daemon once crashed in `native-platform-file-events.dll` (Windows file watching, not the code). Runs with
+  `--no-watch-fs` are stable.
+
+**Not verified:** a real phone. Google documents consuming as what makes a product buyable again. Whether Play consumes a
+purchase it refunded is only reported by other developers, so the owner's test on the next build is the first real check
+(NEXT_TASKS OT-25).
+
+**Owner decision (2026-11-13):** "PR, merge when green, no bump". It ships with the next release; main stays 0.5.7
+(vc 12) until then.

@@ -61,7 +61,7 @@ class EntitlementMergeTest {
         // more generous than the server until the next server fetch, which reconcileServer settles. Pin the behaviour.
         val afterPlay = EntitlementMerge.reconcilePlay(listOf(revoked), listOf(play), now)
         assertEquals(listOf(play), afterPlay)
-        val afterServer = EntitlementMerge.reconcileServer(afterPlay, listOf(revoked))
+        val afterServer = EntitlementMerge.reconcileServer(afterPlay, listOf(revoked), now)
         assertEquals(listOf(revoked), afterServer)
         assertFalse(EntitlementState(afterServer).has(Capability.LOCAL_PRO, now))
     }
@@ -168,16 +168,32 @@ class EntitlementMergeTest {
         val playLifetimeOffline = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life")
         val oldGrant = row(EntitlementSource.GRANT, Verifier.SERVER, productId = null, verifiedAt = now - 5 * day)
         val serverSub = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.SERVER, expiresAt = now + 12 * day)
-        val merged = EntitlementMerge.reconcileServer(listOf(playSub, playLifetimeOffline, oldGrant), listOf(serverSub))
+        val merged = EntitlementMerge.reconcileServer(listOf(playSub, playLifetimeOffline, oldGrant), listOf(serverSub), now)
         // The grant the server no longer lists is gone; the subscription is the server's reading; the Lifetime bought
         // offline and not yet verified stays as the phone's reading.
         assertEquals(setOf(serverSub, playLifetimeOffline), merged.toSet())
     }
 
+    @Test fun a_new_purchase_the_server_hasnt_recorded_survives_its_answer_about_an_earlier_one() {
+        // A Lifetime refunded (token a, EXPIRED on the server) and bought again (token b) before verify recorded b (PB-9).
+        val earlier = row(EntitlementSource.PLAY_LIFETIME, Verifier.SERVER, grants = setOf(Capability.LOCAL_PRO), status = EntitlementStatus.EXPIRED, expiresAt = null, productId = "life", tokenHash = "a".repeat(64))
+        val bought = row(EntitlementSource.PLAY_LIFETIME, Verifier.PLAY_LOCAL, grants = setOf(Capability.LOCAL_PRO), expiresAt = null, productId = "life", tokenHash = "b".repeat(64))
+        val merged = EntitlementMerge.reconcileServer(listOf(bought), listOf(earlier), now)
+        assertEquals(setOf(earlier, bought), merged.toSet())
+        assertTrue(EntitlementState(merged).has(Capability.LOCAL_PRO, now))
+
+        // Play's copy of the ended purchase itself stays the server's to end.
+        val stale = bought.copy(purchaseTokenHash = "a".repeat(64))
+        assertEquals(listOf(earlier), EntitlementMerge.reconcileServer(listOf(stale), listOf(earlier), now))
+        // A server row that still counts keeps its key, as before.
+        val live = earlier.copy(status = EntitlementStatus.ACTIVE)
+        assertEquals(listOf(live), EntitlementMerge.reconcileServer(listOf(bought), listOf(live), now))
+    }
+
     @Test fun an_empty_server_answer_removes_server_rows_but_keeps_play_rows() {
         val play = row(EntitlementSource.PLAY_SUBSCRIPTION, Verifier.PLAY_LOCAL)
         val grant = row(EntitlementSource.GRANT, Verifier.SERVER, productId = null)
-        assertEquals(listOf(play), EntitlementMerge.reconcileServer(listOf(play, grant), emptyList()))
+        assertEquals(listOf(play), EntitlementMerge.reconcileServer(listOf(play, grant), emptyList(), now))
     }
 
     @Test fun readings_must_carry_their_verifier() {
@@ -186,7 +202,7 @@ class EntitlementMergeTest {
         try { EntitlementMerge.reconcilePlay(emptyList(), listOf(wrong), now) } catch (e: IllegalArgumentException) { threw = true }
         assertTrue(threw)
         threw = false
-        try { EntitlementMerge.reconcileServer(emptyList(), listOf(row(EntitlementSource.GRANT, Verifier.PLAY_LOCAL))) } catch (e: IllegalArgumentException) { threw = true }
+        try { EntitlementMerge.reconcileServer(emptyList(), listOf(row(EntitlementSource.GRANT, Verifier.PLAY_LOCAL)), now) } catch (e: IllegalArgumentException) { threw = true }
         assertTrue(threw)
     }
 }

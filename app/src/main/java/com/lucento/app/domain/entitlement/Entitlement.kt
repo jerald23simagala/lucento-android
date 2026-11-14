@@ -188,6 +188,10 @@ data class EntitlementState(val entitlements: List<Entitlement>) {
     /** A pending purchase waiting for Google Play to confirm it. */
     fun pending(): Entitlement? = entitlements.firstOrNull { it.status == EntitlementStatus.PENDING }
 
+    /** A Pro Lifetime on record that has ended: refunded, cancelled or charged back (it never ends any other way). */
+    fun lifetimeEnded(): Boolean =
+        entitlements.any { it.source == EntitlementSource.PLAY_LIFETIME && it.status in Entitlement.ENDED }
+
     /**
      * Pro stopped counting only because the purchase is waiting for a check ([Entitlement.awaitsCheck]): nobody has
      * confirmed it for a month, or Lucento's server hasn't confirmed Google Play's reading lately (L-6). Paused, not
