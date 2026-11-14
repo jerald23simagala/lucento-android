@@ -224,6 +224,17 @@ class ComposerViewModel(
 
     private fun marketKey(currency: String, date: LocalDate) = "$currency@$date"
 
+    // ------------------------------------------------------------------ speech
+
+    /** Whether the person agreed to online voice ([SpeechRequest]). Read fresh: a widget can open the mic at once. */
+    suspend fun onlineVoiceAllowed(): Boolean = preferences?.preferences?.first()?.onlineVoice ?: false
+
+    /** The person agreed to [SpeechRequest.CONSENT_TEXT] after an offline attempt failed. */
+    fun allowOnlineVoice() {
+        val prefs = preferences ?: return
+        viewModelScope.launch { prefs.setOnlineVoice(true) }
+    }
+
     /** Where the composer was opened from: a wallet pre-selects its account; "Income" makes income the default. */
     fun configure(walletId: Long?, typeHint: TransactionType?, transfersEnabled: Boolean) {
         session.update { it.copy(entryWalletId = walletId, typeHint = typeHint, transfersEnabled = transfersEnabled) }

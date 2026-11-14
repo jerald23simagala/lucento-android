@@ -15,6 +15,14 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Voice input (2026-11-13, `fix/voice-online-fallback`, PR #60)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| VI-1 | Lucento's own listening (`VoiceSession`/`VoiceCapture`) restarts the speech service after each stretch. On some phones a restart may beep, or clip a first word spoken during the ~0.5 s gap | Inferred (Android docs, developer reports). **Owner's phone, 2026-11-13: the listening test build (0.5.5-debug) worked, and no beep or cut-off word was reported** | Watch for reports from other phones; if one beeps or clips, restart only before the first words and rely on the silence hints after them |
+| VI-2 | Which error a speech service reports for "no offline language pack" differs by phone. Offline, any language, network or unknown error is treated as "can't listen offline" and offers online voice | Code (`VoiceSession.failureFor`); on the owner's phone, which has no offline English pack, voice worked with the test build (2026-11-13) | Note the error on other real phones (logcat) and narrow the mapping if it misfires |
+| VI-3 | The website's `/privacy` doesn't have the new "Voice input" section yet | Verified (not exported) | After merge: `python tools/legal/export_legal.py ../lucento-website/src/data/legal.ts` (docs/LEGAL.md) |
+
 ## Home-screen widgets (2026-11-12, `feature/home-widgets`)
 
 - **Android 9–11: square corners** (Verified, API 28). Glance's `cornerRadius` needs Android 12; older launchers draw

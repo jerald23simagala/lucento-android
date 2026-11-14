@@ -84,6 +84,10 @@ because accounts, sync, AI and usage counts are all opt-in.
 Not collected:
 
 - **Location, contacts, calendar, SMS, call logs, files, audio, health, web history.**
+- **Audio, despite the microphone permission** (RECORD_AUDIO since 2026-11-13, docs/CAPTURE.md). It lets the composer
+  listen through the phone's speech service, which turns speech into text. Lucento never keeps or sends a recording, and
+  with online voice on, the recording goes from the phone's speech service (Google's) to Google, not to Lucento or its
+  providers. What it receives is text, covered above like typed messages. Re-check this answer if listening ever changes.
 - **Photos.** Receipt scans and profile photos stay on the phone.
 - **Payment info.** Google Play handles cards.
 - **Exchange-rate requests** send two currency codes and a date, and identify no one.
