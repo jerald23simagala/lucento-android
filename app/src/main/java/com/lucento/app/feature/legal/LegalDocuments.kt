@@ -165,6 +165,9 @@ object LegalDocuments {
                     "When you tap the microphone, your phone’s speech service — Google’s on most phones, not Lucento — " +
                         "turns what you say into text, and Lucento receives only the text. Lucento asks it to work " +
                         "offline.",
+                    "Lucento asks for Android’s microphone permission so it can listen until you’ve finished, and uses it " +
+                        "only while its listening screen is open. It never keeps or sends a recording. If you don’t allow " +
+                        "it, the speech service’s own window listens instead.",
                     "Some phones can’t do that offline. If you turn on online voice (Lucento asks first, and you can turn " +
                         "it off in Settings › Privacy), the speech service may send your recording to Google to turn it " +
                         "into text, under Google’s own privacy policy.",

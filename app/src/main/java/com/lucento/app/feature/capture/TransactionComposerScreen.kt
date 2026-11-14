@@ -122,6 +122,12 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.Button
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import android.Manifest
+import android.content.pm.PackageManager
+import android.speech.SpeechRecognizer
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleStartEffect
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -183,8 +189,11 @@ fun TransactionComposerScreen(
         notice = null
     }
 
-    // ---------------------------------------------------------------- speech (the system recogniser; no permission here)
-    // Offline unless the person agreed to online voice (SpeechRequest). Saveable: the result can arrive after a rotation.
+    // ---------------------------------------------------------------- speech
+    // Lucento listens itself (VoiceCapture) when the phone has a speech service and the microphone is allowed: it waits
+    // while people think before they speak. Otherwise the speech service's own window, which needs no permission here.
+    // Both stay offline unless the person agreed to online voice (SpeechRequest). Saveable: a result can arrive after a
+    // rotation.
     var listenedOffline by rememberSaveable { mutableStateOf(false) }
     var askingOnlineVoice by rememberSaveable { mutableStateOf(false) }
     val recognizer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -219,9 +228,59 @@ fun TransactionComposerScreen(
         }
     }
 
+    val onVoiceEnd by rememberUpdatedState<(VoiceCommand) -> Unit> { command ->
+        when (command) {
+            is VoiceCommand.Finish -> {
+                val heard = command.text
+                if (heard == null) {
+                    notice = SpeechRequest.NOTHING_HEARD
+                } else {
+                    notice = null
+                    haptics.tick()
+                    viewModel.send(heard, CaptureSource.SPOKEN)
+                }
+            }
+            is VoiceCommand.Fail -> notice = SpeechRequest.failureNotice(command.reason)
+            else -> Unit
+        }
+    }
+    val voice = remember { VoiceCapture(context) { onVoiceEnd(it) } }
+    // Leaving the app or the composer stops listening; words already heard go back into the field, unsent.
+    LifecycleStartEffect(voice) {
+        onStopOrDispose {
+            voice.cancel()?.let { heard -> if (input.isBlank()) input = heard }
+        }
+    }
+
+    fun startListening(online: Boolean) {
+        listenedOffline = !online
+        notice = null
+        voice.start(online, SpeechRequest.languageTag(Locale.getDefault()))
+    }
+
+    // The mode the microphone was asked for: the online-voice consent may still be being saved when the answer comes.
+    var micForOnline by rememberSaveable { mutableStateOf(false) }
+    val askMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        // Refused: the speech service's own window still works without it.
+        if (granted) startListening(micForOnline) else launchRecognizer(micForOnline)
+    }
+
+    fun listenWith(online: Boolean) {
+        when {
+            voice.listening -> Unit
+            !SpeechRecognizer.isRecognitionAvailable(context) -> launchRecognizer(online)
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED ->
+                startListening(online)
+            else -> {
+                micForOnline = online
+                askMicrophone.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
     fun listen() {
         haptics.tick()
-        scope.launch { launchRecognizer(online = viewModel.onlineVoiceAllowed()) }
+        scope.launch { listenWith(online = viewModel.onlineVoiceAllowed()) }
     }
 
     // ---------------------------------------------------------------- receipts (system camera or photo picker; read on this phone)
@@ -419,7 +478,7 @@ fun TransactionComposerScreen(
             )
         }
         notice?.let { text ->
-            val offerOnline = text == SpeechRequest.OFFLINE_FAILED
+            val offerOnline = SpeechRequest.offersOnline(text)
             InfoNote(
                 text,
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.xs),
@@ -551,10 +610,14 @@ fun TransactionComposerScreen(
                 viewModel.allowOnlineVoice()
                 haptics.tick()
                 // They tapped the mic to speak: listen again straight away, online this time.
-                launchRecognizer(online = true)
+                listenWith(online = true)
             },
             onDismiss = { askingOnlineVoice = false },
         )
+    }
+
+    voice.state?.let { session ->
+        ListeningSheet(state = session, level = { voice.level }, onDone = voice::done, onCancel = { voice.cancel() })
     }
 
     if (confirmDiscard) {

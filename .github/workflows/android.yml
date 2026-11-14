@@ -162,9 +162,10 @@ jobs:
           # Allow-list (see docs/SYNC.md): network access exists only for opt-in cloud sync; WAKE_LOCK and
           # RECEIVE_BOOT_COMPLETED come from WorkManager; USE_BIOMETRIC and USE_FINGERPRINT (normal, no prompt) come from
           # androidx.biometric for the optional app lock (P2-10); com.android.vending.BILLING from Google Play Billing
-          # (Lucento Pro, docs/MONETIZATION.md §9: a normal permission that only lets the app ask Play for purchases).
-          # Any other permission fails the build until reviewed.
-          ALLOWED="android.permission.INTERNET|android.permission.ACCESS_NETWORK_STATE|android.permission.WAKE_LOCK|android.permission.RECEIVE_BOOT_COMPLETED|android.permission.USE_BIOMETRIC|android.permission.USE_FINGERPRINT|com.android.vending.BILLING|com.lucento.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+          # (Lucento Pro, docs/MONETIZATION.md §9: a normal permission that only lets the app ask Play for purchases);
+          # RECORD_AUDIO (runtime, asked on first use) for the composer's own listening sheet (owner, 2026-11-13;
+          # docs/CAPTURE.md). Any other permission fails the build until reviewed.
+          ALLOWED="android.permission.INTERNET|android.permission.ACCESS_NETWORK_STATE|android.permission.WAKE_LOCK|android.permission.RECEIVE_BOOT_COMPLETED|android.permission.USE_BIOMETRIC|android.permission.USE_FINGERPRINT|android.permission.RECORD_AUDIO|com.android.vending.BILLING|com.lucento.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
           UNEXPECTED=$(grep "uses-permission" permissions.txt | sed -E "s/.*name='([^']+)'.*/\1/" | grep -vxE "$ALLOWED" || true)
           if [ -n "$UNEXPECTED" ]; then
             echo "::error::release APK requests unreviewed permissions: $UNEXPECTED"; exit 1
