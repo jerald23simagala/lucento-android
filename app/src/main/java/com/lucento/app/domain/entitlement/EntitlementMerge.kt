@@ -22,6 +22,11 @@ package com.lucento.app.domain.entitlement
  * - What the phone already knew about the same purchase (same key, same token) stays with Play's new reading (L-6). That
  *   covers an ending the purchase check reported, which Play's copy can't undo, and Lucento's last confirmation, taken
  *   from the account's own row for that purchase when it still grants. It also covers when the check last answered.
+ * - The server's answer replaces the phone's rows for the keys it holds, except a **different purchase** of the same
+ *   product while the server's row no longer counts. That's the product bought again after a refund or an expiry, which
+ *   the server hasn't recorded yet (`/api/billing/verify` failed, or refused a test purchase). Play's reading of it stays,
+ *   so the purchase check and the next verification still see it (2026-11-13, MONETIZATION §5.3 L-7). Without the rule,
+ *   a buyer saw the free plan right after paying (KNOWN_ISSUES PB-9).
  */
 object EntitlementMerge {
 
@@ -70,12 +75,22 @@ object EntitlementMerge {
         )
     }
 
-    fun reconcileServer(current: List<Entitlement>, server: List<Entitlement>): List<Entitlement> {
+    fun reconcileServer(current: List<Entitlement>, server: List<Entitlement>, now: Long): List<Entitlement> {
         require(server.all { it.verifiedBy == Verifier.SERVER }) { "Server readings must be SERVER" }
-        val serverKeys = server.mapTo(HashSet()) { it.key }
-        val playRows = current.filter { it.verifiedBy == Verifier.PLAY_LOCAL && it.key !in serverKeys }
+        val serverByKey = server.groupBy { it.key }
+        val playRows = current.filter { row ->
+            row.verifiedBy == Verifier.PLAY_LOCAL && serverByKey[row.key].orEmpty().all { it.earlierPurchaseThan(row, now) }
+        }
         return server + playRows
     }
+
+    /**
+     * This server row is about an earlier purchase of the same product that no longer counts, and [play] is a different
+     * purchase: a new token the server hasn't recorded yet. Rows without a token can't be told apart and stay the server's.
+     */
+    private fun Entitlement.earlierPurchaseThan(play: Entitlement, now: Long): Boolean =
+        purchaseTokenHash != null && play.purchaseTokenHash != null && purchaseTokenHash != play.purchaseTokenHash &&
+            !stillCurrent(now)
 
     /**
      * True while the row still allows access: a granting status, its dates with the offline grace, and a check within

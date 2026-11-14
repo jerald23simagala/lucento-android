@@ -1,7 +1,9 @@
 package com.lucento.app.feature.pro
 
+import com.lucento.app.data.billing.BillingProblem
 import com.lucento.app.data.billing.ProductPrice
 import com.lucento.app.data.entitlement.RefreshOutcome
+import com.lucento.app.data.entitlement.ReleaseOutcome
 import com.lucento.app.domain.entitlement.Capability
 import com.lucento.app.domain.entitlement.DisplayPlan
 import com.lucento.app.domain.entitlement.Entitlement
@@ -11,6 +13,7 @@ import com.lucento.app.domain.entitlement.EntitlementStatus
 import com.lucento.app.domain.entitlement.Limit
 import com.lucento.app.domain.entitlement.PlanCatalog
 import com.lucento.app.domain.entitlement.PlanNotice
+import com.lucento.app.domain.entitlement.PlayProducts
 import com.lucento.app.domain.entitlement.ProFeature
 import com.lucento.app.domain.entitlement.Verifier
 import org.junit.Assert.assertEquals
@@ -140,6 +143,36 @@ class ProCopyTest {
         assertTrue(ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, reached).startsWith("No purchase found"))
         val paused = ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, RefreshOutcome(false, false), awaitingCheck = true)
         assertTrue(paused, paused.startsWith("Lucento still can’t confirm your purchase"))
+        // A refunded Lifetime is a purchase found, not "no purchase found" (owner's test 2026-11-13).
+        val refunded = ProCopy.restoreMessage(DisplayPlan.FREE, DisplayPlan.FREE, reached, lifetimeEnded = true)
+        assertTrue(refunded, refunded.startsWith("Google Play reports your Pro Lifetime as refunded or cancelled"))
+        assertTrue(refunded, refunded.contains("buy it again"))
+        assertEquals(
+            "a plan that works wins over an old refund",
+            "Your plan is up to date: Lucento Pro.",
+            ProCopy.restoreMessage(DisplayPlan.PRO, DisplayPlan.PRO, reached, lifetimeEnded = true),
+        )
+    }
+
+    @Test fun already_owned_says_what_reading_again_found() {
+        val none = ReleaseOutcome.NOTHING
+        val released = ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.FREE, ReleaseOutcome(found = 1, released = 1))
+        assertTrue(released, released.startsWith("Google Play was still holding your earlier Pro Lifetime (refunded or cancelled)"))
+        assertTrue(released, released.endsWith("you can buy Lifetime now."))
+        val stuck = ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.FREE, ReleaseOutcome(found = 1, released = 0))
+        assertTrue(stuck, stuck.startsWith("Google Play is still holding your earlier Pro Lifetime (refunded or cancelled)"))
+        assertTrue(stuck, stuck.contains("Google Play order number"))
+        val working = "Your Google account already owns this, and your Pro Lifetime is working on this phone now."
+        assertEquals(working, ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.LIFETIME, none))
+        // A Lifetime that works is said first, even beside an older ended one Play still holds (QA review 2026-11-13).
+        assertEquals(working, ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.LIFETIME, ReleaseOutcome(found = 1, released = 0)))
+        assertEquals(
+            "Your Google account already owns this, and your Lucento Pro is working on this phone now.",
+            ProCopy.alreadyOwned(PlayProducts.PRO_SUBSCRIPTION, DisplayPlan.PRO, none),
+        )
+        // Nothing settled it: the old advice (Restore purchases), unchanged.
+        assertEquals(ProCopy.billingProblem(BillingProblem.ALREADY_OWNED), ProCopy.alreadyOwned(PlayProducts.PRO_LIFETIME, DisplayPlan.FREE, none))
+        assertEquals(ProCopy.billingProblem(BillingProblem.ALREADY_OWNED), ProCopy.alreadyOwned(PlayProducts.CLOUD_ADDON, DisplayPlan.LIFETIME, none))
     }
 
     @Test fun plan_ended_notices_say_nothing_was_removed_and_quote_the_catalog() {

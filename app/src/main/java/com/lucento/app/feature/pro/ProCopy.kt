@@ -5,6 +5,7 @@ import com.lucento.app.data.billing.ProductPrice
 import com.lucento.app.data.billing.PurchaseResult
 import com.lucento.app.data.billing.VerifyOutcome
 import com.lucento.app.data.entitlement.RefreshOutcome
+import com.lucento.app.data.entitlement.ReleaseOutcome
 import com.lucento.app.domain.entitlement.Capability
 import com.lucento.app.domain.entitlement.ComparisonRow
 import com.lucento.app.domain.entitlement.DisplayPlan
@@ -389,6 +390,33 @@ object ProCopy {
         BillingProblem.DEVELOPER, BillingProblem.OTHER -> "Something went wrong with Google Play. Nothing was charged; please try again."
     }
 
+    /**
+     * What the page says when Google Play refused a purchase because this Google account already owns [productId]. By
+     * then Lucento has read Play and the server again ([plan]) and tried to release a Lifetime it had ended ([release],
+     * MONETIZATION §5.3 L-7).
+     */
+    fun alreadyOwned(productId: String?, plan: DisplayPlan, release: ReleaseOutcome): String = when {
+        // A plan that works says so first, whatever happened to an older purchase.
+        ownedPlanShows(productId, plan) ->
+            "Your Google account already owns this, and your ${planName(plan)} is working on this phone now."
+        release.released > 0 ->
+            "Google Play was still holding your earlier Pro Lifetime (refunded or cancelled), so it couldn’t sell you a new " +
+                "one. Lucento has released it: you can buy Lifetime now."
+        release.found > 0 ->
+            "Google Play is still holding your earlier Pro Lifetime (refunded or cancelled), and Lucento couldn’t release it " +
+                "just now. Check your connection and try again. If it keeps happening, contact support with your Google Play " +
+                "order number."
+        else -> billingProblem(BillingProblem.ALREADY_OWNED)
+    }
+
+    /** Whether [plan] is what owning [productId] gives, so the purchase Play refused is already working here. */
+    private fun ownedPlanShows(productId: String?, plan: DisplayPlan): Boolean = when (productId) {
+        PlayProducts.PRO_LIFETIME -> plan == DisplayPlan.LIFETIME || plan == DisplayPlan.LIFETIME_WITH_SERVICES
+        PlayProducts.PRO_SUBSCRIPTION -> plan != DisplayPlan.FREE
+        PlayProducts.CLOUD_ADDON -> plan == DisplayPlan.LIFETIME_WITH_SERVICES
+        else -> false
+    }
+
     /** What the page says after a purchase it started (customer copy D-9); null when there is nothing to say (cancelled). */
     fun purchaseResult(result: PurchaseResult, productId: String?): String? = when (result) {
         PurchaseResult.Completed -> when (productId) {
@@ -423,6 +451,8 @@ object ProCopy {
         after: DisplayPlan,
         outcome: RefreshOutcome,
         awaitingCheck: Boolean = false,
+        /** A Pro Lifetime on record that Google Play reports as refunded or cancelled ([EntitlementState.lifetimeEnded]). */
+        lifetimeEnded: Boolean = false,
     ): String = when {
         after != DisplayPlan.FREE && before == DisplayPlan.FREE -> "Welcome back: your ${planName(after)} is restored."
         after != DisplayPlan.FREE -> "Your plan is up to date: ${planName(after)}."
@@ -430,6 +460,8 @@ object ProCopy {
             "Store app is on and signed in to the Google account you bought with, then try again."
         !outcome.playReached && !outcome.serverReached ->
             "Restoring needs an internet connection once. If you already restored on this phone, everything you own is still working."
+        lifetimeEnded -> "Google Play reports your Pro Lifetime as refunded or cancelled, so it no longer unlocks Pro. You can " +
+            "buy it again on this page."
         else -> "No purchase found. If you bought Lucento with another Google account, switch accounts in Google Play, or sign " +
             "in to the Lucento account you used before. Still stuck? Contact support with your Google Play order number."
     }
