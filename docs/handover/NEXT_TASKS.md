@@ -10,6 +10,8 @@
 
 ## Owner to-dos (open, for the owner to run)
 
+> **Launch film (2026-11-14):** watch `Downloads/lucento-launch-film/lucento-launch-film.mp4` (and the 30 s and 15 s cuts); decide on narration (script in `docs/marketing/launch-film/VOICEOVER.md`), the vertical version and a real two-account Shared capture; the 10 product issues it surfaced are in `KNOWN_ISSUES.md`.
+
 | # | To-do | Status | Why it matters |
 |---|---|---|---|
 | OT-1 | Apply `supabase/migrations/20261103180000_credit_card_billing.sql` to **`lucento-test`** (SQL editor, one `begin … commit` block; verify query in `PRODUCTION_MIGRATION.md`, top section) | **Done** (owner, 2026-11-03) | A v11 build sends `credit_limit_minor`, `statement_day`, `due_day` on every wallet row; until the project has them, wallet sync from a v11 build stalls (rows stay pending, nothing is lost) |

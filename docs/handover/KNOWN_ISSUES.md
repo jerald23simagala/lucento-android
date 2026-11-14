@@ -15,6 +15,22 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Found while verifying the launch film (2026-11-14)
+
+All **Code-only** (read in source on `main` `0679ccf`); details in `docs/marketing/LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §6.
+
+- **Free users can spend Ask Lucento allowance on Smarter reading.** In the local website repo the interpret proxy counts a request before rejecting non-Pro users (`src/pages/api/interpret.ts` ~154–166, `consume_ai_request`). Check what's deployed.
+- Home's info tooltip still says "Nothing is converted between currencies." (`feature/home/HomeScreen.kt:1409`).
+- The Ask Lucento hero types "What's my top 5 spending categories?"; the chip reads "What are my top 5…".
+- The AI counter says "N left today" although Free's allowance is per month.
+- Onboarding's "Never miss a bill" relies on in-app reminders only (no notifications). The owner accepts the wording
+  (2026-11-14); the launch film uses it for Scheduled transactions.
+- Onboarding's "Sync with an account (Recommended)" and "Synced with your account" don't say sync is Pro.
+- The plan page says debts are free "with no limits"; Free tracks 2 cards or loans.
+- The editor allows "No category"; the composer requires one.
+- Rows beyond 30 in one composer message are dropped silently.
+- README and CHANGELOG are stale (the short first run was reverted on 2026-10-29; Shared is merged; Ask AI sends 60 days of transactions).
+
 ## Sign out (2026-11-12, `feature/sign-out`)
 
 - **Not run with a real account** (Code-only + unit tests; the owner chose to merge on CI, 2026-11-14). The dialogs, the profile row and the Account page ran on the
