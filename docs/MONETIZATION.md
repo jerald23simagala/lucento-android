@@ -505,6 +505,19 @@ than 30 days — otherwise `409 linked_elsewhere` with the support path. A purch
 first account that verifies it. Re-links are counted; more than 2 in a year flags the row for review. The Lucento
 account that holds the link can always recover the purchase (§5.6), which is the legitimate case the rule protects.
 
+**Bought signed out: the rule stays, the app warns (owner decision 2026-11-14).** The owner's internal-track test
+bought Monthly signed out, then signed in on the same phone with a second account, which got the purchase for good.
+The owner kept the rule: the account that signs in is the purchase's final holder, and one account is for one person
+(Terms of Use: "A purchase belongs to the Lucento account that first confirmed it"; "One account is for one person").
+So the app says it at both moments that matter (customer copy D-13):
+- **Before paying:** the Lucento Plan page, signed out (in builds with accounts), shows a warning above the plans
+  (`ProCopy.SIGNED_OUT_PURCHASE`).
+- **Before signing in:** while Google Play on this phone lists a live purchase of ours with no account id
+  (`EntitlementManager.boughtWithoutAccount`), the sign-in panel (`ConnectAccountPanel`, in Settings › Cloud sync and
+  onboarding's "I already have Lucento") shows a warning first (`ProCopy.SIGN_IN_TAKES_PURCHASE`).
+A purchase linked elsewhere keeps working on the phone, and the Plan page's existing note explains it (KNOWN_ISSUES
+PB-11). Asking before linking was designed the same day and set aside by the owner as too complex for now.
+
 ### 5.5 Plan-aware AI on the proxy
 
 `ask.ts` / `interpret.ts`: after auth, call `ai_allowance()`; Free → monthly limit; Pro / Cloud → daily limit plus

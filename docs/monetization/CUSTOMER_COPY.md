@@ -389,6 +389,16 @@ match wins):
 **D-12 Pro badge** — chip text "Pro"; accessibility label "Lucento Pro feature". Shown only to people who do not hold
 the capability.
 
+**D-13 Buying or signing in without an account** (MONETIZATION §5.4, owner decision 2026-11-14). Warnings, no buttons:
+- Lucento Plan page, above the plans, while signed out:
+  > You’re not signed in. If you buy now, the purchase goes to the first Lucento account that signs in on this phone,
+  > and it stays with that account: cloud sync, Lucento Shared and the AI allowance come with it there. To choose the
+  > account, sign in before you buy.
+- Sign-in panel (Settings › Cloud sync, onboarding's "I already have Lucento"), while Google Play on the phone holds a
+  purchase made signed out:
+  > Google Play on this phone has a Lucento Pro purchase made while signed out. It goes to the first Lucento account that
+  > signs in here and stays with that account, so sign in with the one that should keep it.
+
 ---
 
 ## E. Customer FAQ

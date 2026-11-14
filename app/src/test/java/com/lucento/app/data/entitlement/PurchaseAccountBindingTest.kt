@@ -74,6 +74,47 @@ class PurchaseAccountBindingTest {
         assertEquals(listOf("tok-life"), sent)
     }
 
+    /** Owner decision 2026-11-14: the sign-in screens warn while Google Play here holds a purchase made signed out. */
+    @Test fun a_purchase_made_while_signed_out_is_flagged_for_the_sign_in_warning() = runTest {
+        val m = manager(signedIn = null)
+        assertFalse("nothing read yet", m.boughtWithoutAccount.value)
+        play.setPurchases(listOf(lifetime(madeFor = null)))
+        m.refresh()
+        assertTrue(m.boughtWithoutAccount.value)
+
+        play.setPurchases(listOf(lifetime(madeFor = me)))
+        m.refresh()
+        assertFalse("bought signed in: it already has its account", m.boughtWithoutAccount.value)
+
+        play.setPurchases(listOf(lifetime(madeFor = null).copy(pending = true)))
+        m.refresh()
+        assertFalse("not paid yet", m.boughtWithoutAccount.value)
+
+        play.setPurchases(listOf(lifetime(madeFor = null).copy(productId = "someone_elses_product")))
+        m.refresh()
+        assertFalse("not one of Lucento's", m.boughtWithoutAccount.value)
+
+        play.setPurchases(emptyList())
+        m.refresh()
+        assertFalse(m.boughtWithoutAccount.value)
+    }
+
+    @Test fun a_refunded_purchase_play_still_lists_isnt_flagged() = runTest {
+        play.setPurchases(listOf(lifetime(madeFor = null)))
+        val hash = PurchaseInterpreter.tokenHash("tok-life")
+        val ended = Entitlement(
+            source = EntitlementSource.PLAY_LIFETIME, status = EntitlementStatus.EXPIRED, grants = setOf(Capability.LOCAL_PRO),
+            startsAtMillis = now - day, expiresAtMillis = null, productId = PlayProducts.PRO_LIFETIME, purchaseTokenHash = hash,
+            verifiedAtMillis = now, verifiedBy = Verifier.SERVER,
+        )
+        val m = EntitlementManager(
+            cache, play, { listOf(ended, ended.copy(source = EntitlementSource.PLAY_LIFETIME_SERVICES)) },
+            verifier = verifier, clock = { now }, signedInAccountHash = { PurchaseInterpreter.obfuscatedAccountId(me) },
+        )
+        m.refresh()
+        assertFalse(m.boughtWithoutAccount.value)
+    }
+
     @Test fun the_servers_other_account_and_test_purchase_answers_are_final_and_shown() = runTest {
         play.setPurchases(listOf(lifetime(madeFor = null)))
         answer = VerifyOutcome.OTHER_ACCOUNT

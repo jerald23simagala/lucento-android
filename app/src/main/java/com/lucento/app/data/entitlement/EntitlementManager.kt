@@ -12,6 +12,7 @@ import com.lucento.app.domain.entitlement.EntitlementEvaluator
 import com.lucento.app.domain.entitlement.EntitlementMerge
 import com.lucento.app.domain.entitlement.EntitlementState
 import com.lucento.app.domain.entitlement.LifetimeRelease
+import com.lucento.app.domain.entitlement.PlayProducts
 import com.lucento.app.domain.entitlement.ProFeature
 import com.lucento.app.domain.entitlement.PurchaseInterpreter
 import com.lucento.app.domain.entitlement.PurchaseRecord
@@ -98,6 +99,15 @@ class EntitlementManager(
     private val _verificationIssue = MutableStateFlow<VerifyOutcome?>(null)
     val verificationIssue: StateFlow<VerifyOutcome?> get() = _verificationIssue
 
+    /**
+     * Google Play on this phone lists a live Lucento purchase made while no Lucento account was signed in (it carries no
+     * account id). Lucento's server keeps such a purchase with the first account that signs in on this phone, for good
+     * (docs/MONETIZATION.md §5.4), so the sign-in screens say so first (owner decision 2026-11-14). Follows each reading
+     * of Google Play; false until the first.
+     */
+    private val _boughtWithoutAccount = MutableStateFlow(false)
+    val boughtWithoutAccount: StateFlow<Boolean> get() = _boughtWithoutAccount
+
     private val lock = Mutex()
     private var loaded = false
     /** Purchases (by token hash) the server already answered for in this process; not sent again until a restart. */
@@ -126,10 +136,26 @@ class EntitlementManager(
             if (play is PurchaseQuery.Success && confirm(play.purchases, rows)) {
                 remote?.fetch()?.heardAt(now)?.let { fresh -> server = fresh; rows = EntitlementMerge.reconcileServer(rows, fresh, now) }
             }
-            if (play is PurchaseQuery.Success) rows = checkWithLucento(play.purchases, rows, now)
+            if (play is PurchaseQuery.Success) {
+                rows = checkWithLucento(play.purchases, rows, now)
+                noteBoughtWithoutAccount(play.purchases, rows)
+            }
             publish(rows)
             _ready.value = true
             RefreshOutcome(playReached = play is PurchaseQuery.Success, serverReached = server != null)
+        }
+    }
+
+    /**
+     * [boughtWithoutAccount] from Google Play's reading [owned]: a paid purchase of ours with no account id that Lucento
+     * hasn't ended ([rows]: a refunded one Play still lists doesn't count).
+     */
+    private fun noteBoughtWithoutAccount(owned: List<PurchaseRecord>, rows: List<Entitlement>) {
+        _boughtWithoutAccount.value = owned.any { purchase ->
+            val hash = PurchaseInterpreter.tokenHash(purchase.purchaseToken)
+            val known = rows.filter { it.purchaseTokenHash == hash }
+            !purchase.pending && purchase.productId in PlayProducts.ALL && purchase.obfuscatedAccountId.isNullOrBlank() &&
+                (known.isEmpty() || known.any { it.status !in Entitlement.ENDED })
         }
     }
 
@@ -198,7 +224,9 @@ class EntitlementManager(
                 val now = clock()
                 val after = purchases.queryPurchases()
                 if (after is PurchaseQuery.Success) {
-                    publish(EntitlementMerge.reconcilePlay(_state.value.entitlements, playRows(after.purchases, now), now))
+                    val rows = EntitlementMerge.reconcilePlay(_state.value.entitlements, playRows(after.purchases, now), now)
+                    noteBoughtWithoutAccount(after.purchases, rows)
+                    publish(rows)
                 }
             }
             ReleaseOutcome(found = found, released = released)
@@ -229,6 +257,7 @@ class EntitlementManager(
                 publish(rows)
             }
             rows = checkWithLucento(query.purchases, rows, now)
+            noteBoughtWithoutAccount(query.purchases, rows)
             publish(rows)
         }
     }

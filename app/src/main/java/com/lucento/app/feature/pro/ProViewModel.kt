@@ -46,6 +46,11 @@ data class ProUiState(
     val simulatorAvailable: Boolean = false,
     /** Test builds: the fake purchase flow with test prices is on. */
     val testStore: Boolean = false,
+    /**
+     * A Lucento account is signed in. Signed out, the page says before any purchase that the first account to sign in
+     * on this phone will keep it (owner decision 2026-11-14). True until known, so the note never flashes.
+     */
+    val signedIn: Boolean = true,
 )
 
 /**
@@ -61,6 +66,8 @@ class ProViewModel(
     /** The signed-in Lucento account, if any: its hash goes to Play with the order (§5.4 linking rule). */
     private val currentUserId: suspend () -> String? = { null },
     private val clock: () -> Long = System::currentTimeMillis,
+    /** The signed-in account's email, null while signed out (only whether there is one matters here). */
+    signedInEmail: kotlinx.coroutines.flow.Flow<String?> = flowOf(""),
 ) : ViewModel() {
     private data class Local(
         val prices: List<ProductPrice> = emptyList(),
@@ -80,11 +87,11 @@ class ProViewModel(
 
     val state: StateFlow<ProUiState> = combine(
         entitlements.state,
-        local,
+        combine(local, signedInEmail) { l, email -> l to (email != null) },
         entitlements.verificationIssue,
         simulator?.current ?: flowOf(null),
         simulator?.testStore ?: flowOf(false),
-    ) { plan, l, issue, simulated, testStore ->
+    ) { plan, (l, signedIn), issue, simulated, testStore ->
         ProUiState(
             entitlements = plan,
             prices = l.prices,
@@ -96,6 +103,7 @@ class ProViewModel(
             simulated = simulated,
             simulatorAvailable = simulator != null,
             testStore = testStore,
+            signedIn = signedIn,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProUiState(simulatorAvailable = simulator != null))
 
@@ -202,7 +210,10 @@ class ProViewModel(
 
     companion object {
         val Factory = containerFactory {
-            ProViewModel(it.entitlements, it.purchaseSource, it.planSimulator, currentUserId = it.auth::currentUserId)
+            ProViewModel(
+                it.entitlements, it.purchaseSource, it.planSimulator, currentUserId = it.auth::currentUserId,
+                signedInEmail = it.auth.observeSignedInEmail(),
+            )
         }
     }
 }
