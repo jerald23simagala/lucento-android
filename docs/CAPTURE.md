@@ -124,7 +124,9 @@ by many speech services. So the composer runs its own session on the phone's spe
 | `ListeningSheet` | "Listening…", the microphone's halo moving with the voice (still with reduced motion), the words so far, whether it is offline or online, Done and Cancel. Dismissing is Cancel. |
 
 `RECORD_AUDIO` is asked the first time someone taps the microphone (also from the Speak widget) and is in the CI
-release allow-list. Refused, or a phone with no `RecognitionService` (`SpeechRecognizer.isRecognitionAvailable`, which
+release allow-list. The manifest declares `android.hardware.microphone` as not required, because the permission alone
+would make Google Play hide Lucento from devices without a microphone (found in the 0.5.8 AAB, 2026-11-14). Refused, or a
+phone with no `RecognitionService` (`SpeechRecognizer.isRecognitionAvailable`, which
 needs the `<queries>` entry), the speech service's own window (`RecognizerIntent`) is used as before. Leaving the app
 mid-sentence stops listening and puts what was heard into the message field, unsent. Not yet covered by a device test:
 check on real phones that restarts don't clip first words or beep on every stretch.

@@ -21,6 +21,9 @@
          phone's speech service turns the voice into text and Lucento keeps no recording. Refused, the speech
          service's own window is used instead (docs/CAPTURE.md). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- RECORD_AUDIO alone makes Google Play treat a microphone as required hardware, which hides Lucento from phones,
+         tablets and Chromebooks without one. Voice is optional (type or scan instead), so the microphone isn't required. -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <!-- The camera app, the speech service's window and the speech service itself, declared so Android 11+ lets
          Lucento see whether they exist. Lucento needs no CAMERA permission: the camera is another app. -->
