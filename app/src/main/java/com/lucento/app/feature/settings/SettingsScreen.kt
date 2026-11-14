@@ -39,7 +39,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
-import androidx.compose.material.icons.outlined.KeyboardVoice
+import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.SwapHoriz
@@ -210,6 +210,7 @@ fun SettingsScreen(
                 onChangePassword = viewModel::changePassword,
                 onDeleteAccount = viewModel::requestDeleteAccount,
                 onUsageCounts = viewModel::setUsageCounts,
+                onOnlineVoice = viewModel::setOnlineVoice,
                 onAppLock = { enable ->
                     lockNotice = null
                     val activity = context as? FragmentActivity
@@ -404,6 +405,7 @@ private fun SettingsContent(
     onChangePassword: (String) -> Unit,
     onDeleteAccount: () -> Unit,
     onUsageCounts: (Boolean) -> Unit,
+    onOnlineVoice: (Boolean) -> Unit = {},
     onAppLock: (Boolean) -> Unit = {},
     onHideInRecents: (Boolean) -> Unit = {},
     lockNotice: String? = null,
@@ -536,7 +538,7 @@ private fun SettingsContent(
             if (current.cloudSync.status.enabled)
                 "Wallets, transactions, budgets and goals are copied to your account, readable only by you. Everything below stays off until you switch it on."
             else
-                "Your data stays in Lucento’s private storage on this phone. Cloud sync, crash reports, usage counts and Smarter reading each send something only after you turn them on.",
+                "Your data stays in Lucento’s private storage on this phone. Cloud sync, crash reports, usage counts, online voice and Smarter reading each send something only after you turn them on.",
         )
         SwitchRow(
             title = "Send crash reports",
@@ -550,6 +552,7 @@ private fun SettingsContent(
             onCheckedChange = onUsageCounts,
             description = "Off unless you turn this on. Event names and timings only, with a random install id. Never amounts or what you type. Kept 90 days. Turning this off deletes the counts for this install.",
         )
+        OnlineVoiceRow(on = prefs.onlineVoice, onChange = onOnlineVoice)
         // Debug builds without a test proxy have no Smarter reading (P0-1): nothing to switch on.
         if (current.cloudSync.configured && current.cloudSync.signedInEmail != null && com.lucento.app.BuildConfig.AI_INTERPRET_URL.isNotBlank()) {
             SmartReadingSection(
@@ -562,7 +565,7 @@ private fun SettingsContent(
             AskLucentoAiSection(on = prefs.askLucentoAi, onChange = onAskLucentoAi)
         }
         Hairline(inset = Sizes.iconTile + Spacing.md)
-        Fact(Icons.Outlined.KeyboardVoice, "Voice and receipts are read on this phone", "Speech is turned into text by your phone’s own speech service and receipts by on-device text recognition; Lucento reads both offline.")
+        Fact(Icons.Outlined.DocumentScanner, "Receipts are read on this phone", "On-device text recognition reads the photo; it isn’t uploaded.")
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.CloudOff, "Not in cloud backups", "Your financial data is excluded from Android’s automatic cloud backup.")
         // The documents agreed to when creating an account, readable any time (and offline).
@@ -820,6 +823,35 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
         ConfirmDialog(
             title = com.lucento.app.feature.capture.SmartReadingCopy.CONSENT_TITLE,
             text = com.lucento.app.feature.capture.SmartReadingCopy.CONSENT_TEXT,
+            confirmLabel = "Turn on",
+            onConfirm = {
+                asking = false
+                onChange(true)
+            },
+            onDismiss = { asking = false },
+        )
+    }
+}
+
+/**
+ * Online voice (off by default): the composer's microphone may let the phone's speech service go online. Turning it on
+ * always shows the same consent as the composer's prompt ([com.lucento.app.feature.capture.SpeechRequest]).
+ */
+@Composable
+private fun OnlineVoiceRow(on: Boolean, onChange: (Boolean) -> Unit) {
+    var asking by remember { mutableStateOf(false) }
+    SwitchRow(
+        title = "Online voice",
+        checked = on,
+        onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
+        description = "Off: Lucento asks your phone to turn speech into text offline, which some phones can’t do. On: " +
+            "your phone’s speech service — Google’s on most phones — may send what you say to Google. Lucento only " +
+            "receives the text.",
+    )
+    if (asking) {
+        ConfirmDialog(
+            title = com.lucento.app.feature.capture.SpeechRequest.CONSENT_TITLE,
+            text = com.lucento.app.feature.capture.SpeechRequest.CONSENT_TEXT,
             confirmLabel = "Turn on",
             onConfirm = {
                 asking = false

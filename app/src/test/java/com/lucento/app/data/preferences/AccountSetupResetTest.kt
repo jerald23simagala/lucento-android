@@ -30,11 +30,13 @@ class AccountSetupResetTest {
     private val usage = booleanPreferencesKey("usage_counts")
     private val notice = booleanPreferencesKey("local_data_notice_seen")
     private val photo = longPreferencesKey("profile_photo_version")
+    private val onlineVoice = booleanPreferencesKey("online_voice")
 
     private fun accountASetUp() = mutablePreferencesOf(
         onboarding to true, categorySetup to true, guide to "budget", defaultWallet to 7L, name to "Alex", photo to 1_762_000_000_000L,
         budgetMonth to "2026-10", smart to true, askAi to true, askAiV1 to true,
         theme to "DARK", currency to "EUR", features to setOf("budgets", "goals"), crash to true, usage to true, notice to true,
+        onlineVoice to true,
     )
 
     @Test
@@ -66,6 +68,8 @@ class AccountSetupResetTest {
         assertEquals(true, p[crash])
         assertEquals(true, p[usage])
         assertEquals(true, p[notice])
+        // Online voice is about this phone's speech service, not the account: kept like crash reports.
+        assertEquals(true, p[onlineVoice])
     }
 
     @Test

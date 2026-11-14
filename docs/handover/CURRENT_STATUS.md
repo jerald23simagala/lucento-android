@@ -518,3 +518,40 @@ purchase it refunded is only reported by other developers, so the owner's test o
 
 **Owner decision (2026-11-13):** "PR, merge when green, no bump". It ships with the next release; main stays 0.5.7
 (vc 12) until then.
+
+## Voice input that works without an offline pack — 2026-11-13 (`fix/voice-online-fallback`, PR #60)
+
+On the owner's phone, the composer mic showed Google's "Voice search isn't available", on Free and Pro alike. The app asked
+the speech service for offline only (`EXTRA_PREFER_OFFLINE`), and the phone has no offline English pack. Not a
+permission problem.
+
+**Owner decision 1, "Offline, then ask"** (`eb9434f`):
+- Offline stays the default.
+- After a failed offline try, the composer offers **Try online voice** with consent.
+- The choice is remembered (`UserPreferences.onlineVoice`, kept across sign-outs, never in backups) and can be changed
+  in Settings › Privacy › Online voice.
+
+**Owner decision 2, "Lucento listens itself"** (`963d1e8`). Google's window stopped listening a fraction of a second into a
+sentence, and its silence settings are only hints:
+- `VoiceSession` (pure, 19 tests) waits 10 s for the first words and 3.5 s of quiet after them, ends on Done, and caps a
+  session at 60 s.
+- `VoiceCapture` (SpeechRecognizer) and `ListeningSheet` run it.
+- `RECORD_AUDIO` is asked on the first mic tap. If it's refused, the speech service's own window is used.
+- Also updated: the manifest's `<queries>`, the CI release-permission allow-list, the Privacy Policy "Voice input"
+  paragraph and the Play docs. No audio is collected.
+
+**Verified:**
+- The owner confirmed decision 1 on their phone. On 2026-11-13 the decision 2 test build (0.5.5-debug) "worked", with
+  no beep or cut-off word reported (KNOWN_ISSUES VI-1, VI-2).
+- Locally, before main's #65 was merged in: `testDebugUnitTest` 1,412/1,412, `assembleDebug` OK, `lintDebug` 0 errors.
+
+**Owner's call (2026-11-13):** "push and merge when green". Then 0.5.8 with #65. At that release the Privacy Policy
+date goes to the release day and the website's `/privacy` is re-exported (KNOWN_ISSUES VI-3).
+
+## Release 0.5.8 (version code 13) — 2026-11-14 (`release/0.5.8`)
+
+Carries #65 (Pro Lifetime can be bought again after a refund, `360f2f7`) and #60 (voice input that works without an offline
+pack, `391e7d8`). The owner chose "Release 0.5.8 now". #58, #37 and the dependency updates go into 0.5.9.
+- The Privacy Policy is version **2026-11-14** ("Voice input": the microphone permission and online voice). The website
+  publishes the same text in lucento-website #29, with an "Online voice" row in the homepage's short privacy list.
+- Owner retest: NEXT_TASKS OT-25.

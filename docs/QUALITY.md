@@ -91,8 +91,9 @@ The website's screens are dark mode: run the tour with `-Pandroid.testInstrument
 - IDs: release `com.lucento.app`; debug `com.lucento.app.debug` + `-debug` version suffix.
 - Manifest: `allowBackup=false`, `fullBackupContent=false`, `dataExtractionRules` exclude everything from cloud
   backup and device transfer; INTERNET and ACCESS_NETWORK_STATE only for opt-in cloud sync (docs/SYNC.md), HTTPS-only
-network security config, WorkManager's unused FOREGROUND_SERVICE removed with `tools:node="remove"`; no camera,
-  microphone or storage permission (system camera/photo picker/speech recogniser are external apps); FileProvider not
+network security config, WorkManager's unused FOREGROUND_SERVICE removed with `tools:node="remove"`; RECORD_AUDIO
+  (runtime, asked on first use) only for the composer's own listening sheet (owner, 2026-11-13; docs/CAPTURE.md); no
+  camera or storage permission (system camera/photo picker are external apps); FileProvider not
   exported, cache path only. Debug-only: `ui-tooling` (`debugImplementation`).
 - R8: `isMinifyEnabled` + `isShrinkResources`; Room, Navigation, kotlinx.serialization, ML Kit and Lottie ship consumer
   rules; app rules keep serializers; `-dontwarn okio.**` for Lottie's optional loaders.
