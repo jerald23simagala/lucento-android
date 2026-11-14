@@ -8,6 +8,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -79,6 +81,9 @@ enum class MascotMood(val pose: MascotPose, val idleCycles: Int) {
  * budget contexts the default tier is [WellnessTier.THRIVING] (the character's clean, everyday look). When [animate] is
  * true and the system has not removed animations, it arrives with a small hop (greeting adds two gentle rocks),
  * floats for [MascotMood.idleCycles] and rests; pose and tier changes cross-fade. Decorative by default (no accessibility label) unless [contentDescription] is given.
+ * [shadow] adds a soft shadow under the feet that shrinks and fades as the character rises, for places where it stands
+ * on a ground of its own (the Pro cards); off by default, so every other screen draws exactly what it did.
+ * [idleCycles] replaces the mood's own number of floats (the Pro cards keep each visit short); null keeps the mood's.
  */
 @Composable
 fun LucentoMascot(
@@ -88,13 +93,15 @@ fun LucentoMascot(
     mood: MascotMood = MascotMood.Happy,
     tier: WellnessTier = WellnessTier.THRIVING,
     contentDescription: String? = null,
+    shadow: Boolean = false,
+    idleCycles: Int? = null,
 ) {
     val moving = animate && !LucentoTheme.reducedMotion
     val float = remember { Animatable(0f) }
     val hop = remember { Animatable(0f) }
     val rock = remember { Animatable(0f) }
     val small = size < 96.dp
-    LaunchedEffect(moving, mood) {
+    LaunchedEffect(moving, mood, idleCycles) {
         float.snapTo(0f)
         hop.snapTo(0f)
         rock.snapTo(0f)
@@ -110,7 +117,7 @@ fun LucentoMascot(
                 rock.animateTo(0f, tween(durationMillis = 180, easing = FastOutSlowInEasing))
             }
         }
-        repeat(mood.idleCycles) {
+        repeat(idleCycles ?: mood.idleCycles) {
             float.animateTo(1f, tween(durationMillis = 1600, easing = FastOutSlowInEasing))
             float.animateTo(0f, tween(durationMillis = 1600, easing = FastOutSlowInEasing))
         }
@@ -125,6 +132,23 @@ fun LucentoMascot(
         Modifier.clearAndSetSemantics { }
     }
     Box(modifier.size(size).then(semantics)) {
+        if (shadow) {
+            Canvas(Modifier.fillMaxSize()) {
+                // Under the feet (they span 31–62 % across the sprite and end 93 % down), soft-edged, narrower and
+                // fainter the higher the character is.
+                val lift = float.value * amplitude + hop.value * hopHeight
+                val radius = this.size.width * 0.23f * (1f - 2.5f * lift)
+                val center = Offset(this.size.width * 0.465f, this.size.height * 0.93f)
+                val alpha = (0.36f * (1f - 4f * lift)).coerceIn(0.12f, 0.36f)
+                scale(scaleX = 1f, scaleY = 0.17f, pivot = center) {
+                    drawCircle(
+                        brush = Brush.radialGradient(listOf(ShadowInk.copy(alpha = alpha), ShadowInk.copy(alpha = 0f)), center = center, radius = radius),
+                        radius = radius,
+                        center = center,
+                    )
+                }
+            }
+        }
         Crossfade(
             targetState = tier to mood.pose,
             animationSpec = tween(durationMillis = if (moving) 300 else 0),
@@ -164,6 +188,9 @@ fun LucentoMascot(
         }
     }
 }
+
+/** The shadow under the feet: a deep blue, so on the cards' blue it reads as the same blue in shade. */
+private val ShadowInk = Color(0xFF0B1A66)
 
 /** Torch light colour from the character spec (crystal glow #FFCE78) — artwork, not a UI token. */
 private val TorchLight = Color(0xFFFFCE78)

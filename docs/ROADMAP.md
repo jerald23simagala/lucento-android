@@ -193,6 +193,12 @@ recurring-schedule sync, syncing preferences.
   - Anything bought through Google Play (Lifetime or subscription) needs one check a month, from Google Play or the
     server (MONETIZATION §5.3 L-2).
   - The server's refund checks are switched on by the owner (OT-24).
+- 2026-11-13 (`fix/refund-stays-off`, #61; `feature/purchase-check`): a refund stays off on every phone.
+  - A purchase the server called expired (how a Play Console refund arrives) stays off after signing out, like a
+    revoked one.
+  - The purchase check needs no account: signed out, cleared or reinstalled, the phone asks Lucento's site about each
+    Google Play purchase (`/api/billing/check`). Play's word alone carries a purchase for 3 days from buying it, then
+    for 90 days after each confirmation (MONETIZATION §5.3 L-6). Mandatory sign-in was declined in its place.
 - 2026-11-12 (`fix/pro-tour-real-taps`): the Pro welcome's buttons work on real phones. Its touch blocker wrapped the
   cards, so a finger's small drift cancelled every press (KNOWN_ISSUES PW-1). Finger-tap tests now cover the tour and
   the curtain in CI. Held: the owner chose an unboxing reveal to replace the tour, and both ship in one release.

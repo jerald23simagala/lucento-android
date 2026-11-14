@@ -212,7 +212,14 @@ object LegalDocuments {
                     "Lucento’s server checks each purchase with Google and keeps, with your account, the plan it gives, " +
                         "the order number and a scrambled form of the purchase token. When you buy while signed in, the " +
                         "app gives Google Play a scrambled form of your account id so the purchase can be matched to you.",
-                    "Your plan is also kept on your phone, sealed with Android’s keystore, so Pro works offline.",
+                    "Signed in or not, while you’re online the app also asks Lucento’s server every few hours whether " +
+                        "the Pro purchase on your phone is still valid, so a refunded purchase doesn’t stay unlocked. It " +
+                        "sends Google Play’s signed record of that purchase (what you bought, its order number, status, " +
+                        "dates and purchase token), never your records. The server asks Google and keeps only its answer, " +
+                        "the product and a scrambled form of the purchase token, with no account or name.",
+                    "Your plan is also kept on your phone, sealed with Android’s keystore, so Pro works offline. Lucento’s " +
+                        "server needs to confirm the purchase within 3 days of buying it, then at least once every 90 days; " +
+                        "until it can, Pro pauses on that phone. Your records are never touched.",
                     "Google Play’s billing component, built into the app, sends Google its own diagnostics, as in every " +
                         "app that sells through Google Play. Google Play keeps its own purchase records under Google’s " +
                         "privacy policy.",

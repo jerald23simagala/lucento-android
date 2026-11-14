@@ -28,6 +28,13 @@ data class PurchaseRecord(
      * of the Lucento account signed in then), or null for a purchase made while signed out (security audit F-03).
      */
     val obfuscatedAccountId: String? = null,
+    /**
+     * Google Play's signed purchase data (`Purchase.originalJson`) and its [signature], as Play reported them. They're
+     * sent to the purchase check (docs/monetization/SERVER_CONTRACT.md §3b), which proves with Play's public key that
+     * Google wrote them. They're never stored; null outside Google Play (the test store).
+     */
+    val signedData: String? = null,
+    val signature: String? = null,
 )
 
 /**

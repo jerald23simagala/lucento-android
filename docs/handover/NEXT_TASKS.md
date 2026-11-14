@@ -37,7 +37,7 @@
 
 ## Home-screen widgets — follow-ups (2026-11-12, `feature/home-widgets`)
 
-- Merge after CI passes and the owner says "merge it". Then a device pass on Android 12+ (the S8 runs Android 9:
+- Merged as `50727be` (PR #57, 2026-11-13); not released yet. Next, a device pass on Android 12+ (the S8 runs Android 9:
   square corners, no picker preview) covering rounded corners, the preview layout and the launcher's day/night switch.
 - TalkBack pass on both widgets ("Add a transaction", "Scan a receipt", "Speak a transaction", the body's summary).
 - Parked by the owner (2026-11-12): Quick Settings tile, type-and-save notification, Share to Lucento. Their mockups are
@@ -70,14 +70,55 @@ Round 4: REVISE 3.4, with no hard gate failing. Its two P1s (the brand name brok
 conditions hidden at large text) and most P2/P3s are fixed in `a1c994e`. They are re-captured from one APK in studio
 `qa/out/reveal-app-r4/` (with `BUILD.txt`).
 
+**Shipped to main (2026-11-13):** PR #56 merged as `51fac6b`, main CI green; the 0.5.5 (vc 10) AAB went to the owner's
+Downloads for internal testing.
+
 Next:
-- (a) push the round-4 fixes to PR #56, merge when CI is green, then the AAB from main goes to Downloads;
+- (a) done: merged, AAB delivered;
 - (b) on the Galaxy S8 from internal testing, check:
   - TalkBack: Next three times, then Previous once; one announcement per card;
   - how dense the haptics feel;
   - the swipe;
   - large text, where Android 14+ scales differently from API 28;
 - (c) done: the owner's calls from round 3 (see above).
+
+## Pro perk cards: new art (owner, 2026-11-13, `design/perk-card-art`)
+
+The owner wasn't satisfied with the cards' drawn "Scenes" art and asked for better images. Three AI-generated
+directions (painterly, 3D miniature worlds, gilded engraving; critic r1: REVISE / REJECT, studio
+`critic/reports/2026-11-13-perk-art-directions-r1*`) were set aside; a flat hand-drawn 2D set with people followed, and
+the owner then asked: "Too many people. Reimagine, make it simpler but we can add our mascot to make it livelier."
+
+Then: "add subtle doodles in the background instead of plain blue … reduce empty blue spaces as much as possible …
+after that I am good." Built on the branch: each card's art band is CardBlue with faint code-drawn doodles, one
+soft-3D prop cut out of its ground, and `LucentoMascot` stepping a little in front of it in a pose per card
+(`PerkArt.kt`); ten props generated with GPT Image 2.5 (`docs/design/illustrations/perks/`, exported by
+`tools/illustrations/export_perk_art.py`, 425 KB with thumbnails); the deck decodes the next card's prop ahead of its
+turn; the collection rows show each card's prop. Shown to the owner: artifact "Lucento Pro Cards".
+
+Shipping (owner: "PR + review, merge when green"): PR #59, release 0.5.6 (vc 11). Critic app r1 REJECT (doodles under
+the words in dark: fixed), r2 REVISE 3.45 with no hard gate; the owner then chose a **same-size art window** (the band
+at most 0.55 of the card's width, which the pair fills: 12–20 % empty, measured). Also from r2: the pair stays
+together at every band shape, room for the hop, each prop's shape read before it decodes, new props for cards 3 (a
+microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
+- (a) done: critic r3 REVISE 3.45 with no hard gate, CI green; merged as `af4aae4` (2026-11-13) and the 0.5.6
+  (vc 11) AAB went to the owner's Downloads;
+- (a2) owner chose "Polish only" from r3 (`design/perk-card-polish`): one short float per card, doodles kept off
+  the pair, card 7 without its sparkle, the hand on the prop only when pointing. Not chosen: one window per deck with
+  copy trims, plain card under short cards, the dark band colour;
+- (a3) from the polish checks (critic polish r1 REVISE 3.6, r2 REVISE 3.7, no hard gate): doodles fill the free blue
+  around the pair again; the gap beside a standing mascot is set from the prop's own edge (`PerkPropEdges.kt`); a
+  leaving card's mascot holds still; going back never blends two poses (each card face keyed by its card);
+- (a4) polish r3 REVISE 3.6, no hard gate; merged as #62 `f7fbaf6` (2026-11-13, main CI green) and ships in 0.5.7
+  (vc 12, PR #64). Its fixes: the next card is in place under a leaving card at once and a swiped card leaves from
+  where it was let go; each card's own scroll position; balanced last lines. Large text
+  re-captured (130 % light/dark, 150 %, 200 %) after the emulator's System UI froze on text-size changes (capture
+  with a settle step: studio scratch `capture_lt.sh` logic). Open for the owner (three polish rounds done): doodle
+  spacing refinements (bare patches beside the pair), one art window for the deck with copy trims, centring wide pairs
+  versus keeping the torch glow inside, the AI feature's name and card 7's chip wording; a phone recording of leaving,
+  swiping and going back;
+- (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
+- (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
    picks one.

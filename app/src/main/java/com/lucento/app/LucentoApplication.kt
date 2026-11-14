@@ -183,6 +183,7 @@ class AppContainer(application: Application) {
             signedInAccountHash = {
                 auth.currentUserId()?.let(com.lucento.app.domain.entitlement.PurchaseInterpreter::obfuscatedAccountId)
             },
+            checker = purchaseChecker(),
         )
         manager.observePlayUpdates(entitlementScope)
         entitlementScope.launch { manager.refresh() }
@@ -225,6 +226,18 @@ class AppContainer(application: Application) {
             null
         } else {
             com.lucento.app.data.billing.ProxyPurchaseVerifier(BuildConfig.BILLING_VERIFY_URL, BuildConfig.APPLICATION_ID, auth::accessToken)
+        }
+
+    /**
+     * Release builds only (docs/MONETIZATION.md §5.3 L-6): the purchase check, which needs no account. It tells this
+     * phone, signed in or not, whether a purchase Google Play lists here is still live, so a refunded one can't come
+     * back while Play's copy on the phone lags behind the refund.
+     */
+    private fun purchaseChecker(): com.lucento.app.data.billing.PurchaseChecker? =
+        if (BuildConfig.DEBUG || BuildConfig.BILLING_CHECK_URL.isBlank()) {
+            null
+        } else {
+            com.lucento.app.data.billing.ProxyPurchaseChecker(BuildConfig.BILLING_CHECK_URL)
         }
 
     /** Test builds only (docs/MONETIZATION.md §5.7): switch plans without Google Play. Null in release builds. */

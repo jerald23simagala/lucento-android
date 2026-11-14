@@ -462,17 +462,17 @@ object ProCopy {
         )
         PlanNotice.LIFETIME_NEEDS_CHECK -> NoticeCopy(
             "Lucento needs to check your Pro Lifetime",
-            "Lucento hasn’t been able to confirm your purchase with Google Play or your Lucento account for " +
-                "${Entitlement.RECHECK_DAYS} days, so Pro is paused on this phone. Connect to the internet, make sure " +
-                "the Google Play Store app is on and signed in to the Google account you bought with, then tap Restore " +
-                "purchases on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.",
+            // Paused for either reason (MONETIZATION §5.3 L-2, L-6): no word for a month, or Lucento's server hasn't
+            // confirmed Google Play's reading lately. The same steps settle both.
+            "Pro is paused on this phone until Lucento can confirm your purchase again. Connect to the internet, make " +
+                "sure the Google Play Store app is on and signed in to the Google account you bought with, then tap " +
+                "Restore purchases on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.",
         )
         PlanNotice.PRO_NEEDS_CHECK -> NoticeCopy(
             "Lucento needs to check your Lucento Pro",
-            "Lucento hasn’t been able to confirm your subscription with Google Play or your Lucento account for " +
-                "${Entitlement.RECHECK_DAYS} days, so Pro is paused on this phone. Connect to the internet, make sure " +
-                "the Google Play Store app is on and signed in to the Google account you subscribed with, then tap Restore " +
-                "purchases on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.",
+            "Pro is paused on this phone until Lucento can confirm your subscription again. Connect to the internet, make " +
+                "sure the Google Play Store app is on and signed in to the Google account you subscribed with, then tap " +
+                "Restore purchases on the Lucento Pro page. Everything you recorded is still here, and nothing was removed.",
         )
     }
 }

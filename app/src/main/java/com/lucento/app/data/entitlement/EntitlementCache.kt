@@ -101,6 +101,13 @@ object EntitlementSnapshotCodec {
         val autoRenewing: Boolean,
         /** Added 2026-11-12 (docs §5.3 L-2). A snapshot written before it reads as checked when verified. */
         val checkedAt: Long? = null,
+        /**
+         * Added 2026-11-13 (docs §5.3 L-6): Lucento's last confirmation, [NEVER_CONFIRMED] for "not yet on this install".
+         * A snapshot written before it reads as confirmed when verified, so the update itself pauses nobody.
+         */
+        val confirmedAt: Long? = null,
+        /** Added 2026-11-13 (L-6): when the purchase check last answered for this purchase. */
+        val lucentoCheckedAt: Long? = null,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -114,6 +121,7 @@ object EntitlementSnapshotCodec {
                     startsAt = it.startsAtMillis, expiresAt = it.expiresAtMillis, productId = it.productId,
                     basePlanId = it.basePlanId, tokenHash = it.purchaseTokenHash, verifiedAt = it.verifiedAtMillis,
                     verifiedBy = it.verifiedBy.name, autoRenewing = it.autoRenewing, checkedAt = it.checkedAtMillis,
+                    confirmedAt = it.confirmedAtMillis ?: NEVER_CONFIRMED, lucentoCheckedAt = it.lucentoCheckedAtMillis,
                 )
             },
         ),
@@ -136,7 +144,16 @@ object EntitlementSnapshotCodec {
                 verifiedBy = Verifier.valueOf(it.verifiedBy),
                 autoRenewing = it.autoRenewing,
                 checkedAtMillis = it.checkedAt ?: it.verifiedAt,
+                confirmedAtMillis = when (val confirmed = it.confirmedAt) {
+                    null -> it.verifiedAt
+                    NEVER_CONFIRMED -> null
+                    else -> confirmed
+                },
+                lucentoCheckedAtMillis = it.lucentoCheckedAt,
             )
         }
     }.getOrNull()
+
+    /** In [Row.confirmedAt]: Lucento's server hasn't confirmed this purchase on this install yet. */
+    private const val NEVER_CONFIRMED = -1L
 }

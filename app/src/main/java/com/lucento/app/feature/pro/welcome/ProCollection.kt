@@ -1,6 +1,7 @@
 package com.lucento.app.feature.pro.welcome
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,18 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Devices
-import androidx.compose.material.icons.outlined.Flag
-import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.PictureAsPdf
-import androidx.compose.material.icons.outlined.Savings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,7 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
@@ -136,15 +125,15 @@ private fun CollectionRow(item: CollectionItem) {
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
     ) {
         Row(Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(item.stop.icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
-            }
+            // The card's own picture, small: the collection shows the cards collected, not generic icons (critic round 1
+            // of the art). Decorative; the row's words name the card.
+            Image(
+                painter = painterResource(item.stop.thumb),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+            )
             Spacer(Modifier.width(Spacing.md))
             FlowRow(
                 Modifier.weight(1f),
@@ -172,18 +161,3 @@ private fun Tag(text: String, modifier: Modifier = Modifier) {
         modifier = modifier,
     )
 }
-
-/** Each card's icon in the collection (the same symbols the app uses for these features). */
-internal val ProTourStop.icon: ImageVector
-    get() = when (this) {
-        ProTourStop.WALLETS -> Icons.Outlined.AccountBalanceWallet
-        ProTourStop.NET_WORTH -> Icons.Outlined.Savings
-        ProTourStop.SMART_READING -> Icons.Outlined.AutoAwesome
-        ProTourStop.GOALS -> Icons.Outlined.Flag
-        ProTourStop.INSIGHTS_PERIODS -> Icons.Outlined.Insights
-        ProTourStop.STATEMENTS -> Icons.Outlined.PictureAsPdf
-        ProTourStop.AI_ANSWERS -> Icons.Outlined.Forum
-        ProTourStop.SYNC -> Icons.Outlined.Devices
-        ProTourStop.SHARED -> Icons.Outlined.Group
-        ProTourStop.THEMES -> Icons.Outlined.Palette
-    }

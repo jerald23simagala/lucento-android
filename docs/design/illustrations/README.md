@@ -13,3 +13,6 @@ Re-crop from the source rather than editing the WebPs. Keep text, numbers, logos
 
 `themes/` holds the five theme landscapes (Sunrise, Midnight, Grove, Mono, Aurora), shipped as
 `scenery_<theme>_panorama` — see `themes/README.md` and docs/DESIGN.md › Themes.
+
+`perks/` holds the ten Pro perk-card props (soft-3D, on the cards' flat blue), shipped as `perk_art_<stop>` and
+`perk_thumb_<stop>` by `tools/illustrations/export_perk_art.py` — see `perks/README.md`.

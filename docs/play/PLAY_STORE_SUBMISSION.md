@@ -73,7 +73,7 @@ because accounts, sync, AI and usage counts are all opt-in.
 | Personal info › Email address | Yes | Account management, App functionality | No | Account email; a Lucento Shared invitation stores the invitee's email until it's accepted, declined or expires |
 | Personal info › Name | Yes | Account management | No | Google sign-in's name in the account metadata; the Shared Space label a member chooses |
 | Personal info › User IDs | Yes | Account management, App functionality | No | The Supabase account id |
-| Financial info › Purchase history | Yes | App functionality, Account management | No | Product, order number, status, dates, purchase-token hash (Lucento Pro) |
+| Financial info › Purchase history | Yes | App functionality, Account management, Fraud prevention, security and compliance | No | Product, order number, status, dates, purchase-token hash (Lucento Pro). Since 2026-11-13 the purchase check (no account) also sends a buyer's signed Play purchase record every few hours while online, so a refund ends Pro; the server keeps the product, Google's state and the token hash only |
 | Financial info › Other financial info | Yes | App functionality | No | The synced ledger (wallets, transactions, budgets, goals, debts, schedules); figures sent to the AI features the person turns on |
 | App activity › Other user-generated content | Yes | App functionality | **Yes** | Messages and questions typed or spoken into the AI features; the server keeps no copy |
 | App activity › App interactions | Yes | Analytics | No | Usage counts, off by default: event names and timings, kept 90 days |

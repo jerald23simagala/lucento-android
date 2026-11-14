@@ -1,7 +1,9 @@
 package com.lucento.app.data.entitlement
 
+import com.lucento.app.data.billing.PurchaseChecker
 import com.lucento.app.data.billing.PurchaseQuery
 import com.lucento.app.data.billing.PurchaseSource
+import com.lucento.app.data.billing.PurchaseVerdict
 import com.lucento.app.data.billing.PurchaseVerifier
 import com.lucento.app.data.billing.VerifyOutcome
 import com.lucento.app.domain.entitlement.Access
@@ -59,6 +61,12 @@ class EntitlementManager(
      * out. A purchase Play says was made for a different account is never sent for this one.
      */
     private val signedInAccountHash: suspend () -> String? = { null },
+    /**
+     * The purchase check (docs §5.3 L-6): asks Lucento's server about each purchase Play lists that no account row covers,
+     * signed in or not. Null in builds without it (debug: the fake store's purchases must never reach the server). There,
+     * Google Play's word is the confirmation, as before.
+     */
+    private val checker: PurchaseChecker? = null,
     // Last, so existing callers can keep passing it as a trailing lambda.
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
@@ -99,7 +107,7 @@ class EntitlementManager(
             var rows = _state.value.entitlements
             val play = purchases.queryPurchases()
             when (play) {
-                is PurchaseQuery.Success -> rows = EntitlementMerge.reconcilePlay(rows, PurchaseInterpreter.entitlements(play.purchases, now), now)
+                is PurchaseQuery.Success -> rows = EntitlementMerge.reconcilePlay(rows, playRows(play.purchases, now), now)
                 is PurchaseQuery.Failed -> Unit // Play unreachable: the cached reading stands (L-2; a Lifetime for a month)
             }
             var server = remote?.fetch()?.heardAt(now)
@@ -107,6 +115,7 @@ class EntitlementManager(
             if (play is PurchaseQuery.Success && confirm(play.purchases, rows)) {
                 remote?.fetch()?.heardAt(now)?.let { fresh -> server = fresh; rows = EntitlementMerge.reconcileServer(rows, fresh) }
             }
+            if (play is PurchaseQuery.Success) rows = checkWithLucento(play.purchases, rows, now)
             publish(rows)
             _ready.value = true
             RefreshOutcome(playReached = play is PurchaseQuery.Success, serverReached = server != null)
@@ -162,14 +171,57 @@ class EntitlementManager(
         loadCached()
         lock.withLock {
             val now = clock()
-            var rows = EntitlementMerge.reconcilePlay(_state.value.entitlements, PurchaseInterpreter.entitlements(query.purchases, now), now)
+            var rows = EntitlementMerge.reconcilePlay(_state.value.entitlements, playRows(query.purchases, now), now)
             // The plan shows the moment Play confirms it; the server's copy follows (best effort, not waited for twice).
             publish(rows)
             if (confirm(query.purchases, rows)) {
                 remote?.fetch()?.heardAt(now)?.let { rows = EntitlementMerge.reconcileServer(rows, it) }
                 publish(rows)
             }
+            rows = checkWithLucento(query.purchases, rows, now)
+            publish(rows)
         }
+    }
+
+    /**
+     * Play's reading as rows. With the purchase check, Play's word alone isn't Lucento's confirmation (L-6): each row
+     * starts unconfirmed, and [EntitlementMerge.reconcilePlay] keeps what this phone already knew about the same purchase.
+     */
+    private fun playRows(owned: List<PurchaseRecord>, now: Long): List<Entitlement> {
+        val rows = PurchaseInterpreter.entitlements(owned, now)
+        return if (checker == null) rows else rows.map { it.copy(confirmedAtMillis = null) }
+    }
+
+    /**
+     * The purchase check (L-6): every purchase Play lists that's still a Play reading here (no account row covers it) is
+     * checked with Lucento's server: at once when it has never been answered, then at most every
+     * [LUCENTO_CHECK_INTERVAL_MILLIS]. A live answer confirms it; REVOKED or EXPIRED ends it on this phone for good
+     * (Play's copy of that purchase can't bring it back); any other answer only counts as asked. No answer changes
+     * nothing and is tried again at the next refresh. Pending payments wait until Play confirms them.
+     */
+    private suspend fun checkWithLucento(owned: List<PurchaseRecord>, rows: List<Entitlement>, now: Long): List<Entitlement> {
+        val checker = checker ?: return rows
+        var out = rows
+        for (purchase in owned) {
+            if (purchase.pending) continue
+            val hash = PurchaseInterpreter.tokenHash(purchase.purchaseToken)
+            val mine = out.filter { it.verifiedBy == Verifier.PLAY_LOCAL && it.purchaseTokenHash == hash }
+            // Already ended here: nothing to ask. A Lifetime's services row ends with its year while the Lifetime stays.
+            if (mine.isEmpty() || mine.all { it.status in Entitlement.ENDED }) continue
+            val asked = mine.mapNotNull { it.lucentoCheckedAtMillis }.maxOrNull()
+            if (asked != null && now < Math.addExact(asked, LUCENTO_CHECK_INTERVAL_MILLIS)) continue
+            val verdict = runCatching { checker.check(purchase) }.getOrDefault(PurchaseVerdict.Unavailable)
+            if (verdict !is PurchaseVerdict.Known) continue
+            out = out.map { row ->
+                when {
+                    row.verifiedBy != Verifier.PLAY_LOCAL || row.purchaseTokenHash != hash -> row
+                    verdict.status.grantsAccess -> row.copy(confirmedAtMillis = now, lucentoCheckedAtMillis = now)
+                    verdict.status in Entitlement.ENDED -> row.copy(status = verdict.status, lucentoCheckedAtMillis = now)
+                    else -> row.copy(lucentoCheckedAtMillis = now)
+                }
+            }
+        }
+        return out
     }
 
     /** The server's rows as this phone heard them [now]: a Lifetime counts for a month from here (docs §5.3 L-2). */
@@ -193,5 +245,13 @@ class EntitlementManager(
             _state.value = next
             cache.write(rows)
         }
+    }
+
+    companion object {
+        /**
+         * How long an answer from the purchase check stands before the same purchase is asked about again. A refund then
+         * reaches an online phone within hours, while Lucento's shared Play quota sees a few calls a day per buyer.
+         */
+        const val LUCENTO_CHECK_INTERVAL_MILLIS: Long = 6L * 60 * 60 * 1000
     }
 }

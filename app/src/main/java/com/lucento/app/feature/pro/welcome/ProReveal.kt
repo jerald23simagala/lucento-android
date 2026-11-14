@@ -32,8 +32,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -262,6 +265,8 @@ internal fun ProRevealDeck(
     val enter = remember { Animatable(0f) }
     val leave = remember { Animatable(1f) }
     var leaving by remember { mutableStateOf<Int?>(null) }
+    // Where the leaving card was let go (a swipe's offset in px; 0 for a tap).
+    var leaveFrom by remember { mutableFloatStateOf(0f) }
     val band = remember { Animatable(if (unwrap && shown < 0) 0f else 1f) }
     val burst = remember { Animatable(1f) }
     var burstPlayed by rememberSaveable { mutableStateOf(shown >= 0) }
@@ -272,6 +277,10 @@ internal fun ProRevealDeck(
     var queued by remember { mutableIntStateOf(0) }
     // The step came from a swipe: the deck gives the haptic itself (a button gives its own).
     var swiped by remember { mutableStateOf(false) }
+    // The pictures: the next card's is decoded while this one shows, so its face is ready the moment it turns.
+    val resources = LocalContext.current.resources
+    val art = remember(resources) { PerkArtCache(resources) }
+    LaunchedEffect(shown) { cards.getOrNull(shown + 1)?.let { art.load(it.stop.art) } }
 
     fun keep(step: Int) {
         if (SystemClock.uptimeMillis() - stepStarted >= DoubleTapMillis) queued = step
@@ -301,7 +310,14 @@ internal fun ProRevealDeck(
                     if (reduced) band.snapTo(1f) else launch { band.animateTo(1f, tween(420, easing = FastOutLinearInEasing)) }
                 }
             } else {
+                // The leaving copy starts where the card was let go (a swipe's offset and tilt, or the middle for a tap),
+                // and the next card is in place under it at once, so the deck never shows the leaving card twice (critic,
+                // polish round 3: for 140 ms the original stayed face up under its copy, its mascot mid-float).
+                leaveFrom = drag.value
                 leaving = from
+                drag.snapTo(0f)
+                shown = target
+                turn.snapTo(0f)
                 launch {
                     leave.snapTo(0f)
                     leave.animateTo(1f, tween(if (reduced) 180 else 380, easing = FastOutLinearInEasing))
@@ -380,6 +396,7 @@ internal fun ProRevealDeck(
                         card = cards[i],
                         turn = if (up) turn.value else 0f,
                         reduced = reduced,
+                        art = art,
                         // The band says "Lucento Pro" while it is on, so the backs don't say it beneath it too.
                         backLabel = !bandOn,
                         modifier = Modifier
@@ -433,6 +450,9 @@ internal fun ProRevealDeck(
                         card = cards[l],
                         turn = 1f,
                         reduced = reduced,
+                        art = art,
+                        // A fresh copy of the card that just left: its mascot holds still instead of hopping again.
+                        still = true,
                         modifier = Modifier
                             .size(width, height)
                             .clearAndSetSemantics {}
@@ -440,8 +460,9 @@ internal fun ProRevealDeck(
                                 val p = leave.value
                                 alpha = 1f - p
                                 if (!reduced) {
-                                    translationX = -1.3f * size.width * p
-                                    rotationZ = -10f * p
+                                    translationX = leaveFrom + (-1.3f * size.width - leaveFrom) * p
+                                    val tilt = leaveFrom / 28f / density.density
+                                    rotationZ = tilt + (-10f - tilt) * p
                                 }
                             },
                     )
@@ -572,7 +593,15 @@ private fun DeckButtons(
 
 /** A card that turns over: its back until halfway, then its face (each face drawn the right way round). */
 @Composable
-private fun TurningCard(card: RevealCard, turn: Float, reduced: Boolean, modifier: Modifier = Modifier, backLabel: Boolean = true) {
+private fun TurningCard(
+    card: RevealCard,
+    turn: Float,
+    reduced: Boolean,
+    art: PerkArtCache,
+    modifier: Modifier = Modifier,
+    backLabel: Boolean = true,
+    still: Boolean = false,
+) {
     val density = LocalDensity.current
     Box(
         modifier.graphicsLayer {
@@ -582,14 +611,16 @@ private fun TurningCard(card: RevealCard, turn: Float, reduced: Boolean, modifie
             }
         },
     ) {
-        if (reduced) {
-            // Cross-fade: no turning for anyone who asked for less motion.
-            if (turn < 1f) PerkCardBack(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - turn }, showLabel = backLabel)
-            if (turn > 0f) PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { alpha = turn })
-        } else if (turn < 0.5f) {
-            PerkCardBack(Modifier.fillMaxSize(), showLabel = backLabel)
-        } else {
-            PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { rotationY = 180f })
+        CompositionLocalProvider(LocalPerkArtCache provides art) {
+            if (reduced) {
+                // Cross-fade: no turning for anyone who asked for less motion.
+                if (turn < 1f) PerkCardBack(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - turn }, showLabel = backLabel)
+                if (turn > 0f) PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { alpha = turn }, still = still)
+            } else if (turn < 0.5f) {
+                PerkCardBack(Modifier.fillMaxSize(), showLabel = backLabel)
+            } else {
+                PerkCardFront(card.stop, card.copy, Modifier.fillMaxSize().graphicsLayer { rotationY = 180f }, still = still)
+            }
         }
     }
 }
