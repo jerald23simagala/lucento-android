@@ -472,6 +472,21 @@ object ProCopy {
         else -> null
     }
 
+    /**
+     * The Plan page while no account is signed in (owner decision 2026-11-14, docs/MONETIZATION.md §5.4, customer copy
+     * D-13): Lucento's server keeps a purchase made signed out with the first account that signs in on that phone, for
+     * good, so the person hears it before paying.
+     */
+    const val SIGNED_OUT_PURCHASE =
+        "You’re not signed in. If you buy now, the purchase goes to the first Lucento account that signs in on this phone, " +
+            "and it stays with that account: cloud sync, Lucento Shared and the AI allowance come with it there. To choose " +
+            "the account, sign in before you buy."
+
+    /** The sign-in panel while Google Play on this phone holds a purchase made without an account (D-13). */
+    const val SIGN_IN_TAKES_PURCHASE =
+        "Google Play on this phone has a Lucento Pro purchase made while signed out. It goes to the first Lucento account " +
+            "that signs in here and stays with that account, so sign in with the one that should keep it."
+
     /** What "Restore purchases" says afterwards (customer copy D-8). */
     fun restoreMessage(
         before: DisplayPlan,

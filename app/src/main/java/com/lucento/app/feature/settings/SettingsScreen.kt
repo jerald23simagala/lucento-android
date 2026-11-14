@@ -681,6 +681,8 @@ internal fun CloudSyncSection(
                     googleAvailable = state.googleSignInConfigured,
                     onGoogle = onConnectGoogle,
                     onEmail = onConnectEmail,
+                    // Owner, 2026-11-14: a purchase made signed out goes to the account that signs in now, for good.
+                    notice = com.lucento.app.feature.pro.ProCopy.SIGN_IN_TAKES_PURCHASE.takeIf { state.purchaseWithoutAccount },
                 )
             }
             else -> {

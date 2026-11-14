@@ -68,7 +68,18 @@ class OnboardingViewModel(
      * A Partner's binding to their Shared Space counts as allowed (the space is on the Owner's plan).
      */
     private val planAllowsCloud: (suspend () -> Boolean)? = null,
+    /**
+     * Google Play on this phone holds a Pro purchase made while signed out
+     * ([com.lucento.app.data.entitlement.EntitlementManager.boughtWithoutAccount]); false in tests.
+     */
+    purchaseWithoutAccount: kotlinx.coroutines.flow.Flow<Boolean> = kotlinx.coroutines.flow.flowOf(false),
 ) : ViewModel() {
+
+    /**
+     * Owner decision 2026-11-14: the account that signs in keeps a purchase made signed out for good, so the sign-in step
+     * says so first while Google Play on this phone holds one.
+     */
+    val purchaseWithoutAccount: StateFlow<Boolean> = purchaseWithoutAccount.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** Anonymous usage counts: one `onboarding_step_viewed` per screen, numbered from 1 (welcome). */
     fun onStepShown(step: Int) {
@@ -1047,6 +1058,7 @@ class OnboardingViewModel(
                         runCatching { container.entitlements.refresh() }
                         container.planAllowsSync()
                     },
+                    purchaseWithoutAccount = container.entitlements.boughtWithoutAccount,
                 )
             }
         }
