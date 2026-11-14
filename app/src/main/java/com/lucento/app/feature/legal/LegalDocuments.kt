@@ -9,8 +9,8 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-13"
-    const val UPDATED = "13 November 2026"
+    const val VERSION = "2026-11-14"
+    const val UPDATED = "14 November 2026"
 
     /**
      * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit

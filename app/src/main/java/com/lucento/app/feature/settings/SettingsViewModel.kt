@@ -57,8 +57,15 @@ data class SettingsUiState(
 )
 
 /** Everything the "Cloud sync" section needs, kept separate so the rest of Settings never depends on it. */
-/** A wipe the user still has to confirm. [unsynced] means changes that have not reached the server would be lost. */
-data class AccountPrompt(val kind: Kind, val unsyncedCount: Int) {
+/**
+ * A wipe the user still has to confirm. [unsyncedCount]: changes that have not reached the server and would be lost.
+ * [signOut]: for [Kind.SIGN_OUT], where this phone's records stand, which decides what the dialog offers.
+ */
+data class AccountPrompt(
+    val kind: Kind,
+    val unsyncedCount: Int,
+    val signOut: com.lucento.app.feature.account.SignOutCase? = null,
+) {
     /** [MERGE]: a first sync would join this phone's own records with an account that already has data (P0-2). */
     enum class Kind { SIGN_OUT, SWITCH, MERGE }
 
@@ -230,12 +237,54 @@ class SettingsViewModel(
         }
     }
 
-    /** Asks before removing this account's data from the phone. Nothing is deleted until [confirmAccountPrompt]. */
-    fun disconnectAccount() {
+    /**
+     * Asks before signing out. What the dialog offers follows where the records stand
+     * ([com.lucento.app.feature.account.signOutCase]); nothing changes until the person picks one of its actions.
+     */
+    fun requestSignOut() {
         if (syncing.value) return
         viewModelScope.launch {
-            prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.pendingChangeCount())
+            // The profile menu's row can outlive the session by a frame; never ask a signed-out phone to sign out.
+            if (auth.observeSignedInEmail().first() == null) return@launch
+            prompt.value = signOutPrompt()
         }
+    }
+
+    private suspend fun signOutPrompt(): AccountPrompt {
+        val pending = syncRepository.pendingChangeCount()
+        val case = com.lucento.app.feature.account.signOutCase(
+            phoneOnly = accounts.ledgerIsPhoneOnly(),
+            pendingChanges = pending,
+            canUpload = planAllowsSyncNow(),
+        )
+        return AccountPrompt(AccountPrompt.Kind.SIGN_OUT, pending, case)
+    }
+
+    /**
+     * "Keep them here" (owner decision 2026-11-12, F-2): signs out of an account this phone never synced with. The
+     * records were never uploaded, so they stay; only the session, sync and what the phone cached about the account go.
+     * If a first sync claimed the records in the meantime, nothing changes and the dialog asks again with what now applies.
+     */
+    fun keepRecordsAndSignOut() {
+        val current = prompt.value ?: return
+        if (syncing.value || current.signOut != com.lucento.app.feature.account.SignOutCase.PHONE_ONLY) return
+        viewModelScope.launch {
+            syncing.value = true
+            prompt.value = null
+            val kept = withContext(NonCancellable) { accounts.signOutKeepingLedger() }
+            if (kept) {
+                syncMessage.value = com.lucento.app.feature.account.SignOutCopy.KEPT
+            } else {
+                syncMessage.value = com.lucento.app.feature.account.SignOutCopy.KEEP_REFUSED
+                prompt.value = signOutPrompt()
+            }
+            syncing.value = false
+        }
+    }
+
+    /** A line under the account (the sign-out dialog's backup result). */
+    fun showAccountMessage(text: String) {
+        syncMessage.value = text
     }
 
     /** Opens the delete-account confirmation (docs/ACCOUNT_DELETION.md). Nothing changes until [confirmDeleteAccount]. */
@@ -271,15 +320,17 @@ class SettingsViewModel(
                         runCatching {
                             check(accounts.markWipePendingNow()) { "Could not record the wipe" }
                             auth.beginSignOutNow()
+                            // The wipe ends on the welcome screen; this line tells the person there what happened.
+                            preferences.setSignOutNotice(com.lucento.app.feature.account.SignOutNotice.ACCOUNT_DELETED.key)
                             accounts.signOutAndWipe()
-                        }.isSuccess
+                        }.onFailure { runCatching { preferences.setSignOutNotice(null) } }.isSuccess
                     }
                     deletion.value = null
                     syncMessage.value = if (wiped) {
                         com.lucento.app.feature.account.AccountDeletionCopy.DONE
                     } else {
                         "Your account was deleted, but this phone’s records couldn’t be erased just now. Choose " +
-                            "Disconnect to finish."
+                            "${com.lucento.app.feature.account.SignOutCopy.ACTION} to finish."
                     }
                 }
             }
@@ -298,7 +349,7 @@ class SettingsViewModel(
                 firstSyncCheck()
             } else {
                 runSyncNow()
-                prompt.value = AccountPrompt(AccountPrompt.Kind.SIGN_OUT, syncRepository.pendingChangeCount())
+                prompt.value = signOutPrompt()
             }
             syncing.value = false
         }
@@ -325,8 +376,22 @@ class SettingsViewModel(
                 // Not cancellable: the wipe sends the app back to onboarding, which can clear this ViewModel before the
                 // server revoke that follows the wipe has run.
                 AccountPrompt.Kind.SIGN_OUT -> {
-                    withContext(NonCancellable) { accounts.signOutAndWipe() }
-                    syncMessage.value = "Signed out. This account’s data has been removed from this phone."
+                    // Written before the wipe, which ends on the welcome screen (the screen that set it is gone by then).
+                    val notice = if (current.signOut == com.lucento.app.feature.account.SignOutCase.PHONE_ONLY) {
+                        com.lucento.app.feature.account.SignOutNotice.REMOVED
+                    } else {
+                        com.lucento.app.feature.account.SignOutNotice.SIGNED_OUT
+                    }
+                    withContext(NonCancellable) {
+                        preferences.setSignOutNotice(notice.key)
+                        try {
+                            accounts.signOutAndWipe()
+                        } catch (e: Throwable) {
+                            runCatching { preferences.setSignOutNotice(null) }
+                            throw e
+                        }
+                    }
+                    syncMessage.value = notice.text
                 }
                 AccountPrompt.Kind.SWITCH -> {
                     withContext(NonCancellable) { accounts.confirmSwitch() }
