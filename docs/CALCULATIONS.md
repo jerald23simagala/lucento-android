@@ -294,6 +294,15 @@ the same `Report` is drawn on screen and written to the PDF. See docs/ASK.md for
   whole exponents −1200…1200, right to left; a sign binds looser, so −2^2 = −4). Future value of a monthly saving s for
   n years at yearly rate r, compounded yearly on each year's total: s × 12 × ((1 + r)^n − 1) ÷ r. Rates written in an
   answer ("7.03%") are not counted as amounts the AI wrote itself.
+- **Purchase check** (owner test round 2, 2026-11-09; `PurchaseCheck`, on the phone, from the AI figures above): a
+  purchase question ("Should I buy…", "Can I afford…") answered without Gemini (AI off, or Gemini unreachable).
+  *Balances* = money on hand + savings balances; *cushion* = 3 × average monthly expenses. A price (main currency only,
+  read by `AskScope.price`; never converted) ≤ this month's safe to spend → fits this month, leaving safe − price; else
+  balances < price → not yet; else balances − price ≥ cushion → can come from savings, leaving (balances − price) ÷
+  average expenses months (one decimal, rounded down); else → wait. A wait gives the months to close the gap at the
+  average net flow, rounded up (only when net flow > 0): gap = cushion − (balances − price), or price − balances +
+  cushion when the balances can't cover the price. Without a price it lists safe to spend, balances (and the months of
+  spending they cover), net worth and what's owed, with the same rule in words.
 - **Insights change chip**: `Insights.changePercent(net, previous net)` — the period's net flow against the equal period
   before it, as a whole percentage of the previous amount's size (half-up); omitted when the earlier period has no
   records or a zero net. **Chart axis**: `Insights.axisTicks` — round gridlines (1, 2, 2.5 or 5 × a power of ten), at

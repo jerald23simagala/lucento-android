@@ -95,7 +95,11 @@ class AuthRepository(
         UNREACHABLE,
     }
 
-    enum class ResendResult { SENT, TOO_SOON, FAILED }
+    /**
+     * How a request to send an email went. [OFFLINE] and [INVALID_EMAIL] are only given by [sendPasswordReset], so the
+     * sheet can say what actually happened instead of blaming the connection (owner test round 2).
+     */
+    enum class ResendResult { SENT, TOO_SOON, FAILED, OFFLINE, INVALID_EMAIL }
 
     /**
      * The signed-in account's email, or null. Follows the session status, so it updates once the stored session
@@ -247,6 +251,53 @@ class AuthRepository(
             }
         } catch (e: Exception) {
             ResendResult.FAILED
+        }
+    }
+
+    /**
+     * Forgot password, step 1 (owner test 2026-11-09): asks Supabase to email a reset code to [email]. The Reset Password
+     * template (supabase/templates/reset-password.html) shows the code, which the person types in the app — no link to
+     * open, so nothing depends on a browser opening the app. Supabase answers the same whether or not an account exists,
+     * so this never reveals which emails have accounts.
+     */
+    suspend fun sendPasswordReset(email: String): ResendResult {
+        val auth = client?.auth ?: return ResendResult.FAILED
+        if (!isOnline()) return ResendResult.OFFLINE
+        return try {
+            auth.resetPasswordForEmail(email.trim(), redirectUrl = null)
+            ResendResult.SENT
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: AuthRestException) {
+            resetSendResult(e.errorCode, safeFailureDescription(e))
+        } catch (e: Exception) {
+            if (e is HttpRequestException || isTimeout(e)) ResendResult.OFFLINE else ResendResult.FAILED
+        }
+    }
+
+    /**
+     * Forgot password, step 2: proves the emailed [code], sets [newPassword], then ends that short recovery session on
+     * this phone. The person then signs in with the new password through the normal sign-in path, so every check a
+     * sign-in runs (switching accounts, restoring) still happens there and nowhere else.
+     */
+    suspend fun resetPasswordWithCode(email: String, code: String, newPassword: String): SignInResult {
+        val auth = client?.auth ?: return SignInResult.NotConfigured
+        offlineFailure(isOnline)?.let { return it }
+        passwords.problem(newPassword)?.let { return SignInResult.Failed(it) }
+        return try {
+            auth.verifyEmailOtp(io.github.jan.supabase.auth.OtpType.Email.RECOVERY, email = email.trim(), token = code.trim())
+            try {
+                auth.updateUser { password = newPassword }
+            } finally {
+                runCatching { auth.signOut() }
+            }
+            SignInResult.Success
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: AuthRestException) {
+            SignInResult.Failed(resetFailureMessage(e.errorCode, BuildConfig.DEBUG, safeFailureDescription(e)))
+        } catch (e: Exception) {
+            SignInResult.Failed(signInFailureMessage(e, BuildConfig.DEBUG))
         }
     }
 
@@ -581,6 +632,29 @@ internal fun emailFailureMessage(code: AuthErrorCode?, debug: Boolean, detail: S
         emailNotSent(code, detail) ->
             "We couldn’t send the verification email just now, so your account wasn’t created yet. Try again in a few minutes."
         else -> emailFailureText(code)
+    }
+    return if (debug) "$message (debug: $detail)" else message
+}
+
+/**
+ * A refused reset email. Supabase rejects some addresses the form's own check lets through ("name@gmail..com") with
+ * `validation_failed`; an address without an account is never refused (Supabase answers the same either way, so
+ * nobody can use the form to find out who has an account).
+ */
+internal fun resetSendResult(code: AuthErrorCode?, detail: String): AuthRepository.ResendResult = when {
+    code == AuthErrorCode.OverEmailSendRateLimit || code == AuthErrorCode.OverRequestRateLimit -> AuthRepository.ResendResult.TOO_SOON
+    code == AuthErrorCode.ValidationFailed || detail.contains("email address", ignoreCase = true) -> AuthRepository.ResendResult.INVALID_EMAIL
+    else -> AuthRepository.ResendResult.FAILED
+}
+
+/** What the person is told when a reset code or new password is refused. */
+internal fun resetFailureMessage(code: AuthErrorCode?, debug: Boolean, detail: String): String {
+    val message = when (code) {
+        AuthErrorCode.OtpExpired -> "That code has expired or isn’t right. Check it, or send a new one."
+        AuthErrorCode.SamePassword -> "That’s your current password. Choose a different one, or sign in with it."
+        AuthErrorCode.WeakPassword -> "Choose a stronger password: at least $MIN_PASSWORD_LENGTH characters, mixing letters and numbers."
+        AuthErrorCode.OverRequestRateLimit, AuthErrorCode.OverEmailSendRateLimit -> "Too many tries just now. Wait a few minutes and try again."
+        else -> "Couldn’t change your password. Check the code and try again."
     }
     return if (debug) "$message (debug: $detail)" else message
 }

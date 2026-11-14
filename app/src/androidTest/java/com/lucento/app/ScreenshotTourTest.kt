@@ -497,7 +497,7 @@ class ScreenshotTourTest {
         tab("Home")
         waitForText("Monthly budget")
         // The Home header is pinned, so the profile button is always on screen.
-        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
         waitForText("Account and app")
         shot("19-profile-menu")
@@ -506,7 +506,7 @@ class ScreenshotTourTest {
         click("Dark")
         backUntilGone("Account and app")
         waitForText("Monthly budget")
-        runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
+        runCatching { compose.onNodeWithContentDescription("Profile and settings", substring = true).performScrollTo() }
         waitForToastsGone()
         shot("20-home-dark")
         openBudgets()
@@ -542,7 +542,7 @@ class ScreenshotTourTest {
             hasContentDescription("Restaurants,", substring = true) and hasContentDescription("of its budget used", substring = true),
             10_000,
         )
-        runCatching { compose.onNodeWithContentDescription("Profile and settings").performScrollTo() }
+        runCatching { compose.onNodeWithContentDescription("Profile and settings", substring = true).performScrollTo() }
         shot("22-home-budget-almost-used-dark")
 
         // ---------------------------------------------------------------- hidden amounts on every page (round 7)
@@ -614,9 +614,10 @@ class ScreenshotTourTest {
         click("OK")
         tab("Home")
         waitForText("Monthly budget")
-        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
-        click("Lucento Pro")
+        // On the free plan the profile menu shows the Lucento Pro card in place of the plan row (owner, 2026-11-09).
+        click("See Lucento Pro")
         waitForText("What each plan includes")
         shot("24b-pro-page-free")
         runCatching { compose.onNodeWithText("Pro Lifetime").performScrollTo() }
@@ -646,9 +647,9 @@ class ScreenshotTourTest {
             container.preferences.setProMemberSince(null)
         }
         simulator.setTestStore(true)
-        compose.onNodeWithContentDescription("Profile and settings").performClick()
+        compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
-        click("Lucento Pro")
+        click("See Lucento Pro")
         waitForText("Start 7-day free trial")
         runCatching { compose.onNodeWithText("Start 7-day free trial").performScrollTo() }
         shot("24g-pro-page-buy")
@@ -698,7 +699,7 @@ class ScreenshotTourTest {
         // The Lucento Pro page offers the cards again, without the medal.
         compose.onNodeWithContentDescription("Profile and settings").performClick()
         compose.waitForIdle()
-        click("Lucento Pro")
+        click("Lucento Plan")
         waitForText("See your Pro cards")
         shot("25l-pro-page-replay")
         simulator.setTestStore(false)

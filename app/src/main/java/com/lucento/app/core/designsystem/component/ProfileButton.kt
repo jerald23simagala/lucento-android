@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,7 +38,8 @@ import java.util.Locale
 
 /**
  * What the profile button shows and does; provided once by the app shell for every primary screen. [sharedWith]: the
- * other person when this ledger is shared (Lucento Shared) — the button then carries their initial as a badge.
+ * other person when this ledger is shared (Lucento Shared) — the button then carries the "Shared" pill. The Pro mark on
+ * the button is the [proRing] alone (owner, 2026-11-14: one mark, the one Pro's welcome lands on).
  */
 data class ProfileChrome(
     val displayName: String?,
@@ -191,6 +193,8 @@ private fun SharedPill(modifier: Modifier = Modifier) {
     val compact = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Box(
         modifier
+            // May be a few dp wider than the 48dp button ("Shared" was cut to "Share" when held to its width).
+            .wrapContentWidth(unbounded = true)
             .clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.background)
             .padding(1.5.dp)

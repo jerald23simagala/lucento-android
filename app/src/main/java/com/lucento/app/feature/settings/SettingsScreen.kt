@@ -105,7 +105,7 @@ enum class SettingsPage(val key: String, val title: String) {
     /** Lucento Shared: opens its own screen (SharedSpaceRoute), like [FEATURES]. */
     SHARED("shared", "Lucento Shared"),
     /** Lucento Pro: opens its own screen (ProRoute), like [SHARED]. */
-    PRO("pro", "Lucento Pro"),
+    PRO("pro", "Lucento Plan"),
     ;
 
     companion object {
@@ -889,12 +889,8 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
     )
     if (asking) {
         ConfirmDialog(
-            title = "Send messages to Gemini?",
-            text = "When you type or speak in the composer, Lucento sends that message, today’s date, your main currency " +
-                "and the names of your categories and accounts to Lucento’s server, which asks Google’s Gemini to read it. " +
-                "Balances and your history are not sent. ${com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE} Each " +
-                "account has a daily allowance; after it, reading happens on this phone. You review every row before " +
-                "anything is saved, receipts are still read on this phone, and you can turn this off at any time.",
+            title = com.lucento.app.feature.capture.SmartReadingCopy.CONSENT_TITLE,
+            text = com.lucento.app.feature.capture.SmartReadingCopy.CONSENT_TEXT,
             confirmLabel = "Turn on",
             onConfirm = {
                 asking = false

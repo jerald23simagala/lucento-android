@@ -107,7 +107,7 @@ fun ProScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.gutter),
     ) {
-        LucentoTopBar(title = "Lucento Pro", onBack = onBack)
+        LucentoTopBar(title = "Lucento Plan", onBack = onBack)
 
         // The plan this phone holds, and the mascot: its one appearance in the Pro experience.
         HeroCard {

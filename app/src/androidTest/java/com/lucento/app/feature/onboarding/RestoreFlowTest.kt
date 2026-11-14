@@ -39,6 +39,7 @@ class RestoreFlowTest {
                     onRetry = { taps += "retry" },
                     onSetUpAsNew = { taps += "new" },
                     onBack = { taps += "back" },
+                    onLeaveAccount = { taps += "leave" },
                 )
             }
         }
@@ -66,6 +67,20 @@ class RestoreFlowTest {
     }
 
     @Test
+    fun planNeeded_saysSignedInInsteadOfTheSignInFormAgain() {
+        // Owner test round 2: after a password reset the Free plan's restore rule looked like a failed sign-in.
+        show(RestoreStage.PLAN_NEEDED, email = "ada@example.com")
+        compose.onNodeWithText("You’re signed in").assertExists()
+        compose.onNodeWithText("ada@example.com is connected", substring = true).assertExists()
+        compose.onNodeWithText("Sign in to your account").assertDoesNotExist()
+        compose.onNodeWithText("Continue with Google").assertDoesNotExist()
+        compose.onNodeWithText("See Lucento Plan").assertExists()
+        shot("restore-02b-plan-needed")
+        compose.onNodeWithText("Use Lucento without this account").performClick()
+        assertEquals(listOf("leave"), taps)
+    }
+
+    @Test
     fun restoring_showsProgressAndNoActions() {
         show(RestoreStage.RESTORING, email = "ada@example.com")
         compose.onNodeWithText("Bringing your money across").assertExists()
@@ -86,10 +101,13 @@ class RestoreFlowTest {
     @Test
     fun failure_offersRetryOrNewSetup() {
         show(RestoreStage.FAILED, message = "Your data couldn’t be downloaded (timeout). Check your connection and try again.")
-        compose.onNodeWithText("Nothing was changed on this phone.").assertExists()
+        compose.onNodeWithText("Couldn’t finish bringing your data across").assertExists()
+        // The reason shows in a note, not small grey text (owner test round 2).
+        compose.onNodeWithText("Check your connection and try again", substring = true).assertExists()
         compose.onNodeWithText("Try again").performClick()
-        compose.onNodeWithText("Set up as new instead").performClick()
-        assertEquals(listOf("retry", "new"), taps)
+        // Not "set up as new": the account has data. The way out disconnects it instead.
+        compose.onNodeWithText("Use Lucento without this account").performClick()
+        assertEquals(listOf("retry", "leave"), taps)
         shot("restore-05-failed")
     }
 

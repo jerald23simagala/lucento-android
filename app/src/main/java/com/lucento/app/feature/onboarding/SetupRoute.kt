@@ -26,6 +26,14 @@ internal fun setupRoute(probe: AccountProbe, confirmedNewFor: String?): SetupRou
     is AccountProbe.Unavailable -> SetupRoute.RETRY
 }
 
+/**
+ * "I already have Lucento" on a plan without cloud restore: an account with nothing saved goes to
+ * [RestoreStage.EMPTY] (set up as new, staying signed in) — there is nothing that needs Pro; anything else, including a
+ * check that couldn't finish, goes to [RestoreStage.PLAN_NEEDED]. Never "empty" on a failed check.
+ */
+internal fun restoreStageWithoutCloud(probe: AccountProbe): RestoreStage =
+    if (probe is AccountProbe.Empty) RestoreStage.EMPTY else RestoreStage.PLAN_NEEDED
+
 /** What the sync step shows while a connected account is checked. */
 sealed interface AccountCheck {
     data object Idle : AccountCheck

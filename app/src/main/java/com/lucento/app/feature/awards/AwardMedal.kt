@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +50,7 @@ fun awardArt(achievement: Achievement): AwardArt = when (achievement) {
     Achievement.GETTING_CONSISTENT -> AwardArt(Icons.Filled.EventRepeat, AwardArtwork.RibbonPlum, AwardArtwork.StripeGold)
     Achievement.FINANCIAL_EXPLORER -> AwardArt(Icons.Filled.Explore, AwardArtwork.RibbonSky, AwardArtwork.StripeNavy)
     Achievement.GOAL_SETTER -> AwardArt(Icons.Filled.Flag, AwardArtwork.RibbonSun, AwardArtwork.StripeNavy)
+    Achievement.SECURED -> AwardArt(Icons.Filled.Shield, AwardArtwork.RibbonGreen, AwardArtwork.StripeGold)
 }
 
 /**

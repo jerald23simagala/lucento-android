@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -143,6 +144,53 @@ fun SwitchRow(
             checked = checked,
             onCheckedChange = null,
             enabled = enabled,
+            colors = SwitchDefaults.colors(checkedTrackColor = colors.primary),
+        )
+    }
+}
+
+/**
+ * A small labelled switch for a header or a toolbar ("Gemini", "Smarter reading"): the label and switch toggle together,
+ * TalkBack announces one switch, and the touch target is at least 48dp tall.
+ */
+@Composable
+fun CompactSwitch(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+) {
+    val colors = MaterialTheme.colorScheme
+    val haptics = rememberHaptics()
+    Row(
+        modifier
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = {
+                    haptics.tick()
+                    onCheckedChange(it)
+                },
+            )
+            .padding(horizontal = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = if (checked) colors.primary else colors.onSurfaceVariant)
+            Spacer(Modifier.width(Spacing.xs))
+        }
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (enabled) colors.onSurface else colors.onSurfaceVariant)
+        Spacer(Modifier.width(Spacing.sm))
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            enabled = enabled,
+            modifier = Modifier.scale(0.8f),
             colors = SwitchDefaults.colors(checkedTrackColor = colors.primary),
         )
     }
