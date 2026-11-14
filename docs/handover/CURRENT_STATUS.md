@@ -552,6 +552,19 @@ sentence, and its silence settings are only hints:
 **Owner's call (2026-11-13):** "push and merge when green". Then 0.5.8 with #65. At that release the Privacy Policy
 date goes to the release day and the website's `/privacy` is re-exported (KNOWN_ISSUES VI-3).
 
+## Release 0.5.9 (version code 14) — 2026-11-14 (`release/0.5.9`)
+
+The owner chose "Release 0.5.9 now", with the website's /privacy. Carries everything merged since 0.5.8:
+- #58 sign-out redesign (profile menu Sign out, keep or remove this phone's own records);
+- #37 owner test rounds 1–2 (Lucento Plan page name, Pro ring only, password reset by code);
+- #69 microphone not required, so Play's 13 devices without one come back;
+- #68 toolchain (AGP 9.5.1, Gradle 9.6, Kotlin 2.4) and #67 safe library updates;
+- #71 warnings that a purchase made signed out goes to the first account that signs in (KNOWN_ISSUES PB-11);
+- #73 sign-out takes the account's server plan off the phone (PB-12).
+The Privacy Policy stays version **2026-11-14** (released the same day); its account-emails line gained the password
+reset code (#37), and the website publishes the same text (KNOWN_ISSUES VI-4). Owner retest: NEXT_TASKS OT-25 (still on
+0.5.8's items) and OT-26.
+
 ## Release 0.5.8 (version code 13) — 2026-11-14 (`release/0.5.8`)
 
 Carries #65 (Pro Lifetime can be bought again after a refund, `360f2f7`) and #60 (voice input that works without an offline
