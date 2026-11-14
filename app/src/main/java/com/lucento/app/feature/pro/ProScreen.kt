@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AllInclusive
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Replay
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
@@ -141,6 +142,17 @@ fun ProScreen(
             if (state.entitlements.has(com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, now)) "Plans" else "Choose your plan",
             Modifier.padding(top = Spacing.section),
         )
+        // Owner, 2026-11-14: bought signed out, a purchase goes to the first account that signs in here, for good. Said
+        // before anyone pays, wherever accounts exist.
+        if (!state.signedIn && state.prices.isNotEmpty() && com.lucento.app.data.sync.SupabaseModule.isConfigured) {
+            InfoNote(
+                ProCopy.SIGNED_OUT_PURCHASE,
+                icon = Icons.Outlined.WarningAmber,
+                container = LucentoTheme.extendedColors.warningContainer,
+                content = LucentoTheme.extendedColors.warning,
+            )
+            Spacer(Modifier.height(Spacing.md))
+        }
         // Lucento Cloud appears only for people who own Lucento; shown to anyone else it would undercut Pro (D-12).
         ProOffers.cards(state.entitlements, state.prices, now).forEachIndexed { i, card ->
             if (i > 0) Spacer(Modifier.height(Spacing.md))

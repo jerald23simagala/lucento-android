@@ -505,6 +505,27 @@ than 30 days — otherwise `409 linked_elsewhere` with the support path. A purch
 first account that verifies it. Re-links are counted; more than 2 in a year flags the row for review. The Lucento
 account that holds the link can always recover the purchase (§5.6), which is the legitimate case the rule protects.
 
+**Bought signed out: the rule stays, the app warns (owner decision 2026-11-14).** The owner's internal-track test
+bought Monthly signed out, then signed in on the same phone with a second account, which got the purchase for good.
+The owner kept the rule: the account that signs in is the purchase's final holder, and one account is for one person
+(Terms of Use: "A purchase belongs to the Lucento account that first confirmed it"; "One account is for one person").
+So the app says it at both moments that matter (customer copy D-13):
+- **Before paying:** the Lucento Plan page, signed out (in builds with accounts), shows a warning above the plans
+  (`ProCopy.SIGNED_OUT_PURCHASE`).
+- **Before signing in:** while Google Play on this phone lists a live purchase of ours with no account id
+  (`EntitlementManager.boughtWithoutAccount`), the sign-in panel (`ConnectAccountPanel`, in Settings › Cloud sync and
+  onboarding's "I already have Lucento") shows a warning first (`ProCopy.SIGN_IN_TAKES_PURCHASE`).
+A purchase linked elsewhere keeps working on the phone, and the Plan page's existing note explains it (KNOWN_ISSUES
+PB-11). Asking before linking was designed the same day and set aside by the owner as too complex for now.
+
+**Sign-out takes the account's plan with it (2026-11-14, KNOWN_ISSUES PB-12).** Whenever nobody is signed in
+(`AuthRepository.observeSignedOut`: Supabase's `NotAuthenticated`, so a sign-out by any path, a session the server ended,
+or a start signed out; never an offline `RefreshFailure`), `EntitlementManager.signedOut` removes the account's own
+server rows from the phone, so a grant or a purchase linked to someone's account stops unlocking Pro on a phone they only
+signed in to. Google Play's reading stays and keeps the server's last confirmation of the same purchase (L-6), so the
+payer's Pro doesn't pause offline. Rows the server says ended stay (the refund guard, PB-6). The plan it leaves is
+remembered first, so no "your plan has ended" notice follows.
+
 ### 5.5 Plan-aware AI on the proxy
 
 `ask.ts` / `interpret.ts`: after auth, call `ai_allowance()`; Free → monthly limit; Pro / Cloud → daily limit plus
@@ -769,7 +790,7 @@ parked until the Android side is final (memory: website PRs deferred).
 | Purchase token submitted from an unrelated account | `409 linked_elsewhere` | stub |
 | Refund with revoke | server REVOKED → local Free on next contact; data intact | Play Console refund |
 | Lifetime refunded **without** Remove entitlement, then bought again (L-7) | Restore says it was refunded; Buy Lifetime releases it and the new purchase goes through; a Lifetime that counts is never released | owner's internal-track test |
-| Lucento account switch / sign-out / `LocalLedgerReset` | entitlement store survives; server link unchanged | two accounts |
+| Lucento account switch / sign-out / `LocalLedgerReset` | Google Play's reading survives; at sign-out the account's own server rows leave the phone (ended ones stay, PB-6); server link unchanged; no "plan ended" notice | two accounts |
 | Partner when Owner lapses | Partner keeps full access; Owner cannot invite | two phones |
 | AI: Free 10 / month boundary, Pro 50 / day and 400 / month, Lifetime-without-Cloud 10 / month, Smarter reading 403 | proxy unit tests | signed-in release build |
 | Server | `tools/sql-verify`: RLS on `entitlements` / `purchase_links` (read own, no writes), `max_partners` per state, `ai_allowance` per plan, `plan_limits` not readable by clients | advisors |

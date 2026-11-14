@@ -304,7 +304,9 @@ fun OnboardingScreen(
 
     // Restoring an account on a new phone replaces the story with its own short flow.
     if (restoreStage != RestoreStage.NONE) {
+        val purchaseWithoutAccount by viewModel.purchaseWithoutAccount.collectAsStateWithLifecycle()
         RestoreFlow(
+            purchaseNote = com.lucento.app.feature.pro.ProCopy.SIGN_IN_TAKES_PURCHASE.takeIf { purchaseWithoutAccount },
             spaceOwner = spaceOwner,
             invited = joiningByInvitation,
             stage = restoreStage,
@@ -595,6 +597,8 @@ internal fun RestoreFlow(
     spaceOwner: String? = null,
     /** Lucento Shared: came in through "I was invited to share". */
     invited: Boolean = false,
+    /** Said above the sign-in choices: a Pro purchase on this phone that the account signing in will keep for good. */
+    purchaseNote: String? = null,
 ) {
     val ext = LucentoTheme.extendedColors
     var showPlan by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
@@ -669,6 +673,7 @@ internal fun RestoreFlow(
                         onGoogle = onGoogle,
                         onEmail = onEmail,
                         onPrepareEmail = onPrepareEmail,
+                        notice = purchaseNote,
                         emailModes = if (invited) {
                             listOf(com.lucento.app.feature.settings.EmailMode.SIGN_IN, com.lucento.app.feature.settings.EmailMode.CREATE)
                         } else {

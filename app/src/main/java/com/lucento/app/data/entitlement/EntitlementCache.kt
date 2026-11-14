@@ -13,8 +13,9 @@ import javax.crypto.spec.SecretKeySpec
 
 /**
  * The last verified entitlements, kept on the phone so they apply in the first frame and whenever Play and the server are
- * unreachable (docs/MONETIZATION.md §5.3). Device-level: survives sign-out and `LocalLedgerReset`, is never synced and
- * never in a backup file. Not a Boolean: a list of [Entitlement]s with their dates and verifiers.
+ * unreachable (docs/MONETIZATION.md §5.3). Device-level: survives `LocalLedgerReset`, is never synced and never in a
+ * backup file. A sign-out takes the account's own rows from the server out of it, and Google Play's reading stays
+ * ([EntitlementManager.signedOut], 2026-11-14). Not a Boolean: a list of [Entitlement]s with their dates and verifiers.
  */
 interface EntitlementCache {
     /** Null when nothing is stored, or the stored snapshot fails verification (tampered or copied from another phone). */

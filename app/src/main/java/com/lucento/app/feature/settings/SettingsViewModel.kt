@@ -86,6 +86,11 @@ data class CloudSyncUiState(
     val lockedByPlan: Boolean = false,
     /** The open delete-account confirmation (docs/ACCOUNT_DELETION.md), or null. */
     val deletion: com.lucento.app.feature.account.DeleteAccountPrompt? = null,
+    /**
+     * Google Play on this phone holds a Pro purchase made while signed out, which the account that signs in will keep
+     * for good: the sign-in panel says so first (owner decision 2026-11-14).
+     */
+    val purchaseWithoutAccount: Boolean = false,
 )
 
 class SettingsViewModel(
@@ -104,6 +109,8 @@ class SettingsViewModel(
     /** Lucento Pro: the plan this phone holds; null in tests (everything allowed). */
     private val entitlements: kotlinx.coroutines.flow.StateFlow<com.lucento.app.domain.entitlement.EntitlementState>? = null,
     private val partnerOfSpace: kotlinx.coroutines.flow.Flow<Boolean> = kotlinx.coroutines.flow.flowOf(false),
+    /** [com.lucento.app.data.entitlement.EntitlementManager.boughtWithoutAccount]; false in tests. */
+    private val purchaseWithoutAccount: kotlinx.coroutines.flow.Flow<Boolean> = kotlinx.coroutines.flow.flowOf(false),
 ) : ViewModel() {
 
     private val syncing = MutableStateFlow(false)
@@ -138,6 +145,7 @@ class SettingsViewModel(
             entitlements ?: kotlinx.coroutines.flow.flowOf(null),
             partnerOfSpace,
             deletion,
+            purchaseWithoutAccount,
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
@@ -151,6 +159,7 @@ class SettingsViewModel(
             val plan = values[9] as com.lucento.app.domain.entitlement.EntitlementState?
             val partner = values[10] as Boolean
             val deleting = values[11] as com.lucento.app.feature.account.DeleteAccountPrompt?
+            val heldWithoutAccount = values[12] as Boolean
             val lockedByPlan = plan != null && !com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, partner, System.currentTimeMillis())
             SettingsUiState(
                 preferences = prefs,
@@ -167,6 +176,7 @@ class SettingsViewModel(
                     pendingChanges = pending,
                     lockedByPlan = lockedByPlan,
                     deletion = deleting,
+                    purchaseWithoutAccount = heldWithoutAccount,
                 ),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -720,6 +730,7 @@ class SettingsViewModel(
                 appLock = container.appLock,
                 entitlements = container.entitlements.state,
                 partnerOfSpace = kotlinx.coroutines.flow.flow { container.syncPreferences.sharedSpaceOwner.collect { emit(it != null) } },
+                purchaseWithoutAccount = container.entitlements.boughtWithoutAccount,
             )
         }
     }

@@ -150,12 +150,18 @@ fun ConnectAccountPanel(
     emailModes: List<EmailMode> = listOf(EmailMode.CREATE, EmailMode.SIGN_IN),
     /** The server's answer to the last attempt, shown with the form. */
     message: String? = null,
+    /**
+     * Said before anything else, whichever way the person signs in: a Pro purchase on this phone that the account about to
+     * sign in will keep for good ([com.lucento.app.feature.pro.ProCopy.SIGN_IN_TAKES_PURCHASE]).
+     */
+    notice: String? = null,
 ) {
     var usingEmail by rememberSaveable { mutableStateOf(!googleAvailable) }
     var legal by rememberSaveable { mutableStateOf<com.lucento.app.feature.legal.LegalDoc?>(null) }
     legal?.let { com.lucento.app.feature.legal.LegalSheet(it, onDismiss = { legal = null }) }
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        if (notice != null && !busy) com.lucento.app.core.designsystem.component.InfoNote(notice)
         if (busy && !usingEmail) {
             // Never a silent screen while the account connects: the rising mark and what is happening.
             ConnectingIndicator(

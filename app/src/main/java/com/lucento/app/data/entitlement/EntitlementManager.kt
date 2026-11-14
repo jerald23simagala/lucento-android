@@ -12,6 +12,7 @@ import com.lucento.app.domain.entitlement.EntitlementEvaluator
 import com.lucento.app.domain.entitlement.EntitlementMerge
 import com.lucento.app.domain.entitlement.EntitlementState
 import com.lucento.app.domain.entitlement.LifetimeRelease
+import com.lucento.app.domain.entitlement.PlayProducts
 import com.lucento.app.domain.entitlement.ProFeature
 import com.lucento.app.domain.entitlement.PurchaseInterpreter
 import com.lucento.app.domain.entitlement.PurchaseRecord
@@ -78,6 +79,11 @@ class EntitlementManager(
      * Google Play's word is the confirmation, as before.
      */
     private val checker: PurchaseChecker? = null,
+    /**
+     * The plan this phone last showed, for the one-time "your plan has ended" notice. [signedOut] records the plan it
+     * leaves before showing it: an account leaving the phone isn't a plan ending. Null in tests.
+     */
+    private val planMemory: PlanMemory? = null,
     // Last, so existing callers can keep passing it as a trailing lambda.
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
@@ -98,10 +104,24 @@ class EntitlementManager(
     private val _verificationIssue = MutableStateFlow<VerifyOutcome?>(null)
     val verificationIssue: StateFlow<VerifyOutcome?> get() = _verificationIssue
 
+    /**
+     * Google Play on this phone lists a live Lucento purchase made while no Lucento account was signed in (it carries no
+     * account id). Lucento's server keeps such a purchase with the first account that signs in on this phone, for good
+     * (docs/MONETIZATION.md §5.4), so the sign-in screens say so first (owner decision 2026-11-14). Follows each reading
+     * of Google Play; false until the first.
+     */
+    private val _boughtWithoutAccount = MutableStateFlow(false)
+    val boughtWithoutAccount: StateFlow<Boolean> get() = _boughtWithoutAccount
+
     private val lock = Mutex()
     private var loaded = false
     /** Purchases (by token hash) the server already answered for in this process; not sent again until a restart. */
     private val settled = mutableSetOf<String>()
+    /**
+     * The server's last confirmation of each purchase whose account rows just left with a sign-out ([signedOut]), kept
+     * for Google Play's next reading of the same purchases when Play couldn't be read at the sign-out itself.
+     */
+    private var carriedConfirmations: Map<String, Long> = emptyMap()
 
     /** Reads the cached snapshot. Idempotent; a refresh that already ran is never undone by a late load. */
     suspend fun loadCached() = lock.withLock {
@@ -118,7 +138,8 @@ class EntitlementManager(
             var rows = _state.value.entitlements
             val play = purchases.queryPurchases()
             when (play) {
-                is PurchaseQuery.Success -> rows = EntitlementMerge.reconcilePlay(rows, playRows(play.purchases, now), now)
+                is PurchaseQuery.Success ->
+                    rows = carryConfirmations(EntitlementMerge.reconcilePlay(rows, playRows(play.purchases, now), now))
                 is PurchaseQuery.Failed -> Unit // Play unreachable: the cached reading stands (L-2; a Lifetime for a month)
             }
             var server = remote?.fetch()?.heardAt(now)
@@ -126,10 +147,26 @@ class EntitlementManager(
             if (play is PurchaseQuery.Success && confirm(play.purchases, rows)) {
                 remote?.fetch()?.heardAt(now)?.let { fresh -> server = fresh; rows = EntitlementMerge.reconcileServer(rows, fresh, now) }
             }
-            if (play is PurchaseQuery.Success) rows = checkWithLucento(play.purchases, rows, now)
+            if (play is PurchaseQuery.Success) {
+                rows = checkWithLucento(play.purchases, rows, now)
+                noteBoughtWithoutAccount(play.purchases, rows)
+            }
             publish(rows)
             _ready.value = true
             RefreshOutcome(playReached = play is PurchaseQuery.Success, serverReached = server != null)
+        }
+    }
+
+    /**
+     * [boughtWithoutAccount] from Google Play's reading [owned]: a paid purchase of ours with no account id that Lucento
+     * hasn't ended ([rows]: a refunded one Play still lists doesn't count).
+     */
+    private fun noteBoughtWithoutAccount(owned: List<PurchaseRecord>, rows: List<Entitlement>) {
+        _boughtWithoutAccount.value = owned.any { purchase ->
+            val hash = PurchaseInterpreter.tokenHash(purchase.purchaseToken)
+            val known = rows.filter { it.purchaseTokenHash == hash }
+            !purchase.pending && purchase.productId in PlayProducts.ALL && purchase.obfuscatedAccountId.isNullOrBlank() &&
+                (known.isEmpty() || known.any { it.status !in Entitlement.ENDED })
         }
     }
 
@@ -198,11 +235,55 @@ class EntitlementManager(
                 val now = clock()
                 val after = purchases.queryPurchases()
                 if (after is PurchaseQuery.Success) {
-                    publish(EntitlementMerge.reconcilePlay(_state.value.entitlements, playRows(after.purchases, now), now))
+                    val rows = EntitlementMerge.reconcilePlay(_state.value.entitlements, playRows(after.purchases, now), now)
+                    noteBoughtWithoutAccount(after.purchases, rows)
+                    publish(rows)
                 }
             }
             ReleaseOutcome(found = found, released = released)
         }
+    }
+
+    /**
+     * Nobody is signed in on this phone now: a sign-out, a session the server ended, or a start with nobody signed in
+     * (2026-11-14, KNOWN_ISSUES PB-12). The account's own rows from the server leave the phone. Before this, a grant or a
+     * purchase recorded on someone's account kept unlocking Pro on a phone they had only signed in to. What stays:
+     * - Google Play's reading, which belongs to the Google account on this phone. A purchase the server covered keeps the
+     *   server's last confirmation (L-6 counts the account's own row as one), so the payer's Pro doesn't pause offline.
+     * - What the server said has ended (refunded, charged back, expired), so Google Play's late copy of that purchase
+     *   still can't bring it back (owner decision 2026-11-12, PB-6).
+     * The plan it leaves is recorded for the "your plan has ended" notice first: an account left, nothing ended.
+     */
+    suspend fun signedOut() {
+        loadCached()
+        lock.withLock {
+            settled.clear()
+            _verificationIssue.value = null
+            val before = _state.value.entitlements
+            val leaving = before.filter { it.verifiedBy == Verifier.SERVER && it.status !in Entitlement.ENDED }
+            if (leaving.isEmpty()) return@withLock
+            val now = clock()
+            carriedConfirmations = carriedConfirmations + leaving
+                .filter { it.status.grantsAccess && it.purchaseTokenHash != null }
+                .groupBy { it.purchaseTokenHash!! }
+                .mapValues { (_, rows) -> rows.maxOf { it.checkedAtMillis } }
+            var rows = before - leaving.toSet()
+            val play = purchases.queryPurchases()
+            if (play is PurchaseQuery.Success) {
+                rows = carryConfirmations(EntitlementMerge.reconcilePlay(rows, playRows(play.purchases, now), now))
+                noteBoughtWithoutAccount(play.purchases, rows)
+            }
+            planMemory?.let { memory -> runCatching { memory.remember(EntitlementState(rows).displayPlan(now)) } }
+            publish(rows)
+        }
+    }
+
+    /** [rows] with the confirmations a sign-out left ([carriedConfirmations]) on Google Play's readings; used once. */
+    private fun carryConfirmations(rows: List<Entitlement>): List<Entitlement> {
+        val carried = carriedConfirmations
+        if (carried.isEmpty()) return rows
+        carriedConfirmations = emptyMap()
+        return EntitlementMerge.keepConfirmations(rows, carried)
     }
 
     /**
@@ -221,7 +302,7 @@ class EntitlementManager(
         loadCached()
         lock.withLock {
             val now = clock()
-            var rows = EntitlementMerge.reconcilePlay(_state.value.entitlements, playRows(query.purchases, now), now)
+            var rows = carryConfirmations(EntitlementMerge.reconcilePlay(_state.value.entitlements, playRows(query.purchases, now), now))
             // The plan shows the moment Play confirms it; the server's copy follows (best effort, not waited for twice).
             publish(rows)
             if (confirm(query.purchases, rows)) {
@@ -229,6 +310,7 @@ class EntitlementManager(
                 publish(rows)
             }
             rows = checkWithLucento(query.purchases, rows, now)
+            noteBoughtWithoutAccount(query.purchases, rows)
             publish(rows)
         }
     }
