@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Lucento Facebook assets</title>
+<!--
+  Source for the Facebook community graphics. Each <section class="asset"> is one PNG.
+  Render with render.cjs (see ../README.md). Brand files in assets/ are copies of:
+  lucento-website/brand/logo (Rising Crest, unchanged), lucento-website/public/fonts/app (Plus Jakarta Sans, OFL),
+  app/src/main/res/drawable-nodpi (mascot, sunrise panorama).
+-->
+<style>
+  @font-face { font-family: "PJS"; src: url(assets/plus-jakarta-sans-medium.woff2) format("woff2"); font-weight: 500; }
+  @font-face { font-family: "PJS"; src: url(assets/plus-jakarta-sans-semibold.woff2) format("woff2"); font-weight: 600; }
+  @font-face { font-family: "PJS"; src: url(assets/plus-jakarta-sans-bold.woff2) format("woff2"); font-weight: 700; }
+
+  /* Horizon tokens (lucento-studio/system/horizon.tokens.json) */
+  :root {
+    --paper: #FFFDF5; --haze: #FCF5EA; --card: #FFFFFF; --ink: #17233F; --ink-muted: #56607A;
+    --line: #E7E3D6; --action: #154DFD; --tint: #F1F6FF; --sun: #FFC928; --dawn: #FF8A24;
+    --night: #0B1229; --night-card: #17233F; --ink-night: #F8FAFF; --muted-night: #B8C5DC;
+    --sky-blue: #61AEFD;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #888; font-family: "PJS", system-ui, sans-serif; color: var(--ink); padding: 40px;
+         display: flex; flex-direction: column; gap: 40px; align-items: flex-start; -webkit-font-smoothing: antialiased; }
+  .asset { position: relative; overflow: hidden; background: var(--paper); flex: none; }
+  .scenery { position: absolute; inset: 0; background: url(assets/scenery_sunrise_panorama.webp) no-repeat;
+             background-size: cover; }
+  .lockup { display: block; height: auto; }
+  .eyebrow { font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--action); }
+  h1, h2 { font-weight: 700; letter-spacing: -.025em; line-height: 1.04; color: var(--ink); }
+  .blue { color: var(--action); }
+  .mascot { position: absolute; display: block; filter: drop-shadow(0 18px 24px rgba(11, 18, 41, .28)); }
+  svg.i { width: 1em; height: 1em; fill: currentColor; flex: none; }
+
+  /* ---------- Group cover 1640 x 856 ---------- */
+  #group-cover { width: 1640px; height: 856px; }
+  #group-cover .scenery { background-position: 50% 100%; }
+  #group-cover .wash { position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,253,245,.75) 0%, rgba(255,253,245,.35) 45%, rgba(255,253,245,0) 66%); }
+  #group-cover .copy { position: absolute; left: 132px; top: 104px; width: 900px; }
+  #group-cover .lockup { width: 236px; margin-bottom: 44px; }
+  #group-cover .eyebrow { font-size: 24px; margin-bottom: 18px; }
+  #group-cover h1 { font-size: 92px; }
+  #group-cover .sub { margin-top: 26px; font-size: 32px; line-height: 1.4; font-weight: 500; color: var(--ink-muted); width: 760px; }
+  #group-cover .mascot { width: 380px; right: 70px; bottom: 150px; }
+
+  /* ---------- Page cover 1640 x 624 (centre 1100 px stays visible on phones) ---------- */
+  #page-cover { width: 1640px; height: 624px; }
+  #page-cover .scenery { background-size: 1640px auto; background-position: 50% 100%; }
+  #page-cover .wash { position: absolute; inset: 0;
+    background: radial-gradient(ellipse 760px 300px at 50% 34%, rgba(255,253,245,.85), rgba(255,253,245,0) 100%); }
+  #page-cover .copy { position: absolute; left: 0; right: 0; top: 62px; text-align: center; }
+  #page-cover .lockup { width: 220px; margin: 0 auto 34px; }
+  #page-cover h1 { font-size: 66px; line-height: 1.08; }
+
+  /* ---------- Profile picture 720 x 720 (shown as a circle) ---------- */
+  #profile { width: 720px; height: 720px; display: grid; place-items: center; }
+  #profile img { width: 380px; height: 380px; transform: translate(-6px, -4px); }
+
+  /* ---------- Feed posts 1080 x 1350 ---------- */
+  .post { width: 1080px; height: 1350px; }
+  .post .top { position: absolute; left: 84px; right: 84px; top: 76px; display: flex; align-items: center; justify-content: space-between; }
+  .post .top .lockup { width: 196px; }
+  .post .tag { font-size: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--action);
+               background: var(--tint); border-radius: 999px; padding: 12px 22px; }
+  .post .body { position: absolute; left: 84px; right: 84px; top: 210px; }
+  .post h2 { font-size: 80px; }
+  .post .lede { margin-top: 24px; font-size: 32px; line-height: 1.42; font-weight: 500; color: var(--ink-muted); }
+  .post .ground { position: absolute; left: 0; right: 0; bottom: 0; height: 300px;
+                  background: url(assets/scenery_sunrise_panorama.webp) no-repeat 50% 100% / 1080px auto; }
+  .post .ground::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 150px;
+                          background: linear-gradient(var(--paper), rgba(255,253,245,0)); }
+  .post .foot { position: absolute; left: 84px; bottom: 56px; font-size: 26px; font-weight: 600; color: #FFFFFF;
+                letter-spacing: .01em; text-shadow: 0 1px 8px rgba(11,18,41,.35); }
+  .post .foot b { font-weight: 700; }
+  .post .mascot { width: 300px; right: 64px; bottom: 70px; }
+
+  .rows { margin-top: 44px; display: flex; flex-direction: column; gap: 18px; }
+  .row { display: flex; gap: 26px; align-items: center; background: var(--card); border: 2px solid var(--line);
+         border-radius: 28px; padding: 24px 30px; }
+  .row .badge { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; font-size: 40px;
+                background: var(--tint); color: var(--action); flex: none; }
+  .row .badge.num { font-size: 34px; font-weight: 700; }
+  .row .badge.gold { background: #FFF4D1; color: #9A5B00; }
+  .row .t { font-size: 36px; font-weight: 700; line-height: 1.2; color: var(--ink); }
+  .row .d { margin-top: 4px; font-size: 28px; line-height: 1.4; font-weight: 500; color: var(--ink-muted); }
+
+  .checks { margin-top: 52px; display: flex; flex-direction: column; gap: 30px; }
+  .check { display: flex; gap: 20px; align-items: flex-start; font-size: 33px; line-height: 1.35; font-weight: 600; }
+  .check svg { font-size: 40px; color: var(--action); margin-top: 1px; }
+  .check small { display: block; font-size: 27px; font-weight: 500; color: var(--ink-muted); margin-top: 2px; }
+
+  .privacy { margin-top: 56px; background: var(--night-card); color: var(--ink-night); border-radius: 30px;
+             padding: 32px 36px; display: flex; gap: 24px; }
+  .privacy svg { font-size: 48px; color: var(--sun); margin-top: 2px; }
+  .privacy .t { font-size: 32px; font-weight: 700; line-height: 1.3; }
+  .privacy .d { margin-top: 8px; font-size: 27px; line-height: 1.45; font-weight: 500; color: var(--muted-night); }
+  .privacy .d b { color: var(--ink-night); font-weight: 600; }
+
+  .rules { margin-top: 44px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .rule { display: flex; gap: 24px; align-items: baseline; padding: 0 0 16px; border-bottom: 2px solid var(--line); }
+  .rule:last-child { border-bottom: 0; }
+  .rule .n { font-size: 30px; font-weight: 700; color: var(--action); width: 44px; flex: none; }
+  .rule .t { font-size: 34px; font-weight: 700; line-height: 1.25; }
+  .rule .d { margin-top: 4px; font-size: 27px; line-height: 1.4; font-weight: 500; color: var(--ink-muted); }
+
+  #post-prompt { background: var(--night); }
+  #post-prompt .tag { background: rgba(113,156,255,.16); color: #9EBDFF; }
+  #post-prompt h2 { color: var(--ink-night); font-size: 100px; line-height: 1.02; }
+  #post-prompt h2 .blue { color: var(--sun); }
+  #post-prompt .lede { color: var(--muted-night); }
+  #post-prompt .ground { height: 540px; background-image: url(assets/scenery_midnight_panorama.webp); }
+  #post-prompt .ground::before { height: 160px; background: linear-gradient(var(--night), rgba(11,18,41,0)); }
+  /* A cue, not a button: an image can't be tapped, so it mustn't look like one. */
+  #post-prompt .reply { margin-top: 48px; display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 700;
+                        color: var(--sun); }
+  #post-prompt .reply svg { font-size: 42px; }
+  .post .body { z-index: 1; }
+</style>
+</head>
+<body>
+
+<!-- Inline icons: Material Icons paths (Apache 2.0) -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-idea" viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 24 24"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></symbol>
+  <symbol id="i-comment" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></symbol>
+</svg>
+
+<!-- 1. Group cover -->
+<section class="asset" id="group-cover">
+  <div class="scenery"></div><div class="wash"></div>
+  <div class="copy">
+    <img class="lockup" src="assets/lucento-lockup-horizontal-light.svg" alt="Lucento" />
+    <p class="eyebrow">Lucento Community</p>
+    <h1>Help shape<br /><span class="blue">what we build next.</span></h1>
+    <p class="sub">Share ideas, ask questions and report problems, straight to the people building Lucento.</p>
+  </div>
+  <img class="mascot" src="assets/mascot_thriving_greeting_happy.webp" alt="" />
+</section>
+
+<!-- 2. Page cover -->
+<section class="asset" id="page-cover">
+  <div class="scenery"></div><div class="wash"></div>
+  <div class="copy">
+    <img class="lockup" src="assets/lucento-lockup-horizontal-light.svg" alt="Lucento" />
+    <h1>Everything about your money,<br /><span class="blue">in one clear view.</span></h1>
+  </div>
+</section>
+
+<!-- 3. Profile picture -->
+<section class="asset" id="profile">
+  <img src="assets/lucento-symbol-light.svg" alt="Lucento" />
+</section>
+
+<!-- 4. Welcome post -->
+<section class="asset post" id="post-welcome">
+  <div class="top"><img class="lockup" src="assets/lucento-lockup-horizontal-light.svg" alt="Lucento" /><span class="tag">Welcome</span></div>
+  <div class="body">
+    <h2>Welcome to the<br /><span class="blue">Lucento Community.</span></h2>
+    <p class="lede">The app gets better with the people who use it. Here’s what to bring.</p>
+    <div class="rows">
+      <div class="row"><div class="badge"><svg class="i"><use href="#i-idea"/></svg></div>
+        <div><p class="t">Suggest an idea</p><p class="d">What you need, and what gets in the way.</p></div></div>
+      <div class="row"><div class="badge"><svg class="i"><use href="#i-help"/></svg></div>
+        <div><p class="t">Ask a question</p><p class="d">How something works, or how best to set it up.</p></div></div>
+      <div class="row"><div class="badge"><svg class="i"><use href="#i-bug"/></svg></div>
+        <div><p class="t">Report a problem</p><p class="d">What happened, and how to make it happen again.</p></div></div>
+    </div>
+  </div>
+  <div class="ground"></div>
+  <p class="foot"><b>lucentoapp.com</b></p>
+  <img class="mascot" src="assets/mascot_thriving_greeting_happy.webp" alt="" style="width:270px" />
+</section>
+
+<!-- 5. Idea template -->
+<section class="asset post" id="post-idea">
+  <div class="top"><img class="lockup" src="assets/lucento-lockup-horizontal-light.svg" alt="Lucento" /><span class="tag">Ideas</span></div>
+  <div class="body">
+    <h2>Got an idea?<br /><span class="blue">Start with the problem.</span></h2>
+    <p class="lede">The best ideas tell us what you need, not only what to build. Answer these three in your post.</p>
+    <div class="rows">
+      <div class="row"><div class="badge num">1</div>
+        <div><p class="t">What were you trying to do?</p><p class="d">For example: “Split the rent with my housemate.”</p></div></div>
+      <div class="row"><div class="badge num">2</div>
+        <div><p class="t">What got in the way?</p><p class="d">The step that felt slow, confusing or missing.</p></div></div>
+      <div class="row"><div class="badge num gold">3</div>
+        <div><p class="t">What would help?</p><p class="d">Your idea. Rough is fine: we’ll shape it together.</p></div></div>
+    </div>
+  </div>
+  <div class="ground"></div>
+  <p class="foot">One idea per post · <b>Like the ones you want too</b></p>
+  <img class="mascot" src="assets/mascot_thriving_thinking.webp" alt="" style="width:250px; right:56px" />
+</section>
+
+<!-- 6. Problem report template -->
+<section class="asset post" id="post-problem">
+  <div class="top"><img class="lockup" src="assets/lucento-lockup-horizontal-light.svg" alt="Lucento" /><span class="tag">Problems</span></div>
+  <div class="body" style="top:196px">
+    <h2>Something not right?<br /><span class="blue">Help us repeat it.</span></h2>
+    <div class="checks">
+      <p class="check"><svg class="i"><use href="#i-check"/></svg><span>Your phone and Android version</span></p>
+      <p class="check"><svg class="i"><use href="#i-check"/></svg><span>Your Lucento version<small>It’s at the bottom of the profile menu.</small></span></p>
+      <p class="check"><svg class="i"><use href="#i-check"/></svg><span>The steps you took, in order</span></p>
+      <p class="check"><svg class="i"><use href="#i-check"/></svg><span>What you expected, and what happened</span></p>
+    </div>
+    <div class="privacy"><svg class="i"><use href="#i-eye-off"/></svg>
+      <div><p class="t">Screenshot? Hide your amounts first.</p>
+        <p class="d">Tap <b>Hide</b> on Home. Never post account numbers, passwords, sign-in codes or backup files.
+          Anything private: <b>lucentoapp@gmail.com</b></p></div></div>
+  </div>
+  <div class="ground" style="height:220px"></div>
+  <p class="foot" style="bottom:44px"><b>lucentoapp.com</b></p>
+</section>
+
+<!-- 7. House rules -->
+<section class="asset post" id="post-rules">
+  <div class="top"><img class="lockup" src="assets/lucento-lockup-horizontal-light.svg" alt="Lucento" /><span class="tag">House rules</span></div>
+  <div class="body" style="top:196px">
+    <h2>Kind, useful,<br /><span class="blue">and private.</span></h2>
+    <div class="rules">
+      <div class="rule"><span class="n">1</span><div><p class="t">Be kind</p><p class="d">Critique ideas, never people.</p></div></div>
+      <div class="rule"><span class="n">2</span><div><p class="t">Keep your money private</p><p class="d">Hide amounts in screenshots. No account numbers, passwords or codes.</p></div></div>
+      <div class="rule"><span class="n">3</span><div><p class="t">Search before you post</p><p class="d">Add your voice to an existing thread.</p></div></div>
+      <div class="rule"><span class="n">4</span><div><p class="t">No selling or spam</p><p class="d">No ads, referral links or paid “advice”.</p></div></div>
+      <div class="rule"><span class="n">5</span><div><p class="t">Experiences, not advice</p><p class="d">Members share what works for them. It isn’t financial advice.</p></div></div>
+    </div>
+  </div>
+  <div class="ground" style="height:200px"></div>
+  <p class="foot" style="bottom:40px"><b>Lucento Community</b></p>
+</section>
+
+<!-- 8. Weekly question (first prompt) -->
+<section class="asset post" id="post-prompt">
+  <div class="top"><img class="lockup" src="assets/lucento-lockup-horizontal-dark.svg" alt="Lucento" /><span class="tag">This week</span></div>
+  <div class="body" style="top:250px">
+    <h2>What still takes<br />too many taps?<br /><span class="blue">Tell us.</span></h2>
+    <p class="lede">One thing in Lucento you wish were quicker or clearer. We read every reply.</p>
+    <p class="reply"><svg class="i"><use href="#i-comment"/></svg>Reply in the comments</p>
+  </div>
+  <div class="ground"></div>
+  <p class="foot"><b>Lucento Community</b></p>
+  <img class="mascot" src="assets/mascot_thriving_pointing.webp" alt="" style="width:270px" />
+</section>
+
+</body>
+</html>
