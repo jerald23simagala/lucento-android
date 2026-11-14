@@ -74,11 +74,18 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
 
 ## Refunding an order
 
-In Play Console › Order management, open the order › **Refund**, and turn on **Remove entitlement** unless you mean
-the buyer to keep Pro. Without it, Google refunds the money but leaves the purchase with the buyer. Google doesn't list
-such a refund among voided purchases, so neither the daily check nor the instant notices see it, and Lucento keeps
-showing Pro. This was seen on 2026-11-12 with the owner's test Lifetime, and Google offers no way to remove access
-afterwards (KNOWN_ISSUES PB-4). Give **Manage orders and subscriptions** only to people you trust.
+In Play Console › Order management, open the order › **Refund**, and tick **Remove entitlement**. It's off by default.
+Without it, Google refunds the money but leaves the purchase with the buyer, keeps the refund out of its voided
+purchases, and offers no way to remove the purchase afterwards (KNOWN_ISSUES PB-4).
+- **Lifetime:** Lucento ends a refunded Lifetime either way, because Google's server reports the order cancelled
+  (MONETIZATION §5.3 L-6). Without Remove entitlement, Google Play keeps the purchase in the buyer's account and refuses a
+  new one with "You already own this item". That happened with the owner's test Lifetime, refunded 2026-11-12. Lucento
+  now releases that purchase when the buyer taps Buy Lifetime (§5.3 L-7, KNOWN_ISSUES PB-8). Builds without that change
+  leave the buyer unable to buy Lifetime again on that Google account.
+- **Subscription:** Without Remove entitlement the subscription carries on, so Lucento keeps Pro while Google reports
+  it active.
+
+Give **Manage orders and subscriptions** only to people you trust.
 
 ## Going live (the gated release)
 

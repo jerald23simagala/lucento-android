@@ -10,6 +10,7 @@ import com.android.billingclient.api.BillingClient.ProductType
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.ConsumeParams
 import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
@@ -45,6 +46,8 @@ import kotlin.coroutines.resume
  * - Pending payments (cash at a store) are enabled for one-time products and come through as `pending`.
  * - Acknowledging is the caller's job ([acknowledge]), after the server has seen the purchase when it can
  *   ([com.lucento.app.data.entitlement.EntitlementManager]).
+ * - Consuming ([consume]) only ever releases a Lifetime Lucento has ended, so it can be bought again
+ *   ([com.lucento.app.domain.entitlement.LifetimeRelease]).
  *
  * The callbacks are wrapped in coroutines here rather than through billing-ktx, so the library's Kotlin metadata can't
  * pin the project's compiler. Not a JVM test (it is the library); the decisions it relies on are:
@@ -195,6 +198,21 @@ class PlayPurchaseSource(
         }
     }
 
+    override suspend fun consume(purchaseToken: String): Boolean {
+        if (!connected()) return false
+        val params = ConsumeParams.newBuilder().setPurchaseToken(purchaseToken).build()
+        // Bounded: the caller holds the entitlement manager's lock, so a callback that never comes mustn't freeze plans.
+        val released = withTimeoutOrNull(CONSUME_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                client.consumeAsync(params) { result, _ ->
+                    if (result.responseCode != BillingResponseCode.OK) Log.w(TAG, "Play didn't release a purchase (code ${result.responseCode})")
+                    cont.resume(result.responseCode == BillingResponseCode.OK)
+                }
+            }
+        }
+        return released == true
+    }
+
     override suspend fun launchPurchase(activity: Activity, price: ProductPrice, obfuscatedAccountId: String?): BillingProblem? {
         if (!connected()) return BillingProblem.UNAVAILABLE
         val product = details[price.productId]
@@ -242,5 +260,6 @@ class PlayPurchaseSource(
     private companion object {
         const val TAG = "LucentoBilling"
         const val CONNECT_TIMEOUT_MS = 10_000L
+        const val CONSUME_TIMEOUT_MS = 15_000L
     }
 }

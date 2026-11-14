@@ -199,6 +199,10 @@ recurring-schedule sync, syncing preferences.
   - The purchase check needs no account: signed out, cleared or reinstalled, the phone asks Lucento's site about each
     Google Play purchase (`/api/billing/check`). Play's word alone carries a purchase for 3 days from buying it, then
     for 90 days after each confirmation (MONETIZATION §5.3 L-6). Mandatory sign-in was declined in its place.
+- 2026-11-13 (`fix/refunded-lifetime-rebuy`): Pro Lifetime can be bought again after a refund. A Play Console refund
+  without Remove entitlement leaves the purchase in Google Play, which then refused a new one ("You already own this
+  item"). Buy Lifetime now first releases a Lifetime that Lucento's server reported refunded or charged back
+  (MONETIZATION §5.3 L-7, KNOWN_ISSUES PB-8).
 - 2026-11-12 (`fix/pro-tour-real-taps`): the Pro welcome's buttons work on real phones. Its touch blocker wrapped the
   cards, so a finger's small drift cancelled every press (KNOWN_ISSUES PW-1). Finger-tap tests now cover the tour and
   the curtain in CI. Held: the owner chose an unboxing reveal to replace the tour, and both ship in one release.
