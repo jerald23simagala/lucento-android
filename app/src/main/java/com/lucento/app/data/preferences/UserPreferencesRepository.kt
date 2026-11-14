@@ -101,6 +101,13 @@ data class UserPreferences(
      */
     val fxRatesOnline: Boolean = true,
     /**
+     * Online voice (owner, 2026-11-13): the composer's microphone may let the phone's speech service (Google's on most
+     * phones) go online, so the recording may reach Google. Off by default: Lucento asks it to stay offline. Turned on
+     * only after the consent prompt (composer or Settings › Privacy). A device choice like crash reports: kept across
+     * sign-outs, never in backups.
+     */
+    val onlineVoice: Boolean = false,
+    /**
      * The one-time Home note that data stays on this phone and uninstalling erases it. New setup marks this seen.
      * Installs that finished onboarding before the note existed start unseen, so they are told once.
      */
@@ -204,6 +211,7 @@ class UserPreferencesRepository(
         val guideStep = stringPreferencesKey("guide_step")
         val smartReading = booleanPreferencesKey("smart_reading")
         val fxRatesOnline = booleanPreferencesKey("fx_rates_online")
+        val onlineVoice = booleanPreferencesKey("online_voice")
         /**
          * v2 (owner, 2026-11-04): AI answers now send recent transactions, goals and projections. Agreeing to v1
          * ("ask_lucento_ai", summaries only) doesn't cover that, so v1 is ignored and removed: the user is asked again.
@@ -265,6 +273,7 @@ class UserPreferencesRepository(
                 crashReports = p[Keys.crashReports] ?: false,
                 usageCounts = p[Keys.usageCounts] ?: false,
                 fxRatesOnline = p[Keys.fxRatesOnline] ?: true,
+                onlineVoice = p[Keys.onlineVoice] ?: false,
                 localDataNoticeSeen = p[Keys.localDataNoticeSeen] ?: false,
                 setupGeneration = p[Keys.setupGeneration] ?: 0,
                 appLock = p[Keys.appLock] ?: false,
@@ -363,6 +372,11 @@ class UserPreferencesRepository(
     /** Multicurrency: "Exchange rates online" (see [UserPreferences.fxRatesOnline]). A device choice, kept across sign-outs. */
     suspend fun setFxRatesOnline(enabled: Boolean) {
         context.dataStore.edit { it[Keys.fxRatesOnline] = enabled }
+    }
+
+    /** "Online voice" (see [UserPreferences.onlineVoice]). Called only after the person agreed to the consent text. */
+    suspend fun setOnlineVoice(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.onlineVoice] = enabled }
     }
 
     suspend fun setAskLucentoAi(enabled: Boolean) {

@@ -75,6 +75,10 @@ a better user-facing structure while preserving sound engineering boundaries.
     (docs/ASK.md). Anonymous usage counts (event names and timings with a random install id, kept 90 days). Crash
     reports via Firebase Crashlytics, stacks without amounts or notes (docs/QUALITY.md); production releases include
     it (owner decision 2026-11-08; CI writes `app/google-services.json` from the `GOOGLE_SERVICES_JSON` secret).
+    Online voice (owner decision 2026-11-13; docs/CAPTURE.md): the mic asks the phone's speech service for offline
+    only; after a failed try, and only with consent, it may go online, so the recording may reach Google. Lucento gets
+    only the text. Lucento holds `RECORD_AUDIO` (asked on first use) only for the composer's own listening sheet; it
+    keeps no recording, and without the permission the speech service's own window is used.
   - **On by default:** exchange rates (docs/MULTICURRENCY.md, owner decision 2026-11-06): fetched only when something
     is recorded in another currency, sending two currency codes and a date (never an amount); off in Settings › Money.
     In release builds, Google Play's billing component sends Google its own diagnostics. When the person buys Pro,

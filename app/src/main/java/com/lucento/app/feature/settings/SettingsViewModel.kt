@@ -536,6 +536,11 @@ class SettingsViewModel(
     }
 
     /** Switching a module never touches its data; it only changes what is shown. */
+    /** Online voice; the screen shows the consent before passing true. */
+    fun setOnlineVoice(enabled: Boolean) {
+        viewModelScope.launch { preferences.setOnlineVoice(enabled) }
+    }
+
     /** Smarter reading; turned on only from the consent dialog in Settings. */
     fun setSmartReading(enabled: Boolean) {
         viewModelScope.launch { preferences.setSmartReading(enabled) }

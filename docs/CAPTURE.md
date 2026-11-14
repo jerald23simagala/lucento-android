@@ -109,9 +109,36 @@ Definitions: docs/CALCULATIONS.md "Statement scans" and "Receipt amounts". Tests
 
 ## Speech and camera
 
-Speech uses the system recogniser through `RecognizerIntent` (offline preferred). Lucento itself holds no microphone
-or camera permission: the recogniser and camera apps ask for their own. Cancel, denial and "no recogniser" all leave
-a one-line note and the keyboard. Photos are read with ML Kit's bundled on-device model and deleted afterwards. Speech
+Speech asks for English in the phone's own English region (or `en-US`; `SpeechRequest.languageTag`). Lucento holds no
+camera permission (the camera is another app). Cancel, denial and "no recogniser" all leave a one-line note and the
+keyboard.
+
+**Lucento listens itself (owner 2026-11-13).** Google's voice window stopped listening before people had started
+speaking, and the hints that ask a recogniser to wait longer (`EXTRA_SPEECH_INPUT_*_SILENCE_LENGTH_MILLIS`) are ignored
+by many speech services. So the composer runs its own session on the phone's speech service (`SpeechRecognizer`):
+
+| Piece | What it does |
+|---|---|
+| `VoiceSession` (pure, `VoiceSessionTest`) | Waits up to 10 s for the first words, listening again each time the service gives up early (some do within a fraction of a second). After words, listens again through pauses; 3.5 s of quiet ends it. Done ends it at once (mid-sentence, the service gets 2.5 s to hand back its last words). One minute and 30 restarts at most. Stretches are joined with ", " so the interpreter reads them as items. An error after words never loses them. |
+| `VoiceCapture` | Drives `SpeechRecognizer` on the main thread: partial results shown live, a fresh recogniser per stretch (late callbacks from an old one are ignored), the permission checked before every stretch, audio buffers ignored. |
+| `ListeningSheet` | "Listening…", the microphone's halo moving with the voice (still with reduced motion), the words so far, whether it is offline or online, Done and Cancel. Dismissing is Cancel. |
+
+`RECORD_AUDIO` is asked the first time someone taps the microphone (also from the Speak widget) and is in the CI
+release allow-list. Refused, or a phone with no `RecognitionService` (`SpeechRecognizer.isRecognitionAvailable`, which
+needs the `<queries>` entry), the speech service's own window (`RecognizerIntent`) is used as before. Leaving the app
+mid-sentence stops listening and puts what was heard into the message field, unsent. Not yet covered by a device test:
+check on real phones that restarts don't clip first words or beep on every stretch.
+
+**Online voice (opt-in, owner 2026-11-13).** By default both paths set `EXTRA_PREFER_OFFLINE`, which means offline
+*only*: a phone without a matching offline speech pack can't listen (Google's window says "Voice search isn't
+available"; found on a real phone 2026-11-13, and many phones no longer offer the download). When an offline attempt
+fails, the note offers **Try online voice**; agreeing to `SpeechRequest.CONSENT_TEXT` saves
+`UserPreferences.onlineVoice` and listens again without the offline flag, so the speech service (Google's on most
+phones) may send the recording to Google. Lucento only receives the text. Settings › Privacy › Online voice shows the
+same consent and turns it off. A device choice like crash reports: kept across sign-outs, never in backups. Both are in
+the Privacy Policy ("Voice input").
+
+Photos are read with ML Kit's bundled on-device model and deleted afterwards. Speech
 is auto-sent; the user can fix the wording with "Edit message" or fix rows directly.
 
 ## Smarter reading (Gemini) — opt-in

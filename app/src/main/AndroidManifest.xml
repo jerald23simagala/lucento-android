@@ -16,14 +16,23 @@
          after a reboot) plus FOREGROUND_SERVICE, which sync never uses — so that one is removed. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
 
-    <!-- The camera and speech recogniser are other apps the user hands off to; Lucento itself needs no
-         CAMERA or RECORD_AUDIO permission. Declared so Android 11+ lets Lucento see whether they exist. -->
+    <!-- The composer's own listening (owner, 2026-11-13: the speech service's window stopped before people spoke).
+         Asked for the first time someone taps the microphone, used only while the listening sheet is open; the
+         phone's speech service turns the voice into text and Lucento keeps no recording. Refused, the speech
+         service's own window is used instead (docs/CAPTURE.md). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- The camera app, the speech service's window and the speech service itself, declared so Android 11+ lets
+         Lucento see whether they exist. Lucento needs no CAMERA permission: the camera is another app. -->
     <queries>
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
         <intent>
             <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
 

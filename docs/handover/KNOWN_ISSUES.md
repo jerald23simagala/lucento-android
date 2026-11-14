@@ -17,13 +17,21 @@ resolved items are kept at the bottom for traceability.
 
 ## Sign out (2026-11-12, `feature/sign-out`)
 
-- **Not run with a real account** (Code-only + unit tests). The dialogs, the profile row and the Account page ran on the
+- **Not run with a real account** (Code-only + unit tests; the owner chose to merge on CI, 2026-11-14). The dialogs, the profile row and the Account page ran on the
   API 28 emulator at 100 % and 200 %; Keep them here, Remove and sign out, Save a backup and the welcome note have JVM
   tests for their logic but no device pass with a signed-in account on lucento-test yet.
 - **The welcome note is lost if the app dies between the wipe and onboarding reading it** (Inferred). It is read once
   when onboarding starts; harmless, it only explains what happened.
 - **After Save a backup the person signs out again by hand** (by design): the dialog closes, the file is saved, and the
   result shows under the account.
+
+## Voice input (2026-11-13, `fix/voice-online-fallback`, PR #60)
+
+| ID | Issue | Evidence | Next step |
+|---|---|---|---|
+| VI-1 | Lucento's own listening (`VoiceSession`/`VoiceCapture`) restarts the speech service after each stretch. On some phones a restart may beep, or clip a first word spoken during the ~0.5 s gap | Inferred (Android docs, developer reports). **Owner's phone, 2026-11-13: the listening test build (0.5.5-debug) worked, and no beep or cut-off word was reported** | Watch for reports from other phones; if one beeps or clips, restart only before the first words and rely on the silence hints after them |
+| VI-2 | Which error a speech service reports for "no offline language pack" differs by phone. Offline, any language, network or unknown error is treated as "can't listen offline" and offers online voice | Code (`VoiceSession.failureFor`); on the owner's phone, which has no offline English pack, voice worked with the test build (2026-11-13) | Note the error on other real phones (logcat) and narrow the mapping if it misfires |
+| VI-3 | The website's `/privacy` doesn't have the new "Voice input" section yet | Verified (not exported) | **Re-exported for 0.5.8** (Privacy Policy 2026-11-14) in lucento-website #29, together with an "Online voice" row in the homepage's short privacy list |
 
 ## Home-screen widgets (2026-11-12, `feature/home-widgets`)
 
