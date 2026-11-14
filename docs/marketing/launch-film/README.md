@@ -21,8 +21,9 @@ source.
 ```bash
 cd lucento-studio/video
 npm ci                                   # first time only
-npx remotion studio src/index.ts         # opens Remotion Studio; pick LaunchFilm
-npx remotion render src/index.ts LaunchFilm out/lucento-launch-film.mp4 --codec=h264 --crf=16 --audio-bitrate=320k
+npm run studio                           # opens Remotion Studio; pick LaunchFilm
+npm run render:film                      # → out/lucento-launch-film.mp4 (also render:film30, render:film15)
+npm run score                            # regenerate the music (needs Python with numpy and scipy)
 ```
 
 Rendering takes about 10 minutes on this PC.
