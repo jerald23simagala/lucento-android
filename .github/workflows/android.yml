@@ -64,10 +64,10 @@ jobs:
         run: (yes || true) | "$SDKMANAGER" --licenses > /dev/null
 
       - name: Install required SDK packages
-        # Must match compileSdk (35) in app/build.gradle.kts. Build-tools 35.0.0 satisfies AGP 8.7.3.
+        # Must match compileSdk (36) in app/build.gradle.kts. AGP 9.5 downloads any newer build-tools it wants itself.
         run: |
-          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
-          "$SDKMANAGER" --list_installed | grep -E "platforms;android-35|build-tools;35.0.0|platform-tools"
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          "$SDKMANAGER" --list_installed | grep -E "platforms;android-36|build-tools;36.0.0|platform-tools"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4

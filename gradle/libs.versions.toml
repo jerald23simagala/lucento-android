@@ -4,13 +4,13 @@
 agp = "9.5.1"
 kotlin = "2.4.21"
 ksp = "2.3.13"
-coreKtx = "1.19.1"
+coreKtx = "1.15.0"
 activityCompose = "1.9.3"
 # 2025.02.00 = Compose 1.7.8 (Material 3 stays 1.3.1): Glance 1.2.0 needs compose-runtime 1.7.8, so the BOM moves the whole
 # Compose set to that patch instead of mixing runtime 1.7.8 with UI 1.7.6.
-composeBom = "2026.09.00"
+composeBom = "2025.02.00"
 lifecycle = "2.8.7"
-navigation = "2.10.2"
+navigation = "2.8.5"
 room = "2.8.5"
 datastore = "1.3.0"
 splashscreen = "1.2.0"
@@ -29,9 +29,11 @@ mlkitTextRecognition = "16.0.1"
 # Optional cloud sync (see docs/SYNC.md) — the only reason this app ever talks to the network, and only once
 # the user explicitly opts in. supabase-kt needs one Ktor HTTP engine and kotlinx-datetime; WorkManager runs
 # the background push/pull; Credential Manager + the Google ID library drive Google Sign-In.
-supabase = "3.9.0"
+supabase = "3.1.4"
 ktor = "3.0.3"
-kotlinxDatetime = "0.8.0"
+# Held at 0.6.1: 0.7+ turns kotlinx.datetime.Instant into kotlin.time.Instant, and Supabase 3.1.4 is built against the
+# old class (SessionStoreTest: NoSuchMethodError on UserSession). Moves with Supabase 3.9, which needs compileSdk 37.
+kotlinxDatetime = "0.6.1"
 workManager = "2.12.0"
 credentials = "1.3.0"
 googleid = "1.1.1"
@@ -105,7 +107,6 @@ firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashly
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
