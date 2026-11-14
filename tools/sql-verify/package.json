@@ -9,7 +9,7 @@
     "concurrency": "node concurrency.mjs"
   },
   "dependencies": {
-    "@electric-sql/pglite": "0.3.16",
+    "@electric-sql/pglite": "0.5.15",
     "pg": "8.23.1"
   }
 }
