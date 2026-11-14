@@ -23,19 +23,21 @@ Philippine English is welcome: the film is peso-first.
 | 0:43.5 – 0:52.5 | 1305–1575 | Insights, then Ask Lucento | "See where your money goes. Ask a question in plain words, and get an answer worked out from your own records." |
 | 0:54.0 – 1:03.0 | 1620–1890 | Lucento Shared | "Share it with your partner: each on your own phone, both looking at the same numbers. Better decisions start together." |
 | 1:04.5 – 1:11.0 | 1935–2130 | Themes, Hide amounts | "Make it yours, with themes, hidden amounts, and an app that works even offline." |
-| 1:13.0 – 1:16.8 | 2190–2305 | The sun rises | *(silence: let the music build)* |
-| 1:18.0 – 1:21.0 | 2340–2430 | Logo and headline | "Lucento. See your money clearly." |
+| 1:12.5 – 1:21.5 | 2175–2445 | And there's more | "And there's so much more: exchange rates, bills on schedule, loans paid down, goals in sight — offline, or in the cloud." |
+| 1:23.7 – 1:27.5 | 2510–2625 | The sun rises | *(silence: let the music build)* |
+| 1:28.7 – 1:31.7 | 2660–2750 | Logo and headline | "Lucento. See your money clearly." |
 
 ## Why each line is safe to say
 
 These are checked against the code (see `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md`):
 
-- **"see every bill coming"** describes the Scheduled page and the in-app bell. It doesn't promise reminders or notifications, which don't exist.
+- **"see every bill coming"** and **"bills on schedule"** describe the Scheduled page and the in-app bell. They don't promise notifications, which don't exist.
+- **"in the cloud"** is cloud sync, which is Pro (covered by the end card).
 - **"worked out from your own records"** is how on-phone Ask Lucento answers work ("Calculated on this phone"). The line doesn't claim AI.
 - **"works even offline"** is true: every core feature works offline.
 - **Sharing and other currencies** are Pro. The end card says "Some features require Lucento Pro."
 
 ## Shorter versions
 
-- **30-second cut:** use the lines at 0:06, 0:30.4 (from "add your whole day"), 0:54 (first sentence only) and 1:18.
+- **30-second cut:** use the lines at 0:06, 0:30.4 (from "add your whole day"), 0:54 (first sentence only) and the closing line.
 - **15-second cut:** a single line over the logo: "Lucento. See your money clearly."

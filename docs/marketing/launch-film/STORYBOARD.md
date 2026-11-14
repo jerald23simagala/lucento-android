@@ -1,6 +1,7 @@
 # Lucento launch film: final storyboard
 
-**Length:** 82.7 s (2,480 frames). **Format:** 1920 × 1080, 16:9, 30 fps, H.264 MP4 with AAC audio.
+**Length:** 93.3 s (2,800 frames). **Format:** 1920 × 1080, 16:9, 30 fps, H.264 MP4 with AAC audio, plus a
+vertical 1080 × 1920 version with the same timing (portrait layouts, `LaunchFilmVertical`).
 **Source:** `lucento-studio/video/src/launch-film/` (Remotion 4.0.539). Composition `LaunchFilm`.
 
 ## The idea: "First Light"
@@ -25,7 +26,7 @@ The emotional arc follows the light:
 ## Grid
 
 - The score is 90 BPM. One beat is 20 frames, one bar is 80 frames, and every scene starts on a bar line.
-- The music lands the crest on bar 1 (frame 80) and the final logo on bar 29 (frame 2320).
+- The music lands the crest on bar 1 (frame 80) and the final logo on bar 33 (frame 2640).
 - `src/launch-film/timeline.ts` and `tools/compose_score.py` hold the same numbers. Change both together.
 
 ## Scenes
@@ -115,10 +116,27 @@ camera work on those captures, and nothing inside a screen was drawn.
 - **Text:** "Your money. / Your way." · "Five themes" → chips "Hide amounts", "Works offline", "App lock", "No bank login".
 - **Sound:** the peak of the track: four-on-the-floor kick and sixteenth-note bells; a riser into the finale.
 
-### 09 · Final reveal (1:12.0–1:22.7, bars 27–30)
+### 09 · And there's more (1:12.0–1:22.7, bars 27–30)
+- **Shot:** words only, over the lingering dawn (the sky's clock slows here so white type stays crisp). Each feature
+  rises out of a mask, holds for two beats, then lifts away as the next arrives.
+- **Text:** eyebrow "And there's more", then:
+
+| Feature | Line |
+|---|---|
+| FX rates | Today's exchange rate, filled in for you. |
+| Scheduled transactions | Never miss a bill. *(owner's wording; reminders are in the app: the bell and Upcoming)* |
+| Amortization tracking | Watch every loan get paid down. |
+| Goals tracking | See when you'll reach every goal. |
+| Transfers | Move money between accounts, never counted twice. |
+| Offline | Every core feature works without a connection. |
+| Cloud | Sync and restore across your phones. *(Pro)* |
+
+- **Sound:** the calm progression returns (D – Bm – G – A) with eighth-note bells and a half-time kick; a swell leads in.
+
+### 10 · Final reveal (1:22.7–1:33.3, bars 31–34)
 - **Shot:**
   - The sun rises behind the Sunrise ridges as the sky turns ivory.
-  - On the last downbeat (1:17.3) it shrinks into the Rising Crest's dot while the three bars rise beneath it.
+  - On the last downbeat (1:28.0) it shrinks into the Rising Crest's dot while the three bars rise beneath it.
   - The navy wordmark draws in. The mark settles flat, in its own colours, with nothing on it.
 - **Text:**
   - "See your money clearly."
@@ -129,14 +147,16 @@ camera work on those captures, and nothing inside a screen was drawn.
 
 ## Pro features shown
 
-Multicurrency wallets (S03), Lucento Shared (S07) and three of the five themes (S08) are Lucento Pro. The end card says
+Multicurrency wallets (S03), Lucento Shared (S07), three of the five themes (S08) and cloud sync (S09) are Lucento
+Pro. The end card says
 so, as the Play listing does. No prices appear, because they come from Google Play and aren't confirmed.
 
 ## Claims deliberately left out
 
 These are true limits of 0.5.8 (see `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §5):
 
-- notifications or "never miss a bill"
+- notifications or alerts ("Never miss a bill" is used for Scheduled at the owner's call, 2026-11-14; reminders
+  are in the app, so no notification imagery)
 - AI for everyday entry
 - bank connections
 - a customisable dashboard

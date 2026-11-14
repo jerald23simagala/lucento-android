@@ -216,7 +216,7 @@ These are commercially valuable and the brief didn't list them:
 | "Free AI entry" | Smarter reading is Pro | — |
 | "Automatic categorisation / auto-logging / bills paid automatically" | Every row is reviewed and saved by you; schedules never post themselves | "Lucento fills in the details; you confirm." |
 | Bank sync, bank connections, SMS/CSV import | None exist; bank faces are display only | "No bank login." |
-| Push notifications, bill alerts, "never miss a bill" | No notification permission or code; reminders are the in-app bell and Upcoming card | "See every bill coming." |
+| Push notifications, bill alerts, reminder pop-ups | No notification permission or code; reminders are the in-app bell and Upcoming card | "See every bill coming." Owner decision (2026-11-14): "Never miss a bill" may describe Scheduled transactions (also the app's own onboarding wording), without notification imagery |
 | "Nothing ever leaves your phone" | Exchange rates are on by default (two codes and a date); Google Play billing diagnostics; purchase checks; opt-ins | "Works offline." "No bank login." Scope privacy lines to "your entries" and link the Privacy Policy |
 | "Your voice never leaves the phone" | Online voice (opt-in) may send audio to Google | "Lucento never records or keeps your voice." |
 | Any language | Reading is English; scanning reads Latin-alphabet text | — |
@@ -238,7 +238,8 @@ These are commercially valuable and the brief didn't list them:
    which is no longer true with multicurrency.
 3. The Ask Lucento hero types "What's my top 5 spending categories?"; the chip reads "What are my top 5…".
 4. The AI counter says "N left today" even though Free's allowance is per month.
-5. Onboarding's "Never miss a bill" overstates in-app reminders (no notifications).
+5. Onboarding's "Never miss a bill" leans on in-app reminders only (no notifications). The owner accepts this wording
+   (2026-11-14) and the film uses it for Scheduled transactions.
 6. Onboarding's "Sync with an account (Recommended)" and the summary's "Synced with your account" don't say sync is
    Pro; on Free, sync stays off after setup.
 7. The plan page says debts are free "with no limits", but Free tracks 2 cards or loans.

@@ -42,6 +42,7 @@ is drawn. Status and plan come from `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md`.
 | Safe to spend | Dashboard pan (S02) |
 | Offline-first, App lock, no bank login | Chips in S08 |
 | Awards, the payments bell, wallet adjustments | Captured (`awards`, `bell`), not used in the master; future videos |
+| FX rates, Scheduled transactions ("Never miss a bill"), Amortization tracking, Goals tracking, Transfers, Offline, Cloud | Scene 09 "And there's more": named in words, one line each (owner's list, 2026-11-14) |
 
 ## Tier 4: future marketing content
 

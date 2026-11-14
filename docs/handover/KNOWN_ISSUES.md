@@ -23,7 +23,8 @@ All **Code-only** (read in source on `main` `0679ccf`); details in `docs/marketi
 - Home's info tooltip still says "Nothing is converted between currencies." (`feature/home/HomeScreen.kt:1409`).
 - The Ask Lucento hero types "What's my top 5 spending categories?"; the chip reads "What are my top 5…".
 - The AI counter says "N left today" although Free's allowance is per month.
-- Onboarding's "Never miss a bill" overstates in-app reminders (there are no notifications).
+- Onboarding's "Never miss a bill" relies on in-app reminders only (no notifications). The owner accepts the wording
+  (2026-11-14); the launch film uses it for Scheduled transactions.
 - Onboarding's "Sync with an account (Recommended)" and "Synced with your account" don't say sync is Pro.
 - The plan page says debts are free "with no limits"; Free tracks 2 cards or loans.
 - The editor allows "No category"; the composer requires one.

@@ -79,7 +79,7 @@ The random seed is fixed, so it regenerates exactly.
 
 | File | What | Length |
 |---|---|---|
-| `public/launch-film/audio/score.wav` | 90 BPM, D major ambient electronic: detuned-saw pads, FM bell arpeggio, sine sub bass, soft kick, hats and claps arriving scene by scene, risers into the two logo moments, a shared convolution reverb. Builds from about −21 dB RMS to −14 dB at the peak, peak −2.4 dBFS | 82.7 s |
+| `public/launch-film/audio/score.wav` (and `score-30.wav`, `score-15.wav` for the cuts) | 90 BPM, D major ambient electronic: detuned-saw pads, FM bell arpeggio, sine sub bass, soft kick, hats and claps arriving scene by scene, risers into the two logo moments, a shared convolution reverb. Builds from about −21 dB RMS to −14 dB at the peak, peak −2.4 dBFS | 93.3 s |
 | `sfx/tap.wav`, `tick.wav`, `pop.wav`, `mic.wav`, `confirm.wav`, `whoosh.wav`, `swell.wav`, `shimmer.wav` | UI and transition effects, placed on screen events in `src/launch-film/audio/Soundtrack.tsx` | 1–4 s |
 
 To swap in a licensed track, replace `score.wav` (82.7 s, or trim it in `Soundtrack.tsx`). The edit points sit on a
@@ -96,5 +96,5 @@ To swap in a licensed track, replace `score.wav` (82.7 s, or trim it in `Soundtr
 
 | File | Where |
 |---|---|
-| Master film | `lucento-studio/video/out/lucento-launch-film.mp4` (git-ignored; copied to `Downloads/`) |
+| Films | `lucento-studio/video/out/` (git-ignored), copied to `Downloads/lucento-launch-film/`: `lucento-launch-film.mp4` (93.3 s), `-30s`, `-15s`, and each with `-vertical` (1080 × 1920) |
 | Review frames | `lucento-studio/video/out/` (git-ignored) |
