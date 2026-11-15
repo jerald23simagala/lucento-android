@@ -572,3 +572,25 @@ pack, `391e7d8`). The owner chose "Release 0.5.8 now". #58, #37 and the dependen
 - The Privacy Policy is version **2026-11-14** ("Voice input": the microphone permission and online voice). The website
   publishes the same text in lucento-website #29, with an "Online voice" row in the homepage's short privacy list.
 - Owner retest: NEXT_TASKS OT-25.
+
+## Mission Control V1 — 2026-11-15 (`feature/mission-control-db`, repo `lucento-mission-control` `feature/mission-control-v1`)
+
+Owner: "I need my minimalist mission control done … Lets start building now" (Phase 4 go-ahead for the lean V1 in
+`docs/mission-control/v1/`, decisions FD-V1…V15). Phase 5 (production) is the owner's: DEPLOYMENT.md, NEXT_TASKS OT-27…OT-30.
+
+- **Database** (`supabase/migrations/20261116090000…090300_mission_control_*.sql`, one paste:
+  `docs/mission-control/APPLY_MISSION_CONTROL.sql`): schemas `mc` (19 tables, private) and `mc_api` (41 functions, each
+  behind `mc.gate`: admin allowlist, aal2, fresh TOTP for sensitive actions, hourly limits, refusal logging, append-only
+  audit log). Complimentary Pro derived from `mc.entitlement_grants` (comp Lifetime = paid Lifetime's two rows; FD-V5
+  constraint change); suspension; deletion after a 24-hour cool-off through the same cascade as `delete_my_account`;
+  moving a purchase; support tickets; `public.submit_support_request` and `public.report_client` for the app; records
+  view gated by a setting + reason + step-up; Google Play orders with Google's reported net; Resend events (KlaroPH's
+  counted, never named); four pg_cron jobs. Not applied anywhere yet.
+- **Tests**: `tools/sql-verify` — 9 suites, **346 checks, 0 failed** under lucento-test's and Supabase's stock default
+  privileges (`mission_control_suite.sql`: 74). The combined apply file passes the suite on its own. The existing
+  `entitlements_suite` caught a NULL bug in the first version of the FD-V5 constraint (fixed with `coalesce`).
+- **Console** (`../lucento-mission-control`, Next.js 16.4.3, React 19.3, Tailwind 4, Chart.js 4): every page of
+  PRODUCT_SCOPE.md; no service-role key, no Supabase key in the browser; proxy gate with 30-min idle / 12-h absolute
+  limits; CSP nonce; Resend webhook (Svix) and daily cron (Play orders, checks, Crashlytics). `npm run verify` green:
+  lint, typecheck, **31 unit tests**, production build, bundle secret scan. CI + weekly encrypted backup workflows.
+  **Not yet exercised against a running database** (KNOWN_ISSUES MC-1).

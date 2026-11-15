@@ -15,6 +15,17 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Mission Control V1 (2026-11-15, `feature/mission-control-db`, `lucento-mission-control`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| MC-1 | The console has not been run against a database yet: SQL is verified (346 checks) and the app builds, lints and passes its unit tests, but no page has been rendered with real data | Local-stack start was refused by this environment's permission check (it downloads PostgREST and starts local servers) | Owner allows `npm run local`, or OT-27 on lucento-test; then click through every page |
+| MC-2 | Revenue counts subscription **first** payments only: renewals' order ids are never stored (tokens aren't kept, only hashes) | `public.purchase_links.order_id` is the first order; Orders API has no list | Website records `latestSuccessfulOrderId` on re-verification before the first renewals (NEXT_TASKS) |
+| MC-3 | Two retention rules were set as engineering defaults and need the owner's word for the privacy text: resolved support requests deleted after 12 months (and with the account); backups kept 28 days (the design said 90; 28 keeps the delete-account page's "within 30 days") | `mc.daily_rollup`, `.github/workflows/backup.yml` | Owner confirms when approving the policy text (FD-V15) |
+| MC-4 | Suspension ends sessions and refuses refresh, but an access token already issued keeps working up to its expiry (1 hour); on the phone, Pro from server rows leaves (session ended → signed out) while a Google Play purchase still unlocks Pro locally | `mc_api.suspend`; `EntitlementManager.signedOut`; Supabase JWT expiry | Accepted; the suspend dialog says so |
+| MC-5 | Step-up freshness reads `auth.mfa_amr_claims.updated_at` (and the JWT `amr` timestamp as a fallback). That Auth refreshes the claim's time on every re-verification is from Auth's code, not its docs | `mc.fresh_mfa` | Confirm on lucento-test (DEPLOYMENT D): a Lifetime grant right after a code works, and 11 minutes later asks again |
+| MC-6 | Vercel Hobby is for non-commercial use; Mission Control and the website belong to a business selling Pro | INTEGRATION_REQUIREMENTS §4, FD-V1 | Owner checks the terms or upgrades (DEPLOYMENT C1) |
+
 ## Found while verifying the launch film (2026-11-14)
 
 All **Code-only** (read in source on `main` `0679ccf`); details in `docs/marketing/LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §6.

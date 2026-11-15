@@ -1,0 +1,675 @@
+<title>Mission Control V1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<style>
+/* Layout: compact 8-item sidebar + one working column; tables first, yellow only for "careful", every number labelled with its source. */
+:root{
+  --bg:#F5F6F9; --surface:#FFFFFF; --surface-2:#EEF1F6; --surface-3:#E4E8F1;
+  --line:#DFE3EC; --line-strong:#C9D0DE;
+  --ink:#17233F; --ink-2:#47536E; --ink-3:#6E7891;
+  --accent:#3563F5; --accent-ink:#2447C7; --accent-soft:#E8EEFF; --on-accent:#FFFFFF;
+  --care:#FFC928; --care-soft:#FFF4D1; --care-ink:#4A3000;
+  --ok:#137A53; --ok-soft:#E3F5EC; --warn:#9A5806; --warn-soft:#FFEFD9; --bad:#B83838; --bad-soft:#FDE7E7;
+  --c1:#3563F5; --c2:#FF8A24; --c3:#B9C3D6; --c4:#FFC928; --grid:#E6E9F0;
+  --shadow:0 12px 40px rgba(23,35,63,.18);
+  --font-ui:"Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C1322; --surface:#121B2E; --surface-2:#18233B; --surface-3:#202D4A;
+  --line:#232F4B; --line-strong:#33415F;
+  --ink:#E8ECF5; --ink-2:#AEB8CC; --ink-3:#8590AA;
+  --accent:#7C9AFF; --accent-ink:#A9BCFF; --accent-soft:#1C2853; --on-accent:#0C1322;
+  --care:#FFC928; --care-soft:#3A2F0E; --care-ink:#FFE7A0;
+  --ok:#4CC38A; --ok-soft:#0F3326; --warn:#F0B252; --warn-soft:#3A2A10; --bad:#F38787; --bad-soft:#3D1A1C;
+  --c1:#7C9AFF; --c2:#FF9F4D; --c3:#3E4B69; --c4:#E8B923; --grid:#1F2A44;
+  --shadow:0 16px 48px rgba(0,0,0,.5); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0C1322; --surface:#121B2E; --surface-2:#18233B; --surface-3:#202D4A;
+  --line:#232F4B; --line-strong:#33415F;
+  --ink:#E8ECF5; --ink-2:#AEB8CC; --ink-3:#8590AA;
+  --accent:#7C9AFF; --accent-ink:#A9BCFF; --accent-soft:#1C2853; --on-accent:#0C1322;
+  --care:#FFC928; --care-soft:#3A2F0E; --care-ink:#FFE7A0;
+  --ok:#4CC38A; --ok-soft:#0F3326; --warn:#F0B252; --warn-soft:#3A2A10; --bad:#F38787; --bad-soft:#3D1A1C;
+  --c1:#7C9AFF; --c2:#FF9F4D; --c3:#3E4B69; --c4:#E8B923; --grid:#1F2A44;
+  --shadow:0 16px 48px rgba(0,0,0,.5); color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+table{font-size:inherit;border-collapse:collapse}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.mono{font-family:var(--font-mono);font-size:12px;letter-spacing:-.01em}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-3)} .ink2{color:var(--ink-2)} .small{font-size:12px}
+.sr{position:absolute;left:-9999px}
+
+.app{display:grid;grid-template-columns:200px minmax(0,1fr);gap:32px;max-width:1440px;margin:0 auto;padding-block:16px 64px}
+.nav{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);align-self:start;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 32px);overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 6px}
+.brand b{display:block;font-size:14px;font-weight:800;letter-spacing:-.01em}
+.brand span{display:block;font-size:11px;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase}
+.env{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;background:var(--care-soft);color:var(--care-ink);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.env i{width:8px;height:8px;border-radius:2px;background:var(--care);flex:none}
+.links{display:flex;flex-direction:column;gap:1px}
+.navlink{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;text-decoration:none;color:var(--ink-2);font-weight:500;min-height:36px}
+.navlink:hover{background:var(--surface-2);color:var(--ink)}
+.navlink[aria-current="page"]{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:inset 2px 0 0 var(--accent)}
+.navlink svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.navlink .count{margin-left:auto;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;background:var(--surface-3);color:var(--ink-2)}
+.navlink .count.hot{background:var(--bad-soft);color:var(--bad)}
+.sep{height:1px;background:var(--line);margin:6px 10px}
+.main{min-width:0;display:flex;flex-direction:column;gap:20px}
+#view{display:flex;flex-direction:column;gap:20px;min-width:0;outline:none}
+.bandtitle{margin-bottom:-8px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:12px;padding-block:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.search{flex:1 1 260px;display:flex;align-items:center;gap:8px;min-height:38px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink-3);cursor:text;text-align:left}
+.search kbd{margin-left:auto}
+kbd{font-family:var(--font-mono);font-size:11px;padding:1px 6px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:4px;color:var(--ink-2);background:var(--surface)}
+.sample{font-size:11.5px;font-weight:600;color:var(--ink-2);padding:6px 10px;border:1px dashed var(--line-strong);border-radius:6px}
+.who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}
+.avatar{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:12px}
+.iconbtn{min-height:38px;min-width:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);cursor:pointer;display:grid;place-items:center}
+.iconbtn svg{width:16px;height:16px;stroke:var(--ink-2);fill:none;stroke-width:1.8}
+.banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 14px;border-radius:8px;background:var(--care);color:#2A1C00;font-weight:600}
+.banner .t{font-family:var(--font-mono)}
+.banner button{margin-left:auto;background:#2A1C00;color:var(--care);border:0;border-radius:6px;padding:7px 12px;font-weight:700;cursor:pointer;min-height:34px}
+
+.pagehead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;justify-content:space-between}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:700;margin:0 0 4px}
+h1{margin:0;font-size:24px;line-height:1.15;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+h2{margin:0;font-size:15px;font-weight:700}
+h3{margin:0;font-size:13px;font-weight:700}
+p{margin:0}
+.sub{color:var(--ink-2);max-width:74ch;margin-top:4px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.panel>header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.panel>header .right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.body{padding:14px 16px}
+.grid{display:grid;gap:20px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.gm{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.band{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.band>div{padding:13px 16px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0}
+.band>div:last-child{border-right:0}
+.band .label{font-size:12px;color:var(--ink-2);font-weight:600;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.band .value{font-size:22px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15}
+.band .value.na{font-size:14px;font-weight:600;color:var(--ink-3);letter-spacing:0}
+.band .note{font-size:11.5px;color:var(--ink-3)}
+.band .delta{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.band .delta.up{color:var(--ok)}
+.bandtitle{display:flex;align-items:baseline;gap:10px;margin-bottom:-10px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;font-size:11.5px;font-weight:600;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.chip.pro{background:var(--accent-soft);color:var(--accent-ink)} .chip.comp{background:var(--care-soft);color:var(--care-ink)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.bad{background:var(--bad-soft);color:var(--bad)}
+.src{font-family:var(--font-mono);font-size:10px;font-weight:500;padding:1px 5px;border-radius:3px;border:1px solid var(--line-strong);color:var(--ink-3);white-space:nowrap;text-transform:uppercase}
+.src.est{border-style:dashed}
+.st{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12.5px;white-space:nowrap}
+.st::before{content:"";width:9px;height:9px;flex:none}
+.st.ok{color:var(--ok)} .st.ok::before{border-radius:50%;background:var(--ok)}
+.st.warn{color:var(--warn)} .st.warn::before{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid var(--warn)}
+.st.bad{color:var(--bad)} .st.bad::before{background:var(--bad)}
+.st.unk{color:var(--ink-3)} .st.unk::before{border-radius:50%;border:2px solid var(--ink-3)}
+.tblwrap{overflow-x:auto}
+.tbl{width:100%;font-size:13px}
+.tbl th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:700;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .r{text-align:right}
+.tbl tr.click{cursor:pointer} .tbl tr.click:hover td{background:var(--surface-2)} .tbl tr.sel td{background:var(--accent-soft)}
+.cell b{display:block;font-weight:600} .cell span{font-size:12px;color:var(--ink-3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 14px;border-radius:7px;border:1px solid var(--line-strong);background:var(--surface);font-weight:600;cursor:pointer;color:var(--ink);text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.danger{color:var(--bad);border-color:var(--bad)} .btn.danger.solid{background:var(--bad);color:var(--surface)}
+.btn.sm{min-height:30px;padding:0 10px;font-size:12.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.link{border:0;background:none;color:var(--accent-ink);padding:0 4px;min-height:30px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 12px;min-height:32px;cursor:pointer;font-weight:600;font-size:12.5px;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;min-height:40px;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 20px}
+.facts dt{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.facts dd{margin:2px 0 0;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;font-size:12.5px;margin:0}
+.kv dt{color:var(--ink-3)} .kv dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.menu{display:flex;flex-direction:column;gap:6px} .menu .btn{justify-content:flex-start}
+.na-box{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px dashed var(--line-strong);border-radius:8px;font-size:13px;color:var(--ink-2)}
+.na-box b{color:var(--ink)}
+.warnbox{border-left:3px solid var(--warn);background:var(--warn-soft);padding:10px 12px;border-radius:0 6px 6px 0;font-size:13px}
+.infobox{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 12px;border-radius:0 6px 6px 0;font-size:13px}
+.bar{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.bar.warn>i{background:var(--warn)} .bar.bad>i{background:var(--bad)}
+.meter{display:flex;flex-direction:column;gap:6px}
+.meter .top-line{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.chartbox{position:relative;height:240px}
+.chartbox.sm{height:200px}
+.fallback{display:grid;place-items:center;height:100%;color:var(--ink-3);font-size:12.5px;text-align:center}
+
+.support{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr) minmax(230px,280px);border:1px solid var(--line);border-radius:var(--r);background:var(--surface);min-height:600px}
+.support>section{min-width:0;display:flex;flex-direction:column}
+.support>section+section{border-left:1px solid var(--line)}
+.tlist{list-style:none;margin:0;padding:0;overflow:auto}
+.tlist li{padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.tlist li:hover{background:var(--surface-2)}
+.tlist li[aria-selected="true"]{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.tlist .l1{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--ink-3)}
+.tlist .l2{font-weight:600}
+.convo{padding:16px;display:flex;flex-direction:column;gap:12px;overflow:auto;flex:1}
+.msg{border:1px solid var(--line);border-radius:8px;padding:12px 14px;max-width:72ch}
+.msg header{display:flex;gap:8px;font-size:12px;color:var(--ink-3);margin-bottom:6px;flex-wrap:wrap;align-items:center}
+.msg header b{color:var(--ink)}
+.msg.reply{background:var(--accent-soft);border-color:var(--accent-soft)}
+.msg.note{border-style:dashed;background:var(--care-soft);border-color:var(--care)}
+.compose{border-top:1px solid var(--line);padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.side{padding:14px;display:flex;flex-direction:column;gap:14px;overflow:auto}
+textarea,input[type=text],input[type=number],input[type=search],select{border:1px solid var(--line-strong);border-radius:7px;background:var(--surface);padding:8px 10px;min-height:36px;width:100%}
+textarea{min-height:80px;resize:vertical}
+.toggle{display:flex;gap:10px;align-items:center;cursor:pointer;min-height:36px}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+
+.scrim{position:fixed;inset:0;background:rgba(8,12,24,.55);display:grid;place-items:center;z-index:50;padding:16px}
+.dialog{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);width:min(600px,100%);max-height:calc(100vh - 32px);overflow:auto}
+.dialog>header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px}
+.dialog>header p{color:var(--ink-2);font-size:13px;margin-top:4px}
+.dialog .x{margin-left:auto;border:0;background:none;cursor:pointer;min-width:36px;min-height:36px;border-radius:6px;color:var(--ink-2);font-size:18px}
+.dialog .x:hover{background:var(--surface-2)}
+.dialog .content{padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.dialog footer{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+.dialog footer .hint{margin-right:auto;font-size:12px;color:var(--ink-3)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>label,.field>.lab{font-size:12px;font-weight:700;color:var(--ink-2)}
+.choices{display:flex;flex-wrap:wrap;gap:6px}
+.choices label{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--line-strong);border-radius:7px;cursor:pointer;font-weight:600;font-size:13px;min-height:36px}
+.choices input{accent-color:var(--accent)}
+.choices label:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+.preview{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:12px 14px;font-size:13px;display:flex;flex-direction:column;gap:6px}
+.diff{width:100%;font-size:12.5px}
+.diff td,.diff th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+.diff .before{color:var(--bad);text-decoration:line-through} .diff .after{color:var(--ok);font-weight:600}
+.pre{font-family:var(--font-mono);font-size:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.mail{border:1px solid var(--line);border-radius:8px;background:#FFFDF5;color:#17233F}
+.mail .mh{padding:10px 14px;border-bottom:1px solid #E3E8F4;font-size:12px;color:#5B6680}
+.mail .mb{padding:16px} .mail h4{margin:0 0 8px;font-size:18px} .mail p{color:#3A4560;margin-bottom:8px;font-size:13px}
+.masked{letter-spacing:.1em;color:var(--ink-3)}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:var(--surface);padding:11px 16px;border-radius:8px;box-shadow:var(--shadow);font-weight:600;font-size:13px;max-width:min(440px,calc(100vw - 32px))}
+.toast a{color:inherit}
+@media (max-width:1180px){.support{grid-template-columns:minmax(220px,300px) minmax(0,1fr)}.support>section.ctx{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}.gm{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr);gap:12px}
+  .nav{position:static;max-height:none;flex-direction:row;overflow-x:auto;gap:10px;align-items:center}
+  .links{flex-direction:row;gap:2px} .sep,.brand span,.env span{display:none}
+  .navlink{white-space:nowrap}
+  .g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .support{grid-template-columns:minmax(0,1fr)} .support>section+section{border-left:0;border-top:1px solid var(--line)}
+  .band>div{border-right:0;border-bottom:1px solid var(--line)}
+  .who span{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="app">
+  <aside class="nav" aria-label="Mission Control">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#17233F"/><path d="M6 22c3-6 7-9 10-9s7 3 10 9" stroke="#FFC928" stroke-width="2.6" fill="none" stroke-linecap="round"/><circle cx="16" cy="10" r="3" fill="#3563F5"/></svg>
+      <div><b>Mission Control</b><span>Lucento · V1</span></div>
+    </div>
+    <div class="env" title="Production data"><i></i><span>Production</span></div>
+    <nav class="links" aria-label="Pages">
+      <a class="navlink" href="#overview" data-r="overview"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/></svg>Overview</a>
+      <a class="navlink" href="#users" data-r="users"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.5a3.5 3.5 0 010 7M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></svg>Users</a>
+      <a class="navlink" href="#support" data-r="support"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Support<span class="count hot" id="openCount">4</span></a>
+      <a class="navlink" href="#revenue" data-r="revenue"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Revenue</a>
+      <a class="navlink" href="#infrastructure" data-r="infrastructure"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Infrastructure<span class="count">1</span></a>
+      <a class="navlink" href="#emails" data-r="emails"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></svg>Emails</a>
+      <a class="navlink" href="#audit" data-r="audit"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h3"/></svg>Audit Logs</a>
+      <div class="sep"></div>
+      <a class="navlink" href="#config" data-r="config"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>Settings</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <div class="top">
+      <button class="search" id="openCmd" type="button" aria-label="Search users or tickets">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        Search by email, user id or ticket number <kbd>Ctrl K</kbd>
+      </button>
+      <span class="sample" title="All names and numbers are invented">Prototype · fictional data · Thu 18 Mar 2027</span>
+      <button class="iconbtn" id="themeBtn" type="button" aria-label="Switch light or dark theme"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg></button>
+      <div class="who"><div class="avatar" aria-hidden="true">J</div><span>ops@ · TOTP · 27 min left</span></div>
+    </div>
+    <div id="banner" class="banner" hidden role="status"></div>
+    <main id="view" tabindex="-1"></main>
+  </div>
+</div>
+<div id="modal" class="scrim" hidden></div>
+<div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+const $=(s,el=document)=>el.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const php=n=>(n<0?'−':'')+'₱'+Math.abs(Math.round(n)).toLocaleString('en-PH');
+const int=n=>Math.round(n).toLocaleString('en-PH');
+const TODAY=new Date(Date.UTC(2027,2,18));
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmt=d=>d.getUTCDate()+' '+MON[d.getUTCMonth()]+' '+d.getUTCFullYear();
+const addDays=(d,n)=>new Date(d.getTime()+n*86400000);
+const nowHM=()=>new Date().toTimeString().slice(0,5);
+
+/* ---------- fictional data ---------- */
+const VERS=['1.6.0','1.5.2','1.5.2','1.5.2',null,'1.5.1','1.5.2',null,'1.6.0','1.5.2','1.5.2','1.5.1'];
+const DEV=['Pixel 7 · Android 15','Galaxy A54 · Android 14','Redmi Note 13 · Android 14','Pixel 8 · Android 15',null,'Galaxy Tab S9 · Android 14','Galaxy A15 · Android 14',null,'Pixel 6a · Android 15','Galaxy S23 · Android 15','vivo Y36 · Android 14','OPPO A78 · Android 14'];
+const users=[
+ {id:'7f3c91a2-5b0e',name:'Paolo Reyes',email:'paolo.reyes@example.com',reg:'26 Feb 2027',status:'Active',plan:'Free',src:'Purchase linked to another account',act:'Today 07:12',ver:null,w:4,t:212,b:6,g:1,d:1,rc:3,sync:'Today 07:12',provider:'Google',flag:'Purchase link'},
+ {id:'b21e07d4-91c3',name:'Bea Lim',email:'bea.lim@example.com',reg:'2 Dec 2026',status:'Active',plan:'Comp',src:'Complimentary · 1 year',act:'Today 08:40',ver:null,w:6,t:618,b:9,g:3,d:2,rc:7,sync:'Today 08:40',provider:'Email'},
+ {id:'c9a4410f-2d7a',name:'Marco Dela Cruz',email:'marco.dc@example.com',reg:'18 Dec 2026',status:'Active',plan:'Pro',src:'Annual subscription',act:'Today 06:55',ver:null,w:5,t:402,b:8,g:2,d:0,rc:4,sync:'Today 06:55',provider:'Google'},
+ {id:'0d77e3b9-c4e1',name:'Hana Okafor',email:'hana.okafor@example.com',reg:'4 Dec 2026',status:'Active',plan:'Pro',src:'Lifetime',act:'Yesterday',ver:null,w:9,t:1204,b:12,g:4,d:3,rc:11,sync:'Yesterday 21:10',provider:'Email'},
+ {id:'5e18c2aa-0f6b',name:'Lea Navarro',email:'lea.navarro@example.com',reg:'14 Mar 2027',status:'Active',plan:'Trial',src:'Annual · trial ends 21 Mar',act:'Today 08:02',ver:null,w:3,t:41,b:5,g:0,d:0,rc:2,sync:'Today 08:02',provider:'Google'},
+ {id:'91bd2c07-7a18',name:'Rafael Gómez',email:'rafael.gomez@example.com',reg:'9 Jan 2027',status:'Active',plan:'Pro',src:'Monthly · grace period',act:'Today 08:41',ver:null,w:5,t:356,b:7,g:1,d:1,rc:5,sync:'9 Mar (transactions)',provider:'Email'},
+ {id:'e4f0a913-3c55',name:'Sam Whitfield',email:'sam.w@example.com',reg:'1 Mar 2027',status:'Unconfirmed',plan:'Free',src:'—',act:'1 Mar',ver:null,w:0,t:0,b:0,g:0,d:0,rc:0,sync:'Never',provider:'Email'},
+ {id:'a7e2b6c1-8d40',name:'Ken Tanaka',email:'ken.tanaka@example.com',reg:'3 Dec 2026',status:'Active',plan:'Pro',src:'Lifetime',act:'Today 05:30',ver:null,w:7,t:889,b:10,g:5,d:1,rc:9,sync:'Today 05:30',provider:'Google'},
+ {id:'2b5c8e71-1e9f',name:'Carlo Mendoza',email:'carlo.m@example.com',reg:'22 Dec 2026',status:'Active',plan:'Free',src:'Monthly · on hold (payment)',act:'3 days ago',ver:null,w:3,t:120,b:4,g:0,d:1,rc:2,sync:'15 Mar',provider:'Google'},
+ {id:'d8a1f3c6-6b22',name:'Ivy Tan',email:'ivy.tan@example.com',reg:'11 Jan 2027',status:'Active',plan:'Comp',src:'Complimentary · 1 year',act:'Today 07:48',ver:null,w:4,t:233,b:6,g:2,d:0,rc:3,sync:'Today 07:48',provider:'Email'},
+ {id:'6f09d4e8-a0b7',name:'Nadia Rahman',email:'nadia.r@example.com',reg:'16 Mar 2027',status:'Active',plan:'Free',src:'—',act:'Today 08:51',ver:null,w:2,t:9,b:3,g:0,d:0,rc:0,sync:'Today 08:51',provider:'Google'},
+ {id:'3ac6f5d2-4f81',name:'Joy Santiago',email:'joy.s@example.com',reg:'7 Feb 2027',status:'Suspended',plan:'Free',src:'—',act:'12 Mar',ver:null,w:2,t:64,b:2,g:0,d:0,rc:1,sync:'12 Mar',provider:'Email'}
+];
+users.forEach((u,i)=>{u.ver=VERS[i];u.dev=DEV[i];});
+const grants={
+ 'b21e07d4-91c3':[{id:'g-118',kind:'1 year',reason:'Tester',note:'Beta tester since launch',by:'ops@ (Jerald)',at:'2 Dec 2026',ends:'2 Dec 2027',active:true}],
+ 'd8a1f3c6-6b22':[{id:'g-131',kind:'1 year',reason:'Press',note:'Review for a PH tech site',by:'ops@ (Jerald)',at:'17 Mar 2027',ends:'17 Mar 2028',active:true}]
+};
+let ticketSeq=1048;
+const tickets=[
+ {id:'LC-1047',ch:'In-app',diag:{App:'1.6.0 (160)',Android:'15',Phone:'Pixel 7',Sync:'On · last 07:12',Plan:'Free'},uid:'7f3c91a2-5b0e',email:'paolo.reyes@example.com',who:'Paolo Reyes',subj:'Bought Lifetime but the app says Free',cat:'Billing and Pro',status:'Open',pri:'Urgent',age:'2h',msgs:[
+   {k:'inbound',who:'Paolo Reyes',at:'07:04',body:'Hi! I bought Pro Lifetime last month and it worked, but after I signed in with my Google account the app says I am on Free. Restore purchase says it belongs to another account.'}]},
+ {id:'LC-1046',ch:'Manual',uid:'5e18c2aa-0f6b',email:'lea.navarro@example.com',who:'Lea Navarro',subj:'Will I be charged when the trial ends?',cat:'Billing',status:'Awaiting Customer',pri:'Normal',age:'5h',msgs:[
+   {k:'inbound',who:'Lea Navarro',at:'04:10',body:'Hi, will Google charge me automatically when the trial ends?'},
+   {k:'reply',who:'ops@ (Jerald)',at:'05:02',body:'Yes. If you keep the subscription, Google Play charges the annual price on 21 Mar. Cancel before then in Google Play › Subscriptions and you won’t be charged.'}]},
+ {id:'LC-1045',ch:'In-app',diag:{App:'1.5.2 (152)',Android:'14',Phone:'Galaxy A25',Sync:'Off (no account)',Plan:'Free'},uid:null,email:'m.cruz88@example.net',who:'m.cruz88@example.net',subj:'Lost my records after changing phones',cat:'Data recovery',status:'Open',pri:'Urgent',age:'20m',msgs:[
+   {k:'inbound',who:'m.cruz88@example.net',at:'08:44',body:'I changed phones and Lucento is empty. I never made an account I think. Can you get my data back?'}]},
+ {id:'LC-1044',ch:'In-app',diag:{App:'1.5.1 (151)',Android:'14',Phone:'Galaxy Tab S9',Sync:'On · transactions last 9 Mar',Plan:'Pro · monthly (grace)'},uid:'91bd2c07-7a18',email:'rafael.gomez@example.com',who:'Rafael Gómez',subj:'Transactions missing on my tablet',cat:'Sync',status:'In Progress',pri:'Normal',age:'1d',msgs:[
+   {k:'inbound',who:'Rafael Gómez',at:'Yesterday 16:20',body:'My tablet shows fewer transactions than my phone since last week. Both are signed in.'},
+   {k:'note',who:'ops@ (Jerald)',at:'Yesterday 16:45',body:'Tablet is on 1.5.1 and its transactions stopped syncing on 9 Mar. Phone is current. Check the records for a stuck transfer.'},
+   {k:'reply',who:'ops@ (Jerald)',at:'Yesterday 17:02',body:'Thanks Rafael, I can see the tablet stopped syncing transactions on 9 March. I’m looking into it and will email you today.'}]},
+ {id:'LC-1043',ch:'In-app',diag:{App:'1.5.2 (152)',Android:'15',Phone:'Galaxy S23',Sync:'On · last 07:48',Plan:'Pro · complimentary'},uid:'d8a1f3c6-6b22',email:'ivy.tan@example.com',who:'Ivy Tan',subj:'Import a CSV from my bank',cat:'Feature request',status:'Open',pri:'Normal',age:'2d',msgs:[
+   {k:'inbound',who:'Ivy Tan',at:'16 Mar',body:'Could Lucento import the CSV my bank lets me download?'}]},
+ {id:'LC-1041',ch:'Manual',uid:'c9a4410f-2d7a',email:'marco.dc@example.com',who:'Marco Dela Cruz',subj:'Change my email address',cat:'Account',status:'Resolved',pri:'Normal',age:'3d',msgs:[
+   {k:'inbound',who:'Marco Dela Cruz',at:'15 Mar',body:'Please change my account email.'},
+   {k:'reply',who:'ops@ (Jerald)',at:'15 Mar',body:'Done. Please confirm from the new address when Supabase asks.'}]}
+];
+const access={}; /* uid -> {reason, at}: an open Records session */
+let auditSeq=4812;
+const audit=[
+ {n:4812,at:'Today 09:02',who:'ops@ (Jerald)',act:'access.profile_open',target:'Paolo Reyes',reason:'LC-1047',result:'ok'},
+ {n:4811,at:'Today 08:40',who:'app (anonymous)',act:'support.submit',target:'m.cruz88@example.net',reason:'LC-1045 · in-app, signed out',result:'ok'},
+ {n:4810,at:'Today 08:12',who:'unknown account',act:'mc_api.grant_pro',target:'—',reason:'—',result:'refused',detail:'Caller is not in mc.admins'},
+ {n:4809,at:'Yesterday 18:21',who:'ops@ (Jerald)',act:'entitlement.grant',target:'Ivy Tan',reason:'Press · 1 year',result:'ok',before:{grant:null},after:{source:'GRANT',grants:['LOCAL_PRO','CLOUD','AI_PRO','SHARED'],expires_at:'2028-03-17'}},
+ {n:4808,at:'Yesterday 11:05',who:'ops@ (Jerald)',act:'account.suspend',target:'Joy Santiago',reason:'Chargeback abuse, 3 Play refunds',result:'ok',before:{banned_until:null},after:{banned_until:'2127-03-17'}},
+ {n:4807,at:'16 Mar 21:12',who:'ops@ (Jerald)',act:'email.send_transactional',target:'Bea Lim',reason:'Template: Your complimentary Pro is active',result:'ok'},
+ {n:4806,at:'15 Mar 10:30',who:'ops@ (Jerald)',act:'entitlement.revoke_grant',target:'(deleted account)',reason:'Tester programme ended',result:'ok'},
+ {n:4805,at:'15 Mar 09:58',who:'ops@ (Jerald)',act:'session.sign_in',target:'—',reason:'TOTP verified',result:'ok'}
+];
+const emailEvents=[
+ ['09:01','delivered','nadia.r@example.com','Welcome to Lucento','send.lucentoapp.com',''],
+ ['08:58','delivered','nadia.r@example.com','Confirm your email','send.lucentoapp.com',''],
+ ['08:47','bounced','old.box@example.org','Confirm your email','send.lucentoapp.com','Mailbox does not exist (hard)'],
+ ['08:46','delivered','m.cruz88@example.net','[LC-1045] We got your request','send.lucentoapp.com',''],
+ ['08:20','delivered','rafael.gomez@example.com','[LC-1044] Re: Transactions missing','send.lucentoapp.com',''],
+ ['07:55','delayed','lea.navarro@example.com','Your Lucento Pro trial has started','send.lucentoapp.com','Recipient server deferred (retrying)'],
+ ['07:41','delivered','team@example.com','KlaroPH weekly digest','klaroph.com',''],
+ ['07:12','failed','x@invalid.example','Reset your password','send.lucentoapp.com','Daily sending quota reached'],
+ ['Yesterday','complained','promo.hater@example.com','Welcome to Lucento','send.lucentoapp.com','Marked as spam']
+];
+const PERIODS={
+ '7d':{label:'last 7 days',newUsers:212,prevNew:245,dau:742,rev:{gross:41204,est:31580,life:11,lifeAmt:34268,subs:3012,refunds:-3116}},
+ '30d':{label:'last 30 days',newUsers:931,prevNew:870,dau:742,rev:{gross:176902,est:132410,life:51,lifeAmt:154129,subs:15880,refunds:-6232}},
+ '90d':{label:'last 90 days',newUsers:2804,prevNew:614,dau:742,rev:{gross:512455,est:383220,life:154,lifeAmt:445929,subs:37510,refunds:-14241}}
+};
+const state={route:'overview',period:'30d',uid:'7f3c91a2-5b0e',tab:'overview',ticket:'LC-1047',tFilter:'all',tQuery:'',aQuery:'',aResult:'all',aSel:4809,eFilter:'all',limits:{day:100,month:3000},recordsOn:true,linkResolved:false,revealed:{}};
+
+/* ---------- charts (Chart.js, theme-aware) ---------- */
+let charts=[];
+const tok=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function killCharts(){charts.forEach(c=>c.destroy());charts=[];}
+function mk(id,cfg){const el=document.getElementById(id); if(!el) return; if(!window.Chart){el.parentElement.innerHTML='<div class="fallback">Chart library didn’t load. The numbers above are unaffected.</div>';return;}
+ const ink=tok('--ink-3'),grid=tok('--grid');
+ Chart.defaults.font.family=tok('--font-ui'); Chart.defaults.color=ink;
+ cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{backgroundColor:tok('--ink'),titleColor:tok('--surface'),bodyColor:tok('--surface'),padding:10,cornerRadius:6}}},cfg.options||{});
+ if(cfg.type!=='doughnut'){cfg.options.scales=Object.assign({x:{grid:{display:false},ticks:{color:ink,maxRotation:0,autoSkip:true,maxTicksLimit:8},border:{color:grid}},y:{grid:{color:grid},ticks:{color:ink,maxTicksLimit:5},border:{display:false},beginAtZero:true}},cfg.options.scales||{});}
+ charts.push(new Chart(el,cfg));}
+function seq(n,base,amp,seed){const a=[];let s=seed;for(let i=0;i<n;i++){s=(s*9301+49297)%233280;a.push(Math.round(base+amp*Math.sin(i/2.3)+(s/233280-.5)*amp));}return a;}
+
+/* ---------- views ---------- */
+const V={};
+const srcTag=s=>`<span class="src">${s}</span>`;
+V.overview=()=>{const P=PERIODS[state.period];const d=Math.round((P.newUsers-P.prevNew)/P.prevNew*100);
+return `
+<div class="pagehead"><div><p class="eyebrow">Overview · ${P.label}</p><h1>3,418 accounts · ₱18,837 MRR</h1><p class="sub">Every number shows its source. Active users are signed-in accounts; people who use Lucento without an account are only counted by Google Play.</p></div>
+<div class="seg" role="group" aria-label="Period">${[['7d','7 days'],['30d','30 days'],['90d','90 days']].map(([k,l])=>`<button type="button" data-period="${k}" aria-pressed="${state.period===k}">${l}</button>`).join('')}</div></div>
+
+<div class="bandtitle"><h2>Users</h2>${srcTag('Supabase auth · mc.account_activity')}</div>
+<div class="band">
+ <div><span class="label">Registered</span><span class="value">3,418</span><span class="note">Excludes admin and test accounts</span></div>
+ <div><span class="label">New today</span><span class="value">31</span><span class="note">Manila time</span></div>
+ <div><span class="label">New this month</span><span class="value">731</span><span class="note">1–18 Mar</span></div>
+ <div><span class="label">New · ${P.label}</span><span class="value">${int(P.newUsers)}</span><span class="delta ${d>=0?'up':''}">${d>=0?'+':''}${d} % vs previous</span></div>
+ <div><span class="label">Active today</span><span class="value">${int(P.dau)}</span><span class="note">Signed-in accounts</span></div>
+ <div><span class="label">Active 30 days</span><span class="value">1,902</span><span class="note">Signed-in accounts</span></div>
+</div>
+<div class="band">
+ <div><span class="label">Free</span><span class="value">2,959</span></div>
+ <div><span class="label">Pro · paid</span><span class="value">395</span><span class="note">164 subscription · 231 Lifetime</span></div>
+ <div><span class="label">Complimentary</span><span class="value">23</span><span class="note">No paid plan</span></div>
+ <div><span class="label">Trial</span><span class="value">41</span><span class="note">Annual, 7 days</span></div>
+</div>
+
+<div class="bandtitle"><h2>Revenue</h2>${srcTag('Entitlements · Play Orders API')}<span class="src est">EST</span></div>
+<div class="band">
+ <div><span class="label">Lifetime sales · ${P.label}</span><span class="value">${php(P.rev.lifeAmt)}</span><span class="note">${P.rev.life} purchases · one-time</span></div>
+ <div><span class="label">Gross revenue</span><span class="value">${php(P.rev.gross)}</span><span class="note">Paid by customers, incl. VAT</span></div>
+ <div><span class="label">Net (estimate)</span><span class="value">${php(P.rev.est)}</span><span class="note">After VAT and 15 % Google fee</span></div>
+ <div><span class="label">MRR</span><span class="value">₱18,837</span><span class="note">Subscriptions only</span></div>
+ <div><span class="label">Refunds</span><span class="value">${php(P.rev.refunds)}</span><span class="note">Voided by Google Play</span></div>
+</div>
+
+<div class="grid g2">
+ <section class="panel"><header><h2>New registrations</h2>${srcTag('Supabase auth')}</header><div class="body"><div class="chartbox"><canvas id="chReg" aria-label="New registrations per ${state.period==='90d'?'week':'day'}" role="img"></canvas></div></div></section>
+ <section class="panel"><header><h2>Revenue per month</h2>${srcTag('Orders API')}<div class="right row small ink2"><span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c2);margin-right:5px"></i>Lifetime (one-time)</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c1);margin-right:5px"></i>Subscriptions (recurring)</span></div></header><div class="body"><div class="chartbox"><canvas id="chRev" aria-label="Revenue per month, one-time and recurring" role="img"></canvas></div><p class="muted small" style="margin-top:8px">Net of VAT. March to date. Reported figures come from Play's monthly earnings report.</p></div></section>
+</div>
+<div class="grid g2">
+ <section class="panel"><header><h2>Plans</h2>${srcTag('public.entitlements')}</header><div class="body grid" style="grid-template-columns:200px minmax(0,1fr);align-items:center;gap:16px"><div class="chartbox sm"><canvas id="chPlan" aria-label="Free, Pro, complimentary and trial accounts" role="img"></canvas></div>
+  <table class="tbl"><tbody>${[['Free',2959,'--c3'],['Pro · paid',395,'--c1'],['Complimentary',23,'--c4'],['Trial',41,'--c2']].map(([l,v,c])=>`<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(${c});margin-right:8px"></i>${l}</td><td class="r num">${int(v)}</td><td class="r num muted">${(v/3418*100).toFixed(1)} %</td></tr>`).join('')}</tbody></table></div></section>
+ <section class="panel"><header><h2>Operations</h2></header><div class="tblwrap"><table class="tbl"><tbody>
+  <tr><td>Open support tickets</td><td class="r"><a href="#support"><b>4</b></a> <span class="muted small">· 2 urgent</span></td></tr>
+  <tr><td>Crash-free users (7 d)</td><td class="r"><b>99.4 %</b> <span class="muted small">· 3 open issues</span></td></tr>
+  <tr><td>Emails today</td><td class="r"><a href="#emails"><b>81 / ${state.limits.day}</b></a> <span class="chip bad">near limit</span></td></tr>
+  <tr><td>Supabase</td><td class="r"><span class="st ok">Operational</span></td></tr>
+  <tr><td>Vercel · lucento-website</td><td class="r"><span class="st ok">Ready</span></td></tr>
+  <tr><td>Crashlytics export</td><td class="r"><span class="st ok">Updated 06:00</span></td></tr></tbody></table></div></section>
+</div>`;};
+function drawOverview(){const n=state.period==='7d'?7:state.period==='30d'?30:13; const vals=state.period==='90d'?seq(13,215,45,7):seq(n,31,10,state.period==='7d'?3:5);
+ const labels=Array.from({length:n},(_,i)=>{const dd=addDays(TODAY,state.period==='90d'?-(n-1-i)*7:-(n-1-i));return dd.getUTCDate()+' '+MON[dd.getUTCMonth()];});
+ mk('chReg',{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:vals.map((_,i)=>i===vals.length-1?tok('--c1'):tok('--c1')+'99'),borderRadius:3,maxBarThickness:28}]}});
+ mk('chRev',{type:'bar',data:{labels:['Dec','Jan','Feb','Mar'],datasets:[{label:'Lifetime (one-time)',data:[213571,160179,167339,118411],backgroundColor:tok('--c2'),borderRadius:3,maxBarThickness:34},{label:'Subscriptions (recurring)',data:[4107,11206,17931,12940],backgroundColor:tok('--c1'),borderRadius:3,maxBarThickness:34}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+php(c.raw)}}},scales:{y:{ticks:{callback:v=>'₱'+v/1000+'k',maxTicksLimit:5},grid:{color:tok('--grid')},border:{display:false}}}}});
+ mk('chPlan',{type:'doughnut',data:{labels:['Free','Pro · paid','Complimentary','Trial'],datasets:[{data:[2959,395,23,41],backgroundColor:[tok('--c3'),tok('--c1'),tok('--c4'),tok('--c2')],borderColor:tok('--surface'),borderWidth:2}]},options:{cutout:'64%'}});}
+
+const planChip=u=>u.plan==='Pro'?'<span class="chip pro">Pro</span>':u.plan==='Comp'?'<span class="chip comp">Pro · complimentary</span>':u.plan==='Trial'?'<span class="chip warn">Trial</span>':'<span class="chip">Free</span>';
+const statusChip=s=>s==='Active'?'<span class="st ok">Active</span>':s==='Suspended'?'<span class="st bad">Suspended</span>':s==='Deletion scheduled'?'<span class="st warn">Deletion scheduled</span>':'<span class="st unk">Unconfirmed</span>';
+V.users=()=>`
+<div class="pagehead"><div><p class="eyebrow">Users</p><h1>3,418 accounts</h1><p class="sub">Opening a profile is logged. Viewing records needs a reason and your authenticator code, and is logged too.</p></div></div>
+<section class="panel"><header>
+ <label class="sr" for="uq">Search</label><input type="search" id="uq" placeholder="Email or user id" style="max-width:300px">
+ <label class="sr" for="up">Plan</label><select id="up" style="width:auto"><option value="">All plans</option><option value="Free">Free</option><option value="Pro">Pro · paid</option><option value="Comp">Complimentary</option><option value="Trial">Trial</option></select>
+ <label class="sr" for="us">Status</label><select id="us" style="width:auto"><option value="">Any status</option><option>Active</option><option>Unconfirmed</option><option>Suspended</option><option>Deletion scheduled</option></select>
+ <div class="right"><span class="muted small" id="ucount"></span></div></header>
+ <div class="tblwrap"><table class="tbl" aria-label="Users"><thead><tr><th>Email</th><th>Registered</th><th>Status</th><th>Plan</th><th>Last activity</th><th>App version</th></tr></thead><tbody id="urows"></tbody></table></div>
+</section>
+<p class="muted small">App version comes from the app (from the release with the support form); older installs show "not reported". Showing 12 sample rows.</p>`;
+function userRows(){const q=($('#uq')?.value||'').toLowerCase(),p=$('#up')?.value||'',s=$('#us')?.value||'';
+ const rows=users.filter(u=>(!q||(u.email+u.id).toLowerCase().includes(q))&&(!p||u.plan===p)&&(!s||u.status===s));
+ $('#ucount').textContent=rows.length+' shown';
+ $('#urows').innerHTML=rows.map(u=>`<tr class="click" tabindex="0" data-user="${u.id}"><td class="cell"><b>${esc(u.email)}</b><span class="mono">${u.id.slice(0,8)}…</span></td><td class="num">${u.reg}</td><td>${statusChip(u.status)}</td><td>${planChip(u)}</td><td class="num">${u.act}</td><td>${u.ver?`<span class="mono">${u.ver}</span>`:'<span class="muted small">not reported</span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No account matches.</td></tr>';}
+
+V.user=()=>{const u=users.find(x=>x.id===state.uid);const g=grants[u.id]||[];
+const tabs=[['overview','Overview'],['entitlements','Entitlements'],['records','Records'],['activity','Activity']];
+return `
+<div class="pagehead"><div><p class="eyebrow"><a href="#users">Users</a> / profile</p><h1>${esc(u.email)}</h1><p class="sub">${esc(u.name)} · <span class="mono">${u.id}…</span> · ${u.provider} sign-in</p></div>
+<div class="row">${planChip(u)} ${statusChip(u.status)}<button class="btn primary" type="button" data-act="grant">Grant complimentary Pro</button></div></div>
+<div class="tabs" role="tablist">${tabs.map(([k,l])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${state.tab===k}">${l}${k==='records'&&access[u.id]?' <span class="chip comp" style="margin-left:4px">open</span>':''}</button>`).join('')}</div>
+${state.tab==='overview'?profOverview(u):state.tab==='entitlements'?profEnt(u,g):state.tab==='records'?profRecords(u):profActivity(u)}`;};
+function profOverview(u){return `<div class="grid gm"><div class="stack">
+<section class="panel"><header><h2>Account</h2>${srcTag('Supabase auth')}</header><div class="body"><dl class="facts">
+ <div><dt>Registered</dt><dd>${u.reg}</dd></div><div><dt>Email confirmed</dt><dd>${u.status==='Unconfirmed'?'No':'Yes'}</dd></div><div><dt>Last sign-in</dt><dd>16 Mar 2027</dd></div><div><dt>Last activity</dt><dd>${u.act}</dd></div>
+ <div><dt>Status</dt><dd>${u.status}</dd></div><div><dt>App version</dt><dd>${u.ver?`<span class="mono">${u.ver}</span>`:'<span class="muted">Not reported</span>'}</dd></div><div><dt>Phone</dt><dd>${u.dev||'<span class="muted">Not reported</span>'}</dd></div><div><dt>Plan</dt><dd>${esc(u.src==='—'?'Free':u.src)}</dd></div><div><dt>MFA</dt><dd>Not enrolled</dd></div></dl></div></section>
+<section class="panel"><header><h2>Usage</h2>${srcTag('Synced tables · counts only')}</header><div class="body"><dl class="facts">
+ <div><dt>Wallets</dt><dd>${u.w}</dd></div><div><dt>Transactions</dt><dd>${int(u.t)}</dd></div><div><dt>Budgets</dt><dd>${u.b}</dd></div><div><dt>Goals</dt><dd>${u.g}</dd></div><div><dt>Debts and loans</dt><dd>${u.d}</dd></div><div><dt>Recurring</dt><dd>${u.rc}</dd></div></dl>
+ <p class="muted small" style="margin-top:10px">Only what this account synced. Records that live only on the phone aren’t visible.</p></div></section>
+<section class="panel"><header><h2>Synchronization</h2>${srcTag('server_updated_at')}</header><div class="tblwrap"><table class="tbl"><tbody>
+ ${[['wallets',u.sync.replace(' (transactions)',''),'ok'],['transactions',u.sync,u.id==='91bd2c07-7a18'?'warn':'ok'],['budgets',u.sync.replace(' (transactions)',''),'ok'],['goals','15 Mar','ok'],['recurring',u.sync.replace(' (transactions)',''),'ok']].map(([t,w,s])=>`<tr><td class="mono">${t}</td><td class="num">${u.sync==='Never'?'Never':w}</td><td>${u.sync==='Never'?'<span class="st unk">Sync off</span>':`<span class="st ${s}">${s==='ok'?'Current':'Behind'}</span>`}</td></tr>`).join('')}</tbody></table></div></section>
+</div><div class="stack">
+<section class="panel"><header><h2>Actions</h2></header><div class="body menu">
+ <button class="btn" type="button" data-act="grant">Grant complimentary Pro</button>
+ ${u.status==='Suspended'?'<button class="btn" type="button" data-act="reactivate">Reactivate account</button>':'<button class="btn danger" type="button" data-act="suspend">Suspend account</button>'}
+ <button class="btn" type="button" data-act="editprofile">Edit profile information</button>
+ ${u.status==='Deletion scheduled'?'<button class="btn" type="button" data-act="canceldelete">Cancel scheduled deletion</button>':'<button class="btn danger" type="button" data-act="delete">Delete account…</button>'}
+</div></section>
+${u.flag&&!state.linkResolved?`<section class="panel"><header><h2>Purchase link</h2><span class="chip warn">needs review</span></header><div class="body" style="display:flex;flex-direction:column;gap:10px"><p class="ink2">A <span class="mono">lucento_pro_lifetime</span> purchase (order GPA.3381-0921-…) is linked to account <span class="mono">4c1d…</span>, restored there 12 days ago. Play’s 30-day rule blocks an automatic move.</p><button class="btn primary" type="button" data-act="resolve">Resolve purchase link…</button></div></section>`:''}
+<section class="panel"><header><h2>Tickets</h2></header><div class="body">${tickets.filter(t=>t.uid===u.id).map(t=>`<p><a href="#support" data-goticket="${t.id}">${t.id}</a> · ${esc(t.subj)} <span class="chip">${t.status}</span></p>`).join('')||'<p class="muted">No tickets.</p>'}</div></section>
+</div></div>`;}
+function profEnt(u,g){const paid=/Lifetime|subscription|Monthly|Annual/.test(u.src)&&!(u.id==='7f3c91a2-5b0e'&&!state.linkResolved);
+return `<div class="stack">
+<section class="panel"><header><h2>Live entitlements</h2>${srcTag('public.entitlements')}</header><div class="tblwrap"><table class="tbl"><thead><tr><th>Source</th><th>Status</th><th>Unlocks</th><th>Since</th><th>Until</th></tr></thead><tbody>
+ ${/Lifetime/.test(u.src)&&paid?'<tr><td><span class="mono">PLAY_LIFETIME</span> <span class="chip pro">paid</span></td><td><span class="chip ok">ACTIVE</span></td><td class="mono small">LOCAL_PRO</td><td>4 Dec 2026</td><td>Never</td></tr><tr><td><span class="mono">PLAY_LIFETIME_SERVICES</span> <span class="chip pro">paid</span></td><td><span class="chip ok">ACTIVE</span></td><td class="mono small">CLOUD AI_PRO SHARED</td><td>4 Dec 2026</td><td>4 Dec 2027</td></tr>':''}
+ ${/subscription|Monthly|Annual/.test(u.src)?`<tr><td><span class="mono">PLAY_SUBSCRIPTION</span> <span class="chip pro">paid</span></td><td><span class="chip ${/hold/.test(u.src)?'bad':/grace|trial/.test(u.src)?'warn':'ok'}">${/hold/.test(u.src)?'ON_HOLD':/grace/.test(u.src)?'GRACE':/trial/.test(u.src)?'TRIAL':'ACTIVE'}</span></td><td class="mono small">all four</td><td>${u.reg}</td><td>${/Annual/.test(u.src)&&!/trial/.test(u.src)?'18 Dec 2027':'21 Mar 2027'}</td></tr>`:''}
+ ${g.filter(x=>x.active).map(x=>`<tr><td><span class="mono">GRANT</span> <span class="chip comp">complimentary</span></td><td><span class="chip ok">ACTIVE</span></td><td class="mono small">${x.kind==='Lifetime'?'LOCAL_PRO forever · services 12 months':'all four'}</td><td>${x.at}</td><td>${x.ends}</td></tr>`).join('')}
+ ${!paid&&!/subscription|Monthly|Annual/.test(u.src)&&!g.some(x=>x.active)?'<tr><td colspan="5" class="muted" style="text-align:center;padding:18px">No entitlement rows: Free.</td></tr>':''}
+</tbody></table></div></section>
+<section class="panel"><header><h2>Complimentary history</h2>${srcTag('mc.entitlement_grants')}<div class="right"><button class="btn sm primary" type="button" data-act="grant">Grant…</button></div></header>
+ ${g.length?`<div class="tblwrap"><table class="tbl"><thead><tr><th>Grant</th><th>Reason</th><th>By</th><th>Granted</th><th>Ends</th><th></th></tr></thead><tbody>${g.map(x=>`<tr><td><b>${x.kind}</b><div class="mono muted small">${x.id}</div></td><td>${esc(x.reason)}<div class="muted small">${esc(x.note||'')}</div></td><td>${esc(x.by)}</td><td class="num">${x.at}</td><td class="num">${x.ends}</td><td class="r">${x.active?`<button class="btn sm danger" type="button" data-act="revoke" data-g="${x.id}">Revoke</button>`:'<span class="chip">Revoked</span>'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="body muted">Never granted.</p>'}
+</section></div>`;}
+function profRecords(u){const c=access[u.id];
+ if(!state.recordsOn) return `<div class="na-box"><div><b>Records view is switched off.</b> It turns on after the app release that adds the support form and the updated privacy policy (FD-V15). Switch it on in Settings then.</div></div>`;
+ if(!c) return `<div class="na-box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="flex:none"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg><div style="display:flex;flex-direction:column;gap:10px"><span><b>Records are closed.</b> Open them to look at this account\u2019s wallets, transactions, budgets, goals, debts and recurring items. You\u2019ll give a reason (usually the ticket) and your authenticator code. Everything you open is logged.</span><span><button class="btn primary" type="button" data-act="openrecords">Open records\u2026</button></span></div></div>`;
+ const tx=[['16 Mar','Groceries','Debit card','−₱2,140.50','Weekly market run',''],['14 Mar','Transfer out','Savings','−₱5,000.00','Move for rent','1 of 2 legs on server'],['12 Mar','Salary','Payroll','+₱38,500.00','March first half',''],['10 Mar','Utilities','Debit card','−₱3,812.00','Electricity Feb',''],['9 Mar','Dining','Cash','−₱640.00','Lunch with team','']];
+ return `<div class="stack"><div class="infobox">Read-only. Opened for: ${esc(c.reason)} (${c.at}). Notes are masked; each reveal is logged.</div>
+ <div class="grid g2"><section class="panel"><header><h2>Wallets</h2>${srcTag('mc_api.user_records')}</header><div class="tblwrap"><table class="tbl"><thead><tr><th>Wallet</th><th>Type</th><th class="r">Balance</th></tr></thead><tbody><tr><td>Debit card</td><td>Bank</td><td class="r num">₱18,204.10</td></tr><tr><td>Savings</td><td>Bank</td><td class="r num">₱64,900.00</td></tr><tr><td>Cash</td><td>Cash</td><td class="r num">₱1,320.00</td></tr><tr><td>Credit card</td><td>Card</td><td class="r num">−₱7,412.35</td></tr><tr><td>Payroll</td><td>Bank</td><td class="r num">₱2,010.00</td></tr></tbody></table></div></section>
+ <section class="panel"><header><h2>Budgets · goals · debts · recurring</h2></header><div class="body"><dl class="kv"><dt>Budgets (Mar)</dt><dd>7 categories · ₱28,000 planned · ₱19,460 spent</dd><dt>Goals</dt><dd>Emergency fund · ₱64,900 of ₱120,000</dd><dt>Debts and loans</dt><dd>Car loan · ₱182,000 left</dd><dt>Recurring</dt><dd>5 items · next: Internet, 20 Mar</dd></dl></div></section></div>
+ <section class="panel"><header><h2>Transactions</h2><div class="right muted small">5 of 356 · last 10 days</div></header><div class="tblwrap"><table class="tbl"><thead><tr><th>Date</th><th>Category</th><th>Wallet</th><th class="r">Amount</th><th>Note</th><th></th></tr></thead><tbody>
+ ${tx.map((r,i)=>`<tr><td class="num">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="r num">${r[3]}</td><td>${state.revealed[i]?esc(r[4]):`<span class="masked">••••••</span> <button class="btn link sm" type="button" data-reveal="${i}">Reveal</button>`}</td><td>${r[5]?`<span class="chip warn">${r[5]}</span>`:''}</td></tr>`).join('')}</tbody></table></div></section>
+ <p class="muted small">Assisted changes to records aren’t part of V1. Candidates for later approval: restore a deleted record; force one table to re-sync.</p></div>`;}
+function profActivity(u){const rows=audit.filter(a=>a.target.startsWith(u.name));
+ return `<section class="panel"><header><h2>Admin activity on this account</h2>${srcTag('mc.audit_log')}</header><div class="tblwrap"><table class="tbl"><thead><tr><th>When</th><th>Admin</th><th>Action</th><th>Reason</th><th>Result</th></tr></thead><tbody>${rows.map(a=>`<tr><td class="num">${a.at}</td><td>${esc(a.who)}</td><td class="mono">${a.act}</td><td>${esc(a.reason)}</td><td>${resChip(a.result)}</td></tr>`).join('')||'<tr><td colspan="5" class="muted" style="text-align:center;padding:18px">No admin activity yet.</td></tr>'}</tbody></table></div></section>`;}
+const resChip=r=>r==='ok'?'<span class="chip ok">ok</span>':r==='refused'?'<span class="chip bad">refused</span>':r==='failed'?'<span class="chip bad">failed</span>':'<span class="chip warn">pending</span>';
+
+V.support=()=>{const list=tickets.filter(t=>(state.tFilter==='all'||t.status===state.tFilter)&&(!state.tQuery||(t.id+t.subj+t.email).toLowerCase().includes(state.tQuery.toLowerCase())));
+ const t=tickets.find(x=>x.id===state.ticket)||tickets[0]; const u=users.find(x=>x.id===t.uid);
+ const count=s=>tickets.filter(x=>x.status===s).length;
+return `
+<div class="pagehead"><div><p class="eyebrow">Support</p><h1>Tickets</h1></div><button class="btn" type="button" data-act="newticket">New ticket</button></div>
+<div class="band"><div><span class="label">Open</span><span class="value">${count('Open')}</span></div><div><span class="label">In progress</span><span class="value">${count('In Progress')}</span></div><div><span class="label">Awaiting customer</span><span class="value">${count('Awaiting Customer')}</span></div><div><span class="label">Resolved · 7 days</span><span class="value">${count('Resolved')+11}</span></div><div><span class="label">Median first response</span><span class="value">4.2 h</span><span class="note">7 days</span></div></div>
+<div class="support">
+<section aria-label="Ticket list"><div style="padding:10px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px"><label class="sr" for="tq">Search tickets</label><input type="search" id="tq" placeholder="Search subject, email, LC-number" value="${esc(state.tQuery)}"><label class="sr" for="tf">Status</label><select id="tf">${['all','Open','In Progress','Awaiting Customer','Resolved'].map(s=>`<option value="${s}" ${state.tFilter===s?'selected':''}>${s==='all'?'All statuses':s}</option>`).join('')}</select></div>
+<ul class="tlist" role="listbox" aria-label="Tickets">${list.map(x=>`<li role="option" tabindex="0" aria-selected="${x.id===t.id}" data-ticket="${x.id}"><div class="l1"><span class="mono">${x.id}</span><span>${x.ch}</span>${x.pri==='Urgent'?'<span class="chip bad">Urgent</span>':''}<span style="margin-left:auto">${x.age}</span></div><div class="l2">${esc(x.subj)}</div><div class="l1"><span>${esc(x.who)}</span><span style="margin-left:auto">${x.status}</span></div></li>`).join('')||'<li class="muted">No tickets match.</li>'}</ul></section>
+<section aria-label="Conversation"><div style="padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin-right:auto">${esc(t.subj)}</h2><span class="chip ${t.ch==='In-app'?'pro':''}">${t.ch}</span><span class="chip">${esc(t.cat)}</span><label class="sr" for="tstatus">Status</label><select id="tstatus" style="width:auto;min-height:32px">${['Open','In Progress','Awaiting Customer','Resolved'].map(s=>`<option ${t.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+<div class="convo" id="convo">${t.msgs.map((m,i)=>`<article class="msg ${m.k}"><header><b>${esc(m.who)}</b><span>${m.k==='note'?'internal note':m.k==='reply'?'reply sent by email':(t.ch==='In-app'&&i===0?'sent from the app':'customer')}</span><span>${m.at}</span></header><p>${esc(m.body)}</p>${i===0&&t.diag?`<dl class="kv" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">${Object.entries(t.diag).map(([k,v])=>`<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`:''}</article>`).join('')}</div>
+<div class="compose"><div class="row"><label class="sr" for="saved">Saved reply</label><select id="saved" style="width:auto;min-height:32px"><option value="">Saved replies…</option><option value="sync">Sync fixed, please reopen the app</option><option value="link">Purchase on another account</option><option value="trial">How the trial ends</option></select><span class="muted small" style="margin-left:auto">Sent by email from support@send.lucentoapp.com · [${t.id}]</span></div>
+<label class="sr" for="reply">Message</label><textarea id="reply" placeholder="Write a reply, or an internal note"></textarea>
+<div class="row" style="justify-content:flex-end"><button class="btn" type="button" data-act="note">Add internal note</button><button class="btn" type="button" data-act="resolveticket">Mark resolved</button><button class="btn primary" type="button" data-act="send">Send reply</button></div></div></section>
+<section class="ctx" aria-label="Customer"><div class="side">${u?`<div><p class="eyebrow">Customer</p><h2>${esc(u.name)}</h2><p class="muted small">${esc(u.email)}</p></div>
+<dl class="kv"><dt>Plan</dt><dd>${planChip(u)}</dd><dt>Status</dt><dd>${u.status}</dd><dt>Registered</dt><dd>${u.reg}</dd><dt>Last sync</dt><dd>${u.sync}</dd><dt>App version</dt><dd>${u.ver?u.ver:'not reported'}</dd></dl>
+${u.flag&&!state.linkResolved?'<div class="warnbox"><b>Purchase linked to another account.</b> Resolve it from the profile.</div>':''}
+<div class="menu"><button class="btn" type="button" data-user="${u.id}">Open profile</button><button class="btn primary" type="button" data-user="${u.id}" data-totab="records">View records</button></div>`
+:`<div><p class="eyebrow">Customer</p><h2>No account matched</h2><p class="muted small">${esc(t.email)} isn’t on any account. They may have used Lucento without one, in which case the records were only on the old phone, unless they saved a backup file.</p></div><button class="btn" type="button" data-act="linkticket">Link to an account…</button>`}</div></section></div>`;};
+
+V.revenue=()=>`
+<div class="pagehead"><div><p class="eyebrow">Revenue · PHP</p><h1>One-time and recurring, never mixed</h1><p class="sub">Counts come from Lucento’s entitlements. Amounts come from Google Play’s Orders API and are estimates until Play’s monthly earnings report, which you’ll find in Play Console › Download reports › Financial.</p></div></div>
+<div class="grid g2">
+<section class="panel"><header><h2>Paid · one-time</h2>${srcTag('lucento_pro_lifetime')}</header><div class="body"><dl class="kv"><dt>Lifetime purchases</dt><dd>236 all time · 231 active · 5 refunded</dd><dt>Sales, net of VAT</dt><dd>₱659,500 all time · ₱118,411 this month</dd><dt>Founder price (₱2,990)</dt><dd>170 purchases, ended 9 Feb</dd></dl><p class="muted small" style="margin-top:10px">One-time revenue. Never counted in MRR.</p></div></section>
+<section class="panel"><header><h2>Paid · recurring</h2>${srcTag('lucento_pro · lucento_cloud')}</header><div class="body"><dl class="kv"><dt>MRR</dt><dd>₱18,837 (net of VAT)</dd><dt>Subscriptions</dt><dd>97 monthly · 67 annual · 41 in trial (not counted)</dd><dt>On hold / paused</dt><dd>6 (not counted)</dd><dt>Cloud add-on</dt><dd>0 · first Lifetime service years end 3 Dec 2027</dd></dl></div></section>
+<section class="panel"><header><h2>Complimentary</h2>${srcTag('mc.entitlement_grants')}</header><div class="body"><dl class="kv"><dt>Active</dt><dd>23 accounts</dd><dt>Reasons</dt><dd>Tester 12 · Press 4 · Support 4 · Partner 2 · Giveaway 1</dd><dt>Ending in 30 days</dt><dd>4</dd></dl><p class="muted small" style="margin-top:10px">Complimentary access is never counted as revenue or as a cost.</p></div></section>
+<section class="panel"><header><h2>Refunds</h2>${srcTag('Voided purchases · Orders API')}</header><div class="body"><dl class="kv"><dt>This month</dt><dd>2 Lifetime · −₱6,232</dd><dt>All time</dt><dd>5 Lifetime · 0 subscriptions · −₱15,580</dd></dl></div></section>
+</div>
+<section class="panel"><header><h2>Revenue per month</h2>${srcTag('Orders API')}<span class="src est">EST</span></header><div class="body"><div class="chartbox"><canvas id="chRev2" role="img" aria-label="Revenue per month by type"></canvas></div></div>
+<div class="tblwrap"><table class="tbl"><thead><tr><th>Month</th><th class="r">Lifetime (one-time)</th><th class="r">Subscriptions (recurring)</th><th class="r">Refunds</th><th class="r">Gross incl. VAT</th><th class="r">Net estimate</th></tr></thead><tbody>
+${[['Dec 2026',213571,4107,-2670],['Jan 2027',160179,11206,-5339],['Feb 2027',167339,17931,-2670],['Mar 2027 (to 18th)',118411,12940,-6232]].map(r=>`<tr><td>${r[0]}</td><td class="r num">${php(r[1])}</td><td class="r num">${php(r[2])}</td><td class="r num">${php(r[3])}</td><td class="r num">${php((r[1]+r[2])*1.12)}</td><td class="r num"><b>${php((r[1]+r[2]+r[3])*.85)}</b></td></tr>`).join('')}
+</tbody></table></div><p class="muted small" style="padding:10px 16px">Net estimate = (one-time + recurring + refunds) × 0.85, the 15 % Google fee assumed in Settings.</p></section>
+<section class="panel"><header><h2>Recent purchases</h2>${srcTag('entitlements · play_orders')}</header><div class="tblwrap"><table class="tbl"><thead><tr><th>When</th><th>Account</th><th>Product</th><th>Type</th><th class="r">Paid</th><th>Order</th></tr></thead><tbody>
+<tr><td>Today 08:12</td><td>nadia.r@example.com</td><td class="mono">lucento_pro · monthly</td><td>Recurring</td><td class="r num">₱149</td><td class="mono">GPA.3391-…</td></tr>
+<tr><td>Today 07:30</td><td>ken.t2@example.com</td><td class="mono">lucento_pro_lifetime</td><td>One-time</td><td class="r num">₱3,490</td><td class="mono">GPA.3390-…</td></tr>
+<tr><td>Yesterday</td><td>joy.s@example.com</td><td class="mono">lucento_pro_lifetime</td><td>Refund</td><td class="r num">−₱3,490</td><td class="mono">GPA.3377-…</td></tr></tbody></table></div></section>`;
+
+V.infrastructure=()=>`
+<div class="pagehead"><div><p class="eyebrow">Infrastructure</p><h1>All core services operational</h1><p class="sub">Each status comes from a check that ran in the last 10 minutes. A check that hasn’t run shows Unknown, never green.</p></div></div>
+<div class="grid g2">
+<section class="panel"><header><h2>Supabase</h2><span class="st ok">Operational</span><div class="right"><a class="btn sm" href="https://supabase.com/dashboard" target="_blank" rel="noopener">Open</a></div></header><div class="body" style="display:flex;flex-direction:column;gap:12px"><dl class="kv"><dt>Database</dt><dd>Reachable · 84 ms · checked 09:01</dd><dt>Auth</dt><dd>Healthy · checked 09:01</dd><dt>Platform status</dt><dd>All systems operational</dd><dt>Database size</dt><dd>212 MB of 500 MB (Free plan)</dd><dt>File storage</dt><dd>Not used</dd><dt>Last backup</dt><dd>Sun 14 Mar 03:00 · 18 MB · encrypted · <span class="st ok">OK</span></dd></dl>
+<div class="na-box"><div><b>Recent errors need a management token.</b> V1 doesn’t store one (FD-V9). See errors in Supabase › Logs.</div></div></div></section>
+<section class="panel"><header><h2>Crashlytics</h2><span class="st ok">Export current</span><div class="right">${srcTag('BigQuery · daily')}</div></header><div class="body" style="display:flex;flex-direction:column;gap:12px"><dl class="kv"><dt>Crash-free users (7 d)</dt><dd>99.4 %</dd><dt>Crash-free sessions (7 d)</dt><dd>99.81 %</dd><dt>Last export</dt><dd>Today 06:00</dd></dl>
+<div class="tblwrap"><table class="tbl"><thead><tr><th>Issue</th><th class="r">Users</th><th>Version</th></tr></thead><tbody><tr><td><b>IllegalStateException</b><div class="mono muted small">SyncWorker.pushBatch</div></td><td class="r num">9</td><td class="mono">1.5.1–1.6.0</td></tr><tr><td><b>Input dispatching timed out</b><div class="mono muted small">BudgetCopy · ANR</div></td><td class="r num">27</td><td class="mono">1.6.0</td></tr><tr><td><b>SocketTimeoutException</b><div class="mono muted small">EntitlementRemote.fetch · non-fatal</div></td><td class="r num">54</td><td class="mono">1.5.2</td></tr></tbody></table></div>
+<p class="muted small">Opted-in installs only. Crash reports carry no user ids.</p></div></section>
+<section class="panel"><header><h2>Vercel</h2><span class="st ok">Ready</span></header><div class="tblwrap"><table class="tbl"><tbody>
+<tr><td><b>lucento-website</b> · Production</td><td class="mono">a41f9c2</td><td><span class="st ok">Ready</span></td><td class="num muted">16 Mar</td></tr>
+<tr><td>lucento-website · Preview</td><td class="mono">77b0e1d</td><td><span class="st bad">Error</span></td><td class="num muted">15 Mar</td></tr>
+<tr><td><b>mission-control</b> · Production</td><td class="mono">1c9e02b</td><td><span class="st ok">Ready</span></td><td class="num muted">12 Mar</td></tr></tbody></table></div><p class="muted small" style="padding:10px 16px">1 failed deployment in 7 days (a preview; production unaffected).</p></section>
+<section class="panel"><header><h2>Resend</h2><span class="st warn">Near daily limit</span><div class="right"><a class="btn sm" href="#emails">Emails</a></div></header><div class="body" style="display:flex;flex-direction:column;gap:12px">${meters()}<dl class="kv"><dt>Delivered today</dt><dd>74</dd><dt>Bounced today</dt><dd>1</dd><dt>Failed today</dt><dd>1 (quota)</dd></dl></div></section>
+</div>`;
+function meters(){const L=state.limits; const day=81, month=1904; const pd=Math.min(100,day/L.day*100), pm=Math.min(100,month/L.month*100);
+ const cls=p=>p>=90?'bad':p>=70?'warn':'';
+ return `<div class="meter"><div class="top-line"><span><b>Today</b> · resets 08:00 Manila</span><span class="num">${day} / ${int(L.day)}</span></div><div class="bar ${cls(pd)}" role="meter" aria-label="Emails today" aria-valuemin="0" aria-valuemax="${L.day}" aria-valuenow="${day}"><i style="width:${pd}%"></i></div><span class="muted small">Lucento 69 · KlaroPH 12. Every email on the Resend account counts.</span></div>
+ <div class="meter"><div class="top-line"><span><b>This month</b></span><span class="num">${int(month)} / ${int(L.month)}</span></div><div class="bar ${cls(pm)}" role="meter" aria-label="Emails this month" aria-valuemin="0" aria-valuemax="${L.month}" aria-valuenow="${month}"><i style="width:${pm}%"></i></div></div>`;}
+
+V.emails=()=>{const ev=emailEvents.filter(e=>state.eFilter==='all'||e[1]===state.eFilter);
+return `
+<div class="pagehead"><div><p class="eyebrow">Emails</p><h1>81 of ${int(state.limits.day)} daily emails used</h1><p class="sub">Delivery events arrive from Resend’s webhook. Limits come from Settings, because Resend has no usage API.</p></div><div class="row"><button class="btn" type="button" data-act="testemail">Send test to me</button><button class="btn primary" type="button" data-act="transactional">Send transactional email…</button></div></div>
+<div class="grid gm">
+<section class="panel"><header><h2>Recent events</h2>${srcTag('Resend webhook')}<div class="right"><label class="sr" for="ef">Event type</label><select id="ef" style="width:auto;min-height:32px">${['all','delivered','bounced','failed','complained','delayed'].map(s=>`<option value="${s}" ${state.eFilter===s?'selected':''}>${s==='all'?'All events':s}</option>`).join('')}</select></div></header>
+<div class="tblwrap"><table class="tbl"><thead><tr><th>Time</th><th>Event</th><th>Recipient / sender</th><th>Subject</th><th>Domain</th></tr></thead><tbody>
+${ev.map(e=>`<tr><td class="num">${e[0]}</td><td>${{delivered:'<span class="chip ok">delivered</span>',bounced:'<span class="chip bad">bounced</span>',failed:'<span class="chip bad">failed</span>',complained:'<span class="chip bad">complained</span>',delayed:'<span class="chip warn">delayed</span>',received:'<span class="chip pro">received</span>'}[e[1]]}${e[5]?`<div class="muted small">${esc(e[5])}</div>`:''}</td><td>${esc(e[2])}</td><td>${esc(e[3])}</td><td class="mono">${e[4]}</td></tr>`).join('')}
+</tbody></table></div></section>
+<div class="stack"><section class="panel"><header><h2>Quota</h2></header><div class="body" style="display:flex;flex-direction:column;gap:14px">${meters()}<p class="warnbox">At today’s rate the daily limit is reached around 13:00, after which sign-up and password emails fail.</p></div></section>
+<section class="panel"><header><h2>Bounces · 30 days</h2></header><div class="tblwrap"><table class="tbl"><tbody><tr><td>old.box@example.org</td><td><span class="chip bad">hard</span></td><td class="num muted">Today</td></tr><tr><td>j.cruz@example.edu</td><td><span class="chip warn">soft</span></td><td class="num muted">14 Mar</td></tr><tr><td>no-reply@example.co</td><td><span class="chip bad">hard</span></td><td class="num muted">2 Mar</td></tr></tbody></table></div></section></div></div>`;};
+
+V.audit=()=>{const q=state.aQuery.toLowerCase(); const rows=audit.filter(a=>(state.aResult==='all'||a.result===state.aResult)&&(!q||(a.act+a.target+a.reason+a.who).toLowerCase().includes(q))); const sel=audit.find(a=>a.n===state.aSel)||audit[0];
+return `
+<div class="pagehead"><div><p class="eyebrow">Audit Logs</p><h1>Every privileged action</h1><p class="sub">Append-only. No one can edit or delete entries from Mission Control or the API.</p></div></div>
+<div class="row"><label class="sr" for="aq">Search audit log</label><input type="search" id="aq" placeholder="Search user, action, reason" value="${esc(state.aQuery)}" style="max-width:320px"><div class="seg" role="group" aria-label="Result">${[['all','All'],['ok','OK'],['refused','Refused'],['pending','Pending']].map(([k,l])=>`<button type="button" data-ares="${k}" aria-pressed="${state.aResult===k}">${l}</button>`).join('')}</div></div>
+<div class="grid gm"><section class="panel"><div class="tblwrap"><table class="tbl"><thead><tr><th>#</th><th>When</th><th>Admin</th><th>Action</th><th>Affected user</th><th>Result</th></tr></thead><tbody>
+${rows.map(a=>`<tr class="click ${a.n===sel.n?'sel':''}" tabindex="0" data-audit="${a.n}"><td class="mono">${a.n}</td><td class="num">${a.at}</td><td>${esc(a.who)}</td><td class="mono">${a.act}</td><td>${esc(a.target)}</td><td>${resChip(a.result)}</td></tr>`).join('')||'<tr><td colspan="6" class="muted" style="text-align:center;padding:20px">No entries match.</td></tr>'}
+</tbody></table></div></section>
+<section class="panel"><header><h2>Entry ${sel.n}</h2></header><div class="body" style="display:flex;flex-direction:column;gap:12px"><dl class="kv"><dt>Action</dt><dd class="mono">${sel.act}</dd><dt>Admin</dt><dd>${esc(sel.who)}</dd><dt>When</dt><dd>${sel.at}</dd><dt>Affected user</dt><dd>${esc(sel.target)}</dd><dt>Reason</dt><dd>${esc(sel.reason)}</dd><dt>Result</dt><dd>${resChip(sel.result)}</dd>${sel.detail?`<dt>Detail</dt><dd>${esc(sel.detail)}</dd>`:''}</dl>
+${sel.before?`<div><p class="eyebrow">Before</p><pre class="pre">${esc(JSON.stringify(sel.before,null,2))}</pre></div><div><p class="eyebrow">After</p><pre class="pre">${esc(JSON.stringify(sel.after,null,2))}</pre></div>`:''}</div></section></div>`;};
+
+V.config=()=>`
+<div class="pagehead"><div><p class="eyebrow">Settings</p><h1>Settings</h1></div></div>
+<div class="grid g2">
+<section class="panel"><header><h2>You</h2></header><div class="body"><dl class="kv"><dt>Admin login</dt><dd>ops@lucentoapp.com</dd><dt>MFA</dt><dd>Authenticator app (TOTP) · required</dd><dt>Session</dt><dd>Signed in 09:00 · idle limit 30 min · ends by 21:00</dd><dt>Allowlist</dt><dd>1 admin (changed only in SQL)</dd></dl><div class="row" style="margin-top:12px"><button class="btn" type="button" data-act="signout">Sign out</button></div></div></section>
+<section class="panel"><header><h2>Integrations</h2></header><div class="tblwrap"><table class="tbl"><tbody>
+${[['Supabase (mc_api)','ok','Checked 09:01'],['Google Play Orders API','ok','Synced 03:00'],['Crashlytics BigQuery','ok','Export 06:00'],['Vercel','ok','Checked 09:00'],['Resend webhook','ok','Last event 09:01'],['Backups (GitHub Actions)','ok','Sun 14 Mar · 18 MB encrypted'],['Supabase management token','unk','Not configured (FD-V9)']].map(r=>`<tr><td>${r[0]}</td><td><span class="st ${r[1]}">${r[1]==='ok'?'Connected':'Not connected'}</span></td><td class="muted small">${r[2]}</td></tr>`).join('')}
+</tbody></table></div><p class="muted small" style="padding:10px 16px">Shows whether each credential works. Values never appear here.</p></section>
+<section class="panel"><header><h2>Email plan limits</h2></header><div class="body" style="display:flex;flex-direction:column;gap:12px"><div class="grid g2" style="gap:12px"><div class="field"><label for="ld">Daily limit</label><input type="number" id="ld" min="1" value="${state.limits.day}"></div><div class="field"><label for="lm">Monthly limit</label><input type="number" id="lm" min="1" value="${state.limits.month}"></div></div><p class="muted small">Enter your Resend plan’s limits. The quota meters use them.</p><div><button class="btn primary" type="button" data-act="savelimits">Save limits</button></div></div></section>
+<section class="panel"><header><h2>Records view</h2></header><div class="body" style="display:flex;flex-direction:column;gap:10px"><label class="toggle"><input type="checkbox" id="recOn" ${state.recordsOn?'checked':''}> Allow viewing customers\u2019 records when handling support</label><p class="muted small">Starts off in V1. Turn it on when the app release with the updated privacy policy is live (FD-V3, FD-V15). This prototype has it on so you can try it.</p></div></section>
+<section class="panel"><header><h2>Reporting</h2></header><div class="body"><dl class="kv"><dt>Time zone</dt><dd>Asia/Manila</dd><dt>Google fee for estimates</dt><dd>15 %</dd><dt>Currency</dt><dd>PHP</dd></dl></div></section>
+</div>`;
+
+/* ---------- modal, toast, audit ---------- */
+const modal=$('#modal'); let lastFocus=null;
+function openModal(html,onMount){lastFocus=document.activeElement;modal.innerHTML=`<div class="dialog" role="dialog" aria-modal="true">${html}</div>`;modal.hidden=false;onMount&&onMount(modal);const f=modal.querySelector('input:not([type=radio]),select,textarea,input');f&&f.focus();}
+function closeModal(){modal.hidden=true;modal.innerHTML='';lastFocus&&lastFocus.focus&&lastFocus.focus();}
+modal.addEventListener('click',e=>{if(e.target===modal||e.target.closest('[data-close]'))closeModal();});
+let tt; function toast(m){const t=$('#toast');t.innerHTML=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,5000);}
+function log(e){auditSeq++;audit.unshift(Object.assign({n:auditSeq,at:'Today '+nowHM(),who:'ops@ (Jerald)',result:'ok',reason:'—'},e));return auditSeq;}
+const head=(t,p)=>`<header><div><h2>${t}</h2>${p?`<p>${p}</p>`:''}</div><button class="x" type="button" data-close aria-label="Close">×</button></header>`;
+const stepup=`<div class="field"><label for="otp">Authenticator code</label><input type="text" id="otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 digits"><span class="muted small">Asked again because this action is sensitive. Prototype: any 6 digits.</span></div>`;
+function dialog({title,sub,body='',ok,danger,typed,step,reason,onOk}){
+ openModal(head(title,sub)+`<div class="content">${body}${reason?'<div class="field"><label for="dr">Reason (required)</label><input type="text" id="dr"></div>':''}${typed?`<div class="field"><label for="dt">Type <b class="mono">${esc(typed)}</b> to confirm</label><input type="text" id="dt" autocomplete="off"></div>`:''}${step?stepup:''}</div><footer><span class="hint">Recorded in the audit log.</span><button class="btn" type="button" data-close>Cancel</button><button class="btn ${danger?'danger solid':'primary'}" type="button" id="dok">${ok}</button></footer>`,m=>{
+  const b=m.querySelector('#dok');const chk=()=>{b.disabled=(reason&&m.querySelector('#dr').value.trim().length<4)||(typed&&m.querySelector('#dt').value!==typed)||(step&&!/^\d{6}$/.test(m.querySelector('#otp').value));};
+  m.querySelectorAll('input').forEach(i=>i.addEventListener('input',chk));chk();b.onclick=()=>{const r=m.querySelector('#dr');const v=r?r.value:'';closeModal();onOk(v);};});}
+
+function grantDialog(){const u=users.find(x=>x.id===state.uid);
+ openModal(head('Grant complimentary Pro',esc(u.email))+`<div class="content">
+ <div class="field"><span class="lab" id="dl">Duration</span><div class="choices" role="radiogroup" aria-labelledby="dl">${[['30','30 days'],['90','90 days'],['365','1 year'],['life','Lifetime']].map(([v,l],i)=>`<label><input type="radio" name="dur" value="${v}" ${i===1?'checked':''}>${l}</label>`).join('')}</div></div>
+ <div class="field"><label for="gr">Reason (required)</label><select id="gr"><option value="">Choose…</option><option>Tester</option><option>Support recovery</option><option>Compensation</option><option>Partner</option><option>Press</option><option>Giveaway</option><option>Other</option></select></div>
+ <div class="field"><label for="gn">Note</label><input type="text" id="gn" placeholder="Optional, for your records"></div>
+ <div class="preview" id="gp"></div><div id="gs"></div></div>
+ <footer><span class="hint">Separate from Google Play. Paid entitlements are never changed.</span><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" id="gok" disabled>Grant</button></footer>`,m=>{
+  const upd=()=>{const d=m.querySelector('[name=dur]:checked').value;const long=d==='365'||d==='life';
+   const end=d==='life'?null:fmt(addDays(TODAY,+d));
+   m.querySelector('#gp').innerHTML=d==='life'?`<b>Pro on the phone with no end date, plus online services (sync, AI, Shared) until ${fmt(addDays(TODAY,365))}.</b><span class="ink2">The same shape as a paid Lifetime purchase (FD-V5).</span><span class="mono small ink2">GRANT · LOCAL_PRO · no expiry  +  GRANT · CLOUD AI_PRO SHARED · until ${fmt(addDays(TODAY,365))}</span>`:`<b>All of Pro until ${end}.</b><span class="mono small ink2">GRANT · LOCAL_PRO CLOUD AI_PRO SHARED · until ${end}</span>`;
+   m.querySelector('#gs').innerHTML=long?stepup:''; const o=m.querySelector('#otp'); o&&o.addEventListener('input',chk); chk();};
+  const chk=()=>{const d=m.querySelector('[name=dur]:checked').value;const long=d==='365'||d==='life';m.querySelector('#gok').disabled=!m.querySelector('#gr').value||(long&&!/^\d{6}$/.test((m.querySelector('#otp')||{}).value||''));};
+  m.querySelectorAll('[name=dur]').forEach(r=>r.addEventListener('change',upd)); m.querySelector('#gr').addEventListener('change',chk); upd();
+  m.querySelector('#gok').onclick=()=>{const d=m.querySelector('[name=dur]:checked').value;const kind={30:'30 days',90:'90 days',365:'1 year',life:'Lifetime'}[d];
+   const g={id:'g-'+(150+Math.floor(Math.random()*40)),kind,reason:m.querySelector('#gr').value,note:m.querySelector('#gn').value,by:'ops@ (Jerald)',at:fmt(TODAY),ends:d==='life'?'Never (services '+fmt(addDays(TODAY,365))+')':fmt(addDays(TODAY,+d)),active:true};
+   (grants[u.id]=grants[u.id]||[]).unshift(g); if(u.plan==='Free'||u.plan==='Comp'){u.plan='Comp';u.src='Complimentary · '+kind;}
+   const n=log({act:'entitlement.grant',target:u.name,reason:g.reason+' · '+kind,before:{grant:null},after:{source:'GRANT',kind,ends:g.ends}});
+   closeModal();state.tab='entitlements';render();toast(`Granted ${kind} of Pro · <a href="#audit" data-auditlink="${n}">Audit ${n}</a>`);};});}
+
+/* ---------- events ---------- */
+document.addEventListener('click',e=>{const t=e.target;
+ const per=t.closest('[data-period]'); if(per){state.period=per.dataset.period;render();return;}
+ const us=t.closest('[data-user]'); if(us){state.uid=us.dataset.user;state.tab=us.dataset.totab||'overview';state.revealed={};const u=users.find(x=>x.id===state.uid);log({act:'access.profile_open',target:u.name,reason:state.route==='support'?state.ticket:'Directory'});if(location.hash==='#user')render();else location.hash='user';return;}
+ const tb=t.closest('[data-tab]'); if(tb){state.tab=tb.dataset.tab;render();return;}
+ const tk=t.closest('[data-ticket]'); if(tk){state.ticket=tk.dataset.ticket;render();return;}
+ const gt=t.closest('[data-goticket]'); if(gt){state.ticket=gt.dataset.goticket;}
+ const ar=t.closest('[data-audit]'); if(ar){state.aSel=+ar.dataset.audit;render();return;}
+ const al=t.closest('[data-auditlink]'); if(al){state.aSel=+al.dataset.auditlink;state.aResult='all';state.aQuery='';}
+ const rs=t.closest('[data-ares]'); if(rs){state.aResult=rs.dataset.ares;render();return;}
+ const rv=t.closest('[data-reveal]'); if(rv){state.revealed[rv.dataset.reveal]=true;const u=users.find(x=>x.id===state.uid);log({act:'access.reveal_note',target:u.name,reason:access[u.id].reason});render();return;}
+ const a=t.closest('[data-act]'); if(!a) return; const act=a.dataset.act; const u=users.find(x=>x.id===state.uid);
+ if(act==='grant') grantDialog();
+ else if(act==='revoke'){const g=grants[u.id].find(x=>x.id===a.dataset.g); const paid=/Lifetime|subscription|Monthly|Annual/.test(u.src)&&u.plan!=='Comp';
+  dialog({title:'Revoke complimentary Pro',sub:esc(u.email)+' · '+g.kind,body:`<div class="infobox">Ends this complimentary grant only. ${paid?'This account also has a paid plan from Google Play, which stays exactly as it is.':'This account has no paid plan, so it returns to Free. Its records stay; only creating Pro-only items pauses.'}</div>`,ok:'Revoke grant',danger:true,reason:true,onOk:r=>{g.active=false;if(u.plan==='Comp'&&!grants[u.id].some(x=>x.active)){u.plan='Free';u.src='—';}const n=log({act:'entitlement.revoke_grant',target:u.name,reason:r,before:{grant:g.id,active:true},after:{grant:g.id,active:false}});render();toast(`Grant revoked · Audit ${n}`);}});}
+ else if(act==='suspend') dialog({title:'Suspend account',sub:esc(u.email),body:'<div class="warnbox">Lucento works offline, so the app keeps working on the phone. Suspension stops sign-in, sync, AI answers, Lucento Shared and purchase restore within about an hour, when the current session token expires. Google Play subscriptions keep billing until the customer cancels.</div>',ok:'Suspend',danger:true,reason:true,step:true,onOk:r=>{u.status='Suspended';const n=log({act:'account.suspend',target:u.name,reason:r,before:{banned_until:null},after:{banned_until:'until reactivated'}});render();toast(`Suspended · Audit ${n}`);}});
+ else if(act==='openrecords') dialog({title:'Open records',sub:esc(u.email),body:'<p class="ink2">Read-only. Every tab you open and every note you reveal is logged with this reason. Staff access is disclosed in the privacy policy (FD-V3).</p>',ok:'Open records',reason:true,step:true,onOk:r=>{access[u.id]={reason:r,at:'today '+nowHM()};const n=log({act:'records.open',target:u.name,reason:r});render();toast(`Records open · Audit ${n}`);}});
+ else if(act==='closerecords'){const n=log({act:'records.close',target:u.name,reason:access[u.id]?access[u.id].reason:'—'});delete access[u.id];state.revealed={};state.tab='overview';render();toast(`Records closed · Audit ${n}`);}
+ else if(act==='reactivate') dialog({title:'Reactivate account',sub:esc(u.email),body:'<p class="ink2">Clears the suspension. The customer can sign in again straight away.</p>',ok:'Reactivate',reason:true,onOk:r=>{u.status='Active';const n=log({act:'account.reactivate',target:u.name,reason:r});render();toast(`Reactivated · Audit ${n}`);}});
+ else if(act==='editprofile') dialog({title:'Edit profile information',sub:esc(u.email),body:'<div class="na-box"><div><b>Nothing to edit in V1.</b> Lucento has no profile record; the only identity field is the sign-in email. Email changes are rare and are made in Supabase › Authentication › Users, then noted in the ticket (FD-V6).</div></div>',ok:'OK',onOk:()=>{}});
+ else if(act==='delete') dialog({title:'Delete account',sub:esc(u.email),body:'<p class="ink2">Deletes the account and everything stored with it on Lucento’s servers, the same as Delete account in the app. It runs in <b>24 hours</b> and you can cancel until then. Google Play purchases and subscriptions aren’t cancelled; tell the customer how to cancel in Google Play.</p>',ok:'Schedule deletion',danger:true,typed:u.email.split('@')[0],reason:true,step:true,onOk:r=>{u.status='Deletion scheduled';const n=log({act:'account.delete.schedule',target:u.name,reason:r,result:'pending'});render();toast(`Deletion scheduled for tomorrow ${nowHM()} · Audit ${n}`);}});
+ else if(act==='canceldelete') dialog({title:'Cancel scheduled deletion',sub:esc(u.email),ok:'Cancel deletion',reason:true,onOk:r=>{u.status='Active';const n=log({act:'account.delete.cancel',target:u.name,reason:r});render();toast(`Deletion cancelled · Audit ${n}`);}});
+ else if(act==='resolve') dialog({title:'Move the Lifetime purchase to this account',sub:'lucento_pro_lifetime · GPA.3381-0921-…',body:'<table class="diff"><thead><tr><th></th><th>Now</th><th>After</th></tr></thead><tbody><tr><td>Linked account</td><td class="before">4c1d… (j•••@example.com)</td><td class="after">'+esc(u.email)+'</td></tr><tr><td>Lifetime rows on 4c1d…</td><td class="before">PLAY_LIFETIME, PLAY_LIFETIME_SERVICES</td><td class="after">removed</td></tr><tr><td>Lifetime rows here</td><td class="before">none</td><td class="after">PLAY_LIFETIME, PLAY_LIFETIME_SERVICES</td></tr></tbody></table><div class="warnbox">This overrides the 30-day rule. Record the evidence in the reason: for example, the customer wrote from the Google account that paid, and 4c1d… has been inactive since 6 Mar.</div>',ok:'Move purchase',reason:true,step:true,onOk:r=>{state.linkResolved=true;u.plan='Pro';u.src='Lifetime';u.flag='';const n=log({act:'purchase.relink',target:u.name,reason:r,before:{linked_to:'4c1d…'},after:{linked_to:u.id.slice(0,4)+'…'}});render();toast(`Purchase moved · Audit ${n}`);}});
+ else if(act==='send'||act==='note'){const r=$('#reply'); if(!r.value.trim()){r.focus();return;} const tk2=tickets.find(x=>x.id===state.ticket); tk2.msgs.push({k:act==='note'?'note':'reply',who:'ops@ (Jerald)',at:nowHM(),body:r.value}); if(act==='send'&&tk2.status==='Open') tk2.status='Awaiting Customer'; log({act:act==='note'?'ticket.note':'ticket.reply',target:tk2.who,reason:tk2.id}); render(); toast(act==='note'?'Note added (never sent to the customer)':'Reply queued (prototype: nothing is sent)');}
+ else if(act==='resolveticket'){const tk2=tickets.find(x=>x.id===state.ticket);tk2.status='Resolved';log({act:'ticket.resolve',target:tk2.who,reason:tk2.id});render();toast(tk2.id+' resolved');updateCount();}
+ else if(act==='newticket') openModal(head('New ticket','For a call, a Play review or a message outside email')+`<div class="content"><div class="field"><label for="ne">Customer email</label><input type="text" id="ne" placeholder="name@example.com"></div><div class="field"><label for="ns">Subject</label><input type="text" id="ns"></div><div class="field"><label for="nb">What they said</label><textarea id="nb"></textarea></div></div><footer><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" id="nok">Create ticket</button></footer>`,m=>{m.querySelector('#nok').onclick=()=>{const em=m.querySelector('#ne').value.trim(),s=m.querySelector('#ns').value.trim();if(!em||!s){m.querySelector(em?'#ns':'#ne').focus();return;}const id='LC-'+(ticketSeq++);const mu=users.find(x=>x.email===em);tickets.unshift({id,ch:'Manual',uid:mu?mu.id:null,email:em,who:mu?mu.name:em,subj:s,cat:'General',status:'Open',pri:'Normal',age:'now',msgs:[{k:'inbound',who:mu?mu.name:em,at:nowHM(),body:m.querySelector('#nb').value||s}]});state.ticket=id;closeModal();render();updateCount();toast(id+' created');};});
+ else if(act==='linkticket') toast('Prototype: search an account and link it to this ticket.');
+ else if(act==='testemail') dialog({title:'Send a test email to yourself',sub:'To ops@lucentoapp.com from support@send.lucentoapp.com',body:'<p class="ink2">Checks sending and the webhook end to end. Uses 1 of today’s emails.</p>',ok:'Send test',onOk:()=>{const n=log({act:'email.test',target:'ops@lucentoapp.com'});toast(`Test sent (prototype) · Audit ${n}`);}});
+ else if(act==='transactional') openModal(head('Send a transactional email','Fixed templates, to an existing account only')+`<div class="content"><div class="field"><label for="tr">Account</label><select id="tr">${users.filter(x=>x.status!=='Unconfirmed').map(x=>`<option value="${x.id}">${esc(x.email)}</option>`).join('')}</select></div><div class="field"><label for="tt">Template</label><select id="tt"><option value="comp">Your complimentary Pro is active</option><option value="purchase">About your purchase</option><option value="delete">Your account deletion is scheduled</option></select></div><div class="mail" id="tpv"></div></div><footer><span class="hint">Uses 1 email. Recorded in the audit log.</span><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="button" id="tok">Send</button></footer>`,m=>{
+   const T={comp:['Your complimentary Pro is active','You now have Lucento Pro, on us. It’s already on your phone: open Lucento and pull to refresh if you don’t see it yet.'],purchase:['About your purchase','Your Lucento Pro purchase is now attached to this account. Open Lucento and you’ll see Pro within a few minutes.'],delete:['Your account deletion is scheduled','As you asked, your Lucento account will be deleted in 24 hours. Reply to this email before then if you change your mind.']};
+   const draw=()=>{const k=m.querySelector('#tt').value,x=users.find(y=>y.id===m.querySelector('#tr').value);m.querySelector('#tpv').innerHTML=`<div class="mh">To ${esc(x.email)} · Subject: <b>${T[k][0]}</b></div><div class="mb"><h4>${T[k][0]}</h4><p>Hi ${esc(x.name.split(' ')[0])}, ${T[k][1]}</p><p style="font-size:12px;color:#5B6680">You get this because of your Lucento account. Questions: reply to this email.</p></div>`;};
+   m.querySelectorAll('select').forEach(s=>s.addEventListener('change',draw));draw();
+   m.querySelector('#tok').onclick=()=>{const x=users.find(y=>y.id===m.querySelector('#tr').value);const n=log({act:'email.send_transactional',target:x.name,reason:'Template: '+T[m.querySelector('#tt').value][0]});closeModal();toast(`Email queued (prototype: nothing sent) · Audit ${n}`);};});
+ else if(act==='savelimits'){const d=+$('#ld').value,mo=+$('#lm').value;if(d>0&&mo>0){state.limits={day:d,month:mo};const n=log({act:'settings.email_limits',target:'—',reason:d+'/day · '+mo+'/month'});toast(`Limits saved · Audit ${n}`);}}
+ else if(act==='signout') toast('Prototype: you would be signed out and asked for your password and code again.');
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)closeModal();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openCmd();}if(e.key==='Enter'&&e.target.matches('tr[data-user],tr[data-audit],li[data-ticket]'))e.target.click();});
+document.addEventListener('input',e=>{if(e.target.id==='uq')userRows();if(e.target.id==='tq'){state.tQuery=e.target.value;const pos=e.target.selectionStart;render();const el=$('#tq');el.focus();el.setSelectionRange(pos,pos);}if(e.target.id==='aq'){state.aQuery=e.target.value;const pos=e.target.selectionStart;render();const el=$('#aq');el.focus();el.setSelectionRange(pos,pos);}});
+document.addEventListener('change',e=>{const id=e.target.id;
+ if(id==='up'||id==='us')userRows();
+ if(id==='tf'){state.tFilter=e.target.value;render();}
+ if(id==='ef'){state.eFilter=e.target.value;render();}
+ if(id==='tstatus'){const tk2=tickets.find(x=>x.id===state.ticket);const from=tk2.status;tk2.status=e.target.value;log({act:'ticket.status',target:tk2.who,reason:tk2.id+': '+from+' → '+tk2.status});render();updateCount();}
+ if(id==='recOn'){state.recordsOn=e.target.checked;const n=log({act:'settings.records_view',target:'—',reason:state.recordsOn?'on':'off'});toast(`Records view ${state.recordsOn?'on':'off'} · Audit ${n}`);}
+ if(id==='saved'){const T={sync:'Thanks for your patience. The missing transactions are back on our side. Open Lucento on the tablet and give it a minute to sync; they should all appear. Reply here if anything is still missing.',link:'Your purchase is safe. It\u2019s attached to the Lucento account that was signed in when it was first restored. I can move it to the account you use now; I\u2019ll confirm by email when it\u2019s done.',trial:'If you keep the subscription, Google Play charges the annual price when the trial ends. Cancel before then in Google Play \u203a Subscriptions and you won\u2019t be charged.'};if(T[e.target.value])$('#reply').value=T[e.target.value];e.target.value='';}
+});
+function updateCount(){$('#openCount').textContent=tickets.filter(t=>t.status==='Open'||t.status==='In Progress').length;}
+function openCmd(){openModal(head('Search','Users and tickets')+`<div class="content"><label class="sr" for="cq">Search</label><input type="search" id="cq" placeholder="Email, user id or LC-number"><div id="cr" class="menu"></div></div>`,m=>{
+ const items=[...users.map(u=>({l:u.email+' · '+u.name,go:()=>{state.uid=u.id;state.tab='overview';log({act:'access.profile_open',target:u.name,reason:'Search'});location.hash='user';render();}})),...tickets.map(t=>({l:t.id+' · '+t.subj,go:()=>{state.ticket=t.id;location.hash='support';render();}}))];
+ const q=m.querySelector('#cq'),r=m.querySelector('#cr');const draw=()=>{const s=q.value.toLowerCase();r.innerHTML=items.map((it,i)=>[it,i]).filter(([it])=>it.l.toLowerCase().includes(s)).slice(0,7).map(([it,i])=>`<button class="btn" type="button" data-ci="${i}">${esc(it.l)}</button>`).join('')||'<p class="muted">No match.</p>';};
+ q.oninput=draw;draw();r.onclick=e=>{const b=e.target.closest('[data-ci]');if(b){closeModal();items[+b.dataset.ci].go();}};q.onkeydown=e=>{if(e.key==='Enter'){const b=r.querySelector('[data-ci]');b&&b.click();}};});}
+$('#openCmd').onclick=openCmd;
+$('#themeBtn').onclick=()=>{const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('mc1-theme',r.dataset.theme);}catch(_){}render();};
+try{const s=localStorage.getItem('mc1-theme');if(s)document.documentElement.dataset.theme=s;}catch(_){}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>render());}catch(_){}
+
+/* ---------- router ---------- */
+function render(){const r=(location.hash||'#overview').slice(1);state.route=V[r]?r:'overview';killCharts();
+ $('#view').innerHTML=V[state.route]();
+ document.querySelectorAll('.navlink').forEach(a=>{const on=a.dataset.r===state.route||(state.route==='user'&&a.dataset.r==='users');on?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current');});
+ const u=users.find(x=>x.id===state.uid); const b=$('#banner');
+ if(state.route==='user'&&state.tab==='records'&&access[u.id]&&state.recordsOn){b.hidden=false;b.innerHTML=`<span>Viewing records of <b>${esc(u.name)}</b> · read-only · ${esc(access[u.id].reason)}</span><span class="t">opened ${access[u.id].at}</span><button type="button" data-act="closerecords">Close records</button>`;} else b.hidden=true;
+ if(state.route==='overview')drawOverview();
+ if(state.route==='revenue')mk('chRev2',{type:'bar',data:{labels:['Dec','Jan','Feb','Mar*'],datasets:[{label:'Lifetime (one-time)',data:[213571,160179,167339,118411],backgroundColor:tok('--c2'),borderRadius:3,maxBarThickness:40},{label:'Subscriptions (recurring)',data:[4107,11206,17931,12940],backgroundColor:tok('--c1'),borderRadius:3,maxBarThickness:40}]},options:{plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,color:tok('--ink-2')}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+php(c.raw)}}},scales:{y:{ticks:{callback:v=>'₱'+v/1000+'k',maxTicksLimit:5},grid:{color:tok('--grid')},border:{display:false}}}}});
+ if(state.route==='users')userRows();
+ if(state.route==='support'){const c=$('#convo');c&&(c.scrollTop=c.scrollHeight);}
+}
+window.addEventListener('hashchange',()=>{render();$('#view').focus({preventScroll:true});window.scrollTo({top:0});});
+window.addEventListener('load',()=>{if(state.route==='overview'||state.route==='revenue')render();});
+render();
+})();
+</script>
