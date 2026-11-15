@@ -15,6 +15,18 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Mission Control V1 (2026-11-15, `feature/mission-control-db`, `lucento-mission-control`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| MC-1 | **Partly resolved 2026-11-15**: the console has run end to end against the local stack (real PostgreSQL and PostgREST, an Auth stand-in, fictional data): 6 Playwright tests and a 72-screen tour per privacy state pass. Not yet against Supabase's own Auth and gateway | `lucento-mission-control` `npm run local`, `npx playwright test` (CURRENT_STATUS) | OT-27 on lucento-test (DEPLOYMENT.md D) |
+| MC-2 | Revenue counts subscription **first** payments only: renewals' order ids are never stored (tokens aren't kept, only hashes) | `public.purchase_links.order_id` is the first order; Orders API has no list | Website records `latestSuccessfulOrderId` on re-verification before the first renewals (NEXT_TASKS) |
+| MC-3 | **Resolved 2026-11-15**: the owner kept both retention rules (FOUNDER_DECISIONS IN-1, IN-2): support requests deleted 12 months after their last message (and with the account); backups kept 28 days (the design said 90; 28 keeps the delete-account page's "within 30 days"). Both are in Privacy Policy 2026-11-15 (PR #77) | `mc.daily_rollup`, `.github/workflows/backup.yml` | — |
+| MC-4 | Suspension ends sessions and refuses refresh, but an access token already issued keeps working up to its expiry (1 hour); on the phone, Pro from server rows leaves (session ended → signed out) while a Google Play purchase still unlocks Pro locally | `mc_api.suspend`; `EntitlementManager.signedOut`; Supabase JWT expiry | Accepted; the suspend dialog says so |
+| MC-5 | Step-up freshness reads `auth.mfa_amr_claims.updated_at` (and the JWT `amr` timestamp as a fallback). That Auth refreshes the claim's time on every re-verification is from Auth's code, not its docs | `mc.fresh_mfa` | Confirm on lucento-test (DEPLOYMENT D): a Lifetime grant right after a code works, and 11 minutes later asks again |
+| MC-7 | Until the owner turns on **extended data**, Overview shows no active accounts, Revenue shows counts without amounts, and Emails counts Lucento's mail without addresses. Intended: today's privacy policy doesn't list those | `mc.settings` defaults (`extended_data_enabled` false); suite S4/S4b/S5 | Owner turns it on, then the records view, once the Contact-support release and the website's /privacy are live (DEPLOYMENT.md H) |
+| MC-6 | Vercel Hobby is for non-commercial use; Mission Control and the website belong to a business selling Pro | INTEGRATION_REQUIREMENTS §4, FD-V1 | Owner checks the terms or upgrades (DEPLOYMENT C1) |
+
 ## Found while verifying the launch film (2026-11-14)
 
 All **Code-only** (read in source on `main` `0679ccf`); details in `docs/marketing/LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §6.

@@ -18,7 +18,7 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm run concur
 ```
 
 Exit code 0 means every check passed. Each suite runs on a fresh database; the output lists every check, for example
-`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (258 checks on 2026-11-10). Run both
+`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (362 checks on 2026-11-15). Run both
 variants: a migration must be safe whichever default privileges the project has.
 
 `node run.mjs <migrations dir> <suite.sql> [skip …]` runs one suite. By default it skips `usage_events_purge_schedule`,
@@ -31,6 +31,19 @@ counts against the daily total. It creates and drops its own database. CI runs i
 package was used on Windows). Never point it at lucento-test or production.
 
 ## Suites
+
+- `mission_control_suite.sql` — Mission Control V1 (docs/mission-control/v1), 74 checks: the gate (customers, aal1,
+  deactivated admins and anon refused; refusals logged at most 10 an hour; catalog-wide: anon runs only the ingest
+  functions, PUBLIC nothing, no API role on any `mc` table); the append-only audit log (UPDATE, DELETE, TRUNCATE refused
+  for its owner too); step-up from Auth's own session record and from the token's `amr`; complimentary grants (90 days,
+  Lifetime's two rows, overlapping and revoked grants, PLAY_* rows untouched byte for byte, hand-written rows imported
+  once and never undone, expiry); suspension (ban, sessions and refresh tokens ended); deletion (cool-off, the same
+  cascade as `delete_my_account`, cancellation, audit kept); moving a purchase (step-up, rows move, conflicts and refunds
+  refused); the support form (signed out and in, idempotent retries, per-install limits, the shared signed-out cap, the
+  diagnostics allow-list, nothing readable back); `report_client`; the records view (setting, step-up, notes masked,
+  balances per docs/CALCULATIONS.md, another admin's session refused); activity, Overview, the nightly roll-up;
+  Resend events (KlaroPH's anonymous); Google Play orders (test orders excluded, unknown orders not asked again, MRR,
+  reported net).
 
 - `security_remediation_suite.sql` — the security remediation (docs/security/REMEDIATION_REPORT.md), 78 checks: the
   Cloud write gate (Free refused, Pro accepted, a lapsed account reads and cleans up, renewal resumes, a Partner on the

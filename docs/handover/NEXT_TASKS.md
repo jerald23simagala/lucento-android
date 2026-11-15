@@ -40,7 +40,30 @@
 | OT-25 | **Retest 0.5.8 (vc 13) from internal testing**: (1) buying Lifetime after a refund (KNOWN_ISSUES PB-8). Open the plan page, tap Buy Lifetime, pay with a test card, and expect Play's sheet, not "You already own this item", then Pro Lifetime. (2) Voice in the composer in the Play build (PR #60). For later refund tests tick **Remove entitlement** in Play Console (PLAY_CONSOLE_SETUP "Refunding an order") | **Open**, 0.5.8 carries #65 and #60 | The first real check that Google Play releases a refunded purchase when Lucento consumes it |
 | OT-26 | **Check 0.5.9 (vc 14) from internal testing: the signed-out purchase warnings** (KNOWN_ISSUES PB-11): signed out, open the Lucento Plan page and expect the amber note above the plans ("You're not signed in. If you buy now…"). With a purchase made signed out still on the phone's Google Play, open Settings › Cloud sync (signed out) and expect the note above "Continue with Google". Then sign in with an account that holds a grant (Pro shows), sign out, and expect the free plan with no "your Lucento Pro has ended" notice, while a Pro purchase made with this phone's Google account stays (PB-12) | **Open**, ships in 0.5.9 | Needs a release build (debug builds use the test store, which never makes a purchase without an account unless bought signed out) |
 | OT-22 | **Security remediation (2026-11-10)**: work through `docs/security/OWNER_ACTIONS_REQUIRED.md` §1–§14 — Gemini paid tier, Confirm email, plan decision, then apply the four `20261111*` migrations (lucento-test → production), deploy the website branch `security/release-hardening`, internal-track purchase and refund checks | **Open** | The release stays NOT APPROVED until §1, §2, §5/§6, §13 and §14 are done (`docs/security/REMEDIATION_REPORT.md`) |
+| OT-27 | **Mission Control on lucento-test**: `lucento-mission-control/DEPLOYMENT.md` parts A (paste `docs/mission-control/APPLY_MISSION_CONTROL.sql`, verify with `VERIFY_MISSION_CONTROL.sql`, expose `mc_api`, admin login + `mc.admins` row, the two secrets `mc.rotate_ingest_secret('app')` and `('backup')`), C (Vercel project, Preview env = lucento-test) and D (first sign-in with TOTP, the grant/revoke phone check) | **Open** (built 2026-11-15; branch `feature/mission-control-db` + repo `lucento-mission-control`) | The console replaces production SQL for grants, refunds and support; D is the first check of a GRANT row from Mission Control on a phone |
+| OT-28 | **Mission Control on production**: the same part A on `lucento` after OT-27 looks right, then the domain `mission.lucentoapp.com` (CNAME at GoDaddy) | **Open**, after OT-27 | Part A changes one production constraint (`entitlements_grant_expires`, FD-V5) and adds the `mc` schemas and four pg_cron jobs |
+| OT-29 | **Weekly encrypted backup**: DEPLOYMENT.md part B (age key on your PC, five secrets in the main-only GitHub environment `backup`, run the workflow once). Production on Supabase Free has no usable backups | **Open** | Limits a loss to a week (FD-V13) |
+| OT-30 | **Mission Control integrations** (when wanted): Resend send key + webhook (part E), Play service account with financial view only (part F, FD-V10), Crashlytics BigQuery link with sessions (part G) | **Open**, optional | Emails/quota, revenue amounts, crash data. Each page says "not connected" until then |
 
+
+## Mission Control V1 — follow-ups (2026-11-15)
+
+- **Run the local stack end to end** (`lucento-mission-control`: `npm run local`, then `npm run dev`): the console has
+  been built, typechecked, linted, unit-tested and production-built, but not yet clicked through against a database;
+  starting the local stack needs the owner's permission in this environment (it downloads PostgREST and runs local
+  servers). Then Playwright screenshots and a design-critic round.
+- **Subscription renewals in Revenue**: Lucento stores only each purchase's first order id. Before the first monthly
+  renewals (about a month after launch), have the website record each renewal's `latestSuccessfulOrderId` when it
+  re-verifies a subscription (verify.ts / rtdn.ts), so the daily sweep can fetch its amount.
+- **Android release with Contact support** (roadmap 4.6, FD-V4/V7/V15): **built**, draft PR #77
+  (`feature/contact-support`, worktree `../lucento-contact-support`): in-app form, offline queue, daily `report_client`,
+  Privacy Policy 2026-11-15, the complimentary-Lifetime display (M5). Unit tests and lint green locally; no phone test
+  yet. Order: OT-27 (migrations on lucento-test), then the PR's owner test, then merge and release. The same day the
+  release goes live, regenerate the website's /privacy (`python tools/legal/export_legal.py
+  ../lucento-website/src/data/legal.ts`) and deploy it. Only after both are live: Settings › Extended data on, then
+  Records view on (DEPLOYMENT.md H; KNOWN_ISSUES MC-7).
+- ~~Owner confirmations for the privacy policy wording~~ **Done 2026-11-15**: the owner kept both (support requests
+  deleted with the account and 12 months after their last message; backups kept 28 days; KNOWN_ISSUES MC-3).
 ## Home-screen widgets — follow-ups (2026-11-12, `feature/home-widgets`)
 
 - Merged as `50727be` (PR #57, 2026-11-13); not released yet. Next, a device pass on Android 12+ (the S8 runs Android 9:
