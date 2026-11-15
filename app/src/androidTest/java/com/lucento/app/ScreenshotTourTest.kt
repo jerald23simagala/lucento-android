@@ -14,6 +14,8 @@ import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performTouchInput
@@ -261,7 +263,18 @@ class ScreenshotTourTest {
         demoCurrency?.let { code ->
             compose.onAllNodes(hasSetTextAction())[0].performTextInput(code)
             waitForText("$code ·")
-            compose.onNodeWithText("$code ·", substring = true).performClick()
+            // The result row can arrive while the list is still settling, and a tap then doesn't select it: tap until the
+            // main-currency card says so (it happened on an API 35 emulator, 2026-11-13).
+            var chosen = false
+            repeat(5) {
+                if (chosen) return@repeat
+                compose.onAllNodesWithText("$code ·", substring = true).onFirst().performClick()
+                compose.waitForIdle()
+                chosen = runCatching {
+                    compose.waitUntil(2_000) { compose.onAllNodesWithText("$code · your main currency", substring = true).fetchSemanticsNodes().isNotEmpty() }
+                }.isSuccess
+            }
+            check(chosen) { "Onboarding didn't take $code as the main currency" }
             closeKeyboard()
         }
         shot("03b-onboarding-currency")
