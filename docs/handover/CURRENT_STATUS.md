@@ -579,18 +579,29 @@ Owner: "I need my minimalist mission control done … Lets start building now" (
 `docs/mission-control/v1/`, decisions FD-V1…V15). Phase 5 (production) is the owner's: DEPLOYMENT.md, NEXT_TASKS OT-27…OT-30.
 
 - **Database** (`supabase/migrations/20261116090000…090300_mission_control_*.sql`, one paste:
-  `docs/mission-control/APPLY_MISSION_CONTROL.sql`): schemas `mc` (19 tables, private) and `mc_api` (41 functions, each
+  `docs/mission-control/APPLY_MISSION_CONTROL.sql`): schemas `mc` (19 tables, private) and `mc_api` (43 functions, each
   behind `mc.gate`: admin allowlist, aal2, fresh TOTP for sensitive actions, hourly limits, refusal logging, append-only
   audit log). Complimentary Pro derived from `mc.entitlement_grants` (comp Lifetime = paid Lifetime's two rows; FD-V5
   constraint change); suspension; deletion after a 24-hour cool-off through the same cascade as `delete_my_account`;
   moving a purchase; support tickets; `public.submit_support_request` and `public.report_client` for the app; records
   view gated by a setting + reason + step-up; Google Play orders with Google's reported net; Resend events (KlaroPH's
   counted, never named); four pg_cron jobs. Not applied anywhere yet.
-- **Tests**: `tools/sql-verify` — 9 suites, **346 checks, 0 failed** under lucento-test's and Supabase's stock default
-  privileges (`mission_control_suite.sql`: 74). The combined apply file passes the suite on its own. The existing
+- **Tests**: `tools/sql-verify` — 9 suites, **361 checks, 0 failed** under lucento-test's and Supabase's stock default
+  privileges (`mission_control_suite.sql`: 89). The combined apply file passes the suite on its own. The existing
   `entitlements_suite` caught a NULL bug in the first version of the FD-V5 constraint (fixed with `coalesce`).
 - **Console** (`../lucento-mission-control`, Next.js 16.4.3, React 19.3, Tailwind 4, Chart.js 4): every page of
   PRODUCT_SCOPE.md; no service-role key, no Supabase key in the browser; proxy gate with 30-min idle / 12-h absolute
   limits; CSP nonce; Resend webhook (Svix) and daily cron (Play orders, checks, Crashlytics). `npm run verify` green:
   lint, typecheck, **31 unit tests**, production build, bundle secret scan. CI + weekly encrypted backup workflows.
   **Not yet exercised against a running database** (KNOWN_ISSUES MC-1).
+- **Independent security review** (same day, before anything was deployed), every finding fixed on both sides: auth
+  cookies capped at 12 h and an expired database session signs the admin out (H1); scheduling a deletion emails the
+  account's own address at once (M1); signed-out support requests are marked not verified, capped per day, install and
+  IP, and replies to them use a neutral subject; Send again and Delete as spam go through the gate; one ingest secret per
+  purpose (the backup's can only report the backup) and the backup's secrets in a main-only GitHub environment (M7a); no
+  full-access Resend key (M7b); no buyer country from Play orders; deleting an account removes its email-log entries.
+  **Extended data** (active days per account, Play order amounts, the recipients of Lucento's emails) is collected only
+  after the owner turns on a step-up switch once the privacy policy that lists it is live (M6, DEPLOYMENT.md H); until
+  then the pages say what is paused. Wiring that switch found two bugs, both fixed and tested: Lucento's email count and
+  bounce list keyed on stored recipients (now on the sending domain), and "counting since" included paused activity
+  runs. Console commit `82cbf89`.

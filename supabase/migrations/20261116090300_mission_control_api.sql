@@ -799,7 +799,8 @@ begin
       'dau', (select count(distinct a.user_id) from mc.account_activity a where a.day = v_today and not mc.is_excluded(a.user_id)),
       'dau_yesterday', (select count(distinct a.user_id) from mc.account_activity a where a.day = v_today - 1 and not mc.is_excluded(a.user_id)),
       'mau', (select count(distinct a.user_id) from mc.account_activity a where a.day > v_today - 30 and not mc.is_excluded(a.user_id)),
-      'activity_since', (select min(r.started_at) from mc.job_runs r where r.job = 'activity'),
+      -- The first run that really captured (not one paused while extended data was off).
+      'activity_since', (select min(r.started_at) from mc.job_runs r where r.job = 'activity' and r.detail ->> 'paused' is null),
       'active_in_period', (select count(distinct a.user_id) from mc.account_activity a where a.day between v_from and v_to and not mc.is_excluded(a.user_id)),
       'plans', (select jsonb_object_agg(p.plan, p.n) from (
                   select mc.plan_of(u.id) as plan, count(*) as n from auth.users u where not mc.is_excluded(u.id) group by 1) p)),
@@ -1234,7 +1235,9 @@ begin
     'quota', jsonb_build_object(
       'today', (select count(*) from mc.email_events e where e.type in ('email.sent', 'email.received') and e.at >= v_day_start),
       'month', (select count(*) from mc.email_events e where e.type in ('email.sent', 'email.received') and e.at >= v_month_start),
-      'today_lucento', (select count(*) from mc.email_events e where e.type = 'email.sent' and e.at >= v_day_start and e.recipient is not null),
+      -- Lucento's own mail by its sending domain: the recipient is only kept once extended data is on.
+      'today_lucento', (select count(*) from mc.email_events e where e.type = 'email.sent' and e.at >= v_day_start
+                        and (e.from_domain = 'lucentoapp.com' or e.from_domain like '%.lucentoapp.com')),
       'daily_limit', mc.setting_int('resend_daily_limit', 100),
       'monthly_limit', mc.setting_int('resend_monthly_limit', 3000),
       'first_event_at', (select min(e.at) from mc.email_events e),
@@ -1250,7 +1253,7 @@ begin
     'bounces', (select coalesce(jsonb_agg(jsonb_build_object('type', e.type, 'at', e.at, 'recipient', e.recipient, 'subject', e.subject,
                   'reason', e.reason) order by e.at desc), '[]'::jsonb)
                 from (select * from mc.email_events x where x.type in ('email.bounced', 'email.complained', 'email.failed', 'email.suppressed')
-                      and x.recipient is not null order by x.at desc limit 50) e),
+                      and (x.from_domain = 'lucentoapp.com' or x.from_domain like '%.lucentoapp.com') order by x.at desc limit 50) e),
     'sends', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'template', s.template, 'recipient', s.recipient,
                 'status', s.status, 'error', s.error, 'created_at', s.created_at,
                 'sent_by', (select a.display_name from mc.admins a where a.user_id = s.sent_by)) order by s.created_at desc), '[]'::jsonb)

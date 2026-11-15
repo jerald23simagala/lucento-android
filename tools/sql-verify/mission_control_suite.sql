@@ -260,6 +260,12 @@ begin
   v_k := mc_api.ingest_email_events(v_secret, jsonb_build_array(jsonb_build_object('event_id', 'msg_paused', 'email_id', 're_p',
     'type', 'email.sent', 'at', now(), 'from_domain', 'send.lucentoapp.com', 'recipient', 'someone@example.com', 'subject', 'Hi')));
   execute 'reset role';
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_before := mc_api.overview();
+  execute 'reset role';
+  r := r || case when v_before #>> '{users,activity_since}' is null and not (v_before #>> '{ops,extended_data_enabled}')::boolean
+                 then 'ok  S4b a paused activity run doesn''t start the 30-day count, and the overview says it is paused'
+                 else 'FAIL S4b ' || coalesce(v_before #>> '{users,activity_since}', 'null') end;
   r := r || case when v_n = 0 and not exists (select 1 from mc.account_activity) and (v_j ->> 'paused')::boolean
                       and jsonb_array_length(v_j -> 'orders') = 0 and (v_k ->> 'inserted')::integer = 1
                       and (select recipient from mc.email_events where event_id = 'msg_paused') is null
@@ -886,9 +892,10 @@ begin
   v_before := mc_api.email_send_prepare('test');
   v_t := (mc_api.email_send_prepare('complimentary_pro', v_d)) ->> 'error';
   execute 'reset role';
-  r := r || case when (v_j #>> '{quota,today}')::integer = 3 and (v_j #>> '{quota,daily_limit}')::integer = 150
+  r := r || case when (v_j #>> '{quota,today}')::integer = 3 and (v_j #>> '{quota,today_lucento}')::integer = 2
+                      and (v_j #>> '{quota,daily_limit}')::integer = 150
                       and v_k ->> 'error' = 'no_verified_email' and v_before ->> 'recipient' = 'ops@lucento-test.invalid' and v_t = 'no_grant'
-                 then 'ok  E2 the quota counts both products; template emails go only to verified accounts or the admin'
+                 then 'ok  E2 the quota counts both products, Lucento''s by domain (addresses or not); template emails go only to verified accounts or the admin'
                  else 'FAIL E2 ' || left(coalesce(v_j -> 'quota', 'null'::jsonb)::text, 200) || ' ' || coalesce(v_k::text, '') || ' ' || coalesce(v_t, '') end;
 
   -- One secret per purpose: the backup's can report the backup and nothing else (security review L10).
