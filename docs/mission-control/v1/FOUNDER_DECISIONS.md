@@ -28,8 +28,8 @@ privacy text and are confirmed when the policy update is approved (FD-V15).
 
 | Note | What was built | Why |
 |---|---|---|
-| IN-1 | Backups are kept **28 days**, not 90 **(owner to confirm)** | lucentoapp.com/delete-account promises backup copies expire "within 30 days" |
-| IN-2 | Support requests are deleted **with the account**, and **12 months after they're resolved** **(owner to confirm)** | The deletion promise covers everything stored under an account; signed-out requests need some end |
+| IN-1 | Backups are kept **28 days**, not 90 **(owner confirmed 2026-11-15)** | lucentoapp.com/delete-account promises backup copies expire "within 30 days" |
+| IN-2 | Support requests are deleted **with the account**, and **12 months after their last message** **(owner confirmed 2026-11-15)** | The deletion promise covers everything stored under an account; signed-out requests need some end |
 | IN-3 | Net revenue uses Google's **reported** developer revenue per order (`developerRevenueInBuyerCurrency`); only orders without it are estimated (EST) | The Orders API reports it; an estimate was the design's fallback |
 | IN-4 | Subscription **renewals** are not in Revenue yet: only first orders are stored. A small website change (record each renewal's order id) is planned before the first renewals | Purchase tokens are kept only as hashes, and the Orders API can't list orders |
 | IN-5 | The browser holds **no** Supabase key at all; every call goes through Mission Control's server with the admin's session | Stricter than "publishable key only" (SECURITY_CONSIDERATIONS §3) at no cost |

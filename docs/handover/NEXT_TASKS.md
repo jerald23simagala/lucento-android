@@ -62,8 +62,8 @@
   release goes live, regenerate the website's /privacy (`python tools/legal/export_legal.py
   ../lucento-website/src/data/legal.ts`) and deploy it. Only after both are live: Settings › Extended data on, then
   Records view on (DEPLOYMENT.md H; KNOWN_ISSUES MC-7).
-- Owner confirmations for the privacy policy wording (engineering defaults, KNOWN_ISSUES MC-3): support requests deleted
-  with the account and 12 months after their last message; backups kept 28 days.
+- ~~Owner confirmations for the privacy policy wording~~ **Done 2026-11-15**: the owner kept both (support requests
+  deleted with the account and 12 months after their last message; backups kept 28 days; KNOWN_ISSUES MC-3).
 ## Home-screen widgets — follow-ups (2026-11-12, `feature/home-widgets`)
 
 - Merged as `50727be` (PR #57, 2026-11-13); not released yet. Next, a device pass on Android 12+ (the S8 runs Android 9:
