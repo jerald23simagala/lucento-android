@@ -45,8 +45,8 @@ On a Launch Board card, cite failures by ID (for example "T4, T11").
 
 | ID | Rule |
 |---|---|
-| T19 | Real app screens only, captured from a real build (showcase or tour captures, or live adb stills). No mocked UI, no edited numbers, no state the app never shows (a sheet sliding over its own header), and no shortcut the app doesn't allow (Show amounts asks for the phone's unlock, so never show amounts returning on a plain tap, and never say "only you can": a phone with no screen lock gets a confirm dialog). Label demo screens "Demo data" from the first frame |
-| T20 | Demo data is demo data. The showcase world (₱258,108.10 net worth, budget at 89%) never appears as a real person's results, and no caption says "my finances" over it |
+| T19 | Real app screens only, captured from a real build (showcase or tour captures, or live adb stills). No mocked UI, no edited numbers, no state the app never shows (a sheet sliding over its own header), and no shortcut the app doesn't allow (Show amounts asks for the phone's unlock, so never show amounts returning on a plain tap, and never say "only you can": a phone with no screen lock gets a confirm dialog). |
+| T20 | Demo data is demo data. The showcase world (₱258,108.10 net worth, budget at 89%) never appears as a real person's results, and no caption says "my finances" over it. An on-screen "Demo data" label is optional: the owner considers it implied (2026-11-15); the week 47 shorts carry one |
 | T21 | No third-party brands in captions, hashtags, visuals or metadata: no bank, e-wallet, merchant or telco names or logos (GCash, Maya, Meralco, Jollibee, Grab…), even though the app understands them. Use the demo wallets ("Everyday bank", "Cash", "Savings") and generic words ("e-wallet", "electric bill") |
 | T22 | The Rising Crest logo and mascot source files are never altered. The mascot's torch does not follow the budget, so never claim it does |
 | T23 | Music is the original synthesized score (`lucento-studio/video/tools/compose_score.py`) or silence. No licensed or trending tracks added by us. The owner may add a sound inside TikTok only from its Commercial Music Library |

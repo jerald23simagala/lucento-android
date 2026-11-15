@@ -108,6 +108,8 @@ release to collect pre-registrations.
 
 1. Morning: the release is live, and the website PR flips `playListed: true` (owner merges).
 2. Launch film posted: the full film pinned on the Facebook Page and on YouTube; the 30 s vertical on TikTok and Reels.
+   The film is held until launch day (owner, 2026-11-15). Before then: replace its four-in-one capture, whose message
+   names a ride-hailing brand (T21), fix the voice sheet's doubled header, and end it on "Get it on Google Play".
 3. Group announcement, plus a personal note to the closed testers the owner recruited personally: thanks, and "tell
    us what you think on Google Play" (no reward, everyone asked, T25). Testers who came through Testers Community are
    thanked but never asked to rate (T25).
