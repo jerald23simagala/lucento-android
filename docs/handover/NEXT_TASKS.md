@@ -55,9 +55,13 @@
 - **Subscription renewals in Revenue**: Lucento stores only each purchase's first order id. Before the first monthly
   renewals (about a month after launch), have the website record each renewal's `latestSuccessfulOrderId` when it
   re-verifies a subscription (verify.ts / rtdn.ts), so the daily sweep can fetch its amount.
-- **Android release with Contact support** (roadmap 4.6, FD-V4/V7/V15): in-app form, offline queue, daily
-  `report_client`, privacy text; the website's /privacy must change the same day. Only after both are live: Settings ›
-  Extended data on, then Records view on (DEPLOYMENT.md H; KNOWN_ISSUES MC-7).
+- **Android release with Contact support** (roadmap 4.6, FD-V4/V7/V15): **built**, draft PR #77
+  (`feature/contact-support`, worktree `../lucento-contact-support`): in-app form, offline queue, daily `report_client`,
+  Privacy Policy 2026-11-15, the complimentary-Lifetime display (M5). Unit tests and lint green locally; no phone test
+  yet. Order: OT-27 (migrations on lucento-test), then the PR's owner test, then merge and release. The same day the
+  release goes live, regenerate the website's /privacy (`python tools/legal/export_legal.py
+  ../lucento-website/src/data/legal.ts`) and deploy it. Only after both are live: Settings › Extended data on, then
+  Records view on (DEPLOYMENT.md H; KNOWN_ISSUES MC-7).
 - Owner confirmations for the privacy policy wording (engineering defaults, KNOWN_ISSUES MC-3): support requests deleted
   with the account and 12 months after their last message; backups kept 28 days.
 ## Home-screen widgets — follow-ups (2026-11-12, `feature/home-widgets`)
