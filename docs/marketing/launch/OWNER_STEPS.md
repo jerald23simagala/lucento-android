@@ -41,9 +41,10 @@ link and the Group's link.
 1. Install **TikTok**, tap **Sign up** → **Use phone or email** → **Email** → **lucentoapp@gmail.com**. Use your
    real birthday (it must show an adult).
 2. Username `lucentoapp`. Name **Lucento · Budget App**. Add the same profile picture.
-3. Switch to a Business account (needed for scheduling and statistics): **Profile** → **☰** → **Settings and
-   privacy** → **Account** → **Switch to Business Account** → pick the category closest to apps or technology.
-4. Paste the bio from `CHANNEL_KIT.md` §2. If there's a **Website** field, paste the TikTok link from §3.
+3. Stay on a personal account. If TikTok offers a Business account and then asks you to **Verify your business**
+   (company certificate, license number), tap back: Lucento doesn't need it, because we don't pay for promotion.
+4. Paste the bio from `CHANNEL_KIT.md` §2 (it includes lucentoapp.com as text; the link becomes clickable at 1,000
+   followers).
 5. Turn on 2-step verification: **Settings and privacy** → **Security** → **2-step verification**.
 
 ### A5. YouTube (10 min, on a computer)
@@ -52,6 +53,8 @@ link and the Group's link.
    **Create channel**.
 3. **Customize channel** → **Profile**: upload the picture, paste the description from `CHANNEL_KIT.md` §2, and add a
    link (title "Lucento", the YouTube link from §3). Click **Publish**.
+4. Banner (added 15 Nov): **Customize channel** → **Profile** → **Banner image** → **Upload** →
+   `Downloads\lucento-channel-kit\youtube-banner-2560x1440.png` → **Done** → **Publish**.
 
 ### A6. Meta Business Suite (5 min, on a computer)
 1. Go to https://business.facebook.com. In the top-left switcher, check that you see the **Lucento** Page (with
@@ -83,8 +86,9 @@ For each card, watch the video or look at the picture, read the caption, and tap
 each short:
 
 1. **TikTok:** https://www.tiktok.com/tiktokstudio → **Upload** → choose the video → paste the caption → if it shows
-   **Disclose post content**, turn it on and choose **Your brand** → choose **Schedule** and set the date and time →
-   **Schedule**. (TikTok schedules up to 10 days ahead.)
+   **Disclose post content**, turn it on and choose **Your brand** → if there's a **Schedule** option, set the date and
+   time → **Schedule** (up to 10 days ahead). If there's no Schedule option on your personal account, post each video
+   from the TikTok app on your phone at its time instead (you can save it as a draft beforehand).
 2. **Facebook and Instagram Reels together:** https://business.facebook.com → **Lucento** → **Create reel** → upload
    the same video → tick both the **Facebook Page** and **Instagram** → paste the caption → **Schedule** (date and
    time) → **Schedule**.

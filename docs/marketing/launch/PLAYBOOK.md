@@ -70,7 +70,7 @@ Targets over a month. The warm-up weeks lean on Feature in 15 s because nobody k
 
 | Channel | Warm-up (now → P-day) | Launch week | Sustain (weeks 2–8) |
 |---|---|---|---|
-| TikTok (Business account) | 5 shorts a week | Daily, plus the 30 s film | 5 a week |
+| TikTok (personal account) | 5 shorts a week | Daily, plus the 30 s film | 5 a week |
 | Facebook Reels + Instagram Reels (one schedule in Meta Business Suite) | The same 5 | Same | Same |
 | YouTube Shorts | The same 5 | Same, plus the full film (used as the Play listing video) | Same |
 | Facebook Page | 2 posts a week (4:5 carousel or still) | Launch post pinned | 2 a week |
@@ -88,6 +88,16 @@ skipped for now: they're weak channels for PH consumer finance and would cost ow
 **P-day** is the day Google grants production access and the release is live. The closed test (12+ testers, 14 days in
 a row) is running; then the owner applies, and Google usually answers within about a week.
 
+**Dates (2026-11-14):** the closed test runs through Testers Community (15 of 15 testers, a 16-day plan) and started
+on Saturday 14 November. The 14 days are done on 28 November and the plan on 30 November, so the owner applies on
+**Monday 30 November** and **P-day is expected between 1 and 8 December**. Play Console's Dashboard is the authority on
+the day count; if it shows a different number, move these dates with it. December is a good month to land in: the 13th
+month pay and Christmas spending give the launch posts their hook.
+
+**No pre-registration (owner, 2026-11-15):** Google Play pre-registration unlocks for this account only after the
+testing requirement, so the owner chose to launch as soon as production access is granted instead of holding the
+release to collect pre-registrations.
+
 | Phase | When | Call to action in content | Focus |
 |---|---|---|---|
 | Warm-up | Now → P-day | "Coming soon to Google Play. Follow for launch." (+ the website) | Teach the algorithm who we are, build followers, find what hooks work |
@@ -98,8 +108,9 @@ a row) is running; then the owner applies, and Google usually answers within abo
 
 1. Morning: the release is live, and the website PR flips `playListed: true` (owner merges).
 2. Launch film posted: the full film pinned on the Facebook Page and on YouTube; the 30 s vertical on TikTok and Reels.
-3. Group announcement, plus a personal note to closed testers: thanks, and "tell us what you think on Google Play"
-   (no reward, everyone asked, T25).
+3. Group announcement, plus a personal note to the closed testers the owner recruited personally: thanks, and "tell
+   us what you think on Google Play" (no reward, everyone asked, T25). Testers who came through Testers Community are
+   thanked but never asked to rate (T25).
 4. KlaroPH: launch post on the KlaroPH Page, and the Klaro banner and tools card switch to the Play link. The Klaro
    email starts the next day in batches (section 8, T33).
 5. Creator and press pitches go out (personal, one at a time, T28).
@@ -180,10 +191,12 @@ in brackets.
 
 | Week | Mon | Tue | Wed | Thu | Fri |
 |---|---|---|---|---|---|
-| 1 "Meet Lucento" | One message, three transactions [P1] | One clear view: have above, owe below [P3] | Sweldo day: Safe to spend sets bills aside [P2] | Say it: voice entry [P1] | No bank login, works offline [P3] |
-| 2 "Less typing" | A month from one statement screenshot [P1] | "Can I afford it?" purchase check [P2] | A budget in 30 seconds with presets [P3] | Four at once, saved in one tap [P1] | Hide amounts on the jeep [P3] |
-| 3 "Plan ahead" | Never miss a bill: Scheduled [P3] | Ipon goal at your pace [P2] | What "safe to spend" means [P4] | Cards and loans: see the end of your loan [P3] | Safe to spend on your home screen (widget) [P3] |
-| 4 "Together and everywhere" | Two phones, one ledger: Shared (Pro) [P2] | Dirhams, dollars, pesos: multicurrency (Pro) [P2] | Awards, no streaks to break [P3] | Your budget is your categories added up [P4] | Five themes, your look [P3] |
+| 1 "Meet Lucento" (16–20 Nov) | One message, three transactions [P1] | One clear view: have above, owe below [P3] | Sweldo day: Safe to spend sets bills aside [P2] | Say it: voice entry [P1] | No bank login, works offline [P3] |
+| 2 "Less typing" (23–27 Nov) | A month from one statement screenshot [P1] | "Can I afford it?" purchase check [P2] | A budget in 30 seconds with presets [P3] | Four at once, saved in one tap [P1] | Hide amounts on the jeep [P3] |
+| 3 "Plan ahead" (30 Nov–4 Dec) | Never miss a bill: Scheduled [P3] | Ipon goal at your pace [P2] | What "safe to spend" means [P4] | Cards and loans: see the end of your loan [P3] | Safe to spend on your home screen (widget) [P3] |
+| 4 "Together and everywhere" (7–11 Dec) | Two phones, one ledger: Shared (Pro) [P2] | Dirhams, dollars, pesos: multicurrency (Pro) [P2] | Awards, no streaks to break [P3] | Your budget is your categories added up [P4] | Five themes, your look [P3] |
+
+If P-day lands inside week 3 or 4, launch week (section 6) takes over from that day and the rest of the calendar moves back a week.
 
 Facebook Page posts (Tuesday and Saturday) reuse the week's strongest short as a 4:5 carousel or still. The group
 questions for weeks 1–4 are in `docs/community/facebook/README.md`.

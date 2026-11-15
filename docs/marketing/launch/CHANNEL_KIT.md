@@ -18,13 +18,23 @@ Page and Group texts live in `docs/community/facebook/README.md`.
 - Every account is created with **lucentoapp@gmail.com** (so the brand owns it) and has 2-step verification on.
 - A YouTube banner is optional at the start. It comes with the first production batch.
 
+**Live channels (set up by the owner 2026-11-14, all on `@lucentoapp`):**
+
+| Channel | Link | Notes |
+|---|---|---|
+| TikTok | https://www.tiktok.com/@lucentoapp | Personal account (owner, 2026-11-15): switching to Business asks for business verification (company certificate, license number) because finance is a restricted industry, so it stays personal. No paid promotion is needed (₱0). The bio link becomes clickable at 1,000 followers; until then the bio carries lucentoapp.com as text |
+| Instagram | https://www.instagram.com/lucentoapp/ | Professional, linked to the Lucento Page |
+| YouTube | https://www.youtube.com/channel/UCg8f6wbVTgYPnXBeMvD0FyA | |
+| Facebook Page | Page profile ID `61596187720039` (https://www.facebook.com/profile.php?id=61596187720039 until a username is set) | |
+| Facebook Group | https://www.facebook.com/groups/1574188714744063 | Lucento Community |
+
 ## 2. Bios
 
-**TikTok** (80 characters max; 70 used):
-> Type your gastos like a text. A budget app for Android. Coming soon. ✨
+**TikTok** (80 characters max; 77 used; a personal account under 1,000 followers can't have a clickable link, so the address is plain text):
+> Type your gastos like a text. Android budget app, coming soon. lucentoapp.com
 
-After P-day (80 characters max; 65 used):
-> Type your gastos like a text. A budget app for Android. Get it ⬇️
+After P-day (80 characters max; 79 used):
+> Type your gastos like a text. Android budget app on Google Play. lucentoapp.com
 
 **Instagram** (150 characters max; 137 used, line breaks included):
 > Everything about your money, in one clear view.

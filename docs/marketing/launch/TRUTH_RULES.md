@@ -26,9 +26,9 @@ On a Launch Board card, cite failures by ID (for example "T4, T11").
 
 | ID | Rule | Say instead |
 |---|---|---|
-| T10 | Never "nothing leaves your phone", "100% private" or "your data never leaves". Exchange rates (on by default), Google Play billing diagnostics, purchase checks and every opt-in send something | "Your entries stay on your phone unless you turn on sync." "Works offline." |
+| T10 | Never "nothing leaves your phone", "100% private" or "your data never leaves", and never name one opt-in as the only exception (sync alone is wrong: Ask Lucento's AI answers send recent transactions, Smarter reading sends the message). Exchange rates (on by default), Google Play billing diagnostics, purchase checks and every opt-in send something | "Stored on your phone. Cloud sync (Pro) and the Gemini AI features stay off until you turn them on." "Works offline." |
 | T11 | Any privacy line is scoped ("your entries", "your records") and, where the format allows, links www.lucentoapp.com/privacy | — |
-| T12 | Voice: never "your voice never leaves the phone" (online voice is an opt-in) | "Lucento never records or keeps your voice." |
+| T12 | Voice: never "your voice never leaves the phone" (online voice is an opt-in) and never "never records" (Lucento listens through the microphone while its listening screen is open). The Privacy Policy says it "never keeps or sends a recording" | "Lucento keeps no recording of your voice." |
 | T13 | Backups are not encrypted. Never imply that they are | "Back up to a file whenever you like." |
 
 ## Money, pricing and availability
@@ -45,7 +45,7 @@ On a Launch Board card, cite failures by ID (for example "T4, T11").
 
 | ID | Rule |
 |---|---|
-| T19 | Real app screens only, captured from a real build (showcase or tour captures, or live adb stills). No mocked UI, no edited numbers |
+| T19 | Real app screens only, captured from a real build (showcase or tour captures, or live adb stills). No mocked UI, no edited numbers, no state the app never shows (a sheet sliding over its own header), and no shortcut the app doesn't allow (Show amounts asks for the phone's unlock, so never show amounts returning on a plain tap, and never say "only you can": a phone with no screen lock gets a confirm dialog). Label demo screens "Demo data" from the first frame |
 | T20 | Demo data is demo data. The showcase world (₱258,108.10 net worth, budget at 89%) never appears as a real person's results, and no caption says "my finances" over it |
 | T21 | No third-party brands in captions, hashtags, visuals or metadata: no bank, e-wallet, merchant or telco names or logos (GCash, Maya, Meralco, Jollibee, Grab…), even though the app understands them. Use the demo wallets ("Everyday bank", "Cash", "Savings") and generic words ("e-wallet", "electric bill") |
 | T22 | The Rising Crest logo and mascot source files are never altered. The mascot's torch does not follow the budget, so never claim it does |
@@ -56,7 +56,7 @@ On a Launch Board card, cite failures by ID (for example "T4, T11").
 | ID | Rule |
 |---|---|
 | T24 | Never fake reviews, testimonials, quotes, user counts, comments or engagement. No buying followers, likes or reviews, and no engagement pods |
-| T25 | Never offer anything for a rating or review, and never ask only happy users to rate (Google Play policy). "Tell us what you think on Google Play" to everyone is fine |
+| T25 | Never offer anything for a rating or review, and never ask only happy users to rate (Google Play policy). "Tell us what you think on Google Play" to everyone is fine. Never ask testers from a testing service or exchange (Testers Community) to rate or review: they joined through a deal, so their reviews would count as incentivised |
 | T26 | In every community post or reply, the owner says Lucento is their app ("I made this", "I'm the developer") and follows that community's rules. No posting the same text across groups the same day |
 | T27 | Creators who get free Pro disclose it ("gifted", or TikTok's branded-content toggle) and are free to say what they really think. We never script praise |
 | T28 | No unsolicited bulk messages. Every pitch is personal, sent by the owner from lucentoapp@gmail.com, one at a time, and a "no" or no reply after one follow-up ends it |
