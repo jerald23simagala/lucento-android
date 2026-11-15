@@ -961,6 +961,35 @@ begin
                       and v_before #>> '{summary,lifetime,amounts,0,net_reported}' = 'true'
                  then 'ok  V3 net is Google''s reported developer revenue when it has it, an estimate only otherwise'
                  else 'FAIL V3 ' || left(coalesce(v_before #> '{summary,lifetime}', 'null'::jsonb)::text, 400) end;
+  -- Refunds and unpaid orders: a full refund keeps nothing (whatever Google's revenue figure says), a partial refund
+  -- without Google's figure scales the estimate, a cancelled order was never revenue; Lifetime sales count refunded ones.
+  perform pg_temp.as_anon();
+  perform mc_api.ingest_play_orders(v_secret, jsonb_build_array(
+    jsonb_build_object('order_id', 'GPA.life-refunded', 'product_id', 'lucento_pro_lifetime', 'currency', 'PHP',
+      'total_micros', '3500000000', 'tax_micros', '375000000', 'developer_revenue_micros', '2656250000',
+      'refunded_micros', '3500000000', 'ordered_at', now() - interval '1 day', 'state', 'REFUNDED'),
+    jsonb_build_object('order_id', 'GPA.life-partial', 'product_id', 'lucento_pro_lifetime', 'currency', 'PHP',
+      'total_micros', '3500000000', 'tax_micros', '375000000', 'refunded_micros', '1750000000',
+      'ordered_at', now() - interval '1 day', 'state', 'PARTIALLY_REFUNDED'),
+    jsonb_build_object('order_id', 'GPA.life-cancelled', 'product_id', 'lucento_pro_lifetime', 'currency', 'PHP',
+      'total_micros', '3500000000', 'tax_micros', '375000000', 'ordered_at', now() - interval '1 day', 'state', 'CANCELED')));
+  execute 'reset role';
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_before := mc_api.revenue();
+  execute 'reset role';
+  select count(distinct purchase_token_hash) into v_m from public.entitlements
+    where source = 'PLAY_LIFETIME' and not test_purchase and status = 'REVOKED' and starts_at > now() - interval '7 days';
+  select count(distinct purchase_token_hash) into v_n from public.entitlements
+    where source = 'PLAY_LIFETIME' and not test_purchase and status in ('ACTIVE', 'REVOKED') and starts_at > now() - interval '7 days';
+  -- Gross 3 × 3,500 (the cancelled order left out); net 2,656 (Google, V3) + 0 (refunded in full)
+  -- + 3,125 × 0.85 × ½ = 1,328.125 (half refunded, estimated).
+  r := r || case when v_before #>> '{summary,lifetime,amounts,0,gross_micros}' = '10500000000'
+                      and (v_before #>> '{summary,lifetime,amounts,0,orders}')::integer = 3
+                      and v_before #>> '{summary,lifetime,amounts,0,net_micros}' = '3984125000'
+                      and v_before #>> '{summary,lifetime,amounts,0,net_reported}' = 'false'
+                      and v_m >= 1 and (v_before #>> '{summary,lifetime,count}')::integer = v_n
+                 then 'ok  V4 a full refund keeps nothing, a partial one scales the estimate, a cancelled order isn''t revenue; sales count refunded ones'
+                 else 'FAIL V4 ' || left(coalesce(v_before #> '{summary,lifetime}', 'null'::jsonb)::text, 400) || ' revoked=' || v_m || ' sales=' || v_n end;
 
   raise exception E'VERIFY %/% failed\n%',
     (select count(*) from unnest(r) x where x like 'FAIL%'), array_length(r, 1), array_to_string(r, E'\n');

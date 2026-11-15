@@ -586,8 +586,8 @@ Owner: "I need my minimalist mission control done … Lets start building now" (
   moving a purchase; support tickets; `public.submit_support_request` and `public.report_client` for the app; records
   view gated by a setting + reason + step-up; Google Play orders with Google's reported net; Resend events (KlaroPH's
   counted, never named); four pg_cron jobs. Not applied anywhere yet.
-- **Tests**: `tools/sql-verify` — 9 suites, **361 checks, 0 failed** under lucento-test's and Supabase's stock default
-  privileges (`mission_control_suite.sql`: 89). The combined apply file passes the suite on its own. The existing
+- **Tests**: `tools/sql-verify` — 9 suites, **362 checks, 0 failed** under lucento-test's and Supabase's stock default
+  privileges (`mission_control_suite.sql`: 90). The combined apply file passes the suite on its own. The existing
   `entitlements_suite` caught a NULL bug in the first version of the FD-V5 constraint (fixed with `coalesce`).
 - **Console** (`../lucento-mission-control`, Next.js 16.4.3, React 19.3, Tailwind 4, Chart.js 4): every page of
   PRODUCT_SCOPE.md; no service-role key, no Supabase key in the browser; proxy gate with 30-min idle / 12-h absolute
@@ -605,3 +605,12 @@ Owner: "I need my minimalist mission control done … Lets start building now" (
   then the pages say what is paused. Wiring that switch found two bugs, both fixed and tested: Lucento's email count and
   bounce list keyed on stored recipients (now on the sending domain), and "counting since" included paused activity
   runs. Console commit `82cbf89`.
+- **Local end-to-end run** (owner allowed it 2026-11-15): the console against the local stack (real PostgreSQL 17,
+  PostgREST v14, an Auth stand-in, fictional data), in both privacy states. Playwright: 6 tests pass (sign-in with
+  authenticator enrolment, every page, a grant and its revoke, the extended-data switch with step-up and audit) and a
+  72-screen tour per state (light/dark, desktop/phone). It found and fixed: the stack itself had never started (Windows
+  encoding, PostgREST's DLLs, a seed older than the schema); **revenue net counted a fully refunded order** (net is now
+  after refunds, pending and cancelled orders never count, Lifetime sales count every completed sale; suite V4,
+  DATA_SOURCE_INVENTORY updated); refund totals shown as +; MRR ₱0.00 instead of "—" without amounts; labels that said
+  "as Google reports it" while paused; the entitlement table and the ticket composer cut off at 1280 px. Repository
+  `jerald23simagala/lucento-mission-control` (private) created, console PR #1 open.

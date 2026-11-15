@@ -1623,9 +1623,11 @@ end;
 $$;
 
 -- Google Play amounts for orders in [p_start, p_end), per currency: 'lifetime' or 'subscriptions'. Test orders never
--- count. Net is what Google reports per order (developerRevenueInBuyerCurrency: after tax, its fee and partial refunds);
--- an order without it is estimated as total − tax − Google's fee (Settings, 15 % by default), and net_reported says
--- whether every order in the sum was reported.
+-- count, and neither do orders never paid (a pending payment, such as cash at a store, or a cancelled one). Gross is
+-- what buyers paid, refunds included (they have their own figure). Net is what Lucento keeps: Google's reported revenue
+-- per order (developerRevenueInBuyerCurrency: after tax, its fee and partial refunds); an order without it is estimated
+-- as total − tax − Google's fee (Settings, 15 % by default) for the share not refunded; an order refunded in full keeps
+-- nothing. net_reported says whether every order in the sum is exact (reported by Google, or refunded in full).
 create or replace function mc.order_amounts(p_start timestamptz, p_end timestamptz, p_kind text)
 returns jsonb
 language sql
@@ -1644,11 +1646,18 @@ as $$
   from (
     select o.currency, count(*) as orders, coalesce(sum(o.total_micros), 0)::numeric as gross,
            coalesce(sum(o.tax_micros), 0)::numeric as tax, coalesce(sum(o.refunded_micros), 0)::numeric as refunded,
-           coalesce(sum(coalesce(o.developer_revenue_micros::numeric,
-             round((coalesce(o.total_micros, 0) - coalesce(o.tax_micros, 0)) * (1 - (select r from rate))))), 0) as net,
-           bool_and(o.developer_revenue_micros is not null) as reported
+           coalesce(sum(case
+             when o.state = 'REFUNDED' then 0
+             when o.developer_revenue_micros is not null then o.developer_revenue_micros::numeric
+             else round((coalesce(o.total_micros, 0) - coalesce(o.tax_micros, 0)) * (1 - (select r from rate))
+                        * case when coalesce(o.total_micros, 0) > 0
+                               then greatest(o.total_micros - coalesce(o.refunded_micros, 0), 0)::numeric / o.total_micros
+                               else 1 end)
+           end), 0) as net,
+           bool_and(coalesce(o.state = 'REFUNDED', false) or o.developer_revenue_micros is not null) as reported
     from mc.play_orders o
     where not o.test and o.currency is not null and o.ordered_at >= p_start and o.ordered_at < p_end
+      and coalesce(o.state, '') not in ('PENDING', 'CANCELED')
       and ((p_kind = 'lifetime' and o.product_id = 'lucento_pro_lifetime')
            or (p_kind = 'subscriptions' and o.product_id in ('lucento_pro', 'lucento_cloud')))
     group by o.currency
@@ -1705,8 +1714,10 @@ as $$
     'last_orders_sweep', (select max(r.finished_at) from mc.job_runs r where r.job = 'play_orders' and r.result = 'ok'),
     'fee_rate', coalesce((select (s.value #>> '{}')::numeric from mc.settings s where s.key = 'google_fee_rate'), 0.15),
     'lifetime', jsonb_build_object(
+      -- Every completed sale in the period, refunded later or not (refunds have their own figure), like new
+      -- subscriptions; a purchase still waiting for its payment (PENDING) isn't a sale yet.
       'count', (select count(distinct e.purchase_token_hash) from public.entitlements e
-                where e.source = 'PLAY_LIFETIME' and not e.test_purchase and e.status <> 'REVOKED'
+                where e.source = 'PLAY_LIFETIME' and not e.test_purchase and e.status in ('ACTIVE', 'REVOKED')
                   and e.starts_at >= p_start and e.starts_at < p_end),
       'owners', (select count(distinct e.user_id) from public.entitlements e
                  where e.source = 'PLAY_LIFETIME' and not e.test_purchase and mc.is_live(e.status, e.expires_at)),

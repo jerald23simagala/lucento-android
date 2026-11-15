@@ -7,7 +7,7 @@ steps.** Nothing is applied to any Supabase project yet. The earlier full-vision
 **Phase 4 — Implementation**
 - Database: `supabase/migrations/20261116090000…090300_mission_control_*.sql`; one paste for the SQL editor:
   [../APPLY_MISSION_CONTROL.sql](../APPLY_MISSION_CONTROL.sql), checks after: [../VERIFY_MISSION_CONTROL.sql](../VERIFY_MISSION_CONTROL.sql).
-  Tests: `tools/sql-verify/mission_control_suite.sql` (89 checks; 361 across all suites).
+  Tests: `tools/sql-verify/mission_control_suite.sql` (90 checks; 362 across all suites).
 - Console: the private repository `lucento-mission-control` (Next.js), with `DEPLOYMENT.md` (click-by-click owner steps).
 - What changed from the design while building: [FOUNDER_DECISIONS.md](FOUNDER_DECISIONS.md) "Implementation notes".
 

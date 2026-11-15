@@ -34,10 +34,10 @@ signed in with sync off and no AI use, appears only through token refreshes.
 | Metric | Definition | Source of truth | Availability |
 |---|---|---|---|
 | Purchases (count) | Distinct purchase tokens per product | `public.entitlements` / `purchase_links` | Now |
-| Lifetime sales (count) | `lucento_pro_lifetime` purchases not revoked | `public.entitlements` | Now |
+| Lifetime sales (count) | `lucento_pro_lifetime` purchases completed in the period, including ones refunded later (refunds have their own figure); not ones still waiting for payment *(changed 2026-11-15: was "not revoked", which disagreed with the amount)* | `public.entitlements` | Now |
 | Lifetime sales (amount) | Σ order total − tax for Lifetime orders | **Google Play Orders API** → `mc.play_orders` | Setup |
-| Gross revenue | Σ order totals including tax, all products | Orders API | Setup |
-| Net revenue | **Estimate:** gross − tax − Google's service fee (15 % assumed, configurable), labelled EST. **Reported net** only exists in Play's monthly earnings report, not in V1 | Orders API (estimate) / Play Console (reported) | Setup / No (V1 links out) |
+| Gross revenue | Σ order totals including tax, all products, refunded orders included; never orders that weren't paid (pending or cancelled) | Orders API | Setup |
+| Net revenue | What Lucento keeps: Google's reported developer revenue per order (after tax, its fee and partial refunds); without it an **estimate**, total − tax − Google's service fee (15 % assumed, configurable) for the share not refunded, labelled EST; an order refunded in full keeps nothing *(2026-11-15: refunds now count)*. Payouts are in Play's monthly earnings report | Orders API / Play Console (payouts) | Setup |
 | MRR | Live paid subscriptions (ACTIVE, GRACE, CANCELLED_ACTIVE; not TRIAL, ON_HOLD, PAUSED), each at its latest order's price − tax, annual ÷ 12 | Entitlements + Orders API | Setup |
 | Refunds | Purchases with status REVOKED (count); refunded amount from the order | Entitlements (count) / Orders API (amount) | Now / Setup |
 | Complimentary users | Live GRANT rows | Entitlements + `mc.entitlement_grants` | Job |
