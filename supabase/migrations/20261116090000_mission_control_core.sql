@@ -43,8 +43,9 @@ create table if not exists mc.internal_accounts (
 
 -- ------------------------------------------------------------------------------------------------ audit log
 -- Every privileged action and every record view. Append-only: no API role has any privilege on it, and the triggers
--- below refuse UPDATE, DELETE and TRUNCATE for everyone, the table owner included. Entries survive account deletion:
--- they keep the bare user id, never an email address or the contents of a record.
+-- below refuse UPDATE, DELETE and TRUNCATE for every role, the table owner too (who could still disable the triggers;
+-- a hash chain and an off-site copy are planned). Entries survive account deletion: they keep the bare user id, never
+-- an email address or the contents of a record.
 create table if not exists mc.audit_log (
   id bigint generated always as identity primary key,
   at timestamptz not null default now(),
@@ -85,7 +86,7 @@ create trigger audit_log_no_truncate before truncate on mc.audit_log
 create table if not exists mc.settings (
   key text primary key check (key in (
     'resend_daily_limit', 'resend_monthly_limit', 'google_fee_rate', 'timezone', 'records_view_enabled',
-    'saved_replies', 'support_signed_out_hourly_cap'
+    'extended_data_enabled', 'saved_replies', 'support_signed_out_hourly_cap', 'support_daily_cap'
   )),
   value jsonb not null,
   updated_by uuid,
@@ -99,7 +100,12 @@ insert into mc.settings (key, value) values
   ('timezone', '"Asia/Manila"'),
   -- FD-V3 / FD-V15: off until the app release with the updated privacy policy is live.
   ('records_view_enabled', 'false'),
+  -- The same release discloses the daily activity log, Google Play's order amounts and the email delivery log. Until
+  -- then the hourly activity job, the orders sweep and recipient storage do nothing (security review M6).
+  ('extended_data_enabled', 'false'),
   ('support_signed_out_hourly_cap', '20'),
+  -- Every in-app request in a day, signed in or out: a ceiling no script can raise (security review M2).
+  ('support_daily_cap', '200'),
   ('saved_replies', jsonb_build_array(
     jsonb_build_object('title', 'Got it, looking into it',
       'body', E'Hi,\n\nThanks for writing to Lucento. I''m looking into this now and will get back to you as soon as I know more.\n\nJerald\nLucento'),
@@ -131,6 +137,16 @@ as $$
   select coalesce((select (s.value #>> '{}')::integer from mc.settings s where s.key = p_key), p_default)
 $$;
 
+create or replace function mc.setting_on(p_key text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select (s.value #>> '{}')::boolean from mc.settings s where s.key = p_key), false)
+$$;
+
 -- ------------------------------------------------------------------------------------------------ rate counters
 -- Per caller, per action, per hour. Pruned daily (part 4).
 create table if not exists mc.rate_counters (
@@ -141,18 +157,19 @@ create table if not exists mc.rate_counters (
   primary key (admin_id, action, hour)
 );
 
--- ------------------------------------------------------------------------------------------------ ingest secret
--- The webhook and job routes (Resend events, Play orders, the weekly backup's result) hold one random secret instead of
--- an admin session or a service-role key. Only its sha256 is stored. The owner creates it in the SQL editor with
--- `select mc.rotate_ingest_secret();` and pastes the answer into Vercel and GitHub (DEPLOYMENT.md); running it again
--- replaces it.
+-- ------------------------------------------------------------------------------------------------ ingest secrets
+-- The webhook and job routes hold a random secret instead of an admin session or a service-role key, one per purpose
+-- (security review L10): 'app' for Mission Control's own routes (Resend events, Play orders, checks), 'backup' for the
+-- weekly backup in GitHub, which can then only report its own result. Only sha256 is stored. The owner creates each in
+-- the SQL editor with `select mc.rotate_ingest_secret('app');` / `('backup')` and pastes the answer into Vercel or
+-- GitHub (DEPLOYMENT.md); running it again replaces that one.
 create table if not exists mc.ingest_secret (
-  id boolean primary key default true check (id),
+  purpose text primary key check (purpose in ('app', 'backup')),
   secret_hash text not null check (secret_hash ~ '^[0-9a-f]{64}$'),
   rotated_at timestamptz not null default now()
 );
 
-create or replace function mc.rotate_ingest_secret()
+create or replace function mc.rotate_ingest_secret(p_purpose text default 'app')
 returns text
 language plpgsql
 volatile
@@ -162,16 +179,18 @@ declare
   -- Two version-4 UUIDs: 244 random bits from the server's strong random source, with no extension needed.
   v_secret text := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
 begin
-  insert into mc.ingest_secret (id, secret_hash, rotated_at)
-    values (true, encode(sha256(convert_to(v_secret, 'UTF8')), 'hex'), now())
-    on conflict (id) do update set secret_hash = excluded.secret_hash, rotated_at = excluded.rotated_at;
+  if p_purpose is null or p_purpose not in ('app', 'backup') then
+    raise exception 'rotate_ingest_secret: purpose is app or backup' using errcode = '22023';
+  end if;
+  insert into mc.ingest_secret (purpose, secret_hash, rotated_at)
+    values (p_purpose, encode(sha256(convert_to(v_secret, 'UTF8')), 'hex'), now())
+    on conflict (purpose) do update set secret_hash = excluded.secret_hash, rotated_at = excluded.rotated_at;
   return v_secret;
 end;
 $$;
 
--- True when p_secret is the current ingest secret. Compares hashes, so the comparison leaks nothing useful about the
--- secret through timing.
-create or replace function mc.ingest_secret_ok(p_secret text)
+-- True when p_secret is the current secret for p_purpose. Compares hashes, so timing leaks nothing useful.
+create or replace function mc.ingest_secret_ok(p_secret text, p_purpose text default 'app')
 returns boolean
 language sql
 stable
@@ -179,7 +198,8 @@ security definer
 set search_path = ''
 as $$
   select p_secret is not null and char_length(p_secret) between 32 and 200 and exists (
-    select 1 from mc.ingest_secret s where s.secret_hash = encode(sha256(convert_to(p_secret, 'UTF8')), 'hex')
+    select 1 from mc.ingest_secret s
+    where s.purpose = p_purpose and s.secret_hash = encode(sha256(convert_to(p_secret, 'UTF8')), 'hex')
   )
 $$;
 
@@ -201,7 +221,8 @@ as $$
   returning id
 $$;
 
--- A refusal is recorded, but at most 10 per caller and reason an hour, so nobody can fill the log by retrying.
+-- A refusal is recorded, but sparingly, so nobody can fill the append-only log by retrying: someone who isn't an admin
+-- (or no one at all) at most 3 times a day, an admin at most 10 times an hour per reason (security review L6).
 create or replace function mc.log_refusal(p_caller uuid, p_action text, p_reason text)
 returns void
 language plpgsql
@@ -210,16 +231,37 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_bucket text := case when p_caller is null or p_reason in ('not_admin', 'not_signed_in', 'bad_secret') then 'day' else 'hour' end;
+  v_limit integer := case when p_caller is null or p_reason in ('not_admin', 'not_signed_in', 'bad_secret') then 3 else 10 end;
   v_count integer;
 begin
   insert into mc.rate_counters as c (admin_id, action, hour, count)
-    values (coalesce(p_caller, '00000000-0000-0000-0000-000000000000'::uuid), 'refused:' || p_reason, date_trunc('hour', now()), 1)
+    values (coalesce(p_caller, '00000000-0000-0000-0000-000000000000'::uuid), 'refused:' || p_reason,
+            date_trunc(v_bucket, now()), 1)
     on conflict (admin_id, action, hour) do update set count = c.count + 1
     returning c.count into v_count;
-  if v_count <= 10 then
+  if v_count <= v_limit then
     perform mc.audit(p_action, null, null, null, 'refused', null, null, p_reason, p_caller);
   end if;
 end;
+$$;
+
+-- The token's own sign-in session still exists (not signed out, not suspended) and began less than 12 hours ago, so a
+-- copied cookie or token stops working at the same absolute limit Mission Control's server applies (security review
+-- H1). A refresh keeps the session id, so refreshing can't extend it.
+create or replace function mc.session_ok(p_uid uuid, p_jwt jsonb)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from auth.sessions s
+    where s.id = case when p_jwt ->> 'session_id' ~ '^[0-9a-fA-F-]{36}$' then (p_jwt ->> 'session_id')::uuid end
+      and s.user_id = p_uid
+      and s.created_at > now() - interval '12 hours'
+  )
 $$;
 
 -- ------------------------------------------------------------------------------------------------ the gate
@@ -248,8 +290,9 @@ as $$
     )
 $$;
 
--- Null when the caller may go ahead; otherwise why not: not_signed_in, not_admin, mfa_required, step_up_required or
--- rate_limited. Never raises, so the function that asked can return the refusal and the refusal's record commits.
+-- Null when the caller may go ahead; otherwise why not: not_signed_in, not_admin, session_expired, mfa_required,
+-- step_up_required or rate_limited. Never raises, so the function that asked can return the refusal and the refusal's
+-- record commits.
 create or replace function mc.gate(p_action text, p_step_up boolean default false, p_hourly_max integer default null)
 returns text
 language plpgsql
@@ -268,6 +311,8 @@ begin
   end if;
   if not exists (select 1 from mc.admins a where a.user_id = v_uid and a.active) then
     v_refusal := 'not_admin';
+  elsif not mc.session_ok(v_uid, v_jwt) then
+    v_refusal := 'session_expired';
   elsif coalesce(v_jwt ->> 'aal', '') <> 'aal2' then
     v_refusal := 'mfa_required';
   elsif p_step_up and not mc.fresh_mfa(v_jwt) then
@@ -352,6 +397,10 @@ begin
     perform mc.log_refusal(v_uid, 'session.whoami', 'not_admin');
     return mc.refused('not_admin');
   end if;
+  if not mc.session_ok(v_uid, v_jwt) then
+    perform mc.log_refusal(v_uid, 'session.whoami', 'session_expired');
+    return mc.refused('session_expired');
+  end if;
   return jsonb_build_object(
     'ok', true,
     'admin', jsonb_build_object('user_id', v_admin.user_id, 'email', v_admin.email, 'display_name', v_admin.display_name),
@@ -372,14 +421,13 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_refusal text;
+  v_refusal text := mc.gate('session.event', false, 60);
 begin
-  if p_event is null or p_event not in ('signed_in', 'signed_out', 'expired_idle', 'expired_absolute', 'mfa_enrolled') then
-    return mc.failed('invalid', 'Unknown session event');
-  end if;
-  v_refusal := mc.gate('session.' || p_event, false, 60);
   if v_refusal is not null then
     return mc.refused(v_refusal);
+  end if;
+  if p_event is null or p_event not in ('signed_in', 'signed_out', 'expired_idle', 'expired_absolute', 'mfa_enrolled') then
+    return mc.failed('invalid', 'Unknown session event');
   end if;
   perform mc.audit('session.' || p_event, null, null, null, 'ok');
   return jsonb_build_object('ok', true);
@@ -412,8 +460,8 @@ begin
     'internal_accounts', (select coalesce(jsonb_agg(jsonb_build_object('user_id', i.user_id, 'label', i.label,
                    'email', (select u.email from auth.users u where u.id = i.user_id), 'added_at', i.added_at)
                  order by i.added_at), '[]'::jsonb) from mc.internal_accounts i),
-    'ingest_secret_set', exists (select 1 from mc.ingest_secret),
-    'ingest_secret_rotated_at', (select s.rotated_at from mc.ingest_secret s)
+    'ingest_secret_set', exists (select 1 from mc.ingest_secret s where s.purpose = 'app'),
+    'ingest_secrets', (select coalesce(jsonb_object_agg(s.purpose, s.rotated_at), '{}'::jsonb) from mc.ingest_secret s)
   );
 end;
 $$;
@@ -431,8 +479,8 @@ declare
   v_ok boolean;
   v_item jsonb;
 begin
-  -- Turning the records view on or off changes what Mission Control may show about customers: fresh code required.
-  v_refusal := mc.gate('settings.write', p_key = 'records_view_enabled', 30);
+  -- The two privacy switches change what Mission Control may show or keep about customers: fresh code required.
+  v_refusal := mc.gate('settings.write', coalesce(p_key in ('records_view_enabled', 'extended_data_enabled'), false), 30);
   if v_refusal is not null then
     return mc.refused(v_refusal);
   end if;
@@ -443,8 +491,10 @@ begin
     when 'resend_daily_limit' then jsonb_typeof(p_value) = 'number' and (p_value #>> '{}') ~ '^\d{1,7}$' and (p_value #>> '{}')::integer >= 1
     when 'resend_monthly_limit' then jsonb_typeof(p_value) = 'number' and (p_value #>> '{}') ~ '^\d{1,9}$' and (p_value #>> '{}')::integer >= 1
     when 'support_signed_out_hourly_cap' then jsonb_typeof(p_value) = 'number' and (p_value #>> '{}') ~ '^\d{1,4}$'
+    when 'support_daily_cap' then jsonb_typeof(p_value) = 'number' and (p_value #>> '{}') ~ '^\d{1,5}$'
     when 'google_fee_rate' then jsonb_typeof(p_value) = 'number' and (p_value #>> '{}')::numeric between 0 and 0.5
     when 'records_view_enabled' then jsonb_typeof(p_value) = 'boolean'
+    when 'extended_data_enabled' then jsonb_typeof(p_value) = 'boolean'
     when 'timezone' then jsonb_typeof(p_value) = 'string' and exists (select 1 from pg_catalog.pg_timezone_names z where z.name = p_value #>> '{}')
     when 'saved_replies' then jsonb_typeof(p_value) = 'array' and jsonb_array_length(p_value) between 0 and 10
     else false

@@ -380,12 +380,13 @@ declare
   v_after jsonb;
   v_id uuid;
 begin
-  if p_kind is null or p_kind not in ('days_30', 'days_90', 'year_1', 'lifetime') then
-    return mc.failed('invalid', 'Choose 30 days, 90 days, 1 year or Lifetime');
-  end if;
-  v_refusal := mc.gate('grants.write', p_kind in ('year_1', 'lifetime'), 20);
+  -- The gate first, whatever the input (nobody but an admin learns how input is checked).
+  v_refusal := mc.gate('grants.write', coalesce(p_kind in ('year_1', 'lifetime'), false), 20);
   if v_refusal is not null then
     return mc.refused(v_refusal);
+  end if;
+  if p_kind is null or p_kind not in ('days_30', 'days_90', 'year_1', 'lifetime') then
+    return mc.failed('invalid', 'Choose 30 days, 90 days, 1 year or Lifetime');
   end if;
   if p_reason is null or char_length(btrim(p_reason)) < 3 then
     return mc.failed('reason_required', 'Write the reason for this grant');
@@ -654,21 +655,36 @@ begin
   if exists (select 1 from lucento_private.revoked_purchases rp where rp.purchase_token_hash = p_token_hash) then
     return mc.failed('refunded', 'This purchase was refunded; there is nothing to move');
   end if;
-  -- The target's own rows of the same kind: a live one from another purchase stops the move.
-  select string_agg(t.source, ', ') into v_conflict
+  -- Google Play says it was bought for a different account: moving it here would be undone when that account's phone
+  -- next checks it (apply_play_purchase's own rule), so it is refused (security review M4).
+  if v_link.obfuscated_account_id is not null
+     and v_link.obfuscated_account_id <> encode(sha256(convert_to(lower(p_to_user::text), 'UTF8')), 'hex') then
+    return mc.failed('bought_for_other_account', 'Google Play says this was bought for a different account, so it can''t be moved here');
+  end if;
+  -- The target's own rows of the same kind: one from another purchase that hasn't ended (live, on hold, paused,
+  -- pending) stops the move, so a paying customer's plan is never deleted to make room.
+  select string_agg(t.source || ' (' || t.status || ')', ', ') into v_conflict
     from public.entitlements m
     join public.entitlements t on t.user_id = p_to_user and t.source = m.source
       and coalesce(t.product_id, '') = coalesce(m.product_id, '')
     where m.user_id = v_link.user_id and m.purchase_token_hash = p_token_hash
-      and t.purchase_token_hash is distinct from p_token_hash and mc.is_live(t.status, t.expires_at);
+      and t.purchase_token_hash is distinct from p_token_hash and t.status not in ('EXPIRED', 'REVOKED');
   if v_conflict is not null then
-    return mc.failed('target_has_plan', 'The other account already has a live ' || v_conflict || ' row');
+    return mc.failed('target_has_plan', 'The other account already has ' || v_conflict);
   end if;
 
   v_before := jsonb_build_object('from_user', v_link.user_id, 'to_user', p_to_user, 'linked_at', v_link.linked_at,
     'relinked_count', v_link.relinked_count,
     'rows', (select coalesce(jsonb_agg(jsonb_build_object('source', e.source, 'status', e.status, 'expires_at', e.expires_at)), '[]'::jsonb)
-             from public.entitlements e where e.user_id = v_link.user_id and e.purchase_token_hash = p_token_hash));
+             from public.entitlements e where e.user_id = v_link.user_id and e.purchase_token_hash = p_token_hash),
+    -- The target's ended rows of the same kind that the move replaces.
+    'replaced', (select coalesce(jsonb_agg(jsonb_build_object('source', t.source, 'status', t.status, 'expires_at', t.expires_at,
+                   'token_hash', t.purchase_token_hash)), '[]'::jsonb)
+                 from public.entitlements m
+                 join public.entitlements t on t.user_id = p_to_user and t.source = m.source
+                   and coalesce(t.product_id, '') = coalesce(m.product_id, '')
+                 where m.user_id = v_link.user_id and m.purchase_token_hash = p_token_hash
+                   and t.purchase_token_hash is distinct from p_token_hash));
   delete from public.entitlements t
     using public.entitlements m
     where t.user_id = p_to_user and m.user_id = v_link.user_id and m.purchase_token_hash = p_token_hash
@@ -802,6 +818,7 @@ begin
     'revenue', mc.revenue_block(v_start, v_end),
     'revenue_prev', mc.revenue_block(v_pstart, v_start),
     'ops', jsonb_build_object(
+      'extended_data_enabled', mc.setting_on('extended_data_enabled'),
       'tickets_open', (select count(*) from mc.tickets t where t.status in ('open', 'in_progress')),
       'tickets_awaiting', (select count(*) from mc.tickets t where t.status = 'awaiting_customer'),
       'tickets_urgent', (select count(*) from mc.tickets t where t.status <> 'resolved' and t.priority = 'urgent'),
@@ -833,6 +850,7 @@ begin
     return mc.refused(v_refusal);
   end if;
   return jsonb_build_object('ok', true,
+    'extended_data_enabled', mc.setting_on('extended_data_enabled'),
     'open_tickets', (select count(*) from mc.tickets t where t.status in ('open', 'in_progress')),
     'services_attention', (select count(*) from mc.service_checks s
                            where s.status in ('degraded', 'down') and s.checked_at >= now() - interval '10 minutes'),
@@ -876,7 +894,7 @@ begin
   )
   select (select count(*) from base)::integer,
          coalesce((select jsonb_agg(jsonb_build_object('id', b.id, 'number', 'LC-' || b.id, 'channel', b.channel, 'topic', b.topic,
-                     'subject', b.subject, 'status', b.status, 'priority', b.priority, 'customer_email', b.customer_email,
+                     'subject', b.subject, 'status', b.status, 'priority', b.priority, 'customer_email', b.customer_email, 'verified', b.requester_verified,
                      'user_id', b.user_id, 'created_at', b.created_at, 'last_activity_at', b.last_activity_at,
                      'last_kind', (select m.kind from mc.ticket_messages m where m.ticket_id = b.id and m.kind <> 'note' order by m.id desc limit 1))
                      order by b.last_activity_at desc)
@@ -914,7 +932,7 @@ begin
   return jsonb_build_object('ok', true,
     'ticket', jsonb_build_object('id', v_t.id, 'number', 'LC-' || v_t.id, 'channel', v_t.channel, 'topic', v_t.topic,
       'subject', v_t.subject, 'status', v_t.status, 'priority', v_t.priority, 'user_id', v_t.user_id,
-      'requester_email', v_t.requester_email, 'diagnostics', v_t.diagnostics, 'source_note', v_t.source_note,
+      'requester_email', v_t.requester_email, 'verified', v_t.requester_verified, 'diagnostics', v_t.diagnostics, 'source_note', v_t.source_note,
       'created_at', v_t.created_at, 'first_response_at', v_t.first_response_at, 'resolved_at', v_t.resolved_at,
       'last_activity_at', v_t.last_activity_at,
       'reply_to', coalesce((select u.email from auth.users u where u.id = v_t.user_id), v_t.requester_email)),
@@ -992,12 +1010,13 @@ declare
   v_recipient text;
   v_id bigint;
 begin
-  if p_kind is null or p_kind not in ('reply', 'note', 'inbound') then
-    return mc.failed('invalid', 'Unknown message kind');
-  end if;
-  v_refusal := mc.gate(case when p_kind = 'reply' then 'support.reply' else 'support.write' end, false, case when p_kind = 'reply' then 40 else 120 end);
+  v_refusal := mc.gate(case when p_kind = 'reply' then 'support.reply' else 'support.write' end, false,
+                       case when p_kind = 'reply' then 40 else 120 end);
   if v_refusal is not null then
     return mc.refused(v_refusal);
+  end if;
+  if p_kind is null or p_kind not in ('reply', 'note', 'inbound') then
+    return mc.failed('invalid', 'Unknown message kind');
   end if;
   if p_body is null or char_length(btrim(p_body)) not between 1 and 5000 then
     return mc.failed('invalid', 'Write the message (up to 5,000 characters)');
@@ -1026,7 +1045,71 @@ begin
     where t.id = v_t.id;
   perform mc.audit('support.' || p_kind, v_t.user_id, 'LC-' || v_t.id, null, case when p_kind = 'reply' then 'pending' else 'ok' end);
   return jsonb_build_object('ok', true, 'message_id', v_id, 'recipient', v_recipient, 'number', 'LC-' || v_t.id,
-    'subject', '[LC-' || v_t.id || '] ' || v_t.subject);
+    -- A subject the sender typed goes back only to a verified sender: Lucento's domain never carries an unverified
+    -- stranger's words to someone's inbox (security review L7).
+    'subject', '[LC-' || v_t.id || '] ' || case when v_t.requester_verified then v_t.subject else 'Your message to Lucento Support' end);
+end;
+$$;
+
+-- Sending a reply again (its email failed or was never confirmed): counted against the same hourly limit and audited
+-- before Mission Control sends it (security review L5).
+create or replace function mc_api.ticket_reply_retry(p_message bigint)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('support.reply', false, 40);
+  v_m mc.ticket_messages%rowtype;
+  v_t mc.tickets%rowtype;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  select * into v_m from mc.ticket_messages m where m.id = p_message and m.kind = 'reply' for update;
+  if not found then
+    return mc.failed('not_found', 'There is no such reply');
+  end if;
+  if v_m.delivery is not null and v_m.delivery not in ('failed', 'sending') then
+    return mc.failed('already_sent', 'That reply was already sent');
+  end if;
+  select * into v_t from mc.tickets t where t.id = v_m.ticket_id;
+  update mc.ticket_messages m set delivery = 'sending', error = null where m.id = v_m.id;
+  perform mc.audit('support.reply_retry', v_t.user_id, 'LC-' || v_t.id, null, 'pending');
+  return jsonb_build_object('ok', true, 'message_id', v_m.id, 'recipient', v_m.recipient, 'body', v_m.body_text,
+    'number', 'LC-' || v_t.id,
+    'subject', '[LC-' || v_t.id || '] ' || case when v_t.requester_verified then v_t.subject else 'Your message to Lucento Support' end);
+end;
+$$;
+
+-- Deletes a ticket that is spam, with its messages (security review M2). The audit keeps that it happened, not what
+-- it said.
+create or replace function mc_api.ticket_delete(p_ticket bigint, p_reason text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('support.delete', false, 120);
+  v_t mc.tickets%rowtype;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  if p_reason is null or char_length(btrim(p_reason)) < 3 or char_length(p_reason) > 500 then
+    return mc.failed('reason_required', 'Write why this ticket is being deleted');
+  end if;
+  select * into v_t from mc.tickets t where t.id = p_ticket for update;
+  if not found then
+    return mc.failed('not_found', 'There is no ticket LC-' || coalesce(p_ticket::text, '?'));
+  end if;
+  delete from mc.tickets t where t.id = v_t.id;
+  perform mc.audit('support.ticket_delete', v_t.user_id, 'LC-' || v_t.id, btrim(p_reason), 'ok', null, null, v_t.channel);
+  return jsonb_build_object('ok', true);
 end;
 $$;
 
@@ -1122,7 +1205,7 @@ begin
   end if;
   update mc.tickets t set user_id = p_user, requester_email = null, last_activity_at = now() where t.id = v_t.id;
   perform mc.audit('support.link_account', p_user, 'LC-' || v_t.id, null, 'ok',
-    jsonb_build_object('requester_email_domain', split_part(v_t.requester_email, '@', 2)), null);
+    jsonb_build_object('requester_email_domain', split_part(v_t.requester_email, '@', 2)), jsonb_build_object('verified', false));
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -1146,6 +1229,7 @@ begin
     return mc.refused(v_refusal);
   end if;
   return jsonb_build_object('ok', true,
+    'extended_data_enabled', mc.setting_on('extended_data_enabled'),
     -- Resend's quota counts every email on the account, sent and received, for both products; its day is UTC's.
     'quota', jsonb_build_object(
       'today', (select count(*) from mc.email_events e where e.type in ('email.sent', 'email.received') and e.at >= v_day_start),
@@ -1281,6 +1365,7 @@ begin
   v_end := (v_to + 1)::timestamp at time zone v_tz;
   v_year_start := (date_trunc('month', v_today::timestamp) - interval '11 months') at time zone v_tz;
   return jsonb_build_object('ok', true,
+    'extended_data_enabled', mc.setting_on('extended_data_enabled'),
     'range', jsonb_build_object('from', v_from, 'to', v_to, 'timezone', v_tz),
     'summary', mc.revenue_block(v_start, v_end),
     -- Twelve months of Google Play amounts: subscription billings and Lifetime sales, kept apart, per currency.
@@ -1438,14 +1523,21 @@ declare
   v_refusal text;
   v_id uuid;
   v_expires timestamptz := now() + interval '30 minutes';
+  v_session uuid := case when auth.jwt() ->> 'session_id' ~ '^[0-9a-fA-F-]{36}$' then (auth.jwt() ->> 'session_id')::uuid end;
 begin
-  if not coalesce((select (s.value #>> '{}')::boolean from mc.settings s where s.key = 'records_view_enabled'), false) then
+  -- The gate first, so only an admin learns whether the view is on (security review L1); the fresh code after that,
+  -- so nobody is asked for one when the view is off anyway.
+  v_refusal := mc.gate('access.records_open', false, 30);
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  if not mc.setting_on('records_view_enabled') then
     perform mc.log_refusal(auth.uid(), 'access.records_open', 'records_view_disabled');
     return mc.refused('records_view_disabled');
   end if;
-  v_refusal := mc.gate('access.records_open', true, 30);
-  if v_refusal is not null then
-    return mc.refused(v_refusal);
+  if not mc.fresh_mfa(coalesce(auth.jwt(), '{}'::jsonb)) then
+    perform mc.log_refusal(auth.uid(), 'access.records_open', 'step_up_required');
+    return mc.refused('step_up_required');
   end if;
   if p_reason is null or char_length(btrim(p_reason)) < 3 or char_length(p_reason) > 200 then
     return mc.failed('reason_required', 'Write why you need to see these records (usually the ticket number)');
@@ -1455,14 +1547,16 @@ begin
   end if;
   update mc.records_access r set closed_at = now()
     where r.admin_id = auth.uid() and r.user_id = p_user and r.closed_at is null;
-  insert into mc.records_access (admin_id, user_id, reason, expires_at) values (auth.uid(), p_user, btrim(p_reason), v_expires)
+  insert into mc.records_access (admin_id, session_id, user_id, reason, expires_at)
+    values (auth.uid(), v_session, p_user, btrim(p_reason), v_expires)
     returning id into v_id;
   perform mc.audit('access.records_open', p_user, v_id::text, btrim(p_reason), 'ok');
   return jsonb_build_object('ok', true, 'access_id', v_id, 'expires_at', v_expires);
 end;
 $$;
 
--- The access, if it is the caller's, still open, and the setting still on.
+-- The access, if it belongs to the caller's own sign-in session (the one that gave the fresh code, security review
+-- L2), is still open, and the setting is still on.
 create or replace function mc.records_session(p_access uuid)
 returns mc.records_access
 language sql
@@ -1472,7 +1566,8 @@ set search_path = ''
 as $$
   select r.* from mc.records_access r
   where r.id = p_access and r.admin_id = auth.uid() and r.closed_at is null and r.expires_at > now()
-    and coalesce((select (s.value #>> '{}')::boolean from mc.settings s where s.key = 'records_view_enabled'), false)
+    and r.session_id = case when auth.jwt() ->> 'session_id' ~ '^[0-9a-fA-F-]{36}$' then (auth.jwt() ->> 'session_id')::uuid end
+    and mc.setting_on('records_view_enabled')
 $$;
 
 -- One page of one kind of record. Notes are never in this answer: only whether there is one (reveal_note shows it).
@@ -1658,7 +1753,9 @@ $$;
 
 -- ================================================================================================ ingest (anon + secret)
 -- Resend's webhook, already signature-checked by Mission Control's route and reduced to the fields kept here.
--- KlaroPH's mail (another domain on the same Resend account) is counted, with no recipient or subject.
+-- KlaroPH's mail (another domain on the same Resend account) is counted, with no recipient, subject or bounce reason
+-- (a reason can quote the address). Lucento's own recipients and subjects are kept only once the updated privacy policy
+-- is live (extended_data_enabled, security review M6); until then every event is counted without them.
 create or replace function mc_api.ingest_email_events(p_secret text, p_events jsonb)
 returns jsonb
 language plpgsql
@@ -1670,11 +1767,12 @@ declare
   v_e jsonb;
   v_domain text;
   v_lucento boolean;
+  v_keep boolean := mc.setting_on('extended_data_enabled');
   v_type text;
   v_n integer := 0;
   v_one integer;
 begin
-  if not mc.ingest_secret_ok(p_secret) then
+  if not mc.ingest_secret_ok(p_secret, 'app') then
     perform mc.log_refusal(null, 'ingest.email_events', 'bad_secret');
     return mc.refused('bad_secret');
   end if;
@@ -1693,9 +1791,9 @@ begin
     v_lucento := v_domain is not null and (v_domain = 'lucentoapp.com' or v_domain like '%.lucentoapp.com');
     insert into mc.email_events (event_id, email_id, type, at, from_domain, recipient, subject, reason)
       values (v_e ->> 'event_id', left(v_e ->> 'email_id', 100), v_type, (v_e ->> 'at')::timestamptz, v_domain,
-              case when v_lucento then lower(left(v_e ->> 'recipient', 254)) end,
-              case when v_lucento then left(v_e ->> 'subject', 300) end,
-              left(v_e ->> 'reason', 500))
+              case when v_lucento and v_keep then lower(left(v_e ->> 'recipient', 254)) end,
+              case when v_lucento and v_keep then left(v_e ->> 'subject', 300) end,
+              case when v_lucento and v_keep then left(v_e ->> 'reason', 500) end)
       on conflict (event_id) do nothing;
     get diagnostics v_one = row_count;
     v_n := v_n + v_one;
@@ -1714,7 +1812,8 @@ $$;
 
 -- The orders whose amounts Mission Control should fetch from Google Play: first orders of purchases Lucento knows about,
 -- never fetched, or fetched more than a week ago while they could still change (a refund). Google's orders carry no
--- test marker, so each one comes with Lucento's own: whether the purchase was a licence tester's.
+-- test marker, so each one comes with Lucento's own: whether the purchase was a licence tester's. None until the
+-- updated privacy policy (which discloses keeping the amounts) is live (security review M6).
 create or replace function mc_api.play_orders_wanted(p_secret text, p_limit integer default 1000)
 returns jsonb
 language plpgsql
@@ -1723,11 +1822,14 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not mc.ingest_secret_ok(p_secret) then
+  if not mc.ingest_secret_ok(p_secret, 'app') then
     perform mc.log_refusal(null, 'ingest.play_orders_wanted', 'bad_secret');
     return mc.refused('bad_secret');
   end if;
-  return jsonb_build_object('ok', true, 'orders', (
+  if not mc.setting_on('extended_data_enabled') then
+    return jsonb_build_object('ok', true, 'paused', true, 'orders', '[]'::jsonb);
+  end if;
+  return jsonb_build_object('ok', true, 'paused', false, 'orders', (
     select coalesce(jsonb_agg(jsonb_build_object('order_id', l.order_id, 'token_hash', l.purchase_token_hash, 'product_id', l.product_id,
              'test', coalesce((select bool_or(e.test_purchase) from public.entitlements e where e.purchase_token_hash = l.purchase_token_hash), false))), '[]'::jsonb)
     from (select pl.* from public.purchase_links pl
@@ -1751,7 +1853,7 @@ declare
   v_n integer := 0;
   v_micros constant text := '^\d{1,18}$';
 begin
-  if not mc.ingest_secret_ok(p_secret) then
+  if not mc.ingest_secret_ok(p_secret, 'app') then
     perform mc.log_refusal(null, 'ingest.play_orders', 'bad_secret');
     return mc.refused('bad_secret');
   end if;
@@ -1764,13 +1866,12 @@ begin
        or (coalesce(v_o ->> 'currency', '') !~ '^[A-Z]{3}$' and coalesce(v_o ->> 'state', '') <> 'NOT_FOUND') then
       continue;
     end if;
-    insert into mc.play_orders as p (order_id, purchase_token_hash, product_id, base_plan_id, region_code, currency,
+    insert into mc.play_orders as p (order_id, purchase_token_hash, product_id, base_plan_id, currency,
         listing_price_micros, tax_micros, total_micros, refunded_micros, developer_revenue_micros, state, test, ordered_at,
         refunded_at, fetched_at)
       values (v_o ->> 'order_id',
               case when v_o ->> 'token_hash' ~ '^[0-9a-f]{64}$' then v_o ->> 'token_hash' end,
               left(v_o ->> 'product_id', 100), left(v_o ->> 'base_plan_id', 100),
-              case when v_o ->> 'region_code' ~ '^[A-Z]{2}$' then v_o ->> 'region_code' end,
               case when v_o ->> 'currency' ~ '^[A-Z]{3}$' then v_o ->> 'currency' end,
               case when v_o ->> 'listing_price_micros' ~ v_micros then (v_o ->> 'listing_price_micros')::bigint end,
               case when v_o ->> 'tax_micros' ~ v_micros then (v_o ->> 'tax_micros')::bigint end,
@@ -1784,7 +1885,7 @@ begin
       on conflict (order_id) do update set
         purchase_token_hash = coalesce(excluded.purchase_token_hash, p.purchase_token_hash),
         product_id = coalesce(excluded.product_id, p.product_id), base_plan_id = coalesce(excluded.base_plan_id, p.base_plan_id),
-        region_code = coalesce(excluded.region_code, p.region_code), currency = coalesce(excluded.currency, p.currency),
+        currency = coalesce(excluded.currency, p.currency),
         listing_price_micros = coalesce(excluded.listing_price_micros, p.listing_price_micros),
         tax_micros = coalesce(excluded.tax_micros, p.tax_micros), total_micros = coalesce(excluded.total_micros, p.total_micros),
         refunded_micros = coalesce(excluded.refunded_micros, p.refunded_micros),
@@ -1812,7 +1913,8 @@ as $$
 declare
   v_detail jsonb := case when jsonb_typeof(p_detail) = 'object' and pg_column_size(p_detail) <= 4000 then p_detail else '{}'::jsonb end;
 begin
-  if not mc.ingest_secret_ok(p_secret) then
+  -- The backup holds its own secret, good only for reporting itself (security review L10).
+  if not mc.ingest_secret_ok(p_secret, case when p_job = 'backup' then 'backup' else 'app' end) then
     perform mc.log_refusal(null, 'ingest.job_run', 'bad_secret');
     return mc.refused('bad_secret');
   end if;
@@ -1842,7 +1944,7 @@ declare
   v_c jsonb;
   v_n integer := 0;
 begin
-  if not mc.ingest_secret_ok(p_secret) then
+  if not mc.ingest_secret_ok(p_secret, 'app') then
     perform mc.log_refusal(null, 'ingest.service_checks', 'bad_secret');
     return mc.refused('bad_secret');
   end if;
@@ -1887,6 +1989,8 @@ revoke all on function
   mc_api.ticket_reply_result(bigint, text, text),
   mc_api.ticket_update(bigint, text, text),
   mc_api.ticket_link_account(bigint, uuid),
+  mc_api.ticket_reply_retry(bigint),
+  mc_api.ticket_delete(bigint, text),
   mc_api.email_overview(text, text, integer),
   mc_api.email_send_prepare(text, uuid),
   mc_api.email_send_result(uuid, text, text),
@@ -1926,6 +2030,8 @@ grant execute on function
   mc_api.ticket_reply_result(bigint, text, text),
   mc_api.ticket_update(bigint, text, text),
   mc_api.ticket_link_account(bigint, uuid),
+  mc_api.ticket_reply_retry(bigint),
+  mc_api.ticket_delete(bigint, text),
   mc_api.email_overview(text, text, integer),
   mc_api.email_send_prepare(text, uuid),
   mc_api.email_send_result(uuid, text, text),
@@ -1957,6 +2063,9 @@ begin
     perform cron.schedule('mc-grants', '10 * * * *', 'select mc.expire_grants()');
     perform cron.schedule('mc-deletions', '*/15 * * * *', 'select mc.run_due_deletions()');
     perform cron.schedule('mc-daily', '20 16 * * *', 'select mc.daily_rollup()');
+  else
+    -- Production has pg_cron (20261029010000). Without it, deletions and retention would never run: say so loudly.
+    raise warning 'pg_cron is not installed: Mission Control''s jobs (activity, grant expiry, deletions, retention) are not scheduled';
   end if;
 end;
 $$;

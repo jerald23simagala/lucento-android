@@ -20,15 +20,22 @@ declare
   v_mara uuid := gen_random_uuid();  -- Mara: a hand-written GRANT after Mission Control (left alone)
   v_tess uuid := gen_random_uuid();  -- Tess: subscription in its free trial
   v_u uuid := gen_random_uuid();  -- Uma: email not verified
+  v_hw uuid := gen_random_uuid();  -- Hugo: a hand-written 1-year GRANT, then a 30-day grant in Mission Control
+  v_mix uuid := gen_random_uuid(); -- Mila: a hand-written CLOUD-only GRANT, then everything for 30 days
+  v_odd uuid := gen_random_uuid(); -- Otto: a hand-written GRANT for the subscription product
+  v_ev uuid := gen_random_uuid();  -- Eve: an account whose emails are in the delivery log, then deleted
   s_fresh uuid := gen_random_uuid(); s_stale uuid := gen_random_uuid(); s_jwt uuid := gen_random_uuid(); s_two uuid := gen_random_uuid();
+  s_old uuid := gen_random_uuid(); s_fresh2 uuid := gen_random_uuid();
   h_life text := encode(sha256(convert_to('mc-token-lifetime-carla', 'UTF8')), 'hex');
   h_sub text := encode(sha256(convert_to('mc-token-sub-fely', 'UTF8')), 'hex');
   h_trial text := encode(sha256(convert_to('mc-token-trial-tess', 'UTF8')), 'hex');
   h_move text := encode(sha256(convert_to('mc-token-move', 'UTF8')), 'hex');
   h_refund text := encode(sha256(convert_to('mc-token-refund', 'UTF8')), 'hex');
+  h_dup text := encode(sha256(convert_to('mc-token-second-lifetime', 'UTF8')), 'hex');
+  h_sub2 text := encode(sha256(convert_to('mc-token-second-subscription', 'UTF8')), 'hex');
   i_one uuid := gen_random_uuid(); i_two uuid := gen_random_uuid(); i_three uuid := gen_random_uuid();
   v_j jsonb; v_k jsonb; v_before jsonb; v_t text; v_n integer; v_m integer; v_id uuid; v_ticket bigint; v_ticket2 bigint;
-  v_msg bigint; v_secret text; v_access uuid; v_ok boolean; v_ts timestamptz;
+  v_msg bigint; v_secret text; v_bsecret text; v_access uuid; v_ok boolean; v_ts timestamptz; f record; v_sql text;
 begin
   -- ======================================================================== helpers
   create function pg_temp.as_admin(p_uid uuid, p_session uuid, p_aal text, p_totp_age interval) returns void language plpgsql as $f$
@@ -76,18 +83,25 @@ begin
     (v_i, 'ivan@lucento-test.invalid', now(), 'authenticated', 'authenticated', '{}'),
     (v_mara, 'mara@lucento-test.invalid', now(), 'authenticated', 'authenticated', '{}'),
     (v_tess, 'tess@lucento-test.invalid', now(), 'authenticated', 'authenticated', '{}'),
-    (v_u, 'uma@lucento-test.invalid', null, 'authenticated', 'authenticated', '{}');
+    (v_u, 'uma@lucento-test.invalid', null, 'authenticated', 'authenticated', '{}'),
+    (v_hw, 'hugo@lucento-test.invalid', now(), 'authenticated', 'authenticated', '{}'),
+    (v_mix, 'mila@lucento-test.invalid', now(), 'authenticated', 'authenticated', '{}'),
+    (v_odd, 'otto@lucento-test.invalid', now(), 'authenticated', 'authenticated', '{}');
   insert into mc.admins (user_id, email, display_name, active) values
     (v_admin, 'ops@lucento-test.invalid', 'Ops', true),
     (v_admin2, 'ops2@lucento-test.invalid', 'Ops Two', true),
     (v_off, 'former-ops@lucento-test.invalid', 'Former', false);
-  -- Sessions: TOTP verified just now (Auth's own record), an hour ago, and one only the token's amr claim knows about.
-  insert into auth.sessions (id, user_id, aal) values
-    (s_fresh, v_admin, 'aal2'), (s_stale, v_admin, 'aal2'), (s_jwt, v_admin, 'aal2'), (s_two, v_admin2, 'aal2');
+  -- Sessions: TOTP verified just now (Auth's own record), an hour ago, one only the token's amr claim knows about, one
+  -- signed in 13 hours ago (past the absolute limit), and a second fresh one of the same admin.
+  insert into auth.sessions (id, user_id, aal, created_at) values
+    (s_fresh, v_admin, 'aal2', now()), (s_stale, v_admin, 'aal2', now()), (s_jwt, v_admin, 'aal2', now()),
+    (s_two, v_admin2, 'aal2', now()), (s_old, v_admin, 'aal2', now() - interval '13 hours'), (s_fresh2, v_admin, 'aal2', now());
   insert into auth.mfa_amr_claims (session_id, authentication_method, created_at, updated_at) values
     (s_fresh, 'totp', now(), now()),
     (s_stale, 'totp', now() - interval '1 hour', now() - interval '1 hour'),
-    (s_two, 'totp', now(), now());
+    (s_two, 'totp', now(), now()),
+    (s_old, 'totp', now(), now()),
+    (s_fresh2, 'totp', now(), now());
   insert into auth.mfa_factors (user_id, friendly_name, factor_type, status) values (v_admin, 'Phone', 'totp', 'verified');
 
   -- Paid plans, written by the service role as the Vercel endpoints do.
@@ -162,14 +176,46 @@ begin
   exception when insufficient_privilege then r := r || 'ok  K12 anon can''t call admin functions'::text; end;
   execute 'reset role';
 
-  -- Retrying can't fill the log: at most 10 refusals per caller and reason an hour are written.
+  -- Retrying can't fill the append-only log: someone who isn't an admin leaves at most 3 refusal records a day.
   perform pg_temp.as_user(v_d);
   for v_n in 1..15 loop
     perform mc_api.list_users();
   end loop;
   execute 'reset role';
   select count(*) into v_n from mc.audit_log where admin_id = v_d and result = 'refused';
-  r := r || case when v_n = 10 then 'ok  K13 refusals are recorded, at most 10 an hour per caller' else 'FAIL K13 refused rows=' || v_n end;
+  r := r || case when v_n = 3 then 'ok  K13 refusals are recorded, at most 3 a day for someone who isn''t an admin' else 'FAIL K13 refused rows=' || v_n end;
+
+  -- Every admin function refuses a customer before it looks at its input (security review L1, L13).
+  v_t := null;
+  for f in
+    select p.proname, p.pronargs from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+    where s.nspname = 'mc_api' and p.proname not in ('whoami', 'play_orders_wanted') and p.proname not like 'ingest%'
+    order by p.proname
+  loop
+    v_sql := format('select mc_api.%I(%s)', f.proname, array_to_string(array_fill('null'::text, array[f.pronargs]), ', '));
+    perform pg_temp.as_user(v_d);
+    execute v_sql into v_j;
+    execute 'reset role';
+    if v_j ->> 'error' is distinct from 'not_admin' then
+      v_t := coalesce(v_t || ', ', '') || f.proname || '=' || coalesce(v_j ->> 'error', v_j::text);
+    end if;
+  end loop;
+  r := r || case when v_t is null then 'ok  K17 every mc_api function refuses a customer first (not_admin), whatever the input'
+                 else 'FAIL K17 ' || v_t end;
+
+  -- A token is good only while its own sign-in session lasts: signed in 13 hours ago, or signed out (security review H1).
+  perform pg_temp.as_admin(v_admin, s_old, 'aal2', interval '1 minute');
+  v_j := mc_api.overview();
+  v_k := mc_api.whoami();
+  execute 'reset role';
+  delete from auth.sessions where id = s_jwt;
+  perform pg_temp.as_admin(v_admin, s_jwt, 'aal2', interval '1 minute');
+  v_before := mc_api.list_users();
+  execute 'reset role';
+  insert into auth.sessions (id, user_id, aal, created_at) values (s_jwt, v_admin, 'aal2', now());
+  r := r || case when v_j ->> 'error' = 'session_expired' and v_k ->> 'error' = 'session_expired' and v_before ->> 'error' = 'session_expired'
+                 then 'ok  K18 a token from a session over 12 hours old, or one signed out, is refused by the database itself'
+                 else 'FAIL K18 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') || ' ' || coalesce(v_before::text, '') end;
 
   -- Privileges in the catalog, whatever the defaults: anon executes only the ingest functions; PUBLIC nothing.
   select count(*) into v_n from pg_proc p join pg_namespace s on s.oid = p.pronamespace
@@ -205,6 +251,28 @@ begin
   select count(*) into v_n from mc.audit_log where action = 'settings.set' and before = '{"resend_daily_limit": 100}'::jsonb
     and after = '{"resend_daily_limit": 150}'::jsonb;
   r := r || case when v_n = 1 then 'ok  S3 a setting change is audited with before and after' else 'FAIL S3 rows=' || v_n end;
+
+  -- Until the updated privacy policy is live, nothing beyond what it discloses is kept (security review M6).
+  v_n := mc.capture_activity();
+  v_secret := mc.rotate_ingest_secret('app');
+  perform pg_temp.as_anon();
+  v_j := mc_api.play_orders_wanted(v_secret);
+  v_k := mc_api.ingest_email_events(v_secret, jsonb_build_array(jsonb_build_object('event_id', 'msg_paused', 'email_id', 're_p',
+    'type', 'email.sent', 'at', now(), 'from_domain', 'send.lucentoapp.com', 'recipient', 'someone@example.com', 'subject', 'Hi')));
+  execute 'reset role';
+  r := r || case when v_n = 0 and not exists (select 1 from mc.account_activity) and (v_j ->> 'paused')::boolean
+                      and jsonb_array_length(v_j -> 'orders') = 0 and (v_k ->> 'inserted')::integer = 1
+                      and (select recipient from mc.email_events where event_id = 'msg_paused') is null
+                 then 'ok  S4 with the policy update not yet live: no activity log, no order sweep, emails counted without addresses'
+                 else 'FAIL S4 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
+  perform pg_temp.as_admin(v_admin, s_stale, 'aal2', interval '1 hour');
+  v_j := mc_api.settings_set('extended_data_enabled', 'true', 'Privacy policy v2 is live');
+  execute 'reset role';
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_k := mc_api.settings_set('extended_data_enabled', 'true', 'Privacy policy v2 is live');
+  execute 'reset role';
+  r := r || case when v_j ->> 'error' = 'step_up_required' and (v_k ->> 'ok')::boolean and mc.setting_on('extended_data_enabled')
+                 then 'ok  S5 turning it on needs a fresh code' else 'FAIL S5 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
 
   -- ======================================================================== G: complimentary Pro
   -- FD-V5: only a complimentary Lifetime's phone row may go without an expiry.
@@ -340,6 +408,57 @@ begin
   r := r || case when v_j ->> 'error' = 'rate_limited' then 'ok  G12 the 21st grant in an hour is refused' else 'FAIL G12 ' || coalesce(v_j::text, '') end;
   delete from mc.rate_counters where admin_id = v_admin and action = 'grants.write';
 
+  -- Hand-written rows are never undone by a later grant (security review M3).
+  -- (a) A year written by hand, then 30 days in Mission Control: the year stays.
+  insert into public.entitlements (user_id, source, status, grants, expires_at, note) values
+    (v_hw, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], now() + interval '365 days', 'Partner deal');
+  perform mc.import_manual_grants();
+  update public.entitlements set expires_at = now() + interval '400 days', note = 'Extended by hand' where user_id = v_hw and source = 'GRANT';
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_j := mc_api.grant_pro(v_hw, 'days_30', 'Tester');
+  execute 'reset role';
+  r := r || case when (v_j ->> 'ok')::boolean
+                      and (select expires_at from public.entitlements where user_id = v_hw and source = 'GRANT') = now() + interval '400 days'
+                      and (select count(*) from mc.entitlement_grants where user_id = v_hw) = 3
+                 then 'ok  G13 a row written or extended by hand becomes a grant: a later 30-day grant never shortens it'
+                 else 'FAIL G13 ' || coalesce(v_j::text, '') end;
+  -- (b) CLOUD only for 300 days by hand, then everything for 30 days: everything until day 30, then CLOUD to day 300.
+  insert into public.entitlements (user_id, source, status, grants, expires_at, note) values
+    (v_mix, 'GRANT', 'ACTIVE', array['CLOUD'], now() + interval '300 days', 'Sync for a tester');
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_j := mc_api.grant_pro(v_mix, 'days_30', 'Tester');
+  execute 'reset role';
+  select to_jsonb(e) into v_k from public.entitlements e where user_id = v_mix and source = 'GRANT';
+  v_ok := v_k -> 'grants' = '["AI_PRO", "CLOUD", "LOCAL_PRO", "SHARED"]'::jsonb and (v_k ->> 'expires_at')::timestamptz = now() + interval '30 days';
+  update mc.entitlement_grants set starts_at = now() - interval '31 days', ends_at = now() - interval '1 hour',
+    services_end_at = now() - interval '1 hour' where user_id = v_mix and kind = 'days_30';
+  update public.entitlements set expires_at = now() - interval '1 hour' where user_id = v_mix and source = 'GRANT';
+  perform mc.expire_grants();
+  select to_jsonb(e) into v_k from public.entitlements e where user_id = v_mix and source = 'GRANT';
+  r := r || case when v_ok and v_k ->> 'status' = 'ACTIVE' and v_k -> 'grants' = '["CLOUD"]'::jsonb
+                      and (v_k ->> 'expires_at')::timestamptz = now() + interval '300 days'
+                 then 'ok  G14 grants with different capabilities: everything until the first ends, then the hourly job leaves only what still runs'
+                 else 'FAIL G14 first=' || v_ok || ' then=' || coalesce(v_k::text, '') end;
+  -- (c) A hand-written GRANT for the subscription product is folded into Mission Control's one services row, so ending
+  -- the grants ends it too.
+  insert into public.entitlements (user_id, source, status, grants, product_id, expires_at, note) values
+    (v_odd, 'GRANT', 'ACTIVE', array['LOCAL_PRO', 'CLOUD', 'AI_PRO', 'SHARED'], 'lucento_pro', now() + interval '60 days', 'Old style');
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_j := mc_api.grant_pro(v_odd, 'days_30', 'Tester');
+  execute 'reset role';
+  v_ok := not exists (select 1 from public.entitlements where user_id = v_odd and product_id = 'lucento_pro')
+          and (select expires_at from public.entitlements where user_id = v_odd and source = 'GRANT' and product_id is null) = now() + interval '60 days';
+  for f in select id from mc.entitlement_grants where user_id = v_odd and revoked_at is null loop
+    perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+    perform mc_api.revoke_grant(f.id, 'Cleaning up');
+    execute 'reset role';
+  end loop;
+  r := r || case when v_ok and not lucento_private.has_capability(v_odd, 'LOCAL_PRO')
+                      and not exists (select 1 from public.entitlements where user_id = v_odd and mc.is_live(status, expires_at))
+                 then 'ok  G15 a hand-written row for another product is folded in, and revoking every grant really ends Pro'
+                 else 'FAIL G15 folded=' || v_ok end;
+  delete from mc.rate_counters where admin_id = v_admin and action = 'grants.write';
+
   -- ======================================================================== A: suspension
   insert into auth.sessions (id, user_id, aal, refreshed_at) values (gen_random_uuid(), v_d, 'aal1', (now() at time zone 'utc'));
   insert into auth.refresh_tokens (token, user_id, revoked, session_id)
@@ -438,9 +557,23 @@ begin
   perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
   v_j := mc_api.resolve_purchase_link(h_life, v_f, 'Wants it on the other account', 'Order GPA.life-carla, same Google account');
   execute 'reset role';
-  r := r || case when v_j ->> 'error' = 'target_has_plan' and (select user_id from public.purchase_links where purchase_token_hash = h_life) = v_c
-                 then 'ok  P3 a target that already holds a live Lifetime is refused, nothing moves'
+  r := r || case when v_j ->> 'error' = 'bought_for_other_account' and (select user_id from public.purchase_links where purchase_token_hash = h_life) = v_c
+                 then 'ok  P3 a purchase Google Play says was made for another account can''t be moved (its phone would move it back)'
                  else 'FAIL P3 ' || coalesce(v_j::text, '') end;
+  -- Two more bought signed out, then on Dino's account: a second Lifetime, and a subscription.
+  set role service_role;
+  perform public.apply_play_purchase(v_d, h_dup, 'GPA.dup', 'lucento_pro_lifetime', null, 'ACTIVE', null, now() - interval '1 day', null);
+  perform public.apply_play_purchase(v_d, h_sub2, 'GPA.sub2', 'lucento_pro', null, 'ACTIVE', 'monthly', now() - interval '1 day', now() + interval '29 days');
+  execute 'reset role';
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_j := mc_api.resolve_purchase_link(h_dup, v_f, 'Second purchase', 'Order GPA.dup sent by the customer');
+  v_k := mc_api.resolve_purchase_link(h_sub2, v_tess, 'Wants it on her account', 'Order GPA.sub2 sent by the customer');
+  execute 'reset role';
+  r := r || case when v_j ->> 'error' = 'target_has_plan' and v_k ->> 'error' = 'target_has_plan'
+                      and (select status from public.entitlements where user_id = v_tess and purchase_token_hash = h_trial) = 'TRIAL'
+                      and (select user_id from public.purchase_links where purchase_token_hash = h_sub2) = v_d
+                 then 'ok  P5 a target already holding that kind of plan (live, or a trial, hold or pause) is refused; nothing is deleted'
+                 else 'FAIL P5 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
   set role service_role;
   perform public.apply_play_purchase(v_e, h_refund, 'GPA.refund', 'lucento_pro_lifetime', null, 'ACTIVE', null, now() - interval '1 day', null);
   perform public.revoke_play_purchase(h_refund);
@@ -510,21 +643,71 @@ begin
   r := r || case when (v_j ->> 'ok')::boolean and v_j ->> 'reply_to' = 'carla@lucento-test.invalid'
                       and (select user_id from mc.tickets where id = v_ticket2) = v_c
                       and (select requester_email from mc.tickets where id = v_ticket2) is null
-                 then 'ok  T7 signed in: linked to the account, replies go to its own address (the typed one is ignored)'
+                      and (select requester_verified from mc.tickets where id = v_ticket2)
+                      and not (select requester_verified from mc.tickets where id = v_ticket)
+                 then 'ok  T7 signed in: linked, verified, replies go to its own address (typed one ignored); signed out: not verified'
                  else 'FAIL T7 ' || coalesce(v_j::text, '') end;
 
   perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
   v_j := mc_api.ticket_add_message(v_ticket, 'reply', 'Hi, I''m on it.');
   v_msg := (v_j ->> 'message_id')::bigint;
   v_k := mc_api.ticket_reply_result(v_msg, 're_test_123', null);
+  v_before := mc_api.ticket_add_message(v_ticket2, 'reply', 'Checking your sync now.');
   execute 'reset role';
   r := r || case when (v_j ->> 'ok')::boolean and v_j ->> 'recipient' = 'buyer@example.com'
-                      and v_j ->> 'subject' = '[LC-' || v_ticket || '] Billing and Pro: I bought Lifetime but it says Free'
+                      and v_j ->> 'subject' = '[LC-' || v_ticket || '] Your message to Lucento Support'
+                      and v_before ->> 'subject' = '[LC-' || v_ticket2 || '] Sync: My transactions are missing'
                       and (select status from mc.tickets where id = v_ticket) = 'awaiting_customer'
                       and (select first_response_at from mc.tickets where id = v_ticket) is not null
                       and (select delivery from mc.ticket_messages where id = v_msg) = 'sent'
-                 then 'ok  T8 a reply goes to the requester with [LC-…] in the subject; the ticket awaits the customer'
-                 else 'FAIL T8 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
+                 then 'ok  T8 a reply carries [LC-…]; the sender''s own words go back in the subject only to a verified sender'
+                 else 'FAIL T8 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_before::text, '') end;
+  -- "Send again" goes through the gate and its hourly limit, and only for a reply that didn't go (security review L5).
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_j := mc_api.ticket_reply_retry(v_msg);
+  v_k := mc_api.ticket_reply_retry((v_before ->> 'message_id')::bigint);
+  execute 'reset role';
+  r := r || case when v_j ->> 'error' = 'already_sent' and (v_k ->> 'ok')::boolean and v_k ->> 'body' = 'Checking your sync now.'
+                      and exists (select 1 from mc.audit_log where action = 'support.reply_retry')
+                 then 'ok  T13 send again is gated, audited, and refused for a reply already sent'
+                 else 'FAIL T13 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
+
+  -- A retry by someone else never shows the address (security review L4); an anonymous sign-in counts as signed out.
+  perform pg_temp.as_user(v_c);
+  v_j := public.submit_support_request('billing', 'Retry of the same request', null, i_one, i_two, '{}');
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_u, 'role', 'authenticated', 'is_anonymous', true)::text, true);
+  perform set_config('role', 'authenticated', true);
+  v_k := public.submit_support_request('other', 'Anonymous hello', null, gen_random_uuid(), gen_random_uuid(), '{}');
+  execute 'reset role';
+  r := r || case when (v_j ->> 'duplicate')::boolean and v_j -> 'reply_to' = 'null'::jsonb and v_k ->> 'error' = 'invalid_email'
+                 then 'ok  T14 a retry from another caller reveals no address; an anonymous sign-in must give an email like a signed-out one'
+                 else 'FAIL T14 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
+
+  -- Per network address (best effort, where the gateway passes it on), and one ceiling for every request together (M2).
+  perform set_config('request.headers', '{"x-forwarded-for": "203.0.113.7, 10.0.0.1"}', true);
+  perform pg_temp.as_anon();
+  for v_n in 1..6 loop
+    v_j := public.submit_support_request('idea', 'Idea ' || v_n, 'idea' || v_n || '@example.com', gen_random_uuid(), gen_random_uuid(), '{}');
+  end loop;
+  execute 'reset role';
+  perform set_config('request.headers', '', true);
+  update mc.settings set value = to_jsonb((select count(*) from mc.tickets where channel = 'in_app')::integer) where key = 'support_daily_cap';
+  perform pg_temp.as_user(v_c);
+  v_k := public.submit_support_request('bug', 'One more', null, gen_random_uuid(), gen_random_uuid(), '{}');
+  execute 'reset role';
+  update mc.settings set value = '200' where key = 'support_daily_cap';
+  r := r || case when v_j ->> 'error' = 'rate_limited' and v_k ->> 'error' = 'busy'
+                 then 'ok  T15 a 6th signed-out request an hour from one address is refused; the daily ceiling stops everyone, signed in too'
+                 else 'FAIL T15 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_j := mc_api.ticket_create('spammer@example.com', 'other', 'Cheap followers', 'Buy followers here', 'Play review');
+  v_k := mc_api.ticket_delete((v_j ->> 'id')::bigint, 'Spam');
+  execute 'reset role';
+  r := r || case when (v_k ->> 'ok')::boolean and not exists (select 1 from mc.tickets where id = (v_j ->> 'id')::bigint)
+                      and exists (select 1 from mc.audit_log where action = 'support.ticket_delete' and reason = 'Spam' and detail = 'manual')
+                 then 'ok  T16 spam is deleted with its messages; the audit keeps that it happened, not what it said'
+                 else 'FAIL T16 ' || coalesce(v_k::text, '') end;
   perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
   v_j := mc_api.ticket_add_message(v_ticket, 'inbound', 'Thanks! It works now.');
   v_k := mc_api.ticket_add_message(v_ticket, 'note', 'Moved GPA.move to Fely');
@@ -609,8 +792,12 @@ begin
   perform pg_temp.as_admin(v_admin2, s_two, 'aal2', interval '1 hour');
   v_j := mc_api.user_records(v_access, 'wallets');
   execute 'reset role';
-  r := r || case when v_j ->> 'error' = 'records_session_closed' then 'ok  R6 another admin can''t use someone else''s records session'
-                 else 'FAIL R6 ' || coalesce(v_j::text, '') end;
+  perform pg_temp.as_admin(v_admin, s_fresh2, 'aal2', interval '1 hour');
+  v_k := mc_api.user_records(v_access, 'wallets');
+  execute 'reset role';
+  r := r || case when v_j ->> 'error' = 'records_session_closed' and v_k ->> 'error' = 'records_session_closed'
+                 then 'ok  R6 a records session works only in the sign-in session that opened it: not another admin, not another device'
+                 else 'FAIL R6 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
   perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
   perform mc_api.close_records(v_access);
   v_j := mc_api.user_records(v_access, 'wallets');
@@ -635,7 +822,7 @@ begin
   execute 'reset role';
   select count(*) into v_n from auth.users u where u.id not in (v_admin, v_admin2, v_off, v_h);
   r := r || case when (v_j ->> 'ok')::boolean and (v_k #>> '{users,total}')::integer = v_n
-                      and (v_k #>> '{users,plans,lifetime}')::integer = 2 and (v_k #>> '{users,plans,trial}')::integer = 1
+                      and (v_k #>> '{users,plans,lifetime}')::integer = 3 and (v_k #>> '{users,plans,complimentary}')::integer = 2 and (v_k #>> '{users,plans,trial}')::integer = 1
                       and (v_k #>> '{users,dau}')::integer >= 1
                  then 'ok  O2 Overview counts customers only (admins and internal accounts left out), by plan'
                  else 'FAIL O2 expected total ' || v_n || ': ' || left(coalesce(v_k -> 'users', 'null'::jsonb)::text, 400) end;
@@ -650,7 +837,7 @@ begin
   perform mc_api.user_profile(v_c);
   v_before := mc_api.user_profile(v_c);
   execute 'reset role';
-  r := r || case when (v_j ->> 'total')::integer = 2 and (v_k ->> 'total')::integer = 1
+  r := r || case when (v_j ->> 'total')::integer = 3 and (v_k ->> 'total')::integer = 1
                       and v_k #>> '{rows,0,email}' = 'carla@lucento-test.invalid' and v_k #>> '{rows,0,app_version}' = '0.6.0'
                  then 'ok  O4 the directory searches and filters by plan' else 'FAIL O4 ' || left(coalesce(v_j::text, ''), 300) end;
   select count(*) into v_n from mc.audit_log where action = 'access.profile_open' and target_user_id = v_c and admin_id = v_admin;
@@ -680,14 +867,18 @@ begin
     jsonb_build_object('event_id', 'msg_3', 'email_id', 're_luc_1', 'type', 'email.sent', 'at', now(),
       'from_domain', 'send.lucentoapp.com', 'recipient', 'new@example.com', 'subject', 'Welcome to Lucento'),
     jsonb_build_object('event_id', 'msg_1', 'email_id', 're_test_123', 'type', 'email.delivered', 'at', now(),
-      'from_domain', 'send.lucentoapp.com', 'recipient', 'Buyer@Example.com', 'subject', '[LC-1001] Re')));
+      'from_domain', 'send.lucentoapp.com', 'recipient', 'Buyer@Example.com', 'subject', '[LC-1001] Re'),
+    jsonb_build_object('event_id', 'msg_4', 'email_id', 're_kph_2', 'type', 'email.bounced', 'at', now(),
+      'from_domain', 'klaroph.com', 'recipient', 'gone@example.org', 'subject', 'KlaroPH receipt',
+      'reason', 'Mailbox gone@example.org does not exist')));
   execute 'reset role';
-  r := r || case when v_j ->> 'error' = 'bad_secret' and (v_k ->> 'inserted')::integer = 3
+  r := r || case when v_j ->> 'error' = 'bad_secret' and (v_k ->> 'inserted')::integer = 4
                       and (select recipient from mc.email_events where event_id = 'msg_2') is null
                       and (select subject from mc.email_events where event_id = 'msg_2') is null
+                      and (select reason from mc.email_events where event_id = 'msg_4') is null
                       and (select recipient from mc.email_events where event_id = 'msg_1') = 'buyer@example.com'
                       and (select delivery from mc.ticket_messages where id = v_msg) = 'delivered'
-                 then 'ok  E1 Resend events need the secret; KlaroPH''s are counted without recipient or subject; a reply shows delivered'
+                 then 'ok  E1 Resend events need the secret; KlaroPH''s are counted with no recipient, subject or bounce text; a reply shows delivered'
                  else 'FAIL E1 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
   perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
   v_j := mc_api.email_overview();
@@ -695,10 +886,29 @@ begin
   v_before := mc_api.email_send_prepare('test');
   v_t := (mc_api.email_send_prepare('complimentary_pro', v_d)) ->> 'error';
   execute 'reset role';
-  r := r || case when (v_j #>> '{quota,today}')::integer = 2 and (v_j #>> '{quota,daily_limit}')::integer = 150
+  r := r || case when (v_j #>> '{quota,today}')::integer = 3 and (v_j #>> '{quota,daily_limit}')::integer = 150
                       and v_k ->> 'error' = 'no_verified_email' and v_before ->> 'recipient' = 'ops@lucento-test.invalid' and v_t = 'no_grant'
                  then 'ok  E2 the quota counts both products; template emails go only to verified accounts or the admin'
                  else 'FAIL E2 ' || left(coalesce(v_j -> 'quota', 'null'::jsonb)::text, 200) || ' ' || coalesce(v_k::text, '') || ' ' || coalesce(v_t, '') end;
+
+  -- One secret per purpose: the backup's can report the backup and nothing else (security review L10).
+  v_bsecret := mc.rotate_ingest_secret('backup');
+  perform pg_temp.as_anon();
+  v_j := mc_api.ingest_job_run(v_bsecret, 'backup', 'ok', now(), now(), '{"size_bytes": 1234}');
+  v_k := mc_api.ingest_email_events(v_bsecret, '[]');
+  v_before := mc_api.ingest_job_run(v_secret, 'backup', 'ok', now(), now(), '{}');
+  execute 'reset role';
+  r := r || case when (v_j ->> 'ok')::boolean and v_k ->> 'error' = 'bad_secret' and v_before ->> 'error' = 'bad_secret'
+                 then 'ok  E3 the backup''s secret reports the backup only; the app''s secret can''t pose as the backup'
+                 else 'FAIL E3 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') || ' ' || coalesce(v_before::text, '') end;
+
+  -- Deleting an account takes its addresses out of the delivery log, whichever way it is deleted (M6).
+  insert into auth.users (id, email, email_confirmed_at, aud, role) values (v_ev, 'new@example.com', now(), 'authenticated', 'authenticated');
+  delete from auth.users where id = v_ev;
+  r := r || case when not exists (select 1 from mc.email_events where recipient = 'new@example.com')
+                      and exists (select 1 from mc.email_events where recipient = 'buyer@example.com')
+                 then 'ok  E4 an account''s delivery-log entries go with the account; others stay'
+                 else 'FAIL E4' end;
 
   -- ======================================================================== V: revenue
   perform pg_temp.as_anon();
@@ -725,7 +935,7 @@ begin
   r := r || case when v_before #>> '{summary,lifetime,amounts,0,gross_micros}' = '3500000000'
                       and v_before #>> '{summary,lifetime,amounts,0,net_micros}' = '2656250000'
                       and v_before #>> '{summary,lifetime,amounts,0,net_reported}' = 'false'
-                      and (v_before #>> '{summary,subscriptions,mrr,subscriptions}')::integer = 1
+                      and (v_before #>> '{summary,subscriptions,mrr,subscriptions}')::integer = 2 and (v_before #>> '{summary,subscriptions,mrr,unpriced}')::integer = 1
                       and v_before #>> '{summary,subscriptions,mrr,by_currency,0,mrr_micros}' = '89285714'
                       and (v_before #>> '{summary,refunds,count}')::integer = 1
                  then 'ok  V2 Lifetime gross and estimated net exclude test orders; MRR is the annual plan ÷ 12, never Lifetime or trials'

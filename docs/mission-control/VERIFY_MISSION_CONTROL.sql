@@ -3,7 +3,7 @@
 
 select
   (select count(*) from pg_namespace where nspname in ('mc', 'mc_api')) = 2                               as schemas_created,
-  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'mc_api') = 41 as api_functions_41,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'mc_api') = 43 as api_functions_43,
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'mc' and c.relkind = 'r') = 19                                                         as tables_19,
   (select count(*) from mc.settings) >= 7                                                                      as settings_seeded,
@@ -19,6 +19,9 @@ select
   (select count(*) from cron.job where jobname in ('mc-activity', 'mc-grants', 'mc-deletions', 'mc-daily')) = 4 as cron_jobs_4,
   (select pg_get_constraintdef(c.oid) like '%lucento_pro_lifetime%' from pg_constraint c
      where c.conname = 'entitlements_grant_expires')                                                          as grant_constraint_updated,
+  exists (select 1 from pg_trigger where tgname = 'mc_forget_account_emails')                                  as deletion_trigger_on_auth_users,
+  -- Both privacy switches stay off until the release with the updated privacy policy is live (DEPLOYMENT.md part H).
+  not mc.setting_on('records_view_enabled') and not mc.setting_on('extended_data_enabled')                     as privacy_switches_off,
   (select count(*) from mc.entitlement_grants where kind = 'imported')                                         as hand_written_grants_imported,
   exists (select 1 from mc.admins where active)                                                                as admin_added_step_a5,
-  exists (select 1 from mc.ingest_secret)                                                                      as ingest_secret_created_step_a6;
+  (select count(*) from mc.ingest_secret where purpose in ('app', 'backup')) = 2                               as both_secrets_created_step_a6;

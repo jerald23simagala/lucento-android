@@ -154,6 +154,9 @@ create table if not exists mc.tickets (
   -- Only when no account is linked: the address the person typed (signed out) or the admin entered.
   requester_email text check (requester_email is null or (char_length(requester_email) <= 254
     and requester_email ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$')),
+  -- True only for a request sent from the account's own signed-in app. A typed address, a ticket logged by hand and a
+  -- ticket linked to an account afterwards are not verified: anyone can type anyone's email (security review M1).
+  requester_verified boolean not null default false,
   topic text not null check (topic in ('account', 'billing', 'sync', 'data_recovery', 'bug', 'idea', 'other')),
   subject text not null check (char_length(subject) between 1 and 200),
   status text not null default 'open' check (status in ('open', 'in_progress', 'awaiting_customer', 'resolved')),
@@ -239,7 +242,7 @@ create table if not exists mc.play_orders (
   purchase_token_hash text check (purchase_token_hash is null or purchase_token_hash ~ '^[0-9a-f]{64}$'),
   product_id text check (product_id is null or char_length(product_id) <= 100),
   base_plan_id text check (base_plan_id is null or char_length(base_plan_id) <= 100),
-  region_code text check (region_code is null or region_code ~ '^[A-Z]{2}$'),
+  -- (Google's buyer country is deliberately not kept: revenue doesn't need it.)
   -- Null only for an order Google doesn't know (state NOT_FOUND), so it isn't asked for again.
   currency text check (currency is null or currency ~ '^[A-Z]{3}$'),
   -- Micros of the currency (Google's own unit): 1,200 PHP = 1200000000.
@@ -275,6 +278,8 @@ create table if not exists mc.service_checks (
 create table if not exists mc.records_access (
   id uuid primary key default gen_random_uuid(),
   admin_id uuid not null,
+  -- The sign-in session that opened it (with its fresh code); only that session may read through it (review L2).
+  session_id uuid not null,
   user_id uuid not null,
   reason text not null check (char_length(reason) between 3 and 200),
   opened_at timestamptz not null default now(),

@@ -114,13 +114,26 @@ as $$
   from public.entitlements e where e.user_id = p_user and e.source = 'GRANT'
 $$;
 
+-- The note on every GRANT row Mission Control writes. A GRANT row without it was written by hand.
+create or replace function mc.grant_marker()
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select 'Complimentary (Mission Control)'::text
+$$;
+
 -- Writes the account's GRANT rows from the grants still running (DATABASE_PROPOSAL.md §4):
 --   * any running Lifetime grant: a phone row (product lucento_pro_lifetime, LOCAL_PRO, no expiry), like paid Lifetime;
 --   * a services row (no product): the capabilities of every running grant (a Lifetime grant contributes its online
---     services only), until the latest end among them.
+--     services only), until the first moment any of them would end. The hourly job recomputes at that moment, so grants
+--     with different capabilities and ends are each honoured exactly (security review M3).
+-- First, a live GRANT row written by hand (no marker note) that the running grants don't explain becomes a grant of
+-- its own, so recomputing never undoes it; a hand-written GRANT for another product is folded into the services row.
 -- A row with nothing behind it any more ends: REVOKED when a grant was taken back early, EXPIRED when time ran out.
--- Paid rows (PLAY_*) are never read or written here. Accounts without any grant in Mission Control are left alone, so a
--- GRANT row the owner writes by hand is never undone by a job. Returns the GRANT rows afterwards.
+-- Paid rows (PLAY_*) are never read or written here. Accounts without any grant in Mission Control are left alone.
+-- Returns the GRANT rows afterwards.
 create or replace function mc.recompute_grants(p_user uuid)
 returns jsonb
 language plpgsql
@@ -135,6 +148,9 @@ declare
   v_end timestamptz;
   v_start timestamptz;
   v_cut_short boolean;
+  v_running_end timestamptz;
+  v_covered text[];
+  r public.entitlements%rowtype;
 begin
   -- One recompute per account at a time (two admins, or a grant racing the hourly job).
   perform pg_advisory_xact_lock(hashtextextended('mc.recompute_grants:' || p_user::text, 0));
@@ -142,19 +158,52 @@ begin
     return mc.grant_rows(p_user);
   end if;
 
+  -- 1. Hand-written rows become grants.
+  for r in
+    select * from public.entitlements e
+    where e.user_id = p_user and e.source = 'GRANT' and mc.is_live(e.status, e.expires_at)
+      and e.note is distinct from mc.grant_marker()
+  loop
+    if r.product_id = 'lucento_pro_lifetime' then
+      if not exists (select 1 from mc.entitlement_grants g where g.user_id = p_user and g.kind = 'lifetime' and g.revoked_at is null) then
+        -- The phone features for good; its online services already ended.
+        insert into mc.entitlement_grants (user_id, kind, grants, starts_at, ends_at, services_end_at, reason, granted_at)
+          values (p_user, 'lifetime', array['LOCAL_PRO'], r.starts_at, null, r.starts_at, 'Written by hand', v_now);
+      end if;
+    elsif r.expires_at is not null then
+      select max(g.services_end_at) into v_running_end
+        from mc.entitlement_grants g
+        where g.user_id = p_user and g.revoked_at is null and g.starts_at <= v_now and g.services_end_at > v_now;
+      select coalesce(array_agg(distinct c), '{}') into v_covered
+        from mc.entitlement_grants g, unnest(g.grants) c
+        where g.user_id = p_user and g.revoked_at is null and g.starts_at <= v_now and g.services_end_at >= r.expires_at;
+      if v_running_end is null or r.expires_at > v_running_end + interval '1 minute' or not (r.grants <@ v_covered) then
+        insert into mc.entitlement_grants (user_id, kind, grants, starts_at, ends_at, services_end_at, reason, granted_at)
+          values (p_user, 'imported', r.grants, least(r.starts_at, r.expires_at), r.expires_at, r.expires_at, 'Written by hand', v_now);
+      end if;
+      if r.product_id is not null then
+        -- Mission Control keeps one services row; this product's row is now part of it.
+        delete from public.entitlements e where e.id = r.id;
+      end if;
+    end if;
+  end loop;
+
+  -- 2. What the running grants add up to.
   select min(g.starts_at) into v_lifetime_start
     from mc.entitlement_grants g
     where g.user_id = p_user and g.revoked_at is null and g.kind = 'lifetime' and g.starts_at <= v_now;
 
-  select array(
-           select distinct c
-           from mc.entitlement_grants g,
-                unnest(case when g.kind = 'lifetime' then array_remove(g.grants, 'LOCAL_PRO') else g.grants end) c
-           where g.user_id = p_user and g.revoked_at is null and g.starts_at <= v_now and g.services_end_at > v_now
-             and not (v_lifetime_start is not null and c = 'LOCAL_PRO')
-           order by c),
-         max(g.services_end_at), min(g.starts_at)
-    into v_caps, v_end, v_start
+  select coalesce(array_agg(x.c order by x.c), '{}'), min(x.cap_end)
+    into v_caps, v_end
+    from (
+      select c, max(g.services_end_at) as cap_end
+      from mc.entitlement_grants g,
+           unnest(case when g.kind = 'lifetime' then array_remove(g.grants, 'LOCAL_PRO') else g.grants end) c
+      where g.user_id = p_user and g.revoked_at is null and g.starts_at <= v_now and g.services_end_at > v_now
+        and not (v_lifetime_start is not null and c = 'LOCAL_PRO')
+      group by c
+    ) x;
+  select min(g.starts_at) into v_start
     from mc.entitlement_grants g
     where g.user_id = p_user and g.revoked_at is null and g.starts_at <= v_now and g.services_end_at > v_now;
 
@@ -168,7 +217,7 @@ begin
   -- The services row.
   if cardinality(v_caps) > 0 then
     insert into public.entitlements as e (user_id, source, status, grants, product_id, starts_at, expires_at, verified_at, note)
-      values (p_user, 'GRANT', 'ACTIVE', v_caps, null, v_start, v_end, v_now, 'Complimentary (Mission Control)')
+      values (p_user, 'GRANT', 'ACTIVE', v_caps, null, v_start, v_end, v_now, mc.grant_marker())
       on conflict (user_id, source, (coalesce(product_id, ''))) do update
         set status = 'ACTIVE', grants = excluded.grants, starts_at = excluded.starts_at, expires_at = excluded.expires_at,
             verified_at = excluded.verified_at, note = excluded.note, test_purchase = false;
@@ -189,7 +238,7 @@ begin
   if v_lifetime_start is not null then
     insert into public.entitlements as e (user_id, source, status, grants, product_id, starts_at, expires_at, verified_at, note)
       values (p_user, 'GRANT', 'ACTIVE', array['LOCAL_PRO'], 'lucento_pro_lifetime', v_lifetime_start, null, v_now,
-              'Complimentary (Mission Control)')
+              mc.grant_marker())
       on conflict (user_id, source, (coalesce(product_id, ''))) do update
         set status = 'ACTIVE', grants = excluded.grants, starts_at = excluded.starts_at, expires_at = null,
             verified_at = excluded.verified_at, note = excluded.note, test_purchase = false;
@@ -224,10 +273,33 @@ begin
 end;
 $$;
 
+-- Whichever way an account is deleted (the app's Delete account, Mission Control, the Supabase dashboard), what
+-- Mission Control keeps by email address goes with it: the delivery log of emails sent to it and support requests sent
+-- signed out from that address. Everything else it keeps about an account already cascades (security review M6).
+create or replace function mc.forget_account_emails()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.email is not null then
+    delete from mc.email_events e where e.recipient = lower(old.email);
+    delete from mc.tickets t where t.user_id is null and t.requester_email = lower(old.email);
+  end if;
+  return old;
+end;
+$$;
+
+drop trigger if exists mc_forget_account_emails on auth.users;
+create trigger mc_forget_account_emails after delete on auth.users
+  for each row execute function mc.forget_account_emails();
+
 -- ------------------------------------------------------------------------------------------------ jobs (pg_cron, part 4)
 -- Hourly: which signed-in accounts showed activity since the last run. auth.sessions.refreshed_at is overwritten on
 -- every refresh, so it has to be read at least hourly to keep each day; synced writes and AI requests are read the same
--- way. Admin logins are never recorded.
+-- way. Admin logins are never recorded. Paused (nothing kept) until the updated privacy policy is live and the owner
+-- turns extended_data_enabled on (security review M6).
 create or replace function mc.capture_activity()
 returns integer
 language plpgsql
@@ -241,6 +313,11 @@ declare
   v_run bigint;
   v_n integer;
 begin
+  if not mc.setting_on('extended_data_enabled') then
+    insert into mc.job_runs (job, started_at, finished_at, result, detail)
+      values ('activity', now(), now(), 'ok', jsonb_build_object('paused', 'waiting for the updated privacy policy'));
+    return 0;
+  end if;
   select coalesce(max(r.started_at) - interval '15 minutes', now() - interval '2 hours') into v_since
     from mc.job_runs r where r.job = 'activity' and r.result = 'ok';
   insert into mc.job_runs (job, result) values ('activity', 'running') returning id into v_run;
@@ -392,7 +469,8 @@ begin
   delete from mc.email_events e where e.at < now() - interval '90 days';
   delete from mc.rate_counters c where c.hour < now() - interval '2 days';
   delete from mc.job_runs j where j.started_at < now() - interval '90 days' and j.id <> v_run;
-  delete from mc.tickets t where t.status = 'resolved' and t.resolved_at < now() - interval '365 days';
+  -- Support requests: 12 months after the last message, whatever their status (spam nobody resolves goes too).
+  delete from mc.tickets t where t.last_activity_at < now() - interval '365 days';
   delete from mc.email_sends s where s.created_at < now() - interval '365 days';
   update mc.records_access r set closed_at = r.expires_at where r.closed_at is null and r.expires_at < now();
 
@@ -434,11 +512,13 @@ as $$
   ), '{}'::jsonb)
 $$;
 
--- The app's Help › Contact support form (FD-V4). Signed in: the request links to the account and replies go to its email
--- (p_email is ignored). Signed out: an email address is required. Limits: 3 a day per install while signed out, 10 a day
--- per account, and a shared hourly cap on signed-out requests (Settings) so nobody can flood the inbox. p_client_ref is
--- the request's own id, made on the phone: sending it again (a retry after a lost answer) returns the same ticket.
--- Answers {ok, ticket, reply_to} or {ok: false, error}; never anything about another request.
+-- The app's Help › Contact support form (FD-V4). Signed in: the request links to the account, is marked verified, and
+-- replies go to the account's email (p_email is ignored). Signed out (an anonymous sign-in counts as signed out: making
+-- another costs nothing): an email address is required and the request is not verified. Limits (security review M2):
+-- 3 a day per install while signed out, 5 an hour per network address where Supabase's gateway passes one on, a shared
+-- hourly cap on signed-out requests, 10 a day per account, and a daily ceiling on every request together (Settings).
+-- p_client_ref is the request's own id, made on the phone: sending it again (a retry after a lost answer) returns the
+-- same ticket. Answers {ok, ticket, reply_to} or {ok: false, error}; never anything about another request.
 create or replace function public.submit_support_request(
   p_topic text, p_message text, p_email text, p_install_id uuid, p_client_ref uuid, p_diagnostics jsonb default '{}'::jsonb
 )
@@ -449,12 +529,16 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_uid uuid := auth.uid();
+  v_uid uuid := case when coalesce(auth.jwt() ->> 'is_anonymous', 'false') = 'true' then null else auth.uid() end;
+  v_account_email text;
   v_email text;
   v_message text := btrim(coalesce(p_message, ''));
-  v_existing bigint;
+  v_existing mc.tickets%rowtype;
   v_id bigint;
   v_first_line text;
+  v_headers jsonb;
+  v_ip text;
+  v_count integer;
 begin
   if p_topic is null or p_topic not in ('account', 'billing', 'sync', 'data_recovery', 'bug', 'idea', 'other') then
     return jsonb_build_object('ok', false, 'error', 'invalid_topic');
@@ -472,15 +556,23 @@ begin
   -- One decision at a time per install, so two taps can't both pass the limit.
   perform pg_advisory_xact_lock(hashtextextended('mc.support:' || p_install_id::text, 0));
 
-  select t.id into v_existing from mc.tickets t where t.install_id = p_install_id and t.client_ref = p_client_ref;
+  select * into v_existing from mc.tickets t where t.install_id = p_install_id and t.client_ref = p_client_ref;
   if found then
-    return jsonb_build_object('ok', true, 'ticket', 'LC-' || v_existing, 'duplicate', true,
-      'reply_to', (select coalesce(t.requester_email, u.email) from mc.tickets t left join auth.users u on u.id = t.user_id
-                   where t.id = v_existing));
+    -- The same request again: its number, and its reply address only to whoever sent it (security review L4).
+    return jsonb_build_object('ok', true, 'ticket', 'LC-' || v_existing.id, 'duplicate', true,
+      'reply_to', case when v_existing.user_id is not distinct from v_uid then
+                    coalesce(v_existing.requester_email, (select u.email from auth.users u where u.id = v_existing.user_id)) end);
+  end if;
+
+  -- Every in-app request in a day together: a ceiling that no number of installs or accounts can raise.
+  perform pg_advisory_xact_lock(hashtextextended('mc.support:all', 0));
+  if (select count(*) from mc.tickets t where t.channel = 'in_app' and t.created_at > now() - interval '24 hours')
+     >= mc.setting_int('support_daily_cap', 200) then
+    return jsonb_build_object('ok', false, 'error', 'busy');
   end if;
 
   if v_uid is not null then
-    select u.email into v_email from auth.users u where u.id = v_uid;
+    select u.email into v_account_email from auth.users u where u.id = v_uid;
     if not found then
       return jsonb_build_object('ok', false, 'error', 'invalid_request');
     end if;
@@ -490,17 +582,34 @@ begin
     end if;
   end if;
 
-  if v_uid is null or v_email is null then
-    v_email := lower(btrim(coalesce(p_email, '')));
-    if char_length(v_email) > 254 or v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' then
-      return jsonb_build_object('ok', false, 'error', 'invalid_email');
-    end if;
+  v_email := coalesce(lower(v_account_email), lower(btrim(coalesce(p_email, ''))));
+  if v_account_email is null and (char_length(v_email) > 254 or v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$') then
+    return jsonb_build_object('ok', false, 'error', 'invalid_email');
   end if;
 
   if v_uid is null then
     if (select count(*) from mc.tickets t where t.install_id = p_install_id and t.user_id is null
         and t.created_at > now() - interval '24 hours') >= 3 then
       return jsonb_build_object('ok', false, 'error', 'rate_limited');
+    end if;
+    -- The caller's network address, when the gateway passes one on (best effort: a fresh install id is free, an
+    -- address is not). Kept only as a keyed hash in the hourly counters, which are pruned after two days.
+    begin
+      v_headers := nullif(current_setting('request.headers', true), '')::jsonb;
+    exception when others then
+      v_headers := null;
+    end;
+    v_ip := nullif(btrim(split_part(coalesce(v_headers ->> 'cf-connecting-ip', v_headers ->> 'x-real-ip',
+                                             v_headers ->> 'x-forwarded-for', ''), ',', 1)), '');
+    if v_ip is not null then
+      insert into mc.rate_counters as c (admin_id, action, hour, count)
+        values (md5('mc.support.ip:' || v_ip || coalesce((select s.secret_hash from mc.ingest_secret s where s.purpose = 'app'), ''))::uuid,
+                'support:ip', date_trunc('hour', now()), 1)
+        on conflict (admin_id, action, hour) do update set count = c.count + 1
+        returning c.count into v_count;
+      if v_count > 5 then
+        return jsonb_build_object('ok', false, 'error', 'rate_limited');
+      end if;
     end if;
     perform pg_advisory_xact_lock(hashtextextended('mc.support:signed_out', 0));
     if (select count(*) from mc.tickets t where t.channel = 'in_app' and t.user_id is null
@@ -510,8 +619,8 @@ begin
   end if;
 
   v_first_line := btrim(split_part(regexp_replace(v_message, '[[:cntrl:]]+', E'\n', 'g'), E'\n', 1));
-  insert into mc.tickets (channel, user_id, requester_email, topic, subject, install_id, client_ref, diagnostics)
-    values ('in_app', v_uid, case when v_uid is null or (select u.email from auth.users u where u.id = v_uid) is null then v_email end,
+  insert into mc.tickets (channel, user_id, requester_email, requester_verified, topic, subject, install_id, client_ref, diagnostics)
+    values ('in_app', v_uid, case when v_account_email is null then v_email end, v_account_email is not null,
             p_topic,
             left(mc.topic_label(p_topic) || case when v_first_line <> '' then ': ' || v_first_line else '' end, 120),
             p_install_id, p_client_ref, mc.clean_diagnostics(p_diagnostics))
@@ -524,7 +633,8 @@ $$;
 
 -- ------------------------------------------------------------------------------------------------ the phone: version
 -- Once a day for a signed-in account (FD-V7): the app's version, Android's API level and the phone model, so Mission
--- Control can say which version someone runs. Calls within the hour with nothing changed are ignored.
+-- Control can say which version someone runs. Calls within the hour with nothing changed are ignored, and any call
+-- within 10 minutes of the last one (so the row can't be rewritten in a loop).
 create or replace function public.report_client(
   p_app_version text, p_version_code integer, p_android_sdk integer, p_device_model text
 )
@@ -551,8 +661,9 @@ begin
     v_model := 'unknown';
   end if;
   select * into v_row from mc.account_clients c where c.user_id = v_uid for update;
-  if found and v_row.last_seen_at > now() - interval '1 hour' and v_row.app_version = p_app_version
-     and v_row.version_code = p_version_code and v_row.android_sdk = p_android_sdk and v_row.device_model = v_model then
+  if found and (v_row.last_seen_at > now() - interval '10 minutes'
+     or (v_row.last_seen_at > now() - interval '1 hour' and v_row.app_version = p_app_version
+         and v_row.version_code = p_version_code and v_row.android_sdk = p_android_sdk and v_row.device_model = v_model)) then
     return jsonb_build_object('ok', true, 'recorded', false);
   end if;
   insert into mc.account_clients as c (user_id, app_version, version_code, android_sdk, device_model, first_seen_at, last_seen_at)
