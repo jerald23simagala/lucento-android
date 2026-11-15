@@ -573,7 +573,7 @@ pack, `391e7d8`). The owner chose "Release 0.5.8 now". #58, #37 and the dependen
   publishes the same text in lucento-website #29, with an "Online voice" row in the homepage's short privacy list.
 - Owner retest: NEXT_TASKS OT-25.
 
-## Mission Control V1 — 2026-11-15 (`feature/mission-control-db`, repo `lucento-mission-control` `feature/mission-control-v1`)
+## Mission Control V1 — 2026-11-15 (database: PR #76, merged `889e636`; console: private repo `jerald23simagala/lucento-mission-control`, PR #1 merged `d24038f`)
 
 Owner: "I need my minimalist mission control done … Lets start building now" (Phase 4 go-ahead for the lean V1 in
 `docs/mission-control/v1/`, decisions FD-V1…V15). Phase 5 (production) is the owner's: DEPLOYMENT.md, NEXT_TASKS OT-27…OT-30.
@@ -613,4 +613,4 @@ Owner: "I need my minimalist mission control done … Lets start building now" (
   after refunds, pending and cancelled orders never count, Lifetime sales count every completed sale; suite V4,
   DATA_SOURCE_INVENTORY updated); refund totals shown as +; MRR ₱0.00 instead of "—" without amounts; labels that said
   "as Google reports it" while paused; the entitlement table and the ticket composer cut off at 1280 px. Repository
-  `jerald23simagala/lucento-mission-control` (private) created, console PR #1 open.
+  `jerald23simagala/lucento-mission-control` (private) created; console PR #1 merged `d24038f` (owner, 2026-11-15).
