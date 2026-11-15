@@ -71,9 +71,12 @@ exactly those.
 ## Privacy
 
 `feature/legal/LegalDocuments.kt` (version 2026-11-15) lists both paths, the staff-access disclosure (FD-V3), the 35
-days of activity, the Google Play order amounts and the weekly encrypted backups. The website's `/privacy` must publish
-the same text in the same release (`tools/legal/export_legal.py`, docs/LEGAL.md). A request is kept until it is
-resolved and deleted 12 months after that, or with the account (`mc.tickets` cascades from `auth.users`).
+days of activity (sign-ins, the app renewing its sign-in, syncs, AI requests), the Google Play order amounts, the email
+log (90 days; support's account emails 12 months) and the weekly encrypted backups. The website's `/privacy` must
+publish the same text in the same release (`tools/legal/export_legal.py`, docs/LEGAL.md). A request is deleted 12
+months after its last message (`mc.daily_rollup`), or with the account (`mc.tickets` cascades from `auth.users`; a
+signed-out request goes when an account with its address is deleted). A signed-out request's network address is kept
+only as a keyed hash in the hourly limit counters, pruned after two days.
 
 ## Tests
 

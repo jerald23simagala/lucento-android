@@ -180,16 +180,20 @@ object LegalDocuments {
                         "itself), when you agreed to these terms, and — for Google sign-in — the name and picture link on " +
                         "your Google account.",
                     "We send emails only about your account: the link to verify your address, a welcome note when the " +
-                        "account is new, a code to reset your password when you ask for one, and a confirmation when you " +
-                        "buy Lucento Pro. Lucento’s server reads your address " +
+                        "account is new, a code to reset your password when you ask for one, a confirmation when you " +
+                        "buy Lucento Pro, and from support, answers to your requests and notes about your plan, a purchase " +
+                        "or a deletion you asked for. Lucento’s server reads your address " +
                         "from your account and our email provider, Resend, delivers them. They never include your records.",
+                    "Lucento keeps a log of the emails it sends you (the address, the subject and whether each one " +
+                        "arrived) for 90 days, to find the ones that don’t arrive. A note of each email support sends you " +
+                        "about your account (which one, and to which address) is kept for 12 months.",
                     "When you choose a password, Lucento checks it against known data leaks by sending only the first five " +
                         "characters of a scrambled version (Have I Been Pwned). Your password is never sent there.",
                     "While you’re signed in, the app tells Lucento’s server once a day which version of Lucento it is, " +
                         "the phone’s Android version and its model, so we can help when something goes wrong on a " +
                         "particular version or phone.",
-                    "Lucento’s server notes which days your account was used (a sign-in, a sync or an AI request) and " +
-                        "keeps that for 35 days, to count how many people use Lucento.",
+                    "Lucento’s server notes which days your account was used (signing in, the app renewing its sign-in, " +
+                        "a sync or an AI request) and keeps that for 35 days, to count how many people use Lucento.",
                 ),
             ),
             Section(
@@ -202,8 +206,9 @@ object LegalDocuments {
                         "version, the phone’s maker and model, whether cloud sync is on and when it last synced, the plan " +
                         "the app shows, whether you’re signed in and the app’s language — never your records.",
                     "Each request also carries a random number for this install (not the one used for usage counts), " +
-                        "which limits how many requests can be sent. We reply by email, delivered by Resend. A request is " +
-                        "kept until it’s resolved and deleted 12 months after that, or with your account.",
+                        "which limits how many requests can be sent; signed out, a scrambled form of your network address " +
+                        "does the same and is kept for two days. We reply by email, delivered by Resend. A request is " +
+                        "deleted 12 months after its last message, or with your account.",
                 ),
             ),
             Section(
@@ -284,7 +289,8 @@ object LegalDocuments {
                 listOf(
                     "In the app: Settings › Cloud sync › Delete account. It deletes your account and everything stored " +
                         "with it on Lucento’s servers straight away — your synced records, plan records, Shared Space, " +
-                        "AI request counts, support requests, the days it was used and what the app reported about itself " +
+                        "AI request counts, support requests, the log of emails sent to it, the days it was used and what the " +
+                        "app reported about itself " +
                         "— and erases this phone’s records.",
                     "Without the app: follow the steps at $DELETE_ACCOUNT_URL, or email $CONTACT_EMAIL from your " +
                         "account’s address. We delete the account within 30 days and reply to confirm.",
