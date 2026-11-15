@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -117,6 +118,15 @@ internal fun SettingsHub(current: SettingsUiState, onOpenPage: (SettingsPage) ->
             wrapTitle = true,
         )
         if (showWidgets) com.lucento.app.feature.widget.WidgetsSheet(onDismiss = { showWidgets = false })
+
+        SectionHeader("Help", Modifier.padding(top = Spacing.section))
+        NavRow(
+            icon = Icons.Outlined.SupportAgent,
+            title = SettingsPage.HELP.title,
+            summary = "Ask a question or report a problem. We reply by email.",
+            onClick = { onOpenPage(SettingsPage.HELP) },
+            wrapTitle = true,
+        )
 
         SectionHeader("About", Modifier.padding(top = Spacing.section))
         Row(verticalAlignment = Alignment.CenterVertically) {

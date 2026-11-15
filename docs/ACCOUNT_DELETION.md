@@ -38,7 +38,10 @@ web page that works without the app. Lucento offers both, built on 2026-11-07 on
   - wallets, categories, transactions, budgets, goals, goal_contributions, recurring and ledger_settings;
   - entitlements, purchase_links and ai_usage;
   - shared_spaces (with space_members and space_invites) and space_members;
-  - Supabase Auth's own identities, sessions and factors.
+  - Supabase Auth's own identities, sessions and factors;
+  - with Mission Control's migrations (`20261116090100_mission_control_tables.sql`): the account's support requests
+    (`mc.tickets`, with their messages), complimentary grants, active days and the app version it reported
+    (docs/SUPPORT.md). Mission Control's audit log keeps the bare id only.
 - **What stays.**
   - Transactions a Partner added to an Owner's ledger belong to that ledger. Their `created_by` keeps the bare id.
   - `usage_events` carry a random install id, not the account.

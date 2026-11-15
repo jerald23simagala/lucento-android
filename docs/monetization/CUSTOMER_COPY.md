@@ -384,7 +384,8 @@ match wins):
 **D-11 Plan indicator strings (profile row, Settings)**
 "Free plan" · "Lucento Pro · renews {6 Dec}" · "Lucento Pro · ends {6 Dec}" · "Lucento Pro · payment problem" ·
 "Pro Lifetime · you own it" · "Pro Lifetime · Cloud until {6 Nov 2027}" · "Pro Lifetime · Cloud ended" ·
-"Courtesy access until {date}" · "Waiting for Google Play".
+"Courtesy access until {date}" · "Waiting for Google Play". A complimentary Lifetime from Mission Control reads
+"Pro Lifetime · courtesy", with the same detail lines as a bought one (review M5, 2026-11-15).
 
 **D-12 Pro badge** — chip text "Pro"; accessibility label "Lucento Pro feature". Shown only to people who do not hold
 the capability.

@@ -25,7 +25,10 @@ enum class EntitlementSource {
     PLAY_LIFETIME_SERVICES,
     /** `lucento_cloud`: the online services for a Lifetime owner after the included year. */
     PLAY_CLOUD_ADDON,
-    /** Written by the owner on the server: founders, testers, goodwill. Always server-verified, always with an expiry. */
+    /**
+     * Written by the owner on the server (Mission Control): founders, testers, goodwill. Always server-verified, always
+     * with an expiry, except a complimentary Lifetime's phone row ([Entitlement.isComplimentaryLifetime]).
+     */
     GRANT,
 }
 
@@ -97,6 +100,17 @@ data class Entitlement(
 ) {
     /** Rows that describe the same thing replace each other: (source, product). */
     val key: EntitlementKey get() = EntitlementKey(source, productId)
+
+    /**
+     * A complimentary Pro Lifetime from Lucento (Mission Control, FD-V5): a [EntitlementSource.GRANT] row shaped like paid
+     * Lifetime's phone row (product [PlayProducts.PRO_LIFETIME], [Capability.LOCAL_PRO], no expiry). Its online services
+     * come in a second, product-less GRANT row with an end date, as paid Lifetime's do.
+     */
+    val isComplimentaryLifetime: Boolean
+        get() = source == EntitlementSource.GRANT && productId == PlayProducts.PRO_LIFETIME
+
+    /** A Pro Lifetime row: bought through Google Play, or given by Lucento. */
+    val isLifetime: Boolean get() = source == EntitlementSource.PLAY_LIFETIME || isComplimentaryLifetime
 
     /**
      * Whether this row grants [capability] at [now]. A row with an expiry is honoured for [offlineGraceMillis] past it,
@@ -176,7 +190,9 @@ data class EntitlementState(val entitlements: List<Entitlement>) {
         entitlements.filter { e -> Capability.entries.any { e.covers(it, now) } }.sortedByDescending { it.verifiedAtMillis }
 
     fun displayPlan(now: Long): DisplayPlan {
-        val lifetime = entitlements.any { it.source == EntitlementSource.PLAY_LIFETIME && it.covers(Capability.LOCAL_PRO, now) }
+        // A complimentary Lifetime counts as Lifetime too (review M5): its services row says whether the online services
+        // are still included, exactly as paid Lifetime's does.
+        val lifetime = entitlements.any { it.isLifetime && it.covers(Capability.LOCAL_PRO, now) }
         return when {
             lifetime && has(Capability.CLOUD, now) -> DisplayPlan.LIFETIME_WITH_SERVICES
             lifetime -> DisplayPlan.LIFETIME
@@ -184,6 +200,19 @@ data class EntitlementState(val entitlements: List<Entitlement>) {
             else -> DisplayPlan.FREE
         }
     }
+
+    /** The Lifetime shown is Lucento's gift, with no Google Play Lifetime behind it (for the plan row's words). */
+    fun lifetimeIsComplimentary(now: Long): Boolean =
+        entitlements.none { it.source == EntitlementSource.PLAY_LIFETIME && it.covers(Capability.LOCAL_PRO, now) } &&
+            entitlements.any { it.isComplimentaryLifetime && it.covers(Capability.LOCAL_PRO, now) }
+
+    /**
+     * A complimentary Lifetime that has ended, with no Google Play Lifetime on record: its end is a grant taken back, not
+     * a refund, so the plan-ended notice says so ([PlanNotices.after]).
+     */
+    fun complimentaryLifetimeEnded(): Boolean =
+        entitlements.none { it.source == EntitlementSource.PLAY_LIFETIME } &&
+            entitlements.any { it.isComplimentaryLifetime && it.status in Entitlement.ENDED }
 
     /** A pending purchase waiting for Google Play to confirm it. */
     fun pending(): Entitlement? = entitlements.firstOrNull { it.status == EntitlementStatus.PENDING }

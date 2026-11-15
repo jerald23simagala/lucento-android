@@ -36,4 +36,17 @@ class PlanNoticesTest {
         assertNull(PlanNotices.after(DisplayPlan.FREE, DisplayPlan.FREE, awaitingCheck = true))
         assertEquals(PlanNotice.PRO_NEEDS_CHECK, PlanNotices.after(DisplayPlan.PRO, DisplayPlan.FREE, awaitingCheck = true))
     }
+
+    @Test fun a_complimentary_lifetime_taken_back_is_told_as_pro_ending_never_as_a_refund() {
+        assertEquals(PlanNotice.PRO_ENDED, PlanNotices.after(DisplayPlan.LIFETIME, DisplayPlan.FREE, complimentaryEnded = true))
+        assertEquals(PlanNotice.PRO_ENDED, PlanNotices.after(DisplayPlan.LIFETIME_WITH_SERVICES, DisplayPlan.FREE, complimentaryEnded = true))
+        // With no Google Play Lifetime on record, a paused check can only be a subscription's.
+        assertEquals(
+            PlanNotice.PRO_NEEDS_CHECK,
+            PlanNotices.after(DisplayPlan.LIFETIME_WITH_SERVICES, DisplayPlan.FREE, awaitingCheck = true, complimentaryEnded = true),
+        )
+        // Its services year ending reads exactly as paid Lifetime's does.
+        assertEquals(PlanNotice.SERVICES_ENDED, PlanNotices.after(DisplayPlan.LIFETIME_WITH_SERVICES, DisplayPlan.LIFETIME, complimentaryEnded = true))
+        assertNull(PlanNotices.after(DisplayPlan.FREE, DisplayPlan.LIFETIME, complimentaryEnded = true))
+    }
 }

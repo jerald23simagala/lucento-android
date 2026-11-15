@@ -106,6 +106,8 @@ enum class SettingsPage(val key: String, val title: String) {
     SHARED("shared", "Lucento Shared"),
     /** Lucento Pro: opens its own screen (ProRoute), like [SHARED]. */
     PRO("pro", "Lucento Plan"),
+    /** Help › Contact support: opens its own screen (SupportRoute), like [SHARED]. */
+    HELP("help", "Contact support"),
     ;
 
     companion object {
@@ -496,7 +498,7 @@ private fun SettingsContent(
         )
       }
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
-      SettingsPage.SHARED, SettingsPage.PRO -> Unit
+      SettingsPage.SHARED, SettingsPage.PRO, SettingsPage.HELP -> Unit
       SettingsPage.ACCOUNT -> androidx.compose.foundation.layout.Box {
           CloudSyncSection(current.cloudSync, onConnectGoogle, onSignOut, onSyncNow, onConnectEmail, onChangePassword, showHeader = false, onDeleteAccount = onDeleteAccount)
       }
@@ -564,9 +566,9 @@ private fun SettingsContent(
             if (current.cloudSync.status.enabled) Icons.Filled.CloudDone else Icons.Outlined.PhoneAndroid,
             if (current.cloudSync.status.enabled) "Cloud sync is on" else "Nothing, unless you turn something on",
             if (current.cloudSync.status.enabled)
-                "Wallets, transactions, budgets and goals are copied to your account, readable only by you. Everything below stays off until you switch it on."
+                "Wallets, transactions, budgets and goals are copied to your account. Only you, and anyone you share with, can change them; Lucento staff can view them only to help with a problem, and every view is logged. Everything below stays off until you switch it on."
             else
-                "Your data stays in Lucento’s private storage on this phone. Cloud sync, crash reports, usage counts, online voice and Smarter reading each send something only after you turn them on.",
+                "Your data stays in Lucento’s private storage on this phone. Cloud sync, crash reports, usage counts, online voice and Smarter reading each send something only after you turn them on. Exchange rates ask only for currency codes and dates, and Contact support sends only what you write and choose to attach. The Privacy Policy below lists everything.",
         )
         SwitchRow(
             title = "Send crash reports",

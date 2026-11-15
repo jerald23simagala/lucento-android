@@ -27,6 +27,16 @@ Google accounts get no metadata, because their consent is given by continuing.
 - Bump `VERSION` and `UPDATED` whenever the meaning changes.
 - The tests in `AccountFormTest` check only the structure. Accuracy is a review job.
 - The website's `/privacy` page matches the in-app Privacy Policy (checked 2026-11-08: crash reports and usage counts, AI features, exchange rates, Lucento Shared, Google Play billing). Keep them in step whenever either changes.
+- **2026-11-15 (version 2026-11-15, `feature/contact-support`):** Contact support (docs/SUPPORT.md) and Mission Control
+  (docs/mission-control/v1). Added: the support request and what it can attach, and how long it is kept; the daily app
+  version and phone model report for signed-in accounts; the days an account was used (including the app renewing its
+  sign-in), kept 35 days; Google Play order amounts; the email log (90 days) and support's account emails (12 months),
+  with support's emails added to the list of what Lucento sends; a signed-out request's network address, hashed, two
+  days; the weekly encrypted backup (28 days). The Cloud sync section no longer says only the account can *read* its
+  records: FD-V3 discloses staff access instead ("To help with a problem, Lucento staff can view your account and synced
+  records. Every view is logged."). Settings › Privacy's summary and onboarding's "Keep it on this phone only" were
+  scoped to match. The website's `/privacy` must be regenerated and deployed with the release that carries this text,
+  and Mission Control's records view stays off until both are live (FD-V15).
 
 ## Keeping the website in step
 
