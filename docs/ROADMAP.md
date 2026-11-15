@@ -290,6 +290,16 @@ recurring-schedule sync, syncing preferences.
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,
   stable signing via GitHub secrets, Play-ready release workflow.
 
+## In progress — Launch marketing (2026-11-14, `docs/launch-marketing`)
+- Strategy and rules: `docs/marketing/launch/` (PLAYBOOK, TRUTH_RULES, CHANNEL_KIT, OWNER_STEPS). ₱0 budget, faceless
+  shorts on TikTok, Reels and YouTube Shorts, a weekly ready pack the owner schedules, borrowed audiences, and the
+  KlaroPH bridge (Klaro's Page, in-app banner, tools card and one batched email point to Lucento).
+- The Facebook Page and Group kit (`docs/community/facebook/`) comes in with this branch.
+- Next: the shorts template family and first weekly batch (lucento-studio), the Launch Board, scheduled jobs; app
+  changes on `feature/launch-growth` (in-app review prompt, LS-7 invite message with the Play link, "Tell a
+  friend"); a klaroph-app PR (banner, tools card, per-send cap for the campaign sender).
+- Gate: Google Play production access (closed test of 12+ testers for 14 days, then the application).
+
 ## Next recommended milestone
 1. Push v0.4.0 (or run `tools/verify.ps1`), fix any compile errors CI reports, confirm the migration job is green.
 2. Device QA against `docs/design-reference/lucento-mock.png`: light/dark, small phones, font scale 200%, TalkBack,
