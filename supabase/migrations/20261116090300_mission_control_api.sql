@@ -40,7 +40,9 @@ end;
 $$;
 
 -- Google Play amounts for orders in [p_start, p_end), per currency: 'lifetime' or 'subscriptions'. Test orders never
--- count. Net is an estimate: total − tax − Google's service fee (Settings, 15 % by default) on what remains.
+-- count. Net is what Google reports per order (developerRevenueInBuyerCurrency: after tax, its fee and partial refunds);
+-- an order without it is estimated as total − tax − Google's fee (Settings, 15 % by default), and net_reported says
+-- whether every order in the sum was reported.
 create or replace function mc.order_amounts(p_start timestamptz, p_end timestamptz, p_kind text)
 returns jsonb
 language sql
@@ -54,13 +56,16 @@ as $$
   select coalesce(jsonb_agg(jsonb_build_object(
       'currency', x.currency, 'orders', x.orders,
       'gross_micros', x.gross::text, 'tax_micros', x.tax::text,
-      'net_est_micros', round((x.gross - x.tax) * (1 - (select r from rate)))::text,
+      'net_micros', x.net::text, 'net_reported', x.reported,
       'refunded_micros', x.refunded::text) order by x.gross desc), '[]'::jsonb)
   from (
     select o.currency, count(*) as orders, coalesce(sum(o.total_micros), 0)::numeric as gross,
-           coalesce(sum(o.tax_micros), 0)::numeric as tax, coalesce(sum(o.refunded_micros), 0)::numeric as refunded
+           coalesce(sum(o.tax_micros), 0)::numeric as tax, coalesce(sum(o.refunded_micros), 0)::numeric as refunded,
+           coalesce(sum(coalesce(o.developer_revenue_micros::numeric,
+             round((coalesce(o.total_micros, 0) - coalesce(o.tax_micros, 0)) * (1 - (select r from rate))))), 0) as net,
+           bool_and(o.developer_revenue_micros is not null) as reported
     from mc.play_orders o
-    where not o.test and o.ordered_at >= p_start and o.ordered_at < p_end
+    where not o.test and o.currency is not null and o.ordered_at >= p_start and o.ordered_at < p_end
       and ((p_kind = 'lifetime' and o.product_id = 'lucento_pro_lifetime')
            or (p_kind = 'subscriptions' and o.product_id in ('lucento_pro', 'lucento_cloud')))
     group by o.currency
@@ -1708,7 +1713,8 @@ end;
 $$;
 
 -- The orders whose amounts Mission Control should fetch from Google Play: first orders of purchases Lucento knows about,
--- never fetched, or fetched more than a week ago while they could still change (a refund).
+-- never fetched, or fetched more than a week ago while they could still change (a refund). Google's orders carry no
+-- test marker, so each one comes with Lucento's own: whether the purchase was a licence tester's.
 create or replace function mc_api.play_orders_wanted(p_secret text, p_limit integer default 1000)
 returns jsonb
 language plpgsql
@@ -1722,7 +1728,8 @@ begin
     return mc.refused('bad_secret');
   end if;
   return jsonb_build_object('ok', true, 'orders', (
-    select coalesce(jsonb_agg(jsonb_build_object('order_id', l.order_id, 'token_hash', l.purchase_token_hash, 'product_id', l.product_id)), '[]'::jsonb)
+    select coalesce(jsonb_agg(jsonb_build_object('order_id', l.order_id, 'token_hash', l.purchase_token_hash, 'product_id', l.product_id,
+             'test', coalesce((select bool_or(e.test_purchase) from public.entitlements e where e.purchase_token_hash = l.purchase_token_hash), false))), '[]'::jsonb)
     from (select pl.* from public.purchase_links pl
           left join mc.play_orders o on o.order_id = pl.order_id
           where pl.order_id is not null
@@ -1752,31 +1759,37 @@ begin
     return mc.failed('invalid', 'Expected at most 1,000 orders');
   end if;
   for v_o in select * from jsonb_array_elements(p_orders) loop
-    if v_o ->> 'order_id' is null or char_length(v_o ->> 'order_id') > 100 or coalesce(v_o ->> 'currency', '') !~ '^[A-Z]{3}$' then
+    -- An order Google doesn't know is kept as NOT_FOUND (no amounts), so the sweep stops asking for it.
+    if v_o ->> 'order_id' is null or char_length(v_o ->> 'order_id') > 100
+       or (coalesce(v_o ->> 'currency', '') !~ '^[A-Z]{3}$' and coalesce(v_o ->> 'state', '') <> 'NOT_FOUND') then
       continue;
     end if;
     insert into mc.play_orders as p (order_id, purchase_token_hash, product_id, base_plan_id, region_code, currency,
-        listing_price_micros, tax_micros, total_micros, refunded_micros, state, test, ordered_at, refunded_at, fetched_at)
+        listing_price_micros, tax_micros, total_micros, refunded_micros, developer_revenue_micros, state, test, ordered_at,
+        refunded_at, fetched_at)
       values (v_o ->> 'order_id',
               case when v_o ->> 'token_hash' ~ '^[0-9a-f]{64}$' then v_o ->> 'token_hash' end,
               left(v_o ->> 'product_id', 100), left(v_o ->> 'base_plan_id', 100),
               case when v_o ->> 'region_code' ~ '^[A-Z]{2}$' then v_o ->> 'region_code' end,
-              v_o ->> 'currency',
+              case when v_o ->> 'currency' ~ '^[A-Z]{3}$' then v_o ->> 'currency' end,
               case when v_o ->> 'listing_price_micros' ~ v_micros then (v_o ->> 'listing_price_micros')::bigint end,
               case when v_o ->> 'tax_micros' ~ v_micros then (v_o ->> 'tax_micros')::bigint end,
               case when v_o ->> 'total_micros' ~ v_micros then (v_o ->> 'total_micros')::bigint end,
               case when v_o ->> 'refunded_micros' ~ v_micros then (v_o ->> 'refunded_micros')::bigint end,
-              left(v_o ->> 'state', 40), coalesce((v_o ->> 'test')::boolean, false),
+              case when v_o ->> 'developer_revenue_micros' ~ '^-?\d{1,18}$' then (v_o ->> 'developer_revenue_micros')::bigint end,
+              left(v_o ->> 'state', 40), coalesce(v_o ->> 'test' = 'true', false),
               case when v_o ->> 'ordered_at' ~ '^\d{4}-\d{2}-\d{2}' then (v_o ->> 'ordered_at')::timestamptz end,
               case when v_o ->> 'refunded_at' ~ '^\d{4}-\d{2}-\d{2}' then (v_o ->> 'refunded_at')::timestamptz end,
               now())
       on conflict (order_id) do update set
         purchase_token_hash = coalesce(excluded.purchase_token_hash, p.purchase_token_hash),
         product_id = coalesce(excluded.product_id, p.product_id), base_plan_id = coalesce(excluded.base_plan_id, p.base_plan_id),
-        region_code = coalesce(excluded.region_code, p.region_code), currency = excluded.currency,
+        region_code = coalesce(excluded.region_code, p.region_code), currency = coalesce(excluded.currency, p.currency),
         listing_price_micros = coalesce(excluded.listing_price_micros, p.listing_price_micros),
         tax_micros = coalesce(excluded.tax_micros, p.tax_micros), total_micros = coalesce(excluded.total_micros, p.total_micros),
-        refunded_micros = coalesce(excluded.refunded_micros, p.refunded_micros), state = coalesce(excluded.state, p.state),
+        refunded_micros = coalesce(excluded.refunded_micros, p.refunded_micros),
+        developer_revenue_micros = coalesce(excluded.developer_revenue_micros, p.developer_revenue_micros),
+        state = coalesce(excluded.state, p.state),
         test = excluded.test, ordered_at = coalesce(excluded.ordered_at, p.ordered_at),
         refunded_at = coalesce(excluded.refunded_at, p.refunded_at), fetched_at = now();
     v_n := v_n + 1;

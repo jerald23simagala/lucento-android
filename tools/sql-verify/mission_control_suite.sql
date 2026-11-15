@@ -709,21 +709,41 @@ begin
     jsonb_build_object('order_id', 'GPA.sub-fely', 'token_hash', h_sub, 'product_id', 'lucento_pro', 'base_plan_id', 'annual',
       'currency', 'PHP', 'total_micros', '1200000000', 'tax_micros', '128571428', 'ordered_at', now() - interval '2 days'),
     jsonb_build_object('order_id', 'GPA.test-1', 'product_id', 'lucento_pro_lifetime', 'currency', 'PHP', 'total_micros', '3500000000',
-      'test', true, 'ordered_at', now())));
+      'test', true, 'ordered_at', now()),
+    -- Google doesn't know this one: kept as NOT_FOUND so the sweep stops asking.
+    jsonb_build_object('order_id', 'GPA.trial-tess', 'state', 'NOT_FOUND')));
+  select count(*) into v_n from jsonb_array_elements((mc_api.play_orders_wanted(v_secret)) -> 'orders') x
+    where x ->> 'order_id' in ('GPA.trial-tess', 'GPA.life-carla', 'GPA.sub-fely');
   execute 'reset role';
   perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
   v_before := mc_api.revenue();
   execute 'reset role';
-  r := r || case when jsonb_array_length(v_j -> 'orders') >= 4 and (v_k ->> 'stored')::integer = 3
-                 then 'ok  V1 the sweep asks for known first orders and stores Google''s amounts'
-                 else 'FAIL V1 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
+  r := r || case when jsonb_array_length(v_j -> 'orders') >= 4 and (v_k ->> 'stored')::integer = 4 and v_n = 0
+                      and (select x ->> 'test' from jsonb_array_elements(v_j -> 'orders') x where x ->> 'order_id' = 'GPA.life-carla') = 'false'
+                 then 'ok  V1 the sweep asks for known first orders, stores Google''s amounts, and stops asking for unknown ones'
+                 else 'FAIL V1 wanted after=' || v_n || ' ' || coalesce(v_k::text, '') end;
   r := r || case when v_before #>> '{summary,lifetime,amounts,0,gross_micros}' = '3500000000'
-                      and v_before #>> '{summary,lifetime,amounts,0,net_est_micros}' = '2656250000'
+                      and v_before #>> '{summary,lifetime,amounts,0,net_micros}' = '2656250000'
+                      and v_before #>> '{summary,lifetime,amounts,0,net_reported}' = 'false'
                       and (v_before #>> '{summary,subscriptions,mrr,subscriptions}')::integer = 1
                       and v_before #>> '{summary,subscriptions,mrr,by_currency,0,mrr_micros}' = '89285714'
                       and (v_before #>> '{summary,refunds,count}')::integer = 1
                  then 'ok  V2 Lifetime gross and estimated net exclude test orders; MRR is the annual plan ÷ 12, never Lifetime or trials'
                  else 'FAIL V2 ' || left(coalesce(v_before -> 'summary', 'null'::jsonb)::text, 600) end;
+  -- Once Google reports what Lucento received, that replaces the estimate.
+  perform pg_temp.as_anon();
+  perform mc_api.ingest_play_orders(v_secret, jsonb_build_array(
+    jsonb_build_object('order_id', 'GPA.life-carla', 'token_hash', h_life, 'product_id', 'lucento_pro_lifetime', 'currency', 'PHP',
+      'total_micros', '3500000000', 'tax_micros', '375000000', 'developer_revenue_micros', '2656000000',
+      'ordered_at', now() - interval '3 days', 'state', 'PROCESSED')));
+  execute 'reset role';
+  perform pg_temp.as_admin(v_admin, s_fresh, 'aal2', interval '1 hour');
+  v_before := mc_api.revenue();
+  execute 'reset role';
+  r := r || case when v_before #>> '{summary,lifetime,amounts,0,net_micros}' = '2656000000'
+                      and v_before #>> '{summary,lifetime,amounts,0,net_reported}' = 'true'
+                 then 'ok  V3 net is Google''s reported developer revenue when it has it, an estimate only otherwise'
+                 else 'FAIL V3 ' || left(coalesce(v_before #> '{summary,lifetime}', 'null'::jsonb)::text, 400) end;
 
   raise exception E'VERIFY %/% failed\n%',
     (select count(*) from unnest(r) x where x like 'FAIL%'), array_length(r, 1), array_to_string(r, E'\n');

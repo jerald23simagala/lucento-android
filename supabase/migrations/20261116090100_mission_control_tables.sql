@@ -240,12 +240,15 @@ create table if not exists mc.play_orders (
   product_id text check (product_id is null or char_length(product_id) <= 100),
   base_plan_id text check (base_plan_id is null or char_length(base_plan_id) <= 100),
   region_code text check (region_code is null or region_code ~ '^[A-Z]{2}$'),
-  currency text not null check (currency ~ '^[A-Z]{3}$'),
+  -- Null only for an order Google doesn't know (state NOT_FOUND), so it isn't asked for again.
+  currency text check (currency is null or currency ~ '^[A-Z]{3}$'),
   -- Micros of the currency (Google's own unit): 1,200 PHP = 1200000000.
   listing_price_micros bigint check (listing_price_micros is null or listing_price_micros >= 0),
   tax_micros bigint check (tax_micros is null or tax_micros >= 0),
   total_micros bigint check (total_micros is null or total_micros >= 0),
   refunded_micros bigint check (refunded_micros is null or refunded_micros >= 0),
+  -- Google's developerRevenueInBuyerCurrency: what Lucento receives after tax, Google's fee and partial refunds.
+  developer_revenue_micros bigint,
   state text check (state is null or char_length(state) <= 40),
   test boolean not null default false,
   ordered_at timestamptz,
