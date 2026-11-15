@@ -287,16 +287,20 @@ object ProCopy {
                 }
             }
             DisplayPlan.LIFETIME -> PlanStatus(
-                "Pro Lifetime\u00A0· you own it",
+                lifetimeTitle(state, now),
                 "Every Pro feature that runs on this phone is yours. Cloud sync, Lucento Shared and the AI adviser’s Pro " +
                     "allowance come with Lucento Cloud.",
             )
             DisplayPlan.LIFETIME_WITH_SERVICES -> {
                 val services = active.filter { Capability.CLOUD in it.grants }
-                val year = services.firstOrNull { it.source == EntitlementSource.PLAY_LIFETIME_SERVICES }?.expiresAtMillis
+                // A complimentary Lifetime's services come in a GRANT row with their own end date (review M5).
+                val year = (
+                    services.firstOrNull { it.source == EntitlementSource.PLAY_LIFETIME_SERVICES }
+                        ?: services.firstOrNull { it.source == EntitlementSource.GRANT }
+                    )?.expiresAtMillis
                 val cloud = services.firstOrNull { it.source == EntitlementSource.PLAY_CLOUD_ADDON }
                 PlanStatus(
-                    "Pro Lifetime\u00A0· you own it",
+                    lifetimeTitle(state, now),
                     when {
                         cloud != null -> "With Lucento Cloud: cloud sync, Lucento Shared and the AI adviser’s Pro allowance."
                         year != null -> "Cloud sync, Lucento Shared and the AI adviser’s Pro allowance are included until ${date(year)}."
@@ -306,6 +310,10 @@ object ProCopy {
             }
         }
     }
+
+    /** "Pro Lifetime · you own it", or "· courtesy" when it is Lucento's gift (a complimentary Lifetime, review M5). */
+    private fun lifetimeTitle(state: EntitlementState, now: Long): String =
+        if (state.lifetimeIsComplimentary(now)) "Pro Lifetime\u00A0· courtesy" else "Pro Lifetime\u00A0· you own it"
 
     /**
      * On what terms this plan's online services (cloud sync, restore, Lucento Shared, the AI adviser's Pro allowance,

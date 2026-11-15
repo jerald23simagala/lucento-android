@@ -163,6 +163,8 @@ import androidx.compose.ui.focus.focusProperties
 @Serializable data class SharedSpaceRoute(val reviewInvite: String = "")
 /** Lucento Pro: the plan, what each plan includes, restore (docs/MONETIZATION.md §5.5). [from] names the lock that led here. */
 @Serializable data class ProRoute(val from: String = "")
+/** Settings › Help › Contact support (docs/SUPPORT.md). */
+@Serializable data object SupportRoute
 /** Full-page editor for the transaction held in LucentoRoot's editor draft (opened from Edit on a row). */
 @Serializable data object TransactionEditRoute
 /** Read-only View Transaction page; Edit there opens [TransactionEditRoute] (or the transfer sheet). */
@@ -213,6 +215,7 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     FeaturesRoute::class,
     SharedSpaceRoute::class,
     ProRoute::class,
+    SupportRoute::class,
     ComposerRoute::class,
     TransactionEditRoute::class,
     TransactionViewRoute::class,
@@ -697,6 +700,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                             page == SettingsPage.FEATURES -> push(FeaturesRoute)
                                             page == SettingsPage.SHARED -> push(SharedSpaceRoute())
                                             page == SettingsPage.PRO -> push(ProRoute())
+                                            page == SettingsPage.HELP -> push(SupportRoute)
                                             // Not push(): launchSingleTop would replace the hub (same route type), so Back would skip
                                             // it. A repeated tap on the same row is ignored instead.
                                             navController.currentBackStackEntry?.arguments?.getString("page") != page.key ->
@@ -706,6 +710,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 )
                             }
                             pushed<FeaturesRoute>(reducedMotion) { EnabledFeaturesScreen(onBack = back) }
+                            pushed<SupportRoute>(reducedMotion) { com.lucento.app.feature.support.ContactSupportScreen(onBack = back) }
                             pushed<SharedSpaceRoute>(reducedMotion) { entry ->
                                 com.lucento.app.feature.sharedspace.SharedSpaceScreen(
                                     onBack = back,

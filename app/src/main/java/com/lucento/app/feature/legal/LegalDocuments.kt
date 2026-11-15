@@ -9,8 +9,8 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-14"
-    const val UPDATED = "14 November 2026"
+    const val VERSION = "2026-11-15"
+    const val UPDATED = "15 November 2026"
 
     /**
      * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit
@@ -185,6 +185,25 @@ object LegalDocuments {
                         "from your account and our email provider, Resend, delivers them. They never include your records.",
                     "When you choose a password, Lucento checks it against known data leaks by sending only the first five " +
                         "characters of a scrambled version (Have I Been Pwned). Your password is never sent there.",
+                    "While you’re signed in, the app tells Lucento’s server once a day which version of Lucento it is, " +
+                        "the phone’s Android version and its model, so we can help when something goes wrong on a " +
+                        "particular version or phone.",
+                    "Lucento’s server notes which days your account was used (a sign-in, a sync or an AI request) and " +
+                        "keeps that for 35 days, to count how many people use Lucento.",
+                ),
+            ),
+            Section(
+                "Contact support",
+                listOf(
+                    "Settings › Help › Contact support sends your message and the topic you chose to Lucento’s support " +
+                        "inbox, in Lucento’s cloud database. Signed in, the request is linked to your account and we reply " +
+                        "to your account’s address. Signed out, it includes the email address you type, and we reply there.",
+                    "If you leave “Attach details about this phone” on, it also sends the app version, the Android " +
+                        "version, the phone’s maker and model, whether cloud sync is on and when it last synced, the plan " +
+                        "the app shows, whether you’re signed in and the app’s language — never your records.",
+                    "Each request also carries a random number for this install (not the one used for usage counts), " +
+                        "which limits how many requests can be sent. We reply by email, delivered by Resend. A request is " +
+                        "kept until it’s resolved and deleted 12 months after that, or with your account.",
                 ),
             ),
             Section(
@@ -193,7 +212,8 @@ object LegalDocuments {
                     "With sync on, a copy of your records is kept in Lucento’s cloud database (Supabase), so they’re backed " +
                         "up and the same on every phone you sign in to.",
                     "Database rules let only your signed-in account — and people you share with through Lucento Shared — " +
-                        "read or change your records.",
+                        "change your records.",
+                    "To help with a problem, Lucento staff can view your account and synced records. Every view is logged.",
                     "Signing out removes your account’s data from that phone; the cloud copy stays for when you sign in " +
                         "again. The cloud copy is kept while your account exists.",
                 ),
@@ -213,6 +233,8 @@ object LegalDocuments {
                     "Lucento’s server checks each purchase with Google and keeps, with your account, the plan it gives, " +
                         "the order number and a scrambled form of the purchase token. When you buy while signed in, the " +
                         "app gives Google Play a scrambled form of your account id so the purchase can be matched to you.",
+                    "Lucento’s server also asks Google Play for each order’s amounts (the price, the tax and what Lucento " +
+                        "receives) and keeps them with the order number and the scrambled purchase token.",
                     "Signed in or not, while you’re online the app also asks Lucento’s server every few hours whether " +
                         "the Pro purchase on your phone is still valid, so a refunded purchase doesn’t stay unlocked. It " +
                         "sends Google Play’s signed record of that purchase (what you bought, its order number, status, " +
@@ -261,13 +283,17 @@ object LegalDocuments {
                 "Deleting your account and data",
                 listOf(
                     "In the app: Settings › Cloud sync › Delete account. It deletes your account and everything stored " +
-                        "with it on Lucento’s servers straight away — your synced records, plan records, Shared Space and " +
-                        "AI request counts — and erases this phone’s records.",
+                        "with it on Lucento’s servers straight away — your synced records, plan records, Shared Space, " +
+                        "AI request counts, support requests, the days it was used and what the app reported about itself " +
+                        "— and erases this phone’s records.",
                     "Without the app: follow the steps at $DELETE_ACCOUNT_URL, or email $CONTACT_EMAIL from your " +
                         "account’s address. We delete the account within 30 days and reply to confirm.",
                     "Usage counts aren’t linked to your account: they’re deleted after 90 days, or as soon as you turn " +
                         "them off. Short-lived technical logs at our hosting providers expire on their own. Records on a " +
                         "phone without an account stay on it until you delete them or the app.",
+                    "Once a week Lucento makes an encrypted copy of its cloud database for recovery and keeps it for 28 " +
+                        "days (stored at GitHub, encrypted with a key only Lucento holds), so a deleted account is gone " +
+                        "from those copies within that time.",
                 ),
             ),
             Section(

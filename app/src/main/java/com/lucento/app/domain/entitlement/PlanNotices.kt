@@ -25,8 +25,10 @@ object PlanNotices {
     /**
      * What to tell the person when the plan last seen on this phone was [previous] and it is now [current].
      * [awaitingCheck]: Pro only paused for want of a check ([EntitlementState.awaitingCheck]).
+     * [complimentaryEnded]: the Lifetime that ended was Lucento's gift ([EntitlementState.complimentaryLifetimeEnded]), so
+     * it is told as a plan ending, never as a Google Play refund.
      */
-    fun after(previous: DisplayPlan?, current: DisplayPlan, awaitingCheck: Boolean = false): PlanNotice? {
+    fun after(previous: DisplayPlan?, current: DisplayPlan, awaitingCheck: Boolean = false, complimentaryEnded: Boolean = false): PlanNotice? {
         if (previous == null || previous == current) return null
         return when (previous) {
             DisplayPlan.FREE -> null
@@ -36,17 +38,22 @@ object PlanNotices {
                 else -> null
             }
             DisplayPlan.LIFETIME -> when (current) {
-                DisplayPlan.FREE -> lifetimeEnded(awaitingCheck)
+                DisplayPlan.FREE -> lifetimeEnded(awaitingCheck, complimentaryEnded)
                 else -> null
             }
             DisplayPlan.LIFETIME_WITH_SERVICES -> when (current) {
-                DisplayPlan.FREE -> lifetimeEnded(awaitingCheck)
+                DisplayPlan.FREE -> lifetimeEnded(awaitingCheck, complimentaryEnded)
                 DisplayPlan.LIFETIME -> PlanNotice.SERVICES_ENDED
                 else -> null
             }
         }
     }
 
-    private fun lifetimeEnded(awaitingCheck: Boolean): PlanNotice =
-        if (awaitingCheck) PlanNotice.LIFETIME_NEEDS_CHECK else PlanNotice.LIFETIME_ENDED
+    private fun lifetimeEnded(awaitingCheck: Boolean, complimentary: Boolean): PlanNotice = when {
+        // With no Google Play Lifetime on record, a paused check can only be a subscription's.
+        complimentary && awaitingCheck -> PlanNotice.PRO_NEEDS_CHECK
+        complimentary -> PlanNotice.PRO_ENDED
+        awaitingCheck -> PlanNotice.LIFETIME_NEEDS_CHECK
+        else -> PlanNotice.LIFETIME_ENDED
+    }
 }

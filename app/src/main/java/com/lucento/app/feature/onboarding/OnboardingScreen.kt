@@ -1306,7 +1306,7 @@ private fun SyncStep(
                             icon = Icons.Outlined.PhoneAndroid,
                             tone = TonePair(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant),
                             title = "Keep it on this phone only",
-                            body = "Nothing leaves this phone. Export a backup file any time from Settings › Your data.",
+                            body = "Your records stay on this phone. Export a backup file any time from Settings › Your data.",
                             selected = shownPath == BackupPath.DEVICE_ONLY,
                             onSelect = { onPath(BackupPath.DEVICE_ONLY) },
                         ) {

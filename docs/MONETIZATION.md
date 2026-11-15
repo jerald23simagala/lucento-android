@@ -348,6 +348,13 @@ Play promo codes, introductory prices and the founder price are Play Console off
 rows (with expiry) cover founders, testers, giveaways and goodwill. A future Pro Plus / Family is a new `Plan` and a
 `max_partners` change (PRODUCT_SPEC §7); the matrix is data (`PlanCatalog`), not code paths.
 
+A **complimentary Lifetime** (Mission Control, FD-V5) is two `GRANT` rows shaped like paid Lifetime's: a phone row with
+product `lucento_pro_lifetime`, `LOCAL_PRO` and no expiry, and a product-less services row (`CLOUD`, `AI_PRO`, `SHARED`)
+that ends after 365 days. `EntitlementState.displayPlan` counts the phone row as Lifetime (review M5, 2026-11-15), so the
+plan row reads "Pro Lifetime · courtesy" with the services row's date, the Lucento Plan page offers neither Pro nor Lifetime
+(Lucento Cloud once the services end, as for any Lifetime owner), and taking it back is told as Pro ending, never as a
+Google Play refund. `lifetimeEnded()` and `LifetimeRelease` stay Google Play only.
+
 ---
 
 ## 5. Entitlement architecture

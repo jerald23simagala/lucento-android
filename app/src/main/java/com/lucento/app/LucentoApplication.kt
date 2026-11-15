@@ -68,6 +68,12 @@ class LucentoApplication : Application() {
         if (container.pendingRevokes.all().isNotEmpty()) com.lucento.app.data.sync.RevokeScheduler.schedule(this)
         // The welcome email (docs/EMAILS.md): asked for once per signed-in account; nothing while signed out.
         container.welcomeEmail.start(CoroutineScope(SupervisorJob() + Dispatchers.Default), container.auth.observeUserId())
+        // Contact support (docs/SUPPORT.md): requests written offline or killed mid-send go out once there's a network.
+        if (container.supportOutbox.pending().isNotEmpty()) com.lucento.app.data.support.SupportScheduler.schedule(this)
+        // Once a day, signed in only: the app version and phone model (FD-V7). Nothing while signed out.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            container.auth.observeUserId().distinctUntilChanged().collect { id -> container.clientReporter.reportIfDue(id) }
+        }
         // Home-screen widgets (docs/WIDGETS.md): redrawn after every change to what they show, and just after midnight.
         com.lucento.app.feature.widget.WidgetRefresher.start(this)
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
@@ -432,6 +438,40 @@ class AppContainer(application: Application) {
         )
     }
 
+    /** Settings › Help › Contact support (docs/SUPPORT.md): waiting requests, finished ones, this install's support id. */
+    val supportOutbox: com.lucento.app.data.support.PrefsSupportOutboxStore by lazy {
+        com.lucento.app.data.support.PrefsSupportOutboxStore.forApp(application)
+    }
+    private val supportRpc: com.lucento.app.domain.support.SupportRpc? by lazy {
+        if (SupabaseModule.isConfigured) com.lucento.app.data.support.SupabaseSupportRpc(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY) else null
+    }
+    val support: com.lucento.app.domain.support.SupportService by lazy {
+        com.lucento.app.domain.support.SupportService(
+            store = supportOutbox,
+            rpc = supportRpc,
+            signedInUserId = { auth.currentUserId() },
+            accessToken = { auth.accessToken() },
+            scheduleRetry = { com.lucento.app.data.support.SupportScheduler.schedule(application) },
+        )
+    }
+
+    /** Once a day for a signed-in account: the app version, Android API level and phone model (FD-V7). */
+    val clientReporter: com.lucento.app.domain.support.ClientReporter by lazy {
+        com.lucento.app.domain.support.ClientReporter(
+            store = supportOutbox,
+            rpc = supportRpc,
+            accessToken = { auth.accessToken() },
+            info = {
+                com.lucento.app.domain.support.ClientInfo(
+                    appVersion = BuildConfig.VERSION_NAME,
+                    versionCode = BuildConfig.VERSION_CODE,
+                    androidSdk = android.os.Build.VERSION.SDK_INT,
+                    deviceModel = com.lucento.app.domain.support.SupportRules.phoneName(android.os.Build.MANUFACTURER, android.os.Build.MODEL),
+                )
+            },
+        )
+    }
+
     /** The profile picture (private file; from the photo picker, or the Google account's picture on request). */
     val profilePhotos: com.lucento.app.data.media.ProfilePhotos by lazy { com.lucento.app.data.media.ProfilePhotos(application) }
 
@@ -460,7 +500,11 @@ class AppContainer(application: Application) {
             clearTablesUnseeded = { com.lucento.app.data.local.clearLedgerTables(database, seed = false) },
             deleteLedgerPhotos = { photos.deleteAll() },
             // Same DataStore file as sharedSpace's store (preferencesDataStore is one instance per process).
-            forgetAccount = { com.lucento.app.data.sharedspace.DataStoreSharedSpaceStore(application).clearAll() },
+            forgetAccount = {
+                com.lucento.app.data.sharedspace.DataStoreSharedSpaceStore(application).clearAll()
+                // Contact support's list of recent requests is the leaving account's too (docs/SUPPORT.md).
+                supportOutbox.forgetHistory()
+            },
         )
     }
 
@@ -535,6 +579,7 @@ class AppContainer(application: Application) {
             forgetAccount = {
                 com.lucento.app.data.sharedspace.DataStoreSharedSpaceStore(application).clearAll()
                 preferences.forgetAccountConsents()
+                supportOutbox.forgetHistory()
             },
         )
     }

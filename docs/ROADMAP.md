@@ -285,6 +285,20 @@ recurring-schedule sync, syncing preferences.
   6 widths × 7 heights × 7 text sizes). From a widget, Speak and Scan start in an already open composer, and the
   microphone and camera wait for the launch logo and App lock.
 
+## Built, awaiting owner test — Contact support (2026-11-15, `feature/contact-support`, draft PR)
+- Mission Control step 4.6 (docs/mission-control/v1, FD-V4/V4a/V4b/V7/V15). Spec: docs/SUPPORT.md.
+- Settings › Help › Contact support: topic, message, email only while signed out, and a line-by-line preview of the
+  attached phone details with one switch to leave them out. Replies by email; the reference (LC-…) is shown.
+- Saved before sending; offline requests go when the phone is online (SupportWorker), one ticket per request whatever
+  the retries. A request written by an account that has since signed out goes without an account, never into another.
+- Once a day, signed in only: app version, Android API level and phone model (report_client).
+- Privacy Policy 2026-11-15: both paths, staff access (FD-V3), 35 days of activity, order amounts, weekly encrypted
+  backups. The website's /privacy ships the same text in the same release.
+- Needs the Mission Control migrations (`feature/mission-control-db`) on lucento-test, then production, first.
+- Same branch, security review M5: a complimentary Lifetime from Mission Control reads as Lifetime ("Pro Lifetime ·
+  courtesy", the services row's date, no Buy Lifetime); taking it back says Pro has ended, never a Google Play refund.
+  Contact support's install id is its own, never the usage-counts id. Signing out clears the recent-requests list.
+
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,

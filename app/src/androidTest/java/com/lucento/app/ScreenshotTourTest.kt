@@ -703,5 +703,16 @@ class ScreenshotTourTest {
         waitForText("See your Pro cards")
         shot("25l-pro-page-replay")
         simulator.setTestStore(false)
+
+        // ---------------------------------------------------------------- Settings › Help › Contact support (docs/SUPPORT.md)
+        backUntilGone("See your Pro cards")
+        compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
+        compose.waitForIdle()
+        click("Settings")
+        click("Contact support")
+        waitForText("Attach details about this phone")
+        click("Something isn’t working")
+        closeKeyboard()
+        shot("26-contact-support")
     }
 }
