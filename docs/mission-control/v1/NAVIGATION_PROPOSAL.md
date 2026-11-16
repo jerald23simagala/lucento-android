@@ -42,13 +42,16 @@ LUCENTO · Mission Control          [PRODUCTION]
    account" → Resolve purchase link → evidence + step-up → reply with a saved reply → Resolved.
 3. **"My transactions are missing"** (sent from the app): the ticket shows the app version and a stale
    `transactions` sync → View records (reason = the ticket, authenticator code) → read → reply by email.
-4. **Morning check:** Overview (7 days) → anything red in the operational summary → Infrastructure or Emails.
+4. **Morning check:** Overview (7 days) → the Needs attention strip at the top (only what asks for action, each a link;
+   "All clear" otherwise) → Support, Infrastructure or Emails.
 
 ## Visual system
 
 - Lucento's palette roots set in an operational register: navy-tinted neutrals, Electric Blue as the one interactive
   accent, Sunlight Yellow only for "careful" (the production badge, the open-records banner).
-- Plus Jakarta Sans for the interface; a monospace face for ids, order numbers and amounts in logs.
+- IBM Plex Sans for the interface and IBM Plex Mono for ids and order numbers, with tabular figures everywhere (owner,
+  2026-11-15, after the UI pass: clear figures; Atkinson Hyperlegible's slashed zero read as a struck-out amount). Plus
+  Jakarta Sans stays the Android app's face.
 - Tables over cards. Status by shape and word, not colour alone. Money always signed and with its currency.
 - Light and dark from one token set. Desktop first; at phone width the sidebar becomes a scrolling top bar, panes
   stack, and destructive actions remain available but with the same confirmations.
