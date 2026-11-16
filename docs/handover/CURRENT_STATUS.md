@@ -552,6 +552,16 @@ sentence, and its silence settings are only hints:
 **Owner's call (2026-11-13):** "push and merge when green". Then 0.5.8 with #65. At that release the Privacy Policy
 date goes to the release day and the website's `/privacy` is re-exported (KNOWN_ISSUES VI-3).
 
+## Release 0.5.10 (version code 15) — 2026-11-15 (`release/0.5.10`)
+
+The owner asked for 0.5.10 to test on the phone ("Build 0.5.10 so I can test on my phone"). The only app change since
+0.5.9 is #83: Add transactions reads messages on the phone straight away (Smarter reading is turned on only in Settings,
+which warns that it's slower, and is locked for Free), and Ask Lucento has the microphone. On main but not in the app:
+#76, Mission Control's database migrations (lucento-test only; production is OT-28), and documentation (#78, #79, #81,
+#82). The Privacy Policy stays version **2026-11-14** and the website needs nothing: its "Voice input" section covers
+any microphone in the app, and a spoken question is sent the same way as a typed one. Owner: upload to internal
+testing, then OT-32.
+
 ## Release 0.5.9 (version code 14) — 2026-11-14 (`release/0.5.9`)
 
 The owner chose "Release 0.5.9 now", with the website's /privacy. Carries everything merged since 0.5.8:
