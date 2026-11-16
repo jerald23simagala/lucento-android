@@ -614,3 +614,50 @@ Owner: "I need my minimalist mission control done … Lets start building now" (
   DATA_SOURCE_INVENTORY updated); refund totals shown as +; MRR ₱0.00 instead of "—" without amounts; labels that said
   "as Google reports it" while paused; the entitlement table and the ticket composer cut off at 1280 px. Repository
   `jerald23simagala/lucento-mission-control` (private) created; console PR #1 merged `d24038f` (owner, 2026-11-15).
+
+## Fast capture by default, voice in Ask Lucento — 2026-11-15 (`feature/fast-capture-ask-voice`, on `main` `dacb6ea`)
+
+Owner: speech in Add transactions is fast, Smarter reading made each message wait for Gemini, and new users expect fast
+input. Remove the composer's Smarter reading switch, warn whoever turns it on in Settings that it slows adding
+transactions, and give Ask Lucento the speech button. Worktree `../lucento-ask-voice`; uncommitted at the time of writing.
+
+- **Composer:** the Smarter reading switch row and its consent dialog are gone (`TransactionComposerScreen.kt`;
+  `ComposerViewModel` keeps one `geminiReads` flag, `setSmartReading` removed). The note under the examples now says who
+  reads messages: off, "Your messages are read on this phone, so their rows appear straight away."; on, that Gemini
+  takes a few seconds and where to turn it off. The old line ("Nothing is sent unless you turn on cloud sync, crash
+  reports, or Smarter reading.") left out exchange rates (on by default), usage counts and online voice. While Gemini
+  reads, the reply says "Gemini is reading…".
+- **Settings › Privacy & security › Smarter reading**, now the only place to turn it on: the row's note and the first
+  paragraph of the consent dialog say "Adding transactions gets slower: each message waits a few seconds for Gemini's
+  answer." (`SmartReadingCopy.SLOWER`). The dialog calls the screen "Add transactions", not "the composer".
+- **Ask Lucento:** a microphone beside the question field, shown while the Voice entry feature is on (its description
+  now names Ask Lucento). The composer's speech code moved into `feature/capture/VoiceInput.kt` (`rememberVoiceInput`,
+  `VoiceInputSheets`), so both screens run the same listening, notes, online-voice consent and sheet; the sheet's
+  example and the speech window's prompt come from the screen ("How much did I spend this month?" in Ask, which the
+  phone answers itself). A spoken question is asked when listening ends; one that can't be asked yet waits in the field.
+  Ask's placeholder became "Ask about your money…" to fit beside the microphone, and Send no longer clears typed text
+  while the records are still loading.
+- **Words are no longer dropped** when someone leaves mid-sentence with text already in the field: they follow it
+  (`SpeechRequest.intoField`, both screens).
+- **Smarter reading needs the plan** (owner's answer the same day, OT-33): `ProGates.smartReadingAllowed` (`AI_PRO`)
+  gates the interpreter and the composer's `geminiReads`, so on Free no message waits for the proxy's `403`. In
+  Settings the switch can't be turned on without it and a Pro note says why; a consent given earlier is paused (the note
+  says so) and can still be turned off. `ProGatesTest` +1. Spoken questions in Ask stay asked at once (owner).
+- **Found and fixed while checking:** the first version of `rememberVoiceInput` handed the launchers to `VoiceInput` in
+  an effect. After the activity is recreated with the microphone question open (a rotation), Android hands over the
+  answer while the launcher registers, before that effect ran, so a refused microphone said "no speech recogniser"
+  instead of opening the speech service's window. The launchers are now set while composing, as the old composer code
+  effectively did.
+- **Tests:** `SpeechRequestTest` +5 (the microphone's route, `intoField`), `ProGatesTest` +1. Final `testDebugUnitTest
+  assembleDebug lintDebug` on the finished code, plan lock included: 1,489 tests, 0 failures; lint 0 errors (no
+  findings in the changed files).
+- **Device check** (API 35 emulator `Lucento_Shots_API35`, which now holds this branch's debug build, before the plan
+  lock; log in `artifacts/fast-capture-ask-voice/device-log.txt`, screenshots beside it, untracked): Ask shows the microphone; the first tap asks for the
+  microphone; the listening sheet shows Ask's example; offline, the "can't turn speech into text offline" note offers
+  Try online voice, whose consent saves the setting and listens online at once; refusing the microphone opens the speech
+  service's window, also after a rotation with the question open (logcat: the activity relaunched), and closing it says
+  "Listening stopped. You can type it instead."; at 200 % text the bar still fits with no overlap; the new placeholder
+  fits beside the microphone. The composer's microphone, through the shared code, still shows its own example and says
+  "Didn't catch anything" after 10 s of silence. A typed question in Ask is still answered once. **Not checked:** a real
+  spoken question or transaction (the emulator's speech service produced no text) and the Smarter reading row and dialog
+  (debug builds have no proxy, so the section is hidden). KNOWN_ISSUES FC-1 and FC-2, NEXT_TASKS OT-32 and OT-33.

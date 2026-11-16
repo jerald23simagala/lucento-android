@@ -121,15 +121,18 @@ by many speech services. So the composer runs its own session on the phone's spe
 |---|---|
 | `VoiceSession` (pure, `VoiceSessionTest`) | Waits up to 10 s for the first words, listening again each time the service gives up early (some do within a fraction of a second). After words, listens again through pauses; 3.5 s of quiet ends it. Done ends it at once (mid-sentence, the service gets 2.5 s to hand back its last words). One minute and 30 restarts at most. Stretches are joined with ", " so the interpreter reads them as items. An error after words never loses them. |
 | `VoiceCapture` | Drives `SpeechRecognizer` on the main thread: partial results shown live, a fresh recogniser per stretch (late callbacks from an old one are ignored), the permission checked before every stretch, audio buffers ignored. |
-| `ListeningSheet` | "Listening…", the microphone's halo moving with the voice (still with reduced motion), the words so far, whether it is offline or online, Done and Cancel. Dismissing is Cancel. |
+| `ListeningSheet` | "Listening…", the microphone's halo moving with the voice (still with reduced motion), the words so far, something to try saying (the screen's own example), whether it is offline or online, Done and Cancel. Dismissing is Cancel. |
+| `VoiceInput` (`rememberVoiceInput`, `VoiceInputSheets`) | The whole microphone for a screen: the route (`SpeechRequest.route`: Lucento listens; no speech service → its window; microphone not yet allowed → ask, refused → window), the window's answer, the notes, "Try online voice" and its consent, the sheet, and stopping when the app is left. Used by the composer and by Ask Lucento (owner, 2026-11-15; docs/ASK.md "Speaking a question"). |
 
 `RECORD_AUDIO` is asked the first time someone taps the microphone (also from the Speak widget) and is in the CI
 release allow-list. The manifest declares `android.hardware.microphone` as not required, because the permission alone
 would make Google Play hide Lucento from devices without a microphone (found in the 0.5.8 AAB, 2026-11-14). Refused, or a
 phone with no `RecognitionService` (`SpeechRecognizer.isRecognitionAvailable`, which
 needs the `<queries>` entry), the speech service's own window (`RecognizerIntent`) is used as before. Leaving the app
-mid-sentence stops listening and puts what was heard into the message field, unsent. Not yet covered by a device test:
-check on real phones that restarts don't clip first words or beep on every stretch.
+mid-sentence stops listening and puts what was heard into the message field, unsent, after anything already typed
+there (`SpeechRequest.intoField`; until 2026-11-15 the words were dropped when the field wasn't empty). Not yet covered
+by a device test: check on real phones that restarts don't clip first words or beep on every stretch. The "Voice entry"
+feature switch shows or hides the microphone in both the composer and Ask Lucento.
 
 **Online voice (opt-in, owner 2026-11-13).** By default both paths set `EXTRA_PREFER_OFFLINE`, which means offline
 *only*: a phone without a matching offline speech pack can't listen (Google's window says "Voice search isn't
@@ -145,16 +148,31 @@ is auto-sent; the user can fix the wording with "Edit message" or fix rows direc
 
 ## Smarter reading (Gemini) — opt-in
 
-Off by default. When the user turns on **Settings › Smarter reading**, or the **Smarter reading** switch above the
-composer's message field (shown when signed in, in a build with the proxy), a dialog first says what is sent and where —
-the same words in both places (`feature/capture/SmartReadingCopy.kt`). Then typed
-and spoken messages go to Gemini through Lucento's own proxy; everything else — and everything while it is off — is
-read on this phone by `LocalTransactionInterpreter` (deterministic rules; never presented as AI).
+Off by default, and turned on in one place only: **Settings › Privacy & security › Smarter reading** (shown when signed
+in, in a build with the proxy). Its consent dialog says first that adding transactions gets slower — each message waits
+a few seconds for Gemini's answer — then what is sent and where (`feature/capture/SmartReadingCopy.kt`); the switch's
+row says the same under it. Then typed and spoken messages go to Gemini through Lucento's own proxy; everything else —
+and everything while it is off — is read on this phone by `LocalTransactionInterpreter` (deterministic rules; never
+presented as AI).
+
+**No switch in the composer (owner, 2026-11-15).** On-device reading answers at once; Gemini made every message wait,
+which new users read as the app being slow. The composer's own switch (added in owner test 2026-11-09) is gone. While
+Smarter reading is on, the composer says so: the note under its examples ("Smarter reading is on: Gemini reads each
+message, which takes a few seconds. You can turn it off in Settings › Privacy & security."; off: "Your messages are read
+on this phone, so their rows appear straight away.") and the reply while waiting ("Gemini is reading…").
+
+**Plan (owner, 2026-11-15).** Smarter reading is part of Lucento Pro (`Capability.AI_PRO`: Pro, or Lifetime's included
+year; docs/MONETIZATION.md). Without it the proxy refuses every message (`403 pro_required`), so the app doesn't ask:
+`ProGates.smartReadingAllowed` gates the interpreter (`LucentoApplication.interpreter`) and the composer's
+`geminiReads`, and messages are read on this phone at once. In Settings the switch can't be turned on and a Pro note says
+why ("Smarter reading is part of Lucento Pro. Reading on this phone is always free."). A consent given earlier (a
+Lifetime's year ended, a subscription lapsed) is paused, not removed: the note says so, the switch can still be turned
+off, and it works again when the plan includes it, as cloud sync does.
 
 | Piece | Where |
 |---|---|
 | Opt-in flag | `UserPreferences.smartReading` (DataStore), set only from the consent dialog |
-| Composer reader | `data/ai/HybridTransactionInterpreter`: Gemini when on, else local; falls back to local per request (offline, signed out, daily limit used, error, nothing found) and labels the reply "Read by Gemini" / "Read on this phone — <reason>" |
+| Composer reader | `data/ai/HybridTransactionInterpreter`: Gemini when on and in the plan, else local; falls back to local per request (offline, signed out, daily limit used, error, nothing found) and labels the reply "Read by Gemini" / "Read on this phone — <reason>" |
 | Client | `data/ai/RemoteTransactionInterpreter` → `BuildConfig.AI_INTERPRET_URL` (release: default `https://www.lucentoapp.com/api/interpret`, override with `LUCENTO_AI_INTERPRET_URL`; debug: only `LUCENTO_DEBUG_AI_INTERPRET_URL`, otherwise Smarter reading is hidden — debug never calls the production proxy) with the user's Supabase access token |
 | Validation | `RemoteCandidates`: ids must be the user's own, amounts positive decimals, kinds must fit; doubts become review flags. Rows still go through `BatchReview` and the user's review |
 | Proxy | `lucento-website/api/interpret.ts` (Vercel). Holds `GEMINI_API_KEY`; checks the token with Supabase Auth; counts the request with `public.consume_ai_quota()`; returns structured rows |
@@ -177,4 +195,5 @@ A sync account is required: it identifies the user for the daily allowance.
 4. **Check.** `curl -i -X POST -H "Content-Type: application/json" -d "{}" https://www.lucentoapp.com/api/interpret`
    (in PowerShell: `curl.exe`) answers `401 sign_in_required` once deployed; `503 not_configured` means a variable is
    missing. Without the JSON content type Astro's form protection answers `403` instead.
-5. **App.** Sign in to a sync account, then Settings › Smarter reading › on. The composer's replies say who read them.
+5. **App.** Sign in to a sync account, then Settings › Privacy & security › Smarter reading › on. The composer's
+   replies say who read them.

@@ -41,6 +41,21 @@ expired — sign in again", not "needs your sync account".
   answered 503 or timed out: each call except the last gets at most 11 s so another model can still answer, the newest
   Flash-Lite is tried third, and a model that answered 404 is skipped for the function instance.
 
+## Speaking a question
+
+Owner, 2026-11-15: Ask Lucento has the composer's microphone, beside the question field (shown while the **Voice entry**
+feature is on, like the composer's). It is the same code (`feature/capture/VoiceInput.kt`): Lucento listens itself,
+offline unless the person agreed to online voice, with the same notes, "Try online voice" consent and listening sheet
+(its example: "How much did I spend this month?"). Details: docs/CAPTURE.md "Speech and camera".
+
+- A spoken question is asked as soon as listening ends (Done, or 3.5 s of quiet after the words), as the composer sends a
+  spoken message. It is then an ordinary question: answered on the phone when `AskRouter` knows it, by Gemini only while
+  AI answers are on.
+- While an answer is still on its way, or the records are still loading, the words wait in the question field (after
+  anything typed there) instead of being dropped; so do words heard when the person leaves the app mid-sentence.
+- Nothing new leaves the phone: the speech service turns speech into text (online only with online voice on), and the
+  text is a question like any typed one (Privacy Policy "Voice input" and "AI features").
+
 ## Reports
 
 `domain/ask/Reports.kt` builds a `Report`: one currency, a headline figure, sections with columns and totals, and notes
@@ -152,6 +167,7 @@ sign-in details, the Gemini key.
 |---|---|
 | Hero on Insights | `feature/ask/AskLucentoHero.kt` (types "What’s my top 5 spending categories?"; still with reduced motion) |
 | Screen, report sheet, consent sheet | `feature/ask/AskLucentoScreen.kt` |
+| Microphone | `feature/capture/VoiceInput.kt` (shared with the composer); online voice through `AskLucentoViewModel.onlineVoiceAllowed` / `allowOnlineVoice` |
 | Conversation, routing, fallbacks | `feature/ask/AskLucentoViewModel.kt` |
 | Reports, routing, snapshot, answer check | `domain/ask/Reports.kt`, `domain/ask/Ask.kt` (unit-tested) |
 | Calculations, transaction patterns | `domain/ask/Advisor.kt` (`AskCalc`, `TransactionSignals`; `AdvisorTest`) |

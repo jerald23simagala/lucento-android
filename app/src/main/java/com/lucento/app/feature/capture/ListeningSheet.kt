@@ -36,12 +36,14 @@ import com.lucento.app.core.designsystem.theme.Spacing
 
 /**
  * Lucento listening ([VoiceCapture]): a microphone that moves with the voice, the words as they are recognised, and
- * Done. It waits for people to think before they speak (VoiceTiming), so it says so. Dismissing it is Cancel.
+ * Done. It waits for people to think before they speak (VoiceTiming), so it says so, with something to try saying
+ * ([example]: a transaction in the composer, a question in Ask Lucento). Dismissing it is Cancel.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ListeningSheet(
     state: VoiceState,
+    example: String,
     level: () -> Float,
     onDone: () -> Unit,
     onCancel: () -> Unit,
@@ -62,7 +64,8 @@ internal fun ListeningSheet(
                 title = if (stopping) "Finishing…" else "Listening…",
                 subtitle = when {
                     stopping -> "Catching your last words."
-                    transcript.isEmpty() -> "Take your time. Try “Dinner 450, parking 90”."
+                    // A question keeps its own "?": “How much did I spend this month?”, not “…month?”.
+                    transcript.isEmpty() -> "Take your time. Try “$example”" + if (example.endsWith('?')) "" else "."
                     else -> "Keep going, or tap Done when you’ve finished."
                 },
             )

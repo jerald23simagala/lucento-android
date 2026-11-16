@@ -98,10 +98,12 @@ data class ComposerState(
      */
     val fxNeedsChoice: Boolean = false,
     val fxOffline: com.lucento.app.domain.fx.FxSource = com.lucento.app.domain.fx.FxSource.LAST_RATE,
-    /** Smarter reading can be switched on here: signed in, in a build with Lucento's reading proxy. */
-    val smartReadingOffered: Boolean = false,
-    /** The person's Smarter reading consent (docs/CAPTURE.md); messages go to Gemini only while it is on. */
-    val smartReading: Boolean = false,
+    /**
+     * Smarter reading is on (the person's consent, given in Settings; docs/CAPTURE.md) and usable here (signed in, in a
+     * build with Lucento's reading proxy, on a plan that includes it): typed and spoken messages go to Gemini first, so
+     * each takes a few seconds.
+     */
+    val geminiReads: Boolean = false,
 )
 
 /**
@@ -121,8 +123,8 @@ class ComposerViewModel(
     private val today: () -> LocalDate = LocalDate::now,
     /** Multicurrency: the day's exchange rates (null in tests: rows then use the offline choice). */
     private val fxRates: com.lucento.app.data.fx.FxRateSource? = null,
-    /** Whether Smarter reading can be offered on this phone (signed in, with a proxy); false in tests. */
-    smartReadingOffered: Flow<Boolean> = flowOf(false),
+    /** Whether Smarter reading can be used on this phone (signed in, with a proxy, in the plan); false in tests. */
+    smartReadingAvailable: Flow<Boolean> = flowOf(false),
 ) : ViewModel() {
 
     private data class Session(
@@ -156,8 +158,8 @@ class ComposerViewModel(
         categories.observeCategories(),
         transactions.observeTransactions(),
         preferences?.preferences?.map { Triple(it.defaultWalletId, it.primaryCurrency, it.smartReading) } ?: flowOf(Triple(null, null, false)),
-        combine(session, smartReadingOffered) { s, offered -> s to offered },
-    ) { allWallets, categoryList, history, (savedDefault, main, smart), (s, offered) ->
+        combine(session, smartReadingAvailable) { s, available -> s to available },
+    ) { allWallets, categoryList, history, (savedDefault, main, smart), (s, available) ->
         val walletList = allWallets.transactable()
         val ids = walletList.map { it.id }.toSet()
         val defaultId = savedDefault?.takeIf { it in ids }
@@ -199,8 +201,7 @@ class ComposerViewModel(
             fx = fx,
             fxNeedsChoice = needsChoice,
             fxOffline = s.fxOffline,
-            smartReadingOffered = offered,
-            smartReading = smart,
+            geminiReads = smart && available,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ComposerState())
 
@@ -496,12 +497,6 @@ class ComposerViewModel(
         }
     }
 
-    /** Smarter reading from the composer's switch; turning it on follows the same consent as Settings. */
-    fun setSmartReading(enabled: Boolean) {
-        val prefs = preferences ?: return
-        viewModelScope.launch { prefs.setSmartReading(enabled) }
-    }
-
     companion object {
         /** The user's side of the chat for a scanned image (a receipt, a statement or an app's history). */
         const val SCAN_LABEL = "Scanned image"
@@ -509,8 +504,10 @@ class ComposerViewModel(
         val Factory = containerFactory {
             ComposerViewModel(
                 it.transactions, it.wallets, it.categories, it.interpreter, it.preferences, fxRates = it.fxRates,
-                smartReadingOffered = it.auth.observeSignedInEmail().map { email ->
-                    email != null && com.lucento.app.BuildConfig.AI_INTERPRET_URL.isNotBlank()
+                // Signed in, a proxy in this build, and a plan that includes it: the interpreter's own rule.
+                smartReadingAvailable = combine(it.auth.observeSignedInEmail(), it.entitlements.state) { email, plan ->
+                    email != null && com.lucento.app.BuildConfig.AI_INTERPRET_URL.isNotBlank() &&
+                        com.lucento.app.domain.entitlement.ProGates.smartReadingAllowed(plan, System.currentTimeMillis())
                 },
             )
         }

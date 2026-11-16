@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.PieChart
@@ -79,6 +80,7 @@ import com.lucento.app.core.designsystem.component.ChatDayDivider
 import com.lucento.app.core.designsystem.component.ChatInputBar
 import com.lucento.app.core.designsystem.component.ChatMessageField
 import com.lucento.app.core.designsystem.component.ChatSendButton
+import com.lucento.app.core.designsystem.component.ChatToolButton
 import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.IconTile
@@ -110,6 +112,7 @@ import com.lucento.app.domain.ask.Report
 import com.lucento.app.domain.ask.ReportKind
 import com.lucento.app.domain.ask.ReportLine
 import com.lucento.app.domain.ask.ReportSection
+import com.lucento.app.feature.capture.SpeechRequest
 import com.lucento.app.feature.reports.icon
 import java.time.YearMonth
 
@@ -117,17 +120,21 @@ import java.time.YearMonth
  * Ask Lucento: questions about the user's own money. The page opens with Lucento's greeting and preset questions; every
  * answer says who worked it out (this phone, or Gemini with figures from this phone), and an answer worked out as a
  * report opens it in full. The built-in reports themselves live on Insights (tester round 3). AI answers are off until
- * the user agrees in the consent sheet.
+ * the user agrees in the consent sheet. With [voiceEnabled] (the Voice entry feature), a question can be spoken, through
+ * the composer's own microphone ([com.lucento.app.feature.capture.VoiceInput]).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AskLucentoScreen(
     onBack: () -> Unit,
+    voiceEnabled: Boolean,
     viewModel: AskLucentoViewModel = viewModel(factory = AskLucentoViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
     var input by rememberSaveable { mutableStateOf("") }
+    // The microphone's one-line note ("Didn’t catch anything…", "Try online voice"); cleared when something is asked.
+    var notice by remember { mutableStateOf<String?>(null) }
     var consentFor by remember { mutableStateOf<String?>(null) }
     var askingConsent by remember { mutableStateOf(false) }
     var openReport by remember { mutableStateOf<Report?>(null) }
@@ -148,12 +155,30 @@ fun AskLucentoScreen(
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(listState.layoutInfo.totalItemsCount.coerceAtLeast(1) - 1)
     }
 
-    fun send(text: String = input) {
-        if (text.isBlank() || state.thinking) return
-        haptics.tick()
+    /** Asks [text]; false while an answer is on its way or the records are still loading, when nothing is asked. */
+    fun ask(text: String): Boolean {
+        if (text.isBlank() || state.thinking || state.loading) return false
+        notice = null
         viewModel.ask(text)
+        return true
+    }
+
+    fun send(text: String = input) {
+        if (!ask(text)) return
+        haptics.tick()
         if (text == input) input = ""
     }
+
+    // A spoken question is asked as soon as listening ends, as in the composer. One that can't be asked yet (an answer
+    // is still on its way) waits in the field, and so do the words heard when the person leaves mid-sentence.
+    val voice = com.lucento.app.feature.capture.rememberVoiceInput(
+        example = "How much did I spend this month?",
+        onlineAllowed = viewModel::onlineVoiceAllowed,
+        onAllowOnline = viewModel::allowOnlineVoice,
+        onNotice = { notice = it },
+        onHeard = { heard -> if (!ask(heard)) input = SpeechRequest.intoField(input, heard, AskLucentoViewModel.QUESTION_LIMIT) },
+        onLeft = { heard -> input = SpeechRequest.intoField(input, heard, AskLucentoViewModel.QUESTION_LIMIT) },
+    )
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding()) {
         LucentoTopBar(
@@ -260,12 +285,25 @@ fun AskLucentoScreen(
             }
         }
 
+        notice?.let { text ->
+            val offerOnline = SpeechRequest.offersOnline(text)
+            InfoNote(
+                text,
+                modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.xs),
+                actionLabel = if (offerOnline) SpeechRequest.TRY_ONLINE else null,
+                onAction = if (offerOnline) voice::offerOnline else null,
+            )
+        }
         ChatInputBar(Modifier.padding(horizontal = Spacing.gutter).padding(bottom = Spacing.sm, top = Spacing.xxs).navigationBarsPadding()) {
+            if (voiceEnabled) {
+                ChatToolButton(Icons.Outlined.KeyboardVoice, "Speak a question", onClick = voice::listen)
+            }
             ChatMessageField(
                 value = input,
                 onValueChange = { input = it.take(AskLucentoViewModel.QUESTION_LIMIT) },
                 onSend = { send() },
-                placeholder = if (state.aiActive) "Ask anything about your money…" else "Ask about net worth, budget, debts…",
+                // Short enough to fit beside the microphone; the chips above say what can be asked.
+                placeholder = "Ask about your money…",
                 description = "Ask Lucento a question",
                 modifier = Modifier.weight(1f),
             )
@@ -296,6 +334,7 @@ fun AskLucentoScreen(
             pdfLocked = state.pdfLocked,
         )
     }
+    com.lucento.app.feature.capture.VoiceInputSheets(voice)
 }
 
 @Composable
