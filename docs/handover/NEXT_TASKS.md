@@ -101,8 +101,10 @@ Claude's tool is in `lucento-studio` (`marketing/mc`, `6edd819`). Contract: `doc
 - **Owner:** OT-34 (part I on lucento-test), then the phone check with the first pack; week 48 go/no-go Sat 21 Nov
   18:00 Manila. Production comes with OT-28 (the marketing SQL folds into the regenerated `APPLY_MISSION_CONTROL.sql`; a
   second store `lucento-marketing-production`; `setup --env PRODUCTION … --default`).
-- **Owner decision, open:** an hourly checker (Windows Task Scheduler) so Claude reads change requests without the
-  pasted prompt. Until then the page says "Saved for Claude" and when Claude last checked (KNOWN_ISSUES MC-11).
+- **Owner decisions (2026-11-16, after three critic rounds):** merge to TEST now; a 'coming soon' post after launch
+  can still be approved ("Approve anyway"), scheduling waits for a launch version; keep the phone order (media, then
+  texts and decisions); no scheduled checker: the owner pastes "Check Mission Control marketing requests" into Claude
+  (the page shows when Claude last checked, with a Copy button; KNOWN_ISSUES MC-11).
 - **First real TEST push:** confirm the Blob API takes the tool's streamed uploads (KNOWN_ISSUES MC-9), then that a
   video seeks and Download saves on the phone (DEPLOYMENT I6).
 - **Design:** critic round 1 REJECT 2.9 (studio `critic/reports/2026-11-16-mission-control-marketing-r1.md`); fixed:
@@ -115,9 +117,8 @@ Claude's tool is in `lucento-studio` (`marketing/mc`, `6edd819`). Contract: `doc
   `launch_version_needed`), the one-tap launch request keeps its answer and counts with Claude, "I posted it" is
   recorded as posted by hand (`posted_late`), undoing the launch can cancel those requests. Three rounds without
   APPROVE: escalated to the owner (design loop rule).
-- **Left after round 3 (owner calls or later):** decision buttons above the media on phones (the first Approve is about
-  1,700 px down at 393 px; a layout change, so a preview first); the summary's detail behind "More"; Safari and
-  TalkBack checks on a real device.
+- **Left after round 3:** the summary's detail behind "More" (optional polish); Safari and TalkBack checks on a real
+  device. Decision buttons above the media on phones: the owner kept the current order (2026-11-16).
 - **Truth rules in words:** the T-codes in Claude's truth lines have no plain-language list anywhere (MC-10); the card
   shows the pass/fail chip and keeps the codes under "What Claude checked".
 
