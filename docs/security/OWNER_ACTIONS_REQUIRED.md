@@ -11,6 +11,9 @@ These steps need your consoles, your production projects or a real payment, so t
 > §6 production stays on Supabase Free for now · §8 test purchases allowed during internal testing · §13 approved: grants
 > added for jerald23simagala@gmail.com and rachelretas20@gmail.com (12 months, done 2026-11-10); the migrations are
 > applied by pasting `docs/security/PRODUCTION_APPLY_2026-11-10.sql` (the MCP calls were declined twice).
+>
+> **Update 2026-11-15 (owner):** §1 moves from "once there is a user base" to **one of the last steps before the
+> production release**, keeping the free tier until then. The steps below follow Google's new Prepay billing.
 
 **Done 2026-11-10:** §13 on production (owner pasted the file) and §14 (all checks pass, see
 RELEASE_READINESS_CHECKLIST A1). lucento-test still needs the same file pasted once.
@@ -23,7 +26,7 @@ in `docs/security/evidence/` (create the folder) with the file name given. Tick 
 
 | § | Action | Blocks release | Time |
 |---|---|---|---|
-| 1 | Gemini key on the paid tier (F-05) | **Yes** | 5 min |
+| 1 | Gemini key on the paid tier (F-05) — **last, just before the production release** | **Yes** | 12 min |
 | 2 | Supabase "Confirm email" ON (F-06) | **Yes** | 5 min |
 | 3 | Leaked-password protection ON (F-06) | Recommended | 2 min |
 | 4 | Redirect allow-list (F-06) | Recommended | 3 min |
@@ -44,17 +47,50 @@ in `docs/security/evidence/` (create the folder) with the file name given. Tick 
 
 On the free tier Google may use prompts — including the financial summaries Ask Lucento sends — to improve its products.
 
-1. Open https://aistudio.google.com/apikey and sign in with the Google account that created Lucento's key.
-2. Find the key Vercel uses (Vercel → lucento-website → Settings → Environment Variables → the Gemini key's last 4
-   characters match). Note the **Project** name next to it in AI Studio.
-3. Open https://console.cloud.google.com/billing/linkedaccount and choose that project in the project picker at the top.
-4. The page must show a **billing account linked**. If it says "This project has no billing account", click **Link a
-   billing account**, choose or create one, and confirm.
-5. Recommended: **Billing → Budgets & alerts → Create budget**, a monthly amount you're comfortable with, alerts at 50 %
-   and 90 % to your email.
+**When (owner, 2026-11-15):** one of the **last steps before the production release** (P-day expected 1–8 Dec), so
+Lucento stays on the free tier as long as possible. Do it before the final release build: the free-tier sentence in the
+app and on the website comes out only after billing is linked (step 13). NEXT_TASKS OT-31.
 
-**Evidence:** screenshot of step 4 → `evidence/gemini-billing.png`. Then add one line to `docs/ASK.md`:
-"Gemini key on the paid tier since <date> (billing account linked)".
+**How it works now (Google, checked 2026-11-15):** the Gemini API uses **Prepay**: you buy credit first (minimum $5,
+expires after 12 months, generally non-refundable). **At $0 every key on that billing account stops** (Google answers
+HTTP 402) until you add credit, so Ask Lucento and Smarter reading stop for everyone. Auto-reload (steps 7–8) prevents
+that. Google Cloud's $300 free-trial credit doesn't cover Gemini. Tier 1 has an automatic $250 a month spend cap.
+
+**Find the project (2 min)**
+1. Open https://aistudio.google.com/api-keys and sign in with the Google account that created Lucento's key.
+2. Note the **project name** next to Lucento's key. If there's only one key, that's it. If there are several, stop and
+   send Claude a screenshot (Vercel hides the key's value, so it can't be matched by its last characters).
+
+**Turn billing on (5 min)**
+3. In the **Billing Tier** column next to that project, click **Set up billing**.
+4. First time: choose **Philippines**, accept the terms, fill in your contact details and add a card. If you already
+   have a Google billing account, choose it instead.
+5. If it offers **Prepay** or **Postpay**, choose **Prepay** (Google is moving every account to it).
+6. Buy the minimum **$5** of credit.
+
+**Keep it from switching off (3 min)**
+7. AI Studio's **Billing** page › **Available credits** card › **Setup auto-reload**: your card, reload amount **$5**,
+   reload when the balance drops to **$2**.
+8. **Manage auto-reload** › expand **Monthly Limit** › **$20** › **Save** (stops automatic top-ups past $20 a month).
+9. Optional: https://aistudio.google.com/spend › **Monthly spend cap** › **Edit spend cap** › **$20** (Google marks it
+   experimental).
+
+These amounts are a starting point; the server's own allowance (Free 10 questions a month, Pro 50 a day) keeps use small.
+
+**Check it (2 min)**
+10. https://aistudio.google.com/projects: the **Billing Tier** column no longer says "Set up billing". "Set up Prepay"
+    means step 6 isn't finished; "No credits" means the balance is empty.
+11. Nothing changes in Vercel (a key follows its project's billing). Ask Lucento a question on a phone; it should
+    answer. If it doesn't, Vercel's logs show `Gemini answered HTTP …` with the reason.
+12. Screenshot of step 10 → `evidence/gemini-billing.png`.
+
+**Then (Claude, same day):** 13. Tell Claude the date. Claude removes the free-tier sentence
+(`LegalDocuments.GEMINI_DATA_USE`, used by the policy, both AI consents in Settings and the AI answers sheet), bumps
+`LegalDocuments.VERSION`, regenerates the website's /privacy (`tools/legal/export_legal.py`), and records "Gemini key on
+the paid tier since <date>" in `docs/ASK.md`. The new wording ships in the release build and the website deploy; until
+then the old wording only over-warns.
+
+**Later:** if AI answers stop working, check AI Studio's Billing page for **No credits** first.
 
 ## 2. Supabase "Confirm email" ON (F-06)
 
