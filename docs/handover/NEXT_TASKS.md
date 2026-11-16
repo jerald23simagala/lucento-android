@@ -47,6 +47,7 @@
 | OT-30 | **Mission Control integrations** (when wanted): Resend send key + webhook (part E), Play service account with financial view only (part F, FD-V10), Crashlytics BigQuery link with sessions (part G) | **Open**, optional | Emails/quota, revenue amounts, crash data. Each page says "not connected" until then |
 | OT-32 | **Try the microphone in Ask Lucento and the composer in 0.5.10 (vc 15) from internal testing**: Insights › Ask Lucento › microphone, say "How much did I spend this month?" and expect the answer without tapping Send; then in Add transactions say "Lunch 250, coffee 120" as before. Signed in with Pro, turn on Settings › Privacy & security › Smarter reading: the row and the dialog should warn that adding transactions gets slower, and the composer should say "Gemini is reading…" while it waits. Signed in on Free (a test account without Pro), the same switch can't be turned on and shows "Smarter reading is part of Lucento Pro…" with See Lucento Pro | **Open**, ships in 0.5.10 | The emulator couldn't turn speech into text, so no spoken words have gone through the shared microphone code yet (KNOWN_ISSUES FC-1) |
 | OT-33 | **Decide: lock Smarter reading for Free in Settings?** A Free user could turn it on and then waited for the server's refusal on every message (KNOWN_ISSUES FC-2) | **Done** (owner, 2026-11-15: lock it); built on `feature/fast-capture-ask-voice` | Free first users are the ones who'd feel the slowdown |
+| OT-34 | **Mission Control › Marketing on lucento-test**: `lucento-mission-control/DEPLOYMENT.md` part I, click by click: paste `docs/mission-control/APPLY_MARKETING.sql`, then `VERIFY_MARKETING.sql` (every column true); make the marketing key (`select mc.rotate_ingest_secret('marketing');`) and give it to Claude's tool on the PC (`node marketing/mc/mc.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); create the private Blob store `lucento-marketing-test` (Singapore, Production + Preview, read-write token unticked) and redeploy; check Settings › Integrations; then the phone check with the first pack (I6) | **Open** (2026-11-16) | Until then Marketing says "isn't set up in this database yet" and the weekly packs stay on the Launch Board artifact. The week 48 go/no-go in Mission Control is Saturday 21 November, 18:00 Manila |
 
 
 ## Custom budget periods — future Pro feature, after launch (owner, 2026-11-16)
@@ -91,6 +92,26 @@ every caller and test still passes) → Room tables with a migration test → ba
 Mission Control) and `PulledRowRules` → `ProFeature.CUSTOM_BUDGET_PERIODS(LOCAL_PRO)` with a `ProGates` rule → screens
 and copy (about 170 month-worded phrases) → "same range, same figure" tests, boundary months and a mixed-version pair
 of phones.
+
+## Mission Control › Marketing approvals — follow-ups (2026-11-16)
+
+Built on `feature/mc-marketing` (database, this repository) and `lucento-mission-control` `feature/marketing` (console);
+Claude's tool is in `lucento-studio` (`marketing/mc`, `6edd819`). Contract: `docs/mission-control/v1/MARKETING_APPROVALS.md`.
+
+- **Owner:** OT-34 (part I on lucento-test), then the phone check with the first pack; week 48 go/no-go Sat 21 Nov
+  18:00 Manila. Production comes with OT-28 (the marketing SQL folds into the regenerated `APPLY_MISSION_CONTROL.sql`; a
+  second store `lucento-marketing-production`; `setup --env PRODUCTION … --default`).
+- **Owner decision, open:** an hourly checker (Windows Task Scheduler) so Claude reads change requests without the
+  pasted prompt. Until then the page says "Saved for Claude" and when Claude last checked (KNOWN_ISSUES MC-11).
+- **First real TEST push:** confirm the Blob API takes the tool's streamed uploads (KNOWN_ISSUES MC-9), then that a
+  video seeks and Download saves on the phone (DEPLOYMENT I6).
+- **Design:** critic round 1 REJECT 2.9 (studio `critic/reports/2026-11-16-mission-control-marketing-r1.md`); fixed:
+  typed input kept on a refusal, "Saved for Claude" instead of "Sent", "Scheduled in" (every app ticked), filters
+  (Needs you · With Claude · Done · All) with settled posts folded to one row, the week pinned in the address, urgency
+  on the card, launch switch below the posts, Overview capped at three marketing lines, two columns from 1024 px.
+  Round 2 is running.
+- **Truth rules in words:** the T-codes in Claude's truth lines have no plain-language list anywhere (MC-10); the card
+  shows the pass/fail chip and keeps the codes under "What Claude checked".
 
 ## Mission Control V1 — follow-ups (2026-11-15)
 
