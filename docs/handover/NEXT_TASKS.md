@@ -53,7 +53,8 @@
   privacy state; then the UI pass below ran on it.
 - **Console UI pass** (owner: "I need better UI/UX", 2026-11-15): merged as console PR #7 (`df195fe`), live on TEST.
   Owner choices the same day: Needs attention strip first on Overview, ticket pages message first, keep IBM Plex
-  (branch `design/attention-strip`, its own critic round). Left from critic round 3 (studio
+  (merged as lucento-mission-control #8, `998420f`, live on TEST: three critic rounds, REVISE 3.4 last, the owner took
+  it with the P1/P2 fixes; studio `critic/reports/2026-11-15-mission-control-p2-r3b.md` lists the polish left). Left from critic round 3 (studio
   `critic/reports/2026-11-15-mission-control-r3.md`): stat values misalign when a label wraps at 130 % text, the Custom
   date panel ignores Esc and outside clicks, several action panels can be open at once, the translucent sticky header,
   "16 accounts" vs "Registered 14" without a breakdown.
