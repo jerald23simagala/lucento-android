@@ -178,8 +178,9 @@ try {
 
   // ---------------------------------------------------------------- Marketing approvals (MARKETING_APPROVALS.md §3.1)
   // Each race: session A opens a transaction and makes its call, which takes the marketing lock and keeps it until A
-  // commits; session B makes its call meanwhile and must wait for that lock (seen as an ungranted advisory lock), then
-  // act on what A committed.
+  // commits; session B makes its call meanwhile and must wait (seen as a lock B's own backend hasn't been granted), then
+  // act on what A committed. B usually waits for the marketing lock (advisory); two calls by the same admin (MC3) are
+  // already serialised one step earlier, on the gate's hourly counter row (a transaction lock), and that is just as good.
   const admin = '7a1b5c2e-0000-4000-8000-0000000000a1';
   const adminSession = '7a1b5c2e-0000-4000-8000-0000000000a2';
   await setup.query(
@@ -215,9 +216,10 @@ try {
     c.query(`select mc_api.marketing_decide($1, $2, $3, $4, null) as j`, [id, version, decision, note]).then((r) => r.rows[0].j);
   const cardRow = async (key) =>
     (await setup.query(`select id, state, current_version, decided_at from mc.marketing_cards where key = $1`, [key])).rows[0];
-  const waitingForLock = async () => {
+  const pidOf = async (c) => (await c.query('select pg_backend_pid() as p')).rows[0].p;
+  const waitingForLock = async (pid) => {
     await new Promise((r) => setTimeout(r, 300));
-    return (await setup.query(`select count(*)::int as n from pg_locks where locktype = 'advisory' and not granted`)).rows[0].n;
+    return (await setup.query(`select count(*)::int as n from pg_locks where pid = $1 and not granted`, [pid])).rows[0].n;
   };
   {
     const c = await asClaude();
@@ -231,10 +233,11 @@ try {
   {
     const r1 = await cardRow('r1');
     const [a, b] = [await asOwner(), await asClaude()];
+    const bPid = await pidOf(b);
     await a.query('begin');
     const approved = await decide(a, r1.id, 1, 'approve');
     const pushing = push(b, pack('race-1', [card('r1', 2)]));
-    const waited = await waitingForLock();
+    const waited = await waitingForLock(bPid);
     await a.query('commit');
     const pushed = await pushing;
     await Promise.all([a.end(), b.end()]);
@@ -251,10 +254,11 @@ try {
   {
     const r1 = await cardRow('r1');
     const [a, b] = [await asClaude(), await asOwner()];
+    const bPid = await pidOf(b);
     await a.query('begin');
     const pushed = await push(a, pack('race-1', [card('r1', 3)]));
     const deciding = decide(b, r1.id, 2, 'approve');
-    const waited = await waitingForLock();
+    const waited = await waitingForLock(bPid);
     await a.query('commit');
     const decided = await deciding;
     await Promise.all([a.end(), b.end()]);
@@ -266,14 +270,16 @@ try {
     );
   }
 
-  // MC3: two approvals of one post (two devices). The second waits and finds it approved: one decision, one log entry.
+  // MC3: two approvals of one post (two devices). The second waits (here on the gate's counter row, which the first
+  // already updated) and finds it approved: one decision, one log entry.
   {
     const r2 = await cardRow('r2');
     const [a, b] = [await asOwner(), await asOwner()];
+    const bPid = await pidOf(b);
     await a.query('begin');
     const first = await decide(a, r2.id, 1, 'approve');
     const secondCall = decide(b, r2.id, 1, 'approve');
-    const waited = await waitingForLock();
+    const waited = await waitingForLock(bPid);
     await a.query('commit');
     const second = await secondCall;
     await Promise.all([a.end(), b.end()]);
@@ -290,10 +296,11 @@ try {
     const media = [{ file: 'race-3.mp4', content_type: 'video/mp4', bytes: 4321, sha256: 'a'.repeat(64), width: 1080, height: 1920, duration_ms: 12700 }];
     const body = pack('race-3', [card('r3', 1, { kind: 'short', media })]);
     const [a, b] = [await asClaude(), await asClaude()];
+    const bPid = await pidOf(b);
     await a.query('begin');
     const first = await push(a, body);
     const secondCall = push(b, body);
-    const waited = await waitingForLock();
+    const waited = await waitingForLock(bPid);
     await a.query('commit');
     const second = await secondCall;
     await Promise.all([a.end(), b.end()]);
@@ -315,10 +322,11 @@ try {
   {
     const r4 = await cardRow('r4');
     const [a, b] = [await asOwner(), await asClaude()];
+    const bPid = await pidOf(b);
     await a.query('begin');
     const asked = await decide(a, r4.id, 1, 'request_change', 'Race note: shorter hook');
     const reading = b.query(`select mc_api.ingest_marketing_feedback($1, null, 0) as j`, [secret]).then((r) => r.rows[0].j);
-    const waited = await waitingForLock();
+    const waited = await waitingForLock(bPid);
     await a.query('commit');
     const fed = await reading;
     await Promise.all([a.end(), b.end()]);
