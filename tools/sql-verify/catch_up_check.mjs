@@ -2,7 +2,11 @@
 //   A. a project like lucento-test (every migration before Mission Control except the seven the catch-up brings) →
 //      the catch-up → APPLY_MISSION_CONTROL.sql → VERIFY_MISSION_CONTROL.sql;
 //   B. a project that already has everything → the catch-up again (it must change nothing and not fail);
-//   C. a project whose history shows the 2026-11-10 production apply → the catch-up refuses and changes nothing.
+//   C. a project whose history shows the 2026-11-10 production apply → the catch-up refuses and changes nothing;
+//   D. Marketing approvals on top: APPLY_MISSION_CONTROL.sql → APPLY_MARKETING.sql twice (the owner may paste it again),
+//      and a third time with a post stored → VERIFY_MISSION_CONTROL.sql still all true → VERIFY_MARKETING.sql all true;
+//      and APPLY_MARKETING.sql is current (python tools/supabase/build_marketing_apply.py --check).
+import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +23,10 @@ const CATCH_UP = [
 const catchUp = readFileSync(join(docs, 'LUCENTO_TEST_CATCH_UP.sql'), 'utf8');
 const apply = readFileSync(join(docs, 'APPLY_MISSION_CONTROL.sql'), 'utf8');
 const verify = readFileSync(join(docs, 'VERIFY_MISSION_CONTROL.sql'), 'utf8');
+const applyMarketing = readFileSync(join(docs, 'APPLY_MARKETING.sql'), 'utf8');
+const verifyMarketing = readFileSync(join(docs, 'VERIFY_MARKETING.sql'), 'utf8');
+// VERIFY_MISSION_CONTROL.sql columns that wait for the owner's later steps (or for pg_cron, which PGlite lacks).
+const LATER_STEPS = ['cron_jobs_4', 'admin_added_step_a5', 'both_secrets_created_step_a6'];
 
 async function project(skip) {
   const db = new PGlite();
@@ -61,7 +69,7 @@ const check = (ok, label, detail = '') => {
   await db.exec(`create schema if not exists cron; create table if not exists cron.job (jobname text);`);
   try {
     const v = last(await db.exec(verify))[0];
-    const falses = Object.entries(v).filter(([k, val]) => val === false && !['cron_jobs_4', 'admin_added_step_a5', 'both_secrets_created_step_a6'].includes(k));
+    const falses = Object.entries(v).filter(([k, val]) => val === false && !LATER_STEPS.includes(k));
     check(falses.length === 0, 'A4 VERIFY_MISSION_CONTROL.sql: everything true except the steps still to come (and pg_cron here)', JSON.stringify(falses));
   } catch (e) {
     check(false, 'A4 VERIFY_MISSION_CONTROL.sql runs', e.message);
@@ -99,6 +107,58 @@ const check = (ok, label, detail = '') => {
   await db.exec('rollback').catch(() => {});
   const still = await db.query(`select value_int from lucento_private.plan_limits where key = 'allow_test_purchases'`);
   check(still.rows[0].value_int === 0, 'C2 and changes nothing there (test purchases stay off)');
+  await db.close();
+}
+
+// D. Marketing approvals (docs/mission-control/APPLY_MARKETING.sql) on a project that has Mission Control
+{
+  const built = spawnSync('python', ['-I', join(root, 'tools/supabase/build_marketing_apply.py'), '--check'], { encoding: 'utf8' });
+  check(built.status === 0, 'D0 APPLY_MARKETING.sql is generated from the migration and current',
+    `${built.error?.message ?? ''} ${built.stdout ?? ''} ${built.stderr ?? ''}`.trim());
+  const db = await project([]);
+  await db.exec(apply);
+  try {
+    await db.exec(applyMarketing);
+    await db.exec(applyMarketing);
+    check(true, 'D1 APPLY_MARKETING.sql runs after APPLY_MISSION_CONTROL.sql, and again (pasted twice)');
+  } catch (e) {
+    check(false, 'D1 APPLY_MARKETING.sql runs after APPLY_MISSION_CONTROL.sql, and again (pasted twice)', e.message);
+  }
+  // Pasted again once posts are stored: the re-added constraints accept them, and the database's id (Claude's cursor) stays.
+  try {
+    const secret = (await db.query(`select mc.rotate_ingest_secret('marketing') as s`)).rows[0].s;
+    const before = (await db.query(`select db_id::text as id from mc.marketing_launch`)).rows[0].id;
+    await db.query('set role anon');
+    const pushed = (await db.query(`select mc_api.ingest_marketing_pack($1, 'test', $2::jsonb) as j`, [secret, JSON.stringify({
+      pack: { key: '2026-W48', title: 'Week 48', starts_on: '2026-11-23', ends_on: '2026-11-29' },
+      cards: [{ key: 'W48-1', kind: 'post', phase: 'any', title: 'A post', version: 1, truth: 'pass. T1', platforms: ['Lucento Page'],
+        media: [{ file: 'a.png', content_type: 'image/png', bytes: 10, sha256: 'b'.repeat(64) }] }],
+    })])).rows[0].j;
+    await db.query('reset role');
+    await db.exec(applyMarketing);
+    const after = (await db.query(`select (select count(*) from mc.marketing_cards)::int as cards,
+      (select count(*) from mc.marketing_files)::int as files, (select db_id::text from mc.marketing_launch) as id,
+      mc.ingest_secret_ok($1, 'marketing') as secret_ok`, [secret])).rows[0];
+    check(pushed.ok && pushed.cards[0].result === 'created' && after.cards === 1 && after.files === 1 && after.id === before && after.secret_ok,
+      'D1b pasted again with a post stored: the post, its file, the marketing secret and the database id stay', JSON.stringify({ pushed, after }));
+  } catch (e) {
+    check(false, 'D1b pasted again with a post stored', e.message);
+  }
+  await db.exec(`create schema if not exists cron; create table if not exists cron.job (jobname text);`);
+  try {
+    const v = last(await db.exec(verify))[0];
+    const falses = Object.entries(v).filter(([k, val]) => val === false && !LATER_STEPS.includes(k));
+    check(falses.length === 0, 'D2 VERIFY_MISSION_CONTROL.sql stays true with Marketing approvals added', JSON.stringify(falses));
+  } catch (e) {
+    check(false, 'D2 VERIFY_MISSION_CONTROL.sql runs with Marketing approvals added', e.message);
+  }
+  try {
+    const m = last(await db.exec(verifyMarketing))[0];
+    const falses = Object.entries(m).filter(([, val]) => val !== true);
+    check(falses.length === 0 && Object.keys(m).length >= 15, 'D3 VERIFY_MARKETING.sql: every column true', JSON.stringify(m));
+  } catch (e) {
+    check(false, 'D3 VERIFY_MARKETING.sql runs', e.message);
+  }
   await db.close();
 }
 

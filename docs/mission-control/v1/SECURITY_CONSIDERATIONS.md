@@ -107,6 +107,15 @@ disclosure over a consent step (FD-V3), so:
 - CSRF: SameSite=Strict cookies + origin checks on actions. Webhooks verify Resend's signature and are idempotent.
 - No analytics or third-party scripts. Dependencies pinned; Dependabot alerts on.
 - Preview deployments point at lucento-test and sit behind Vercel's deployment protection.
+- Marketing media (MARKETING_APPROVALS.md §6): `img-src` and `media-src` add exactly one origin, the private Blob
+  store's own (`https://<store id>.private.blob.vercel-storage.com`, built from a validated `BLOB_STORE_ID`); nothing is
+  wildcarded. Files are reached through short-lived signed links for this environment's pathnames only.
+- Claude's tool calls `/api/marketing/pack`, `/upload`, `/uploaded` and `/feedback` with a bearer secret of its own
+  (checked by the database, `mc.ingest_secret_ok('marketing')`); those four exact paths skip the cookie gate, anything
+  else under `/api/marketing` is gated. The tool's secret can't mark a file ready: only the console's own secret can.
+- `?next=` after sign-in keeps the admin on Mission Control: same-origin paths only, judged after URL normalisation (so
+  `/.//host`, `/a/..//host` and `/%2e//host` can't become `//host`), never back into sign-in or `/api`; the proxy also
+  refuses any redirect that would leave its own origin.
 
 ## 8. Testing the controls (Phase 4)
 

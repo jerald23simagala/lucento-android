@@ -583,6 +583,30 @@ pack, `391e7d8`). The owner chose "Release 0.5.8 now". #58, #37 and the dependen
   publishes the same text in lucento-website #29, with an "Online voice" row in the homepage's short privacy list.
 - Owner retest: NEXT_TASKS OT-25.
 
+## Mission Control › Marketing approvals — 2026-11-16 (database: `feature/mc-marketing`; console: `lucento-mission-control` `feature/marketing`; tool: lucento-studio `6edd819`)
+
+Owner: "I want my marketing approval workflow be integrated here … a section in mission control so I can handle approval
+and change requests there", then "go ahead". Contract: `docs/mission-control/v1/MARKETING_APPROVALS.md` (v2).
+
+- **Database** (`supabase/migrations/20261117090000_mission_control_marketing.sql`, one paste: `docs/mission-control/
+  APPLY_MARKETING.sql`, check: `VERIFY_MARKETING.sql`): packs, posts, immutable versions, files, an append-only log,
+  launch details and Sunday numbers in `mc`; admin functions behind `mc.gate` (approve, ask for a change, skip, undo,
+  the apps steps, launch with a fresh code); four ingest functions for Claude's tool with their own secret. Not applied
+  anywhere yet (OT-34).
+- **Tests:** `tools/sql-verify` 10 suites, **456 checks, 0 failed** under both default-privilege variants
+  (`marketing_suite.sql` 94); the races **10/10** on a real Postgres 17.11 (MC3 now detects any lock wait: two calls
+  by one admin queue on the gate's counter row); `catch_up_check.mjs` passes, including APPLY_MARKETING pasted twice.
+  Console: `npm run verify` green (lint, types, **174 unit tests**, production build, bundle scan); end to end on a
+  freshly seeded local stack **22 passed** (every desktop spec, launch day included, and both phone specs: 360 px at
+  100 % and 200 % text, every post open; the screenshot tour is opt-in). Tool: **103 tests**.
+- **Design:** three critic rounds (REJECT 2.9 → REJECT 3.2 → REVISE 3.3, all hard gates passing in round 3), the
+  launch-day findings of round 3 and a second code review fixed after it; escalated to the owner (NEXT_TASKS).
+- **Review** (four code reviewers with skeptics, then the design critic): an open redirect in the sign-in return
+  (`/login?next=/.//host`) fixed in `safeNext` and again in the proxy; the race harness; a decision switching weeks;
+  client state carried across weeks; a post still in the apps after an undone approval; the budget counting upload
+  slots that can never be used; `missed` on posts already in the apps; the tool's resume, probe, launch details,
+  profiles, reused names, retries and dropped notes. All fixed with tests.
+
 ## Mission Control V1 — 2026-11-15 (database: PR #76, merged `889e636`; console: private repo `jerald23simagala/lucento-mission-control`, PR #1 merged `d24038f`)
 
 Owner: "I need my minimalist mission control done … Lets start building now" (Phase 4 go-ahead for the lean V1 in
