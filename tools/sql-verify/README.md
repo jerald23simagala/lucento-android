@@ -18,21 +18,42 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm run concur
 ```
 
 Exit code 0 means every check passed. Each suite runs on a fresh database; the output lists every check, for example
-`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (362 checks on 2026-11-15). Run both
-variants: a migration must be safe whichever default privileges the project has.
+`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (10 suites, 437 checks on
+2026-11-16). Run both variants: a migration must be safe whichever default privileges the project has.
 
 `node run.mjs <migrations dir> <suite.sql> [skip …]` runs one suite. By default it skips `usage_events_purge_schedule`,
 because PGlite has no `pg_cron`.
 
 `concurrency.mjs` races several real sessions against one limit (PGlite has a single connection): two first inserts of a
 new account, two transactions for the last places under a row ceiling, twenty writers at once, and forty anonymous usage
-counts against the daily total. It creates and drops its own database. CI runs it against a Postgres 17 service container
+counts against the daily total. For Marketing approvals (MC1–MC5) it races an approval against Claude's new version in
+both orders, two approvals of one post, two pushes of one pack, and Claude's feedback against a request being written:
+each time the second session waits for the marketing lock, then acts on what the first committed. It creates and drops
+its own database. CI runs it against a Postgres 17 service container
 (`.github/workflows/android.yml`, job `sql-verify`); locally any throwaway server works (the `embedded-postgres` npm
 package was used on Windows). Never point it at lucento-test or production.
 
+`catch_up_check.mjs` (run by hand: `node catch_up_check.mjs`) pastes the owner's SQL files the way the owner will: the
+lucento-test catch-up, `APPLY_MISSION_CONTROL.sql` and its VERIFY, and (part D) `APPLY_MARKETING.sql` twice on top with
+both VERIFY files all true; it also checks that `APPLY_MARKETING.sql` is current
+(`python tools/supabase/build_marketing_apply.py --check`).
+
 ## Suites
 
-- `mission_control_suite.sql` — Mission Control V1 (docs/mission-control/v1), 74 checks: the gate (customers, aal1,
+- `marketing_suite.sql` — Mission Control's Marketing approvals (docs/mission-control/v1/MARKETING_APPROVALS.md), 75
+  checks: who may call what (customers refused first by all 11 page functions, anon by none of them, signed-in callers by
+  none of the 4 ingest functions; the app's and the backup's secrets refused by Claude's, the marketing secret by the
+  console's file check); pushes (created, unchanged, version_changed, revised, version_out_of_order, withdrawn,
+  truth_failed, phase_required, slot outside the pack, contact details, quotas: 1 MB, 40 posts, 10 files, 20 versions,
+  30 pushes an hour, the 700 MB storage budget, another environment); NFC text; files (reuse across versions, pending,
+  ready, already, mismatch and a new pathname, unknown, clean-up that spares the version in the apps); every decision
+  and its refusals (stale_version, bad_state, not_ready, note rules and contact details, tags); in the apps, removed,
+  posted by hand; the derived flags around launch (any time on launch day, too early, apps stale, due soon, missed,
+  uploading and media missing); launch set and cleared (step-up, Manila time, limits); Claude's feedback (cursor, reset,
+  500 at a time, "Claude saw it", the shared lock); Claude's notes (once per version); redaction; the append-only log
+  and immutable versions; numbers; the badge; the audit; retention.
+
+- `mission_control_suite.sql` — Mission Control V1 (docs/mission-control/v1), 90 checks: the gate (customers, aal1,
   deactivated admins and anon refused; refusals logged at most 10 an hour; catalog-wide: anon runs only the ingest
   functions, PUBLIC nothing, no API role on any `mc` table); the append-only audit log (UPDATE, DELETE, TRUNCATE refused
   for its owner too); step-up from Auth's own session record and from the token's `amr`; complimentary grants (90 days,
