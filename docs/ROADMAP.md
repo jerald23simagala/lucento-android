@@ -229,6 +229,8 @@ recurring-schedule sync, syncing preferences.
 ## M3 — Budgets
 - Monthly overall + per-category limits, rollover option, progress bars, "safe to spend per day", 80%/100% states.
 - Deterministic period math (calendar months in user time zone, custom start day). Tests for edge months.
+  Calendar months are built. The custom start day and other budget periods (payday, weekly, biweekly) are planned as
+  Pro after launch: audited 2026-11-16, rules and outline in `docs/handover/NEXT_TASKS.md` › "Custom budget periods".
 
 ## M4 — Goals
 - Target amount/date, contributions (optionally linked to a savings wallet), progress, projected completion date

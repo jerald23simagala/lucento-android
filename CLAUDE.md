@@ -48,8 +48,9 @@ a better user-facing structure while preserving sound engineering boundaries.
 - Transfers are a single atomic DB transaction producing two linked legs (`transfer_group`); never double-count.
 - Financial definitions (budget, burn rate, net flow, goals, net worth, debts) live in `docs/CALCULATIONS.md`.
 - **The overall budget is always the sum of category allocations** (`BudgetPlanner`), per currency and calendar month.
-  Never add a separately editable overall amount; legacy "everything" rows are ignored. Home, Budget and Insights read
-  the same `BudgetPlan`.
+  Never add a separately editable overall amount; legacy "everything" rows are ignored. Home (and its widget), Budget
+  and Ask Lucento read the same `BudgetPlan`, built from the translated ledger (`FxTranslation.translate`): every budget
+  figure on a screen is computed from that ledger, never from the raw transaction or wallet lists.
 - Guard against duplicate submissions (in-flight flags, idempotency keys for imports).
 - New transactions are added only through the composer (`feature/capture`): `TransactionInterpreter` → `BatchReview`
   → `TransactionRepository.saveBatch` (atomic, one idempotency key per row). The full-page editor (`TransactionEditorScreen`, opened from
@@ -62,6 +63,9 @@ a better user-facing structure while preserving sound engineering boundaries.
 - Fresh installs seed income categories only; expense categories come from the mandatory onboarding step
   (`CategoryPresets` + `CategorySelection`). `DefaultCategories.all` is frozen (MIGRATION_1_2 depends on it).
 - Every version bump needs an explicit `Migration` plus a migration test. Never enable destructive fallback.
+- Budget periods other than calendar months (planned Pro) go in new tables, never new scope columns on `budgets`:
+  older app versions ignore unknown columns, would read such rows as every-month amounts, and their duplicate fold
+  would delete them (`docs/handover/NEXT_TASKS.md` › "Custom budget periods").
 
 ## Privacy & cost
 - Core features work fully offline. No mandatory paid APIs, accounts, cloud, or bank integrations.

@@ -149,6 +149,7 @@ fun BudgetScreen(
     val month = YearMonth.from(state.today).minusMonths(monthOffset.toLong())
     // Multicurrency: spending in other currencies counts toward the main-currency budget at its own value (owner,
     // 2026-11-05); FX gains and losses never do. The same figures as Home's budget card and the Transactions totals.
+    // Everything on this tab that reads spending (the plan, Safe per day, the month-kept moment) reads this ledger.
     val ledger = remember(state.primaryCurrency, state.wallets, state.transactions) {
         com.lucento.app.domain.fx.FxTranslation.translate(state.primaryCurrency, state.wallets, state.transactions)
     }
@@ -173,12 +174,12 @@ fun BudgetScreen(
     // A finished month kept within the category-based budget is acknowledged once (persisted), never for overspending.
     var celebration by remember { mutableStateOf<Confirmation?>(null) }
     var acknowledgedThisVisit by remember { mutableStateOf(false) }
-    LaunchedEffect(state.loading, state.acknowledgedBudgetMonth, state.budgets, state.transactions) {
+    LaunchedEffect(state.loading, state.acknowledgedBudgetMonth, state.budgets, ledger) {
         if (state.loading || acknowledgedThisVisit) return@LaunchedEffect
         val kept = BudgetMilestones.monthToAcknowledge(
             categories = state.categories,
             budgets = state.budgets,
-            transactions = state.transactions,
+            ledger = ledger,
             currencyCode = state.primaryCurrency,
             today = state.today,
             lastAcknowledged = state.acknowledgedBudgetMonth,
@@ -274,8 +275,8 @@ fun BudgetScreen(
 
             item(key = "summary") {
                 val burn = remember(plan, state.today) { BudgetPlanner.burn(plan, state.today) }
-                val daily = remember(plan, burn, state.transactions, state.wallets, state.budgets, state.schedules, state.categories) {
-                    budgetDailyFigure(plan, burn, state.today, state.transactions, state.wallets, state.budgets, state.schedules, state.categories)
+                val daily = remember(plan, burn, ledger, state.budgets, state.schedules, state.categories) {
+                    budgetDailyFigure(plan, burn, state.today, ledger, state.budgets, state.schedules, state.categories)
                 }
                 BudgetSummaryCard(plan, burn, isCurrentMonth = isCurrentMonth, daily = daily)
             }
