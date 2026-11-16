@@ -176,8 +176,8 @@ computed on an incoming card with the same function. The tool sends no hash.
   `by_hand = platforms` and `by_hand_done_at = now()` in one step, logged as `posted_by_hand` ("Posted late, by hand")
   and audited as marketing.posted_late; the same two launch refusals apply.
 - **Derived flags** (computed on read with the slot interval in the pack's tz):
-  - `replace_after_launch`: phase warmup, pday_at set, slot end > pday_at, and (state in waiting/changes/approved or
-    in_apps_version set). Urgent when in the apps.
+  - `replace_after_launch`: phase warmup, pday_at set, slot end > pday_at and > now() (one that already went out can't
+    be replaced), and (state in waiting/changes/approved or in_apps_version set). Urgent when in the apps.
   - `too_early`: phase launch, state not skipped/withdrawn, and pday_at null, or pday_at > slot start for a set time
     and ≥ slot end for an "any time" day (once Lucento is live that day, the rest of the day is fine)
     (`mc.marketing_launch_too_early`, which `marketing_apps` also uses to refuse `in_apps`).

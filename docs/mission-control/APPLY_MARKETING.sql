@@ -604,8 +604,9 @@ set search_path = ''
 as $$
   select c.id, c.pack_id, p.key, c.key, c.title, c.kind, c.phase, c.state, c.current_version, c.in_apps_version,
          c.position, c.slot_day, c.slot_time, c.slot_label, lower(s.slot), upper(s.slot), v.truth_pass, v.created_at, r.ready,
-         -- Says "coming soon" but goes out after launch (still to decide, approved, or already in the apps).
-         mc.marketing_after_launch(c.phase, s.slot, p_pday)
+         -- Says "coming soon" but goes out after launch (still to decide, approved, or already in the apps), while its
+         -- slot hasn't ended: one that already went out can't be replaced any more.
+         mc.marketing_after_launch(c.phase, s.slot, p_pday) and upper(s.slot) > now()
            and (c.state in ('waiting', 'changes', 'approved') or c.in_apps_version is not null),
          -- Says "Get it on Google Play" but goes out before launch (or launch hasn't been marked yet).
          c.state not in ('skipped', 'withdrawn') and mc.marketing_launch_too_early(c.phase, s.slot, c.slot_time is null, p_pday),

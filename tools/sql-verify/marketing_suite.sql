@@ -877,6 +877,18 @@ begin
                                and not s.replace_after_launch)
                  then 'ok  M44c a ''coming soon'' post after launch needs a launch version, not a yes: it isn''t "ready to approve" (badge) nor "needs a yes soon"'
                  else 'FAIL M44c ' || coalesce(v_m::text, '') end;
+  -- A 'coming soon' post that went out after launch (in the apps, its slot over) asks for nothing any more.
+  v_soon := (now() - interval '20 minutes') at time zone 'Asia/Manila';
+  perform pg_temp.push(pg_temp.mk_pack('F-pack', v_today - 3, jsonb_build_array(
+    pg_temp.mk_card('F-went-out', v_soon::date, jsonb_build_object('phase', 'warmup', 'slot_time', to_char(v_soon, 'HH24:MI'))))));
+  update mc.marketing_launch set pday_at = null where id;
+  perform pg_temp.decide(pg_temp.cid('F-pack', 'F-went-out'), 1, 'approve');
+  perform pg_temp.apps(pg_temp.cid('F-pack', 'F-went-out'), 1, 'in_apps');
+  update mc.marketing_launch set pday_at = v_pday_at where id;
+  r := r || case when (select not s.replace_after_launch from mc.marketing_status(mc.marketing_pday()) s where s.card_key = 'F-went-out')
+                      and (select in_apps_version = 1 from mc.marketing_cards where id = pg_temp.cid('F-pack', 'F-went-out'))
+                 then 'ok  M44e a ''coming soon'' post that already went out after launch isn''t flagged for replacement any more'
+                 else 'FAIL M44e ' || coalesce((select row_to_json(s)::text from mc.marketing_status(mc.marketing_pday()) s where s.card_key = 'F-went-out'), 'none') end;
   v_j := pg_temp.decide(pg_temp.cid('F-pack', 'F-missed'), 1, 'approve');
   v_k := pg_temp.apps(pg_temp.cid('F-pack', 'F-missed'), 1, 'posted_late');
   v_m := pg_temp.apps(pg_temp.cid('F-pack', 'F-missed'), 1, 'posted_late');
