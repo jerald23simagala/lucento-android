@@ -24,7 +24,7 @@ declare
   v_pday_local timestamp; v_pday_day date; v_pday_text text; v_soon timestamp;
   v_hash bigint := hashtextextended('mc.marketing', 0);
   v_fn record; v_sql text;
-  v_g uuid; v_g2 uuid; v_paths text[]; v_q jsonb;
+  v_g uuid; v_g2 uuid; v_paths text[]; v_q jsonb; v_pday_at timestamptz;
 begin
   -- ======================================================================== helpers
   create function pg_temp.as_admin(p_uid uuid, p_session uuid, p_aal text, p_totp_age interval) returns void language plpgsql as $f$
@@ -828,8 +828,19 @@ begin
                  then 'ok  M43c an "any time" launch post on launch day isn''t too early once Lucento is live that day: it can be scheduled'
                  else 'FAIL M43c ' || coalesce(pg_temp.cardj(v_b, 'F-launch-anytime') -> 'flags', 'null'::jsonb)::text || ' '
                       || coalesce(v_k::text, '') || ' ' || coalesce(v_m::text, '') end;
-  perform pg_temp.decide(pg_temp.cid('F-pack', 'F-anytime'), 1, 'approve');
+  -- After launch a 'coming soon' post can be approved but not scheduled; "I posted it" for it is refused too.
+  v_j := pg_temp.decide(pg_temp.cid('F-pack', 'F-anytime'), 1, 'approve');
+  v_k := pg_temp.apps(pg_temp.cid('F-pack', 'F-anytime'), 1, 'in_apps');
+  v_m := pg_temp.apps(pg_temp.cid('F-pack', 'F-anytime'), 1, 'posted_late');
+  r := r || case when (v_j ->> 'ok')::boolean and v_k ->> 'error' = 'launch_version_needed' and v_m ->> 'error' = 'launch_version_needed'
+                      and (select in_apps_version is null from mc.marketing_cards where id = pg_temp.cid('F-pack', 'F-anytime'))
+                 then 'ok  M43d after launch a ''coming soon'' post can be approved but not scheduled or marked posted (launch_version_needed)'
+                 else 'FAIL M43d ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') || ' ' || coalesce(v_m::text, '') end;
+  -- It was scheduled before launch, as a real one would be: the launch then flags it for replacement.
+  select pday_at into v_pday_at from mc.marketing_launch where id;
+  update mc.marketing_launch set pday_at = null where id;
   perform pg_temp.apps(pg_temp.cid('F-pack', 'F-anytime'), 1, 'in_apps');
+  update mc.marketing_launch set pday_at = v_pday_at where id;
   v_j := pg_temp.preview(v_pday_text);
   r := r || case when (v_j ->> 'replace_after_launch')::integer = 1 and (v_j ->> 'in_apps_after_launch')::integer = 1
                  then 'ok  M44 the count says how many of them are already in the apps' else 'FAIL M44 ' || coalesce(v_j::text, '') end;
@@ -839,10 +850,12 @@ begin
       jsonb_build_object('phase', 'warmup', 'slot_time', to_char(time '08:00' + v_n * interval '1 hour', 'HH24:MI'))));
   end loop;
   perform pg_temp.push(pg_temp.mk_pack('F-pack', v_today - 3, v_cards));
+  update mc.marketing_launch set pday_at = null where id;
   for v_n in 1..12 loop
     perform pg_temp.decide(pg_temp.cid('F-pack', 'F-many-' || lpad(v_n::text, 2, '0')), 1, 'approve');
     perform pg_temp.apps(pg_temp.cid('F-pack', 'F-many-' || lpad(v_n::text, 2, '0')), 1, 'in_apps');
   end loop;
+  update mc.marketing_launch set pday_at = v_pday_at where id;
   v_m := pg_temp.summary();
   v_x := (select count(*) from mc.marketing_status(mc.marketing_pday()) s
           where s.replace_after_launch and s.in_apps_version is not null and (s.slot_end is null or s.slot_end > now()));
@@ -852,6 +865,31 @@ begin
                       and (v_m #>> '{counts,replace_after_launch_in_apps}')::integer <= (v_m #>> '{counts,replace_after_launch}')::integer
                  then 'ok  M44b the summary counts every "coming soon" post to replace that is already in the apps, beyond the 10 it lists'
                  else 'FAIL M44b ' || coalesce(v_m -> 'counts', 'null'::jsonb)::text || ' live ' || coalesce(v_x::text, 'null') end;
+  perform pg_temp.push(pg_temp.mk_pack('F-pack', v_today - 3, jsonb_build_array(
+    pg_temp.mk_card('F-soon-warm', v_soon::date, jsonb_build_object('phase', 'warmup', 'slot_time', to_char(v_soon, 'HH24:MI'))))));
+  v_m := pg_temp.summary();
+  r := r || case when not pg_temp.has(v_m -> 'needs_decision_soon', 'F-soon-warm')
+                      and (select count(*) from mc.marketing_status(mc.marketing_pday()) s
+                           where s.card_key = 'F-soon-warm' and s.replace_after_launch and not s.needs_decision_soon) = 1
+                      and (mc.marketing_waiting() ->> 'count')::integer
+                          = (select count(*) from mc.marketing_status(mc.marketing_pday()) s
+                             where s.state = 'waiting' and s.truth_pass and s.ready and (s.slot_end is null or s.slot_end > now())
+                               and not s.replace_after_launch)
+                 then 'ok  M44c a ''coming soon'' post after launch needs a launch version, not a yes: it isn''t "ready to approve" (badge) nor "needs a yes soon"'
+                 else 'FAIL M44c ' || coalesce(v_m::text, '') end;
+  v_j := pg_temp.decide(pg_temp.cid('F-pack', 'F-missed'), 1, 'approve');
+  v_k := pg_temp.apps(pg_temp.cid('F-pack', 'F-missed'), 1, 'posted_late');
+  v_m := pg_temp.apps(pg_temp.cid('F-pack', 'F-missed'), 1, 'posted_late');
+  r := r || case when (v_j ->> 'ok')::boolean and (v_k ->> 'ok')::boolean
+                      and (select in_apps_version = 1 and by_hand = platforms and by_hand_done_at is not null
+                           from mc.marketing_cards where id = pg_temp.cid('F-pack', 'F-missed'))
+                      and exists (select 1 from mc.marketing_log l where l.card_id = pg_temp.cid('F-pack', 'F-missed')
+                                    and l.kind = 'posted_by_hand' and l.note = 'Posted late, by hand')
+                      and not exists (select 1 from mc.marketing_log l where l.card_id = pg_temp.cid('F-pack', 'F-missed') and l.kind = 'in_apps')
+                      and exists (select 1 from mc.audit_log where action = 'marketing.posted_late' and result = 'ok')
+                      and v_m ->> 'error' = 'bad_state'
+                 then 'ok  M44d "I posted it" on a slot that passed is recorded as posted by hand (now), never as scheduled; a second tap is refused'
+                 else 'FAIL M44d ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') || ' ' || coalesce(v_m::text, '') end;
   v_j := jsonb_build_array(
     pg_temp.launch(to_char((now() + interval '2 hours') at time zone 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI')) ->> 'error',
     pg_temp.launch(to_char((now() - interval '8 days') at time zone 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI')) ->> 'error',
@@ -1329,10 +1367,11 @@ begin
   -- ======================================================================== S: the audit
   select string_agg(a, ',' order by a) into v_t from (
     select distinct substr(action, 11) as a from mc.audit_log where action like 'marketing.%' and result = 'ok') x;
-  r := r || case when v_t = 'approve,in_apps,launch_cleared,launch_set,media_deleted,numbers,posted_by_hand,redact_note,removed_from_apps,request_change,skip,undo'
+  r := r || case when v_t = 'approve,in_apps,launch_cleared,launch_set,media_deleted,numbers,posted_by_hand,posted_late,redact_note,removed_from_apps,request_change,skip,undo'
                       and not exists (select 1 from mc.audit_log where action like 'marketing.%' and target_user_id is not null)
                       and not exists (select 1 from mc.audit_log where action in ('marketing.approve', 'marketing.request_change', 'marketing.skip',
-                                        'marketing.undo', 'marketing.in_apps', 'marketing.removed_from_apps', 'marketing.posted_by_hand')
+                                        'marketing.undo', 'marketing.in_apps', 'marketing.removed_from_apps', 'marketing.posted_by_hand',
+                                        'marketing.posted_late')
                                       and target_ref !~ '^[^/]+/[^ ]+ v[0-9]+$')
                       and exists (select 1 from mc.audit_log where action = 'marketing.request_change' and admin_id = v_admin
                                   and target_ref = '2026-W48/W48-1-sweldo v1' and detail = 'caption,timing')

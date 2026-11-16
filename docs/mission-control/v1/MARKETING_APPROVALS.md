@@ -169,16 +169,23 @@ computed on an incoming card with the same function. The tool sends no hash.
   is `unchanged`; any other push to a withdrawn card is refused (`withdrawn`: use a new card key).
 - **In the apps** (owner): `in_apps` sets `in_apps_version = current_version` and `by_hand = p_by_hand` (approved
   only; refused with `launch_not_live` for a launch post while it would go out too early, the same rule as the
-  `too_early` flag: approving it ahead of launch stays allowed); `removed_from_apps` clears both (any state, when
-  `in_apps_version` is set); `posted_by_hand` sets `by_hand_done_at` (after the slot started).
+  `too_early` flag, and with `launch_version_needed` for a 'coming soon' post whose slot is after launch, the same rule
+  as `replace_after_launch` (`mc.marketing_after_launch`): approving either stays allowed); `removed_from_apps` clears
+  both (any state, when `in_apps_version` is set); `posted_by_hand` sets `by_hand_done_at` (after the slot started);
+  `posted_late` ("I posted it" on an approved post never scheduled, once its slot began) sets `in_apps_version`,
+  `by_hand = platforms` and `by_hand_done_at = now()` in one step, logged as `posted_by_hand` ("Posted late, by hand")
+  and audited as marketing.posted_late; the same two launch refusals apply.
 - **Derived flags** (computed on read with the slot interval in the pack's tz):
   - `replace_after_launch`: phase warmup, pday_at set, slot end > pday_at, and (state in waiting/changes/approved or
     in_apps_version set). Urgent when in the apps.
-  - `too_early`: phase launch, state not skipped/withdrawn, and pday_at null or > slot start
+  - `too_early`: phase launch, state not skipped/withdrawn, and pday_at null, or pday_at > slot start for a set time
+    and ≥ slot end for an "any time" day (once Lucento is live that day, the rest of the day is fine)
     (`mc.marketing_launch_too_early`, which `marketing_apps` also uses to refuse `in_apps`).
   - `apps_stale`: in_apps_version set and (in_apps_version < current_version or state in skipped/withdrawn).
-  - `due_soon`: approved, in_apps_version null, slot start < now()+36 h and slot end > now().
-  - `needs_decision_soon`: state in waiting/changes, slot start < now()+36 h, slot end > now() (warn < 36 h, bad < 12 h).
+  - `due_soon`: approved, in_apps_version null, allowed to be scheduled (not too early, not after launch for a
+    'coming soon' post), slot start < now()+36 h and slot end > now().
+  - `needs_decision_soon`: state waiting (a post with Claude, or a 'coming soon' one that needs a launch version, isn't
+    waiting for a yes), slot start < now()+36 h, slot end > now() (warn < 36 h, bad < 12 h).
   - `missed`: state in waiting/changes, not in the apps (in_apps_version null: a post in the apps went out at its
     slot) and slot end ≤ now() (leaves the badge; offers skip).
   - `media_missing`: current version not ready and the version is older than 2 hours (else "Uploading").
@@ -202,7 +209,7 @@ only, not security definer).
 |---|---|---|
 | `marketing_board(p_pack text)` | ('marketing.read', false, null) | section 5.4 |
 | `marketing_decide(p_card uuid, p_version int, p_decision text, p_note text, p_tags text[])` | ('marketing.decide', false, 300) | decision in ('approve','request_change','skip','undo'); audits marketing.approve / request_change / skip / undo; returns `{ok, state, cleanup: [pathnames]}` (files no current or in-apps version references, on approve and skip) |
-| `marketing_apps(p_card uuid, p_version int, p_action text, p_by_hand text[])` | ('marketing.apps', false, 300) | action in ('in_apps','removed_from_apps','posted_by_hand'); `in_apps` on a launch post that is still too early → `launch_not_live`; audits marketing.in_apps / removed_from_apps / posted_by_hand |
+| `marketing_apps(p_card uuid, p_version int, p_action text, p_by_hand text[])` | ('marketing.apps', false, 300) | action in ('in_apps','removed_from_apps','posted_by_hand','posted_late'); `in_apps`/`posted_late` on a launch post that is still too early → `launch_not_live`, on a 'coming soon' post after launch → `launch_version_needed`; audits marketing.in_apps / removed_from_apps / posted_by_hand / posted_late |
 | `marketing_set_launch(p_local text)` | ('marketing.launch', true, 10) | step-up (fresh code); `p_local` 'YYYY-MM-DDTHH:MM' Manila or null to clear; converted `(p_local::timestamp) at time zone mc.tz()`; refuses > 1 h ahead or > 7 days back; returns `{ok, pday_at, replace_after_launch, in_apps_after_launch, too_early}`; audits marketing.launch_set / launch_cleared |
 | `marketing_launch_preview(p_local text)` | ('marketing.read', false, null) | what setting that moment would flag (for the confirm step) |
 | `marketing_save_numbers(p_pack text, p_followers jsonb, p_views jsonb, p_installs int, p_visitors int)` | ('marketing.numbers', false, 60) | audits marketing.numbers |
@@ -212,7 +219,8 @@ only, not security definer).
 | `marketing_file(p_file uuid)` | ('marketing.read', false, null) | `{ok, pathname, file_name, content_type, ready, deleted}` for the gated download route; `not_found` otherwise |
 
 `mc_api.nav_badges()` is recreated with its full current body plus key `marketing`: cards waiting with a ready, passing
-current version and a slot that hasn't ended.
+current version and a slot that hasn't ended, leaving out 'coming soon' posts that need a launch version (the page's
+"to approve" count follows the same rule).
 
 Refusal codes and the console's words:
 | Code | Owner-facing text |
@@ -224,6 +232,8 @@ Refusal codes and the console's words:
 | note_required | "Say what should change, in a few words." |
 | note_has_contact | "Leave out names, e-mail addresses and phone numbers." |
 | not_in_apps | "This post isn't marked as in the apps." |
+| launch_version_needed | "Ask Claude for a launch version first: this post says 'coming soon' and its slot is after launch." (The card shows the same words instead of the scheduling form.) |
+| quota (from "Bring it back") | "Mission Control's file storage is full, so this post's files can't come back yet. Decide or skip older posts so their files can go, then bring it back." |
 | launch_not_live | "Mark Lucento as live first (below the posts): this post says 'Get it on Google Play'." (The card itself shows "Schedule this after you mark Lucento as live (below the posts)." instead of the scheduling form, so the refusal only meets a stale page.) |
 | launch_future / launch_too_old | "Set this once Lucento is live (not more than an hour ahead)." / "That's more than 7 days ago." |
 
@@ -231,7 +241,7 @@ Refusal codes and the console's words:
 | Function | Secret | Purpose |
 |---|---|---|
 | `ingest_marketing_pack(p_secret text, p_env text, p_pack jsonb)` | marketing | upsert pack and cards, create versions, files and slots |
-| `ingest_marketing_pending(p_secret text, p_pathnames text[])` | marketing | the subset of pathnames still to come (≤ 60; §3.5), with content type and bytes; used before issuing an upload token and before checking files |
+| `ingest_marketing_pending(p_secret text, p_pathnames text[], p_purpose text default 'upload')` | marketing | `upload`: the subset of pathnames still to come (≤ 60; §3.5), with content type and bytes, used before issuing an upload token; `record`: any file of a current version not recorded yet unless its post was taken out (one may reach the store just before the owner skips its post), used by `/uploaded` before checking files |
 | `ingest_marketing_media_ready(p_app_secret text, p_items jsonb)` | **app** (MC_INGEST_SECRET, held by the console only) | record files the console found in the store |
 | `ingest_marketing_feedback(p_secret text, p_db text, p_since bigint)` | marketing | decisions since the cursor, open requests, flags; stamps claude_checked_at |
 

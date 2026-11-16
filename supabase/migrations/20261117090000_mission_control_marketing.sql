@@ -564,6 +564,17 @@ as $$
            or case when p_whole_day then p_pday >= upper(p_slot) else p_pday > lower(p_slot) end), false)
 $$;
 
+-- A warm-up post ("coming soon") whose slot ends after the launch moment: it would say 'coming soon' once Lucento is
+-- live. The replace_after_launch flag reads it, and so does marketing_apps, which refuses "I've scheduled it" for it.
+create or replace function mc.marketing_after_launch(p_phase text, p_slot tstzrange, p_pday timestamptz)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_phase = 'warmup' and p_pday is not null and upper(p_slot) > p_pday, false)
+$$;
+
 -- Every post with its slot and its derived flags (§4), for a given launch moment: the stored one, or one the owner is
 -- about to confirm (the launch preview). One place for every rule, read by the board, the summary, the badge and
 -- Claude's feedback. p_card narrows it to one post.
@@ -583,16 +594,21 @@ as $$
   select c.id, c.pack_id, p.key, c.key, c.title, c.kind, c.phase, c.state, c.current_version, c.in_apps_version,
          c.position, c.slot_day, c.slot_time, c.slot_label, lower(s.slot), upper(s.slot), v.truth_pass, v.created_at, r.ready,
          -- Says "coming soon" but goes out after launch (still to decide, approved, or already in the apps).
-         coalesce(c.phase = 'warmup' and p_pday is not null and upper(s.slot) > p_pday
-                  and (c.state in ('waiting', 'changes', 'approved') or c.in_apps_version is not null), false),
+         mc.marketing_after_launch(c.phase, s.slot, p_pday)
+           and (c.state in ('waiting', 'changes', 'approved') or c.in_apps_version is not null),
          -- Says "Get it on Google Play" but goes out before launch (or launch hasn't been marked yet).
          c.state not in ('skipped', 'withdrawn') and mc.marketing_launch_too_early(c.phase, s.slot, c.slot_time is null, p_pday),
          -- The apps hold an older version, or a post that is skipped or taken out.
          coalesce(c.in_apps_version is not null
                   and (c.in_apps_version < c.current_version or c.state in ('skipped', 'withdrawn')), false),
+         -- Approved, not in the apps, and allowed to be scheduled (not a launch post before launch, nor a 'coming soon'
+         -- one after it), within 36 hours.
          coalesce(c.state = 'approved' and c.in_apps_version is null
-                  and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now(), false),
-         coalesce(c.state in ('waiting', 'changes')
+                  and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now()
+                  and not mc.marketing_launch_too_early(c.phase, s.slot, c.slot_time is null, p_pday)
+                  and not mc.marketing_after_launch(c.phase, s.slot, p_pday), false),
+         -- Waiting for the owner's yes within 36 hours (a post with Claude, or one that needs a launch version, isn't).
+         coalesce(c.state = 'waiting' and not mc.marketing_after_launch(c.phase, s.slot, p_pday)
                   and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now(), false),
          -- Passed without a yes, and not in the apps (a post in the apps went out at its slot).
          coalesce(c.state in ('waiting', 'changes') and c.in_apps_version is null and upper(s.slot) <= now(), false),
@@ -642,6 +658,7 @@ as $$
   select jsonb_build_object('count', count(*), 'first_slot', min(s.slot_start))
   from mc.marketing_status(mc.marketing_pday()) s
   where s.state = 'waiting' and s.truth_pass and s.ready and (s.slot_end is null or s.slot_end > now())
+    and not s.replace_after_launch
 $$;
 
 -- The posts one flag points at, among those that haven't gone out yet: how many, and the first p_limit by slot.
@@ -1826,7 +1843,7 @@ begin
     return mc.refused(v_refusal);
   end if;
   perform mc.marketing_lock();
-  if p_action is null or p_action not in ('in_apps', 'removed_from_apps', 'posted_by_hand') then
+  if p_action is null or p_action not in ('in_apps', 'removed_from_apps', 'posted_by_hand', 'posted_late') then
     return mc.failed('invalid', 'Unknown action');
   end if;
   select * into v_c from mc.marketing_cards c where c.id = p_card for update;
@@ -1848,6 +1865,9 @@ begin
     if mc.marketing_launch_too_early(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), v_c.slot_time is null, mc.marketing_pday()) then
       return mc.failed('launch_not_live', 'Mark Lucento as live first: this post says ''Get it on Google Play''.');
     end if;
+    if mc.marketing_after_launch(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), mc.marketing_pday()) then
+      return mc.failed('launch_version_needed', 'This post says ''coming soon'' and its slot is after launch: ask Claude for a launch version first.');
+    end if;
     v_wanted := array(select mc.marketing_text(h) from unnest(coalesce(p_by_hand, '{}'::text[])) h);
     if not mc.text_items_ok(v_wanted, 8, 60) or not (v_wanted <@ v_c.platforms) then
       return mc.failed('invalid', 'Choose the platforms you post by hand among this post''s platforms');
@@ -1862,6 +1882,31 @@ begin
     end if;
     v_version := v_c.current_version;
     v_note := case when cardinality(v_by_hand) > 0 then 'By hand at the time: ' || array_to_string(v_by_hand, ', ') end;
+  elsif p_action = 'posted_late' then
+    -- Approved but never scheduled, and its slot has begun: the owner posted it by hand (late). Recorded as posted by hand
+    -- on every platform, not as scheduled in the apps.
+    if v_c.state <> 'approved' or v_c.in_apps_version is not null then
+      return mc.failed('bad_state', 'This post changed on another device. Reload to see it.')
+        || jsonb_build_object('state', v_c.state);
+    end if;
+    if lower(mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz)) > now() then
+      return mc.failed('bad_state', 'Its time hasn''t come yet: schedule it instead.');
+    end if;
+    if mc.marketing_launch_too_early(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), v_c.slot_time is null, mc.marketing_pday()) then
+      return mc.failed('launch_not_live', 'Mark Lucento as live first: this post says ''Get it on Google Play''.');
+    end if;
+    if mc.marketing_after_launch(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), mc.marketing_pday()) then
+      return mc.failed('launch_version_needed', 'This post says ''coming soon'' and its slot is after launch: ask Claude for a launch version first.');
+    end if;
+    update mc.marketing_cards c
+      set in_apps_version = c.current_version, by_hand = c.platforms, by_hand_done_at = now(), updated_at = now()
+      where c.id = p_card and c.current_version = p_version and c.state = 'approved' and c.in_apps_version is null
+      returning * into v_c;
+    if not found then
+      return mc.failed('bad_state', 'This post changed on another device. Reload to see it.');
+    end if;
+    v_version := v_c.current_version;
+    v_note := 'Posted late, by hand';
   elsif p_action = 'removed_from_apps' then
     if v_c.in_apps_version is null then
       return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
@@ -1896,7 +1941,7 @@ begin
     end if;
   end if;
   insert into mc.marketing_log (card_id, version, kind, note, actor, admin_id)
-    values (v_c.id, v_version, p_action, v_note, 'admin', auth.uid());
+    values (v_c.id, v_version, case when p_action = 'posted_late' then 'posted_by_hand' else p_action end, v_note, 'admin', auth.uid());
   perform mc.audit('marketing.' || p_action, null, v_pack || '/' || v_c.key || ' v' || v_version, null, 'ok',
     jsonb_build_object('in_apps_version', v_before.in_apps_version, 'by_hand', v_before.by_hand),
     jsonb_build_object('in_apps_version', v_c.in_apps_version, 'by_hand', v_c.by_hand));
