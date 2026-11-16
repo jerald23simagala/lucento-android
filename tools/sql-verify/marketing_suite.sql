@@ -86,6 +86,14 @@ begin
     execute 'reset role';
     return v;
   end $f$;
+  create function pg_temp.pending_for(p_paths text[], p_purpose text) returns jsonb language plpgsql as $f$
+  declare v jsonb;
+  begin
+    perform pg_temp.as_anon();
+    v := mc_api.ingest_marketing_pending(current_setting('verify.mkt'), p_paths, p_purpose);
+    execute 'reset role';
+    return v;
+  end $f$;
   create function pg_temp.ready(p_items jsonb) returns jsonb language plpgsql as $f$
   declare v jsonb;
   begin
@@ -809,6 +817,17 @@ begin
                       and (select in_apps_version is null from mc.marketing_cards where id = pg_temp.cid('F-pack', 'F-launch-past'))
                  then 'ok  M43b after launch it can be scheduled; a launch post whose slot started before Lucento went live still can''t'
                  else 'FAIL M43b ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') || ' ' || coalesce(v_m::text, '') end;
+  v_j := pg_temp.push(pg_temp.mk_pack('F-pack', v_today - 3, jsonb_build_array(
+    pg_temp.mk_card('F-launch-anytime', v_pday_day, jsonb_build_object('phase', 'launch', 'kind', 'group', 'slot_time', null)))));
+  v_b := pg_temp.board('F-pack');
+  v_k := pg_temp.decide(pg_temp.cid('F-pack', 'F-launch-anytime'), 1, 'approve');
+  v_m := pg_temp.apps(pg_temp.cid('F-pack', 'F-launch-anytime'), 1, 'in_apps');
+  r := r || case when pg_temp.res(v_j, 'F-launch-anytime') ->> 'result' = 'created'
+                      and not (pg_temp.cardj(v_b, 'F-launch-anytime') #>> '{flags,too_early}')::boolean
+                      and (v_k ->> 'ok')::boolean and (v_m ->> 'ok')::boolean
+                 then 'ok  M43c an "any time" launch post on launch day isn''t too early once Lucento is live that day: it can be scheduled'
+                 else 'FAIL M43c ' || coalesce(pg_temp.cardj(v_b, 'F-launch-anytime') -> 'flags', 'null'::jsonb)::text || ' '
+                      || coalesce(v_k::text, '') || ' ' || coalesce(v_m::text, '') end;
   perform pg_temp.decide(pg_temp.cid('F-pack', 'F-anytime'), 1, 'approve');
   perform pg_temp.apps(pg_temp.cid('F-pack', 'F-anytime'), 1, 'in_apps');
   v_j := pg_temp.preview(v_pday_text);
@@ -1182,20 +1201,23 @@ begin
     pg_temp.mk_card('S5', v_today - 9, jsonb_build_object('media',
       (select jsonb_agg(pg_temp.mk_media('s5-' || g || '.mp4', 'video/mp4', 104857600, 'big-s5-' || g)) from generate_series(1, 4) g))))));
   v_m := pg_temp.pending(v_paths);
-  perform pg_temp.decide(v_g, 1, 'undo');
+  v_j := pg_temp.pending_for(v_paths, 'record');
+  v_cards := pg_temp.decide(v_g, 1, 'undo');
   v_b := pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(v_q,
     pg_temp.mk_card('S6', v_today - 9, jsonb_build_object('media', jsonb_build_array(pg_temp.mk_media('s6.png', 'image/png', 1000, 'img-s6')))))));
   r := r || case when pg_temp.res(v_k, 'S4') ->> 'result' = 'unchanged' and pg_temp.res(v_k, 'S4') ->> 'state' = 'skipped'
                       and pg_temp.res(v_k, 'S5') ->> 'result' = 'created'
                       and not exists (select 1 from jsonb_array_elements(v_k -> 'uploads') u where u ->> 'card' = 'S4')
                       and jsonb_array_length(v_m -> 'pending') = 0
-                      and pg_temp.res(v_b, 'S4') ->> 'state' = 'waiting'
-                      and (select array_agg(u ->> 'pathname' order by u ->> 'pathname') from jsonb_array_elements(v_b -> 'uploads') u
-                           where u ->> 'card' = 'S4') = v_paths
-                      and jsonb_array_length(pg_temp.pending(v_paths) -> 'pending') = 4
-                      and pg_temp.res(v_b, 'S6') ->> 'reason' = 'quota'
-                 then 'ok  M68c a skipped post''s videos that never arrived are no longer asked for and hold no room; "Bring it back" asks for the same files again and counts them'
-                 else 'FAIL M68c ' || left(pg_temp.reasons(v_k)::text || ' ' || pg_temp.reasons(v_b)::text || ' ' || coalesce(v_m::text, ''), 400) end;
+                      and v_cards ->> 'error' = 'quota' and (select state = 'skipped' from mc.marketing_cards where id = v_g)
+                      and pg_temp.res(v_b, 'S4') ->> 'state' = 'skipped'
+                      and not exists (select 1 from jsonb_array_elements(v_b -> 'uploads') u where u ->> 'card' = 'S4')
+                      and pg_temp.res(v_b, 'S6') ->> 'result' = 'created'
+                 then 'ok  M68c a skipped post''s videos that never arrived hold no room and aren''t asked for; "Bring it back" is refused (quota) while they wouldn''t fit'
+                 else 'FAIL M68c ' || left(pg_temp.reasons(v_k)::text || ' ' || pg_temp.reasons(v_b)::text || ' ' || coalesce(v_cards::text, ''), 400) end;
+  r := r || case when jsonb_array_length(v_j -> 'pending') = 4
+                 then 'ok  M70 a skipped post''s file can still be recorded if it reached the store just before the skip ("record"), never handed a new upload ("upload")'
+                 else 'FAIL M70 ' || coalesce(v_j::text, '') end;
   v_k := pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(
     pg_temp.mk_card('S5', v_today - 9, jsonb_build_object('version', 2, 'changes', 'One picture instead of four videos',
       'media', jsonb_build_array(pg_temp.mk_media('s5.png', 'image/png', 1000, 'img-s5')))),
@@ -1208,6 +1230,41 @@ begin
                       and (select count(*) from jsonb_array_elements(v_k -> 'uploads') u where u ->> 'card' = 'S5') = 1
                  then 'ok  M68d a new version without the videos that never arrived frees their room (they are no longer asked for)'
                  else 'FAIL M68d ' || left(pg_temp.reasons(v_k)::text, 300) end;
+  -- Files coming back are counted before they can be asked for again: a skipped post revived with its videos, a version
+  -- going back to videos that never arrived, and "Bring it back" are refused while they wouldn't fit, and work once they do.
+  v_j := pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(
+    pg_temp.mk_card('S8', v_today - 9, jsonb_build_object('media',
+      (select jsonb_agg(pg_temp.mk_media('s8-' || g || '.mp4', 'video/mp4', 104857600, 'big-s8-' || g)) from generate_series(1, 2) g))))));
+  v_k := pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(
+    pg_temp.mk_card('S4', v_today - 9, jsonb_build_object('version', 2, 'changes', 'Back, with the same videos', 'revive', true,
+      'media', (select jsonb_agg(pg_temp.mk_media('s4-' || g || '.mp4', 'video/mp4', 104857600, 'big-s4-' || g)) from generate_series(1, 4) g))),
+    pg_temp.mk_card('S5', v_today - 9, jsonb_build_object('version', 3, 'changes', 'Back to the four videos',
+      'media', (select jsonb_agg(pg_temp.mk_media('s5-' || g || '.mp4', 'video/mp4', 104857600, 'big-s5-' || g)) from generate_series(1, 4) g))))));
+  v_m := pg_temp.decide(v_g, 1, 'undo');
+  perform pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(
+    pg_temp.mk_card('S8', v_today - 9, jsonb_build_object('withdrawn', true, 'withdrawn_reason', 'Room for another post')))));
+  v_b := pg_temp.decide(v_g, 1, 'undo');
+  select array_agg(f.pathname order by f.pathname) into v_paths from mc.marketing_files f where f.card_id = v_g;
+  r := r || case when pg_temp.res(v_j, 'S8') ->> 'result' = 'created'
+                      and pg_temp.res(v_k, 'S4') ->> 'reason' = 'quota' and pg_temp.res(v_k, 'S5') ->> 'reason' = 'quota'
+                      and (select current_version = 2 from mc.marketing_cards where id = pg_temp.cid('S-pack', 'S5'))
+                      and v_m ->> 'error' = 'quota'
+                      and (v_b ->> 'ok')::boolean and (select state = 'waiting' and current_version = 1 from mc.marketing_cards where id = v_g)
+                      and jsonb_array_length(pg_temp.pending(v_paths) -> 'pending') = 4
+                 then 'ok  M68e a skipped post revived with its videos, a version going back to videos that never arrived, and "Bring it back" are refused while they wouldn''t fit (quota), and work once they do'
+                 else 'FAIL M68e ' || left(pg_temp.reasons(v_k)::text || ' ' || coalesce(v_m::text, '') || ' ' || coalesce(v_b::text, ''), 400) end;
+  -- A change asked while the videos upload: they are still asked for (and counted). A file that expired counts no more.
+  perform pg_temp.decide(pg_temp.cid('S-pack', 'S7'), 1, 'request_change', 'Shorter, please', array['video']);
+  select array_agg(f.pathname order by f.pathname) into v_paths from mc.marketing_files f where f.card_id = pg_temp.cid('S-pack', 'S7');
+  v_m := pg_temp.pending(v_paths);
+  update mc.marketing_files set ready = true, uploaded_at = now() - interval '31 days', expires_at = now() - interval '1 minute'
+    where pathname = v_paths[1];
+  r := r || case when (select state = 'changes' from mc.marketing_cards where id = pg_temp.cid('S-pack', 'S7'))
+                      and jsonb_array_length(v_m -> 'pending') = 2
+                      and not mc.marketing_file_held((select id from mc.marketing_files where pathname = v_paths[1]))
+                      and mc.marketing_file_held((select id from mc.marketing_files where pathname = v_paths[2]))
+                 then 'ok  M68f a post with a change asked still has its videos asked for and counted; a file that expired in the store counts no more'
+                 else 'FAIL M68f ' || coalesce(v_m::text, '') end;
   update mc.marketing_files set deleted_at = now() where pathname like 'marketing/test/S-pack/%';
   v_j := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, jsonb_build_array(pg_temp.mk_card('Q-env', v_today, '{}'))), 'local');
   v_k := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, jsonb_build_array(pg_temp.mk_card('Q-env', v_today, '{}'))), 'staging');

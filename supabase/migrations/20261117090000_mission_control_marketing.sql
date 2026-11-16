@@ -549,15 +549,19 @@ as $$
   select l.pday_at from mc.marketing_launch l where l.id
 $$;
 
--- A launch post ("Get it on Google Play") that mustn't go out yet: Lucento isn't marked live, or its slot starts
--- before that moment. The too_early flag reads it, and so does marketing_apps, which refuses "I've scheduled it" for it.
-create or replace function mc.marketing_launch_too_early(p_phase text, p_slot_start timestamptz, p_pday timestamptz)
+-- A launch post ("Get it on Google Play") that mustn't go out yet: Lucento isn't marked live, or its slot comes before
+-- that moment. A set time is judged by its start; an "any time" day by its end, so once Lucento is live that day the
+-- rest of the day is fine (the 'coming soon' rule judges a day by its end too). The too_early flag reads it, and so does
+-- marketing_apps, which refuses "I've scheduled it" for it.
+drop function if exists mc.marketing_launch_too_early(text, timestamptz, timestamptz);
+create or replace function mc.marketing_launch_too_early(p_phase text, p_slot tstzrange, p_whole_day boolean, p_pday timestamptz)
 returns boolean
 language sql
 immutable
 set search_path = ''
 as $$
-  select coalesce(p_phase = 'launch' and (p_pday is null or p_pday > p_slot_start), false)
+  select coalesce(p_phase = 'launch' and (p_pday is null
+           or case when p_whole_day then p_pday >= upper(p_slot) else p_pday > lower(p_slot) end), false)
 $$;
 
 -- Every post with its slot and its derived flags (§4), for a given launch moment: the stored one, or one the owner is
@@ -582,7 +586,7 @@ as $$
          coalesce(c.phase = 'warmup' and p_pday is not null and upper(s.slot) > p_pday
                   and (c.state in ('waiting', 'changes', 'approved') or c.in_apps_version is not null), false),
          -- Says "Get it on Google Play" but goes out before launch (or launch hasn't been marked yet).
-         c.state not in ('skipped', 'withdrawn') and mc.marketing_launch_too_early(c.phase, lower(s.slot), p_pday),
+         c.state not in ('skipped', 'withdrawn') and mc.marketing_launch_too_early(c.phase, s.slot, c.slot_time is null, p_pday),
          -- The apps hold an older version, or a post that is skipped or taken out.
          coalesce(c.in_apps_version is not null
                   and (c.in_apps_version < c.current_version or c.state in ('skipped', 'withdrawn')), false),
@@ -944,6 +948,24 @@ begin
 end;
 $$;
 
+-- After a push attached or repaired a version's files: when any of them is still to come, the store must still fit. A
+-- reused file counts here too, not only a new one: a skipped post revived with its videos, or a version going back to
+-- videos that never arrived, takes room again without a new row.
+create or replace function mc.marketing_check_budget_for(p_card uuid, p_version integer)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+begin
+  if exists (select 1 from mc.marketing_media m
+             where m.card_id = p_card and m.version = p_version and mc.marketing_file_uploadable(m.file_id)) then
+    perform mc.marketing_check_budget();
+  end if;
+end;
+$$;
+
 -- The file row for one pushed media item: the post's live file with the same content when there is one, otherwise a
 -- new row with a fresh pathname. A matching file that expired in the store (or belongs to another environment's
 -- store) is marked deleted first, so the same content goes up again. Returns the file id and whether it is new.
@@ -994,16 +1016,12 @@ declare
   v_pos integer;
   v_file uuid;
   v_new boolean;
-  v_any_new boolean := false;
 begin
   for v_item, v_pos in select x.value, (x.ordinality - 1)::integer from jsonb_array_elements(p_media) with ordinality x loop
     select f.o_file, f.o_new into v_file, v_new from mc.marketing_file_for(p_pack, p_env, p_card, v_item) f;
     insert into mc.marketing_media (card_id, version, position, file_id) values (p_card.id, p_version, v_pos, v_file);
-    v_any_new := v_any_new or v_new;
   end loop;
-  if v_any_new then
-    perform mc.marketing_check_budget();
-  end if;
+  perform mc.marketing_check_budget_for(p_card.id, p_version);
 end;
 $$;
 
@@ -1020,7 +1038,7 @@ declare
   r record;
   v_file uuid;
   v_new boolean;
-  v_any_new boolean := false;
+  v_any boolean := false;
 begin
   for r in
     select m.position
@@ -1033,10 +1051,10 @@ begin
     select f.o_file, f.o_new into v_file, v_new from mc.marketing_file_for(p_pack, p_env, p_card, p_media -> r.position) f;
     update mc.marketing_media m set file_id = v_file
       where m.card_id = p_card.id and m.version = p_card.current_version and m.position = r.position;
-    v_any_new := v_any_new or v_new;
+    v_any := true;
   end loop;
-  if v_any_new then
-    perform mc.marketing_check_budget();
+  if v_any then
+    perform mc.marketing_check_budget_for(p_card.id, p_card.current_version);
   end if;
 end;
 $$;
@@ -1450,7 +1468,8 @@ $$;
 
 -- Which of these pathnames still wait for their upload (mc.marketing_file_uploadable: before the console issues an upload
 -- token, and before it checks the store), with what the upload must be and how many days the store keeps it.
-create or replace function mc_api.ingest_marketing_pending(p_secret text, p_pathnames text[])
+drop function if exists mc_api.ingest_marketing_pending(text, text[]);
+create or replace function mc_api.ingest_marketing_pending(p_secret text, p_pathnames text[], p_purpose text default 'upload')
 returns jsonb
 language plpgsql
 volatile
@@ -1465,6 +1484,9 @@ begin
   if p_pathnames is null or coalesce(array_ndims(p_pathnames), 1) <> 1 or cardinality(p_pathnames) > 60 then
     return mc.failed('invalid', 'Send at most 60 pathnames');
   end if;
+  if p_purpose is null or p_purpose not in ('upload', 'record') then
+    return mc.failed('invalid', 'Purpose is upload or record');
+  end if;
   return jsonb_build_object('ok', true, 'pending', (
     select coalesce(jsonb_agg(jsonb_build_object('pathname', f.pathname, 'content_type', f.content_type, 'bytes', f.bytes,
              'pack', p.key, 'card', c.key, 'pack_ends_on', p.ends_on,
@@ -1472,7 +1494,15 @@ begin
     from mc.marketing_files f
     join mc.marketing_cards c on c.id = f.card_id
     join mc.marketing_packs p on p.id = c.pack_id
-    where f.pathname = any(p_pathnames) and mc.marketing_file_uploadable(f.id)));
+    where f.pathname = any(p_pathnames)
+      and case when p_purpose = 'record'
+            -- Recording what already arrived (the console's /uploaded): a file of the current version that isn't recorded
+            -- yet, unless its post was taken out. It may have reached the store just before the owner skipped the post.
+            then not f.ready and f.deleted_at is null and c.state <> 'withdrawn'
+                 and exists (select 1 from mc.marketing_media m
+                             where m.file_id = f.id and m.card_id = c.id and m.version = c.current_version)
+            -- Handing out an upload slot: only a file the store may still receive.
+            else mc.marketing_file_uploadable(f.id) end));
 end;
 $$;
 
@@ -1732,6 +1762,17 @@ begin
     return mc.failed('bad_state', 'This post changed on another device. Reload to see it.')
       || jsonb_build_object('state', v_c.state);
   end if;
+  if p_decision = 'undo' and v_c.state = 'skipped' then
+    -- Bringing a skipped post back asks for its files that never arrived again: they must still fit in the store.
+    if (select coalesce(sum(f.bytes), 0) from mc.marketing_files f where mc.marketing_file_held(f.id))
+       + (select coalesce(sum(f.bytes), 0) from mc.marketing_files f
+          where f.id in (select m.file_id from mc.marketing_media m where m.card_id = v_c.id and m.version = v_c.current_version)
+            and not f.ready and f.deleted_at is null)
+       > mc.marketing_storage_budget() then
+      return mc.failed('quota', 'Mission Control''s file storage is full (700 MB), so this post''s files can''t come back yet. '
+        || 'Decide or skip older posts so their files can go, then bring it back.');
+    end if;
+  end if;
   if p_decision = 'approve' then
     if not mc.marketing_version_ready(v_c.id, v_c.current_version) then
       return mc.failed('not_ready', 'You can approve once the video has uploaded.');
@@ -1804,7 +1845,7 @@ begin
         || jsonb_build_object('state', v_c.state);
     end if;
     -- A "Get it on Google Play" post can be approved ahead of launch, but not scheduled: it would go out too early.
-    if mc.marketing_launch_too_early(v_c.phase, lower(mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz)), mc.marketing_pday()) then
+    if mc.marketing_launch_too_early(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), v_c.slot_time is null, mc.marketing_pday()) then
       return mc.failed('launch_not_live', 'Mark Lucento as live first: this post says ''Get it on Google Play''.');
     end if;
     v_wanted := array(select mc.marketing_text(h) from unnest(coalesce(p_by_hand, '{}'::text[])) h);
@@ -2271,7 +2312,7 @@ revoke all on function
   mc_api.marketing_media_deleted(text[]),
   mc_api.marketing_file(uuid),
   mc_api.ingest_marketing_pack(text, text, jsonb),
-  mc_api.ingest_marketing_pending(text, text[]),
+  mc_api.ingest_marketing_pending(text, text[], text),
   mc_api.ingest_marketing_media_ready(text, jsonb),
   mc_api.ingest_marketing_feedback(text, text, bigint)
   from public, anon, authenticated, service_role;
@@ -2292,7 +2333,7 @@ grant execute on function
 
 grant execute on function
   mc_api.ingest_marketing_pack(text, text, jsonb),
-  mc_api.ingest_marketing_pending(text, text[]),
+  mc_api.ingest_marketing_pending(text, text[], text),
   mc_api.ingest_marketing_media_ready(text, jsonb),
   mc_api.ingest_marketing_feedback(text, text, bigint)
   to anon;
