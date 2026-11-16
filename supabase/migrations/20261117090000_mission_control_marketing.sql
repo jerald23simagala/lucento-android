@@ -580,7 +580,8 @@ as $$
                   and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now(), false),
          coalesce(c.state in ('waiting', 'changes')
                   and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now(), false),
-         coalesce(c.state in ('waiting', 'changes') and upper(s.slot) <= now(), false),
+         -- Passed without a yes, and not in the apps (a post in the apps went out at its slot).
+         coalesce(c.state in ('waiting', 'changes') and c.in_apps_version is null and upper(s.slot) <= now(), false),
          coalesce(not r.ready and v.created_at <= now() - interval '2 hours', false),
          coalesce(not r.ready and v.created_at > now() - interval '2 hours', false)
   from mc.marketing_cards c
@@ -720,6 +721,41 @@ as $$
   )
 $$;
 
+-- A file the store may still receive: not uploaded yet, not given up, and shown by the current version of a post that
+-- still needs it (waiting, a change asked, or approved). No other file is ever asked for again: one of a version Claude
+-- replaced, of a skipped post (an undone skip asks again at the next push) or of a post taken out. The push's uploads,
+-- the pending check before an upload token and before recording a file, and the storage budget all read this.
+create or replace function mc.marketing_file_uploadable(p_file uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from mc.marketing_files f
+    join mc.marketing_media m on m.file_id = f.id
+    join mc.marketing_cards c on c.id = m.card_id and c.current_version = m.version
+    where f.id = p_file and not f.ready and f.deleted_at is null and c.state in ('waiting', 'changes', 'approved')
+  )
+$$;
+
+-- A file that holds room in the store, or may still take it: uploaded and not expired yet, or still to come (above). The
+-- storage budget and the one-environment check count exactly these: a file that can never arrive holds nothing.
+create or replace function mc.marketing_file_held(p_file uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from mc.marketing_files f
+    where f.id = p_file and f.deleted_at is null
+      and case when f.ready then f.expires_at is null or f.expires_at > now() else mc.marketing_file_uploadable(f.id) end
+  )
+$$;
+
 -- The post's files that nothing shows any more: the console may delete them from the store (then
 -- marketing_media_deleted, which checks again).
 create or replace function mc.marketing_cleanup(p_card uuid)
@@ -834,8 +870,8 @@ as $$
   join mc.marketing_versions v on v.card_id = s.card_id and v.version = s.current_version
 $$;
 
--- The current version's files that still have to be uploaded, for the push's answer. p_media is the card as pushed
--- (its file names, by position).
+-- The current version's files that still have to be uploaded, for the push's answer (none for a skipped post or one
+-- taken out: mc.marketing_file_uploadable). p_media is the card as pushed (its file names, by position).
 create or replace function mc.marketing_uploads(p_card uuid, p_card_key text, p_version integer, p_media jsonb)
 returns jsonb
 language sql
@@ -847,7 +883,7 @@ as $$
            'file', coalesce(p_media -> m.position ->> 'file', f.file_name), 'pathname', f.pathname,
            'content_type', f.content_type, 'bytes', f.bytes) order by m.position), '[]'::jsonb)
   from mc.marketing_media m join mc.marketing_files f on f.id = m.file_id
-  where m.card_id = p_card and m.version = p_version and not f.ready and f.deleted_at is null
+  where m.card_id = p_card and m.version = p_version and mc.marketing_file_uploadable(f.id)
 $$;
 
 -- The answer for a card the push refused.
@@ -881,7 +917,8 @@ begin
 end;
 $$;
 
--- Files kept and not expired, this push's new ones included (they are written before this runs).
+-- The files that hold room in the store or may still take it (mc.marketing_file_held), this push's new ones included
+-- (they are written before this runs). A file that can never arrive any more doesn't count.
 create or replace function mc.marketing_check_budget()
 returns void
 language plpgsql
@@ -890,8 +927,8 @@ security definer
 set search_path = ''
 as $$
 begin
-  if (select coalesce(sum(f.bytes), 0) from mc.marketing_files f
-      where f.deleted_at is null and (f.expires_at is null or f.expires_at > now())) > mc.marketing_storage_budget() then
+  if (select coalesce(sum(f.bytes), 0) from mc.marketing_files f where mc.marketing_file_held(f.id))
+     > mc.marketing_storage_budget() then
     perform mc.marketing_refuse('quota', 'Mission Control''s file storage is full (700 MB): approve or skip older posts so their files can go');
   end if;
 end;
@@ -1204,8 +1241,7 @@ begin
 
   return jsonb_build_object('key', v_key, 'version', v_c.current_version, 'result', v_result, 'reason', null,
     'state', v_c.state,
-    'uploads', case when v_c.state = 'withdrawn' then '[]'::jsonb
-                    else mc.marketing_uploads(v_c.id, v_c.key, v_c.current_version, v_media) end);
+    'uploads', mc.marketing_uploads(v_c.id, v_c.key, v_c.current_version, v_media));
 end;
 $$;
 
@@ -1333,10 +1369,10 @@ begin
     return mc.failed(v_reason, v_detail);
   end;
 
-  -- One database, one store: a push from another environment's console would mix their files.
+  -- One database, one store: a push from another environment's console would mix their files. Only files that hold
+  -- room in a store or may still take it count (mc.marketing_file_held).
   if exists (select 1 from mc.marketing_files f
-             where f.deleted_at is null and (f.expires_at is null or f.expires_at > now())
-               and split_part(f.pathname, '/', 2) <> v_env) then
+             where split_part(f.pathname, '/', 2) <> v_env and mc.marketing_file_held(f.id)) then
     return mc.failed('wrong_environment', 'This database already keeps files of another environment');
   end if;
 
@@ -1402,8 +1438,8 @@ begin
 end;
 $$;
 
--- Which of these pathnames still wait for their upload (before the console issues an upload token, and before it checks
--- the store), with what the upload must be and how many days the store keeps it.
+-- Which of these pathnames still wait for their upload (mc.marketing_file_uploadable: before the console issues an upload
+-- token, and before it checks the store), with what the upload must be and how many days the store keeps it.
 create or replace function mc_api.ingest_marketing_pending(p_secret text, p_pathnames text[])
 returns jsonb
 language plpgsql
@@ -1426,7 +1462,7 @@ begin
     from mc.marketing_files f
     join mc.marketing_cards c on c.id = f.card_id
     join mc.marketing_packs p on p.id = c.pack_id
-    where f.pathname = any(p_pathnames) and not f.ready and f.deleted_at is null and c.state <> 'withdrawn'));
+    where f.pathname = any(p_pathnames) and mc.marketing_file_uploadable(f.id)));
 end;
 $$;
 
@@ -1999,7 +2035,8 @@ begin
 end;
 $$;
 
--- Overview's "Needs you now" (§6.4): each list at most 10 posts by slot, with the full counts beside them.
+-- Overview's "Needs you now" (§6.4): each list at most 10 posts by slot (the posts missing their files too, so Overview
+-- links straight to the card), with the full counts beside them.
 create or replace function mc_api.marketing_summary()
 returns jsonb
 language plpgsql
@@ -2047,7 +2084,7 @@ begin
     'needs_decision_soon', v_soon -> 'items', 'due_soon', v_due -> 'items', 'apps_stale', v_stale -> 'items',
     'replace_after_launch', v_after -> 'items', 'too_early', v_early -> 'items',
     'missed', (select count(*) from mc.marketing_status(v_l.pday_at) s where s.missed),
-    'media_missing', (v_missing ->> 'count')::integer,
+    'media_missing', (v_missing ->> 'count')::integer, 'media_missing_items', v_missing -> 'items',
     'media_missing_since', (select min(s.version_created_at) from mc.marketing_status(v_l.pday_at) s
                             where s.media_missing and s.state not in ('skipped', 'withdrawn')
                               and (s.slot_end is null or s.slot_end > now())),

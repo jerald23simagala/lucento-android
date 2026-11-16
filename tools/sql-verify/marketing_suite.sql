@@ -24,6 +24,7 @@ declare
   v_pday_local timestamp; v_pday_day date; v_pday_text text; v_soon timestamp;
   v_hash bigint := hashtextextended('mc.marketing', 0);
   v_fn record; v_sql text;
+  v_g uuid; v_g2 uuid; v_paths text[]; v_q jsonb;
 begin
   -- ======================================================================== helpers
   create function pg_temp.as_admin(p_uid uuid, p_session uuid, p_aal text, p_totp_age interval) returns void language plpgsql as $f$
@@ -608,6 +609,60 @@ begin
                  then 'ok  M33 an approved post can be skipped (not approved again until brought back); a plain skip asks nothing of Claude'
                  else 'FAIL M33 ' || v_j::text end;
 
+  -- ======================================================================== G2: deciding on a post with a change asked
+  -- "Approve this version anyway": the request closes, and the answer lists what nothing shows any more.
+  v_j := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, jsonb_build_array(pg_temp.mk_card('G-approve', v_today + 5,
+    jsonb_build_object('kind', 'post', 'platforms', jsonb_build_array('Lucento Page'),
+      'media', jsonb_build_array(pg_temp.mk_media('g-1.png', 'image/png', 500, 'img-g1')))))));
+  v_t := v_j #>> '{uploads,0,pathname}';
+  perform pg_temp.ready_one(v_t, 500, 'image/png');
+  v_g := pg_temp.cid('2026-W48', 'G-approve');
+  perform pg_temp.decide(v_g, 1, 'request_change', 'A brighter picture, please', array['video']);
+  v_j := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, jsonb_build_array(pg_temp.mk_card('G-approve', v_today + 5,
+    jsonb_build_object('kind', 'post', 'platforms', jsonb_build_array('Lucento Page'), 'version', 2, 'changes', 'A brighter picture',
+      'media', jsonb_build_array(pg_temp.mk_media('g-2.png', 'image/png', 510, 'img-g2')))))));
+  perform pg_temp.ready_one(v_j #>> '{uploads,0,pathname}', 510, 'image/png');
+  v_k := pg_temp.decide(v_g, 2, 'request_change', 'Close, but crop it tighter', array['video']);
+  v_m := pg_temp.cardj(pg_temp.board('2026-W48'), 'G-approve');
+  v_b := pg_temp.decide(v_g, 2, 'approve');
+  v_q := pg_temp.cardj(pg_temp.board('2026-W48'), 'G-approve');
+  r := r || case when v_k ->> 'state' = 'changes' and jsonb_array_length(v_m -> 'open_requests') = 1
+                      and (v_b ->> 'ok')::boolean and v_b ->> 'state' = 'approved' and v_b -> 'cleanup' = jsonb_build_array(v_t)
+                      and v_q ->> 'state' = 'approved' and jsonb_array_length(v_q -> 'open_requests') = 0
+                      and (select count(*) from mc.marketing_log where card_id = v_g and version = 2 and kind = 'approved') = 1
+                      and exists (select 1 from mc.audit_log where action = 'marketing.approve' and target_ref = '2026-W48/G-approve v2'
+                                  and before = '{"state": "changes"}'::jsonb and after = '{"state": "approved"}'::jsonb)
+                 then 'ok  M33b approve with a change asked ("Approve this version anyway"): approved, nothing left open, version 1''s picture in the clean-up, audited'
+                 else 'FAIL M33b ' || coalesce(v_k::text, '') || ' ' || coalesce(v_b::text, '') || ' '
+                        || left(coalesce(v_q -> 'open_requests', 'null'::jsonb)::text, 200) end;
+  -- "Don't post this one" with a change asked: the request gives way to the skip, or to "ask Claude for another post".
+  perform pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, jsonb_build_array(
+    pg_temp.mk_card('G-skip', v_today + 5, jsonb_build_object('kind', 'group', 'platforms', jsonb_build_array('Community group'))),
+    pg_temp.mk_card('G-replace', v_today + 5, jsonb_build_object('kind', 'group', 'platforms', jsonb_build_array('Community group'))))));
+  v_g := pg_temp.cid('2026-W48', 'G-skip');
+  v_g2 := pg_temp.cid('2026-W48', 'G-replace');
+  perform pg_temp.decide(v_g, 1, 'request_change', 'Ask a shorter question', array['caption']);
+  perform pg_temp.decide(v_g2, 1, 'request_change', 'Ask a shorter question', array['caption']);
+  v_j := pg_temp.decide(v_g, 1, 'skip');
+  v_k := pg_temp.decide(v_g2, 1, 'skip', null, array['replace']);
+  v_m := pg_temp.board('2026-W48');
+  r := r || case when v_j ->> 'state' = 'skipped' and v_k ->> 'state' = 'skipped'
+                      and jsonb_array_length(pg_temp.cardj(v_m, 'G-skip') -> 'open_requests') = 0
+                      and jsonb_array_length(pg_temp.cardj(v_m, 'G-replace') -> 'open_requests') = 1
+                      and pg_temp.cardj(v_m, 'G-replace') #>> '{open_requests,0,kind}' = 'skipped'
+                      and pg_temp.cardj(v_m, 'G-replace') #> '{open_requests,0,tags}' = '["replace"]'::jsonb
+                      and (pg_temp.cardj(v_m, 'G-replace') #>> '{open_requests,0,log_id}')::bigint
+                          = (select max(id) from mc.marketing_log where card_id = v_g2 and kind = 'skipped')
+                      and exists (select 1 from mc.audit_log where action = 'marketing.skip' and target_ref = '2026-W48/G-skip v1'
+                                  and before = '{"state": "changes"}'::jsonb and detail is null)
+                      and exists (select 1 from mc.audit_log where action = 'marketing.skip' and target_ref = '2026-W48/G-replace v1'
+                                  and detail = 'replace')
+                 then 'ok  M33c skip with a change asked: a plain skip leaves nothing open; "skip it and ask Claude for another post" becomes the open request'
+                 else 'FAIL M33c ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') || ' '
+                        || left(coalesce(pg_temp.cardj(v_m, 'G-replace') -> 'open_requests', 'null'::jsonb)::text, 300) end;
+  -- Nothing left open for Claude's checks below.
+  perform pg_temp.decide(v_g2, 1, 'undo');
+
   -- ======================================================================== H: new versions and taking posts out
   v_j := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, jsonb_build_array(
     pg_temp.mk_card('W48-1-sweldo', v_today + 1, jsonb_build_object('version', 2,
@@ -767,9 +822,40 @@ begin
                       and (v_m ->> 'media_missing')::integer = 1 and (v_m ->> 'media_missing_since')::timestamptz = now() - interval '3 hours'
                  then 'ok  M47 a video that hasn''t arrived 2 hours after its version is missing, with the time it was pushed'
                  else 'FAIL M47 ' || left(coalesce(v_b -> 'flags', 'null'::jsonb)::text, 300) end;
+  r := r || case when jsonb_array_length(v_m -> 'media_missing_items') = (v_m ->> 'media_missing')::integer
+                      and v_m #>> '{media_missing_items,0,card}' = 'F-video' and v_m #>> '{media_missing_items,0,pack}' = 'F-pack'
+                      and (v_m #>> '{media_missing_items,0,card_id}')::uuid = pg_temp.cid('F-pack', 'F-video')
+                      and (v_m #>> '{media_missing_items,0,current_version}')::integer = 1
+                      and v_m #>> '{media_missing_items,0,slot_time}' = '12:15'
+                 then 'ok  M47b Overview gets the posts missing their files too (pack, card, version, slot), so it links straight to the card'
+                 else 'FAIL M47b ' || left(coalesce(v_m -> 'media_missing_items', 'null'::jsonb)::text, 300) end;
   perform pg_temp.decide(pg_temp.cid('F-pack', 'F-missed'), 1, 'skip');
   r := r || case when not (select missed from mc.marketing_status(null, pg_temp.cid('F-pack', 'F-missed')))
                  then 'ok  M48 "Don''t post it" on a missed post clears missed' else 'FAIL M48' end;
+  -- A post the apps hold went out at its slot: never "missed", even with a change asked since.
+  perform pg_temp.push(pg_temp.mk_pack('F-pack', v_today - 3, jsonb_build_array(
+    pg_temp.mk_card('F-gone', v_today - 1, jsonb_build_object('slot_time', '10:00')),
+    pg_temp.mk_card('F-gone-2', v_today - 1, jsonb_build_object('slot_time', '10:00')))));
+  v_g := pg_temp.cid('F-pack', 'F-gone');
+  v_g2 := pg_temp.cid('F-pack', 'F-gone-2');
+  perform pg_temp.decide(v_g, 1, 'approve');
+  perform pg_temp.apps(v_g, 1, 'in_apps');
+  perform pg_temp.decide(v_g, 1, 'request_change', 'Shorter next time', array['caption']);
+  perform pg_temp.decide(v_g2, 1, 'request_change', 'A shorter caption', array['caption']);
+  v_ok := not (select missed from mc.marketing_status(null, v_g)) and (select missed from mc.marketing_status(null, v_g2))
+          and not (pg_temp.cardj(pg_temp.board('F-pack'), 'F-gone') #>> '{flags,missed}')::boolean
+          and (pg_temp.cardj(pg_temp.board('F-pack'), 'F-gone') ->> 'state') = 'changes';
+  v_n := (pg_temp.summary() ->> 'missed')::integer;
+  v_y := (select count(*) from mc.marketing_status(null) s where s.missed);
+  perform pg_temp.apps(v_g, 1, 'removed_from_apps');
+  v_x := (pg_temp.summary() ->> 'missed')::integer;
+  r := r || case when v_ok and v_n = v_y and v_x = v_n + 1 and (select missed from mc.marketing_status(null, v_g))
+                 then 'ok  M48b a post in the apps went out at its slot: not missed, even with a change asked (Overview''s count follows); removed from the apps, it is'
+                 else 'FAIL M48b ok=' || coalesce(v_ok::text, 'null') || ' ' || coalesce(v_n::text, 'null') || ' '
+                        || coalesce(v_y::text, 'null') || ' ' || coalesce(v_x::text, 'null') end;
+  -- Nothing left open for Claude's checks below.
+  perform pg_temp.decide(v_g, 1, 'skip');
+  perform pg_temp.decide(v_g2, 1, 'skip');
 
   -- ======================================================================== J: Claude's feedback
   v_k := pg_temp.decide(pg_temp.cid('F-pack', 'F-soon'), 1, 'request_change', 'Change the hook to sweldo', array['video']);
@@ -1038,6 +1124,53 @@ begin
                       and (select count(*) from mc.marketing_files where pathname like 'marketing/test/S-pack/%') = 4
                  then 'ok  M68 the storage budget (700 MB of files kept, this push''s new ones included) refuses the post that would go over it'
                  else 'FAIL M68 ' || left(pg_temp.reasons(v_j)::text || ' ' || pg_temp.reasons(v_k)::text, 300) end;
+  -- Files that can never arrive hold no room: those of a post taken out, of a skipped one, of a version Claude replaced.
+  v_j := pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(
+    pg_temp.mk_card('S1', v_today - 9, jsonb_build_object('withdrawn', true, 'withdrawn_reason', 'Its videos never arrived')),
+    pg_temp.mk_card('S4', v_today - 9, jsonb_build_object('media',
+      (select jsonb_agg(pg_temp.mk_media('s4-' || g || '.mp4', 'video/mp4', 104857600, 'big-s4-' || g)) from generate_series(1, 4) g))))));
+  select array_agg(f.pathname order by f.pathname) into v_paths from mc.marketing_files f where f.card_id = pg_temp.cid('S-pack', 'S1');
+  r := r || case when pg_temp.res(v_j, 'S1') ->> 'result' = 'withdrawn' and pg_temp.res(v_j, 'S4') ->> 'result' = 'created'
+                      and jsonb_array_length(v_j -> 'uploads') = 4
+                      and (select bool_and(u ->> 'card' = 'S4') from jsonb_array_elements(v_j -> 'uploads') u)
+                      and cardinality(v_paths) = 4 and jsonb_array_length(pg_temp.pending(v_paths) -> 'pending') = 0
+                 then 'ok  M68b a post taken out before its videos arrived frees their room: the next 400 MB post fits'
+                 else 'FAIL M68b ' || left(pg_temp.reasons(v_j)::text, 300) end;
+  v_g := pg_temp.cid('S-pack', 'S4');
+  select array_agg(u ->> 'pathname' order by u ->> 'pathname') into v_paths from jsonb_array_elements(v_j -> 'uploads') u;
+  v_q := pg_temp.mk_card('S4', v_today - 9, jsonb_build_object('media',
+    (select jsonb_agg(pg_temp.mk_media('s4-' || g || '.mp4', 'video/mp4', 104857600, 'big-s4-' || g)) from generate_series(1, 4) g)));
+  perform pg_temp.decide(v_g, 1, 'skip');
+  v_k := pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(v_q,
+    pg_temp.mk_card('S5', v_today - 9, jsonb_build_object('media',
+      (select jsonb_agg(pg_temp.mk_media('s5-' || g || '.mp4', 'video/mp4', 104857600, 'big-s5-' || g)) from generate_series(1, 4) g))))));
+  v_m := pg_temp.pending(v_paths);
+  perform pg_temp.decide(v_g, 1, 'undo');
+  v_b := pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(v_q,
+    pg_temp.mk_card('S6', v_today - 9, jsonb_build_object('media', jsonb_build_array(pg_temp.mk_media('s6.png', 'image/png', 1000, 'img-s6')))))));
+  r := r || case when pg_temp.res(v_k, 'S4') ->> 'result' = 'unchanged' and pg_temp.res(v_k, 'S4') ->> 'state' = 'skipped'
+                      and pg_temp.res(v_k, 'S5') ->> 'result' = 'created'
+                      and not exists (select 1 from jsonb_array_elements(v_k -> 'uploads') u where u ->> 'card' = 'S4')
+                      and jsonb_array_length(v_m -> 'pending') = 0
+                      and pg_temp.res(v_b, 'S4') ->> 'state' = 'waiting'
+                      and (select array_agg(u ->> 'pathname' order by u ->> 'pathname') from jsonb_array_elements(v_b -> 'uploads') u
+                           where u ->> 'card' = 'S4') = v_paths
+                      and jsonb_array_length(pg_temp.pending(v_paths) -> 'pending') = 4
+                      and pg_temp.res(v_b, 'S6') ->> 'reason' = 'quota'
+                 then 'ok  M68c a skipped post''s videos that never arrived are no longer asked for and hold no room; "Bring it back" asks for the same files again and counts them'
+                 else 'FAIL M68c ' || left(pg_temp.reasons(v_k)::text || ' ' || pg_temp.reasons(v_b)::text || ' ' || coalesce(v_m::text, ''), 400) end;
+  v_k := pg_temp.push(pg_temp.mk_pack('S-pack', v_today - 10, jsonb_build_array(
+    pg_temp.mk_card('S5', v_today - 9, jsonb_build_object('version', 2, 'changes', 'One picture instead of four videos',
+      'media', jsonb_build_array(pg_temp.mk_media('s5.png', 'image/png', 1000, 'img-s5')))),
+    pg_temp.mk_card('S7', v_today - 9, jsonb_build_object('media',
+      (select jsonb_agg(pg_temp.mk_media('s7-' || g || '.mp4', 'video/mp4', 104857600, 'big-s7-' || g)) from generate_series(1, 2) g))))));
+  select array_agg(f.pathname order by f.pathname) into v_paths from mc.marketing_files f
+    join mc.marketing_media m on m.file_id = f.id where m.card_id = pg_temp.cid('S-pack', 'S5') and m.version = 1;
+  r := r || case when pg_temp.res(v_k, 'S5') ->> 'result' = 'revised' and pg_temp.res(v_k, 'S7') ->> 'result' = 'created'
+                      and cardinality(v_paths) = 4 and jsonb_array_length(pg_temp.pending(v_paths) -> 'pending') = 0
+                      and (select count(*) from jsonb_array_elements(v_k -> 'uploads') u where u ->> 'card' = 'S5') = 1
+                 then 'ok  M68d a new version without the videos that never arrived frees their room (they are no longer asked for)'
+                 else 'FAIL M68d ' || left(pg_temp.reasons(v_k)::text, 300) end;
   update mc.marketing_files set deleted_at = now() where pathname like 'marketing/test/S-pack/%';
   v_j := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, jsonb_build_array(pg_temp.mk_card('Q-env', v_today, '{}'))), 'local');
   v_k := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, jsonb_build_array(pg_temp.mk_card('Q-env', v_today, '{}'))), 'staging');
@@ -1045,6 +1178,24 @@ begin
                       and not exists (select 1 from mc.marketing_cards where key = 'Q-env')
                  then 'ok  M69 a push for another environment than the stored files'' is refused; unknown environments too'
                  else 'FAIL M69 ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
+  -- Another environment's file that can never arrive (here on a post taken out) doesn't block a push; one still to come
+  -- (on a post waiting for the owner) does. Both rows are fixtures, removed again right after.
+  insert into mc.marketing_files (card_id, pathname, file_name, content_type, bytes, sha256)
+    values (v_text, 'marketing/local/2026-W48/W48-group-wed/aaaaaaaaaaaa/x.png', 'x.png', 'image/png', 1000, repeat('a', 64))
+    returning id into v_fid;
+  insert into mc.marketing_media (card_id, version, position, file_id) values (v_text, 1, 9, v_fid);
+  v_j := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, '[]'::jsonb));
+  insert into mc.marketing_files (card_id, pathname, file_name, content_type, bytes, sha256)
+    values (pg_temp.cid('2026-W48', 'B-video'), 'marketing/local/2026-W48/B-video/bbbbbbbbbbbb/x.png', 'x.png', 'image/png', 1000,
+            repeat('b', 64))
+    returning id into v_fid;
+  insert into mc.marketing_media (card_id, version, position, file_id) values (pg_temp.cid('2026-W48', 'B-video'), 1, 9, v_fid);
+  v_k := pg_temp.push(pg_temp.mk_pack('2026-W48', v_p1_start, '[]'::jsonb));
+  delete from mc.marketing_media where position = 9 and card_id in (v_text, pg_temp.cid('2026-W48', 'B-video'));
+  delete from mc.marketing_files where pathname like 'marketing/local/%';
+  r := r || case when (v_j ->> 'ok')::boolean and v_k ->> 'error' = 'wrong_environment'
+                 then 'ok  M69b only files that hold room in a store or may still take it count as another environment''s: one that can never arrive doesn''t block'
+                 else 'FAIL M69b ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
   insert into mc.rate_counters (admin_id, action, hour, count)
     values ('00000000-0000-0000-0000-000000000000', 'ingest.marketing_pack', date_trunc('hour', now()), 30)
     on conflict (admin_id, action, hour) do update set count = 30;

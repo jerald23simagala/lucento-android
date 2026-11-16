@@ -111,6 +111,13 @@ default false; uploaded_at timestamptz null, `ready = (uploaded_at is not null)`
 timestamptz null; deleted_at timestamptz null; created_at. Unique (card_id, sha256, bytes, content_type) where
 deleted_at is null.
 
+A file is **still to come** (`mc.marketing_file_uploadable`) while it isn't uploaded, isn't deleted and is shown by the
+current version of a post that waits, has a change asked or is approved. No other file is ever asked for again: one of a
+version Claude replaced, of a skipped post (an undone skip asks for it again at the next push) or of a post taken out.
+A file **holds room** (`mc.marketing_file_held`) while it is uploaded and not expired, or still to come: the storage
+budget and the one-environment check count only these, so a file that can never arrive holds nothing. An uploaded
+file of a skipped or withdrawn post stays in the store until its TTL ends.
+
 ### 3.6 `mc.marketing_media` (a version's files in order)
 PK (card_id, version, position); (card_id, version) → versions on delete cascade; position 0..9; file_id uuid → files.
 
@@ -170,7 +177,8 @@ computed on an incoming card with the same function. The tool sends no hash.
   - `apps_stale`: in_apps_version set and (in_apps_version < current_version or state in skipped/withdrawn).
   - `due_soon`: approved, in_apps_version null, slot start < now()+36 h and slot end > now().
   - `needs_decision_soon`: state in waiting/changes, slot start < now()+36 h, slot end > now() (warn < 36 h, bad < 12 h).
-  - `missed`: state in waiting/changes and slot end ≤ now() (leaves the badge; offers skip).
+  - `missed`: state in waiting/changes, not in the apps (in_apps_version null: a post in the apps went out at its
+    slot) and slot end ≤ now() (leaves the badge; offers skip).
   - `media_missing`: current version not ready and the version is older than 2 hours (else "Uploading").
 - Request status for the owner: an open request is "Claude saw it <time>" when `claude_seen_log_id >= log id`, else
   "Claude hasn't seen it yet".
@@ -197,7 +205,7 @@ only, not security definer).
 | `marketing_launch_preview(p_local text)` | ('marketing.read', false, null) | what setting that moment would flag (for the confirm step) |
 | `marketing_save_numbers(p_pack text, p_followers jsonb, p_views jsonb, p_installs int, p_visitors int)` | ('marketing.numbers', false, 60) | audits marketing.numbers |
 | `marketing_redact_note(p_log_id bigint, p_reason text)` | ('marketing.redact', true, 20) | sets note to '[removed]'; logs `note_redacted`; audits marketing.redact_note with the reason |
-| `marketing_summary()` | ('marketing.read', false, null) | `{ok, waiting, first_slot, needs_decision_soon[], due_soon[], apps_stale[], replace_after_launch[], too_early[], missed, media_missing, unseen_requests[], claude_checked_at}` (each list ≤ 10 items with pack, card, title, slot, state; sorted by slot) |
+| `marketing_summary()` | ('marketing.read', false, null) | `{ok, waiting, first_slot, needs_decision_soon[], due_soon[], apps_stale[], replace_after_launch[], too_early[], missed, media_missing, media_missing_items[], media_missing_since, unseen_requests[], counts, claude_checked_at}` (each flag list ≤ 10 posts with pack, card, card_id, title, kind, phase, state, current_version, in_apps_version and slot; `unseen_requests` ≤ 10 with the request's log_id, kind, tags and time; all sorted by slot; `media_missing` is the count and `media_missing_items` the first 10 posts; `counts` the full count of every list) |
 | `marketing_media_deleted(p_pathnames text[])` | ('marketing.decide', false, 300) | ≤ 50; marks files deleted only if unreferenced; audits marketing.media_deleted (count) |
 | `marketing_file(p_file uuid)` | ('marketing.read', false, null) | `{ok, pathname, file_name, content_type, ready, deleted}` for the gated download route; `not_found` otherwise |
 
@@ -220,14 +228,15 @@ Refusal codes and the console's words:
 | Function | Secret | Purpose |
 |---|---|---|
 | `ingest_marketing_pack(p_secret text, p_env text, p_pack jsonb)` | marketing | upsert pack and cards, create versions, files and slots |
-| `ingest_marketing_pending(p_secret text, p_pathnames text[])` | marketing | the subset of pathnames that are pending uploads (≤ 60), with content type and bytes; used before issuing an upload token and before checking files |
+| `ingest_marketing_pending(p_secret text, p_pathnames text[])` | marketing | the subset of pathnames still to come (≤ 60; §3.5), with content type and bytes; used before issuing an upload token and before checking files |
 | `ingest_marketing_media_ready(p_app_secret text, p_items jsonb)` | **app** (MC_INGEST_SECRET, held by the console only) | record files the console found in the store |
 | `ingest_marketing_feedback(p_secret text, p_db text, p_since bigint)` | marketing | decisions since the cursor, open requests, flags; stamps claude_checked_at |
 
 Volume limits (refused with `quota`): payload `pg_column_size(p_pack)` ≤ 1 MB; ≤ 40 cards per push; ≤ 10 media per
 version; ≤ 20 versions per card; ≤ 30 pushes per hour (counted in `mc.rate_counters` under the zero uuid and action
-'ingest.marketing_pack'); storage budget: bytes of files not deleted and not expired, plus this push's new files,
-≤ 700 MB (setting-free constant).
+'ingest.marketing_pack'); storage budget: bytes of files that hold room (uploaded and not expired, or still to come:
+§3.5), this push's new files included, ≤ 700 MB (setting-free constant). A push is refused `wrong_environment` while
+the database holds room for files of another environment.
 
 `ingest_marketing_pack` payload:
 ```json
@@ -252,7 +261,8 @@ version = current → `unchanged` when the hash matches, else refused `version_c
 `changes` → `revised`; otherwise `version_out_of_order`; truth not passing → refused `truth_failed`; phase missing →
 `phase_required`. Files: an item with the same (sha256, bytes, content_type) as a ready, live file of this card reuses
 it; otherwise a new file row with a fresh pathname. A file that the console reported as a mismatch is replaced by a new
-row (new 12-hex) on the next push. Response:
+row (new 12-hex) on the next push. `uploads` lists each card's current-version files still to come (§3.5): none for a
+skipped post or one taken out, and the same pathnames again once a skip is undone. Response:
 ```json
 { "ok": true, "pack": "2026-W48", "environment": "test",
   "cards": [{ "key": "…", "version": 1, "result": "created", "reason": null, "state": "waiting" }],
@@ -379,7 +389,8 @@ scroll):
   yes · first goes out Mon 19:30" · "Tue 12:15 is approved but not scheduled" · "The apps still have an old or skipped
   version: Mon 19:30" · "3 'coming soon' posts are scheduled after launch" · "Wed 19:30 says 'Get it on Google Play' but
   Lucento isn't live yet" · "2 posts are missing their video since Mon 08:12" · "1 change request waiting for Claude since
-  Tue 21:05 (goes out Wed 19:30)" (unseen 12 h or slot < 24 h). Each links to `/marketing?pack=…#card-<key>`.
+  Tue 21:05 (goes out Wed 19:30)" (unseen 12 h or slot < 24 h). Each links to `/marketing?pack=…#card-<key>` (the
+  missing files through `media_missing_items`).
 - Settings › Integrations: "Vercel Blob file storage" (connected / not connected / store id invalid) and "Blob upload
   signing key (BLOB_WEBHOOK_PUBLIC_KEY)"; "Marketing key (database)" created <ago> / not created.
 - Audit labels for `marketing.*` and ACTION_GROUPS "Marketing".
@@ -459,9 +470,11 @@ and move the test store to Preview only; run C4 on a Sunday after the open pack 
   marketing secret refused by media_ready), pushes (created / unchanged / version_changed / revised / out_of_order /
   withdrawn / truth_failed / phase_required / caps / quota / storage budget / slot outside the pack), file reuse across
   versions, pending and media_ready paths (ready / already / mismatch → new pathname / unknown), text-only approval,
-  decisions (each transition, stale_version, note rules incl. contact refusal, skip with replace tag, undo per state,
+  decisions (each transition, approve and skip from changes included, stale_version, note rules incl. contact
+  refusal, skip with replace tag, undo per state,
   in_apps / removed / posted_by_hand), derived flags (replace_after_launch with "any time" on launch day, too_early,
-  apps_stale, due_soon, missed), feedback cursor (more, reset, shared lock), claude notes idempotent, redaction, log
+  apps_stale, due_soon, missed but not for a post in the apps), files that can never arrive holding no room (taken
+  out, skipped, replaced; in the budget and the one-environment check), feedback cursor (more, reset, shared lock), claude notes idempotent, redaction, log
   append-only (UPDATE/DELETE/TRUNCATE refused; cascade allowed), launch set/clear with time-zone conversion and limits,
   numbers validation, nav_badges key, audit rows, retention. Update K14 (anon list) and VERIFY counts in the same PR;
   add races (decide vs revise, two decides, two pushes) to `concurrency.mjs`.
