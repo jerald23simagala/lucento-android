@@ -109,7 +109,15 @@ Claude's tool is in `lucento-studio` (`marketing/mc`, `6edd819`). Contract: `doc
   typed input kept on a refusal, "Saved for Claude" instead of "Sent", "Scheduled in" (every app ticked), filters
   (Needs you · With Claude · Done · All) with settled posts folded to one row, the week pinned in the address, urgency
   on the card, launch switch below the posts, Overview capped at three marketing lines, two columns from 1024 px.
-  Round 2 is running.
+  Round 2 REJECT 3.2 (gate 6: a duplicate React key, fixed; and a WebKit hydration warning that turned out to come from
+  the QA tool's screenshots, MC-8, fixed in the studio). Round 3 **REVISE 3.3, all gates pass**
+  (`…-r3.md`); its launch-day findings were fixed after it: no scheduling a 'coming soon' post after launch (database
+  `launch_version_needed`), the one-tap launch request keeps its answer and counts with Claude, "I posted it" is
+  recorded as posted by hand (`posted_late`), undoing the launch can cancel those requests. Three rounds without
+  APPROVE: escalated to the owner (design loop rule).
+- **Left after round 3 (owner calls or later):** decision buttons above the media on phones (the first Approve is about
+  1,700 px down at 393 px; a layout change, so a preview first); the summary's detail behind "More"; Safari and
+  TalkBack checks on a real device.
 - **Truth rules in words:** the T-codes in Claude's truth lines have no plain-language list anywhere (MC-10); the card
   shows the pass/fail chip and keeps the codes under "What Claude checked".
 

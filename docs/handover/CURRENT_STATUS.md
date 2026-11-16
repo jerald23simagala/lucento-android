@@ -593,10 +593,14 @@ and change requests there", then "go ahead". Contract: `docs/mission-control/v1/
   launch details and Sunday numbers in `mc`; admin functions behind `mc.gate` (approve, ask for a change, skip, undo,
   the apps steps, launch with a fresh code); four ingest functions for Claude's tool with their own secret. Not applied
   anywhere yet (OT-34).
-- **Tests:** `tools/sql-verify` 10 suites, **448 checks, 0 failed** under both default-privilege variants
-  (`marketing_suite.sql` 86); the races **10/10** on a real Postgres 17.11 (MC3 now detects any lock wait: two calls
+- **Tests:** `tools/sql-verify` 10 suites, **456 checks, 0 failed** under both default-privilege variants
+  (`marketing_suite.sql` 94); the races **10/10** on a real Postgres 17.11 (MC3 now detects any lock wait: two calls
   by one admin queue on the gate's counter row); `catch_up_check.mjs` passes, including APPLY_MARKETING pasted twice.
-  Console: lint, types, **160 unit tests**; end to end on the local stack **19 desktop specs and both phone specs (360 px, 100 % and 200 % text) pass; the screenshot tour is opt-in**. Tool: **103 tests**.
+  Console: `npm run verify` green (lint, types, **174 unit tests**, production build, bundle scan); end to end on a
+  freshly seeded local stack **22 passed** (every desktop spec, launch day included, and both phone specs: 360 px at
+  100 % and 200 % text, every post open; the screenshot tour is opt-in). Tool: **103 tests**.
+- **Design:** three critic rounds (REJECT 2.9 → REJECT 3.2 → REVISE 3.3, all hard gates passing in round 3), the
+  launch-day findings of round 3 and a second code review fixed after it; escalated to the owner (NEXT_TASKS).
 - **Review** (four code reviewers with skeptics, then the design critic): an open redirect in the sign-in return
   (`/login?next=/.//host`) fixed in `safeNext` and again in the proxy; the race harness; a decision switching weeks;
   client state carried across weeks; a post still in the apps after an undone approval; the budget counting upload
