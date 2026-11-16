@@ -684,3 +684,27 @@ the owner approved the merge the same day, after main's #82 was merged into the 
   "Didn't catch anything" after 10 s of silence. A typed question in Ask is still answered once. **Not checked:** a real
   spoken question or transaction (the emulator's speech service produced no text) and the Smarter reading row and dialog
   (debug builds have no proxy, so the section is hidden). KNOWN_ISSUES FC-1 and FC-2, NEXT_TASKS OT-32 and OT-33.
+
+## Budget tab counts foreign-wallet spending everywhere — 2026-11-16 (`fix/budget-screen-multicurrency`)
+
+Found by the read-only custom-budget-periods audit the same day (private report
+https://claude.ai/artifact/1xgQTq65RzqaSgDQ2JM88C). The owner asked to fix its D1 and D2 and to record custom budget
+periods as a future task (NEXT_TASKS › "Custom budget periods").
+
+- **D1, Safe per day** (KNOWN_ISSUES BF-1): the Budget hero built its plan from the translated ledger but passed the
+  raw transactions and wallets to `budgetDailyFigure`, whose `CashflowCalculator.safeToSpend` planned again without
+  foreign-wallet spending. With ₱6,000 in pesos and ¥10,000 worth ₱3,800 against ₱10,000 on 16 November, the hero said
+  ₱200 remaining while Safe per day said ₱266.66; it now says ₱13.33, as Home does.
+- **D2, month kept** (BF-2): `BudgetMilestones.monthToAcknowledge` read the raw transactions too, so a month that
+  foreign-wallet spending took over budget could still be celebrated.
+- **Fix:** both functions take the `TranslatedLedger` instead of lists, so untranslated data no longer compiles at
+  either call site; `BudgetScreen` passes the ledger it already remembered for the hero. Only these two call sites
+  changed; Home, the widget and Ask Lucento already passed translated data.
+- **Tests:** `BudgetDailyFigureTest` +2 (foreign spending within budget gives Home's safe to spend; over budget leaves
+  nothing per day), `BudgetMilestonesTest` +1 (over → no celebration, under → celebrated); both helpers now build the
+  ledger as the screen does. Local `./gradlew testDebugUnitTest assembleDebug`: BUILD SUCCESSFUL, 1,492 unit tests,
+  0 failures. Lint, the release builds, the SQL suites and the emulator jobs run in CI on the PR.
+- **Docs:** CALCULATIONS (Safe per day; Budget month kept, which compares every expense, as the code always has, not
+  budgeted spending only; a pointer to the periods rules), NEXT_TASKS "Custom budget periods" (future Pro: rules,
+  decisions, outline), ROADMAP M3, CLAUDE.md (who reads `BudgetPlan`; the `budgets` table rule), KNOWN_ISSUES BF-1/BF-2.
+- **Not checked:** a phone (logic only; the screen's layout is unchanged).
