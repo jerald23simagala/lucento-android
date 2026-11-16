@@ -728,7 +728,10 @@ begin
                  else 'FAIL M37 ' || left(coalesce(pg_temp.reasons(v_m)::text, '') || ' ' || coalesce(v_t, ''), 400) end;
 
   -- ======================================================================== I: launch day and the derived flags
-  v_pday_local := date_trunc('minute', (now() - interval '1 hour') at time zone 'Asia/Manila');
+  -- An hour ago, but never before today's midnight in Manila: "launch day" must still be today, or its "any time"
+  -- posts would already be over (a post whose slot ended isn't flagged) when the suite runs just after midnight.
+  v_pday_local := date_trunc('minute', greatest((now() - interval '1 hour') at time zone 'Asia/Manila',
+                                                date_trunc('day', now() at time zone 'Asia/Manila')));
   v_pday_day := v_pday_local::date;
   v_pday_text := to_char(v_pday_local, 'YYYY-MM-DD"T"HH24:MI');
   v_soon := (now() + interval '20 hours') at time zone 'Asia/Manila';
