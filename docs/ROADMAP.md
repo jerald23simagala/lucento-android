@@ -285,6 +285,16 @@ recurring-schedule sync, syncing preferences.
   6 widths × 7 heights × 7 text sizes). From a widget, Speak and Scan start in an already open composer, and the
   microphone and camera wait for the launch logo and App lock.
 
+## Built — Fast capture by default, voice in Ask Lucento (2026-11-15, `feature/fast-capture-ask-voice`)
+- Owner: speech in the composer is fast, Smarter reading made every message wait for Gemini, and new users expect fast
+  input. The composer's Smarter reading switch is gone; it is turned on only in Settings › Privacy & security, whose row
+  and consent dialog now say first that adding transactions gets slower. While it is on, the composer's note and its
+  "Gemini is reading…" reply say so (docs/CAPTURE.md). Without a plan that includes it (Free, a Lifetime after its
+  year) the switch is locked with a Pro note and messages are never sent to be refused.
+- Ask Lucento has the composer's microphone (`VoiceInput`, one implementation for both screens; Voice entry shows or
+  hides both). A spoken question is asked when listening ends; words that can't be asked yet wait in the field
+  (docs/ASK.md "Speaking a question").
+
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,

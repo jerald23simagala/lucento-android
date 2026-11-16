@@ -366,12 +366,18 @@ class AppContainer(application: Application) {
             scheduleRevoke = { com.lucento.app.data.sync.RevokeScheduler.schedule(application) },
         ) }
 
-    /** The composer's reader: Gemini when Smarter reading is on (see docs/CAPTURE.md), else this phone. */
+    /**
+     * The composer's reader: Gemini when Smarter reading is on and the plan includes it (see docs/CAPTURE.md), else this
+     * phone. Without the plan the server would refuse every message, so it isn't asked (owner, 2026-11-15).
+     */
     val interpreter: com.lucento.app.domain.capture.TransactionInterpreter by lazy {
         com.lucento.app.data.ai.HybridTransactionInterpreter(
             local = com.lucento.app.domain.capture.LocalTransactionInterpreter(),
             remote = com.lucento.app.data.ai.RemoteTransactionInterpreter(accessToken = auth::accessToken),
-            enabled = { preferences.preferences.first().smartReading },
+            enabled = {
+                preferences.preferences.first().smartReading &&
+                    com.lucento.app.domain.entitlement.ProGates.smartReadingAllowed(entitlements.state.value, System.currentTimeMillis())
+            },
             currency = { preferences.preferences.first().primaryCurrency },
         )
     }

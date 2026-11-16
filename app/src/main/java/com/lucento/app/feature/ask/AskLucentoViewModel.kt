@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -213,6 +214,16 @@ class AskLucentoViewModel(
 
     fun clear() {
         if (!conversation.value.thinking) conversation.update { it.copy(messages = emptyList()) }
+    }
+
+    // ------------------------------------------------------------------ speech (the composer's microphone, shared)
+
+    /** Whether the person agreed to online voice ([com.lucento.app.feature.capture.SpeechRequest]); read fresh. */
+    suspend fun onlineVoiceAllowed(): Boolean = preferences.preferences.first().onlineVoice
+
+    /** The person agreed to online voice after an offline attempt failed: the same preference as the composer's. */
+    fun allowOnlineVoice() {
+        viewModelScope.launch { preferences.setOnlineVoice(true) }
     }
 
     /** Writes [report] as a PDF to the document the user picked. */

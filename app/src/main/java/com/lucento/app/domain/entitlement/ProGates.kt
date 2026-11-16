@@ -38,6 +38,13 @@ object ProGates {
     fun pdfAllowed(state: EntitlementState, now: Long): Boolean = state.has(Capability.LOCAL_PRO, now)
 
     /**
+     * Smarter reading (Gemini reads the composer's messages) is an online service: Pro, or Lifetime's included year
+     * (docs §3.6). Without it Lucento's server refuses every message, so the app neither offers it nor asks: each
+     * message would only wait for the refusal before being read on the phone anyway (owner, 2026-11-15).
+     */
+    fun smartReadingAllowed(state: EntitlementState, now: Long): Boolean = state.has(ProFeature.SMART_READING.requires, now)
+
+    /**
      * Sunrise and Midnight are free; Grove, Mono and Aurora are Pro (docs §3.8). Theme ids are strings here so the domain
      * stays free of the preferences layer; callers pass [com.lucento.app.data.preferences.ThemeId.name].
      */

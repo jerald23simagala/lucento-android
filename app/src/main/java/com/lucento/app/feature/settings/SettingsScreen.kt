@@ -586,6 +586,7 @@ private fun SettingsContent(
             SmartReadingSection(
                 on = prefs.smartReading,
                 signedIn = true,
+                locked = current.smartReadingLocked,
                 onChange = onSmartReading,
             )
         }
@@ -874,21 +875,37 @@ private fun Fact(icon: ImageVector, title: String, body: String) {
 
 /**
  * Smarter reading (opt-in, off by default): typed and spoken messages are read by Gemini through Lucento's server.
- * Turning it on always goes through a dialog that says what is sent and where; it needs a sync account, which carries
- * the daily allowance. Receipts are always read on this phone, and so is everything when this is off or unreachable.
+ * This is the only place it is turned on (owner, 2026-11-15). Turning it on always goes through a dialog that says
+ * first that adding transactions gets slower, then what is sent and where; it needs a sync account, which carries the
+ * daily allowance, and a plan that includes it ([locked] otherwise: a Pro note instead, owner 2026-11-15). Receipts are
+ * always read on this phone, and so is everything when this is off, unreachable or not in the plan.
  */
 @Composable
-private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boolean) -> Unit) {
+private fun SmartReadingSection(on: Boolean, signedIn: Boolean, locked: Boolean, onChange: (Boolean) -> Unit) {
     var asking by remember { mutableStateOf(false) }
     SectionHeader("Smarter reading", Modifier.padding(top = Spacing.section))
     SwitchRow(
         title = "Read messages with Gemini",
         checked = on,
         onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
-        enabled = signedIn || on,
-        description = "Better at messy, multi-item messages. Off or offline, Lucento reads them on this phone as before.",
-        note = if (!signedIn) "Connect a sync account above first — it keeps your daily allowance." else null,
+        // Turning it off always works, so a consent given earlier can be taken back while it is paused.
+        enabled = (signedIn && !locked) || on,
+        description = "Better at messy, multi-item messages. Off, Lucento reads them on this phone straight away.",
+        // The cost stays in view, on or off: it's why the composer has no switch of its own.
+        note = when {
+            !signedIn -> "Connect a sync account above first — it keeps your daily allowance."
+            locked -> null
+            else -> com.lucento.app.feature.capture.SmartReadingCopy.SLOWER
+        },
     )
+    if (locked) {
+        // Like cloud sync: an earlier "on" is paused, not lost, and says so; otherwise, why it can't be turned on.
+        com.lucento.app.feature.pro.ProNote(
+            text = if (on) com.lucento.app.feature.capture.SmartReadingCopy.PAUSED
+            else com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.SMART_READING),
+            from = com.lucento.app.domain.entitlement.ProFeature.SMART_READING,
+        )
+    }
     if (asking) {
         ConfirmDialog(
             title = com.lucento.app.feature.capture.SmartReadingCopy.CONSENT_TITLE,
@@ -904,8 +921,9 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
 }
 
 /**
- * Online voice (off by default): the composer's microphone may let the phone's speech service go online. Turning it on
- * always shows the same consent as the composer's prompt ([com.lucento.app.feature.capture.SpeechRequest]).
+ * Online voice (off by default): the microphone (the composer and Ask Lucento) may let the phone's speech service go
+ * online. Turning it on always shows the same consent as the microphone's prompt
+ * ([com.lucento.app.feature.capture.SpeechRequest]).
  */
 @Composable
 private fun OnlineVoiceRow(on: Boolean, onChange: (Boolean) -> Unit) {

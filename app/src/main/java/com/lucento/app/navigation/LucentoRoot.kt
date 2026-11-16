@@ -612,7 +612,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 Gated(Feature.INSIGHTS, features, enableFeature, back) { InsightsScreen(onBack = back, onAsk = { push(AskRoute) }) }
                             }
                             pushed<AskRoute>(reducedMotion) {
-                                Gated(Feature.INSIGHTS, features, enableFeature, back) { com.lucento.app.feature.ask.AskLucentoScreen(onBack = back) }
+                                Gated(Feature.INSIGHTS, features, enableFeature, back) {
+                                    // Voice entry turns the microphone on or off everywhere: here as in the composer.
+                                    com.lucento.app.feature.ask.AskLucentoScreen(onBack = back, voiceEnabled = features.isEnabled(Feature.VOICE_ENTRY))
+                                }
                             }
 
                             pushed<WalletDetailRoute>(reducedMotion) { entry ->

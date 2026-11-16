@@ -150,7 +150,7 @@ fun SwitchRow(
 }
 
 /**
- * A small labelled switch for a header or a toolbar ("Gemini", "Smarter reading"): the label and switch toggle together,
+ * A small labelled switch for a header or a toolbar (Ask Lucento's "Gemini"): the label and switch toggle together,
  * TalkBack announces one switch, and the touch target is at least 48dp tall.
  */
 @Composable
