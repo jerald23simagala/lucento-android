@@ -1,18 +1,22 @@
 -- Mission Control V1: read-only checks after APPLY_MISSION_CONTROL.sql (DEPLOYMENT.md step A3). Changes nothing.
 -- Paste into the Supabase SQL editor and Run. Every column should say true (the counts are for information).
+-- Marketing approvals (APPLY_MARKETING.sql) stay out of these counts, before and after it: VERIFY_MARKETING.sql checks them.
 
 select
   (select count(*) from pg_namespace where nspname in ('mc', 'mc_api')) = 2                               as schemas_created,
-  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'mc_api') = 43 as api_functions_43,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'mc_api' and p.proname not like '%marketing%') = 43                                  as api_functions_43,
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'mc' and c.relkind = 'r') = 19                                                         as tables_19,
+     where n.nspname = 'mc' and c.relkind = 'r' and c.relname not like 'marketing\_%') = 19                  as tables_19,
   (select count(*) from mc.settings) >= 7                                                                      as settings_seeded,
-  -- Nobody but the owner reaches the private schema; anon runs only the five ingest functions.
+  -- Nobody but the owner reaches the private schema; anon runs only the five ingest functions (and Marketing's four).
   not has_schema_privilege('authenticated', 'mc', 'usage') and not has_schema_privilege('anon', 'mc', 'usage') as mc_schema_private,
   not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'mc_api' and has_function_privilege('anon', p.oid, 'execute')
-      and p.proname not in ('ingest_email_events', 'play_orders_wanted', 'ingest_play_orders', 'ingest_job_run', 'ingest_service_checks')
+      and p.proname not in ('ingest_email_events', 'play_orders_wanted', 'ingest_play_orders', 'ingest_job_run', 'ingest_service_checks',
+                            'ingest_marketing_pack', 'ingest_marketing_pending', 'ingest_marketing_media_ready',
+                            'ingest_marketing_feedback')
   )                                                                                                            as anon_ingest_only,
   has_function_privilege('anon', 'public.submit_support_request(text, text, text, uuid, uuid, jsonb)', 'execute') as support_form_open,
   not has_function_privilege('anon', 'public.report_client(text, integer, integer, text)', 'execute')          as report_client_signed_in_only,

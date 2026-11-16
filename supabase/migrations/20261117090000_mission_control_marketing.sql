@@ -1,0 +1,2242 @@
+-- Mission Control: Marketing approvals (docs/mission-control/v1/MARKETING_APPROVALS.md §3–§5 and §8).
+--
+-- Claude prepares a week's social posts (a pack) and pushes it here with its own `marketing` secret; the owner plays
+-- each video, reads the texts and approves, asks for a change or skips each post in Mission Control › Marketing, then
+-- schedules them by hand in TikTok Studio, Meta Business Suite and YouTube Studio. Not FD-4's marketing email.
+--
+--   * Every decision names the version it was made on; a decision on a version Claude has replaced is refused
+--     (stale_version), and an approval never carries over to a new version.
+--   * The files themselves live in a private Vercel Blob store. This database keeps their pathnames and checks only:
+--     never a URL, never the bytes, and nothing in Supabase Storage.
+--   * The marketing secret can push packs, write Claude's notes, reserve upload slots within the quotas and read the
+--     owner's decisions. Marking a file as uploaded takes the console's own `app` secret.
+--   * One advisory lock (mc.marketing_lock) serialises every writer, taken first: one lock order, no races. The feedback
+--     reader takes it shared, so the cursor it hands out never skips an entry that is still being written.
+--
+-- Additive and safe to paste twice. Outside its own new objects it changes three things:
+--   * mc.ingest_secret's purpose check and mc.rotate_ingest_secret: a third purpose, `marketing`;
+--   * mc.job_runs' job check: the daily `marketing_retention` job;
+--   * mc_api.nav_badges: the same answer as before plus a `marketing` count.
+-- And it schedules one pg_cron job, mc-marketing-retention (only where pg_cron exists).
+
+-- ================================================================================================ the marketing secret
+-- One secret per purpose (security review L10): Claude's command-line tool holds `marketing` and nothing else.
+alter table mc.ingest_secret drop constraint if exists ingest_secret_purpose_check;
+alter table mc.ingest_secret add constraint ingest_secret_purpose_check check (purpose in ('app', 'backup', 'marketing'));
+
+-- The same function as part 1, with the third purpose. Still not security definer: only the owner runs it, in the SQL
+-- editor (`select mc.rotate_ingest_secret('marketing');`), and the answer is shown once.
+create or replace function mc.rotate_ingest_secret(p_purpose text default 'app')
+returns text
+language plpgsql
+volatile
+set search_path = ''
+as $$
+declare
+  -- Two version-4 UUIDs: 244 random bits from the server's strong random source, with no extension needed.
+  v_secret text := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+begin
+  if p_purpose is null or p_purpose not in ('app', 'backup', 'marketing') then
+    raise exception 'rotate_ingest_secret: purpose is app, backup or marketing' using errcode = '22023';
+  end if;
+  insert into mc.ingest_secret (purpose, secret_hash, rotated_at)
+    values (p_purpose, encode(sha256(convert_to(v_secret, 'UTF8')), 'hex'), now())
+    on conflict (purpose) do update set secret_hash = excluded.secret_hash, rotated_at = excluded.rotated_at;
+  return v_secret;
+end;
+$$;
+
+-- ================================================================================================ helpers (no tables)
+-- Text as it is stored and hashed: line breaks as \n, no surrounding white space, Unicode NFC. Empty becomes null.
+create or replace function mc.marketing_text(p text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select nullif(normalize(regexp_replace(regexp_replace(p, E'\r\n?', E'\n', 'g'), '^\s+|\s+$', '', 'g'), NFC), '')
+$$;
+
+-- A list of short labels: one dimension, at most p_max items, none null, each 1..p_len characters after trimming.
+create or replace function mc.text_items_ok(p text[], p_max integer, p_len integer)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p is not null
+     and coalesce(array_ndims(p), 1) = 1
+     and coalesce(cardinality(p), 0) <= p_max
+     and not exists (select 1 from unnest(p) x
+                     where x is null or char_length(regexp_replace(x, '^\s+|\s+$', '', 'g')) not between 1 and p_len)
+$$;
+
+-- Notes never carry contact details (§8): an e-mail address, or something shaped like a phone number. Dates, times,
+-- prices and counts don't match. Names can't be recognised; the console asks for them to be left out.
+create or replace function mc.marketing_has_contact(p text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(
+    -- an e-mail address
+    p ~* '[[:alnum:]._%+-]+@[[:alnum:]-]+(\.[[:alnum:]-]+)*\.[[:alpha:]]{2,}'
+    -- an international number: +63 917 123 4567, +1 (555) 010-9999
+    or p ~ '\+[0-9]{1,3}[ .-]?(\([0-9]{1,4}\)|[0-9]{1,4})([ .-]?[0-9]){5,10}'
+    -- a Philippine mobile number: 0917 123 4567, 0917-123-4567
+    or p ~ '(^|[^0-9])09[0-9]{2}[ .-]?[0-9]{3}[ .-]?[0-9]{4}([^0-9]|$)'
+    -- a landline with its area code: (02) 8123 4567, 032 234 5678
+    or p ~ '(^|[^0-9])\(?0[2-8][0-9]?\)?[ .-]?[0-9]{3,4}[ .-]?[0-9]{4}([^0-9]|$)'
+    -- ten or more digits in a row
+    or p ~ '[0-9]{10,}',
+    false)
+$$;
+
+-- When a post goes out, in its pack's time zone: the moment itself when it has a time, the whole day ("any time")
+-- when it doesn't; null without a day.
+create or replace function mc.marketing_slot(p_day date, p_time time, p_tz text)
+returns tstzrange
+language sql
+stable
+set search_path = ''
+as $$
+  select case
+    when p_day is null then null
+    when p_time is not null then tstzrange((p_day + p_time) at time zone p_tz, (p_day + p_time) at time zone p_tz, '[]')
+    else tstzrange(p_day::timestamp at time zone p_tz, (p_day + 1)::timestamp at time zone p_tz, '[)')
+  end
+$$;
+
+-- What a version says and shows (§3.10): stored on the version when it is created, computed the same way on every
+-- incoming card, so a push of the same content is recognised as unchanged. The tool sends no hash. Called only after
+-- the card was validated (its dates, times and byte counts parse).
+create or replace function mc.marketing_content_hash(p_card jsonb)
+returns text
+language sql
+stable
+set search_path = ''
+as $$
+  select encode(sha256(convert_to(jsonb_build_array(
+    mc.marketing_text(p_card ->> 'title'), p_card ->> 'kind', p_card ->> 'phase',
+    (p_card ->> 'slot_day')::date, (p_card ->> 'slot_time')::time, mc.marketing_text(p_card ->> 'slot_label'),
+    (select coalesce(jsonb_agg(mc.marketing_text(x.v) order by x.o), '[]'::jsonb)
+       from jsonb_array_elements_text(case when jsonb_typeof(p_card -> 'platforms') = 'array' then p_card -> 'platforms'
+                                           else '[]'::jsonb end) with ordinality x(v, o)),
+    mc.marketing_text(p_card ->> 'caption_label'), mc.marketing_text(p_card ->> 'caption'),
+    mc.marketing_text(p_card ->> 'yt_title'), mc.marketing_text(p_card ->> 'yt_desc'), mc.marketing_text(p_card ->> 'alt'),
+    mc.marketing_text(p_card ->> 'truth'),
+    (select coalesce(jsonb_agg(jsonb_build_array(m.v ->> 'content_type', m.v ->> 'sha256', (m.v ->> 'bytes')::bigint)
+                               order by m.o), '[]'::jsonb)
+       from jsonb_array_elements(case when jsonb_typeof(p_card -> 'media') = 'array' then p_card -> 'media'
+                                      else '[]'::jsonb end) with ordinality m(v, o))
+  )::text, 'UTF8')), 'hex')
+$$;
+
+-- Every marketing writer takes this first (after the gate or the secret check, before any row lock).
+create or replace function mc.marketing_lock()
+returns void
+language plpgsql
+volatile
+set search_path = ''
+as $$
+begin
+  perform pg_advisory_xact_lock(hashtextextended('mc.marketing', 0));
+end;
+$$;
+
+-- Bytes Mission Control may keep in the Blob store at once: 700 MB, counted the way the contract counts its 100 MB file
+-- cap (104,857,600 bytes), which leaves Vercel Blob's free 1 GB a margin. Going over locks Blob for 30 days.
+create or replace function mc.marketing_storage_budget()
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select 734003200::bigint
+$$;
+
+-- Refuses the card being pushed: the push catches it, rolls the card back to its savepoint and reports the reason.
+create or replace function mc.marketing_refuse(p_reason text, p_message text default null)
+returns void
+language plpgsql
+volatile
+set search_path = ''
+as $$
+begin
+  raise exception using errcode = 'MKREF', message = p_reason, detail = coalesce(p_message, p_reason);
+end;
+$$;
+
+-- Reading one field of a pushed card. Absent and JSON null are null; anything malformed refuses the card (invalid).
+create or replace function mc.marketing_str(p jsonb, p_field text, p_max integer)
+returns text
+language plpgsql
+volatile
+set search_path = ''
+as $$
+declare
+  v text;
+begin
+  if p is null or jsonb_typeof(p) = 'null' then
+    return null;
+  end if;
+  if jsonb_typeof(p) <> 'string' then
+    perform mc.marketing_refuse('invalid', p_field || ' is text');
+  end if;
+  v := mc.marketing_text(p #>> '{}');
+  if char_length(v) > p_max then
+    perform mc.marketing_refuse('invalid', p_field || ' is at most ' || p_max || ' characters');
+  end if;
+  return v;
+end;
+$$;
+
+create or replace function mc.marketing_int(p jsonb, p_field text, p_min bigint, p_max bigint)
+returns bigint
+language plpgsql
+volatile
+set search_path = ''
+as $$
+begin
+  if p is null or jsonb_typeof(p) = 'null' then
+    return null;
+  end if;
+  if jsonb_typeof(p) <> 'number' or (p #>> '{}') !~ '^-?\d{1,15}$' then
+    perform mc.marketing_refuse('invalid', p_field || ' is a whole number');
+  end if;
+  if (p #>> '{}')::bigint not between p_min and p_max then
+    perform mc.marketing_refuse('invalid', p_field || ' is from ' || p_min || ' to ' || p_max);
+  end if;
+  return (p #>> '{}')::bigint;
+end;
+$$;
+
+create or replace function mc.marketing_day(p jsonb, p_field text)
+returns date
+language plpgsql
+volatile
+set search_path = ''
+as $$
+declare
+  v date;
+begin
+  if p is null or jsonb_typeof(p) = 'null' then
+    return null;
+  end if;
+  if jsonb_typeof(p) <> 'string' or (p #>> '{}') !~ '^\d{4}-\d{2}-\d{2}$' then
+    perform mc.marketing_refuse('invalid', p_field || ' is a date (YYYY-MM-DD)');
+  end if;
+  begin
+    v := (p #>> '{}')::date;
+  exception when others then
+    perform mc.marketing_refuse('invalid', p_field || ' is not a real date');
+  end;
+  return v;
+end;
+$$;
+
+create or replace function mc.marketing_time(p jsonb, p_field text)
+returns time
+language plpgsql
+volatile
+set search_path = ''
+as $$
+begin
+  if p is null or jsonb_typeof(p) = 'null' then
+    return null;
+  end if;
+  if jsonb_typeof(p) <> 'string' or (p #>> '{}') !~ '^([01][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$' then
+    perform mc.marketing_refuse('invalid', p_field || ' is a time (HH:MM)');
+  end if;
+  return (p #>> '{}')::time;
+end;
+$$;
+
+create or replace function mc.marketing_bool(p jsonb, p_field text)
+returns boolean
+language plpgsql
+volatile
+set search_path = ''
+as $$
+begin
+  if p is null or jsonb_typeof(p) = 'null' then
+    return null;
+  end if;
+  if jsonb_typeof(p) <> 'boolean' then
+    perform mc.marketing_refuse('invalid', p_field || ' is true or false');
+  end if;
+  return (p #>> '{}')::boolean;
+end;
+$$;
+
+-- A list of labels (the platforms), each normalized like every other text, order kept.
+create or replace function mc.marketing_list(p jsonb, p_field text, p_max integer, p_len integer)
+returns text[]
+language plpgsql
+volatile
+set search_path = ''
+as $$
+declare
+  v text[];
+begin
+  if p is null or jsonb_typeof(p) = 'null' then
+    return '{}';
+  end if;
+  if jsonb_typeof(p) <> 'array' then
+    perform mc.marketing_refuse('invalid', p_field || ' is a list');
+  end if;
+  if exists (select 1 from jsonb_array_elements(p) x where jsonb_typeof(x) <> 'string') then
+    perform mc.marketing_refuse('invalid', p_field || ' is a list of names');
+  end if;
+  v := array(select mc.marketing_text(x.v) from jsonb_array_elements_text(p) with ordinality x(v, o) order by x.o);
+  if not mc.text_items_ok(v, p_max, p_len) then
+    perform mc.marketing_refuse('invalid', p_field || ': at most ' || p_max || ' names of 1 to ' || p_len || ' characters');
+  end if;
+  return v;
+end;
+$$;
+
+-- ================================================================================================ tables
+-- A pack: the posts Claude prepared for a stretch of days (normally an ISO week, key '2026-W48').
+create table if not exists mc.marketing_packs (
+  id uuid primary key default gen_random_uuid(),
+  key text not null unique check (key ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$'),
+  title text not null check (char_length(title) between 1 and 200),
+  starts_on date not null,
+  ends_on date not null,
+  -- Mission Control's time zone when the pack arrived: its slots are read in it for good.
+  tz text not null default mc.tz(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint marketing_packs_dates check (ends_on >= starts_on and ends_on - starts_on <= 31)
+);
+
+-- A post. What it says lives in its versions; the card holds where it stands and when it goes out.
+create table if not exists mc.marketing_cards (
+  id uuid primary key default gen_random_uuid(),
+  pack_id uuid not null references mc.marketing_packs (id) on delete cascade,
+  key text not null check (key ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'),
+  -- Orders posts that share a slot.
+  position integer not null default 0,
+  kind text not null check (kind in ('short', 'post', 'group', 'klaro', 'other')),
+  phase text not null check (phase in ('warmup', 'launch', 'any')),
+  title text not null check (char_length(title) between 1 and 200),
+  -- Within the pack's dates ± 7 days (checked when pushed). No time: any time that day.
+  slot_day date,
+  slot_time time,
+  slot_label text not null default '' check (char_length(slot_label) <= 80),
+  platforms text[] not null default '{}' check (mc.text_items_ok(platforms, 8, 60)),
+  current_version integer not null default 1 check (current_version between 1 and 20),
+  state text not null default 'waiting' check (state in ('waiting', 'approved', 'changes', 'skipped', 'withdrawn')),
+  withdrawn_reason text check (withdrawn_reason is null or char_length(withdrawn_reason) <= 500),
+  -- The owner's last decision on the current version; cleared when Claude pushes a new version.
+  decided_at timestamptz,
+  decided_by uuid,
+  -- The version the owner scheduled in the apps (null: nothing scheduled), and the platforms posted by hand at the slot.
+  in_apps_version integer check (in_apps_version is null or in_apps_version >= 1),
+  by_hand text[] not null default '{}' check (mc.text_items_ok(by_hand, 8, 60)),
+  by_hand_done_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint marketing_cards_pack_key unique (pack_id, key),
+  constraint marketing_cards_in_apps check (in_apps_version is null or in_apps_version <= current_version),
+  constraint marketing_cards_by_hand check (cardinality(by_hand) = 0 or in_apps_version is not null),
+  constraint marketing_cards_by_hand_platforms check (by_hand <@ platforms),
+  constraint marketing_cards_slot check (slot_time is null or slot_day is not null),
+  constraint marketing_cards_withdrawn check (state <> 'withdrawn' or withdrawn_reason is not null)
+);
+create index if not exists marketing_cards_slot_idx on mc.marketing_cards (pack_id, slot_day, slot_time, position);
+create index if not exists marketing_cards_open_idx on mc.marketing_cards (state) where state in ('waiting', 'changes');
+
+-- What a version of a post says. Never changes once written (trigger below): a change is a new version.
+create table if not exists mc.marketing_versions (
+  card_id uuid not null references mc.marketing_cards (id) on delete cascade,
+  version integer not null check (version between 1 and 20),
+  caption_label text not null default 'Caption' check (char_length(caption_label) between 1 and 80),
+  caption text check (caption is null or char_length(caption) <= 5000),
+  yt_title text check (yt_title is null or char_length(yt_title) <= 100),
+  yt_desc text check (yt_desc is null or char_length(yt_desc) <= 5000),
+  alt_text text check (alt_text is null or char_length(alt_text) <= 1500),
+  -- Claude's truth check (TRUTH_RULES): "pass. <rule ids>", and no word of failure or exception anywhere in it.
+  truth text not null check (char_length(truth) between 1 and 2000),
+  truth_pass boolean generated always as (truth ~* '^\s*pass\.(\s|$)' and truth !~* '\m(fail|fails|failed|except|but)\M') stored,
+  -- What Claude changed, shown beside the owner's request: required from version 2 on.
+  changes text check (changes is null or char_length(changes) <= 1000),
+  content_hash text not null check (content_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  primary key (card_id, version),
+  constraint marketing_versions_changes check (version = 1 or changes is not null)
+);
+
+-- A post's current version, and the version the apps hold, always exist. Checked at commit: a push writes the post
+-- just before its new version.
+alter table mc.marketing_cards drop constraint if exists marketing_cards_current_version;
+alter table mc.marketing_cards add constraint marketing_cards_current_version
+  foreign key (id, current_version) references mc.marketing_versions (card_id, version) deferrable initially deferred;
+alter table mc.marketing_cards drop constraint if exists marketing_cards_in_apps_version;
+alter table mc.marketing_cards add constraint marketing_cards_in_apps_version
+  foreign key (id, in_apps_version) references mc.marketing_versions (card_id, version) deferrable initially deferred;
+
+-- One stored file in the Blob store. Versions of the same post share it while the content is the same (same sha256,
+-- size and type). ready = the console found it in the store with the expected size and type; a file that arrived
+-- wrong is marked deleted (the console deletes the blob) and the next push asks for it again at a new pathname.
+create table if not exists mc.marketing_files (
+  id uuid primary key default gen_random_uuid(),
+  card_id uuid not null references mc.marketing_cards (id) on delete cascade,
+  -- marketing/<environment>/<pack>/<card>/<12 random hex>/<file name>; the console signs nothing outside its own
+  -- environment's prefix.
+  pathname text not null unique check (pathname ~ '^marketing/(test|production|local)/[A-Za-z0-9][A-Za-z0-9._-]{0,39}/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/[0-9a-f]{12}/[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$'),
+  file_name text not null check (file_name ~ '^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$'),
+  content_type text not null check (content_type in ('video/mp4', 'image/png', 'image/jpeg', 'image/webp')),
+  kind text generated always as (case when content_type like 'video/%' then 'video' else 'image' end) stored,
+  bytes bigint not null check (bytes between 1 and 104857600),
+  sha256 text not null check (sha256 ~ '^[0-9a-f]{64}$'),
+  width integer check (width is null or width between 1 and 10000),
+  height integer check (height is null or height between 1 and 10000),
+  duration_ms integer check (duration_ms is null or duration_ms between 1 and 600000),
+  ready boolean not null default false,
+  uploaded_at timestamptz,
+  etag text check (etag is null or char_length(etag) <= 200),
+  -- When the store deletes it by itself (its TTL).
+  expires_at timestamptz,
+  deleted_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint marketing_files_ready check (ready = (uploaded_at is not null)),
+  constraint marketing_files_name check (right(pathname, char_length(file_name) + 1) = '/' || file_name)
+);
+create unique index if not exists marketing_files_live on mc.marketing_files (card_id, sha256, bytes, content_type)
+  where deleted_at is null;
+
+-- A version's files, in order. A version keeps its content (the hash covers type, sha256 and size by position), but the
+-- push may point a position at a fresh file row when the stored one failed its check or expired.
+create table if not exists mc.marketing_media (
+  card_id uuid not null,
+  version integer not null,
+  position integer not null check (position between 0 and 9),
+  -- Files only ever go with their post (cascade), so the two cascades meet in either order.
+  file_id uuid not null references mc.marketing_files (id) on delete cascade,
+  primary key (card_id, version, position),
+  foreign key (card_id, version) references mc.marketing_versions (card_id, version) on delete cascade
+);
+create index if not exists marketing_media_file_idx on mc.marketing_media (file_id);
+
+-- Everything that happened to a post, from both sides: Claude's pushes and notes, the owner's decisions and requests.
+-- Append-only (trigger below). Only the launch details pushed with a pack belong to no post.
+create table if not exists mc.marketing_log (
+  id bigint generated always as identity primary key,
+  card_id uuid references mc.marketing_cards (id) on delete cascade,
+  version integer check (version is null or version between 1 and 20),
+  kind text not null check (kind in ('created', 'revised', 'withdrawn', 'claude_note', 'approved', 'changes', 'skipped',
+    'undo', 'in_apps', 'removed_from_apps', 'posted_by_hand', 'launch_meta', 'note_redacted')),
+  note text check (note is null or char_length(note) <= 2000),
+  tags text[] not null default '{}' check (mc.text_items_ok(tags, 7, 20)
+    and tags <@ array['video', 'caption', 'youtube', 'alt', 'timing', 'other', 'replace']::text[]),
+  actor text not null check (actor in ('admin', 'claude')),
+  admin_id uuid,
+  at timestamptz not null default now(),
+  constraint marketing_log_actor check ((actor = 'admin') = (admin_id is not null)),
+  constraint marketing_log_scope check ((kind = 'launch_meta') = (card_id is null) and (kind = 'launch_meta') = (version is null)),
+  constraint marketing_log_note check (kind not in ('claude_note', 'changes') or note is not null)
+);
+-- Claude's notes are idempotent: the same note on the same version is stored once.
+create unique index if not exists marketing_log_claude_note on mc.marketing_log (card_id, version, md5(note))
+  where kind = 'claude_note';
+create index if not exists marketing_log_card_idx on mc.marketing_log (card_id, version, id);
+
+-- One row: the launch dates Claude pushes, the moment the owner marked Lucento live on Google Play, and when Claude last
+-- read the owner's requests. db_id ties the tool's cursor to this database.
+create table if not exists mc.marketing_launch (
+  id boolean primary key default true check (id),
+  closed_test_start date,
+  closed_test_days integer check (closed_test_days is null or closed_test_days between 1 and 60),
+  apply_on date,
+  pday_label text check (pday_label is null or char_length(pday_label) <= 80),
+  pday_at timestamptz,
+  pday_set_by uuid,
+  pday_set_at timestamptz,
+  claude_checked_at timestamptz,
+  claude_seen_log_id bigint not null default 0,
+  db_id uuid not null default gen_random_uuid(),
+  updated_at timestamptz not null default now()
+);
+insert into mc.marketing_launch (id) values (true) on conflict (id) do nothing;
+
+-- The week's numbers the owner types on Sunday: followers per channel, views per post and platform, and after launch the
+-- Play installs and listing visitors.
+create table if not exists mc.marketing_numbers (
+  pack_id uuid primary key references mc.marketing_packs (id) on delete cascade,
+  followers jsonb not null default '{}'::jsonb check (jsonb_typeof(followers) = 'object' and pg_column_size(followers) <= 4096),
+  views jsonb not null default '{}'::jsonb check (jsonb_typeof(views) = 'object' and pg_column_size(views) <= 65536),
+  installs integer check (installs is null or installs >= 0),
+  listing_visitors integer check (listing_visitors is null or listing_visitors >= 0),
+  updated_at timestamptz not null default now(),
+  updated_by uuid
+);
+
+-- ================================================================================================ triggers
+create or replace function mc.marketing_versions_immutable()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  raise exception 'mc.marketing_versions never change: push a new version instead' using errcode = '42501';
+end;
+$$;
+
+drop trigger if exists marketing_versions_no_update on mc.marketing_versions;
+create trigger marketing_versions_no_update before update on mc.marketing_versions
+  for each row execute function mc.marketing_versions_immutable();
+
+-- UPDATE only to remove an owner's note (mc_api.marketing_redact_note sets the flag for that one statement, and nothing
+-- else in the row may change); DELETE only when the post itself is gone (cascades); never TRUNCATE.
+create or replace function mc.marketing_log_append_only()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'UPDATE' then
+    if coalesce(current_setting('mc.marketing_redact', true), '') = 'on' then
+      if old.note is not null and new.note = '[removed]' and (to_jsonb(new) - 'note') = (to_jsonb(old) - 'note') then
+        return new;
+      end if;
+    end if;
+  elsif tg_op = 'DELETE' then
+    if old.card_id is not null then
+      if not exists (select 1 from mc.marketing_cards c where c.id = old.card_id) then
+        return old;
+      end if;
+    end if;
+  end if;
+  raise exception 'mc.marketing_log is append-only' using errcode = '42501';
+end;
+$$;
+
+drop trigger if exists marketing_log_no_change on mc.marketing_log;
+create trigger marketing_log_no_change before update or delete on mc.marketing_log
+  for each row execute function mc.marketing_log_append_only();
+drop trigger if exists marketing_log_no_truncate on mc.marketing_log;
+create trigger marketing_log_no_truncate before truncate on mc.marketing_log
+  for each statement execute function mc.marketing_log_append_only();
+
+-- ================================================================================================ helpers (reading)
+-- A version can be approved once every file it shows is in the store: none pending, failed, deleted or expired. A
+-- text-only post has no files and is ready at once.
+create or replace function mc.marketing_version_ready(p_card uuid, p_version integer)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select not exists (
+    select 1 from mc.marketing_media m join mc.marketing_files f on f.id = m.file_id
+    where m.card_id = p_card and m.version = p_version
+      and (not f.ready or f.deleted_at is not null or (f.expires_at is not null and f.expires_at <= now()))
+  )
+$$;
+
+-- When Lucento went live on Google Play (null until the owner says so).
+create or replace function mc.marketing_pday()
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select l.pday_at from mc.marketing_launch l where l.id
+$$;
+
+-- Every post with its slot and its derived flags (§4), for a given launch moment: the stored one, or one the owner is
+-- about to confirm (the launch preview). One place for every rule, read by the board, the summary, the badge and
+-- Claude's feedback. p_card narrows it to one post.
+create or replace function mc.marketing_status(p_pday timestamptz, p_card uuid default null)
+returns table (
+  card_id uuid, pack_id uuid, pack_key text, card_key text, title text, kind text, phase text, state text,
+  current_version integer, in_apps_version integer, card_position integer, slot_day date, slot_time time, slot_label text,
+  slot_start timestamptz, slot_end timestamptz, truth_pass boolean, version_created_at timestamptz, ready boolean,
+  replace_after_launch boolean, too_early boolean, apps_stale boolean, due_soon boolean, needs_decision_soon boolean,
+  missed boolean, media_missing boolean, uploading boolean
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select c.id, c.pack_id, p.key, c.key, c.title, c.kind, c.phase, c.state, c.current_version, c.in_apps_version,
+         c.position, c.slot_day, c.slot_time, c.slot_label, lower(s.slot), upper(s.slot), v.truth_pass, v.created_at, r.ready,
+         -- Says "coming soon" but goes out after launch (still to decide, approved, or already in the apps).
+         coalesce(c.phase = 'warmup' and p_pday is not null and upper(s.slot) > p_pday
+                  and (c.state in ('waiting', 'changes', 'approved') or c.in_apps_version is not null), false),
+         -- Says "Get it on Google Play" but goes out before launch (or launch hasn't been marked yet).
+         coalesce(c.phase = 'launch' and c.state not in ('skipped', 'withdrawn')
+                  and (p_pday is null or p_pday > lower(s.slot)), false),
+         -- The apps hold an older version, or a post that is skipped or taken out.
+         coalesce(c.in_apps_version is not null
+                  and (c.in_apps_version < c.current_version or c.state in ('skipped', 'withdrawn')), false),
+         coalesce(c.state = 'approved' and c.in_apps_version is null
+                  and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now(), false),
+         coalesce(c.state in ('waiting', 'changes')
+                  and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now(), false),
+         coalesce(c.state in ('waiting', 'changes') and upper(s.slot) <= now(), false),
+         coalesce(not r.ready and v.created_at <= now() - interval '2 hours', false),
+         coalesce(not r.ready and v.created_at > now() - interval '2 hours', false)
+  from mc.marketing_cards c
+  join mc.marketing_packs p on p.id = c.pack_id
+  join mc.marketing_versions v on v.card_id = c.id and v.version = c.current_version
+  cross join lateral (select mc.marketing_slot(c.slot_day, c.slot_time, p.tz) as slot) s
+  cross join lateral (select mc.marketing_version_ready(c.id, c.current_version) as ready) r
+  where p_card is null or c.id = p_card
+$$;
+
+-- The owner's requests Claude still has to act on: the change requests on the current version since the owner last
+-- approved, undid or skipped it (while the post waits for Claude), and "skip it and ask Claude for another post" while
+-- that skip stands.
+create or replace function mc.marketing_open_requests(p_card uuid default null)
+returns table (log_id bigint, card_id uuid, version integer, kind text, note text, tags text[], at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select l.id, l.card_id, l.version, l.kind, l.note, l.tags, l.at
+  from mc.marketing_cards c
+  join mc.marketing_log l on l.card_id = c.id and l.version = c.current_version and l.actor = 'admin'
+  where (p_card is null or c.id = p_card)
+    and ((c.state = 'changes' and l.kind = 'changes'
+          and l.id > coalesce((select max(x.id) from mc.marketing_log x
+                               where x.card_id = c.id and x.version = c.current_version and x.actor = 'admin'
+                                 and x.kind in ('approved', 'undo', 'skipped')), 0))
+      or (c.state = 'skipped' and l.kind = 'skipped' and 'replace' = any(l.tags)
+          and l.id = (select max(x.id) from mc.marketing_log x
+                      where x.card_id = c.id and x.version = c.current_version and x.actor = 'admin'
+                        and x.kind in ('approved', 'changes', 'skipped', 'undo'))))
+$$;
+
+-- Posts waiting for the owner's yes that can get it now: a ready, passing current version and a slot that hasn't
+-- ended. The navigation badge and Overview's "wait for your yes" both count exactly these.
+create or replace function mc.marketing_waiting()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('count', count(*), 'first_slot', min(s.slot_start))
+  from mc.marketing_status(mc.marketing_pday()) s
+  where s.state = 'waiting' and s.truth_pass and s.ready and (s.slot_end is null or s.slot_end > now())
+$$;
+
+-- The posts one flag points at, among those that haven't gone out yet: how many, and the first p_limit by slot.
+create or replace function mc.marketing_flag_items(p_flag text, p_limit integer)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('count', count(*), 'items', coalesce(jsonb_agg(jsonb_build_object(
+      'pack', x.pack_key, 'card', x.card_key, 'card_id', x.card_id, 'title', x.title, 'kind', x.kind, 'phase', x.phase,
+      'state', x.state, 'current_version', x.current_version, 'in_apps_version', x.in_apps_version,
+      'slot', x.slot_start, 'slot_end', x.slot_end, 'slot_day', x.slot_day, 'slot_time', left(x.slot_time::text, 5),
+      'slot_label', x.slot_label, 'version_created_at', x.version_created_at)
+    order by x.slot_start nulls last, x.card_position, x.card_key) filter (where x.rn <= p_limit), '[]'::jsonb))
+  from (
+    select s.*, row_number() over (order by s.slot_start nulls last, s.card_position, s.card_key) as rn
+    from mc.marketing_status(mc.marketing_pday()) s
+    where (s.slot_end is null or s.slot_end > now())
+      and case p_flag
+            when 'needs_decision_soon' then s.needs_decision_soon
+            when 'due_soon' then s.due_soon
+            when 'apps_stale' then s.apps_stale
+            when 'replace_after_launch' then s.replace_after_launch
+            when 'too_early' then s.too_early
+            when 'media_missing' then s.media_missing and s.state not in ('skipped', 'withdrawn')
+            else false
+          end
+  ) x
+$$;
+
+-- What marking Lucento live at p_at would flag (the confirm step, and the answer once it is set).
+create or replace function mc.marketing_launch_counts(p_at timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'replace_after_launch', count(*) filter (where s.replace_after_launch),
+    'in_apps_after_launch', count(*) filter (where s.replace_after_launch and s.in_apps_version is not null),
+    'too_early', count(*) filter (where s.too_early))
+  from mc.marketing_status(p_at) s
+$$;
+
+-- The owner's "when it went live" (YYYY-MM-DDTHH:MM in Mission Control's time zone) as a moment, or why not.
+create or replace function mc.marketing_launch_at(p_local text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_at timestamptz;
+begin
+  if p_local is null then
+    return jsonb_build_object('ok', true, 'at', null);
+  end if;
+  if p_local !~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$' then
+    return mc.failed('invalid', 'Enter the moment as YYYY-MM-DDTHH:MM (Manila time)');
+  end if;
+  begin
+    v_at := (p_local::timestamp) at time zone mc.tz();
+  exception when others then
+    return mc.failed('invalid', 'That date or time doesn''t exist');
+  end;
+  if v_at > now() + interval '1 hour' then
+    return mc.failed('launch_future', 'Set this once Lucento is live (not more than an hour ahead).');
+  end if;
+  if v_at < now() - interval '7 days' then
+    return mc.failed('launch_too_old', 'That''s more than 7 days ago.');
+  end if;
+  return jsonb_build_object('ok', true, 'at', v_at);
+end;
+$$;
+
+-- A file still shown by a post: by its current version, or by the version the apps hold.
+create or replace function mc.marketing_file_in_use(p_file uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from mc.marketing_media m join mc.marketing_cards c on c.id = m.card_id
+    where m.file_id = p_file and (m.version = c.current_version or m.version = c.in_apps_version)
+  )
+$$;
+
+-- The post's files that nothing shows any more: the console may delete them from the store (then
+-- marketing_media_deleted, which checks again).
+create or replace function mc.marketing_cleanup(p_card uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(f.pathname order by f.created_at, f.pathname), '[]'::jsonb)
+  from mc.marketing_files f
+  where f.card_id = p_card and f.deleted_at is null and not mc.marketing_file_in_use(f.id)
+$$;
+
+-- The environment the stored files belong to (test, production, local), from the newest pathname.
+create or replace function mc.marketing_environment()
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select split_part(f.pathname, '/', 2) from mc.marketing_files f order by f.created_at desc, f.pathname desc limit 1
+$$;
+
+create or replace function mc.marketing_launch_json()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('closed_test_start', l.closed_test_start, 'closed_test_days', l.closed_test_days,
+    'apply_on', l.apply_on, 'pday_label', l.pday_label, 'pday_at', l.pday_at, 'pday_set_at', l.pday_set_at,
+    'pday_set_by', (select a.display_name from mc.admins a where a.user_id = l.pday_set_by))
+  from mc.marketing_launch l where l.id
+$$;
+
+-- Every pack with its counts, newest first.
+create or replace function mc.marketing_packs_json()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(x.j order by x.starts_on desc nulls last, x.created_at desc), '[]'::jsonb)
+  from (
+    select p.starts_on, p.created_at,
+           jsonb_build_object('key', p.key, 'title', p.title, 'starts_on', p.starts_on, 'ends_on', p.ends_on,
+             'counts', jsonb_build_object('total', count(c.id),
+               'waiting', count(c.id) filter (where c.state = 'waiting'),
+               'approved', count(c.id) filter (where c.state = 'approved'),
+               'changes', count(c.id) filter (where c.state = 'changes'),
+               'skipped', count(c.id) filter (where c.state = 'skipped'),
+               'withdrawn', count(c.id) filter (where c.state = 'withdrawn'))) as j
+    from mc.marketing_packs p left join mc.marketing_cards c on c.pack_id = p.id
+    group by p.id
+  ) x
+$$;
+
+-- One post as the Marketing page shows it (§5.4).
+create or replace function mc.marketing_card_json(p_card uuid, p_pday timestamptz, p_seen bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'id', s.card_id, 'key', s.card_key, 'position', s.card_position, 'kind', s.kind, 'phase', s.phase, 'title', s.title,
+    'slot_day', s.slot_day, 'slot_time', left(s.slot_time::text, 5), 'slot_label', s.slot_label,
+    'slot_start', s.slot_start, 'slot_end', s.slot_end, 'platforms', to_jsonb(c.platforms),
+    'state', s.state, 'current_version', s.current_version, 'decided_at', c.decided_at,
+    'decided_by', (select a.display_name from mc.admins a where a.user_id = c.decided_by),
+    'in_apps_version', s.in_apps_version, 'by_hand', to_jsonb(c.by_hand), 'by_hand_done_at', c.by_hand_done_at,
+    'withdrawn_reason', c.withdrawn_reason,
+    'flags', jsonb_build_object('replace_after_launch', s.replace_after_launch, 'too_early', s.too_early,
+      'apps_stale', s.apps_stale, 'due_soon', s.due_soon, 'needs_decision_soon', s.needs_decision_soon,
+      'missed', s.missed, 'media_missing', s.media_missing, 'uploading', s.uploading),
+    'version', jsonb_build_object('version', v.version, 'caption_label', v.caption_label, 'caption', v.caption,
+      'yt_title', v.yt_title, 'yt_desc', v.yt_desc, 'alt_text', v.alt_text, 'truth', v.truth,
+      'truth_pass', v.truth_pass, 'changes', v.changes, 'ready', s.ready, 'created_at', v.created_at),
+    'previous', (select jsonb_build_object('version', pv.version, 'caption', pv.caption, 'yt_title', pv.yt_title,
+                   'yt_desc', pv.yt_desc, 'alt_text', pv.alt_text, 'changes', pv.changes)
+                 from mc.marketing_versions pv where pv.card_id = s.card_id and pv.version = s.current_version - 1),
+    'media', (select coalesce(jsonb_agg(jsonb_build_object('position', m.position, 'file_id', f.id, 'kind', f.kind,
+                'file_name', f.file_name, 'pathname', f.pathname, 'content_type', f.content_type, 'bytes', f.bytes,
+                'width', f.width, 'height', f.height, 'duration_ms', f.duration_ms, 'ready', f.ready,
+                'expired', coalesce(f.expires_at <= now(), false), 'deleted', f.deleted_at is not null)
+                order by m.position), '[]'::jsonb)
+              from mc.marketing_media m join mc.marketing_files f on f.id = m.file_id
+              where m.card_id = s.card_id and m.version = s.current_version),
+    'open_requests', (select coalesce(jsonb_agg(jsonb_build_object('log_id', o.log_id, 'version', o.version, 'kind', o.kind,
+                        'note', o.note, 'tags', to_jsonb(o.tags), 'at', o.at, 'seen', p_seen >= o.log_id)
+                        order by o.log_id), '[]'::jsonb)
+                      from mc.marketing_open_requests(s.card_id) o),
+    -- Claude's latest note, while no owner entry came after it.
+    'latest_claude_note', (select jsonb_build_object('log_id', n.id, 'version', n.version, 'note', n.note, 'at', n.at)
+                           from mc.marketing_log n
+                           where n.card_id = s.card_id and n.kind = 'claude_note'
+                             and n.id > coalesce((select max(o.id) from mc.marketing_log o
+                                                  where o.card_id = s.card_id and o.actor = 'admin'), 0)
+                           order by n.id desc limit 1),
+    'log', (select coalesce(jsonb_agg(jsonb_build_object('id', g.id, 'version', g.version, 'kind', g.kind, 'note', g.note,
+              'tags', to_jsonb(g.tags), 'actor', g.actor,
+              'by', (select a.display_name from mc.admins a where a.user_id = g.admin_id), 'at', g.at)
+              order by g.id desc), '[]'::jsonb)
+            from (select x.* from mc.marketing_log x where x.card_id = s.card_id order by x.id desc limit 30) g))
+  from mc.marketing_status(p_pday, p_card) s
+  join mc.marketing_cards c on c.id = s.card_id
+  join mc.marketing_versions v on v.card_id = s.card_id and v.version = s.current_version
+$$;
+
+-- The current version's files that still have to be uploaded, for the push's answer. p_media is the card as pushed
+-- (its file names, by position).
+create or replace function mc.marketing_uploads(p_card uuid, p_card_key text, p_version integer, p_media jsonb)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('card', p_card_key, 'version', p_version, 'position', m.position,
+           'file', coalesce(p_media -> m.position ->> 'file', f.file_name), 'pathname', f.pathname,
+           'content_type', f.content_type, 'bytes', f.bytes) order by m.position), '[]'::jsonb)
+  from mc.marketing_media m join mc.marketing_files f on f.id = m.file_id
+  where m.card_id = p_card and m.version = p_version and not f.ready and f.deleted_at is null
+$$;
+
+-- The answer for a card the push refused.
+create or replace function mc.marketing_refused_card(p_pack uuid, p_card jsonb, p_reason text, p_message text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'key', case when jsonb_typeof(p_card -> 'key') = 'string' then left(p_card ->> 'key', 64) end,
+    'version', case when jsonb_typeof(p_card -> 'version') = 'number' and (p_card ->> 'version') ~ '^\d{1,4}$'
+                    then (p_card ->> 'version')::integer end,
+    'result', 'refused', 'reason', p_reason, 'message', left(p_message, 300),
+    'state', (select c.state from mc.marketing_cards c
+              where c.pack_id = p_pack and jsonb_typeof(p_card -> 'key') = 'string' and c.key = p_card ->> 'key'))
+$$;
+
+-- ================================================================================================ pushing a card
+create or replace function mc.marketing_check_slot(p_pack mc.marketing_packs, p_day date)
+returns void
+language plpgsql
+volatile
+set search_path = ''
+as $$
+begin
+  if p_day is not null and (p_day < p_pack.starts_on - 7 or p_day > p_pack.ends_on + 7) then
+    perform mc.marketing_refuse('slot_outside_pack', 'The slot is more than 7 days outside the pack''s dates');
+  end if;
+end;
+$$;
+
+-- Files kept and not expired, this push's new ones included (they are written before this runs).
+create or replace function mc.marketing_check_budget()
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+begin
+  if (select coalesce(sum(f.bytes), 0) from mc.marketing_files f
+      where f.deleted_at is null and (f.expires_at is null or f.expires_at > now())) > mc.marketing_storage_budget() then
+    perform mc.marketing_refuse('quota', 'Mission Control''s file storage is full (700 MB): approve or skip older posts so their files can go');
+  end if;
+end;
+$$;
+
+-- The file row for one pushed media item: the post's live file with the same content when there is one, otherwise a
+-- new row with a fresh pathname. A matching file that expired in the store (or belongs to another environment's
+-- store) is marked deleted first, so the same content goes up again. Returns the file id and whether it is new.
+create or replace function mc.marketing_file_for(p_pack mc.marketing_packs, p_env text, p_card mc.marketing_cards, p_item jsonb,
+                                                 out o_file uuid, out o_new boolean)
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_f mc.marketing_files%rowtype;
+begin
+  select * into v_f from mc.marketing_files f
+    where f.card_id = p_card.id and f.sha256 = p_item ->> 'sha256' and f.bytes = (p_item ->> 'bytes')::bigint
+      and f.content_type = p_item ->> 'content_type' and f.deleted_at is null
+    for update;
+  if found then
+    if (v_f.expires_at is null or v_f.expires_at > now()) and split_part(v_f.pathname, '/', 2) = p_env then
+      o_file := v_f.id;
+      o_new := false;
+      return;
+    end if;
+    update mc.marketing_files f set deleted_at = now() where f.id = v_f.id;
+  end if;
+  insert into mc.marketing_files (card_id, pathname, file_name, content_type, bytes, sha256, width, height, duration_ms)
+    values (p_card.id,
+            'marketing/' || p_env || '/' || p_pack.key || '/' || p_card.key || '/'
+              || left(replace(gen_random_uuid()::text, '-', ''), 12) || '/' || (p_item ->> 'file'),
+            p_item ->> 'file', p_item ->> 'content_type', (p_item ->> 'bytes')::bigint, p_item ->> 'sha256',
+            (p_item ->> 'width')::integer, (p_item ->> 'height')::integer, (p_item ->> 'duration_ms')::integer)
+    returning id into o_file;
+  o_new := true;
+end;
+$$;
+
+-- A new version's files, in order.
+create or replace function mc.marketing_attach_media(p_pack mc.marketing_packs, p_env text, p_card mc.marketing_cards,
+                                                     p_version integer, p_media jsonb)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_item jsonb;
+  v_pos integer;
+  v_file uuid;
+  v_new boolean;
+  v_any_new boolean := false;
+begin
+  for v_item, v_pos in select x.value, (x.ordinality - 1)::integer from jsonb_array_elements(p_media) with ordinality x loop
+    select f.o_file, f.o_new into v_file, v_new from mc.marketing_file_for(p_pack, p_env, p_card, v_item) f;
+    insert into mc.marketing_media (card_id, version, position, file_id) values (p_card.id, p_version, v_pos, v_file);
+    v_any_new := v_any_new or v_new;
+  end loop;
+  if v_any_new then
+    perform mc.marketing_check_budget();
+  end if;
+end;
+$$;
+
+-- The same version pushed again: a file that failed its check, expired or sits in another environment's store is asked
+-- for again under a new pathname (the version's content is unchanged: the same type, sha256 and size by position).
+create or replace function mc.marketing_repair_media(p_pack mc.marketing_packs, p_env text, p_card mc.marketing_cards, p_media jsonb)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  r record;
+  v_file uuid;
+  v_new boolean;
+  v_any_new boolean := false;
+begin
+  for r in
+    select m.position
+    from mc.marketing_media m join mc.marketing_files f on f.id = m.file_id
+    where m.card_id = p_card.id and m.version = p_card.current_version
+      and (f.deleted_at is not null or (f.expires_at is not null and f.expires_at <= now())
+           or split_part(f.pathname, '/', 2) <> p_env)
+    order by m.position
+  loop
+    select f.o_file, f.o_new into v_file, v_new from mc.marketing_file_for(p_pack, p_env, p_card, p_media -> r.position) f;
+    update mc.marketing_media m set file_id = v_file
+      where m.card_id = p_card.id and m.version = p_card.current_version and m.position = r.position;
+    v_any_new := v_any_new or v_new;
+  end loop;
+  if v_any_new then
+    perform mc.marketing_check_budget();
+  end if;
+end;
+$$;
+
+-- A new version's texts. Its truth line must pass, read by the version's own generated column.
+create or replace function mc.marketing_add_version(p_card uuid, p_version integer, p_card_json jsonb, p_changes text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_truth text := mc.marketing_text(p_card_json ->> 'truth');
+  v_pass boolean;
+begin
+  if v_truth is null then
+    perform mc.marketing_refuse('truth_failed', 'Every post needs a truth line that starts with "pass."');
+  end if;
+  insert into mc.marketing_versions (card_id, version, caption_label, caption, yt_title, yt_desc, alt_text, truth, changes,
+                                     content_hash)
+    values (p_card, p_version,
+            coalesce(mc.marketing_text(p_card_json ->> 'caption_label'), 'Caption'),
+            mc.marketing_text(p_card_json ->> 'caption'), mc.marketing_text(p_card_json ->> 'yt_title'),
+            mc.marketing_text(p_card_json ->> 'yt_desc'), mc.marketing_text(p_card_json ->> 'alt'), v_truth, p_changes,
+            mc.marketing_content_hash(p_card_json))
+    returning truth_pass into v_pass;
+  if not v_pass then
+    perform mc.marketing_refuse('truth_failed', 'The truth line doesn''t pass: fix the post or take it out');
+  end if;
+end;
+$$;
+
+-- One card of a push (§5.3), inside the push's savepoint for it: every refusal raises (mc.marketing_refuse), so a card
+-- that fails never half-writes. Answers {key, version, result, reason, state, uploads}.
+create or replace function mc.marketing_push_card(p_pack mc.marketing_packs, p_env text, p_card jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_key text;
+  v_version integer;
+  v_position integer;
+  v_kind text;
+  v_phase text;
+  v_title text;
+  v_day date;
+  v_time time;
+  v_label text;
+  v_platforms text[];
+  v_changes text;
+  v_revive boolean;
+  v_withdrawn boolean;
+  v_reason text;
+  v_media jsonb;
+  v_item jsonb;
+  v_hash text;
+  v_c mc.marketing_cards%rowtype;
+  v_result text;
+begin
+  -- 1. Read and check every field before looking at anything stored.
+  if jsonb_typeof(p_card) is distinct from 'object' then
+    perform mc.marketing_refuse('invalid', 'Each card is an object');
+  end if;
+  v_key := case when jsonb_typeof(p_card -> 'key') = 'string' then p_card ->> 'key' end;
+  if v_key is null or v_key !~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$' then
+    perform mc.marketing_refuse('invalid', 'key: up to 64 letters, digits, dots, dashes or underscores');
+  end if;
+  v_version := mc.marketing_int(p_card -> 'version', 'version', 1, 1000);
+  if v_version is null then
+    perform mc.marketing_refuse('invalid', 'version is required');
+  end if;
+  if v_version > 20 then
+    perform mc.marketing_refuse('quota', 'A post has at most 20 versions');
+  end if;
+  v_position := coalesce(mc.marketing_int(p_card -> 'position', 'position', -1000000, 1000000), 0);
+  v_kind := case when jsonb_typeof(p_card -> 'kind') = 'string' then p_card ->> 'kind' end;
+  if v_kind is null or v_kind not in ('short', 'post', 'group', 'klaro', 'other') then
+    perform mc.marketing_refuse('invalid', 'kind is short, post, group, klaro or other');
+  end if;
+  if jsonb_typeof(p_card -> 'phase') is distinct from 'string' or p_card ->> 'phase' = '' then
+    perform mc.marketing_refuse('phase_required', 'Every post says its phase: warmup, launch or any');
+  end if;
+  v_phase := p_card ->> 'phase';
+  if v_phase not in ('warmup', 'launch', 'any') then
+    perform mc.marketing_refuse('invalid', 'phase is warmup, launch or any');
+  end if;
+  v_title := mc.marketing_str(p_card -> 'title', 'title', 200);
+  if v_title is null then
+    perform mc.marketing_refuse('invalid', 'title: 1 to 200 characters');
+  end if;
+  v_day := mc.marketing_day(p_card -> 'slot_day', 'slot_day');
+  v_time := mc.marketing_time(p_card -> 'slot_time', 'slot_time');
+  if v_time is not null and v_day is null then
+    perform mc.marketing_refuse('invalid', 'slot_time needs a slot_day');
+  end if;
+  v_label := coalesce(mc.marketing_str(p_card -> 'slot_label', 'slot_label', 80), '');
+  v_platforms := mc.marketing_list(p_card -> 'platforms', 'platforms', 8, 60);
+  v_changes := mc.marketing_str(p_card -> 'changes', 'changes', 1000);
+  v_revive := coalesce(mc.marketing_bool(p_card -> 'revive', 'revive'), false);
+  v_withdrawn := coalesce(mc.marketing_bool(p_card -> 'withdrawn', 'withdrawn'), false);
+  v_reason := mc.marketing_str(p_card -> 'withdrawn_reason', 'withdrawn_reason', 500);
+  perform mc.marketing_str(p_card -> 'caption_label', 'caption_label', 80);
+  perform mc.marketing_str(p_card -> 'caption', 'caption', 5000);
+  perform mc.marketing_str(p_card -> 'yt_title', 'yt_title', 100);
+  perform mc.marketing_str(p_card -> 'yt_desc', 'yt_desc', 5000);
+  perform mc.marketing_str(p_card -> 'alt', 'alt', 1500);
+  perform mc.marketing_str(p_card -> 'truth', 'truth', 2000);
+  -- What Claude writes into the log is held to the same rule as the owner's notes.
+  if mc.marketing_has_contact(v_changes) or mc.marketing_has_contact(v_reason) then
+    perform mc.marketing_refuse('note_has_contact', 'Leave out names, e-mail addresses and phone numbers');
+  end if;
+  if jsonb_typeof(p_card -> 'media') not in ('array', 'null') then
+    perform mc.marketing_refuse('invalid', 'media is a list');
+  end if;
+  v_media := coalesce(case when jsonb_typeof(p_card -> 'media') = 'array' then p_card -> 'media' end, '[]'::jsonb);
+  if jsonb_array_length(v_media) > 10 then
+    perform mc.marketing_refuse('quota', 'A post has at most 10 files');
+  end if;
+  for v_item in select x from jsonb_array_elements(v_media) x loop
+    if jsonb_typeof(v_item) is distinct from 'object' then
+      perform mc.marketing_refuse('invalid', 'Each media item is an object');
+    end if;
+    if jsonb_typeof(v_item -> 'file') is distinct from 'string' or (v_item ->> 'file') !~ '^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$' then
+      perform mc.marketing_refuse('invalid', 'media file: a plain file name (letters, digits, spaces, dots, dashes, underscores)');
+    end if;
+    if jsonb_typeof(v_item -> 'content_type') is distinct from 'string'
+       or (v_item ->> 'content_type') not in ('video/mp4', 'image/png', 'image/jpeg', 'image/webp') then
+      perform mc.marketing_refuse('invalid', 'media content_type is video/mp4, image/png, image/jpeg or image/webp');
+    end if;
+    if mc.marketing_int(v_item -> 'bytes', 'media bytes', 1, 104857600) is null then
+      perform mc.marketing_refuse('invalid', 'media bytes is required');
+    end if;
+    if jsonb_typeof(v_item -> 'sha256') is distinct from 'string' or (v_item ->> 'sha256') !~ '^[0-9a-f]{64}$' then
+      perform mc.marketing_refuse('invalid', 'media sha256: 64 lowercase hex characters');
+    end if;
+    perform mc.marketing_int(v_item -> 'width', 'media width', 1, 10000);
+    perform mc.marketing_int(v_item -> 'height', 'media height', 1, 10000);
+    perform mc.marketing_int(v_item -> 'duration_ms', 'media duration_ms', 1, 600000);
+  end loop;
+  v_hash := mc.marketing_content_hash(p_card);
+
+  -- 2. What the push means for the stored post.
+  select * into v_c from mc.marketing_cards c where c.pack_id = p_pack.id and c.key = v_key for update;
+  if not found then
+    if v_withdrawn then
+      perform mc.marketing_refuse('not_found', 'There is no post ' || v_key || ' to take out');
+    end if;
+    if v_version <> 1 then
+      perform mc.marketing_refuse('version_out_of_order', 'A new post starts at version 1');
+    end if;
+    perform mc.marketing_check_slot(p_pack, v_day);
+    insert into mc.marketing_cards (pack_id, key, position, kind, phase, title, slot_day, slot_time, slot_label, platforms)
+      values (p_pack.id, v_key, v_position, v_kind, v_phase, v_title, v_day, v_time, v_label, v_platforms)
+      returning * into v_c;
+    perform mc.marketing_add_version(v_c.id, 1, p_card, v_changes);
+    perform mc.marketing_attach_media(p_pack, p_env, v_c, 1, v_media);
+    insert into mc.marketing_log (card_id, version, kind, actor) values (v_c.id, 1, 'created', 'claude');
+    v_result := 'created';
+  elsif v_c.state = 'withdrawn' then
+    if v_withdrawn and v_version = v_c.current_version then
+      v_result := 'unchanged';
+    else
+      perform mc.marketing_refuse('withdrawn', 'This post was taken out: a new post needs a new card key');
+    end if;
+  elsif v_withdrawn then
+    if v_version <> v_c.current_version then
+      perform mc.marketing_refuse('version_out_of_order', 'Take a post out on its current version (' || v_c.current_version || ')');
+    end if;
+    if v_reason is null then
+      perform mc.marketing_refuse('reason_required', 'Say why the post is taken out (withdrawn_reason)');
+    end if;
+    update mc.marketing_cards c set state = 'withdrawn', withdrawn_reason = v_reason, position = v_position, updated_at = now()
+      where c.id = v_c.id
+      returning * into v_c;
+    insert into mc.marketing_log (card_id, version, kind, note, actor)
+      values (v_c.id, v_c.current_version, 'withdrawn', v_reason, 'claude');
+    v_result := 'withdrawn';
+  elsif v_version = v_c.current_version then
+    if v_hash is distinct from (select v.content_hash from mc.marketing_versions v
+                                where v.card_id = v_c.id and v.version = v_c.current_version) then
+      perform mc.marketing_refuse('version_changed', 'Version ' || v_version || ' is already here with other content: push version '
+        || (v_version + 1) || ' with what changed');
+    end if;
+    if v_c.position <> v_position then
+      update mc.marketing_cards c set position = v_position, updated_at = now() where c.id = v_c.id returning * into v_c;
+    end if;
+    perform mc.marketing_repair_media(p_pack, p_env, v_c, v_media);
+    v_result := 'unchanged';
+  elsif v_version = v_c.current_version + 1 and v_changes is not null then
+    perform mc.marketing_check_slot(p_pack, v_day);
+    -- An approval never carries over: waiting again, unless the owner skipped it and Claude doesn't ask to revive it.
+    update mc.marketing_cards c set
+      current_version = v_version, position = v_position, kind = v_kind, phase = v_phase, title = v_title,
+      slot_day = v_day, slot_time = v_time, slot_label = v_label, platforms = v_platforms,
+      by_hand = array(select h from unnest(c.by_hand) h where h = any(v_platforms)),
+      state = case when c.state = 'skipped' and not v_revive then 'skipped' else 'waiting' end,
+      decided_at = null, decided_by = null, updated_at = now()
+      where c.id = v_c.id
+      returning * into v_c;
+    perform mc.marketing_add_version(v_c.id, v_version, p_card, v_changes);
+    perform mc.marketing_attach_media(p_pack, p_env, v_c, v_version, v_media);
+    insert into mc.marketing_log (card_id, version, kind, note, actor) values (v_c.id, v_version, 'revised', v_changes, 'claude');
+    v_result := 'revised';
+  else
+    perform mc.marketing_refuse('version_out_of_order', 'This post is at version ' || v_c.current_version
+      || ': push ' || v_c.current_version || ' again, or ' || (v_c.current_version + 1) || ' with what changed');
+  end if;
+
+  return jsonb_build_object('key', v_key, 'version', v_c.current_version, 'result', v_result, 'reason', null,
+    'state', v_c.state,
+    'uploads', case when v_c.state = 'withdrawn' then '[]'::jsonb
+                    else mc.marketing_uploads(v_c.id, v_c.key, v_c.current_version, v_media) end);
+end;
+$$;
+
+-- ================================================================================================ ingest (anon + secret)
+-- Claude's push (§5.3): the pack, its launch details, its cards (each in its own savepoint) and Claude's notes.
+create or replace function mc_api.ingest_marketing_pack(p_secret text, p_env text, p_pack jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_env text := lower(btrim(coalesce(p_env, '')));
+  v_count integer;
+  v_p jsonb;
+  v_key text;
+  v_title text;
+  v_starts date;
+  v_ends date;
+  v_launch jsonb;
+  v_cts date;
+  v_ctd integer;
+  v_apply date;
+  v_label text;
+  v_pack mc.marketing_packs%rowtype;
+  v_l mc.marketing_launch%rowtype;
+  v_card jsonb;
+  v_res jsonb;
+  v_cards jsonb := '[]'::jsonb;
+  v_uploads jsonb := '[]'::jsonb;
+  v_note jsonb;
+  v_text text;
+  v_cid uuid;
+  v_ver integer;
+  v_n integer;
+  v_added integer := 0;
+  v_already integer := 0;
+  v_skipped integer := 0;
+  v_reason text;
+  v_detail text;
+begin
+  if not mc.ingest_secret_ok(p_secret, 'marketing') then
+    perform mc.log_refusal(null, 'ingest.marketing_pack', 'bad_secret');
+    return mc.refused('bad_secret');
+  end if;
+  perform mc.marketing_lock();
+  -- At most 30 pushes an hour, whatever they hold (pruned with the other counters by the daily job).
+  insert into mc.rate_counters as c (admin_id, action, hour, count)
+    values ('00000000-0000-0000-0000-000000000000'::uuid, 'ingest.marketing_pack', date_trunc('hour', now()), 1)
+    on conflict (admin_id, action, hour) do update set count = c.count + 1
+    returning c.count into v_count;
+  if v_count > 30 then
+    return mc.failed('quota', 'At most 30 pushes an hour: try again later');
+  end if;
+  if v_env not in ('test', 'production', 'local') then
+    return mc.failed('invalid', 'The environment is test, production or local');
+  end if;
+  if jsonb_typeof(p_pack) is distinct from 'object' then
+    return mc.failed('invalid', 'Expected a pack object');
+  end if;
+  if pg_column_size(p_pack) > 1048576 then
+    return mc.failed('quota', 'A push is at most 1 MB');
+  end if;
+
+  -- Everything about the push as a whole is checked before anything is written.
+  begin
+    v_p := p_pack -> 'pack';
+    if jsonb_typeof(v_p) is distinct from 'object' then
+      perform mc.marketing_refuse('invalid', 'pack is missing');
+    end if;
+    v_key := case when jsonb_typeof(v_p -> 'key') = 'string' then v_p ->> 'key' end;
+    if v_key is null or v_key !~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$' then
+      perform mc.marketing_refuse('invalid', 'pack.key: up to 40 letters, digits, dots, dashes or underscores');
+    end if;
+    v_title := mc.marketing_str(v_p -> 'title', 'pack.title', 200);
+    v_starts := mc.marketing_day(v_p -> 'starts_on', 'pack.starts_on');
+    v_ends := mc.marketing_day(v_p -> 'ends_on', 'pack.ends_on');
+    if v_title is null or v_starts is null or v_ends is null then
+      perform mc.marketing_refuse('invalid', 'The pack needs a title, starts_on and ends_on');
+    end if;
+    if v_ends < v_starts or v_ends - v_starts > 31 then
+      perform mc.marketing_refuse('invalid', 'pack.ends_on is on or after starts_on, at most 31 days later');
+    end if;
+    if jsonb_typeof(p_pack -> 'cards') is distinct from 'array' then
+      perform mc.marketing_refuse('invalid', 'cards is a list');
+    end if;
+    if jsonb_array_length(p_pack -> 'cards') > 40 then
+      perform mc.marketing_refuse('quota', 'At most 40 posts in one push');
+    end if;
+    if jsonb_typeof(p_pack -> 'notes') not in ('array', 'null') then
+      perform mc.marketing_refuse('invalid', 'notes is a list');
+    end if;
+    if jsonb_typeof(p_pack -> 'notes') = 'array' then
+      if jsonb_array_length(p_pack -> 'notes') > 200 then
+        perform mc.marketing_refuse('quota', 'At most 200 notes in one push');
+      end if;
+    end if;
+    v_launch := p_pack -> 'launch';
+    if jsonb_typeof(v_launch) not in ('object', 'null') then
+      perform mc.marketing_refuse('invalid', 'launch is an object');
+    end if;
+    select * into v_l from mc.marketing_launch l where l.id for update;
+    v_cts := v_l.closed_test_start;
+    v_ctd := v_l.closed_test_days;
+    v_apply := v_l.apply_on;
+    v_label := v_l.pday_label;
+    -- A key that is present replaces the stored value (null clears it); a key that is left out keeps it.
+    if jsonb_typeof(v_launch) = 'object' then
+      if v_launch ? 'closed_test_start' then
+        v_cts := mc.marketing_day(v_launch -> 'closed_test_start', 'launch.closed_test_start');
+      end if;
+      if v_launch ? 'closed_test_days' then
+        v_ctd := mc.marketing_int(v_launch -> 'closed_test_days', 'launch.closed_test_days', 1, 60);
+      end if;
+      if v_launch ? 'apply_on' then
+        v_apply := mc.marketing_day(v_launch -> 'apply_on', 'launch.apply_on');
+      end if;
+      if v_launch ? 'pday_label' then
+        v_label := mc.marketing_str(v_launch -> 'pday_label', 'launch.pday_label', 80);
+      end if;
+    end if;
+  exception when sqlstate 'MKREF' then
+    get stacked diagnostics v_reason = message_text, v_detail = pg_exception_detail;
+    return mc.failed(v_reason, v_detail);
+  end;
+
+  -- One database, one store: a push from another environment's console would mix their files.
+  if exists (select 1 from mc.marketing_files f
+             where f.deleted_at is null and (f.expires_at is null or f.expires_at > now())
+               and split_part(f.pathname, '/', 2) <> v_env) then
+    return mc.failed('wrong_environment', 'This database already keeps files of another environment');
+  end if;
+
+  insert into mc.marketing_packs (key, title, starts_on, ends_on) values (v_key, v_title, v_starts, v_ends)
+    on conflict (key) do nothing;
+  select * into v_pack from mc.marketing_packs p where p.key = v_key for update;
+  if (v_pack.title, v_pack.starts_on, v_pack.ends_on) is distinct from (v_title, v_starts, v_ends) then
+    update mc.marketing_packs p set title = v_title, starts_on = v_starts, ends_on = v_ends, updated_at = now()
+      where p.id = v_pack.id
+      returning * into v_pack;
+  end if;
+
+  if (v_l.closed_test_start, v_l.closed_test_days, v_l.apply_on, v_l.pday_label)
+     is distinct from (v_cts, v_ctd, v_apply, v_label) then
+    update mc.marketing_launch l
+      set closed_test_start = v_cts, closed_test_days = v_ctd, apply_on = v_apply, pday_label = v_label, updated_at = now()
+      where l.id;
+    insert into mc.marketing_log (kind, note, actor)
+      values ('launch_meta', nullif(left(concat_ws(' · ', 'closed test from ' || v_cts, v_ctd || ' days',
+                                                    'apply on ' || v_apply, 'launch ' || v_label), 2000), ''), 'claude');
+  end if;
+
+  for v_card in select x from jsonb_array_elements(p_pack -> 'cards') x loop
+    begin
+      v_res := mc.marketing_push_card(v_pack, v_env, v_card);
+    exception
+      when sqlstate 'MKREF' then
+        get stacked diagnostics v_reason = message_text, v_detail = pg_exception_detail;
+        v_res := mc.marketing_refused_card(v_pack.id, v_card, v_reason, v_detail);
+      when others then
+        get stacked diagnostics v_detail = message_text;
+        v_res := mc.marketing_refused_card(v_pack.id, v_card, 'invalid', v_detail);
+    end;
+    v_cards := v_cards || jsonb_build_array(v_res - 'uploads');
+    v_uploads := v_uploads || coalesce(v_res -> 'uploads', '[]'::jsonb);
+  end loop;
+
+  -- Claude's notes on posts of this pack: stored once per post version and text; a note for a post that isn't here,
+  -- empty, too long or carrying contact details is skipped.
+  if jsonb_typeof(p_pack -> 'notes') = 'array' then
+    for v_note in select x from jsonb_array_elements(p_pack -> 'notes') x loop
+      v_text := case when jsonb_typeof(v_note -> 'text') = 'string' then mc.marketing_text(v_note ->> 'text') end;
+      v_cid := null;
+      select c.id, c.current_version into v_cid, v_ver from mc.marketing_cards c
+        where c.pack_id = v_pack.id and jsonb_typeof(v_note -> 'card') = 'string' and c.key = v_note ->> 'card';
+      if v_cid is null or v_text is null or char_length(v_text) > 2000 or mc.marketing_has_contact(v_text) then
+        v_skipped := v_skipped + 1;
+        continue;
+      end if;
+      insert into mc.marketing_log (card_id, version, kind, note, actor) values (v_cid, v_ver, 'claude_note', v_text, 'claude')
+        on conflict (card_id, version, md5(note)) where kind = 'claude_note' do nothing;
+      get diagnostics v_n = row_count;
+      if v_n = 1 then
+        v_added := v_added + 1;
+      else
+        v_already := v_already + 1;
+      end if;
+    end loop;
+  end if;
+
+  return jsonb_build_object('ok', true, 'pack', v_pack.key, 'environment', v_env, 'cards', v_cards, 'uploads', v_uploads,
+    'notes', jsonb_build_object('added', v_added, 'already', v_already, 'skipped', v_skipped));
+end;
+$$;
+
+-- Which of these pathnames still wait for their upload (before the console issues an upload token, and before it checks
+-- the store), with what the upload must be and how many days the store keeps it.
+create or replace function mc_api.ingest_marketing_pending(p_secret text, p_pathnames text[])
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+begin
+  if not mc.ingest_secret_ok(p_secret, 'marketing') then
+    perform mc.log_refusal(null, 'ingest.marketing_pending', 'bad_secret');
+    return mc.refused('bad_secret');
+  end if;
+  if p_pathnames is null or coalesce(array_ndims(p_pathnames), 1) <> 1 or cardinality(p_pathnames) > 60 then
+    return mc.failed('invalid', 'Send at most 60 pathnames');
+  end if;
+  return jsonb_build_object('ok', true, 'pending', (
+    select coalesce(jsonb_agg(jsonb_build_object('pathname', f.pathname, 'content_type', f.content_type, 'bytes', f.bytes,
+             'pack', p.key, 'card', c.key, 'pack_ends_on', p.ends_on,
+             'ttl_days', greatest(30, (p.ends_on + 14) - (now() at time zone p.tz)::date)) order by f.pathname), '[]'::jsonb)
+    from mc.marketing_files f
+    join mc.marketing_cards c on c.id = f.card_id
+    join mc.marketing_packs p on p.id = c.pack_id
+    where f.pathname = any(p_pathnames) and not f.ready and f.deleted_at is null and c.state <> 'withdrawn'));
+end;
+$$;
+
+-- The console reports what it found in the store (head()). Takes the console's own `app` secret: the marketing secret
+-- can reserve upload slots but never mark a file as uploaded.
+create or replace function mc_api.ingest_marketing_media_ready(p_app_secret text, p_items jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_item jsonb;
+  v_path text;
+  v_f mc.marketing_files%rowtype;
+  v_bytes bigint;
+  v_type text;
+  v_expires timestamptz;
+  v_result text;
+  v_results jsonb := '[]'::jsonb;
+begin
+  if not mc.ingest_secret_ok(p_app_secret, 'app') then
+    perform mc.log_refusal(null, 'ingest.marketing_media_ready', 'bad_secret');
+    return mc.refused('bad_secret');
+  end if;
+  perform mc.marketing_lock();
+  if jsonb_typeof(p_items) is distinct from 'array' then
+    return mc.failed('invalid', 'Expected a list of files');
+  end if;
+  if jsonb_array_length(p_items) > 60 then
+    return mc.failed('invalid', 'Expected at most 60 files');
+  end if;
+  for v_item in select x from jsonb_array_elements(p_items) x loop
+    v_path := case when jsonb_typeof(v_item -> 'pathname') = 'string' then v_item ->> 'pathname' end;
+    select * into v_f from mc.marketing_files f where f.pathname = v_path for update;
+    if not found or v_f.deleted_at is not null then
+      v_result := 'unknown';
+    elsif v_f.ready then
+      v_result := 'already';
+    else
+      v_bytes := case when jsonb_typeof(v_item -> 'bytes') = 'number' and (v_item ->> 'bytes') ~ '^\d{1,12}$'
+                      then (v_item ->> 'bytes')::bigint end;
+      v_type := case when jsonb_typeof(v_item -> 'content_type') = 'string' then lower(btrim(v_item ->> 'content_type')) end;
+      if v_bytes is distinct from v_f.bytes or v_type is distinct from v_f.content_type then
+        -- The wrong file arrived: the console deletes the blob, and the next push asks for it at a new pathname.
+        update mc.marketing_files f set deleted_at = now() where f.id = v_f.id;
+        v_result := 'mismatch';
+      else
+        v_expires := null;
+        if jsonb_typeof(v_item -> 'expires_at') = 'string' and (v_item ->> 'expires_at') ~ '^\d{4}-\d{2}-\d{2}' then
+          begin
+            v_expires := (v_item ->> 'expires_at')::timestamptz;
+          exception when others then
+            v_expires := null;
+          end;
+        end if;
+        update mc.marketing_files f
+          set ready = true, uploaded_at = now(), expires_at = v_expires,
+              etag = case when jsonb_typeof(v_item -> 'etag') = 'string' then left(v_item ->> 'etag', 200) end
+          where f.id = v_f.id;
+        v_result := 'ready';
+      end if;
+    end if;
+    v_results := v_results || jsonb_build_array(jsonb_build_object('pathname', v_path, 'result', v_result));
+  end loop;
+  return jsonb_build_object('ok', true, 'results', v_results);
+end;
+$$;
+
+-- What Claude needs to act on (§5.3): the owner's entries since the cursor (oldest first, 500 at a time), every open
+-- request, the launch details and the posts that need replacing or uploading again. Stamps when Claude last checked and
+-- how far it has read, which the owner sees as "Claude saw it".
+create or replace function mc_api.ingest_marketing_feedback(p_secret text, p_db text, p_since bigint)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_l mc.marketing_launch%rowtype;
+  v_max bigint;
+  v_reset boolean;
+  v_since bigint;
+  v_n integer;
+  v_events jsonb;
+  v_cursor bigint;
+  v_open jsonb;
+  v_open_max bigint;
+begin
+  if not mc.ingest_secret_ok(p_secret, 'marketing') then
+    perform mc.log_refusal(null, 'ingest.marketing_feedback', 'bad_secret');
+    return mc.refused('bad_secret');
+  end if;
+  -- Shared: every writer holds this lock exclusively until it commits, so no entry below the cursor handed out here can
+  -- still be on its way.
+  perform pg_advisory_xact_lock_shared(hashtextextended('mc.marketing', 0));
+  select * into v_l from mc.marketing_launch l where l.id;
+  select coalesce(max(l.id), 0) into v_max from mc.marketing_log l;
+  -- A cursor from another database, or from beyond this log's end, starts again from the beginning.
+  v_reset := p_db is null or lower(btrim(p_db)) is distinct from v_l.db_id::text
+             or coalesce(p_since, 0) < 0 or coalesce(p_since, 0) > v_max;
+  v_since := case when v_reset then 0 else coalesce(p_since, 0) end;
+  select count(*) into v_n from (select 1 from mc.marketing_log l where l.actor = 'admin' and l.id > v_since limit 501) x;
+  select coalesce(jsonb_agg(jsonb_build_object('id', e.id, 'pack', e.pack_key, 'card', e.card_key, 'card_id', e.card_id,
+           'title', e.title, 'version', e.version, 'kind', e.kind, 'note', e.note, 'tags', to_jsonb(e.tags), 'at', e.at,
+           'state', e.state, 'current_version', e.current_version) order by e.id), '[]'::jsonb),
+         coalesce(max(e.id), v_since)
+    into v_events, v_cursor
+    from (select l.id, l.card_id, l.version, l.kind, l.note, l.tags, l.at, c.key as card_key, c.title, c.state,
+                 c.current_version, p.key as pack_key
+          from mc.marketing_log l
+          join mc.marketing_cards c on c.id = l.card_id
+          join mc.marketing_packs p on p.id = c.pack_id
+          where l.actor = 'admin' and l.id > v_since
+          order by l.id
+          limit 500) e;
+  -- Oldest first, so the stamp below never covers a request this answer left out.
+  select coalesce(jsonb_agg(x.j order by x.log_id), '[]'::jsonb), max(x.log_id) into v_open, v_open_max
+    from (select o.log_id,
+                 jsonb_build_object('log_id', o.log_id, 'pack', s.pack_key, 'card', s.card_key, 'card_id', s.card_id,
+                   'title', s.title, 'version', o.version, 'kind', o.kind, 'note', o.note, 'tags', to_jsonb(o.tags),
+                   'at', o.at, 'state', s.state, 'current_version', s.current_version, 'slot', s.slot_start,
+                   'slot_label', s.slot_label) as j
+          from mc.marketing_open_requests() o
+          join mc.marketing_status(v_l.pday_at) s on s.card_id = o.card_id
+          order by o.log_id
+          limit 200) x;
+  update mc.marketing_launch l
+    set claude_checked_at = now(), claude_seen_log_id = greatest(l.claude_seen_log_id, v_cursor, coalesce(v_open_max, 0))
+    where l.id;
+  return jsonb_build_object('ok', true, 'db_id', v_l.db_id, 'reset', v_reset, 'cursor', v_cursor, 'more', v_n > 500,
+    'now', now(), 'tz', mc.tz(),
+    'launch', jsonb_build_object('closed_test_start', v_l.closed_test_start, 'closed_test_days', v_l.closed_test_days,
+                'apply_on', v_l.apply_on, 'pday_label', v_l.pday_label, 'pday_at', v_l.pday_at),
+    'open_requests', v_open, 'events', v_events,
+    'replace_after_launch', mc.marketing_flag_items('replace_after_launch', 100) -> 'items',
+    'too_early', mc.marketing_flag_items('too_early', 100) -> 'items',
+    'apps_stale', mc.marketing_flag_items('apps_stale', 100) -> 'items',
+    'media_missing', mc.marketing_flag_items('media_missing', 100) -> 'items');
+end;
+$$;
+
+-- ================================================================================================ the Marketing page
+-- A pack with every post (§5.4). No pack named: the newest one with a post waiting or in changes, else the newest.
+create or replace function mc_api.marketing_board(p_pack text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.read');
+  v_pack mc.marketing_packs%rowtype;
+  v_l mc.marketing_launch%rowtype;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  select * into v_l from mc.marketing_launch l where l.id;
+  if p_pack is not null then
+    select * into v_pack from mc.marketing_packs p where p.key = p_pack;
+    if not found then
+      return mc.failed('not_found', 'There is no such pack');
+    end if;
+  else
+    select * into v_pack from mc.marketing_packs p
+      where exists (select 1 from mc.marketing_cards c where c.pack_id = p.id and c.state in ('waiting', 'changes'))
+      order by p.starts_on desc, p.created_at desc
+      limit 1;
+    if not found then
+      select * into v_pack from mc.marketing_packs p order by p.starts_on desc, p.created_at desc limit 1;
+    end if;
+  end if;
+  return jsonb_build_object('ok', true, 'now', now(), 'tz', mc.tz(), 'environment', mc.marketing_environment(),
+    'launch', mc.marketing_launch_json(), 'claude_checked_at', v_l.claude_checked_at,
+    'packs', mc.marketing_packs_json(),
+    'pack', case when v_pack.id is null then null
+                 else jsonb_build_object('id', v_pack.id, 'key', v_pack.key, 'title', v_pack.title, 'starts_on', v_pack.starts_on,
+                        'ends_on', v_pack.ends_on, 'tz', v_pack.tz, 'created_at', v_pack.created_at,
+                        'updated_at', v_pack.updated_at) end,
+    'numbers', (select jsonb_build_object('followers', n.followers, 'views', n.views, 'installs', n.installs,
+                  'listing_visitors', n.listing_visitors, 'updated_at', n.updated_at,
+                  'updated_by', (select a.display_name from mc.admins a where a.user_id = n.updated_by))
+                from mc.marketing_numbers n where n.pack_id = v_pack.id),
+    'cards', (select coalesce(jsonb_agg(mc.marketing_card_json(c.id, v_l.pday_at, v_l.claude_seen_log_id)
+                order by c.slot_day nulls last, c.slot_time nulls last, c.position, c.key), '[]'::jsonb)
+              from mc.marketing_cards c where c.pack_id = v_pack.id));
+end;
+$$;
+
+-- The owner's decision on one version of a post (§4): approve, request_change, skip or undo.
+create or replace function mc_api.marketing_decide(p_card uuid, p_version integer, p_decision text, p_note text, p_tags text[])
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.decide', false, 300);
+  v_note text := mc.marketing_text(p_note);
+  v_tags text[] := coalesce(p_tags, '{}');
+  v_c mc.marketing_cards%rowtype;
+  v_allowed text[];
+  v_to text;
+  v_kind text;
+  v_ref text;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  perform mc.marketing_lock();
+  if p_decision is null or p_decision not in ('approve', 'request_change', 'skip', 'undo') then
+    return mc.failed('invalid', 'Unknown decision');
+  end if;
+  if not mc.text_items_ok(v_tags, 7, 20)
+     or (p_decision = 'request_change' and not (v_tags <@ array['video', 'caption', 'youtube', 'alt', 'timing', 'other']))
+     or (p_decision = 'skip' and not (v_tags <@ array['replace']))
+     or (p_decision in ('approve', 'undo') and cardinality(v_tags) > 0) then
+    return mc.failed('invalid', 'Those tags don''t go with this decision');
+  end if;
+  v_tags := array(select distinct t from unnest(v_tags) t order by t);
+  if p_decision in ('approve', 'undo') then
+    v_note := null;
+  end if;
+  if p_decision = 'request_change' and (v_note is null or char_length(v_note) < 3) then
+    return mc.failed('note_required', 'Say what should change, in a few words.');
+  end if;
+  if char_length(v_note) > 2000 then
+    return mc.failed('invalid', 'A note is at most 2,000 characters');
+  end if;
+  if mc.marketing_has_contact(v_note) then
+    return mc.failed('note_has_contact', 'Leave out names, e-mail addresses and phone numbers.');
+  end if;
+  select * into v_c from mc.marketing_cards c where c.id = p_card for update;
+  if not found then
+    return mc.failed('not_found', 'There is no such post');
+  end if;
+  if p_version is distinct from v_c.current_version then
+    return mc.failed('stale_version', 'Claude changed this post a moment ago (now version ' || v_c.current_version || ').')
+      || jsonb_build_object('current_version', v_c.current_version, 'state', v_c.state);
+  end if;
+  case p_decision
+    when 'approve' then
+      v_allowed := array['waiting', 'changes']; v_to := 'approved'; v_kind := 'approved';
+    when 'request_change' then
+      v_allowed := array['waiting', 'approved', 'changes']; v_to := 'changes'; v_kind := 'changes';
+    when 'skip' then
+      v_allowed := array['waiting', 'changes', 'approved']; v_to := 'skipped'; v_kind := 'skipped';
+    else
+      v_allowed := array['approved', 'changes', 'skipped']; v_to := 'waiting'; v_kind := 'undo';
+  end case;
+  if not (v_c.state = any(v_allowed)) then
+    return mc.failed('bad_state', 'This post changed on another device. Reload to see it.')
+      || jsonb_build_object('state', v_c.state);
+  end if;
+  if p_decision = 'approve' then
+    if not mc.marketing_version_ready(v_c.id, v_c.current_version) then
+      return mc.failed('not_ready', 'You can approve once the video has uploaded.');
+    end if;
+    if not coalesce((select v.truth_pass from mc.marketing_versions v
+                     where v.card_id = v_c.id and v.version = v_c.current_version), false) then
+      return mc.failed('truth_failed', 'This post fails the truth check, so it can''t be approved. Ask Claude to fix it.');
+    end if;
+  end if;
+  update mc.marketing_cards c set
+    state = v_to,
+    decided_at = case when v_kind = 'undo' then null else now() end,
+    decided_by = case when v_kind = 'undo' then null else auth.uid() end,
+    updated_at = now()
+    where c.id = p_card and c.current_version = p_version and c.state = any(v_allowed);
+  if not found then
+    return mc.failed('bad_state', 'This post changed on another device. Reload to see it.');
+  end if;
+  insert into mc.marketing_log (card_id, version, kind, note, tags, actor, admin_id)
+    values (v_c.id, v_c.current_version, v_kind, v_note, v_tags, 'admin', auth.uid());
+  select p.key || '/' || v_c.key || ' v' || v_c.current_version into v_ref from mc.marketing_packs p where p.id = v_c.pack_id;
+  -- The note stays out of the audit: the tags say what it was about.
+  perform mc.audit('marketing.' || p_decision, null, v_ref, null, 'ok',
+    jsonb_build_object('state', v_c.state), jsonb_build_object('state', v_to), nullif(array_to_string(v_tags, ','), ''));
+  return jsonb_build_object('ok', true, 'state', v_to,
+    'cleanup', case when p_decision in ('approve', 'skip') then mc.marketing_cleanup(v_c.id) else '[]'::jsonb end);
+end;
+$$;
+
+-- What the owner did in TikTok Studio, Meta Business Suite and YouTube Studio: scheduled the current version (with the
+-- platforms posted by hand at the time), removed it, or posted the by-hand ones.
+create or replace function mc_api.marketing_apps(p_card uuid, p_version integer, p_action text, p_by_hand text[])
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.apps', false, 300);
+  v_c mc.marketing_cards%rowtype;
+  v_before mc.marketing_cards%rowtype;
+  v_tz text;
+  v_pack text;
+  v_wanted text[];
+  v_by_hand text[];
+  v_version integer;
+  v_note text;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  perform mc.marketing_lock();
+  if p_action is null or p_action not in ('in_apps', 'removed_from_apps', 'posted_by_hand') then
+    return mc.failed('invalid', 'Unknown action');
+  end if;
+  select * into v_c from mc.marketing_cards c where c.id = p_card for update;
+  if not found then
+    return mc.failed('not_found', 'There is no such post');
+  end if;
+  if p_version is distinct from v_c.current_version then
+    return mc.failed('stale_version', 'Claude changed this post a moment ago (now version ' || v_c.current_version || ').')
+      || jsonb_build_object('current_version', v_c.current_version, 'state', v_c.state);
+  end if;
+  v_before := v_c;
+  select p.tz, p.key into v_tz, v_pack from mc.marketing_packs p where p.id = v_c.pack_id;
+  if p_action = 'in_apps' then
+    if v_c.state <> 'approved' then
+      return mc.failed('bad_state', 'This post changed on another device. Reload to see it.')
+        || jsonb_build_object('state', v_c.state);
+    end if;
+    v_wanted := array(select mc.marketing_text(h) from unnest(coalesce(p_by_hand, '{}'::text[])) h);
+    if not mc.text_items_ok(v_wanted, 8, 60) or not (v_wanted <@ v_c.platforms) then
+      return mc.failed('invalid', 'Choose the platforms you post by hand among this post''s platforms');
+    end if;
+    v_by_hand := array(select x.v from unnest(v_c.platforms) with ordinality x(v, o) where x.v = any(v_wanted) order by x.o);
+    update mc.marketing_cards c
+      set in_apps_version = c.current_version, by_hand = v_by_hand, by_hand_done_at = null, updated_at = now()
+      where c.id = p_card and c.current_version = p_version and c.state = 'approved'
+      returning * into v_c;
+    if not found then
+      return mc.failed('bad_state', 'This post changed on another device. Reload to see it.');
+    end if;
+    v_version := v_c.current_version;
+    v_note := case when cardinality(v_by_hand) > 0 then 'By hand at the time: ' || array_to_string(v_by_hand, ', ') end;
+  elsif p_action = 'removed_from_apps' then
+    if v_c.in_apps_version is null then
+      return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
+    end if;
+    v_version := v_c.in_apps_version;
+    update mc.marketing_cards c set in_apps_version = null, by_hand = '{}', by_hand_done_at = null, updated_at = now()
+      where c.id = p_card and c.current_version = p_version and c.in_apps_version is not null
+      returning * into v_c;
+    if not found then
+      return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
+    end if;
+  else
+    if v_c.in_apps_version is null then
+      return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
+    end if;
+    if cardinality(v_c.by_hand) = 0 then
+      return mc.failed('bad_state', 'Nothing of this post is posted by hand.');
+    end if;
+    if lower(mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz)) > now() then
+      return mc.failed('bad_state', 'Its time hasn''t come yet.');
+    end if;
+    if v_c.by_hand_done_at is not null then
+      return jsonb_build_object('ok', true, 'already', true, 'state', v_c.state, 'in_apps_version', v_c.in_apps_version,
+        'by_hand', to_jsonb(v_c.by_hand), 'by_hand_done_at', v_c.by_hand_done_at);
+    end if;
+    v_version := v_c.in_apps_version;
+    update mc.marketing_cards c set by_hand_done_at = now(), updated_at = now()
+      where c.id = p_card and c.current_version = p_version and c.in_apps_version is not null
+      returning * into v_c;
+    if not found then
+      return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
+    end if;
+  end if;
+  insert into mc.marketing_log (card_id, version, kind, note, actor, admin_id)
+    values (v_c.id, v_version, p_action, v_note, 'admin', auth.uid());
+  perform mc.audit('marketing.' || p_action, null, v_pack || '/' || v_c.key || ' v' || v_version, null, 'ok',
+    jsonb_build_object('in_apps_version', v_before.in_apps_version, 'by_hand', v_before.by_hand),
+    jsonb_build_object('in_apps_version', v_c.in_apps_version, 'by_hand', v_c.by_hand));
+  return jsonb_build_object('ok', true, 'state', v_c.state, 'in_apps_version', v_c.in_apps_version,
+    'by_hand', to_jsonb(v_c.by_hand), 'by_hand_done_at', v_c.by_hand_done_at);
+end;
+$$;
+
+-- "Lucento is live on Google Play" (§6.4), with a fresh authenticator code: the moment in Mission Control's time zone,
+-- or null to undo it.
+create or replace function mc_api.marketing_set_launch(p_local text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.launch', true, 10);
+  v_j jsonb;
+  v_at timestamptz;
+  v_before timestamptz;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  perform mc.marketing_lock();
+  v_j := mc.marketing_launch_at(p_local);
+  if not (v_j ->> 'ok')::boolean then
+    return v_j;
+  end if;
+  v_at := (v_j ->> 'at')::timestamptz;
+  select l.pday_at into v_before from mc.marketing_launch l where l.id for update;
+  update mc.marketing_launch l
+    set pday_at = v_at,
+        pday_set_by = case when v_at is null then null else auth.uid() end,
+        pday_set_at = case when v_at is null then null else now() end,
+        updated_at = now()
+    where l.id;
+  perform mc.audit(case when v_at is null then 'marketing.launch_cleared' else 'marketing.launch_set' end, null, null, null, 'ok',
+    jsonb_build_object('pday_at', v_before), jsonb_build_object('pday_at', v_at));
+  return jsonb_build_object('ok', true, 'pday_at', v_at) || mc.marketing_launch_counts(v_at);
+end;
+$$;
+
+-- What setting that moment would flag, for the confirm step. Changes nothing.
+create or replace function mc_api.marketing_launch_preview(p_local text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.read');
+  v_j jsonb;
+  v_at timestamptz;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  v_j := mc.marketing_launch_at(p_local);
+  if not (v_j ->> 'ok')::boolean then
+    return v_j;
+  end if;
+  v_at := (v_j ->> 'at')::timestamptz;
+  return jsonb_build_object('ok', true, 'pday_at', v_at) || mc.marketing_launch_counts(v_at);
+end;
+$$;
+
+-- Sunday's numbers for a pack, replacing what was saved before.
+create or replace function mc_api.marketing_save_numbers(p_pack text, p_followers jsonb, p_views jsonb, p_installs integer,
+                                                         p_visitors integer)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.numbers', false, 60);
+  v_pack mc.marketing_packs%rowtype;
+  v_followers jsonb := coalesce(p_followers, '{}'::jsonb);
+  v_views jsonb := coalesce(p_views, '{}'::jsonb);
+  v_e record;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  perform mc.marketing_lock();
+  select * into v_pack from mc.marketing_packs p where p.key = p_pack;
+  if not found then
+    return mc.failed('not_found', 'There is no such pack');
+  end if;
+  if not mc.marketing_counts_ok(v_followers, 10, 100000000) then
+    return mc.failed('invalid', 'Followers: up to 10 channels, each a whole number from 0 to 100,000,000');
+  end if;
+  if jsonb_typeof(v_views) <> 'object' then
+    return mc.failed('invalid', 'Views: per post, per platform');
+  end if;
+  if (select count(*) from jsonb_object_keys(v_views)) > 60 then
+    return mc.failed('invalid', 'Views: at most 60 posts');
+  end if;
+  for v_e in select * from jsonb_each(v_views) loop
+    if not exists (select 1 from mc.marketing_cards c where c.pack_id = v_pack.id and c.key = v_e.key)
+       or not mc.marketing_counts_ok(v_e.value, 10, 2147483647) then
+      return mc.failed('invalid', 'Views: for posts of this pack, up to 10 platforms each, whole numbers');
+    end if;
+  end loop;
+  if p_installs < 0 or p_visitors < 0 then
+    return mc.failed('invalid', 'Installs and listing visitors are whole numbers from 0');
+  end if;
+  insert into mc.marketing_numbers as n (pack_id, followers, views, installs, listing_visitors, updated_at, updated_by)
+    values (v_pack.id, v_followers, v_views, p_installs, p_visitors, now(), auth.uid())
+    on conflict (pack_id) do update
+      set followers = excluded.followers, views = excluded.views, installs = excluded.installs,
+          listing_visitors = excluded.listing_visitors, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
+  perform mc.audit('marketing.numbers', null, v_pack.key, null, 'ok', null,
+    jsonb_build_object('channels', (select count(*) from jsonb_object_keys(v_followers)),
+                       'posts', (select count(*) from jsonb_object_keys(v_views)),
+                       'installs', p_installs, 'listing_visitors', p_visitors));
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- Counts keyed by a short camelCase name (tiktok, fbReels): at most p_max_keys, each null or a whole number from 0 to
+-- p_max_value.
+create or replace function mc.marketing_counts_ok(p jsonb, p_max_keys integer, p_max_value bigint)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if p is null or jsonb_typeof(p) <> 'object' then
+    return false;
+  end if;
+  if (select count(*) from jsonb_object_keys(p)) > p_max_keys then
+    return false;
+  end if;
+  return not exists (
+    select 1 from jsonb_each(p) e
+    where e.key !~ '^[a-z][a-zA-Z0-9]{0,30}$'
+       or not case
+                when jsonb_typeof(e.value) = 'null' then true
+                when jsonb_typeof(e.value) = 'number' and (e.value #>> '{}') ~ '^\d{1,10}$'
+                  then (e.value #>> '{}')::bigint <= p_max_value
+                else false
+              end);
+end;
+$$;
+
+-- Removes one of the owner's own notes from the history (fresh authenticator code). The entry stays, saying
+-- '[removed]'; the reason goes into the audit.
+create or replace function mc_api.marketing_redact_note(p_log_id bigint, p_reason text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.redact', true, 20);
+  v_reason text := mc.marketing_text(p_reason);
+  v_l mc.marketing_log%rowtype;
+  v_ref text;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  perform mc.marketing_lock();
+  if v_reason is null or char_length(v_reason) not between 3 and 500 then
+    return mc.failed('reason_required', 'Say why this note goes (3 to 500 characters)');
+  end if;
+  select * into v_l from mc.marketing_log l where l.id = p_log_id and l.actor = 'admin' and l.note is not null for update;
+  if not found then
+    return mc.failed('not_found', 'There is no note of yours with that number');
+  end if;
+  if v_l.note = '[removed]' then
+    return jsonb_build_object('ok', true, 'already', true);
+  end if;
+  perform set_config('mc.marketing_redact', 'on', true);
+  update mc.marketing_log l set note = '[removed]' where l.id = v_l.id;
+  perform set_config('mc.marketing_redact', 'off', true);
+  insert into mc.marketing_log (card_id, version, kind, actor, admin_id)
+    values (v_l.card_id, v_l.version, 'note_redacted', 'admin', auth.uid());
+  select p.key || '/' || c.key || ' v' || v_l.version into v_ref
+    from mc.marketing_cards c join mc.marketing_packs p on p.id = c.pack_id where c.id = v_l.card_id;
+  perform mc.audit('marketing.redact_note', null, v_ref, v_reason, 'ok', null, null, 'log entry ' || v_l.id);
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- Overview's "Needs you now" (§6.4): each list at most 10 posts by slot, with the full counts beside them.
+create or replace function mc_api.marketing_summary()
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.read');
+  v_l mc.marketing_launch%rowtype;
+  v_waiting jsonb;
+  v_soon jsonb;
+  v_due jsonb;
+  v_stale jsonb;
+  v_after jsonb;
+  v_early jsonb;
+  v_missing jsonb;
+  v_unseen jsonb;
+  v_unseen_count integer;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  select * into v_l from mc.marketing_launch l where l.id;
+  v_waiting := mc.marketing_waiting();
+  v_soon := mc.marketing_flag_items('needs_decision_soon', 10);
+  v_due := mc.marketing_flag_items('due_soon', 10);
+  v_stale := mc.marketing_flag_items('apps_stale', 10);
+  v_after := mc.marketing_flag_items('replace_after_launch', 10);
+  v_early := mc.marketing_flag_items('too_early', 10);
+  v_missing := mc.marketing_flag_items('media_missing', 10);
+  select count(*), coalesce(jsonb_agg(x.j order by x.slot_start nulls last, x.log_id) filter (where x.rn <= 10), '[]'::jsonb)
+    into v_unseen_count, v_unseen
+    from (select o.log_id, s.slot_start,
+                 row_number() over (order by s.slot_start nulls last, o.log_id) as rn,
+                 jsonb_build_object('pack', s.pack_key, 'card', s.card_key, 'card_id', s.card_id, 'title', s.title,
+                   'state', s.state, 'current_version', s.current_version, 'slot', s.slot_start, 'slot_end', s.slot_end,
+                   'slot_day', s.slot_day, 'slot_time', left(s.slot_time::text, 5), 'slot_label', s.slot_label,
+                   'log_id', o.log_id, 'kind', o.kind, 'tags', to_jsonb(o.tags), 'at', o.at) as j
+          from mc.marketing_open_requests() o
+          join mc.marketing_status(v_l.pday_at) s on s.card_id = o.card_id
+          where o.log_id > v_l.claude_seen_log_id) x;
+  return jsonb_build_object('ok', true,
+    'waiting', (v_waiting ->> 'count')::integer, 'first_slot', v_waiting -> 'first_slot',
+    'needs_decision_soon', v_soon -> 'items', 'due_soon', v_due -> 'items', 'apps_stale', v_stale -> 'items',
+    'replace_after_launch', v_after -> 'items', 'too_early', v_early -> 'items',
+    'missed', (select count(*) from mc.marketing_status(v_l.pday_at) s where s.missed),
+    'media_missing', (v_missing ->> 'count')::integer,
+    'media_missing_since', (select min(s.version_created_at) from mc.marketing_status(v_l.pday_at) s
+                            where s.media_missing and s.state not in ('skipped', 'withdrawn')
+                              and (s.slot_end is null or s.slot_end > now())),
+    'unseen_requests', v_unseen,
+    'counts', jsonb_build_object('needs_decision_soon', v_soon -> 'count', 'due_soon', v_due -> 'count',
+                'apps_stale', v_stale -> 'count', 'replace_after_launch', v_after -> 'count',
+                'too_early', v_early -> 'count', 'unseen_requests', v_unseen_count),
+    'claude_checked_at', v_l.claude_checked_at);
+end;
+$$;
+
+-- After the console deleted files from the store: marks them deleted, but only those nothing shows any more (checked
+-- again here, under the lock). Answers which pathnames are now deleted and which were kept. Calling it before deleting
+-- the blobs, and deleting only the answer's `deleted`, rules out a race with a push that reuses one.
+create or replace function mc_api.marketing_media_deleted(p_pathnames text[])
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.decide', false, 300);
+  v_path text;
+  v_f mc.marketing_files%rowtype;
+  v_deleted text[] := '{}';
+  v_kept text[] := '{}';
+  v_n integer := 0;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  perform mc.marketing_lock();
+  if p_pathnames is null or coalesce(array_ndims(p_pathnames), 1) <> 1 or cardinality(p_pathnames) > 50 then
+    return mc.failed('invalid', 'Send at most 50 pathnames');
+  end if;
+  for v_path in select distinct x from unnest(p_pathnames) x where x is not null order by x loop
+    select * into v_f from mc.marketing_files f where f.pathname = v_path for update;
+    if not found then
+      v_kept := v_kept || v_path;
+    elsif v_f.deleted_at is not null then
+      v_deleted := v_deleted || v_path;
+    elsif mc.marketing_file_in_use(v_f.id) then
+      v_kept := v_kept || v_path;
+    else
+      update mc.marketing_files f set deleted_at = now() where f.id = v_f.id;
+      v_deleted := v_deleted || v_path;
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  perform mc.audit('marketing.media_deleted', null, null, null, 'ok', null, jsonb_build_object('files', v_n), v_n || ' files');
+  return jsonb_build_object('ok', true, 'deleted', to_jsonb(v_deleted), 'kept', to_jsonb(v_kept));
+end;
+$$;
+
+-- One file for the gated download route (§6.1).
+create or replace function mc_api.marketing_file(p_file uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.read');
+  v_f mc.marketing_files%rowtype;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  select * into v_f from mc.marketing_files f where f.id = p_file;
+  if not found then
+    return mc.failed('not_found', 'There is no such file');
+  end if;
+  return jsonb_build_object('ok', true, 'pathname', v_f.pathname, 'file_name', v_f.file_name,
+    'content_type', v_f.content_type, 'bytes', v_f.bytes, 'ready', v_f.ready,
+    'expired', coalesce(v_f.expires_at <= now(), false),
+    'deleted', v_f.deleted_at is not null or coalesce(v_f.expires_at <= now(), false));
+end;
+$$;
+
+-- ================================================================================================ navigation badges
+-- Part 4's function, unchanged, plus the posts waiting for the owner's yes (mc.marketing_waiting).
+create or replace function mc_api.nav_badges()
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('nav.read');
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  return jsonb_build_object('ok', true,
+    'extended_data_enabled', mc.setting_on('extended_data_enabled'),
+    'open_tickets', (select count(*) from mc.tickets t where t.status in ('open', 'in_progress')),
+    'services_attention', (select count(*) from mc.service_checks s
+                           where s.status in ('degraded', 'down') and s.checked_at >= now() - interval '10 minutes'),
+    'records_view_enabled', coalesce((select (s.value #>> '{}')::boolean from mc.settings s where s.key = 'records_view_enabled'), false),
+    'marketing', (mc.marketing_waiting() ->> 'count')::integer);
+end;
+$$;
+
+-- ================================================================================================ retention (§8)
+alter table mc.job_runs drop constraint if exists job_runs_job_check;
+alter table mc.job_runs add constraint job_runs_job_check
+  check (job in ('activity', 'daily', 'grants', 'deletions', 'backup', 'play_orders', 'crashlytics', 'marketing_retention'));
+
+-- Daily: packs whose last day is more than 365 days ago go, with their posts, versions, files, numbers and log. Nothing
+-- is deleted in the store: every file there expired long before (its TTL ends at most 14 days after the pack, or 30 days
+-- after the upload). The launch details' own log entries stay (no post, no personal data).
+create or replace function mc.marketing_retention()
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_run bigint;
+  v_n integer;
+begin
+  perform mc.marketing_lock();
+  insert into mc.job_runs (job, result) values ('marketing_retention', 'running') returning id into v_run;
+  delete from mc.marketing_packs p where p.ends_on < (now() at time zone mc.tz())::date - 365;
+  get diagnostics v_n = row_count;
+  update mc.job_runs set finished_at = now(), result = 'ok', detail = jsonb_build_object('packs_deleted', v_n)
+    where id = v_run;
+  return v_n;
+end;
+$$;
+
+-- ================================================================================================ schedule (pg_cron, UTC)
+-- 21:15 UTC is 05:15 in Manila. Rescheduling under the same name replaces the job, so applying this twice is harmless.
+do $$
+begin
+  if exists (select 1 from pg_catalog.pg_extension x where x.extname = 'pg_cron') then
+    perform cron.schedule('mc-marketing-retention', '15 21 * * *', 'select mc.marketing_retention()');
+  else
+    raise warning 'pg_cron is not installed: Mission Control''s marketing retention (mc-marketing-retention) is not scheduled';
+  end if;
+end;
+$$;
+
+-- ================================================================================================ privileges
+-- Tables and helpers in mc: nobody but their owner. Functions in mc_api one by one: the Marketing page's to
+-- authenticated (each checks the admin itself), Claude's and the console's ingest functions to anon (each checks its
+-- secret first).
+revoke all on all tables in schema mc from public, anon, authenticated, service_role;
+revoke all on all sequences in schema mc from public, anon, authenticated, service_role;
+revoke all on all functions in schema mc from public, anon, authenticated, service_role;
+revoke all on function
+  mc_api.nav_badges(),
+  mc_api.marketing_board(text),
+  mc_api.marketing_decide(uuid, integer, text, text, text[]),
+  mc_api.marketing_apps(uuid, integer, text, text[]),
+  mc_api.marketing_set_launch(text),
+  mc_api.marketing_launch_preview(text),
+  mc_api.marketing_save_numbers(text, jsonb, jsonb, integer, integer),
+  mc_api.marketing_redact_note(bigint, text),
+  mc_api.marketing_summary(),
+  mc_api.marketing_media_deleted(text[]),
+  mc_api.marketing_file(uuid),
+  mc_api.ingest_marketing_pack(text, text, jsonb),
+  mc_api.ingest_marketing_pending(text, text[]),
+  mc_api.ingest_marketing_media_ready(text, jsonb),
+  mc_api.ingest_marketing_feedback(text, text, bigint)
+  from public, anon, authenticated, service_role;
+
+grant execute on function
+  mc_api.nav_badges(),
+  mc_api.marketing_board(text),
+  mc_api.marketing_decide(uuid, integer, text, text, text[]),
+  mc_api.marketing_apps(uuid, integer, text, text[]),
+  mc_api.marketing_set_launch(text),
+  mc_api.marketing_launch_preview(text),
+  mc_api.marketing_save_numbers(text, jsonb, jsonb, integer, integer),
+  mc_api.marketing_redact_note(bigint, text),
+  mc_api.marketing_summary(),
+  mc_api.marketing_media_deleted(text[]),
+  mc_api.marketing_file(uuid)
+  to authenticated;
+
+grant execute on function
+  mc_api.ingest_marketing_pack(text, text, jsonb),
+  mc_api.ingest_marketing_pending(text, text[]),
+  mc_api.ingest_marketing_media_ready(text, jsonb),
+  mc_api.ingest_marketing_feedback(text, text, bigint)
+  to anon;
