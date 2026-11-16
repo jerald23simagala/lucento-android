@@ -751,6 +751,16 @@ begin
                       and not pg_temp.has(v_m -> 'too_early', 'F-launch-past') and (v_m ->> 'missed')::integer >= 1
                  then 'ok  M38 before launch: "Get it on Google Play" posts are too early, a slot within 36 hours needs a decision, a passed one is missed, a new video is uploading'
                  else 'FAIL M38 ' || left(coalesce(v_m::text, ''), 500) end;
+  v_j := pg_temp.decide(pg_temp.cid('F-pack', 'F-launch-early'), 1, 'approve');
+  v_k := pg_temp.apps(pg_temp.cid('F-pack', 'F-launch-early'), 1, 'in_apps');
+  r := r || case when (v_j ->> 'ok')::boolean and v_j ->> 'state' = 'approved'
+                      and v_k ->> 'error' = 'launch_not_live'
+                      and v_k ->> 'message' = 'Mark Lucento as live first: this post says ''Get it on Google Play''.'
+                      and (select state = 'approved' and in_apps_version is null from mc.marketing_cards where id = pg_temp.cid('F-pack', 'F-launch-early'))
+                      and not exists (select 1 from mc.marketing_log where card_id = pg_temp.cid('F-pack', 'F-launch-early') and kind = 'in_apps')
+                      and not exists (select 1 from mc.audit_log where action = 'marketing.in_apps' and target_ref like 'F-pack/F-launch-early%')
+                 then 'ok  M38b before launch a "Get it on Google Play" post can be approved, but "I''ve scheduled it" is refused (launch_not_live) and nothing is written'
+                 else 'FAIL M38b ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') end;
   v_j := pg_temp.decide(pg_temp.cid('F-pack', 'F-due'), 1, 'approve');
   v_ok := (select due_soon and not needs_decision_soon from mc.marketing_status(null, pg_temp.cid('F-pack', 'F-due')));
   v_m := pg_temp.summary();
@@ -791,11 +801,38 @@ begin
                       and v_b #>> '{launch,pday_set_by}' = 'Ops'
                  then 'ok  M43 after launch: a "coming soon" post set for any time on launch day is flagged for replacement; one before it isn''t; launch posts after it are fine'
                  else 'FAIL M43 ' || left(coalesce(pg_temp.cardj(v_b, 'F-anytime')::text, ''), 400) end;
+  v_j := pg_temp.apps(pg_temp.cid('F-pack', 'F-launch-early'), 1, 'in_apps');
+  v_k := pg_temp.decide(pg_temp.cid('F-pack', 'F-launch-past'), 1, 'approve');
+  v_m := pg_temp.apps(pg_temp.cid('F-pack', 'F-launch-past'), 1, 'in_apps');
+  r := r || case when (v_j ->> 'ok')::boolean and (v_j ->> 'in_apps_version')::integer = 1
+                      and (v_k ->> 'ok')::boolean and v_m ->> 'error' = 'launch_not_live'
+                      and (select in_apps_version is null from mc.marketing_cards where id = pg_temp.cid('F-pack', 'F-launch-past'))
+                 then 'ok  M43b after launch it can be scheduled; a launch post whose slot started before Lucento went live still can''t'
+                 else 'FAIL M43b ' || coalesce(v_j::text, '') || ' ' || coalesce(v_k::text, '') || ' ' || coalesce(v_m::text, '') end;
   perform pg_temp.decide(pg_temp.cid('F-pack', 'F-anytime'), 1, 'approve');
   perform pg_temp.apps(pg_temp.cid('F-pack', 'F-anytime'), 1, 'in_apps');
   v_j := pg_temp.preview(v_pday_text);
   r := r || case when (v_j ->> 'replace_after_launch')::integer = 1 and (v_j ->> 'in_apps_after_launch')::integer = 1
                  then 'ok  M44 the count says how many of them are already in the apps' else 'FAIL M44 ' || coalesce(v_j::text, '') end;
+  v_cards := '[]'::jsonb;
+  for v_n in 1..12 loop
+    v_cards := v_cards || jsonb_build_array(pg_temp.mk_card('F-many-' || lpad(v_n::text, 2, '0'), v_today + 1,
+      jsonb_build_object('phase', 'warmup', 'slot_time', to_char(time '08:00' + v_n * interval '1 hour', 'HH24:MI'))));
+  end loop;
+  perform pg_temp.push(pg_temp.mk_pack('F-pack', v_today - 3, v_cards));
+  for v_n in 1..12 loop
+    perform pg_temp.decide(pg_temp.cid('F-pack', 'F-many-' || lpad(v_n::text, 2, '0')), 1, 'approve');
+    perform pg_temp.apps(pg_temp.cid('F-pack', 'F-many-' || lpad(v_n::text, 2, '0')), 1, 'in_apps');
+  end loop;
+  v_m := pg_temp.summary();
+  v_x := (select count(*) from mc.marketing_status(mc.marketing_pday()) s
+          where s.replace_after_launch and s.in_apps_version is not null and (s.slot_end is null or s.slot_end > now()));
+  r := r || case when (v_m #>> '{counts,replace_after_launch_in_apps}')::integer = v_x and v_x >= 12
+                      and jsonb_array_length(v_m -> 'replace_after_launch') = 10
+                      and (v_m #>> '{counts,replace_after_launch}')::integer > 10
+                      and (v_m #>> '{counts,replace_after_launch_in_apps}')::integer <= (v_m #>> '{counts,replace_after_launch}')::integer
+                 then 'ok  M44b the summary counts every "coming soon" post to replace that is already in the apps, beyond the 10 it lists'
+                 else 'FAIL M44b ' || coalesce(v_m -> 'counts', 'null'::jsonb)::text || ' live ' || coalesce(v_x::text, 'null') end;
   v_j := jsonb_build_array(
     pg_temp.launch(to_char((now() + interval '2 hours') at time zone 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI')) ->> 'error',
     pg_temp.launch(to_char((now() - interval '8 days') at time zone 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI')) ->> 'error',

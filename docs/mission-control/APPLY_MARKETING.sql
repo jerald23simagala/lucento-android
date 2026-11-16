@@ -560,6 +560,17 @@ as $$
   select l.pday_at from mc.marketing_launch l where l.id
 $$;
 
+-- A launch post ("Get it on Google Play") that mustn't go out yet: Lucento isn't marked live, or its slot starts
+-- before that moment. The too_early flag reads it, and so does marketing_apps, which refuses "I've scheduled it" for it.
+create or replace function mc.marketing_launch_too_early(p_phase text, p_slot_start timestamptz, p_pday timestamptz)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_phase = 'launch' and (p_pday is null or p_pday > p_slot_start), false)
+$$;
+
 -- Every post with its slot and its derived flags (§4), for a given launch moment: the stored one, or one the owner is
 -- about to confirm (the launch preview). One place for every rule, read by the board, the summary, the badge and
 -- Claude's feedback. p_card narrows it to one post.
@@ -582,8 +593,7 @@ as $$
          coalesce(c.phase = 'warmup' and p_pday is not null and upper(s.slot) > p_pday
                   and (c.state in ('waiting', 'changes', 'approved') or c.in_apps_version is not null), false),
          -- Says "Get it on Google Play" but goes out before launch (or launch hasn't been marked yet).
-         coalesce(c.phase = 'launch' and c.state not in ('skipped', 'withdrawn')
-                  and (p_pday is null or p_pday > lower(s.slot)), false),
+         c.state not in ('skipped', 'withdrawn') and mc.marketing_launch_too_early(c.phase, lower(s.slot), p_pday),
          -- The apps hold an older version, or a post that is skipped or taken out.
          coalesce(c.in_apps_version is not null
                   and (c.in_apps_version < c.current_version or c.state in ('skipped', 'withdrawn')), false),
@@ -1804,6 +1814,10 @@ begin
       return mc.failed('bad_state', 'This post changed on another device. Reload to see it.')
         || jsonb_build_object('state', v_c.state);
     end if;
+    -- A "Get it on Google Play" post can be approved ahead of launch, but not scheduled: it would go out too early.
+    if mc.marketing_launch_too_early(v_c.phase, lower(mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz)), mc.marketing_pday()) then
+      return mc.failed('launch_not_live', 'Mark Lucento as live first: this post says ''Get it on Google Play''.');
+    end if;
     v_wanted := array(select mc.marketing_text(h) from unnest(coalesce(p_by_hand, '{}'::text[])) h);
     if not mc.text_items_ok(v_wanted, 8, 60) or not (v_wanted <@ v_c.platforms) then
       return mc.failed('invalid', 'Choose the platforms you post by hand among this post''s platforms');
@@ -2067,11 +2081,15 @@ declare
   v_missing jsonb;
   v_unseen jsonb;
   v_unseen_count integer;
+  v_after_in_apps integer;
 begin
   if v_refusal is not null then
     return mc.refused(v_refusal);
   end if;
   select * into v_l from mc.marketing_launch l where l.id;
+  -- The same posts as replace_after_launch's list (those that haven't gone out), counted whole.
+  select count(*) into v_after_in_apps from mc.marketing_status(v_l.pday_at) s
+    where s.replace_after_launch and s.in_apps_version is not null and (s.slot_end is null or s.slot_end > now());
   v_waiting := mc.marketing_waiting();
   v_soon := mc.marketing_flag_items('needs_decision_soon', 10);
   v_due := mc.marketing_flag_items('due_soon', 10);
@@ -2102,6 +2120,7 @@ begin
     'unseen_requests', v_unseen,
     'counts', jsonb_build_object('needs_decision_soon', v_soon -> 'count', 'due_soon', v_due -> 'count',
                 'apps_stale', v_stale -> 'count', 'replace_after_launch', v_after -> 'count',
+                'replace_after_launch_in_apps', v_after_in_apps,
                 'too_early', v_early -> 'count', 'unseen_requests', v_unseen_count),
     'claude_checked_at', v_l.claude_checked_at);
 end;
