@@ -224,7 +224,7 @@ Refusal codes and the console's words:
 | note_required | "Say what should change, in a few words." |
 | note_has_contact | "Leave out names, e-mail addresses and phone numbers." |
 | not_in_apps | "This post isn't marked as in the apps." |
-| launch_not_live | "Schedule this after you mark Lucento as live (below the posts)." |
+| launch_not_live | "Mark Lucento as live first (below the posts): this post says 'Get it on Google Play'." (The card itself shows "Schedule this after you mark Lucento as live (below the posts)." instead of the scheduling form, so the refusal only meets a stale page.) |
 | launch_future / launch_too_old | "Set this once Lucento is live (not more than an hour ahead)." / "That's more than 7 days ago." |
 
 ### 5.3 Ingest functions
