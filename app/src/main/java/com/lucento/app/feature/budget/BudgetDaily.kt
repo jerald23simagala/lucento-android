@@ -8,8 +8,7 @@ import com.lucento.app.domain.CashflowCalculator
 import com.lucento.app.domain.Category
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.SafeToSpend
-import com.lucento.app.domain.Transaction
-import com.lucento.app.domain.Wallet
+import com.lucento.app.domain.fx.TranslatedLedger
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -30,21 +29,23 @@ sealed interface DailyFigure {
 }
 
 /**
- * Picks [plan]'s per-day figure. [schedules] should already exclude switched-off modules (Recurring off → none), as on
- * Home. Null when the current month has no budget in this currency (the hero then shows its no-budget state).
+ * Picks [plan]'s per-day figure. [ledger] is the translated ledger [plan] was built from (`FxTranslation.translate`), so
+ * spending in other currencies counts at its own value here exactly as in the hero and on Home. It is a ledger rather
+ * than two lists so the untranslated ones can't be passed by mistake: until 2026-11-16 they were, and "Safe per day"
+ * left foreign-wallet spending out. [schedules] should already exclude switched-off modules (Recurring off → none), as
+ * on Home. Null when the current month has no budget in this currency (the hero then shows its no-budget state).
  */
 fun budgetDailyFigure(
     plan: BudgetPlan,
     burn: BudgetBurn,
     today: LocalDate,
-    transactions: List<Transaction>,
-    wallets: List<Wallet>,
+    ledger: TranslatedLedger,
     budgets: List<Budget>,
     schedules: List<RecurringSchedule>,
     categories: List<Category>,
 ): DailyFigure? {
     if (plan.month != YearMonth.from(today)) return DailyFigure.DailyAverage(burn.dailyAverage, burn.daysInMonth)
-    val safe = CashflowCalculator.safeToSpend(plan.currencyCode, today, transactions, wallets, budgets, schedules, categories)
+    val safe = CashflowCalculator.safeToSpend(plan.currencyCode, today, ledger.transactions, ledger.wallets, budgets, schedules, categories)
         ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
         ?: return null
     val perDay = safe.perDay

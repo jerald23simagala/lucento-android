@@ -1,6 +1,7 @@
 package com.lucento.app.domain
 
 import com.lucento.app.core.money.Money
+import com.lucento.app.domain.fx.TranslatedLedger
 import java.time.YearMonth
 
 /**
@@ -104,13 +105,19 @@ object BudgetMilestones {
      * The most recent *finished* month (before [today]'s month) worth acknowledging, or null. Only allocations that
      * existed for that whole month (created on or before its first day) count, so a budget set up mid-month is never
      * judged on a partial month. The month qualifies when those allocations add up to a positive total in
-     * [currencyCode], there was real budgeted spending, and it stayed at or under the total. Overspending is never
-     * celebrated, nor is an empty month, nor a month already acknowledged ([lastAcknowledged] on or after it).
+     * [currencyCode], there was real spending, and the month's Spent (every expense, as in [BudgetPlan.spent]) stayed at
+     * or under the total. Overspending is never celebrated, nor is an empty month, nor a month already acknowledged
+     * ([lastAcknowledged] on or after it).
+     *
+     * [ledger] is the translated ledger (`FxTranslation.translate`), the one the Budget tab builds its plan from, so
+     * spending in other currencies counts at its own value. It is a ledger rather than a list so untranslated
+     * transactions can't be passed by mistake: until 2026-11-16 they were, and a month that foreign-wallet spending took
+     * over budget could still be celebrated.
      */
     fun monthToAcknowledge(
         categories: List<Category>,
         budgets: List<Budget>,
-        transactions: List<Transaction>,
+        ledger: TranslatedLedger,
         currencyCode: String,
         today: java.time.LocalDate,
         lastAcknowledged: YearMonth?,
@@ -118,7 +125,7 @@ object BudgetMilestones {
         val month = YearMonth.from(today).minusMonths(1)
         if (lastAcknowledged != null && !lastAcknowledged.isBefore(month)) return null
         val wholeMonth = budgets.filter { b -> b.createdOn != null && !b.createdOn.isAfter(month.atDay(1)) }
-        val plan = BudgetPlanner.plan(categories, wholeMonth, transactions, currencyCode, month)
+        val plan = BudgetPlanner.plan(categories, wholeMonth, ledger.transactions, currencyCode, month)
         if (!plan.hasBudget || plan.spent.isZero || plan.spent > plan.total) return null
         return plan
     }

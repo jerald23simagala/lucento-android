@@ -49,6 +49,49 @@
 | OT-33 | **Decide: lock Smarter reading for Free in Settings?** A Free user could turn it on and then waited for the server's refusal on every message (KNOWN_ISSUES FC-2) | **Done** (owner, 2026-11-15: lock it); built on `feature/fast-capture-ask-voice` | Free first users are the ones who'd feel the slowdown |
 
 
+## Custom budget periods — future Pro feature, after launch (owner, 2026-11-16)
+
+Budgets by payday cycle, week, two weeks, half-month or a named period, as a Pro feature (`docs/MONETIZATION.md` §3
+lists "custom periods" as Planned). **Not in the launch scope:** Lucento launches with calendar-month budgets as they
+are. A read-only audit on 2026-11-16 (`origin/main` `ef816c6`; private report
+https://claude.ai/artifact/1xgQTq65RzqaSgDQ2JM88C) found nothing that has to be prepared in code: transactions carry
+only a calendar date and no budget link, no SQL query filters by date, the budget math is pure and centralised in
+`BudgetPlanner`, each screen keeps its own month, and Pro gating has a ready pattern (Insights' 6/12-month lock).
+Estimated complexity **Medium**: Low–Medium for a monthly cycle with a custom start day ("my month starts on the
+25th"), Medium–High for weekly, biweekly, semi-monthly (15th and month end) or arbitrary periods.
+
+**Rules any implementation must follow:**
+1. **New tables only, never period columns on `budgets`.** Older app versions decode sync rows with
+   `ignoreUnknownKeys` and nothing can force an update, so an older phone would read such a row as an "every month"
+   amount, and `SyncRepository.mergeDuplicateBudgets` (grouped by category, currency, `month`, `effective_from`)
+   would delete it. From any phone on the owner's account that deletion syncs everywhere. Older phones never pull
+   tables they don't know. (The v10 lifecycle columns went onto `budgets` before launch; don't repeat that pattern.)
+2. **Existing `"yyyy-MM"` rows always mean calendar months.** Seed a custom cycle's amounts by copying the monthly
+   ones; reinterpreting old rows would move past budgets onto other dates.
+3. **Cycle definitions are effective-dated**, like `effective_from`. Nothing is snapshotted, so a rule applied without
+   a start date rewrites every past period. Define the switch-over stub (moving to a 25th start mid-month leaves
+   1–24 Nov) and the month-end anchor for day-N cycles (`RecurringMath`: Jan 31 → Feb 28 → Mar 31).
+4. **One contiguous cycle per ledger.** Overlapping named budgets (a holiday budget) are a separate, later concept,
+   never added to the cycle's figures.
+5. **No implicit proration** between period lengths: amounts are entered per period type.
+6. **The cycle setting needs its own synced table:** `ledger_settings` is insert-only (it locks the main currency).
+
+**Owner decisions when it is scheduled** (ask as options): which cycles ship first (recommended: the monthly start
+day); which screens follow the budget period (recommended: Budget; Home's budget card, pace and Safe to spend; the
+widget; Ask Lucento's budget facts and "Budget vs actual". Insights, Wallets, net flow, "Where it went" and
+Transactions stay on calendar months); the rule that replaces "a month's spending is one figure"
+(`MonthSpendingReconciliationTest`; proposed: the same date range gives the same figure, with a "This budget period"
+preset in Transactions); lapse behaviour (recommended, per MONETIZATION §6.3: an active cycle keeps running, only
+creating or changing a cycle is locked); what a Partner sees.
+
+**Outline:** pure domain first (`BudgetPeriod`, an effective-dated `BudgetCycle`; period versions of
+`BudgetPlanner.plan`/`burn` and `CashflowCalculator.safeToSpend`, keeping the `YearMonth` versions as wrappers so
+every caller and test still passes) → Room tables with a migration test → backup schema bump → Supabase migration
+(owner writes, Partner reads, grants, LWW and stamp triggers, CHECKs, the cloud write gate, quotas, account deletion,
+Mission Control) and `PulledRowRules` → `ProFeature.CUSTOM_BUDGET_PERIODS(LOCAL_PRO)` with a `ProGates` rule → screens
+and copy (about 170 month-worded phrases) → "same range, same figure" tests, boundary months and a mixed-version pair
+of phones.
+
 ## Mission Control V1 — follow-ups (2026-11-15)
 
 - ~~Run the local stack end to end~~ **Done 2026-11-15** (CURRENT_STATUS): 6 Playwright tests, a 72-screen tour per

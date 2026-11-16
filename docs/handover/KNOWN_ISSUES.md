@@ -15,6 +15,13 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Budget tab with foreign-currency wallets (2026-11-16, `fix/budget-screen-multicurrency`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| BF-1 | **Fixed 2026-11-16**: the Budget hero's "Safe per day" left out spending from wallets in other currencies, which the hero's own Spent and Remaining, and Home, count at its value (₱200 remaining beside ₱266.66 safe per day). `BudgetScreen` passed the untranslated lists to `budgetDailyFigure`; it now takes the `TranslatedLedger`, so they can't be passed | Found Code-only by the custom-budget-periods audit; fix Verified by JVM tests (`BudgetDailyFigureTest`: foreign spending within budget equals Home's safe to spend; over budget leaves nothing per day) | A look on a phone with a multicurrency ledger when convenient |
+| BF-2 | **Fixed 2026-11-16**: "You stayed within <month>'s budget" read the untranslated transactions, so a month that foreign-wallet spending took over budget could still be celebrated. `BudgetMilestones.monthToAcknowledge` now takes the `TranslatedLedger` | Found Code-only; fix Verified by JVM test (`BudgetMilestonesTest`: over → no celebration, under → celebrated) | — |
+
 ## Mission Control V1 (2026-11-15, `feature/mission-control-db`, `lucento-mission-control`)
 
 | Id | Issue | Evidence | Next step |
