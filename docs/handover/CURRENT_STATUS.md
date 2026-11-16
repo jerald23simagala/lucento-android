@@ -614,12 +614,25 @@ Owner: "I need my minimalist mission control done … Lets start building now" (
   DATA_SOURCE_INVENTORY updated); refund totals shown as +; MRR ₱0.00 instead of "—" without amounts; labels that said
   "as Google reports it" while paused; the entitlement table and the ticket composer cut off at 1280 px. Repository
   `jerald23simagala/lucento-mission-control` (private) created; console PR #1 merged `d24038f` (owner, 2026-11-15).
+- **On lucento-test** (owner, 2026-11-15): DEPLOYMENT.md parts A–D (catch-up SQL from #79, APPLY, VERIFY, `mc_api`
+  exposed, admin + secrets, Vercel TEST, first sign-in). Grant and revoke work. Console PRs #2–#6: deployment-guide
+  fixes, sign-in diagnostics, the Supabase URL taken as its origin.
+- **UI pass** (owner asked for the Impeccable skill and better UI/UX): console PR #7 merged `df195fe`, live on TEST. IBM
+  Plex, a rem type scale in five steps (works to 200 % text), plain-language captions (Gross before refunds, Net always
+  EST), phone layouts (stacked tables, sideways rows with fades, 44 px targets), a composer with a draft per kind of
+  message, visible metric definitions, focus never under the sticky bar, a skip link. Checks: Impeccable 0 findings on
+  15 routes; studio audit 0 FAIL on every route (phone/desktop, light/dark); no overflow at 130/150/200 %. Critic rounds
+  (studio `critic/reports/2026-11-15-mission-control-r{1,2,3}.md`): REVISE 3.2 → REJECT 2.9 → REJECT 3.3 (one gate,
+  layout integrity, two causes, fixed after the round and checked by the gates, not re-critiqued); escalated, and the
+  owner chose to merge. Then the owner's layout choices: Needs attention strip first, tickets message first, keep Plex
+  (branch `design/attention-strip`).
 
-## Fast capture by default, voice in Ask Lucento — 2026-11-15 (`feature/fast-capture-ask-voice`, on `main` `dacb6ea`)
+## Fast capture by default, voice in Ask Lucento — 2026-11-15 (PR #83, `feature/fast-capture-ask-voice`)
 
 Owner: speech in Add transactions is fast, Smarter reading made each message wait for Gemini, and new users expect fast
 input. Remove the composer's Smarter reading switch, warn whoever turns it on in Settings that it slows adding
-transactions, and give Ask Lucento the speech button. Worktree `../lucento-ask-voice`; uncommitted at the time of writing.
+transactions, and give Ask Lucento the speech button. Built in the worktree `../lucento-ask-voice` as PR #83 (CI green);
+the owner approved the merge the same day, after main's #82 was merged into the branch.
 
 - **Composer:** the Smarter reading switch row and its consent dialog are gone (`TransactionComposerScreen.kt`;
   `ComposerViewModel` keeps one `geminiReads` flag, `setSmartReading` removed). The note under the examples now says who
