@@ -64,16 +64,23 @@ ciphertext.
   older version is in the apps), a launch post before launch (`too_early`) or a 'coming soon' post after it
   (`after_launch`). The card says which; deleting it in the apps and tapping "I've removed it from the apps" hands it
   over.
+- **A destination that can post** (`mc.autopost_destination_ok`, design review round 2): chosen, its last Check
+  didn't refuse, and its account's last token renewal didn't fail. What the posts say is what happens: an account that
+  needs a reconnect posts nothing (no job is made; a waiting one stops) until a reconnect clears its Checks.
 - **Candidates** (`mc.autopost_candidates`): auto-posting on; post approved, not `autopost_off`, with a slot; current
-  version ready and passing the truth check; not blocked; the target has a destination.
-- **Covers** (`mc.autopost_covers`): every label on the post is a connected target. **Posts any**
+  version ready and passing the truth check; not blocked; the target's destination can post.
+- **Covers** (`mc.autopost_covers`): every label on the post is a target whose destination can post. **Posts any**
   (`mc.autopost_posts_any`): at least one is; `due_soon` ("approved but not scheduled") leaves those out, as the owner
-  has nothing to schedule (a manual label, such as the group, is posted at the time and asked about after the slot).
+  has nothing to schedule (a manual label, such as the group, is posted at the time and asked about after the slot). A
+  post whose every account needs a reconnect is the owner's to schedule again.
 - **Jobs** are created by the claim within their lead time (never at approval), stepped under a 3-minute lease, and
-  re-checked at every step: a post undone, skipped, revised or turned to by hand, a destination gone, or auto-posting off
-  stops it before its next step (`cancelled`; turning auto-posting off cancels the waiting steps at once). A cancelled
-  job starts over when its post can go out again (approved again, back to automatic, reconnected, on again): it never
-  posted anything. Past late-until a job `failed` with `missed`.
+  re-checked at every step: a post undone, skipped, revised or turned to by hand, a destination gone or to reconnect,
+  or auto-posting off stops it before its next step (`cancelled`; turning auto-posting off cancels the waiting steps at
+  once). Each stop records why, as a code its card puts in words (`mc.autopost_stop_reason`): `autopost_off`,
+  `disconnected`, `card_off` (the owner's own), `not_approved`, `new_version`, `no_destination`, `reconnect`,
+  `blocked_<why>`, `not_ready`. A cancelled job starts over when its post can go out again while its slot's window is
+  open (approved again, back to automatic, reconnected, on again): it never posted anything. Past that, the owner
+  decides: "Post it now" (`retry`) or "I'll post it by hand". Past late-until a waiting job `failed` with `missed`.
 - **A run that never reported** (`mc.autopost_settle_lapsed`, first in the claim, disconnecting and "post this one by
   hand"): every result, retry, cancellation and miss clears the lease, so a lease left behind means the run died or its
   result couldn't be saved. A step taken at or after the slot that publishes from its status (`ready`; `queued` Page,
@@ -84,9 +91,10 @@ ciphertext.
   (the platform may have posted it: never retried; the owner looks). A late "posted" from a lapsed lease is still
   recorded: what happened on the platform wins.
 - **Out**: the first job posted (or sent to drafts, or taken by hand) sets `in_apps_version` to that version; `by_hand`
-  gets the labels the owner still finishes (manual ones, a target sent to drafts or taken by hand, an unconnected
-  target), so the page asks "Did you post it on …?" after the slot. Nothing changes when the post was revised or undone
-  meanwhile.
+  gets the labels the owner still finishes (manual ones, a target sent to drafts or taken by hand, a target whose
+  destination can't post and that didn't go out: not connected, disconnected or to reconnect), so the page asks "Did you
+  post it on …?" after the slot. A label Mission Control later posts on every platform (its account came back) leaves
+  `by_hand`. Nothing changes when the post was revised or undone meanwhile.
 
 ## 5. SQL API
 
@@ -100,9 +108,9 @@ Owner (granted to authenticated; each calls `mc.gate` first, its own hourly coun
 | `autopost_set_destination(key, option_id)` | marketing.autopost_destination, step-up, 60/h | only from the connection's options, of the right kind; null clears |
 | `autopost_disconnect(provider)` | marketing.autopost_disconnect, step-up, 20/h | cancels its jobs not under way; deletes tokens and destinations |
 | `autopost_credentials(key)` | marketing.autopost_credentials, 120/h | the destination's ciphertexts, for the console's Check |
-| `autopost_record_check(key, ok, note)` | marketing.autopost_check, 120/h | keeps the Check's answer on the destination (Settings and the posts show it); cleared when the destination or its token changes |
+| `autopost_record_check(key, ok, note)` | marketing.autopost_check, 120/h | keeps the Check's answer on the destination (Settings and the posts show it); cleared when the destination or its token changes; one that passed also clears its account's failed renewal |
 | `autopost_save_token(provider, account_id, …)` | marketing.autopost_token, 120/h | after a refresh in a Check, or its error; only for that account (a reconnect meanwhile is left alone) |
-| `autopost_job_action(job, action)` | marketing.decide | `retry` (failed/uncertain, approved current version), `posted` (uncertain), `by_hand` |
+| `autopost_job_action(job, action)` | marketing.decide | `retry` (failed, uncertain or stopped, approved current version, only when Mission Control may post it now: `not_allowed` says why not), `posted` (uncertain), `by_hand` (stopped ones too) |
 | `autopost_card(card, version, off)` | marketing.decide | `stale_version`; `busy` while a step is under way; `already_started` once a step began |
 
 Console (granted to anon; each checks its secret first): `ingest_autopost_claim(tick_secret, app_secret, limit)` (both
@@ -114,9 +122,10 @@ Clock: `mc.autopost_kick()` (pg_cron `mc-autopost`, every minute: off / no addre
 SQL editor: rotates the `autopost` secret into Vault as `mc_autopost_tick`, records the address, schedules the job).
 
 The board's cards gain `autopost {enabled, off, covers, posts_any, blocked, due_at, late_until, targets[{label, target,
-destination, mode, connected, destination_name, check_ok, checked_at, job}]}`; the board gains `autopost` (the
-settings: the clock, connections, destinations with their last Check, and `work_due`); the summary gains `autopost
-{failed[], uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
+destination, mode, connected, destination_name, check_ok (false also while its account's renewal failed), checked_at,
+job (with `stop_note` when stopped)}]}`; the board gains `autopost` (the settings: the clock, connections, destinations
+with their last Check, and `work_due`); the summary gains `autopost {failed[], uncertain[], drafts_waiting[], counts,
+accounts {chosen, working, reconnect[]}}` (each list ≤ 10, by slot).
 
 ## 6. Console
 
@@ -148,16 +157,30 @@ settings: the clock, connections, destinations with their last Check, and `work_
   `/settings/connect/<provider>/finish` with a navigation of its own (meta refresh, no script). /finish is gated like
   every page: it checks the state against the cookie and the admin, exchanges the code, encrypts the tokens and calls
   `autopost_save_connection` (whose step-up the code entered at Connect still covers).
-- Settings › Auto-posting keeps each destination's last Check on its row ("Works · checked 2 min ago", "Reconnect
-  needed"); turning auto-posting on checks every account and names those that can't post. The posting-clock line warns
-  when something is due and the clock hasn't run for 5 minutes (`work_due`).
-- Marketing card: the plan before the slot, naming both sides ("posts it on Facebook, Instagram and YouTube Mon 19:30.
-  TikTok goes to your drafts…; you post it on … at the time"), each result after it (at the top of a settled card),
-  Try again (or "Post it now" past the window, naming the slot) / I'll post it by hand / It's posted; a step that can't
-  go on says why: paused while auto-posting is off, waiting for a posting clock that stopped, not posted in time. The
-  approve button says "Approve and post Mon 19:30" only when Mission Control will post it (not blocked, an account
-  that passes its Check). The chip, banner and filters agree: "Partly posted · 1 needs you" when a platform failed
-  after another went out.
+- Settings › Auto-posting (design review round 2): the chip and the first sentence say what will actually happen with
+  the accounts as they are ("On · nothing can post", "On · some can't post", naming them), never only "On"; the timing
+  rules and what stays the owner's ("Still yours", from what is connected) follow. Each destination keeps its last
+  Check on its row ("Works · checked 2 min ago", "Reconnect needed · checked 2 min ago"). An account that needs a
+  reconnect says so once: a notice with Reconnect as its main button and the cause under Details (the platform's
+  sentence first, a technical aside apart); its rows lose Check and Change until then, and the notice takes the focus
+  when a Check just turned it so. With nothing that can post, the switch steps back ("Turn auto-posting on anyway").
+  Turning on checks every account; an answer that still needs the owner is a warning. The posting clock: a label, its
+  state (Set up, Not set up, Stalled) and, when it stalled with something due, what to check in Supabase.
+- Marketing and Overview: while auto-posting is on and accounts can't post, one line says so at the top of Marketing
+  and in Overview's "Needs you now", with the way to Settings.
+- Marketing card: while auto-posting is on every post has a plan sentence, also one the owner posts all of ("Mission
+  Control doesn't post this one: you post it in the Lucento Community group at the time"). Before the slot it names
+  both sides ("posts it on Facebook, Instagram and YouTube Mon 19:30. TikTok goes to your drafts…; you post it on … at
+  the time"), as a ▲ warning with a link to Settings when an account needs a reconnect ("YouTube won't post until you
+  reconnect it"). The panel ("Automatic posting") has each result after the slot (at the top of a settled card; the
+  card doesn't also say "Version 1 went out"), with the date when it went out on another day than its slot; Try again
+  (or "Post it now" past the window, naming the slot) only where another attempt can happen / I'll post it by hand /
+  It's posted. A step that can't go on says why: paused while auto-posting is off, waiting for a posting clock that
+  stopped, not posted in time, stopped (and why: "Stopped when auto-posting was turned off (Mon 16 Nov, 21:04)"), with
+  what the owner can do. The approve button says "Approve and post Mon 19:30" only when Mission Control will post it
+  (not blocked, an account that can post). The chip, banner and filters agree: "Partly posted · 2 need you" counts a
+  platform that failed, couldn't be confirmed or was stopped after another went out; "Approved · reconnect needed"
+  when every account it would go to needs one.
 
 ## 7. Security and privacy
 
@@ -178,10 +201,12 @@ settings: the clock, connections, destinations with their last Check, and `work_
 
 ## 8. Tests
 
-- SQL `tools/sql-verify/autopost_suite.sql` (48 checks: secrets and grants, the map, due times, connections and picks,
-  every job step and refusal, coverage and due_soon, cancellations and starting over, missed, a run that never reported,
-  busy, renewals for one account only, Meta without a user token, posts in the apps by hand and launch posts blocked,
-  Checks kept and cleared, `work_due`, launch rules, the clock's guards, the board, the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
+- SQL `tools/sql-verify/autopost_suite.sql` (54 checks: secrets and grants, the map, due times, connections and picks,
+  every job step and refusal, coverage and due_soon, cancellations (with why) and starting over, missed, a run that
+  never reported, busy, renewals for one account only, Meta without a user token, posts in the apps by hand and launch
+  posts blocked, Checks kept and cleared, `work_due`, stopped steps sent now or taken by hand, the accounts' health, a
+  refused account posting nothing until reconnected, a disconnected platform asked about, launch rules, the clock's
+  guards, the board, the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
   `catch_up_check.mjs` part E pastes APPLY_AUTOPOST.sql the owner's way.
 - Console (`lucento-mission-control`): unit tests `autopost-crypto` (encryption, additional data, the state cookie,
   PKCE), `autopost-runner` (every target's steps against fake platforms, the retry/uncertain rules, the deadline, one

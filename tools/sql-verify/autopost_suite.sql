@@ -502,8 +502,8 @@ begin
   v_j := pg_temp.claim();
   r := r || case when v_ok and (pg_temp.job(v_c4, 'facebook_photo')).status = 'cancelled' and pg_temp.claimed(v_j, 'A-page', 'facebook_photo') is null
                       and exists (select 1 from mc.autopost_events e join mc.autopost_jobs j on j.id = e.job_id
-                                  where j.card_id = v_c4 and e.kind = 'cancelled')
-                 then 'ok  P27 a post undone before its slot is cancelled at the next step: nothing posts'
+                                  where j.card_id = v_c4 and e.kind = 'cancelled' and e.note = 'not_approved')
+                 then 'ok  P27 a post undone before its slot is cancelled at the next step (why: not_approved): nothing posts'
                  else 'FAIL P27 ' || left(coalesce(v_j::text, ''), 300) end;
 
   -- A revised post: the old version's queued jobs are cancelled, the new version waits for the owner.
@@ -516,7 +516,9 @@ begin
   r := r || case when (pg_temp.job(v_c2, 'instagram_reel')).status = 'cancelled' and (pg_temp.job(v_c2, 'instagram_reel')).version = 1
                       and (select state from mc.marketing_cards where id = v_c2) = 'waiting'
                       and not exists (select 1 from mc.autopost_jobs where card_id = v_c2 and version = 2)
-                 then 'ok  P28 a revision cancels the old version''s jobs; the new version posts only once approved'
+                      and exists (select 1 from mc.autopost_events e join mc.autopost_jobs j on j.id = e.job_id
+                                  where j.card_id = v_c2 and j.version = 1 and e.kind = 'cancelled' and e.note = 'new_version')
+                 then 'ok  P28 a revision cancels the old version''s jobs (why: new_version); the new version posts only once approved'
                  else 'FAIL P28 ' || left(coalesce(v_k::text, ''), 300) end;
 
   -- Approved again, then missed (past 3 hours after its slot).
@@ -600,7 +602,9 @@ begin
                       and not exists (select 1 from mc.autopost_connections where provider = 'meta')
                       and not exists (select 1 from mc.autopost_jobs where card_id = v_c6 and status in ('queued', 'preparing', 'ready')
                                         and destination in ('lucento_page', 'instagram'))
-                 then 'ok  P36 disconnecting removes the account, its tokens and destinations, and cancels its jobs not under way'
+                      and exists (select 1 from mc.autopost_events e join mc.autopost_jobs j on j.id = e.job_id
+                                  where j.card_id = v_c6 and e.kind = 'cancelled' and e.note = 'disconnected')
+                 then 'ok  P36 disconnecting removes the account, its tokens and destinations, and cancels its jobs not under way (why: disconnected)'
                  else 'FAIL P36 ' || left(coalesce(v_j::text, ''), 300) end;
 
   perform pg_temp.as_anon();
@@ -683,12 +687,14 @@ begin
   update mc.autopost_jobs set lease_until = now() - interval '1 second' where card_id = pg_temp.cid('A-sec');
   v_m := pg_temp.owner_call('select mc_api.autopost_set_enabled(false)');
   v_ok := (pg_temp.job(pg_temp.cid('A-sec'), 'facebook_reel')).status = 'cancelled'
-          and (pg_temp.job(v_c6, 'youtube')).status = 'queued';
+          and (pg_temp.job(v_c6, 'youtube')).status = 'queued'
+          and (select e.note from mc.autopost_events e where e.job_id = (pg_temp.job(pg_temp.cid('A-sec'), 'facebook_reel')).id
+               and e.kind = 'cancelled' order by e.id desc limit 1) = 'autopost_off';
   v_k := pg_temp.owner_call('select mc_api.autopost_set_enabled(true)');
   v_j := pg_temp.claim();
   r := r || case when (v_m ->> 'ok')::boolean and v_ok and (v_k ->> 'ok')::boolean
                       and pg_temp.claimed(v_j, 'A-sec', 'facebook_reel') is not null
-                 then 'ok  P44 turning auto-posting off stops the steps waiting (not one under way); on again starts them over'
+                 then 'ok  P44 turning auto-posting off stops the steps waiting (not one under way; why: autopost_off); on again starts them over'
                  else 'FAIL P44 ' || coalesce(v_m::text, '') || left(coalesce(v_j::text, ''), 300) end;
 
   -- ======================================================================== J: after the design review
@@ -738,13 +744,135 @@ begin
                  then 'ok  P47 Settings knows when something is due (so it can tell a posting clock that stopped)'
                  else 'FAIL P47 ' || left(coalesce(v_s::text, ''), 300) end;
 
+  -- ======================================================================== K: after the design review, round 2
+  -- A step stopped by turning auto-posting off: its card says why; "Post it now" is refused while off and, once on (past
+  -- the slot's window, so nothing restarts it by itself), sends it.
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-stop', (v_local - interval '1 minute')::date,
+             to_char(v_local - interval '1 minute', 'HH24:MI'), jsonb_build_object('platforms', jsonb_build_array('YouTube Shorts')))));
+  perform pg_temp.decide(pg_temp.cid('A-stop'), 1, 'approve');
+  perform pg_temp.claim();
+  update mc.autopost_jobs set lease_id = null, lease_until = null where card_id = pg_temp.cid('A-stop');
+  v_job := (pg_temp.job(pg_temp.cid('A-stop'), 'youtube')).id;
+  perform pg_temp.owner_call('select mc_api.autopost_set_enabled(false)');
+  v_b := pg_temp.board();
+  v_m := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''retry'')', v_job));
+  perform pg_temp.owner_call('select mc_api.autopost_set_enabled(true)');
+  update mc.marketing_cards set slot_day = (v_local - interval '4 hours')::date,
+                                slot_time = to_char(v_local - interval '4 hours', 'HH24:MI')::time where id = pg_temp.cid('A-stop');
+  v_j := pg_temp.claim();
+  v_ok := (pg_temp.job(pg_temp.cid('A-stop'), 'youtube')).status = 'cancelled' and pg_temp.claimed(v_j, 'A-stop', 'youtube') is null;
+  v_k := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''retry'')', v_job));
+  v_j := pg_temp.claim();
+  r := r || case when v_job is not null
+                      and pg_temp.cardj(v_b, 'A-stop') #>> '{autopost,targets,0,job,status}' = 'cancelled'
+                      and pg_temp.cardj(v_b, 'A-stop') #>> '{autopost,targets,0,job,stop_note}' = 'autopost_off'
+                      and v_m ->> 'error' = 'not_allowed' and v_ok
+                      and v_k ->> 'status' = 'queued' and pg_temp.claimed(v_j, 'A-stop', 'youtube') is not null
+                      and (pg_temp.job(pg_temp.cid('A-stop'), 'youtube')).late_until > now() + interval '59 minutes'
+                 then 'ok  P48 a step stopped by turning auto-posting off says why on its card; "Post it now" is refused while off and, once on, sends it'
+                 else 'FAIL P48 ' || coalesce(v_m::text, '') || coalesce(v_k::text, '') || left(coalesce(pg_temp.cardj(v_b, 'A-stop')::text, ''), 300) end;
+
+  -- "I'll post it by hand" takes a stopped step too: the label joins what the owner finishes.
+  update mc.autopost_jobs set lease_id = null, lease_until = null where id = v_job;
+  perform pg_temp.owner_call('select mc_api.autopost_set_enabled(false)');
+  v_m := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''by_hand'')', v_job));
+  perform pg_temp.owner_call('select mc_api.autopost_set_enabled(true)');
+  r := r || case when v_m ->> 'status' = 'by_hand'
+                      and (select by_hand from mc.marketing_cards where id = pg_temp.cid('A-stop')) @> '{YouTube Shorts}'
+                      and (select in_apps_version from mc.marketing_cards where id = pg_temp.cid('A-stop')) = 1
+                 then 'ok  P49 "I''ll post it by hand" takes a stopped step: the label joins "Did you post it on …?"'
+                 else 'FAIL P49 ' || coalesce(v_m::text, '') end;
+
+  -- The accounts' health: Overview can tell auto-posting is on but can't post; a failed token renewal counts as a
+  -- refusal on the posts until a Check passes.
+  v_t := (select account_id from mc.autopost_connections where provider = 'google');
+  perform pg_temp.owner_call('select mc_api.autopost_record_check(''youtube'', true, null)');
+  v_s := pg_temp.summary();
+  v_n := (v_s #>> '{autopost,accounts,working}')::integer;
+  perform pg_temp.as_anon();
+  v_j := mc_api.ingest_autopost_token(v_app, 'google', v_t, null, null, null, null, 'invalid_grant');
+  execute 'reset role';
+  v_m := pg_temp.summary();
+  v_b := pg_temp.board();
+  v_ok := (v_m #>> '{autopost,accounts,working}')::integer = v_n - 1
+          and (v_m #> '{autopost,accounts,reconnect}') @> '["google"]'::jsonb
+          and pg_temp.cardj(v_b, 'A-stop') #>> '{autopost,targets,0,check_ok}' = 'false';
+  perform pg_temp.owner_call('select mc_api.autopost_record_check(''youtube'', true, null)');
+  v_k := pg_temp.summary();
+  r := r || case when (v_j ->> 'ok')::boolean and v_ok and v_n >= 1
+                      and (v_k #>> '{autopost,accounts,working}')::integer = v_n
+                      and not ((v_k #> '{autopost,accounts,reconnect}') @> '["google"]'::jsonb)
+                      and (select last_error from mc.autopost_connections where provider = 'google') is null
+                      and (v_k #>> '{autopost,accounts,chosen}')::integer >= v_n
+                 then 'ok  P50 the summary counts the accounts that can post and names those to reconnect (a refused Check or a failed renewal, which the posts show too); a passing Check clears a failed renewal'
+                 else 'FAIL P50 ' || left(coalesce((v_m #> '{autopost,accounts}')::text, ''), 200) || left(coalesce((v_k #> '{autopost,accounts}')::text, ''), 200) end;
+
+  -- A platform disconnected before its slot is the owner's: when the rest goes out, "Did you post it on …?" asks.
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-disc', (v_local - interval '1 minute')::date,
+             to_char(v_local - interval '1 minute', 'HH24:MI'),
+             jsonb_build_object('kind', 'post', 'platforms', jsonb_build_array('Lucento Facebook Page', 'YouTube Shorts')))));
+  perform pg_temp.decide(pg_temp.cid('A-disc'), 1, 'approve');
+  perform pg_temp.claim();
+  update mc.autopost_jobs set lease_id = null, lease_until = null where card_id = pg_temp.cid('A-disc');
+  perform pg_temp.owner_call('select mc_api.autopost_disconnect(''google'')');
+  v_j := pg_temp.claim();
+  v_k := pg_temp.claimed(v_j, 'A-disc', 'facebook_photo');
+  v_m := pg_temp.result((v_k ->> 'id')::uuid, (v_k ->> 'lease_id')::uuid,
+           '{"status": "posted", "external_id": "p1", "external_url": "https://www.facebook.com/p1"}');
+  r := r || case when (v_m ->> 'ok')::boolean
+                      and (pg_temp.job(pg_temp.cid('A-disc'), 'youtube')).status = 'cancelled'
+                      and (select by_hand from mc.marketing_cards where id = pg_temp.cid('A-disc')) = '{YouTube Shorts}'
+                 then 'ok  P51 a platform disconnected before its slot is the owner''s: once the rest goes out, "Did you post it on YouTube Shorts?" asks'
+                 else 'FAIL P51 ' || coalesce(v_m::text, '') || left(coalesce(v_j::text, ''), 300) end;
+
+  -- An account whose Check refused doesn't post: its post isn't counted as Mission Control's, its waiting step stops
+  -- (why: reconnect), and "Post it now" says to reconnect first.
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-refused', (v_local - interval '1 minute')::date,
+             to_char(v_local - interval '1 minute', 'HH24:MI'),
+             jsonb_build_object('kind', 'post', 'platforms', jsonb_build_array('Lucento Facebook Page')))));
+  perform pg_temp.decide(pg_temp.cid('A-refused'), 1, 'approve');
+  v_ok := mc.autopost_posts_any(pg_temp.cid('A-refused')) and mc.autopost_covers(pg_temp.cid('A-refused'));
+  perform pg_temp.claim();
+  update mc.autopost_jobs set lease_id = null, lease_until = null where card_id = pg_temp.cid('A-refused');
+  perform pg_temp.owner_call('select mc_api.autopost_record_check(''lucento_page'', false, ''Reconnect Facebook and Instagram: the sign-in was refused.'')');
+  v_j := pg_temp.claim();
+  v_t := (select e.note from mc.autopost_events e where e.job_id = (pg_temp.job(pg_temp.cid('A-refused'), 'facebook_photo')).id
+          and e.kind = 'cancelled' order by e.id desc limit 1);
+  v_m := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''retry'')', (pg_temp.job(pg_temp.cid('A-refused'), 'facebook_photo')).id));
+  r := r || case when v_ok
+                      and not mc.autopost_posts_any(pg_temp.cid('A-refused')) and not mc.autopost_covers(pg_temp.cid('A-refused'))
+                      and (pg_temp.job(pg_temp.cid('A-refused'), 'facebook_photo')).status = 'cancelled' and v_t = 'reconnect'
+                      and pg_temp.claimed(v_j, 'A-refused', 'facebook_photo') is null
+                      and v_m ->> 'error' = 'not_allowed' and v_m ->> 'message' like 'Its account needs a reconnect%'
+                 then 'ok  P52 an account whose Check refused doesn''t post: its post isn''t counted as Mission Control''s, its waiting step stops (why: reconnect) and "Post it now" says to reconnect first'
+                 else 'FAIL P52 ' || coalesce(v_t, 'no note') || coalesce(v_m::text, '') end;
+
+  -- Reconnected: the Checks are cleared and the stopped steps start over; a label the owner was asked about (YouTube,
+  -- disconnected before its slot) isn't asked about any more once Mission Control posts it.
+  perform pg_temp.owner_call(format('select mc_api.autopost_save_connection(%L, %L, %L, null, null, null, null, %L, %L::jsonb)',
+           'meta', '1001', 'Jerald', '{pages_manage_posts}',
+           jsonb_build_array(jsonb_build_object('kind', 'page', 'id', '501', 'name', 'Lucento', 'token_cipher', v_page_cipher),
+                             jsonb_build_object('kind', 'instagram', 'id', '17841', 'name', 'lucentoapp', 'page_id', '501'))));
+  perform pg_temp.owner_call(format('select mc_api.autopost_save_connection(%L, %L, %L, %L, %L, %L, null, %L, %L::jsonb)',
+           'google', 'g-1', 'Lucento', v_cipher, v_cipher, (now() + interval '1 hour')::text, '{}',
+           jsonb_build_array(jsonb_build_object('kind', 'youtube', 'id', 'UCg8f6wbVTgYPnXBeMvD0FyA', 'name', 'Lucento'))));
+  v_j := pg_temp.claim();
+  v_k := pg_temp.claimed(v_j, 'A-disc', 'youtube');
+  v_m := pg_temp.result((v_k ->> 'id')::uuid, (v_k ->> 'lease_id')::uuid,
+           '{"status": "posted", "external_id": "yt1", "external_url": "https://www.youtube.com/shorts/yt1"}');
+  r := r || case when pg_temp.claimed(v_j, 'A-refused', 'facebook_photo') is not null
+                      and (v_m ->> 'ok')::boolean
+                      and (select by_hand from mc.marketing_cards where id = pg_temp.cid('A-disc')) = '{}'
+                 then 'ok  P53 reconnected, the stopped steps start over; a label Mission Control then posts is no longer asked about'
+                 else 'FAIL P53 ' || coalesce(v_m::text, '') || left(coalesce(v_j::text, ''), 300) end;
+
   select string_agg(a, ',' order by a) into v_t from (
     select distinct substr(action, 11) as a from mc.audit_log where action like 'marketing.autopost%' and result = 'ok') x;
   r := r || case when v_t = 'autopost_by_hand,autopost_card_off,autopost_confirmed,autopost_connect,autopost_destination,autopost_disconnect,autopost_off,autopost_on,autopost_retry'
                       and not exists (select 1 from mc.audit_log where action like 'marketing.autopost%'
                                       and coalesce(detail, '') || coalesce(target_ref, '') || coalesce(before::text, '') || coalesce(after::text, '') like '%v1:%')
-                 then 'ok  P48 every auto-posting action is audited, never with a token'
-                 else 'FAIL P48 ' || coalesce(v_t, 'none') end;
+                 then 'ok  P54 every auto-posting action is audited, never with a token'
+                 else 'FAIL P54 ' || coalesce(v_t, 'none') end;
 
   raise exception E'VERIFY %/% failed\n%',
     (select count(*) from unnest(r) x where x like 'FAIL%'), array_length(r, 1), array_to_string(r, E'\n');

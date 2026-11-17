@@ -295,9 +295,48 @@ as $$
   where c.id = p_card
 $$;
 
--- Every post Mission Control may post now or soon, with each automatic target that has a destination: approved, not
--- turned to by hand, auto-posting on, a ready and passing current version, a slot, and nothing blocking it
--- (mc.autopost_blocked: not in the apps by hand, launch rules).
+-- A destination Mission Control posts to: chosen, its last Check didn't refuse, and its account's last token renewal
+-- didn't fail (design review round 2: what the posts say is what happens; reconnecting clears both).
+create or replace function mc.autopost_destination_ok(p_key text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from mc.autopost_destinations d join mc.autopost_connections cn on cn.provider = d.provider
+                 where d.key = p_key and d.check_ok is distinct from false and cn.last_error is null)
+$$;
+
+-- Why a job was stopped before it posted, as a code its card puts in words (design review round 2): the owner's own
+-- stops are recorded where they happen (autopost_off: auto-posting turned off; disconnected: its account disconnected;
+-- card_off: the post turned to by hand); the clock's are worked out here, in this order.
+create or replace function mc.autopost_stop_reason(p_card uuid, p_version integer, p_target text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((
+    select case
+             when c.current_version <> p_version then 'new_version'
+             when c.state <> 'approved' then 'not_approved'
+             when c.autopost_off then 'card_off'
+             when not exists (select 1 from mc.autopost_targets(c.platforms) t
+                              join mc.autopost_destinations d on d.key = t.destination
+                              where t.target = p_target) then 'no_destination'
+             when not exists (select 1 from mc.autopost_targets(c.platforms) t
+                              where t.target = p_target and mc.autopost_destination_ok(t.destination)) then 'reconnect'
+             when mc.autopost_blocked(c.id) is not null then 'blocked_' || mc.autopost_blocked(c.id)
+             else 'not_ready'
+           end
+    from mc.marketing_cards c where c.id = p_card), 'not_ready')
+$$;
+
+-- Every post Mission Control may post now or soon, with each automatic target whose destination can post
+-- (mc.autopost_destination_ok): approved, not turned to by hand, auto-posting on, a ready and passing current version, a
+-- slot, and nothing blocking it (mc.autopost_blocked: not in the apps by hand, launch rules).
 create or replace function mc.autopost_candidates()
 returns table (card_id uuid, version integer, target text, destination text, label text, due_at timestamptz,
                late_until timestamptz)
@@ -313,14 +352,16 @@ as $$
   join mc.marketing_versions v on v.card_id = c.id and v.version = c.current_version
   cross join lateral mc.autopost_targets(c.platforms) t
   join mc.autopost_destinations d on d.key = t.destination
+  join mc.autopost_connections cn on cn.provider = d.provider
   where mc.setting_on('autopost_enabled') and c.state = 'approved' and not c.autopost_off and c.slot_day is not null
     and t.target is not null and v.truth_pass and mc.marketing_version_ready(c.id, c.current_version)
+    and d.check_ok is distinct from false and cn.last_error is null
     and mc.autopost_blocked(c.id) is null
 $$;
 
 -- Mission Control will post every label of this one: auto-posting is on, the owner hasn't turned it to by hand, nothing
--- blocks it, and every label is a target with a destination (a manual label, such as the group, or an unconnected
--- platform still needs the owner).
+-- blocks it, and every label is a target whose destination can post (a manual label, such as the group, an unconnected
+-- platform or one to reconnect still needs the owner).
 create or replace function mc.autopost_covers(p_card uuid)
 returns boolean
 language sql
@@ -332,8 +373,7 @@ as $$
     select mc.setting_on('autopost_enabled') and not c.autopost_off and mc.autopost_blocked(c.id) is null
        and exists (select 1 from mc.autopost_targets(c.platforms) t where t.target is not null)
        and not exists (select 1 from mc.autopost_targets(c.platforms) t
-                       where t.target is null
-                          or not exists (select 1 from mc.autopost_destinations d where d.key = t.destination))
+                       where t.target is null or not mc.autopost_destination_ok(t.destination))
     from mc.marketing_cards c where c.id = p_card), false)
 $$;
 
@@ -349,7 +389,7 @@ as $$
   select coalesce((
     select mc.setting_on('autopost_enabled') and not c.autopost_off and mc.autopost_blocked(c.id) is null
        and exists (select 1 from mc.autopost_targets(c.platforms) t
-                   join mc.autopost_destinations d on d.key = t.destination where t.target is not null)
+                   where t.target is not null and mc.autopost_destination_ok(t.destination))
     from mc.marketing_cards c where c.id = p_card), false)
 $$;
 
@@ -379,7 +419,9 @@ as $$
 $$;
 
 -- A post's auto-posting as the Marketing page shows it: each label with its target, whether it is connected and the
--- latest job (the current version's first; else an older version's, so "version 1 went out" can be told).
+-- latest job (the current version's first; else an older version's, so "version 1 went out" can be told). A stopped
+-- job carries why it stopped; a destination whose account's last token renewal failed counts as refused (check_ok
+-- false), as Settings shows it.
 create or replace function mc.autopost_card_json(p_card uuid)
 returns jsonb
 language sql
@@ -393,16 +435,23 @@ as $$
     'late_until', mc.autopost_late_until(c.slot_day, c.slot_time, p.tz),
     'targets', (select coalesce(jsonb_agg(jsonb_build_object('label', t.label, 'target', t.target,
                    'destination', t.destination, 'mode', t.mode, 'connected', d.key is not null,
-                   'destination_name', d.name, 'check_ok', d.check_ok, 'checked_at', d.checked_at,
+                   'destination_name', d.name,
+                   'check_ok', case when cn.last_error is not null then false else d.check_ok end,
+                   'checked_at', d.checked_at,
                    'job', (select jsonb_build_object('id', j.id, 'version', j.version, 'status', j.status,
                              'attempts', j.attempts, 'external_url', j.external_url, 'error', j.error,
-                             'error_code', j.error_code, 'due_at', j.due_at, 'finished_at', j.finished_at,
-                             'next_try_at', j.next_try_at, 'updated_at', j.updated_at)
+                             'error_code', j.error_code, 'due_at', j.due_at, 'late_until', j.late_until,
+                             'finished_at', j.finished_at,
+                             'next_try_at', j.next_try_at, 'updated_at', j.updated_at,
+                             'stop_note', case when j.status = 'cancelled' then
+                                            (select e.note from mc.autopost_events e
+                                             where e.job_id = j.id and e.kind = 'cancelled' order by e.id desc limit 1) end)
                            from mc.autopost_jobs j where j.card_id = c.id and j.target = t.target
                            order by (j.version = c.current_version) desc, j.version desc limit 1))
                  order by t.ord, t.target), '[]'::jsonb)
                 from mc.autopost_targets(c.platforms) t
-                left join mc.autopost_destinations d on d.key = t.destination))
+                left join mc.autopost_destinations d on d.key = t.destination
+                left join mc.autopost_connections cn on cn.provider = d.provider))
   from mc.marketing_cards c join mc.marketing_packs p on p.id = c.pack_id
   where c.id = p_card
 $$;
@@ -436,7 +485,9 @@ as $$
     'work_due', mc.autopost_work_due())
 $$;
 
--- For the summary and Overview: posts whose automatic posting failed, couldn't be confirmed, or sit in TikTok drafts.
+-- For the summary and Overview: posts whose automatic posting failed, couldn't be confirmed, or sit in TikTok drafts;
+-- and the accounts' health (destinations chosen, those that should work, the platforms that need a reconnect: a refused
+-- Check or a failed token renewal), so Overview can say when auto-posting is on but can't post.
 create or replace function mc.autopost_summary_json()
 returns jsonb
 language sql
@@ -471,7 +522,12 @@ as $$
     'counts', jsonb_build_object(
       'failed', (select count(*) from problems x where x.status = 'failed'),
       'uncertain', (select count(*) from problems x where x.status = 'uncertain'),
-      'drafts_waiting', (select count(*) from problems x where x.status = 'sent_to_drafts')))
+      'drafts_waiting', (select count(*) from problems x where x.status = 'sent_to_drafts')),
+    'accounts', (select jsonb_build_object('chosen', count(*),
+                   'working', count(*) filter (where d.check_ok is distinct from false and cn.last_error is null),
+                   'reconnect', coalesce(jsonb_agg(distinct d.provider order by d.provider)
+                                           filter (where d.check_ok is false or cn.last_error is not null), '[]'::jsonb))
+                 from mc.autopost_destinations d join mc.autopost_connections cn on cn.provider = d.provider))
 $$;
 
 -- After a job posted (or sent to drafts, or the owner took it by hand): the post is out at its version. The first such
@@ -496,7 +552,7 @@ begin
     return;
   end if;
   -- Labels the owner finishes: manual ones; a label with a target sent to drafts or taken by hand; a label with a
-  -- target that has no job and no destination (not connected).
+  -- target whose destination can't post (not connected, disconnected or to reconnect) and that didn't go out.
   select coalesce(array_agg(x.label order by x.ord), '{}') into v_by_hand
   from (
     select t.label, min(t.ord) as ord
@@ -505,16 +561,24 @@ begin
     group by t.label
     having bool_or(t.target is null)
         or coalesce(bool_or(j.status in ('sent_to_drafts', 'by_hand')), false)
-        or bool_or(j.id is null and t.target is not null
-                   and not exists (select 1 from mc.autopost_destinations d where d.key = t.destination))
+        or bool_or(t.target is not null and coalesce(j.status, '') not in ('posted', 'sent_to_drafts')
+                   and not mc.autopost_destination_ok(t.destination))
   ) x;
   if v_c.in_apps_version is distinct from v_j.version then
     update mc.marketing_cards c set in_apps_version = v_j.version, by_hand = v_by_hand, by_hand_done_at = null,
       updated_at = now()
       where c.id = v_c.id;
   else
+    -- A label Mission Control has now posted on every platform (its account came back) is never asked about again.
     update mc.marketing_cards c
-      set by_hand = (select coalesce(array_agg(distinct l), '{}') from unnest(c.by_hand || v_by_hand) l),
+      set by_hand = (select coalesce(array_agg(distinct l), '{}') from unnest(c.by_hand || v_by_hand) l
+                     where l not in (select x.label from (
+                                       select t.label, bool_and(coalesce(j.status = 'posted', false)) as all_posted
+                                       from mc.autopost_targets(v_c.platforms) t
+                                       left join mc.autopost_jobs j on j.card_id = v_c.id and j.version = v_j.version
+                                                                   and j.target = t.target
+                                       group by t.label) x
+                                     where x.all_posted)),
           updated_at = now()
       where c.id = v_c.id;
   end if;
@@ -816,7 +880,7 @@ begin
       where j.status in ('queued', 'preparing', 'ready') and (j.lease_until is null or j.lease_until < now())
       returning j.id)
     insert into mc.autopost_events (job_id, kind, note, actor, admin_id)
-      select g.id, 'cancelled', 'Auto-posting turned off', 'admin', auth.uid() from gone g;
+      select g.id, 'cancelled', 'autopost_off', 'admin', auth.uid() from gone g;
   end if;
   perform mc.audit(case when p_on then 'marketing.autopost_on' else 'marketing.autopost_off' end, null, 'autopost', null, 'ok');
   return jsonb_build_object('ok', true, 'enabled', p_on);
@@ -1039,7 +1103,7 @@ begin
       and j.destination in (select d.key from mc.autopost_destinations d where d.provider = p_provider)
     returning j.id)
   insert into mc.autopost_events (job_id, kind, note, actor, admin_id)
-    select g.id, 'cancelled', 'Account disconnected', 'admin', auth.uid() from gone g;
+    select g.id, 'cancelled', 'disconnected', 'admin', auth.uid() from gone g;
   delete from mc.autopost_connections c where c.provider = p_provider;
   perform mc.audit('marketing.autopost_disconnect', null, p_provider, null, 'ok', null, null, left(v_name, 200));
   return jsonb_build_object('ok', true) || mc.autopost_settings_json();
@@ -1069,6 +1133,11 @@ begin
     where d.key = p_key;
   if not found then
     return mc.failed('not_found', 'That destination isn''t set.');
+  end if;
+  -- A Check that passed proves the account's sign-in works: an earlier failed token renewal no longer stands.
+  if p_ok then
+    update mc.autopost_connections c set last_error = null, last_error_at = null
+      where c.provider = (select d.provider from mc.autopost_destinations d where d.key = p_key) and c.last_error is not null;
   end if;
   return jsonb_build_object('ok', true);
 end;
@@ -1148,7 +1217,8 @@ begin
 end;
 $$;
 
--- The owner on one job: retry (a failed or unconfirmed one), posted (an unconfirmed one is up after all) or by_hand (the
+-- The owner on one job: retry (a failed, unconfirmed or stopped one, when Mission Control may post it now: auto-posting
+-- on, the post approved at this version, its account set), posted (an unconfirmed one is up after all) or by_hand (the
 -- owner posts this platform: the job stops and the label joins "Did you post it on …?").
 create or replace function mc_api.autopost_job_action(p_job uuid, p_action text)
 returns jsonb
@@ -1181,11 +1251,21 @@ begin
     return mc.failed('busy', 'Mission Control is posting this right now. Try again in a minute.');
   end if;
   if p_action = 'retry' then
-    if v_j.status not in ('failed', 'uncertain') then
-      return mc.failed('bad_state', 'Only a failed or unconfirmed post can be tried again.');
+    if v_j.status not in ('failed', 'uncertain', 'cancelled') then
+      return mc.failed('bad_state', 'Only a failed, unconfirmed or stopped post can be tried again.');
     end if;
     if v_c.state <> 'approved' or v_c.current_version <> v_j.version then
       return mc.failed('bad_state', 'This post is no longer the approved version.');
+    end if;
+    -- A retry that the next run would stop again is refused here, in words (design review round 2).
+    if not exists (select 1 from mc.autopost_candidates() x
+                   where x.card_id = v_j.card_id and x.version = v_j.version and x.target = v_j.target) then
+      return mc.failed('not_allowed', case
+        when not mc.setting_on('autopost_enabled') then 'Auto-posting is off. Turn it on in Settings first, or post it by hand.'
+        when exists (select 1 from mc.autopost_destinations d where d.key = v_j.destination)
+             and not mc.autopost_destination_ok(v_j.destination)
+          then 'Its account needs a reconnect first (Settings), or post it by hand.'
+        else 'Mission Control can''t post this one now: check its account in Settings, or post it by hand.' end);
     end if;
     update mc.autopost_jobs j set status = 'queued', attempts = 0, next_try_at = null, error = null, error_code = null,
       lease_id = null, lease_until = null,
@@ -1204,7 +1284,7 @@ begin
     perform mc.autopost_mark_out(p_job);
     perform mc.audit('marketing.autopost_confirmed', null, v_ref, null, 'ok');
   else
-    if v_j.status not in ('queued', 'preparing', 'ready', 'failed', 'uncertain') then
+    if v_j.status not in ('queued', 'preparing', 'ready', 'failed', 'uncertain', 'cancelled') then
       return mc.failed('bad_state', 'This one is already done.');
     end if;
     update mc.autopost_jobs j set status = 'by_hand', finished_at = now(), updated_at = now(), next_try_at = null,
@@ -1262,7 +1342,7 @@ begin
         and (j.lease_until is null or j.lease_until < now())
       returning j.id)
     insert into mc.autopost_events (job_id, kind, note, actor, admin_id)
-      select g.id, 'cancelled', 'Turned to by hand', 'admin', auth.uid() from gone g;
+      select g.id, 'cancelled', 'card_off', 'admin', auth.uid() from gone g;
   end if;
   update mc.marketing_cards c set autopost_off = p_off, updated_at = now() where c.id = p_card;
   perform mc.audit(case when p_off then 'marketing.autopost_card_off' else 'marketing.autopost_card_on' end, null,
@@ -1322,9 +1402,9 @@ begin
     where j.status in ('queued', 'preparing', 'ready') and (j.lease_until is null or j.lease_until < now())
       and not exists (select 1 from mc.autopost_candidates() x
                       where x.card_id = j.card_id and x.version = j.version and x.target = j.target)
-    returning j.id)
+    returning j.id, j.card_id, j.version, j.target)
   insert into mc.autopost_events (job_id, kind, note, actor)
-    select g.id, 'cancelled', 'No longer approved for this slot', 'system' from gone g;
+    select g.id, 'cancelled', mc.autopost_stop_reason(g.card_id, g.version, g.target), 'system' from gone g;
 
   -- Missed: past the last moment it may go out.
   with late as (
