@@ -30,7 +30,7 @@ Google accounts get no metadata, because their consent is given by continuing.
 - Version 2026-11-17: Ask Lucento's AI answers are on by default for a signed-in account and confirmed once before
   anything is sent (owner decision; docs/ASK.md "Consent (v3)"); Read messages with Gemini stays off until turned on
   (Lucento Pro). The Terms say "Gemini for the AI features you use". The website's `legal.ts`, homepage privacy table
-  and FAQ change in the same release (lucento-website PR).
+  and FAQ change in the same release (lucento-website PR #36).
 
 ## Keeping the website in step
 
