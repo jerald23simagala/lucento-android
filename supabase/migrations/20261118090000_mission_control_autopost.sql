@@ -1655,11 +1655,8 @@ begin
                                    where x is distinct from mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target)),
             updated_at = now()
         where c.id = v_j.card_id and mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target) is not null;
+      -- History has it once: its event ("You chose not to post the Instagram Reel").
       perform mc.autopost_by_hand_settle(v_j.card_id);
-      insert into mc.marketing_log (card_id, version, kind, note, actor, admin_id)
-        select c.id, v_j.version, 'not_posted', mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target), 'admin', auth.uid()
-        from mc.marketing_cards c
-        where c.id = v_j.card_id and mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target) is not null;
     end if;
     perform mc.audit(case when p_action = 'not_posting' then 'marketing.autopost_not_posting' else 'marketing.autopost_by_hand' end,
       null, v_ref, null, 'ok');

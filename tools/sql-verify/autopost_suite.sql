@@ -937,7 +937,8 @@ begin
                            from mc.marketing_cards where id = pg_temp.cid('A-refused'))
                       and not exists (select 1 from jsonb_array_elements(v_s #> '{autopost,failed}') x where x ->> 'card' = 'A-refused')
                       and exists (select 1 from mc.autopost_events e where e.job_id = v_jobid and e.kind = 'by_hand' and e.note = 'not_posting')
-                      and exists (select 1 from mc.marketing_log l where l.card_id = pg_temp.cid('A-refused') and l.kind = 'not_posted')
+                      -- Recorded once (the event), not also as a log entry.
+                      and not exists (select 1 from mc.marketing_log l where l.card_id = pg_temp.cid('A-refused') and l.kind = 'not_posted')
                  then 'ok  P58 "Don''t post it there" on a step that didn''t go out makes it the owner''s, answered "not posting there" at once, and takes it off Overview'
                  else 'FAIL P58 ' || coalesce(v_m::text, '') || left(coalesce((v_s #> '{autopost,failed}')::text, ''), 300) end;
 
