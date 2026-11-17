@@ -11,7 +11,7 @@ posting run, the Marketing card) and the owner's setup (lucento-mission-control 
 
 1. Once, in Settings › Auto-posting: connect **Facebook and Instagram** (one Meta sign-in: the Lucento Page, the
    KlaroPH Page and the Instagram account linked to the Lucento Page), **YouTube** and **TikTok**; check each; turn
-   auto-posting **on** (a fresh authenticator code).
+   auto-posting **on** (a fresh authenticator code). The three developer apps are the owner's own (DEPLOYMENT.md part J).
 2. Each week, as before, the owner approves posts in Marketing. An approved post now says **"Posts automatically
    Mon 19:30"** with each platform; at the slot Mission Control posts it, even with the owner's PC off.
 3. After the slot the card shows each platform's result with a link (**Posted 19:31 · View**). TikTok says **"In your
@@ -25,7 +25,7 @@ posting run, the Marketing card) and the owner's setup (lucento-mission-control 
 
 | Label on a post | What Mission Control does | Why |
 |---|---|---|
-| FB + IG Reels | Facebook Reel on the Lucento Page, Instagram Reel, both public | Meta app in development mode used only by its admin: Standard Access, no App Review ("only for a business I own or manage") |
+| FB + IG Reels | Facebook Reel on the Lucento Page, Instagram Reel, both public | The owner's own Meta app, switched to **Live** and used only by its admin: Standard Access, no App Review ("only for a business I own or manage"). In development mode Meta shows the app's posts only to the app's admins, developers and testers, so it must be Live |
 | Lucento Facebook Page / KlaroPH Facebook Page | A photo post on that Page, with the alt text | Same Meta app; each Page has its own token |
 | YouTube Shorts | Uploaded as a public Short | Uploads from unaudited API projects were long locked to private; reports from Oct 2026 say this was lifted. Mission Control checks the answer: a video YouTube kept private is reported ("YouTube kept it private: publish it in YouTube Studio") |
 | TikTok | Sent to the owner's TikTok drafts (inbox); the owner taps Post | An unaudited app can only post privately (to a private account); TikTok's audit takes weeks and is often refused. The upload-to-drafts flow needs no audit |
@@ -103,8 +103,10 @@ uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
 
 ## 6. Console
 
-- `POST /api/autopost/tick` (exempt from the session gate; the bearer must be 64 hex): claim → for each job, its step →
-  result; stops taking new steps after ~45 s. Never logs a token, caption or link with a token.
+- `POST /api/autopost/tick` (exempt from the session gate; the bearer must be 64 hex; `maxDuration` 60 s): claim (up to
+  4) → each job's step, side by side → its result under its lease. Every request ends within 48 s of the start, and a
+  publishing call isn't started with less than 12 s left (an upload: 20 s), so the function never stops mid-publish.
+  Tokens are renewed once per provider per run. Never logs or answers a token, a caption or a link with a signature.
 - Steps per target:
   - **Facebook Reel**: start an upload session and let Meta fetch the video from a presigned Blob link (ahead) →
     `ready` → at the slot finish with `video_state=PUBLISHED` and the caption → `posted` (link `facebook.com/reel/<id>`).
@@ -119,8 +121,14 @@ uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
 - Errors: 429/5xx/network → `failed` retryable; 4xx (permissions, media) → `failed` with the platform's message; an
   expired or revoked token → `failed` "Reconnect <platform> in Settings"; a timeout after a publish call → `uncertain`.
 - Settings › Auto-posting: the switch, the clock line, each provider (Connect / Reconnect / Check / Disconnect; the
-  Pages and Instagram account to use). OAuth: `/settings/connect/<provider>` (state and PKCE in a signed, HttpOnly,
-  10-minute cookie) and `/settings/connect/<provider>/callback`; connecting needs a fresh authenticator code first.
+  Pages and Instagram account to use). OAuth: Connect (a Server Action) verifies a fresh authenticator code, keeps the
+  state, the PKCE verifier (Google) and the return address in a signed, HttpOnly, 10-minute cookie scoped to
+  `/settings/connect`, and sends the owner to the platform. The platform returns to
+  `/settings/connect/<provider>/callback`; the session cookies are SameSite=Strict and don't come with a return from
+  another site, so that page (exempt from the session gate, reading nothing) only passes the answer on to
+  `/settings/connect/<provider>/finish` with a navigation of its own (meta refresh, no script). /finish is gated like
+  every page: it checks the state against the cookie and the admin, exchanges the code, encrypts the tokens and calls
+  `autopost_save_connection` (whose step-up the code entered at Connect still covers).
 - Marketing card: the plan before the slot, each result after it, Try again / I'll post it by hand / It's posted; the
   approve button says "Approve and post Mon 19:30" when Mission Control will post it.
 
@@ -140,6 +148,9 @@ uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
   every job step and refusal, coverage and due_soon, cancellations, missed, launch rules, the clock's guards, the board,
   the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
   `catch_up_check.mjs` part E pastes APPLY_AUTOPOST.sql the owner's way.
-- Console: unit tests (encryption, each provider's requests and answers with a fake fetch, the step runner, the routes'
-  checks), e2e for Settings and the card with seeded jobs.
+- Console (`lucento-mission-control`): unit tests `autopost-crypto` (encryption, additional data, the state cookie,
+  PKCE), `autopost-runner` (every target's steps against fake platforms, the retry/uncertain rules, the deadline, one
+  token renewal per run), `autopost-words` (the card's lines, Approve's words, Marketing's status, filters and Overview
+  lines with auto-posting) and `autopost-routes` (the tick's secrets, the callback page, /finish's refusals); end to end
+  `settings-autopost.spec.ts` on the local stack's seeded connections and results.
 - Owner's first run: Check on each destination, then one approved post watched at its slot.
