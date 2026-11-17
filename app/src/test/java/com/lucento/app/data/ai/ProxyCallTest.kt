@@ -123,6 +123,14 @@ class ProxyCallTest {
         assertEquals(listOf("Bearer old", "Bearer new"), seen.toList())
     }
 
+    @Test fun askLucentoReadsHowTheAllowanceRuns() = runBlocking {
+        // The free plan's allowance is a month's: the app must not call what is left "today" (owner, 2026-11-17).
+        replies = listOf(200 to """{"answer":"Yes.","remaining":9,"plan":"FREE"}""")
+        val snapshot = AskSnapshot("PHP", LocalDate.parse("2026-11-17"), emptyList())
+        val result = AskLucentoClient(Tokens()::get, endpoint).ask("Can I afford it?", emptyList(), snapshot)
+        assertEquals(AskLucentoClient.Result.Answered("Yes.", null, null, emptyList(), 9, "FREE"), result)
+    }
+
     @Test fun aTokenIsRefreshedBeforeItExpires() {
         val now = 1_000_000_000L
         assertTrue(tokenNeedsRefresh(expiresAtMs = now - 1, nowMs = now))
@@ -133,7 +141,7 @@ class ProxyCallTest {
 
     @Test fun anEndedSessionIsNotCalledAMissingAccount() {
         val refused = AskLucentoClient.Result.NotSignedIn
-        assertEquals("AI answers need your sync account", AskLucentoViewModel.failureReason(refused, signedIn = false))
+        assertEquals("AI answers need you to sign in", AskLucentoViewModel.failureReason(refused, signedIn = false))
         assertTrue(AskLucentoViewModel.failureReason(refused, signedIn = true).startsWith("Your sign-in has expired"))
         assertEquals("Gemini took too long to answer", AskLucentoViewModel.failureReason(null, signedIn = true))
         assertEquals("Gemini couldn’t be reached", AskLucentoViewModel.failureReason(AskLucentoClient.Result.Failed("HTTP 502"), signedIn = true))

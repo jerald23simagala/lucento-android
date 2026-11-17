@@ -35,6 +35,15 @@ class SettingsHubTest {
         assertEquals("App lock off · 2 sharing options on", privacySummary(prefs.copy(usageCounts = true, smartReading = true)))
     }
 
+    @Test fun `AI answers count as sharing only once confirmed, since nothing is sent before`() {
+        // On by default for a signed-in account (owner, 2026-11-17), but not yet confirmed: nothing is shared.
+        assertEquals("App lock off · nothing shared", privacySummary(prefs.copy(askLucentoAi = true, askAiConfirmed = false)))
+        assertEquals("App lock off · 1 sharing option on", privacySummary(prefs.copy(askLucentoAi = true, askAiConfirmed = true)))
+        assertEquals("App lock off · nothing shared", privacySummary(prefs.copy(askLucentoAi = false, askAiConfirmed = false)))
+        // Where AI answers aren't offered (signed out, or no proxy in this build), they never count.
+        assertEquals("App lock off · nothing shared", privacySummary(prefs.copy(askAiConfirmed = true), smartReadingOffered = false))
+    }
+
     @Test fun `pages round-trip through their route key and unknown keys open the hub`() {
         SettingsPage.entries.forEach { assertEquals(it, SettingsPage.fromKey(it.key)) }
         assertNull(SettingsPage.fromKey(""))
