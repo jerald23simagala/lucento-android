@@ -249,7 +249,7 @@ begin
   end;
   r := r || case when v_mkt ~ '^[0-9a-f]{64}$' and v_mkt <> v_app
                       and exists (select 1 from mc.ingest_secret where purpose = 'marketing')
-                      and v_t like '%purpose is app, backup or marketing%'
+                      and v_t like '%purpose is app, backup, marketing%'
                  then 'ok  M1 a third secret purpose, marketing, separate from app and backup; anything else refused'
                  else 'FAIL M1 ' || coalesce(v_t, 'null') end;
 

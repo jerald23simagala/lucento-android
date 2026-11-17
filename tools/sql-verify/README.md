@@ -18,8 +18,8 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm run concur
 ```
 
 Exit code 0 means every check passed. Each suite runs on a fresh database; the output lists every check, for example
-`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (10 suites, 448 checks on
-2026-11-16). Run both variants: a migration must be safe whichever default privileges the project has.
+`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (11 suites, 494 checks on
+2026-11-17). Run both variants: a migration must be safe whichever default privileges the project has.
 
 `node run.mjs <migrations dir> <suite.sql> [skip …]` runs one suite. By default it skips `usage_events_purge_schedule`,
 because PGlite has no `pg_cron`.
@@ -40,6 +40,17 @@ both VERIFY files all true; it also checks that `APPLY_MARKETING.sql` is current
 (`python tools/supabase/build_marketing_apply.py --check`).
 
 ## Suites
+
+- `autopost_suite.sql` — Mission Control's auto-posting for Marketing (docs/mission-control/v1/MARKETING_AUTOPOST.md),
+  38 checks: the `autopost` secret purpose; customers refused first by all 9 page functions, anon by none, signed-in
+  callers by none of the 3 ingest functions; the claim needing both the tick and the app secret; the label-to-platform
+  map and due times; connections (step-up, ciphertext only, options of the right kind) and the destinations picked
+  from them, refreshed or cleared on reconnecting; due_soon left out for posts Mission Control will post; jobs created
+  within their lead time, stepped under a lease (lease_lost), preparing, ready, posted, sent to drafts, retried up to
+  3 attempts, uncertain (recorded from a lapsed lease, confirmed by the owner), missed; the post marked out with what
+  the owner finishes by hand; cancellation when undone or revised; launch rules; off; the clock's guards and setup
+  refusals; the board, the summary (no token anywhere), disconnecting and the audit. Race MC6 in `concurrency.mjs`:
+  two claims at once hand each job out once.
 
 - `marketing_suite.sql` — Mission Control's Marketing approvals (docs/mission-control/v1/MARKETING_APPROVALS.md), 75
   checks: who may call what (customers refused first by all 11 page functions, anon by none of them, signed-in callers by

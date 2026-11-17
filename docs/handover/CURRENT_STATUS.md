@@ -593,6 +593,21 @@ pack, `391e7d8`). The owner chose "Release 0.5.8 now". #58, #37 and the dependen
   publishes the same text in lucento-website #29, with an "Online voice" row in the homepage's short privacy list.
 - Owner retest: NEXT_TASKS OT-25.
 
+## Mission Control › Auto-posting for Marketing — 2026-11-17 (database: `feature/mc-autopost`; console: `lucento-mission-control` `feature/autopost`)
+
+Owner: "I want an interface that when I approved it Claude will handle the posting. I can connect all my accounts as
+needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mission-control/v1/MARKETING_AUTOPOST.md`.
+
+- **Database** (`supabase/migrations/20261118090000_mission_control_autopost.sql`, one paste: `docs/mission-control/
+  APPLY_AUTOPOST.sql`, check: `VERIFY_AUTOPOST.sql`): connections holding encrypted tokens only, destinations, one job
+  per post, version and platform (created within its lead time, stepped under a 3-minute lease, re-checked at every
+  step), events and the clock (pg_cron every minute → pg_net → the console's tick, with its own Vault secret). Nine
+  owner functions behind `mc.gate`, three ingest functions for the console. Not applied anywhere yet (OT-36).
+- **Tests:** `tools/sql-verify` 11 suites, **494 checks, 0 failed** under both default-privilege variants
+  (`autopost_suite.sql` 38); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
+  handed out once); `catch_up_check.mjs` passes, including APPLY_AUTOPOST pasted twice (part E).
+- **Console:** in progress on `feature/autopost`.
+
 ## Mission Control › Marketing approvals — 2026-11-16 (database: `feature/mc-marketing`; console: `lucento-mission-control` `feature/marketing`; tool: lucento-studio `6edd819`)
 
 Owner: "I want my marketing approval workflow be integrated here … a section in mission control so I can handle approval

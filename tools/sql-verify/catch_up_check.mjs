@@ -5,7 +5,10 @@
 //   C. a project whose history shows the 2026-11-10 production apply → the catch-up refuses and changes nothing;
 //   D. Marketing approvals on top: APPLY_MISSION_CONTROL.sql → APPLY_MARKETING.sql twice (the owner may paste it again),
 //      and a third time with a post stored → VERIFY_MISSION_CONTROL.sql still all true → VERIFY_MARKETING.sql all true;
-//      and APPLY_MARKETING.sql is current (python tools/supabase/build_marketing_apply.py --check).
+//      and APPLY_MARKETING.sql is current (python tools/supabase/build_marketing_apply.py --check);
+//   E. auto-posting on top of that: APPLY_AUTOPOST.sql twice (and APPLY_MARKETING.sql pasted again after it) →
+//      VERIFY_MISSION_CONTROL.sql, VERIFY_MARKETING.sql and VERIFY_AUTOPOST.sql all true (but the clock, which waits for
+//      the owner's setup and pg_cron, and pg_net, which PGlite lacks).
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -25,6 +28,8 @@ const apply = readFileSync(join(docs, 'APPLY_MISSION_CONTROL.sql'), 'utf8');
 const verify = readFileSync(join(docs, 'VERIFY_MISSION_CONTROL.sql'), 'utf8');
 const applyMarketing = readFileSync(join(docs, 'APPLY_MARKETING.sql'), 'utf8');
 const verifyMarketing = readFileSync(join(docs, 'VERIFY_MARKETING.sql'), 'utf8');
+const applyAutopost = readFileSync(join(docs, 'APPLY_AUTOPOST.sql'), 'utf8');
+const verifyAutopost = readFileSync(join(docs, 'VERIFY_AUTOPOST.sql'), 'utf8');
 // VERIFY_MISSION_CONTROL.sql columns that wait for the owner's later steps (or for pg_cron, which PGlite lacks).
 const LATER_STEPS = ['cron_jobs_4', 'admin_added_step_a5', 'both_secrets_created_step_a6'];
 
@@ -158,6 +163,54 @@ const check = (ok, label, detail = '') => {
     check(falses.length === 0 && Object.keys(m).length >= 15, 'D3 VERIFY_MARKETING.sql: every column true', JSON.stringify(m));
   } catch (e) {
     check(false, 'D3 VERIFY_MARKETING.sql runs', e.message);
+  }
+  await db.close();
+}
+
+// E. Auto-posting (docs/mission-control/APPLY_AUTOPOST.sql) on a project that has Marketing approvals
+{
+  const db = await project([]);
+  await db.exec(apply);
+  await db.exec(applyMarketing);
+  try {
+    await db.exec(applyAutopost);
+    await db.exec(applyAutopost);
+    check(true, 'E1 APPLY_AUTOPOST.sql runs after APPLY_MARKETING.sql, and again (pasted twice)');
+  } catch (e) {
+    check(false, 'E1 APPLY_AUTOPOST.sql runs after APPLY_MARKETING.sql, and again (pasted twice)', e.message);
+  }
+  // APPLY_MARKETING.sql pasted again later puts back its own versions of the shared checks; the owner then pastes
+  // APPLY_AUTOPOST.sql again (DEPLOYMENT.md part J says so), which restores auto-posting's.
+  try {
+    await db.exec(applyMarketing);
+    await db.exec(applyAutopost);
+    const s = (await db.query(`select mc.rotate_ingest_secret('autopost') is not null as ok`)).rows[0];
+    check(s.ok, 'E1b APPLY_MARKETING.sql then APPLY_AUTOPOST.sql pasted again: the autopost secret purpose is back');
+  } catch (e) {
+    check(false, 'E1b APPLY_MARKETING.sql then APPLY_AUTOPOST.sql pasted again', e.message);
+  }
+  await db.exec(`create schema if not exists cron; create table if not exists cron.job (jobname text);`);
+  try {
+    const v = last(await db.exec(verify))[0];
+    const falses = Object.entries(v).filter(([k, val]) => val === false && !LATER_STEPS.includes(k));
+    check(falses.length === 0, 'E2 VERIFY_MISSION_CONTROL.sql stays true with auto-posting added', JSON.stringify(falses));
+  } catch (e) {
+    check(false, 'E2 VERIFY_MISSION_CONTROL.sql runs with auto-posting added', e.message);
+  }
+  try {
+    const m = last(await db.exec(verifyMarketing))[0];
+    const falses = Object.entries(m).filter(([, val]) => val !== true);
+    check(falses.length === 0, 'E3 VERIFY_MARKETING.sql stays true with auto-posting added', JSON.stringify(m));
+  } catch (e) {
+    check(false, 'E3 VERIFY_MARKETING.sql runs with auto-posting added', e.message);
+  }
+  try {
+    const a = last(await db.exec(verifyAutopost))[0];
+    const falses = Object.entries(a).filter(([k, val]) => val !== true && !['clock_scheduled', 'pg_net_on'].includes(k));
+    check(falses.length === 0 && Object.keys(a).length >= 15, 'E4 VERIFY_AUTOPOST.sql: every column true (but the clock and pg_net)',
+      JSON.stringify(a));
+  } catch (e) {
+    check(false, 'E4 VERIFY_AUTOPOST.sql runs', e.message);
   }
   await db.close();
 }
