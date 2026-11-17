@@ -36,7 +36,10 @@ export) → schema committed and unchanged (`git diff --exit-code app/schemas`) 
 (application id `com.lucento.app`, not debuggable, permissions limited to an allow-list — INTERNET,
 ACCESS_NETWORK_STATE for opt-in cloud sync, WAKE_LOCK, RECEIVE_BOOT_COMPLETED for WorkManager, USE_BIOMETRIC /
 USE_FINGERPRINT for the app lock, `com.android.vending.BILLING` for Google Play Billing (Lucento Pro); debug id `com.lucento.app.debug`)
-→ size table in the run summary → artifacts (debug APK, release AAB/APK + R8 mapping, schemas, reports).
+→ release code free of the edge-to-edge APIs Android 15 deprecated (`dexdump`: no `Window.setStatusBarColor`,
+`setNavigationBarColor`, `setNavigationBarDividerColor`, `setStatusBarContrastEnforced`, and no cutout mode written in
+code; Play Console flags them, and 0.5.10 had them through androidx.activity's `enableEdgeToEdge`, which
+`core/designsystem/theme/SystemBars.kt` and the themes replace) → size table in the run summary → artifacts (debug APK, release AAB/APK + R8 mapping, schemas, reports).
 
 Job **migrations** (needs build): fails immediately if schema history is incomplete, otherwise boots an API 30 x86_64
 emulator (Pixel 6 profile) and runs `MigrationTest`, `ReconciliationTest` (Home, Transactions and Budget agree on a

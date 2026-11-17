@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Lucento" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- Light and dark (values-night) differ only here. Theme.Lucento adds the cutout mode per Android version
+         (values-v28, values-v30), so edge to edge never needs the cutout constants Android 15 deprecated in code. -->
+    <style name="Base.Theme.Lucento" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/splash_background</item>
+        <!-- Transparent bars before Android 15 (from 15 they always are). See SystemBars.kt. -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <style name="Theme.Lucento" parent="Base.Theme.Lucento" />
 
     <style name="Theme.Lucento.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
