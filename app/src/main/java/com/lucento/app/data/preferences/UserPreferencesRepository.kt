@@ -85,16 +85,17 @@ data class UserPreferences(
      */
     val smartReading: Boolean = false,
     /**
-     * Ask Lucento's AI answers: a free-form question goes to Gemini through Lucento's proxy with a summary of the user's
-     * figures (never transactions, notes or payees). Off by default, set only from Ask Lucento's consent sheet or
-     * Settings; never restored from a backup, so a restore can't switch sharing on.
+     * Ask Lucento's AI answers are on: a free-form question goes to Gemini through Lucento's proxy with a summary of the
+     * person's figures and their transactions from the last 60 days (docs/ASK.md). On by default for a signed-in account
+     * (owner, 2026-11-17); false only after the person turned them off. Nothing is sent until [askAiConfirmed].
      */
-    val askLucentoAi: Boolean = false,
+    val askLucentoAi: Boolean = true,
     /**
-     * Ask Lucento suggested AI answers once, the first time a question needed them (owner test 2026-11-09). Only decides
-     * whether that one-time pop-up appears; consent is still [askLucentoAi], given in the sheet. A device choice.
+     * The person agreed to what AI answers send: at their first question (Ask Lucento's card), in Ask's sheet or in
+     * Settings' dialog. Never restored from a backup, so a restore can't switch sharing on; cleared with the account
+     * (sign-out, reset), so the next account confirms for itself.
      */
-    val askAiOfferShown: Boolean = false,
+    val askAiConfirmed: Boolean = false,
     /** Crash reports. Off until the user turns them on in Settings. Nothing is sent while this is false. */
     val crashReports: Boolean = false,
     /** Anonymous usage counts. Off until the user opts in. Nothing is sent while this is false. */
@@ -220,12 +221,15 @@ class UserPreferencesRepository(
         val fxRatesOnline = booleanPreferencesKey("fx_rates_online")
         val onlineVoice = booleanPreferencesKey("online_voice")
         /**
-         * v2 (owner, 2026-11-04): AI answers now send recent transactions, goals and projections. Agreeing to v1
-         * ("ask_lucento_ai", summaries only) doesn't cover that, so v1 is ignored and removed: the user is asked again.
+         * The agreement to AI answers. v2 (owner, 2026-11-04): they send recent transactions, goals and projections, and
+         * agreeing to v1 ("ask_lucento_ai", summaries only) doesn't cover that, so v1 is ignored and removed. Since
+         * 2026-11-17 AI answers are on by default and this key records only that the person confirmed what is sent; an
+         * agreement given before then still counts.
          */
-        val askLucentoAi = booleanPreferencesKey("ask_lucento_ai_v2")
+        val askAiConfirmed = booleanPreferencesKey("ask_lucento_ai_v2")
         val askLucentoAiV1 = booleanPreferencesKey("ask_lucento_ai")
-        val askAiOfferShown = booleanPreferencesKey("ask_ai_offer_shown")
+        /** The person turned AI answers off (owner, 2026-11-17: they are on by default). */
+        val askAiOff = booleanPreferencesKey("ask_ai_off")
         val crashReports = booleanPreferencesKey("crash_reports")
         val usageCounts = booleanPreferencesKey("usage_counts")
         val usageInstallId = stringPreferencesKey("usage_install_id")
@@ -278,8 +282,8 @@ class UserPreferencesRepository(
                 defaultWalletId = p[Keys.defaultWalletId],
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
                 smartReading = p[Keys.smartReading] ?: false,
-                askLucentoAi = p[Keys.askLucentoAi] ?: false,
-                askAiOfferShown = p[Keys.askAiOfferShown] ?: false,
+                askLucentoAi = askAiOn(p),
+                askAiConfirmed = askAiConfirmed(p),
                 crashReports = p[Keys.crashReports] ?: false,
                 usageCounts = p[Keys.usageCounts] ?: false,
                 fxRatesOnline = p[Keys.fxRatesOnline] ?: true,
@@ -320,8 +324,9 @@ class UserPreferencesRepository(
             val photo = p[Keys.profilePhotoVersion]
             val photoChoice = p[Keys.profilePhotoChoice]
             val smart = p[Keys.smartReading]
-            val ai = p[Keys.askLucentoAi]
+            val ai = p[Keys.askAiConfirmed]
             val aiV1 = p[Keys.askLucentoAiV1]
+            val aiOff = p[Keys.askAiOff]
             val welcomed = p[Keys.proWelcomed]
             val memberSince = p[Keys.proMemberSince]
             resetAccountSetup(p)
@@ -329,8 +334,9 @@ class UserPreferencesRepository(
             photo?.let { p[Keys.profilePhotoVersion] = it }
             photoChoice?.let { p[Keys.profilePhotoChoice] = it }
             smart?.let { p[Keys.smartReading] = it }
-            ai?.let { p[Keys.askLucentoAi] = it }
+            ai?.let { p[Keys.askAiConfirmed] = it }
             aiV1?.let { p[Keys.askLucentoAiV1] = it }
+            aiOff?.let { p[Keys.askAiOff] = it }
             // The same person: their Lucento Pro welcome and medal stay.
             welcomed?.let { p[Keys.proWelcomed] = it }
             memberSince?.let { p[Keys.proMemberSince] = it }
@@ -391,27 +397,24 @@ class UserPreferencesRepository(
         context.dataStore.edit { it[Keys.onlineVoice] = enabled }
     }
 
+    /**
+     * AI answers on, from a consent the person accepted (Ask's first-question card or sheet, Settings' dialog): on and
+     * agreed. Off: off, and the agreement withdrawn, so turning them on again shows what is sent again.
+     */
     suspend fun setAskLucentoAi(enabled: Boolean) {
-        context.dataStore.edit {
-            it[Keys.askLucentoAi] = enabled
-            it.remove(Keys.askLucentoAiV1)
-        }
-    }
-
-    suspend fun setAskAiOfferShown() {
-        context.dataStore.edit { it[Keys.askAiOfferShown] = true }
+        context.dataStore.edit { applyAskAi(it, enabled) }
     }
 
     /**
      * Signing out but keeping this phone's own records (owner decision 2026-11-12, F-2): the setup stays, but Smarter
-     * reading and Ask Lucento's AI answers were agreed to while signed in, so they're switched off as the sign-out wipe
-     * does ([resetAccountSetup]). Signing in again asks afresh.
+     * reading and the agreement to Ask Lucento's AI answers were given while signed in, so they go as the sign-out wipe
+     * does ([resetAccountSetup]): Smarter reading off, AI answers back to their default (on, nothing sent until the next
+     * account confirms). Signing in again asks afresh.
      */
     suspend fun forgetAccountConsents() {
         context.dataStore.edit {
             it[Keys.smartReading] = false
-            it[Keys.askLucentoAi] = false
-            it.remove(Keys.askLucentoAiV1)
+            forgetAskAi(it)
         }
     }
 
@@ -635,7 +638,8 @@ class UserPreferencesRepository(
          * After a sign-out wipe the ledger is a fresh install's, so the setup that belonged to it goes too (F-7): the next
          * account goes through onboarding, which checks it and restores or sets it up. Kept: device choices (theme,
          * currency, modules), consent for crash reports and usage counts, and notices already shown. Smarter reading is
-         * switched off because it sends composer text and was opted into for the previous account.
+         * switched off because it sends composer text and was opted into for the previous account; AI answers go back to
+         * their default ([forgetAskAi]), so the next account confirms them for itself.
          */
         internal fun resetAccountSetup(p: MutablePreferences) {
             // A new generation only when onboarding had finished, so its finished ViewModel isn't reused. A wipe started
@@ -660,7 +664,29 @@ class UserPreferencesRepository(
             p.remove(Keys.profilePhotoChoice)
             p.remove(Keys.acknowledgedBudgetMonth)
             p[Keys.smartReading] = false
-            p[Keys.askLucentoAi] = false
+            forgetAskAi(p)
+        }
+
+        /** Ask Lucento's AI answers are on unless the person turned them off (owner, 2026-11-17). */
+        internal fun askAiOn(p: Preferences): Boolean = p[Keys.askAiOff] != true
+
+        /** The person confirmed what AI answers send ([UserPreferences.askAiConfirmed]). */
+        internal fun askAiConfirmed(p: Preferences): Boolean = p[Keys.askAiConfirmed] ?: false
+
+        /** [UserPreferencesRepository.setAskLucentoAi] on [p]: on and agreed, or off with the agreement withdrawn. */
+        internal fun applyAskAi(p: MutablePreferences, enabled: Boolean) {
+            if (enabled) p.remove(Keys.askAiOff) else p[Keys.askAiOff] = true
+            p[Keys.askAiConfirmed] = enabled
+            p.remove(Keys.askLucentoAiV1)
+        }
+
+        /**
+         * AI answers belong to the signed-in account: back to the default (on, not confirmed), so nothing is sent for the
+         * next account until it confirms for itself.
+         */
+        internal fun forgetAskAi(p: MutablePreferences) {
+            p.remove(Keys.askAiOff)
+            p[Keys.askAiConfirmed] = false
             p.remove(Keys.askLucentoAiV1)
         }
 

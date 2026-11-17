@@ -345,7 +345,8 @@ jobs:
             ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.feature.capture.ScanOcrTest
             # The Pro welcome's deck pressed with injected finger taps that drift a pixel or two, as real ones do
             # (performClick never moves, which hid the old tour's dead buttons on real phones; KNOWN_ISSUES PW-1).
-            ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ProWelcomeRealTapTest,com.lucento.app.feature.pro.welcome.ProRevealDeckFingerTest
+            # Ask Lucento's AI answers, on by default: nothing is requested until the person confirms the first question.
+            ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ProWelcomeRealTapTest,com.lucento.app.feature.pro.welcome.ProRevealDeckFingerTest,com.lucento.app.feature.ask.AskAiConfirmTest
             ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ScreenshotTourTest || echo "SCREENSHOT_TOUR_FAILED=true" >> "$GITHUB_ENV"
             mkdir -p app/build/screenshots && adb pull /data/local/tmp/lucento-shots/. app/build/screenshots/ || true
 

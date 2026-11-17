@@ -16,6 +16,7 @@ Verified this session unless noted. Details: `CLAUDE_INITIAL_AUDIT.md`, `P0_2_ON
 
 | Work | State | Evidence |
 |---|---|---|
+| **AI answers on by default, confirmed once (2026-11-17, owner: "AI answers … should be enabled. Align everything"; Smarter reading stays Pro-only)**, branch `feature/ai-answers-on-by-default` (KNOWN_ISSUES AI-1…4). AI answers are on for every signed-in account (Free 10 a month, Pro 50 a day); the first question that would go to Gemini shows a card (`AskMessage.ConfirmAi`, `AiConfirmCard`) with what is sent, Google's free-tier sentence, the plan's allowance, **Ask Gemini** and **Keep answers on this phone**; "What's sent" opens the full sheet. Routing in `domain/ask/AskAiRoute.kt`; preferences `ask_ai_off` + the agreement `ask_lucento_ai_v2` (earlier agreements count; sign-out/reset back to the default); the one-time pop-up is gone. The allowance wording follows the plan (`feature/ask/AskAiCopy.kt`, the reply's `plan`, `ProGates.aiAllowancePerDay`): "N left this month" on Free. Settings shows the confirm note and a plan-aware dialog; its Privacy summary counts AI answers only once confirmed. Privacy Policy and Terms 2026-11-17; CLAUDE.md, ASK.md, MONETIZATION.md, SYNC.md, LEGAL.md and the Play submission notes updated. Website PR #36 (on hold until the release): regenerated `legal.ts`, homepage privacy table, FAQ, `PRODUCT.md` (to go live with the release) | Unit tests 1512/1512 (+20), `assembleDebug`, `lintDebug` 0 errors (20 warnings, as before), `compileDebugAndroidTestKotlin`. `AskAiConfirmTest` on API 35: 6 passing runs at 100 % and 200 % text; screenshots `artifacts/ai-answers-default/`. Added to CI's emulator job | No real Gemini answer yet (debug has no proxy): OT-36 in a release build |
 | **Play Console edge-to-edge warnings on 0.5.10 (2026-11-16)**, branch `fix/edge-to-edge-deprecated-apis` (KNOWN_ISSUES E2E-1…3). The flagged `setStatusBarColor`, `setNavigationBarColor` and `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES` all came from androidx.activity's `enableEdgeToEdge()` (R8 map of the 0.5.10 AAB), and activity 1.13.0 still calls them. `MainActivity` now uses `Window.drawEdgeToEdge(darkTheme)` (`core/designsystem/theme/SystemBars.kt`: decor behind the bars before Android 15, no navigation-bar scrim, icon colours); the themes keep the bars transparent and set the cutout mode (`Base.Theme.Lucento` + `values-v28` shortEdges / `values-v30` always). CI's release inspection now fails if the release code calls those APIs again | Unit tests 1492/1492, `assembleDebug`, `assembleRelease`, `lintDebug` 0 errors (after the machine-local `local.properties` escape). `dexdump`: 0.5.10 had 2× `setStatusBarColor`, 2× `setNavigationBarColor`, 1× `setStatusBarContrastEnforced`, 2 cutout writes; the new release APK has none and no `EdgeToEdge` class; the CI grep flags the 0.5.10 dump and passes the new one. Before/after on API 28 and API 35 (`artifacts/edge-to-edge/`) | Play's re-scan needs the next upload. Android 11–14 seen only through CI's API 30 tour |
 | **Launch film (2026-11-14, owner brief: "official product launch film")**. 93.3 s film (1920 × 1080, 30 fps; owner added an "And there's more" features scene) plus a vertical 1080 × 1920 version, and 30 s and 15 s cuts in both shapes, built in Remotion in `lucento-studio/video/src/launch-film/` from 53 real 0.5.8 captures (API 35, peso demo month) and an original synthesized score. Docs on branch `marketing/launch-film`: `docs/marketing/LAUNCH_VIDEO_FEATURE_DISCOVERY.md` (code-verified inventory, claims to avoid, 10 product issues) and `docs/marketing/launch-film/` (storyboard, feature-to-visual map, voiceover, asset inventory, cut-downs, future videos). No app code changed. | Rendered; awaiting owner review | MP4s in `lucento-studio/video/out/` and `Downloads/lucento-launch-film/`; frames reviewed scene by scene; Remotion Studio opens the project |
 | **Sign-out takes the account's plan with it (2026-11-14, owner: "what the fix… then we do it")**, branch `fix/sign-out-takes-plan` (KNOWN_ISSUES PB-12). `AuthRepository.observeSignedOut` (Supabase `NotAuthenticated` only, never an offline `RefreshFailure`) → `EntitlementManager.signedOut`: the account's non-ended server rows leave the phone, Google Play's reading keeps the server's last confirmation (`EntitlementMerge.keepConfirmations`), ended rows stay (PB-6), and the plan it leaves is remembered first (`PlanMemory`), so no "plan ended" notice. MONETIZATION §5.4 and test matrix, NEXT_TASKS OT-26 | Code + JVM tests; not yet on a device | `SignOutPlanTest` (5); plan/billing/Pro tests 238 passed locally |
@@ -553,6 +554,15 @@ sentence, and its silence settings are only hints:
 **Owner's call (2026-11-13):** "push and merge when green". Then 0.5.8 with #65. At that release the Privacy Policy
 date goes to the release day and the website's `/privacy` is re-exported (KNOWN_ISSUES VI-3).
 
+## Release 0.5.12 (version code 17) — 2026-11-17 (`release/0.5.12`)
+
+The owner chose "Build 0.5.12 + publish site" after #95. The only app change since 0.5.11 is #95: Ask Lucento's AI
+answers are on by default for a signed-in account, Free included (10 questions a month), and the first question shows
+what would be sent before anything leaves the phone; the free plan's allowance now says "this month" (KNOWN_ISSUES
+AI-1…4). The Privacy Policy and Terms go to version **2026-11-17**, and the website's /privacy, privacy table and FAQ
+are published with this build (lucento-website PR #36). Owner: upload to internal testing, then OT-36 (and OT-35 if
+0.5.11 wasn't uploaded: 0.5.12 carries its edge-to-edge fix too).
+
 ## Release 0.5.11 (version code 16) — 2026-11-16 (`release/0.5.11`)
 
 The owner asked for a build that clears Play Console's edge-to-edge warnings on 0.5.10 ("Proceed"). App changes since
@@ -605,7 +615,7 @@ needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mi
   owner functions behind `mc.gate`, three ingest functions for the console. An account whose Check refused (or whose
   renewal failed) posts nothing until reconnected; every stop records why (design review round 2); a two-platform
   label is asked about by the platform still the owner's, and the summary keeps an approved post's problems until
-  handled, with the clock's state (round 3). Not applied anywhere yet (OT-36).
+  handled, with the clock's state (round 3). Not applied anywhere yet (OT-37).
 - **Tests:** `tools/sql-verify` 11 suites, **518 checks, 0 failed** under both default-privilege variants
   (`autopost_suite.sql` 62); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
   handed out once); `catch_up_check.mjs` passes, including APPLY_AUTOPOST pasted twice (part E).
@@ -618,7 +628,7 @@ needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mi
   now, I'll post it by hand, It's posted, Don't post it there, Not posted after all). **273 unit tests**, lint, build
   and the bundle check green (`npm run verify`, Next 16.4.6); end to end on a fresh local stack **26 passed, 1 skipped** (the optional tour;
   `settings-autopost.spec.ts` 4, both phone specs); no sideways scroll at 360/393 px with 115–200 % text; studio
-  audit 0 FAIL. Not run against the real platforms (OT-36, MC-12).
+  audit 0 FAIL. Not run against the real platforms (OT-37, MC-12).
 - **Reviews:** a security review (no critical or high; M1 and L1–L5 fixed, MARKETING_AUTOPOST.md §7) and the design
   critic's round 1 (REJECT 2.9: a post already in the apps would be posted again, a launch post promised, a dead
   "Posting now…" while off, "Went out" while a platform failed, a Check its status contradicted; all fixed, with

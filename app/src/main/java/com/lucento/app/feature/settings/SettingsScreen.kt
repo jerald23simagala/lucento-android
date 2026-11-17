@@ -591,7 +591,12 @@ private fun SettingsContent(
             )
         }
         if (current.cloudSync.configured && current.cloudSync.signedInEmail != null && com.lucento.app.BuildConfig.AI_ASK_URL.isNotBlank()) {
-            AskLucentoAiSection(on = prefs.askLucentoAi, onChange = onAskLucentoAi)
+            AskLucentoAiSection(
+                on = prefs.askLucentoAi,
+                confirmed = prefs.askAiConfirmed,
+                perDay = current.aiAllowancePerDay,
+                onChange = onAskLucentoAi,
+            )
         }
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.DocumentScanner, "Receipts are read on this phone", "On-device text recognition reads the photo; it isn’t uploaded.")
@@ -951,18 +956,24 @@ private fun OnlineVoiceRow(on: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 /**
- * Ask Lucento's AI answers (docs/ASK.md): off until the user agrees to what is sent. Reports are always calculated on
- * this phone, with or without it.
+ * Ask Lucento's AI answers (docs/ASK.md): on by default for a signed-in account, with nothing sent until the person
+ * confirms what is sent (their first question in Ask, or this dialog; owner, 2026-11-17). Off is immediate; turning them
+ * back on shows the dialog. Reports are always calculated on this phone, with or without them.
  */
 @Composable
-private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
+private fun AskLucentoAiSection(on: Boolean, confirmed: Boolean, perDay: Boolean, onChange: (Boolean) -> Unit) {
     var asking by remember { mutableStateOf(false) }
     SectionHeader("Ask Lucento", Modifier.padding(top = Spacing.section))
     SwitchRow(
         title = "AI answers with Gemini",
         checked = on,
         onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
-        description = "Ask anything about your money and get advice. Off, Ask Lucento still prepares your reports on this phone.",
+        description = "Ask anything about your money and get advice. " +
+            if (on && !confirmed) {
+                "Nothing is sent until you confirm your first question in Ask Lucento."
+            } else {
+                "Off, Ask Lucento still prepares your reports on this phone."
+            },
     )
     if (asking) {
         ConfirmDialog(
@@ -973,8 +984,8 @@ private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
                 "note) to Lucento’s server, which asks Google’s Gemini. ${com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE} " +
                 "Receipts, photos, older transactions and other " +
                 "currencies are never sent. Every amount in an answer is worked out on this phone. Gemini's advice is " +
-                "based on your figures, but AI can be inaccurate, so check it before you act on it. Each account has a " +
-                "daily allowance, shared with Smarter reading, and you can turn this off at any time.",
+                "based on your figures, but AI can be inaccurate, so check it before you act on it. " +
+                "${com.lucento.app.feature.ask.AskAiCopy.allowance(perDay)} You can turn this off at any time.",
             confirmLabel = "Turn on",
             onConfirm = {
                 asking = false

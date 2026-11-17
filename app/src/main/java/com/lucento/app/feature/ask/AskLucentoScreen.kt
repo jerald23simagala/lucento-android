@@ -119,9 +119,10 @@ import java.time.YearMonth
 /**
  * Ask Lucento: questions about the user's own money. The page opens with Lucento's greeting and preset questions; every
  * answer says who worked it out (this phone, or Gemini with figures from this phone), and an answer worked out as a
- * report opens it in full. The built-in reports themselves live on Insights (tester round 3). AI answers are off until
- * the user agrees in the consent sheet. With [voiceEnabled] (the Voice entry feature), a question can be spoken, through
- * the composer's own microphone ([com.lucento.app.feature.capture.VoiceInput]).
+ * report opens it in full. The built-in reports themselves live on Insights (tester round 3). AI answers are on by
+ * default for a signed-in account, and the first question shows what would be sent before anything leaves the phone
+ * (owner, 2026-11-17). With [voiceEnabled] (the Voice entry feature), a question can be spoken, through the composer's own
+ * microphone ([com.lucento.app.feature.capture.VoiceInput]).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -137,18 +138,11 @@ fun AskLucentoScreen(
     var notice by remember { mutableStateOf<String?>(null) }
     var consentFor by remember { mutableStateOf<String?>(null) }
     var askingConsent by remember { mutableStateOf(false) }
+    // A first-question card whose "What’s sent" is open: the full consent, ending in that card's "Ask Gemini".
+    var reviewingCard by remember { mutableStateOf<Long?>(null) }
     var openReport by remember { mutableStateOf<Report?>(null) }
     var menu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-
-    // The first question this phone can't answer: suggest AI answers once, with that question ready to ask again.
-    val offered = state.messages.lastOrNull() as? AskMessage.Answer
-    LaunchedEffect(offered?.id, state.aiOfferShown, state.aiAvailable) {
-        if (offered == null || !offered.offersAi || state.aiOfferShown || !state.aiAvailable || state.aiOn || askingConsent) return@LaunchedEffect
-        consentFor = state.messages.lastOrNull { it is AskMessage.Question && it.id < offered.id }?.let { (it as AskMessage.Question).text }
-        askingConsent = true
-        viewModel.aiOfferShown()
-    }
 
     // Keep the newest message in view as the conversation grows.
     LaunchedEffect(state.messages.size, state.thinking) {
@@ -275,6 +269,16 @@ fun AskLucentoScreen(
                             },
                             onFollowUp = { send(it) },
                         )
+                        is AskMessage.ConfirmAi -> AiConfirmCard(
+                            perDay = state.aiPerDay,
+                            enabled = !state.thinking,
+                            onSend = {
+                                haptics.tick()
+                                viewModel.confirmAi(message.id)
+                            },
+                            onKeep = { viewModel.declineAi(message.id) },
+                            onWhatsSent = { reviewingCard = message.id },
+                        )
                     }
                 }
             }
@@ -313,6 +317,7 @@ fun AskLucentoScreen(
 
     if (askingConsent) {
         AiConsentSheet(
+            perDay = state.aiPerDay,
             onAccept = {
                 askingConsent = false
                 viewModel.setAiAnswers(true, thenAsk = consentFor)
@@ -322,6 +327,19 @@ fun AskLucentoScreen(
                 askingConsent = false
                 consentFor = null
             },
+        )
+    }
+    reviewingCard?.let { cardId ->
+        AiConsentSheet(
+            perDay = state.aiPerDay,
+            title = "What AI answers send",
+            acceptLabel = AskAiCopy.CONFIRM_SEND,
+            onAccept = {
+                reviewingCard = null
+                haptics.tick()
+                viewModel.confirmAi(cardId)
+            },
+            onDismiss = { reviewingCard = null },
         )
     }
     openReport?.let { report ->
@@ -347,14 +365,17 @@ private fun SmallLabel(text: String) {
     )
 }
 
-/** Where answers come from right now: this phone only, or AI answers on (Gemini), with today's allowance once known. */
+/**
+ * Where answers come from right now: this phone only, or AI answers on (Gemini), with what is left of the allowance once
+ * the server has said (per day with Lucento Pro, per month on the free plan).
+ */
 @Composable
 private fun AiStatus(state: AskUiState, onTurnOn: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         if (state.aiActive) {
             StatusPill("AI answers on · Gemini", StatusTones.brand)
-            state.remainingToday?.let {
-                Text("$it left today", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            state.remaining?.let {
+                Text(AskAiCopy.remaining(it, state.aiPerDay), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             StatusPill("Answers on this phone", StatusTones.neutral)
@@ -504,26 +525,69 @@ private fun PreviewLine(line: ReportLine) {
 }
 
 /**
- * The consent for AI answers: what is sent, what never is, where it goes, the daily allowance and that it can be turned
- * off. Nothing is sent until "Turn on AI answers".
+ * The full consent for AI answers: what is sent, what never is, where it goes, the plan's allowance and that it can be
+ * turned off. Nothing is sent until [acceptLabel]: "Turn on AI answers" after the person turned them off, or "Ask
+ * Gemini" from a first-question card's "What’s sent".
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun AiConsentSheet(onAccept: () -> Unit, onDismiss: () -> Unit) {
+private fun AiConsentSheet(
+    perDay: Boolean,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit,
+    title: String = "Turn on AI answers?",
+    acceptLabel: String = "Turn on AI answers",
+) {
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.gutter).navigationBarsPadding()) {
-            SheetHeader(title = "Turn on AI answers?", subtitle = "Ask anything about your money and get advice, answered by Gemini.", icon = Icons.Outlined.AutoAwesome)
+            SheetHeader(title = title, subtitle = "Ask anything about your money and get advice, answered by Gemini.", icon = Icons.Outlined.AutoAwesome)
             ConsentPoint("Sent", AI_SENT)
             ConsentPoint("Never sent", AI_NEVER_SENT)
             ConsentPoint("Google", com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE)
             ConsentPoint("Checked here", "Every amount in an answer is one of your figures, or a sum this phone worked out from them — shown in bold. Gemini gives you its own recommendations from your figures, but AI can misread a question or miss something only you know, so check advice before you act on it.")
-            ConsentPoint("Limits", "Needs your sync account. Each account has a daily allowance, shared with Smarter reading. Turn this off any time from the menu or Settings.")
+            ConsentPoint("Limits", "Needs you to be signed in. ${AskAiCopy.allowance(perDay)} Turn AI answers off any time with the Gemini switch above or in Settings.")
             Spacer(Modifier.height(Spacing.md))
-            LucentoPrimaryButton(text = "Turn on AI answers", onClick = onAccept)
+            LucentoPrimaryButton(text = acceptLabel, onClick = onAccept)
             Spacer(Modifier.height(Spacing.sm))
             LucentoSecondaryButton(text = "Not now", onClick = onDismiss)
             Spacer(Modifier.height(Spacing.lg))
         }
+    }
+}
+
+/**
+ * The first question while AI answers are on but not yet confirmed (owner, 2026-11-17): what would be sent, Google's
+ * free-tier terms, the plan's allowance and that AI can be wrong. Nothing leaves the phone until "Ask Gemini"; "Keep
+ * answers on this phone" turns AI answers off. The buttons are stacked full width so 200 % text never squeezes them.
+ */
+@Composable
+internal fun AiConfirmCard(perDay: Boolean, enabled: Boolean, onSend: () -> Unit, onKeep: () -> Unit, onWhatsSent: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    LucentoReply(mood = MascotMood.Curious) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = colors.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(Spacing.xs))
+            Text(AskAiCopy.CONFIRM_TITLE, style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            AskAiCopy.CONFIRM_BODY,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        InfoNote(com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE)
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            "${AskAiCopy.allowance(perDay)} $AI_CAN_BE_WRONG",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.onSurfaceVariant,
+        )
+        LucentoTextButton(text = AskAiCopy.WHATS_SENT, onClick = onWhatsSent, enabled = enabled)
+        Spacer(Modifier.height(Spacing.xs))
+        LucentoPrimaryButton(text = AskAiCopy.CONFIRM_SEND, icon = Icons.Outlined.AutoAwesome, onClick = onSend, enabled = enabled)
+        Spacer(Modifier.height(Spacing.sm))
+        LucentoSecondaryButton(text = AskAiCopy.CONFIRM_KEEP, onClick = onKeep, enabled = enabled)
     }
 }
 

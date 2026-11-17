@@ -656,8 +656,9 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      - on a Partner's phone, the wallets and Lucento Shared cards.
    - **Signed-out buyers** still see the Gemini, sync and Lucento Shared cards. They say plainly that the feature uses a
      Lucento account, and where to sign in.
-   - **Opt-in stays opt-in.** Smarter reading and AI answers say where to turn them on. They say "On" only when the
-     person has turned them on.
+   - **Opt-in stays opt-in.** Smarter reading says where to turn it on, and "On" only when the person has turned it on.
+     AI answers are on by default for a signed-in account (owner, 2026-11-17; docs/ASK.md "Consent (v3)"), so they say
+     "On" unless the person turned them off; nothing is sent until the first question is confirmed.
    - **Where a service stands comes first**, right under the card's title: "Off · needs your Lucento account", "Waiting
      for your account to confirm Pro", "Off until you turn it on" or "On". At large text the condition is never hidden
      under "More" while a number shows.

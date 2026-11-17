@@ -56,6 +56,8 @@ data class SettingsUiState(
     val cloudSync: CloudSyncUiState,
     /** Lucento Pro: this phone's plan doesn't include Smarter reading ([com.lucento.app.domain.entitlement.ProGates.smartReadingAllowed]). */
     val smartReadingLocked: Boolean = false,
+    /** The AI allowance runs per day (Lucento Pro) rather than per month (free) ([com.lucento.app.domain.entitlement.ProGates.aiAllowancePerDay]). */
+    val aiAllowancePerDay: Boolean = false,
 )
 
 /** Everything the "Cloud sync" section needs, kept separate so the rest of Settings never depends on it. */
@@ -169,6 +171,8 @@ class SettingsViewModel(
                 transactionCount = transactionTotal,
                 smartReadingLocked = plan != null &&
                     !com.lucento.app.domain.entitlement.ProGates.smartReadingAllowed(plan, System.currentTimeMillis()),
+                aiAllowancePerDay = plan != null &&
+                    com.lucento.app.domain.entitlement.ProGates.aiAllowancePerDay(plan, System.currentTimeMillis()),
                 cloudSync = CloudSyncUiState(
                     configured = SupabaseModule.isConfigured,
                     googleSignInConfigured = SupabaseModule.isGoogleSignInConfigured,

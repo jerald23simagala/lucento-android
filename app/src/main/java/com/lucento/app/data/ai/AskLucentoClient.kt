@@ -8,11 +8,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Ask Lucento's AI answers, through Lucento's own proxy (lucento-website `api/ask`), which holds the Gemini key and the
- * per-user daily limit — the APK holds neither. Sent, and only once the user turned AI answers on (the v2 consent): the
- * question, the last few turns of the conversation, today's date, the main currency and [AskSnapshot]'s labelled
- * figures (summaries, projections, goals, transaction patterns and the last 60 days of transactions; never receipts or
- * photos). The reply's figures and calculations are references the app fills in.
+ * Ask Lucento's AI answers, through Lucento's own proxy (lucento-website `api/ask`), which holds the Gemini key and
+ * counts each account's allowance — the APK holds neither. Sent only after the person confirmed AI answers (their first
+ * question, Ask's sheet or Settings; owner, 2026-11-17): the question, the last few turns of the conversation, today's
+ * date, the main currency and [AskSnapshot]'s labelled figures (summaries, projections, goals, transaction patterns and
+ * the last 60 days of transactions; never receipts or photos). The reply's figures and calculations are references the
+ * app fills in.
  */
 class AskLucentoClient(
     /** The session's token; `refresh = true` after the proxy refused one ([postToProxy]). */
@@ -20,7 +21,18 @@ class AskLucentoClient(
     private val endpoint: String = BuildConfig.AI_ASK_URL,
 ) {
     sealed interface Result {
-        data class Answered(val answer: String, val report: String?, val month: String?, val followUps: List<String>, val remainingToday: Int?) : Result
+        /**
+         * [remaining] is what is left of the allowance; [plan] says how it runs: "PRO" per day, "FREE" per month (the
+         * server's `consume_ai_request`). Either is null from an older proxy.
+         */
+        data class Answered(
+            val answer: String,
+            val report: String?,
+            val month: String?,
+            val followUps: List<String>,
+            val remaining: Int?,
+            val plan: String? = null,
+        ) : Result
         data object LimitReached : Result
         data object NotSignedIn : Result
         data class Failed(val reason: String) : Result
@@ -39,7 +51,7 @@ class AskLucentoClient(
             200 -> {
                 val answer = json.decodeFromString(AskResponse.serializer(), reply.body.orEmpty())
                 if (answer.answer.isNullOrBlank()) Result.Failed("empty answer")
-                else Result.Answered(answer.answer, answer.report, answer.month, answer.followUps.orEmpty(), answer.remaining)
+                else Result.Answered(answer.answer, answer.report, answer.month, answer.followUps.orEmpty(), answer.remaining, answer.plan)
             }
             401 -> Result.NotSignedIn
             429 -> Result.LimitReached
@@ -103,4 +115,5 @@ internal data class AskResponse(
     val month: String? = null,
     val followUps: List<String>? = null,
     val remaining: Int? = null,
+    val plan: String? = null,
 )
