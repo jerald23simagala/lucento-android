@@ -603,7 +603,7 @@ pack, `391e7d8`). The owner chose "Release 0.5.8 now". #58, #37 and the dependen
   publishes the same text in lucento-website #29, with an "Online voice" row in the homepage's short privacy list.
 - Owner retest: NEXT_TASKS OT-25.
 
-## Mission Control › Auto-posting for Marketing — 2026-11-17 (database: `feature/mc-autopost`; console: `lucento-mission-control` `feature/autopost`)
+## Mission Control › Auto-posting for Marketing — 2026-11-17 (merged: android #94 2e310e1; console `lucento-mission-control` #12 5bb1daa, deployed to Vercel; database not applied yet: OT-37)
 
 Owner: "I want an interface that when I approved it Claude will handle the posting. I can connect all my accounts as
 needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mission-control/v1/MARKETING_AUTOPOST.md`.
