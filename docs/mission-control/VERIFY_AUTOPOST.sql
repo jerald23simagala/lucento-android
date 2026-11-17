@@ -11,7 +11,7 @@ select
   exists (select 1 from information_schema.columns
           where table_schema = 'mc' and table_name = 'marketing_cards' and column_name = 'autopost_off')         as card_column_added,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'mc_api' and p.proname like 'autopost\_%') = 9                                           as page_functions_9,
+     where n.nspname = 'mc_api' and p.proname like 'autopost\_%') = 10                                          as page_functions_10,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'mc_api' and p.proname like 'ingest\_autopost\_%') = 3                                   as ingest_functions_3,
   -- The page's functions: signed-in callers only, each checking the admin itself.

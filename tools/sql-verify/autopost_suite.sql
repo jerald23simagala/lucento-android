@@ -184,7 +184,7 @@ begin
       v_t := coalesce(v_t || ', ', '') || v_fn.proname || '=' || coalesce(v_j ->> 'error', v_j::text);
     end if;
   end loop;
-  r := r || case when v_t is null and v_n = 9 then 'ok  P2 all 9 auto-posting page functions refuse a customer first: not_admin'
+  r := r || case when v_t is null and v_n = 10 then 'ok  P2 all 10 auto-posting page functions refuse a customer first: not_admin'
                  else 'FAIL P2 functions=' || v_n || ' ' || coalesce(v_t, '') end;
 
   v_t := null;
@@ -691,13 +691,60 @@ begin
                  then 'ok  P44 turning auto-posting off stops the steps waiting (not one under way); on again starts them over'
                  else 'FAIL P44 ' || coalesce(v_m::text, '') || left(coalesce(v_j::text, ''), 300) end;
 
+  -- ======================================================================== J: after the design review
+  -- A post the owner already scheduled in the apps by hand is left alone (it would go out twice); a launch post before
+  -- launch waits; the card says which.
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-apps', (v_local - interval '1 minute')::date,
+                                                         to_char(v_local - interval '1 minute', 'HH24:MI'))));
+  perform pg_temp.decide(pg_temp.cid('A-apps'), 1, 'approve');
+  v_m := pg_temp.owner_call(format('select mc_api.marketing_apps(%L, 1, ''in_apps'', ''{}''::text[])', pg_temp.cid('A-apps')));
+  v_j := pg_temp.claim();
+  v_b := pg_temp.board();
+  r := r || case when (v_m ->> 'ok')::boolean
+                      and not exists (select 1 from mc.autopost_jobs where card_id = pg_temp.cid('A-apps'))
+                      and pg_temp.cardj(v_b, 'A-apps') #>> '{autopost,blocked}' = 'in_apps'
+                      and not (pg_temp.cardj(v_b, 'A-apps') #>> '{autopost,posts_any}')::boolean
+                      and mc.autopost_blocked(v_c5) = 'too_early' and pg_temp.cardj(v_b, 'A-launch') #>> '{autopost,blocked}' = 'too_early'
+                      and mc.autopost_blocked(v_c1) is null
+                 then 'ok  P45 a post already scheduled in the apps by hand gets no job (no second post) and a launch post waits for launch; the card says why; one whose own automatic post went out isn''t blocked'
+                 else 'FAIL P45 ' || coalesce(v_m::text, '') || left(coalesce(pg_temp.cardj(v_b, 'A-apps')::text, ''), 300) end;
+
+  -- Settings › Check is kept per destination, shown in Settings and on the posts, and cleared when the token changes.
+  v_m := pg_temp.owner_call('select mc_api.autopost_record_check(''lucento_page'', false, ''  Reconnect Facebook and Instagram: the sign-in was refused.  '')');
+  v_k := pg_temp.owner_call('select mc_api.autopost_record_check(''klaroph_page'', true, null)');
+  v_s := pg_temp.owner_call('select mc_api.autopost_settings()');
+  v_b := pg_temp.board();
+  v_ok := v_s #>> '{destinations,lucento_page,check_ok}' = 'false'
+          and v_s #>> '{destinations,lucento_page,check_note}' = 'Reconnect Facebook and Instagram: the sign-in was refused.'
+          and (v_s #>> '{destinations,lucento_page,checked_at}')::timestamptz = now()
+          and (select bool_or(x ->> 'check_ok' = 'false') from jsonb_array_elements(pg_temp.cardj(v_b, 'A-off') #> '{autopost,targets}') x
+               where x ->> 'destination' = 'lucento_page');
+  perform pg_temp.owner_call(format('select mc_api.autopost_save_connection(%L, %L, %L, null, null, null, null, %L, %L::jsonb)',
+           'meta', '1001', 'Jerald', '{pages_manage_posts}',
+           jsonb_build_array(jsonb_build_object('kind', 'page', 'id', '501', 'name', 'Lucento', 'token_cipher', v_klaro_cipher),
+                             jsonb_build_object('kind', 'instagram', 'id', '17841', 'name', 'lucentoapp', 'page_id', '501'))));
+  r := r || case when (v_m ->> 'ok')::boolean and v_k ->> 'error' = 'not_found' and v_ok
+                      and (select check_ok is null and checked_at is null from mc.autopost_destinations where key = 'lucento_page')
+                      and (v_s ->> 'work_due') is not null
+                 then 'ok  P46 a Check''s answer is kept for its destination (Settings and the posts show it) and cleared when the token changes; only a set destination takes one'
+                 else 'FAIL P46 ' || coalesce(v_m::text, '') || coalesce(v_k::text, '') || left(coalesce(v_s::text, ''), 300) end;
+
+  update mc.autopost_jobs set status = 'cancelled', lease_id = null, lease_until = null where status in ('queued', 'preparing', 'ready');
+  v_s := pg_temp.owner_call('select mc_api.autopost_settings()');
+  v_ok := (v_s ->> 'work_due')::boolean;
+  update mc.marketing_cards set state = 'waiting' where state = 'approved';
+  v_s := pg_temp.owner_call('select mc_api.autopost_settings()');
+  r := r || case when v_ok and not (v_s ->> 'work_due')::boolean
+                 then 'ok  P47 Settings knows when something is due (so it can tell a posting clock that stopped)'
+                 else 'FAIL P47 ' || left(coalesce(v_s::text, ''), 300) end;
+
   select string_agg(a, ',' order by a) into v_t from (
     select distinct substr(action, 11) as a from mc.audit_log where action like 'marketing.autopost%' and result = 'ok') x;
   r := r || case when v_t = 'autopost_by_hand,autopost_card_off,autopost_confirmed,autopost_connect,autopost_destination,autopost_disconnect,autopost_off,autopost_on,autopost_retry'
                       and not exists (select 1 from mc.audit_log where action like 'marketing.autopost%'
                                       and coalesce(detail, '') || coalesce(target_ref, '') || coalesce(before::text, '') || coalesce(after::text, '') like '%v1:%')
-                 then 'ok  P45 every auto-posting action is audited, never with a token'
-                 else 'FAIL P45 ' || coalesce(v_t, 'none') end;
+                 then 'ok  P48 every auto-posting action is audited, never with a token'
+                 else 'FAIL P48 ' || coalesce(v_t, 'none') end;
 
   raise exception E'VERIFY %/% failed\n%',
     (select count(*) from unnest(r) x where x like 'FAIL%'), array_length(r, 1), array_to_string(r, E'\n');

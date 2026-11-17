@@ -201,6 +201,11 @@ create table if not exists mc.autopost_destinations (
   token_cipher text null check (token_cipher is null or mc.autopost_cipher_ok(token_cipher)),
   set_by uuid not null,
   updated_at timestamptz not null default now(),
+  -- The console's last Check of it (Settings): when, whether the platform answered, and why not. Cleared when the
+  -- destination or its token changes.
+  checked_at timestamptz null,
+  check_ok boolean null,
+  check_note text null check (char_length(check_note) <= 300),
   check (provider = case key when 'youtube' then 'google' when 'tiktok' then 'tiktok' else 'meta' end),
   check ((provider = 'meta') = (token_cipher is not null))
 );
@@ -262,9 +267,37 @@ create table if not exists mc.autopost_state (
 insert into mc.autopost_state (id) values (true) on conflict (id) do nothing;
 
 -- ================================================================================================ rules
+-- Why Mission Control won't post this post whatever its approval, or null:
+--   in_apps       it is already in the apps by the owner's hand (no automatic post of that version went out), or an
+--                 older version is: posting it too would put it out twice. Deleting it in the apps and tapping "I've
+--                 removed it from the apps" hands it over;
+--   too_early     a launch post before Lucento is live;
+--   after_launch  a 'coming soon' post whose slot is after launch (the same rules as "I've scheduled it").
+create or replace function mc.autopost_blocked(p_card uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+           when c.in_apps_version is not null
+                and not (c.in_apps_version = c.current_version
+                         and exists (select 1 from mc.autopost_jobs j
+                                     where j.card_id = c.id and j.version = c.in_apps_version
+                                       and j.status in ('posted', 'sent_to_drafts', 'by_hand'))) then 'in_apps'
+           when mc.marketing_launch_too_early(c.phase, s.slot, c.slot_time is null, s.pday) then 'too_early'
+           when mc.marketing_after_launch(c.phase, s.slot, s.pday) then 'after_launch'
+         end
+  from mc.marketing_cards c
+  join mc.marketing_packs p on p.id = c.pack_id
+  cross join lateral (select mc.marketing_slot(c.slot_day, c.slot_time, p.tz) as slot, mc.marketing_pday() as pday) s
+  where c.id = p_card
+$$;
+
 -- Every post Mission Control may post now or soon, with each automatic target that has a destination: approved, not
--- turned to by hand, auto-posting on, a ready and passing current version, a slot, and allowed out at that slot (not a
--- launch post before launch nor a 'coming soon' post after it: the same rules as "I've scheduled it").
+-- turned to by hand, auto-posting on, a ready and passing current version, a slot, and nothing blocking it
+-- (mc.autopost_blocked: not in the apps by hand, launch rules).
 create or replace function mc.autopost_candidates()
 returns table (card_id uuid, version integer, target text, destination text, label text, due_at timestamptz,
                late_until timestamptz)
@@ -280,16 +313,14 @@ as $$
   join mc.marketing_versions v on v.card_id = c.id and v.version = c.current_version
   cross join lateral mc.autopost_targets(c.platforms) t
   join mc.autopost_destinations d on d.key = t.destination
-  cross join lateral (select mc.marketing_slot(c.slot_day, c.slot_time, p.tz) as slot, mc.marketing_pday() as pday) s
   where mc.setting_on('autopost_enabled') and c.state = 'approved' and not c.autopost_off and c.slot_day is not null
     and t.target is not null and v.truth_pass and mc.marketing_version_ready(c.id, c.current_version)
-    and not mc.marketing_launch_too_early(c.phase, s.slot, c.slot_time is null, s.pday)
-    and not mc.marketing_after_launch(c.phase, s.slot, s.pday)
+    and mc.autopost_blocked(c.id) is null
 $$;
 
--- Mission Control will post this one: auto-posting is on, the owner hasn't turned it to by hand, and every label on it
--- is a target with a destination (a manual label, such as the group, or an unconnected platform still needs the owner).
--- due_soon ("approved but not scheduled") leaves these out.
+-- Mission Control will post every label of this one: auto-posting is on, the owner hasn't turned it to by hand, nothing
+-- blocks it, and every label is a target with a destination (a manual label, such as the group, or an unconnected
+-- platform still needs the owner).
 create or replace function mc.autopost_covers(p_card uuid)
 returns boolean
 language sql
@@ -298,11 +329,27 @@ security definer
 set search_path = ''
 as $$
   select coalesce((
-    select mc.setting_on('autopost_enabled') and not c.autopost_off
+    select mc.setting_on('autopost_enabled') and not c.autopost_off and mc.autopost_blocked(c.id) is null
        and exists (select 1 from mc.autopost_targets(c.platforms) t where t.target is not null)
        and not exists (select 1 from mc.autopost_targets(c.platforms) t
                        where t.target is null
                           or not exists (select 1 from mc.autopost_destinations d where d.key = t.destination))
+    from mc.marketing_cards c where c.id = p_card), false)
+$$;
+
+-- Mission Control will post at least one label of this one (the rest, if any, the owner posts at the time): due_soon
+-- ("approved but not scheduled") leaves these out, as the owner has nothing to schedule for them.
+create or replace function mc.autopost_posts_any(p_card uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((
+    select mc.setting_on('autopost_enabled') and not c.autopost_off and mc.autopost_blocked(c.id) is null
+       and exists (select 1 from mc.autopost_targets(c.platforms) t
+                   join mc.autopost_destinations d on d.key = t.destination where t.target is not null)
     from mc.marketing_cards c where c.id = p_card), false)
 $$;
 
@@ -341,12 +388,12 @@ security definer
 set search_path = ''
 as $$
   select jsonb_build_object('enabled', mc.setting_on('autopost_enabled'), 'off', c.autopost_off,
-    'covers', mc.autopost_covers(c.id),
+    'covers', mc.autopost_covers(c.id), 'posts_any', mc.autopost_posts_any(c.id), 'blocked', mc.autopost_blocked(c.id),
     'due_at', mc.autopost_due_at(c.slot_day, c.slot_time, p.tz),
     'late_until', mc.autopost_late_until(c.slot_day, c.slot_time, p.tz),
     'targets', (select coalesce(jsonb_agg(jsonb_build_object('label', t.label, 'target', t.target,
                    'destination', t.destination, 'mode', t.mode, 'connected', d.key is not null,
-                   'destination_name', d.name,
+                   'destination_name', d.name, 'check_ok', d.check_ok, 'checked_at', d.checked_at,
                    'job', (select jsonb_build_object('id', j.id, 'version', j.version, 'status', j.status,
                              'attempts', j.attempts, 'external_url', j.external_url, 'error', j.error,
                              'error_code', j.error_code, 'due_at', j.due_at, 'finished_at', j.finished_at,
@@ -382,8 +429,11 @@ as $$
                      order by c.provider), '[]'::jsonb)
                     from mc.autopost_connections c),
     'destinations', (select coalesce(jsonb_object_agg(d.key, jsonb_build_object('provider', d.provider,
-                        'external_id', d.external_id, 'name', d.name, 'updated_at', d.updated_at)), '{}'::jsonb)
-                     from mc.autopost_destinations d))
+                        'external_id', d.external_id, 'name', d.name, 'updated_at', d.updated_at,
+                        'checked_at', d.checked_at, 'check_ok', d.check_ok, 'check_note', d.check_note)), '{}'::jsonb)
+                     from mc.autopost_destinations d),
+    -- Something is due: with the clock's last run, Settings can tell a clock that stopped.
+    'work_due', mc.autopost_work_due())
 $$;
 
 -- For the summary and Overview: posts whose automatic posting failed, couldn't be confirmed, or sit in TikTok drafts.
@@ -529,7 +579,7 @@ as $$
                   and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now()
                   and not mc.marketing_launch_too_early(c.phase, s.slot, c.slot_time is null, p_pday)
                   and not mc.marketing_after_launch(c.phase, s.slot, p_pday)
-                  and not mc.autopost_covers(c.id), false),
+                  and not mc.autopost_posts_any(c.id), false),
          -- Waiting for the owner's yes within 36 hours (a post with Claude, or one that needs a launch version, isn't).
          coalesce(c.state = 'waiting' and not mc.marketing_after_launch(c.phase, s.slot, p_pday)
                   and lower(s.slot) < now() + interval '36 hours' and upper(s.slot) > now(), false),
@@ -840,7 +890,8 @@ begin
     values (p_key, v_o ->> 'provider', v_o ->> 'external_id', v_o ->> 'name', v_o ->> 'token_cipher',
             coalesce(auth.uid(), '00000000-0000-0000-0000-000000000000'), now())
     on conflict (key) do update set provider = excluded.provider, external_id = excluded.external_id, name = excluded.name,
-      token_cipher = excluded.token_cipher, set_by = excluded.set_by, updated_at = excluded.updated_at;
+      token_cipher = excluded.token_cipher, set_by = excluded.set_by, updated_at = excluded.updated_at,
+      checked_at = null, check_ok = null, check_note = null;
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -992,6 +1043,34 @@ begin
   delete from mc.autopost_connections c where c.provider = p_provider;
   perform mc.audit('marketing.autopost_disconnect', null, p_provider, null, 'ok', null, null, left(v_name, 200));
   return jsonb_build_object('ok', true) || mc.autopost_settings_json();
+end;
+$$;
+
+-- The console's Check of one destination: whether the platform answered and, if not, why (shown in Settings and on the
+-- posts). Cleared whenever the destination or its token changes.
+create or replace function mc_api.autopost_record_check(p_key text, p_ok boolean, p_note text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.autopost_check', false, 120);
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  if p_ok is null or p_key is null then
+    return mc.failed('invalid', 'Which destination, and did it work?');
+  end if;
+  update mc.autopost_destinations d set checked_at = now(), check_ok = p_ok,
+    check_note = case when p_ok then null else left(nullif(btrim(p_note), ''), 300) end
+    where d.key = p_key;
+  if not found then
+    return mc.failed('not_found', 'That destination isn''t set.');
+  end if;
+  return jsonb_build_object('ok', true);
 end;
 $$;
 
@@ -1497,6 +1576,7 @@ revoke all on function
   mc_api.autopost_set_destination(text, text),
   mc_api.autopost_disconnect(text),
   mc_api.autopost_credentials(text),
+  mc_api.autopost_record_check(text, boolean, text),
   mc_api.autopost_save_token(text, text, text, timestamptz, text, timestamptz, text),
   mc_api.autopost_job_action(uuid, text),
   mc_api.autopost_card(uuid, integer, boolean),
@@ -1514,6 +1594,7 @@ grant execute on function
   mc_api.autopost_set_destination(text, text),
   mc_api.autopost_disconnect(text),
   mc_api.autopost_credentials(text),
+  mc_api.autopost_record_check(text, boolean, text),
   mc_api.autopost_save_token(text, text, text, timestamptz, text, timestamptz, text),
   mc_api.autopost_job_action(uuid, text),
   mc_api.autopost_card(uuid, integer, boolean)

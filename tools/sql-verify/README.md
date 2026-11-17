@@ -18,7 +18,7 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm run concur
 ```
 
 Exit code 0 means every check passed. Each suite runs on a fresh database; the output lists every check, for example
-`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (11 suites, 501 checks on
+`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (11 suites, 504 checks on
 2026-11-17). Run both variants: a migration must be safe whichever default privileges the project has.
 
 `node run.mjs <migrations dir> <suite.sql> [skip …]` runs one suite. By default it skips `usage_events_purge_schedule`,
@@ -42,7 +42,7 @@ both VERIFY files all true; it also checks that `APPLY_MARKETING.sql` is current
 ## Suites
 
 - `autopost_suite.sql` — Mission Control's auto-posting for Marketing (docs/mission-control/v1/MARKETING_AUTOPOST.md),
-  45 checks: the `autopost` secret purpose; customers refused first by all 9 page functions, anon by none, signed-in
+  48 checks: the `autopost` secret purpose; customers refused first by all 9 page functions, anon by none, signed-in
   callers by none of the 3 ingest functions; the claim needing both the tick and the app secret; the label-to-platform
   map and due times; connections (step-up, ciphertext only, options of the right kind) and the destinations picked
   from them, refreshed or cleared on reconnecting; due_soon left out for posts Mission Control will post; jobs created
@@ -53,7 +53,8 @@ both VERIFY files all true; it also checks that `APPLY_MARKETING.sql` is current
   a step taken at its slot whose run never reported becomes uncertain (never handed out again) while one taken before
   only prepared and goes out again, "Try again" clears the lease, "post this one by hand" is busy while a step is under
   way, a renewal is saved only for its own account, Meta is kept without its user token, a cancelled job starts over,
-  turning off stops the waiting steps. Race MC6 in `concurrency.mjs`: two claims at once hand each job out once.
+  turning off stops the waiting steps; and the design review's: a post already in the apps by hand gets no job and a
+  launch post waits (the card says why), a Check's answer is kept and cleared, Settings knows when something is due. Race MC6 in `concurrency.mjs`: two claims at once hand each job out once.
 
 - `marketing_suite.sql` — Mission Control's Marketing approvals (docs/mission-control/v1/MARKETING_APPROVALS.md), 75
   checks: who may call what (customers refused first by all 11 page functions, anon by none of them, signed-in callers by

@@ -603,10 +603,21 @@ needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mi
   per post, version and platform (created within its lead time, stepped under a 3-minute lease, re-checked at every
   step), events and the clock (pg_cron every minute → pg_net → the console's tick, with its own Vault secret). Nine
   owner functions behind `mc.gate`, three ingest functions for the console. Not applied anywhere yet (OT-36).
-- **Tests:** `tools/sql-verify` 11 suites, **494 checks, 0 failed** under both default-privilege variants
-  (`autopost_suite.sql` 38); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
+- **Tests:** `tools/sql-verify` 11 suites, **504 checks, 0 failed** under both default-privilege variants
+  (`autopost_suite.sql` 48); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
   handed out once); `catch_up_check.mjs` passes, including APPLY_AUTOPOST pasted twice (part E).
-- **Console:** in progress on `feature/autopost`.
+- **Console** (`lucento-mission-control` PR #12, `feature/autopost`): Settings › Auto-posting (the switch, the posting
+  clock with a stalled-clock warning, each platform's account with Connect / Reconnect / Check / Disconnect and each
+  destination's kept Check), the platforms' sign-in (fresh code, signed state cookie, a callback page that only passes
+  the answer on to the gated /finish), `/api/autopost/tick` (claims up to 4 steps, runs them side by side under a
+  40-second deadline, saves each result with retries; Facebook Reels, Instagram Reels, Page posts, YouTube, TikTok
+  drafts), and on each post the plan, each platform's result with its link, and the owner's ways (Try again or Post it
+  now, I'll post it by hand, It's posted). `npm run verify` green: **243 unit tests**; end to end on a fresh local stack
+  **26 passed** (`settings-autopost.spec.ts` 4, both phone specs). Not run against the real platforms (OT-36, MC-12).
+- **Reviews:** a security review (no critical or high; M1 and L1–L5 fixed, MARKETING_AUTOPOST.md §7) and the design
+  critic's round 1 (REJECT 2.9: a post already in the apps would be posted again, a launch post promised, a dead
+  "Posting now…" while off, "Went out" while a platform failed, a Check its status contradicted; all fixed, with
+  touch targets, the Settings layout and the words). Round 2 next; studio `critic/reports/2026-11-17-autopost-ui-r1.md`.
 
 ## Mission Control › Marketing approvals — 2026-11-16 (database: `feature/mc-marketing`; console: `lucento-mission-control` `feature/marketing`; tool: lucento-studio `6edd819`)
 

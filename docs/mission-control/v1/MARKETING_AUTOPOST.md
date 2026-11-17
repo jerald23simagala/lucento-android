@@ -59,11 +59,16 @@ ciphertext.
 - **Due** at the slot (10:00 for an "any time" day); **late until** 3 hours after (the day's end for "any time").
   Reels start 20 minutes ahead (Meta fetches and processes the video), then publish at the slot; the rest start at the
   slot.
+- **Blocked** (`mc.autopost_blocked`, design review round 1): Mission Control never posts a post that is already in
+  the apps by the owner's hand (`in_apps`: `in_apps_version` set and no automatic post of that version went out, or an
+  older version is in the apps), a launch post before launch (`too_early`) or a 'coming soon' post after it
+  (`after_launch`). The card says which; deleting it in the apps and tapping "I've removed it from the apps" hands it
+  over.
 - **Candidates** (`mc.autopost_candidates`): auto-posting on; post approved, not `autopost_off`, with a slot; current
-  version ready and passing the truth check; not a launch post before launch nor a 'coming soon' post after it (the
-  same rules as "I've scheduled it"); the target has a destination.
-- **Covers** (`mc.autopost_covers`): every label on the post is a connected target. `due_soon` ("approved but not
-  scheduled") leaves those out; a post with a manual label (the group) still raises it.
+  version ready and passing the truth check; not blocked; the target has a destination.
+- **Covers** (`mc.autopost_covers`): every label on the post is a connected target. **Posts any**
+  (`mc.autopost_posts_any`): at least one is; `due_soon` ("approved but not scheduled") leaves those out, as the owner
+  has nothing to schedule (a manual label, such as the group, is posted at the time and asked about after the slot).
 - **Jobs** are created by the claim within their lead time (never at approval), stepped under a 3-minute lease, and
   re-checked at every step: a post undone, skipped, revised or turned to by hand, a destination gone, or auto-posting off
   stops it before its next step (`cancelled`; turning auto-posting off cancels the waiting steps at once). A cancelled
@@ -95,6 +100,7 @@ Owner (granted to authenticated; each calls `mc.gate` first, its own hourly coun
 | `autopost_set_destination(key, option_id)` | marketing.autopost_destination, step-up, 60/h | only from the connection's options, of the right kind; null clears |
 | `autopost_disconnect(provider)` | marketing.autopost_disconnect, step-up, 20/h | cancels its jobs not under way; deletes tokens and destinations |
 | `autopost_credentials(key)` | marketing.autopost_credentials, 120/h | the destination's ciphertexts, for the console's Check |
+| `autopost_record_check(key, ok, note)` | marketing.autopost_check, 120/h | keeps the Check's answer on the destination (Settings and the posts show it); cleared when the destination or its token changes |
 | `autopost_save_token(provider, account_id, …)` | marketing.autopost_token, 120/h | after a refresh in a Check, or its error; only for that account (a reconnect meanwhile is left alone) |
 | `autopost_job_action(job, action)` | marketing.decide | `retry` (failed/uncertain, approved current version), `posted` (uncertain), `by_hand` |
 | `autopost_card(card, version, off)` | marketing.decide | `stale_version`; `busy` while a step is under way; `already_started` once a step began |
@@ -107,9 +113,10 @@ Clock: `mc.autopost_kick()` (pg_cron `mc-autopost`, every minute: off / no addre
 → nothing; else one `net.http_post` to the tick address with the Vault secret) and `mc.autopost_setup(url)` (owner,
 SQL editor: rotates the `autopost` secret into Vault as `mc_autopost_tick`, records the address, schedules the job).
 
-The board's cards gain `autopost {enabled, off, covers, due_at, late_until, targets[{label, target, destination, mode,
-connected, destination_name, job}]}`; the board gains `autopost` (the settings); the summary gains `autopost {failed[],
-uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
+The board's cards gain `autopost {enabled, off, covers, posts_any, blocked, due_at, late_until, targets[{label, target,
+destination, mode, connected, destination_name, check_ok, checked_at, job}]}`; the board gains `autopost` (the
+settings: the clock, connections, destinations with their last Check, and `work_due`); the summary gains `autopost
+{failed[], uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
 
 ## 6. Console
 
@@ -141,8 +148,16 @@ uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
   `/settings/connect/<provider>/finish` with a navigation of its own (meta refresh, no script). /finish is gated like
   every page: it checks the state against the cookie and the admin, exchanges the code, encrypts the tokens and calls
   `autopost_save_connection` (whose step-up the code entered at Connect still covers).
-- Marketing card: the plan before the slot, each result after it, Try again / I'll post it by hand / It's posted; the
-  approve button says "Approve and post Mon 19:30" when Mission Control will post it.
+- Settings › Auto-posting keeps each destination's last Check on its row ("Works · checked 2 min ago", "Reconnect
+  needed"); turning auto-posting on checks every account and names those that can't post. The posting-clock line warns
+  when something is due and the clock hasn't run for 5 minutes (`work_due`).
+- Marketing card: the plan before the slot, naming both sides ("posts it on Facebook, Instagram and YouTube Mon 19:30.
+  TikTok goes to your drafts…; you post it on … at the time"), each result after it (at the top of a settled card),
+  Try again (or "Post it now" past the window, naming the slot) / I'll post it by hand / It's posted; a step that can't
+  go on says why: paused while auto-posting is off, waiting for a posting clock that stopped, not posted in time. The
+  approve button says "Approve and post Mon 19:30" only when Mission Control will post it (not blocked, an account
+  that passes its Check). The chip, banner and filters agree: "Partly posted · 1 needs you" when a platform failed
+  after another went out.
 
 ## 7. Security and privacy
 
@@ -163,10 +178,10 @@ uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
 
 ## 8. Tests
 
-- SQL `tools/sql-verify/autopost_suite.sql` (45 checks: secrets and grants, the map, due times, connections and picks,
+- SQL `tools/sql-verify/autopost_suite.sql` (48 checks: secrets and grants, the map, due times, connections and picks,
   every job step and refusal, coverage and due_soon, cancellations and starting over, missed, a run that never reported,
-  busy, renewals for one account only, Meta without a user token, launch rules, the clock's guards, the board, the
-  summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
+  busy, renewals for one account only, Meta without a user token, posts in the apps by hand and launch posts blocked,
+  Checks kept and cleared, `work_due`, launch rules, the clock's guards, the board, the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
   `catch_up_check.mjs` part E pastes APPLY_AUTOPOST.sql the owner's way.
 - Console (`lucento-mission-control`): unit tests `autopost-crypto` (encryption, additional data, the state cookie,
   PKCE), `autopost-runner` (every target's steps against fake platforms, the retry/uncertain rules, the deadline, one
