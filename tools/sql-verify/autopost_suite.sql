@@ -796,6 +796,8 @@ begin
   v_b := pg_temp.board();
   v_ok := (v_m #>> '{autopost,accounts,working}')::integer = v_n - 1
           and (v_m #> '{autopost,accounts,reconnect}') @> '["google"]'::jsonb
+          and (v_m #> '{autopost,accounts,refused}') @> '["youtube"]'::jsonb
+          and (v_m #> '{autopost,accounts,chosen_keys}') @> '["youtube"]'::jsonb
           and pg_temp.cardj(v_b, 'A-stop') #>> '{autopost,targets,0,check_ok}' = 'false';
   perform pg_temp.owner_call('select mc_api.autopost_record_check(''youtube'', true, null)');
   v_k := pg_temp.summary();

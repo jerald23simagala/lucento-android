@@ -523,11 +523,12 @@ as $$
       'failed', (select count(*) from problems x where x.status = 'failed'),
       'uncertain', (select count(*) from problems x where x.status = 'uncertain'),
       'drafts_waiting', (select count(*) from problems x where x.status = 'sent_to_drafts')),
-    'accounts', (select jsonb_build_object('chosen', count(*),
-                   'working', count(*) filter (where d.check_ok is distinct from false and cn.last_error is null),
-                   'reconnect', coalesce(jsonb_agg(distinct d.provider order by d.provider)
-                                           filter (where d.check_ok is false or cn.last_error is not null), '[]'::jsonb))
-                 from mc.autopost_destinations d join mc.autopost_connections cn on cn.provider = d.provider))
+    'accounts', (select jsonb_build_object('chosen', count(*), 'working', count(*) filter (where x.ok),
+                   'reconnect', coalesce(jsonb_agg(distinct x.provider order by x.provider) filter (where not x.ok), '[]'::jsonb),
+                   'chosen_keys', coalesce(jsonb_agg(x.key order by x.key), '[]'::jsonb),
+                   'refused', coalesce(jsonb_agg(x.key order by x.key) filter (where not x.ok), '[]'::jsonb))
+                 from (select d.key, d.provider, d.check_ok is distinct from false and cn.last_error is null as ok
+                       from mc.autopost_destinations d join mc.autopost_connections cn on cn.provider = d.provider) x))
 $$;
 
 -- After a job posted (or sent to drafts, or the owner took it by hand): the post is out at its version. The first such

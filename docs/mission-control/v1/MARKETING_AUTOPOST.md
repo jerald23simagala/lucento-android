@@ -125,7 +125,8 @@ The board's cards gain `autopost {enabled, off, covers, posts_any, blocked, due_
 destination, mode, connected, destination_name, check_ok (false also while its account's renewal failed), checked_at,
 job (with `stop_note` when stopped)}]}`; the board gains `autopost` (the settings: the clock, connections, destinations
 with their last Check, and `work_due`); the summary gains `autopost {failed[], uncertain[], drafts_waiting[], counts,
-accounts {chosen, working, reconnect[]}}` (each list ≤ 10, by slot).
+accounts {chosen, working, reconnect[], chosen_keys[], refused[]}}` (each list ≤ 10, by slot; one Page that
+can't post is named, not its whole account).
 
 ## 6. Console
 
