@@ -18,8 +18,8 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm run concur
 ```
 
 Exit code 0 means every check passed. Each suite runs on a fresh database; the output lists every check, for example
-`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (10 suites, 448 checks on
-2026-11-16). Run both variants: a migration must be safe whichever default privileges the project has.
+`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (11 suites, 518 checks on
+2026-11-17). Run both variants: a migration must be safe whichever default privileges the project has.
 
 `node run.mjs <migrations dir> <suite.sql> [skip …]` runs one suite. By default it skips `usage_events_purge_schedule`,
 because PGlite has no `pg_cron`.
@@ -40,6 +40,28 @@ both VERIFY files all true; it also checks that `APPLY_MARKETING.sql` is current
 (`python tools/supabase/build_marketing_apply.py --check`).
 
 ## Suites
+
+- `autopost_suite.sql` — Mission Control's auto-posting for Marketing (docs/mission-control/v1/MARKETING_AUTOPOST.md),
+  62 checks: the `autopost` secret purpose; customers refused first by all 9 page functions, anon by none, signed-in
+  callers by none of the 3 ingest functions; the claim needing both the tick and the app secret; the label-to-platform
+  map and due times; connections (step-up, ciphertext only, options of the right kind) and the destinations picked
+  from them, refreshed or cleared on reconnecting; due_soon left out for posts Mission Control will post; jobs created
+  within their lead time, stepped under a lease (lease_lost), preparing, ready, posted, sent to drafts, retried up to
+  3 attempts, uncertain (recorded from a lapsed lease, confirmed by the owner), missed; the post marked out with what
+  the owner finishes by hand; cancellation when undone or revised; launch rules; off; the clock's guards and setup
+  refusals; the board, the summary (no token anywhere), disconnecting and the audit; and the security review's fixes:
+  a step taken at its slot whose run never reported becomes uncertain (never handed out again) while one taken before
+  only prepared and goes out again, "Try again" clears the lease, "post this one by hand" is busy while a step is under
+  way, a renewal is saved only for its own account, Meta is kept without its user token, a cancelled job starts over,
+  turning off stops the waiting steps; and the design review's: a post already in the apps by hand gets no job and a
+  launch post waits (the card says why), a Check's answer is kept and cleared, Settings knows when something is due;
+  and round 2's: every stop records why, a stopped step can be sent now (only when it can go) or taken by hand, the
+  summary counts the accounts that can post, an account to reconnect posts nothing until reconnected, a platform
+  disconnected before its slot is asked about, one Mission Control posts later isn't; and round 3's: a two-platform
+  label is asked about by the platform still the owner's ("Instagram Reels"), the summary keeps an approved post's
+  problems until handled (a stop past its window too) and says how the clock is, a post the owner confirmed says so;
+  and round 4's: each by-hand platform answered on its own, "Don't post it there", "It's posted" taken back, the stall
+  counted from when the work became due, History with the automatic steps, the questions in the post's own order. Race MC6 in `concurrency.mjs`: two claims at once hand each job out once.
 
 - `marketing_suite.sql` — Mission Control's Marketing approvals (docs/mission-control/v1/MARKETING_APPROVALS.md), 75
   checks: who may call what (customers refused first by all 11 page functions, anon by none of them, signed-in callers by

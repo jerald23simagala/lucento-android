@@ -603,6 +603,53 @@ pack, `391e7d8`). The owner chose "Release 0.5.8 now". #58, #37 and the dependen
   publishes the same text in lucento-website #29, with an "Online voice" row in the homepage's short privacy list.
 - Owner retest: NEXT_TASKS OT-25.
 
+## Mission Control › Auto-posting for Marketing — 2026-11-17 (database: `feature/mc-autopost`; console: `lucento-mission-control` `feature/autopost`)
+
+Owner: "I want an interface that when I approved it Claude will handle the posting. I can connect all my accounts as
+needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mission-control/v1/MARKETING_AUTOPOST.md`.
+
+- **Database** (`supabase/migrations/20261118090000_mission_control_autopost.sql`, one paste: `docs/mission-control/
+  APPLY_AUTOPOST.sql`, check: `VERIFY_AUTOPOST.sql`): connections holding encrypted tokens only, destinations, one job
+  per post, version and platform (created within its lead time, stepped under a 3-minute lease, re-checked at every
+  step), events and the clock (pg_cron every minute → pg_net → the console's tick, with its own Vault secret). Ten
+  owner functions behind `mc.gate`, three ingest functions for the console. An account whose Check refused (or whose
+  renewal failed) posts nothing until reconnected; every stop records why (design review round 2); a two-platform
+  label is asked about by the platform still the owner's, and the summary keeps an approved post's problems until
+  handled, with the clock's state (round 3). Not applied anywhere yet (OT-37).
+- **Tests:** `tools/sql-verify` 11 suites, **518 checks, 0 failed** under both default-privilege variants
+  (`autopost_suite.sql` 62); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
+  handed out once); `catch_up_check.mjs` passes, including APPLY_AUTOPOST pasted twice (part E).
+- **Console** (`lucento-mission-control` PR #12, `feature/autopost`): Settings › Auto-posting (the switch, the posting
+  clock with a stalled-clock warning, each platform's account with Connect / Reconnect / Check / Disconnect and each
+  destination's kept Check), the platforms' sign-in (fresh code, signed state cookie, a callback page that only passes
+  the answer on to the gated /finish), `/api/autopost/tick` (claims up to 4 steps, runs them side by side under a
+  40-second deadline, saves each result with retries; Facebook Reels, Instagram Reels, Page posts, YouTube, TikTok
+  drafts), and on each post the plan, each platform's result with its link, and the owner's ways (Try again or Post it
+  now, I'll post it by hand, It's posted, Don't post it there, Not posted after all). **273 unit tests**, lint, build
+  and the bundle check green (`npm run verify`, Next 16.4.6); end to end on a fresh local stack **26 passed, 1 skipped** (the optional tour;
+  `settings-autopost.spec.ts` 4, both phone specs); no sideways scroll at 360/393 px with 115–200 % text; studio
+  audit 0 FAIL. Not run against the real platforms (OT-37, MC-12).
+- **Reviews:** a security review (no critical or high; M1 and L1–L5 fixed, MARKETING_AUTOPOST.md §7) and the design
+  critic's round 1 (REJECT 2.9: a post already in the apps would be posted again, a launch post promised, a dead
+  "Posting now…" while off, "Went out" while a platform failed, a Check its status contradicted; all fixed, with
+  touch targets, the Settings layout and the words). Round 2 (REJECT 3.1: "On" while nothing could post, a stopped
+  platform with no way back, the footer contradicting the results, the fix least visible in Settings, Page posts
+  silent, no warning where the owner looks) all fixed: the switch says what will post, stopped posts say why with Post
+  it now / I'll post it by hand, one notice per account with Reconnect first, a plan line on every post, a line on
+  Marketing and Overview, 48 px fields. Round 3 (REJECT 3.2: Marketing scrolled sideways from 130 % text; a stalled
+  posting clock hidden where the owner looks; a step stuck after "Post it now" shown as "Posting…" and counted done; a
+  false "No other post waits for you"; by hand asked per label, risking a second Facebook post; plus plan sentences,
+  TikTok's "connect it" with no Connect button, old failures off Overview, and copy): escalated; the owner chose "fix
+  all, review again", a confirmation before posting a day or more late, failures kept until handled, Next 16.4.6
+  (MC-13) and every marketing post moved one week. All fixed but the week picker's count (notes). Round 4 (REJECT
+  3.0: after "I posted it" the card still said to delete the post in the apps; no truthful way to skip one platform;
+  "I posted it" as the main button beside "Post it now"; a "clock stopped" alarm right after "Post it now"; "No other
+  post waits" counting approvals only; plus seven medium items). The owner chose: fix all, a critic confirms only the
+  round-4 list item by item, then merge; per-platform "Don't post it there"; "Post it now" as the main button on a
+  missed post; Overview always shows auto-posting's lines. All fixed (MARKETING_AUTOPOST.md §6, round 4; database:
+  per-platform answers, `not_posting` / `not_posted`, `work_due_since`, History with the automatic steps). Studio
+  `critic/reports/2026-11-17-autopost-ui-r1.md` … `-r4.md`.
+
 ## Mission Control › Marketing approvals — 2026-11-16 (database: `feature/mc-marketing`; console: `lucento-mission-control` `feature/marketing`; tool: lucento-studio `6edd819`)
 
 Owner: "I want my marketing approval workflow be integrated here … a section in mission control so I can handle approval

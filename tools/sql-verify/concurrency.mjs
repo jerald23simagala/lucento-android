@@ -338,6 +338,55 @@ try {
     );
   }
 
+  // MC6 (auto-posting, MARKETING_AUTOPOST.md): two posting runs claim at once. The second waits for the first's lock,
+  // then finds every due step leased: each job is handed out once, so nothing can be posted twice.
+  {
+    const tick = (await setup.query(`select mc.rotate_ingest_secret('autopost') as s`)).rows[0].s;
+    const app = (await setup.query(`select mc.rotate_ingest_secret('app') as s`)).rows[0].s;
+    const cipher = 'v1:AAAAAAAAAAAAAAAA:dG9rZW4:AAAAAAAAAAAAAAAAAAAAAA';
+    await setup.query(
+      `insert into mc.autopost_connections (provider, account_id, account_name, token_cipher, options, connected_by)
+       values ('meta', '1001', 'Ops', $1, '[]', $2)`, [cipher, admin]);
+    await setup.query(
+      `insert into mc.autopost_destinations (key, provider, external_id, name, token_cipher, set_by)
+       values ('lucento_page', 'meta', '501', 'Lucento', $1, $2), ('instagram', 'meta', '17841', 'lucentoapp', $1, $2)`,
+      [cipher, admin]);
+    await setup.query(`update mc.settings set value = 'true' where key = 'autopost_enabled'`);
+    await setup.query(`update mc.autopost_state set clock_set_at = now() where id`);
+    // A post due a minute ago, in Manila time, in a pack around today.
+    const { rows: [t] } = await setup.query(
+      `select to_char((now() at time zone 'Asia/Manila')::date - 1, 'YYYY-MM-DD') as starts,
+              to_char((now() at time zone 'Asia/Manila')::date + 5, 'YYYY-MM-DD') as ends,
+              to_char(now() at time zone 'Asia/Manila' - interval '1 minute', 'YYYY-MM-DD') as day,
+              to_char(now() at time zone 'Asia/Manila' - interval '1 minute', 'HH24:MI') as time`);
+    const c = await asClaude();
+    const pushed = await push(c, { pack: { key: 'race-auto', title: 'Race auto', starts_on: t.starts, ends_on: t.ends },
+      cards: [card('auto1', 1, { kind: 'short', platforms: ['FB + IG Reels'], slot_day: t.day, slot_time: t.time })] });
+    await c.end();
+    const row = await cardRow('auto1');
+    const o = await asOwner();
+    const approved = await decide(o, row.id, 1, 'approve');
+    await o.end();
+    const claim = (cl) =>
+      cl.query(`select mc_api.ingest_autopost_claim($1, $2, 10) as j`, [tick, app]).then((r) => r.rows[0].j);
+    const [a, b] = [await asClaude(), await asClaude()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const first = await claim(a);
+    const secondCall = claim(b);
+    const waited = await waitingForLock(bPid);
+    await a.query('commit');
+    const second = await secondCall;
+    await Promise.all([a.end(), b.end()]);
+    const { rows } = await setup.query(
+      `select count(*)::int as jobs, count(distinct lease_id)::int as leases from mc.autopost_jobs where card_id = $1`, [row.id]);
+    check(
+      pushed.ok && approved.ok && first.ok && first.jobs.length === 2 && waited >= 1 && second.ok && second.jobs.length === 0
+        && rows[0].jobs === 2 && rows[0].leases === 2,
+      `MC6 two posting runs claim at once: the second waits (${waited}) and gets nothing (${second.jobs?.length}); ${rows[0].jobs} jobs, ${rows[0].leases} leases`,
+    );
+  }
+
   await setup.end();
 } catch (e) {
   check(false, `the run stopped: ${e.code ?? ''} ${e.message}`);

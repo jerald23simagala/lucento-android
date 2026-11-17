@@ -116,6 +116,21 @@ disclosure over a consent step (FD-V3), so:
 - `?next=` after sign-in keeps the admin on Mission Control: same-origin paths only, judged after URL normalisation (so
   `/.//host`, `/a/..//host` and `/%2e//host` can't become `//host`), never back into sign-in or `/api`; the proxy also
   refuses any redirect that would leave its own origin.
+- Auto-posting (MARKETING_AUTOPOST.md §7) posts only to the owner's own accounts, from the owner's own developer apps:
+  - Tokens are encrypted in the console (AES-256-GCM, `MC_TOKEN_KEY` held by Vercel only, the provider, account and
+    purpose as additional data) before they reach the database; no API role can read the tables and no answer to a
+    page carries a ciphertext. Changing the key means reconnecting.
+  - The posting clock's secret (Vault, purpose `autopost`) only asks for a run; the claim also needs the console's
+    `MC_INGEST_SECRET`, and only approved posts that are due are handed out, each under a lease.
+  - The platforms fetch the files from presigned links for that one pathname that end within the hour.
+  - Connecting needs a fresh authenticator code; the sign-in's state, PKCE verifier and return address are bound to the
+    admin in a signed, HttpOnly, 10-minute cookie scoped to `/settings/connect`. The platforms' return page is the only
+    page outside the cookie gate: it reads nothing and passes the answer on to the gated `/finish`, which checks the
+    state and the admin before anything is exchanged.
+  - A post goes out at most once on its own: a step that may have posted but whose result was never saved becomes
+    "uncertain" for the owner to check, never handed out again; "post this one by hand" waits while a step runs.
+  - Meta's user token isn't kept (posting uses the Pages' own); Disconnect withdraws the sign-in at Google and TikTok.
+  - What the platforms receive is what the owner approved (videos, pictures, captions, alt text): never customer data.
 
 ## 8. Testing the controls (Phase 4)
 
