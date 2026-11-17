@@ -273,6 +273,10 @@ recurring-schedule sync, syncing preferences.
 - Play Console answers (Data safety, App content, listing, Google sign-in SHA-1s, testing tracks):
   docs/play/PLAY_STORE_SUBMISSION.md. Website refresh with pricing, terms and deletion pages (`feature/site-refresh`).
 - Owner: OT-15 (migration), OT-16 (Play Console), legal review.
+- 2026-11-16 (`fix/edge-to-edge-deprecated-apis`): Play Console flagged 0.5.10 for edge-to-edge APIs Android 15
+  deprecated (`setStatusBarColor`, `setNavigationBarColor`, `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`), all inside
+  androidx.activity's `enableEdgeToEdge`. Lucento now draws edge to edge itself (`SystemBars.kt` + themes), and CI fails
+  a release that calls them again (docs/QUALITY.md).
 
 ## Built — Home-screen widgets (2026-11-12, `feature/home-widgets`)
 - Owner chose widgets only, both free (after exploring a Quick Settings tile, a type-in-the-shade notification and

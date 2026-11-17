@@ -15,6 +15,14 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Play Console edge-to-edge warnings on 0.5.10 (2026-11-16, `fix/edge-to-edge-deprecated-apis`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| E2E-1 | **Fixed 2026-11-16**: "Your app uses deprecated APIs or parameters for edge-to-edge" (`Window.setStatusBarColor`, `setNavigationBarColor`, `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`; starting in `s12.b`, `v12.b`, `n2.p`). The 0.5.10 AAB's R8 map resolves them to androidx.activity's `EdgeToEdgeApi26`/`EdgeToEdgeApi29.setUp` and an API outline that `EdgeToEdgeApi28` uses, so all of them come from `enableEdgeToEdge()`. activity 1.13.0 still calls them (its new `EdgeToEdgeApi35` too), so upgrading the library is not a fix. `core/designsystem/theme/SystemBars.kt` replaces it, and the themes set the bars' transparency and the cutout mode (`values-v28` shortEdges, `values-v30` always) | Verified: `dexdump` of the 0.5.10 AAB found 2× `setStatusBarColor`, 2× `setNavigationBarColor`, 1× `setStatusBarContrastEnforced` and 2 cutout writes, all in activity's classes; the new release APK has none of them and no `EdgeToEdge` class (R8 drops it). CI now fails a release that has them | Upload the next release to see Play Console re-scan it |
+| E2E-2 | "Edge-to-edge may not display for all users" is Play's general advice for apps targeting SDK 35+. Lucento has drawn edge to edge with insets handled since before targetSdk 36 (CI's API 30 tour, API 35/36 website shots) | Inferred from the wording; Play gives no more detail | Check whether it clears after the next upload; if it stays, it needs no app change |
+| E2E-3 | Device coverage: API 28 and API 35 checked by hand; Android 11–14 only through CI's API 30 tour | Verified (`artifacts/edge-to-edge/`): the old `enableEdgeToEdge` build vs the new one on the same seeded data. API 28: dark theme over a light system identical in both bar strips (pixel diff 0), light theme gets dark icons, a tall-notch emulation fills beside the notch in landscape as before (the window reports cutout mode 1 from the theme). API 35: dark identical (the only status-bar diff is the emulator's signal icon), light theme gets dark icons, no scrim behind 3-button navigation. Verified (CI) on PR #92's API 30 tour: 77 of 78 shots have bar strips identical to `main`'s run; `07a-awards-cabinet` caught the Dashboard before the Awards sheet had drawn (it waits for the sheet's text in the Compose tree, not on screen), and `07b` shows the sheet open | — (the `07a` timing could wait for the sheet to settle if it recurs) |
+
 ## Budget tab with foreign-currency wallets (2026-11-16, `fix/budget-screen-multicurrency`)
 
 | Id | Issue | Evidence | Next step |

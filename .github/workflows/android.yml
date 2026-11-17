@@ -148,7 +148,7 @@ jobs:
           fi
           ./gradlew --stacktrace assembleRelease bundleRelease
 
-      - name: Inspect release artifacts (permissions, debuggable, application id, size)
+      - name: Inspect release artifacts (permissions, debuggable, application id, deprecated APIs, size)
         run: |
           AAPT2="$ANDROID_HOME/build-tools/35.0.0/aapt2"
           RELEASE_APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
@@ -175,6 +175,17 @@ jobs:
           for APK in "$RELEASE_APK" "$DEBUG_APK"; do
             if unzip -p "$APK" 'classes*.dex' | grep -a -q -E 'sb_secret_|service_role'; then echo "::error::$APK contains a server-only key"; exit 1; fi
           done
+          # Edge to edge without the window APIs Android 15 deprecated: Play Console flags any release whose code calls
+          # them (0.5.10, all from androidx.activity's enableEdgeToEdge). SystemBars.kt and the themes replace them; the
+          # theme, never code, sets the cutout mode. A failure here usually means a library update brought them back.
+          rm -rf release-dex && unzip -q -o "$RELEASE_APK" 'classes*.dex' -d release-dex
+          for DEX in release-dex/classes*.dex; do "$ANDROID_HOME/build-tools/35.0.0/dexdump" -d "$DEX"; done > release-dex/dump.txt
+          # An empty or broken dump would pass the check below silently, so first make sure it holds the app's code.
+          grep -q "Class descriptor  : 'Lcom/lucento/app/MainActivity;'" release-dex/dump.txt || { echo "::error::dexdump produced no usable output for the release APK"; exit 1; }
+          DEPRECATED=$(grep -o -E 'Landroid/view/Window;\.(setStatusBarColor|setNavigationBarColor|setNavigationBarDividerColor|setStatusBarContrastEnforced)|iput[^,]*, [^,]*, Landroid/view/WindowManager\$LayoutParams;\.layoutInDisplayCutoutMode' release-dex/dump.txt | sed -E 's/^iput.*/layoutInDisplayCutoutMode (written in code)/' | sort | uniq -c || true)
+          if [ -n "$DEPRECATED" ]; then
+            echo "::error::release code uses edge-to-edge APIs deprecated in Android 15 (Play Console flags them):"; echo "$DEPRECATED"; exit 1
+          fi
           {
             echo "### Lucento build"
             echo "| Artifact | Size |"
