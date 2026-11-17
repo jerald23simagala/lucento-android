@@ -27,6 +27,10 @@ Google accounts get no metadata, because their consent is given by continuing.
 - Bump `VERSION` and `UPDATED` whenever the meaning changes.
 - The tests in `AccountFormTest` check only the structure. Accuracy is a review job.
 - The website's `/privacy` page matches the in-app Privacy Policy (checked 2026-11-08: crash reports and usage counts, AI features, exchange rates, Lucento Shared, Google Play billing). Keep them in step whenever either changes.
+- Version 2026-11-17: Ask Lucento's AI answers are on by default for a signed-in account and confirmed once before
+  anything is sent (owner decision; docs/ASK.md "Consent (v3)"); Read messages with Gemini stays off until turned on
+  (Lucento Pro). The Terms say "Gemini for the AI features you use". The website's `legal.ts`, homepage privacy table
+  and FAQ change in the same release (lucento-website PR).
 
 ## Keeping the website in step
 

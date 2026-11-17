@@ -69,20 +69,24 @@ a better user-facing structure while preserving sound engineering boundaries.
 
 ## Privacy & cost
 - Core features work fully offline. No mandatory paid APIs, accounts, cloud, or bank integrations.
-- Network use is only what the person turns on, plus two defaults. The in-app Privacy Policy
+- Network use is only what the person turns on or confirms, plus the defaults below. The in-app Privacy Policy
   (`feature/legal/LegalDocuments.kt`, published at the website's /privacy) must list every path, and any summary of it
   (website, onboarding, store listing) must either list them all or be scoped (for example "your entries") and link to it.
   - **Opt-ins, each off until chosen:** cloud sync (docs/SYNC.md): nothing leaves the device until the user signs in
-    (Google, or an email account) and keeps sync on; Room stays the source of truth. A signed-in account also gets account emails (verify, welcome, password reset code on request, Pro confirmation; docs/EMAILS.md); the app's only part is one welcome request with the account's token. The Gemini features through
-    Lucento's proxy: Smarter reading sends the typed or spoken message (docs/CAPTURE.md); Ask Lucento's AI answers send
-    the question with a summary of the person's finances, including recent transactions, under their own consent
-    (docs/ASK.md). Anonymous usage counts (event names and timings with a random install id, kept 90 days). Crash
+    (Google, or an email account) and keeps sync on; Room stays the source of truth. A signed-in account also gets account emails (verify, welcome, password reset code on request, Pro confirmation; docs/EMAILS.md); the app's only part is one welcome request with the account's token. Smarter
+    reading (Lucento Pro), Gemini through Lucento's proxy, sends the typed or spoken message (docs/CAPTURE.md). Anonymous
+    usage counts (event names and timings with a random install id, kept 90 days). Crash
     reports via Firebase Crashlytics, stacks without amounts or notes (docs/QUALITY.md); production releases include
     it (owner decision 2026-11-08; CI writes `app/google-services.json` from the `GOOGLE_SERVICES_JSON` secret).
     Online voice (owner decision 2026-11-13; docs/CAPTURE.md): the mic asks the phone's speech service for offline
     only; after a failed try, and only with consent, it may go online, so the recording may reach Google. Lucento gets
     only the text. Lucento holds `RECORD_AUDIO` (asked on first use) only for the composer's own listening sheet; it
     keeps no recording, and without the permission the speech service's own window is used.
+  - **On by default, confirmed once:** Ask Lucento's AI answers (owner decision 2026-11-17; docs/ASK.md), on every plan
+    for a signed-in account (Free 10 questions a month, Pro 50 a day). Nothing is sent until the person confirms what
+    is sent: the first question shows a card ("Ask Gemini" / "Keep answers on this phone"), or they accept Ask's sheet or
+    Settings' dialog. Then the question goes with a summary of their finances, including the last 60 days of
+    transactions. Sign-out and account resets return it to unconfirmed; turning it off withdraws the agreement.
   - **On by default:** exchange rates (docs/MULTICURRENCY.md, owner decision 2026-11-06): fetched only when something
     is recorded in another currency, sending two currency codes and a date (never an amount); off in Settings › Money.
     In release builds, Google Play's billing component sends Google its own diagnostics. When the person buys Pro,

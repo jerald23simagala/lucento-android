@@ -297,8 +297,9 @@ in for Smarter reading or a Shared invitation; their records were never uploaded
 for good while the old dialog said "Sign back in to download them again". **Keep them here** runs
 `AccountBoundary.signOutKeepingLedger`: under the sync lock it checks again that no account claimed the records, then
 ends the session (recorded for the server revoke first, as below), cancels background sync, turns sync off, and
-forgets what the phone cached about the account (Lucento Shared's cached space and invitations; Smarter reading and Ask
-Lucento's AI answers are switched off, `forgetAccountConsents`). The ledger, onboarding, name and photo stay, and no
+forgets what the phone cached about the account (Lucento Shared's cached space and invitations; Smarter reading is
+switched off and Ask Lucento's AI answers go back to their default, on but not confirmed, `forgetAccountConsents`). The
+ledger, onboarding, name and photo stay, and no
 wipe marker is set. If a first sync claimed the records in between, nothing changes and the dialog asks again.
 
 After a wipe the welcome screen says what happened, once (`SignOutNotice`, written just before the wipe and cleared if

@@ -189,7 +189,7 @@ object ProWelcomeCopy {
                 body = when {
                     online == OnlineStatus.SIGN_IN_NEEDED ->
                         "Gemini answers your questions about your money. It uses your Lucento account: sign in from " +
-                            "$accountPath, then turn AI answers on in Ask Lucento."
+                            "$accountPath, then ask in Ask Lucento."
                     online == OnlineStatus.CONFIRMING ->
                         "Gemini answers your questions about your money. Your daily allowance starts as soon as your " +
                             "Lucento account confirms Pro."

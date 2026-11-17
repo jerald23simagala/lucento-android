@@ -301,6 +301,13 @@ recurring-schedule sync, syncing preferences.
   hides both). A spoken question is asked when listening ends; words that can't be asked yet wait in the field
   (docs/ASK.md "Speaking a question").
 
+## Built — Ask Lucento's AI answers on by default, confirmed once (2026-11-17, `feature/ai-answers-on-by-default`)
+- Owner: AI answers should be enabled, on Free too (10 questions a month; Pro 50 a day); Smarter reading stays Pro-only.
+  They are on for every signed-in account, and the first question shows what would be sent: nothing leaves the phone
+  until **Ask Gemini**; **Keep answers on this phone** turns them off (docs/ASK.md "Consent (v3)").
+- The allowance wording follows the plan ("N left this month" on Free, "N left today" with Pro). Privacy Policy and Terms
+  2026-11-17; the website's /privacy, privacy table and FAQ go live with the release that ships it.
+
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,
