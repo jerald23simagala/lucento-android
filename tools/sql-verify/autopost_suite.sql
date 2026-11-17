@@ -27,6 +27,7 @@ declare
   v_klaro_cipher text := 'v1:CCCCCCCCCCCCCCCC:a2xhcm8tdG9rZW4:CCCCCCCCCCCCCCCCCCCCCC';
   v_soon_day date; v_soon_time text;
   v_far_day date; v_far_time text;
+  v_ts1 timestamptz; v_ts2 timestamptz; v_jobid uuid;
 begin
   -- ======================================================================== helpers
   create function pg_temp.as_admin(p_uid uuid, p_session uuid, p_aal text, p_totp_age interval) returns void language plpgsql as $f$
@@ -908,9 +909,124 @@ begin
                  then 'ok  P55 Overview keeps a failure until it''s handled and lists a step stopped past its window; the summary carries the clock; a post the owner confirmed says so'
                  else 'FAIL P55 ' || left(coalesce((v_s -> 'autopost')::text, ''), 500) end;
 
+  -- ======================================================================== M: after the design review, round 4
+  -- Each by-hand platform gets its own answer: posted there, or not posting there (never a false "Yes" for all).
+  v_j := pg_temp.owner_call(format('select mc_api.marketing_apps(%L, 1, ''posted_there'', %L::text[])', pg_temp.cid('A-plat'), '{Instagram Reels}'));
+  v_ok := (select by_hand_posted = '{Instagram Reels}' and by_hand_skipped = '{}' and by_hand_done_at is not null
+           from mc.marketing_cards where id = pg_temp.cid('A-plat'));
+  v_k := pg_temp.owner_call(format('select mc_api.marketing_apps(%L, 1, ''not_posting_there'', %L::text[])', pg_temp.cid('A-plat'), '{Instagram Reels}'));
+  v_m := pg_temp.owner_call(format('select mc_api.marketing_apps(%L, 1, ''posted_there'', %L::text[])', pg_temp.cid('A-plat'), '{Facebook Reels}'));
+  v_b := pg_temp.board();
+  r := r || case when (v_j ->> 'ok')::boolean and v_ok and (v_k ->> 'ok')::boolean
+                      and (select by_hand_posted = '{}' and by_hand_skipped = '{Instagram Reels}' and by_hand_done_at is not null
+                           from mc.marketing_cards where id = pg_temp.cid('A-plat'))
+                      and v_m ->> 'error' = 'invalid'
+                      and pg_temp.cardj(v_b, 'A-plat') -> 'by_hand_skipped' = '["Instagram Reels"]'::jsonb
+                      and exists (select 1 from mc.marketing_log l where l.card_id = pg_temp.cid('A-plat') and l.kind = 'posted_by_hand' and l.note = 'Instagram Reels')
+                      and exists (select 1 from mc.marketing_log l where l.card_id = pg_temp.cid('A-plat') and l.kind = 'not_posted' and l.note = 'Instagram Reels')
+                 then 'ok  P57 each by-hand platform gets its own answer (posted there, or not posting there), recorded in History; only the post''s by-hand platforms can be answered'
+                 else 'FAIL P57 ' || coalesce(v_j::text, '') || coalesce(v_k::text, '') || coalesce(v_m::text, '') end;
+
+  -- "Don't post it there" on a step that didn't go out: the owner's, answered at once, and off Overview's list.
+  v_jobid := (pg_temp.job(pg_temp.cid('A-refused'), 'facebook_photo')).id;
+  v_m := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''not_posting'')', v_jobid));
+  v_s := pg_temp.summary();
+  r := r || case when v_m ->> 'status' = 'by_hand'
+                      and (select by_hand = '{Lucento Facebook Page}' and by_hand_skipped = '{Lucento Facebook Page}'
+                                  and by_hand_done_at is not null and in_apps_version = 1
+                           from mc.marketing_cards where id = pg_temp.cid('A-refused'))
+                      and not exists (select 1 from jsonb_array_elements(v_s #> '{autopost,failed}') x where x ->> 'card' = 'A-refused')
+                      and exists (select 1 from mc.autopost_events e where e.job_id = v_jobid and e.kind = 'by_hand' and e.note = 'not_posting')
+                      and exists (select 1 from mc.marketing_log l where l.card_id = pg_temp.cid('A-refused') and l.kind = 'not_posted')
+                 then 'ok  P58 "Don''t post it there" on a step that didn''t go out makes it the owner''s, answered "not posting there" at once, and takes it off Overview'
+                 else 'FAIL P58 ' || coalesce(v_m::text, '') || left(coalesce((v_s #> '{autopost,failed}')::text, ''), 300) end;
+
+  -- "It's posted" can be taken back (only the owner's own confirmation): unconfirmed again, back on Overview, and with
+  -- nothing else of it out, no longer counted as in the apps.
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-undo', (v_local - interval '1 minute')::date,
+             to_char(v_local - interval '1 minute', 'HH24:MI'),
+             jsonb_build_object('kind', 'post', 'platforms', jsonb_build_array('Lucento Facebook Page')))));
+  perform pg_temp.decide(pg_temp.cid('A-undo'), 1, 'approve');
+  v_j := pg_temp.claim();
+  v_k := pg_temp.claimed(v_j, 'A-undo', 'facebook_photo');
+  perform pg_temp.result((v_k ->> 'id')::uuid, (v_k ->> 'lease_id')::uuid, '{"status": "uncertain", "error": "Timed out after publishing"}');
+  v_jobid := (v_k ->> 'id')::uuid;
+  v_n := (select count(*) from mc.marketing_cards where id = pg_temp.cid('A-undo') and in_apps_version is null);
+  v_t := (pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''posted'')', v_jobid))) ->> 'status';
+  v_ok := (select in_apps_version = 1 from mc.marketing_cards where id = pg_temp.cid('A-undo'));
+  v_m := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''not_posted'')', v_jobid));
+  v_k := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''not_posted'')',
+           (pg_temp.job(pg_temp.cid('A-plat'), 'facebook_reel')).id));
+  v_s := pg_temp.summary();
+  v_b := pg_temp.board();
+  r := r || case when v_n = 1 and v_t = 'posted' and v_ok
+                      and v_m ->> 'status' = 'uncertain' and v_k ->> 'error' = 'bad_state'
+                      and exists (select 1 from mc.autopost_events e where e.job_id = v_jobid and e.kind = 'unconfirmed')
+                      and (select in_apps_version is null and by_hand = '{}' from mc.marketing_cards where id = pg_temp.cid('A-undo'))
+                      and exists (select 1 from jsonb_array_elements(v_s #> '{autopost,uncertain}') x where x ->> 'card' = 'A-undo')
+                      and not coalesce((pg_temp.cardj(v_b, 'A-undo') #>> '{autopost,targets,0,job,confirmed}')::boolean, true)
+                 then 'ok  P59 "It''s posted" can be taken back (never a post Mission Control saw go out): unconfirmed again, back on Overview, and not in the apps when nothing else went out'
+                 else 'FAIL P59 ' || coalesce(v_m::text, '') || coalesce(v_k::text, '') || ' ' || coalesce(v_t, '?') || ' '
+                      || left(coalesce((v_s #> '{autopost,uncertain}')::text, ''), 300) end;
+
+  -- The clock's stall is measured from when the work became due: a step sent now counts from now, not from its old slot.
+  v_jobid := (pg_temp.job(pg_temp.cid('A-old'), 'facebook_photo')).id;
+  v_m := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''retry'')', v_jobid));
+  begin
+    -- Alone: everything else due waits an hour (undone below).
+    update mc.autopost_jobs set next_try_at = now() + interval '1 hour'
+      where status in ('queued', 'preparing', 'ready') and id <> v_jobid;
+    update mc.marketing_cards set autopost_off = true where state = 'approved' and id <> pg_temp.cid('A-old');
+    v_ts1 := mc.autopost_work_due_since();
+    update mc.autopost_jobs set next_try_at = now() + interval '1 hour' where id = v_jobid;
+    v_ts2 := mc.autopost_work_due_since();
+    raise exception using errcode = 'P0001', message = 'undo';
+  exception when sqlstate 'P0001' then null;
+  end;
+  v_s := pg_temp.summary();
+  v_b := pg_temp.board();
+  r := r || case when v_m ->> 'status' = 'queued'
+                      and (pg_temp.job(pg_temp.cid('A-old'), 'facebook_photo')).due_at < now() - interval '1 hour'
+                      and v_ts1 >= now() - interval '1 second' and v_ts2 is null
+                      and (v_s #> '{autopost,clock}') ? 'work_due_since' and (v_b -> 'autopost') ? 'work_due_since'
+                 then 'ok  P60 the posting clock''s stall counts from when the work became due: a step sent now (its slot hours ago) counts from now; nothing due, no time'
+                 else 'FAIL P60 ' || coalesce(v_m::text, '') || ' since ' || coalesce(v_ts1::text, 'null') || ' / ' || coalesce(v_ts2::text, 'null') end;
+
+  -- History shows what auto-posting did, platform by platform, with the owner's answers, newest first.
+  v_b := pg_temp.board();
+  v_k := pg_temp.cardj(v_b, 'A-plat') -> 'log';
+  r := r || case when exists (select 1 from jsonb_array_elements(v_k) x
+                              where x ->> 'kind' = 'autopost' and x ->> 'event' = 'posted' and x ->> 'target' = 'facebook_reel'
+                                and (x ->> 'id')::bigint < 0 and x ->> 'actor' = 'system')
+                      and exists (select 1 from jsonb_array_elements(v_k) x
+                                  where x ->> 'kind' = 'autopost' and x ->> 'event' = 'by_hand' and x ->> 'target' = 'instagram_reel'
+                                    and x ->> 'actor' = 'admin')
+                      and exists (select 1 from jsonb_array_elements(v_k) x where x ->> 'kind' = 'not_posted')
+                      and (select bool_and(a.at >= b.at) from (
+                             select (x ->> 'at')::timestamptz as at, o from jsonb_array_elements(v_k) with ordinality y(x, o)) a
+                           join (select (x ->> 'at')::timestamptz as at, o from jsonb_array_elements(v_k) with ordinality y(x, o)) b
+                             on b.o = a.o + 1)
+                 then 'ok  P61 History shows what auto-posting did, platform by platform, with the owner''s answers, newest first'
+                 else 'FAIL P61 ' || left(coalesce(v_k::text, ''), 500) end;
+
+  -- "Did you post it …?" asks in the post's own order (YouTube Shorts before Instagram Reels here), not alphabetically.
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-order', (v_local - interval '1 minute')::date,
+             to_char(v_local - interval '1 minute', 'HH24:MI'), jsonb_build_object('platforms', jsonb_build_array('YouTube Shorts', 'FB + IG Reels')))));
+  perform pg_temp.decide(pg_temp.cid('A-order'), 1, 'approve');
+  v_j := pg_temp.claim();
+  v_k := pg_temp.claimed(v_j, 'A-order', 'facebook_reel');
+  perform pg_temp.result((v_k ->> 'id')::uuid, (v_k ->> 'lease_id')::uuid,
+           '{"status": "posted", "external_id": "r9", "external_url": "https://www.facebook.com/reel/r9"}');
+  update mc.autopost_jobs set lease_id = null, lease_until = null where card_id = pg_temp.cid('A-order');
+  perform pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''by_hand'')', (pg_temp.job(pg_temp.cid('A-order'), 'instagram_reel')).id));
+  perform pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''by_hand'')', (pg_temp.job(pg_temp.cid('A-order'), 'youtube')).id));
+  r := r || case when (select by_hand from mc.marketing_cards where id = pg_temp.cid('A-order')) = '{YouTube Shorts,Instagram Reels}'
+                 then 'ok  P62 "Did you post it …?" asks in the post''s own order, not alphabetically'
+                 else 'FAIL P62 ' || coalesce((select by_hand::text from mc.marketing_cards where id = pg_temp.cid('A-order')), '') end;
+
   select string_agg(a, ',' order by a) into v_t from (
     select distinct substr(action, 11) as a from mc.audit_log where action like 'marketing.autopost%' and result = 'ok') x;
-  r := r || case when v_t = 'autopost_by_hand,autopost_card_off,autopost_confirmed,autopost_connect,autopost_destination,autopost_disconnect,autopost_off,autopost_on,autopost_retry'
+  r := r || case when v_t = 'autopost_by_hand,autopost_card_off,autopost_confirmed,autopost_connect,autopost_destination,autopost_disconnect,autopost_not_posting,autopost_off,autopost_on,autopost_retry,autopost_unconfirmed'
                       and not exists (select 1 from mc.audit_log where action like 'marketing.autopost%'
                                       and coalesce(detail, '') || coalesce(target_ref, '') || coalesce(before::text, '') || coalesce(after::text, '') like '%v1:%')
                  then 'ok  P56 every auto-posting action is audited, never with a token'

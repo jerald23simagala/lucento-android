@@ -766,7 +766,9 @@ begin
   v_k := pg_temp.apps(pg_temp.cid('F-pack', 'F-launch-early'), 1, 'in_apps');
   r := r || case when (v_j ->> 'ok')::boolean and v_j ->> 'state' = 'approved'
                       and v_k ->> 'error' = 'launch_not_live'
-                      and v_k ->> 'message' = 'Mark Lucento as live first: this post says ''Get it on Google Play''.'
+                      -- The auto-posting module recreates the function with typographic quotes (design review round 4).
+                      and v_k ->> 'message' in ('Mark Lucento as live first: this post says ''Get it on Google Play''.',
+                                                'Mark Lucento as live first: this post says “Get it on Google Play”.')
                       and (select state = 'approved' and in_apps_version is null from mc.marketing_cards where id = pg_temp.cid('F-pack', 'F-launch-early'))
                       and not exists (select 1 from mc.marketing_log where card_id = pg_temp.cid('F-pack', 'F-launch-early') and kind = 'in_apps')
                       and not exists (select 1 from mc.audit_log where action = 'marketing.in_apps' and target_ref like 'F-pack/F-launch-early%')

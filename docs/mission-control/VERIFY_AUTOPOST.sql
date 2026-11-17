@@ -8,8 +8,9 @@ select
        and c.relname in ('autopost_connections', 'autopost_destinations', 'autopost_jobs', 'autopost_events',
                          'autopost_state')) = 5                                                                   as tables_5,
   exists (select 1 from mc.autopost_state where id)                                                              as state_row_seeded,
-  exists (select 1 from information_schema.columns
-          where table_schema = 'mc' and table_name = 'marketing_cards' and column_name = 'autopost_off')         as card_column_added,
+  (select count(*) from information_schema.columns
+     where table_schema = 'mc' and table_name = 'marketing_cards'
+       and column_name in ('autopost_off', 'by_hand_posted', 'by_hand_skipped')) = 3                              as card_columns_added,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'mc_api' and p.proname like 'autopost\_%') = 10                                          as page_functions_10,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace

@@ -15,8 +15,8 @@ posting run, the Marketing card) and the owner's setup (lucento-mission-control 
 2. Each week, as before, the owner approves posts in Marketing. An approved post now says **"Posts automatically
    Mon 19:30"** with each platform; at the slot Mission Control posts it, even with the owner's PC off.
 3. After the slot the card shows each platform's result with a link (**Posted 19:31 · View**). TikTok says **"In your
-   TikTok drafts: open TikTok and tap Post"**, and the existing "Did you post it on TikTok? [Yes]" follows.
-4. Something went wrong: the card and Overview say so (**"Instagram couldn't post Mon 19:30's video"**) with **Try
+   TikTok drafts: open TikTok and tap Post"**, and "Did you post it on TikTok? [Yes] [Don't post it there]" follows.
+4. Something went wrong: the card and Overview say so (**"The Instagram video for Mon 19:30 didn't go out"**) with **Try
    again** and **I'll post it by hand**. Mission Control never posts more than 3 hours late on its own; a day or more
    late, **Post it now** says how late and asks first.
 5. Before its slot, any post can still be undone, skipped or changed (nothing is posted), or turned to **"Post this one
@@ -192,7 +192,7 @@ is listed with the failed ones (`stopped`). Each card's job says `confirmed` whe
   It's posted. A step that can't go on says why: paused while auto-posting is off, waiting for a posting clock that
   stopped, not posted in time, stopped (and why: "Stopped when auto-posting was turned off (Mon 16 Nov, 21:04)"), with
   what the owner can do. The approve button says "Approve and post Mon 19:30" only when Mission Control will post it
-  (not blocked, an account that can post). The chip, banner and filters agree: "Partly posted · 2 need you" counts a
+  (not blocked, an account that can post). The chip, banner and filters agree: "Partly posted · 2 platforms need you" counts a
   platform that failed, couldn't be confirmed or was stopped after another went out; "Approved · reconnect needed"
   when every account it would go to needs one.
 - Marketing card (design review round 3): a step whose account can't post says "Won't post: reconnect needed" ("Post it
@@ -205,6 +205,33 @@ is listed with the failed ones (`stopped`). Each card's job says `confirmed` whe
   "I posted it / Don't post it" block shows, the panel's buttons are secondary. A group post says what approving means
   ("approve it, then you post it in the Lucento Community group at the time"); the page subtitle says what auto-posting
   does. A code prompt can be put away (Cancel).
+- Design review round 4 (owner, 17 Nov: fix all, a critic confirms the list, then merge):
+  - **Each by-hand platform gets its own answer** once the slot has begun: "Did you post it on TikTok?" **[Yes]
+    [Don't post it there]**, one row per platform ("Did you post it there?" with several); no "Not yet". A platform that
+    didn't go out offers **Don't post it there** beside **I'll post it by hand** (`not_posting`: the owner's, answered at
+    once). The card keeps `by_hand_posted` / `by_hand_skipped`; `by_hand_done_at` is set once every entry has an answer
+    (an entry added later is asked about again). History records each answer.
+  - **"It's posted" can be taken back** ("Not posted after all", `not_posted`): only the owner's own confirmation; the
+    step is unconfirmed again and back on Overview, and with nothing else out the post is no longer in the apps.
+  - **The posting clock's stall counts from when the work became due** (`work_due_since`: a step sent again counts from
+    then, a post approved, reconnected or turned on again from then): no "nothing is posting" in the minute after "Post
+    it now"; a step due and not picked up says "Posting within a minute". Chip, banner, rows and the clock's own chip
+    use the same rule (red, ■).
+  - **One main button per card**: beside the card's own "has passed" block, a plain "Post it now" (under a day late)
+    leads and "I posted it" is plain; one "Don't post" control after the slot (the block's; "Don't post this one…" is
+    for before). A late "Post it now" is never the main button; its question takes the focus.
+  - **After "I posted it"** the plan line is gone (no plan after the slot) and the platform lines say "Posted by you".
+  - **One name for a post that didn't publish**: "Didn't go out" (rows, chip "Approved · didn't go out", the week's
+    line "1 didn't go out", Overview "The Instagram video for Mon 19:30 didn't go out"); counts say their unit
+    ("2 platforms need you"; the week picker names platforms: "Instagram didn't go out · YouTube to check").
+  - "1 more post needs you: Fri 13 Nov ›" after an answer (the page's own "Needs you" rule), "No other post needs you
+    this week" when none.
+  - Settings: a refusal the whole account shares (the saved sign-in can't be opened) is recorded on every destination of
+    it, so no row keeps a stale "Works"; otherwise the other rows keep Check and Change. The account's chip says
+    "Reconnect needed". "What goes where" follows what is chosen (a Page not chosen says so); "Reels start uploading 20
+    minutes early; YouTube, TikTok and Page posts start at the slot". Overview always shows auto-posting's lines (the
+    three-line cap folds only the others). Accounts are named in lists ("Facebook, Instagram and YouTube"), never "its
+    accounts"; quoted words on Marketing use “typographic” quotes.
 
 ## 7. Security and privacy
 
@@ -225,13 +252,15 @@ is listed with the failed ones (`stopped`). Each card's job says `confirmed` whe
 
 ## 8. Tests
 
-- SQL `tools/sql-verify/autopost_suite.sql` (56 checks: secrets and grants, the map, due times, connections and picks,
+- SQL `tools/sql-verify/autopost_suite.sql` (62 checks: secrets and grants, the map, due times, connections and picks,
   every job step and refusal, coverage and due_soon, cancellations (with why) and starting over, missed, a run that
   never reported, busy, renewals for one account only, Meta without a user token, posts in the apps by hand and launch
   posts blocked, Checks kept and cleared, `work_due`, stopped steps sent now or taken by hand, the accounts' health, a
   refused account posting nothing until reconnected, a disconnected platform asked about, by hand per platform, the
-  summary keeping problems until handled (stopped ones too) with the clock, a confirmed post, launch rules, the clock's
-  guards, the board, the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
+  summary keeping problems until handled (stopped ones too) with the clock, a confirmed post, per-platform answers,
+  "Don't post it there", "It's posted" taken back, the stall's due-since time, History with the automatic steps, launch
+  rules, the clock's guards, the board, the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once:
+  each job handed out once).
   `catch_up_check.mjs` part E pastes APPLY_AUTOPOST.sql the owner's way.
 - Console (`lucento-mission-control`): unit tests `autopost-crypto` (encryption, additional data, the state cookie,
   PKCE), `autopost-runner` (every target's steps against fake platforms, the retry/uncertain rules, the deadline, one

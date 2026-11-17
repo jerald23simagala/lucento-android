@@ -135,6 +135,34 @@ as $$
                            where t.target in ('facebook_reel', 'instagram_reel')), '{}'::text[])
 $$;
 
+-- Where a by_hand entry sits among the post's platforms: its label's place, a reel platform at its label's place
+-- (Facebook before Instagram), so "Did you post it …?" asks in the post's own order.
+create or replace function mc.autopost_by_hand_order(p_platforms text[], p_name text)
+returns numeric
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(array_position(p_platforms, p_name)::numeric,
+                  (select min(t.ord)::numeric + case p_name when 'Instagram Reels' then 0.5 else 0.25 end
+                   from mc.autopost_targets(p_platforms) t
+                   where t.target = case p_name when 'Facebook Reels' then 'facebook_reel' when 'Instagram Reels' then 'instagram_reel' end),
+                  1000)
+$$;
+
+-- The by_hand entry that covers a job's target: its label, or its platform when only that platform of the label is the
+-- owner's ("Instagram Reels"), or null when the owner doesn't post it.
+create or replace function mc.autopost_by_hand_entry(p_by_hand text[], p_label text, p_target text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_label = any(p_by_hand) then p_label
+              when p_target = 'facebook_reel' and 'Facebook Reels' = any(p_by_hand) then 'Facebook Reels'
+              when p_target = 'instagram_reel' and 'Instagram Reels' = any(p_by_hand) then 'Instagram Reels' end
+$$;
+
 -- When a post is due: its time on its day, or 10:00 for an "any time" day, in the pack's time zone.
 create or replace function mc.autopost_due_at(p_day date, p_time time, p_tz text)
 returns timestamptz
@@ -249,7 +277,7 @@ create table if not exists mc.autopost_events (
   id bigint generated always as identity primary key,
   job_id uuid not null references mc.autopost_jobs (id) on delete cascade,
   kind text not null check (kind in ('created', 'preparing', 'ready', 'posted', 'sent_to_drafts', 'retrying', 'failed',
-                                     'uncertain', 'cancelled', 'by_hand', 'retry', 'confirmed_posted')),
+                                     'uncertain', 'cancelled', 'by_hand', 'retry', 'confirmed_posted', 'unconfirmed')),
   note text null check (char_length(note) <= 500),
   actor text not null check (actor in ('system', 'admin')),
   admin_id uuid null,
@@ -273,6 +301,22 @@ insert into mc.autopost_state (id) values (true) on conflict (id) do nothing;
 alter table mc.marketing_cards drop constraint if exists marketing_cards_by_hand_platforms;
 alter table mc.marketing_cards add constraint marketing_cards_by_hand_platforms
   check (by_hand <@ mc.autopost_by_hand_names(platforms));
+
+-- The owner's answer for each by_hand entry once its slot has begun: posted there, or not posting there (design review
+-- round 4: a platform the owner skips is closed truthfully, never with a false "Yes"). An answer counts only while its
+-- entry is still in by_hand; by_hand_done_at is set once every entry has one.
+alter table mc.marketing_cards add column if not exists by_hand_posted text[] not null default '{}';
+alter table mc.marketing_cards add column if not exists by_hand_skipped text[] not null default '{}';
+alter table mc.marketing_cards drop constraint if exists marketing_cards_by_hand_answers;
+alter table mc.marketing_cards add constraint marketing_cards_by_hand_answers
+  check (mc.text_items_ok(by_hand_posted, 8, 60) and mc.text_items_ok(by_hand_skipped, 8, 60)
+         and not (by_hand_posted && by_hand_skipped));
+
+-- The history's "not posting there" answer.
+alter table mc.marketing_log drop constraint if exists marketing_log_kind_check;
+alter table mc.marketing_log add constraint marketing_log_kind_check
+  check (kind in ('created', 'revised', 'withdrawn', 'claude_note', 'approved', 'changes', 'skipped', 'undo', 'in_apps',
+                  'removed_from_apps', 'posted_by_hand', 'launch_meta', 'note_redacted', 'not_posted'));
 
 -- ================================================================================================ rules
 -- Why Mission Control won't post this post whatever its approval, or null:
@@ -426,6 +470,48 @@ as $$
                                        else j.due_at <= now() end)))
 $$;
 
+-- Since when the work due now has been due, at the latest moment each part of it could have become due: a step
+-- queued again ("Post it now") counts from then, a post approved, reconnected or turned on again from then. Erring late
+-- only delays "the posting clock has stopped" (never raises it early). Null when nothing is due.
+create or replace function mc.autopost_work_due_since()
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when mc.setting_on('autopost_enabled') then (
+    select min(w.since) from (
+      select greatest(x.due_at - mc.autopost_lead(x.target), c.updated_at, d.updated_at, cn.updated_at,
+                      coalesce((select s.updated_at from mc.settings s where s.key = 'autopost_enabled'), '-infinity'::timestamptz),
+                      coalesce((select max(j.updated_at) from mc.autopost_jobs j
+                                where j.card_id = x.card_id and j.version = x.version and j.target = x.target),
+                               '-infinity'::timestamptz)) as since
+      from mc.autopost_candidates() x
+      join mc.marketing_cards c on c.id = x.card_id
+      join mc.autopost_destinations d on d.key = x.destination
+      join mc.autopost_connections cn on cn.provider = d.provider
+      where x.due_at - mc.autopost_lead(x.target) <= now() and now() < x.late_until
+        and not exists (select 1 from mc.autopost_jobs j
+                        where j.card_id = x.card_id and j.version = x.version and j.target = x.target
+                          and j.status <> 'cancelled')
+      union all
+      select greatest(case when now() >= j.late_until then j.late_until
+                           when j.status = 'queued' then j.due_at - mc.autopost_lead(j.target)
+                           when j.status = 'preparing' then j.updated_at
+                           else j.due_at end,
+                      j.updated_at, coalesce(j.next_try_at, '-infinity'::timestamptz),
+                      coalesce(j.lease_until, '-infinity'::timestamptz))
+      from mc.autopost_jobs j
+      where j.status in ('queued', 'preparing', 'ready')
+        and (j.next_try_at is null or j.next_try_at <= now())
+        and (j.lease_until is null or j.lease_until < now())
+        and (now() >= j.late_until
+             or case j.status when 'queued' then j.due_at - mc.autopost_lead(j.target) <= now()
+                              when 'preparing' then true
+                              else j.due_at <= now() end)) w) end
+$$;
+
 -- A post's auto-posting as the Marketing page shows it: each label with its target, whether it is connected and the
 -- latest job (the current version's first; else an older version's, so "version 1 went out" can be told). A stopped
 -- job carries why it stopped; a destination whose account's last token renewal failed counts as refused (check_ok
@@ -451,8 +537,10 @@ as $$
                              'error_code', j.error_code, 'due_at', j.due_at, 'late_until', j.late_until,
                              'finished_at', j.finished_at,
                              'next_try_at', j.next_try_at, 'updated_at', j.updated_at,
-                             'confirmed', exists (select 1 from mc.autopost_events e
-                                                  where e.job_id = j.id and e.kind = 'confirmed_posted'),
+                             'confirmed', j.status = 'posted'
+                                          and coalesce((select e.kind = 'confirmed_posted' from mc.autopost_events e
+                                                        where e.job_id = j.id and e.kind in ('confirmed_posted', 'unconfirmed')
+                                                        order by e.id desc limit 1), false),
                              'stop_note', case when j.status = 'cancelled' then
                                             (select e.note from mc.autopost_events e
                                              where e.job_id = j.id and e.kind = 'cancelled' order by e.id desc limit 1) end)
@@ -491,8 +579,9 @@ as $$
                         'external_id', d.external_id, 'name', d.name, 'updated_at', d.updated_at,
                         'checked_at', d.checked_at, 'check_ok', d.check_ok, 'check_note', d.check_note)), '{}'::jsonb)
                      from mc.autopost_destinations d),
-    -- Something is due: with the clock's last run, Settings can tell a clock that stopped.
-    'work_due', mc.autopost_work_due())
+    -- Something is due, and since when: with the clock's last run, Settings can tell a clock that stopped (and not
+    -- mistake work queued a moment ago, before the clock's next minute, for a stop: design review round 4).
+    'work_due', mc.autopost_work_due(), 'work_due_since', mc.autopost_work_due_since())
 $$;
 
 -- For the summary and Overview: approved posts whose automatic posting failed (or stopped and can no longer start
@@ -514,6 +603,8 @@ as $$
     join mc.marketing_cards c on c.id = j.card_id
     join mc.marketing_packs p on p.id = c.pack_id
     where j.version = c.current_version and c.state = 'approved'
+      -- The owner answered for this platform ("Did you post it on …?"): handled.
+      and mc.autopost_by_hand_entry(c.by_hand_posted || c.by_hand_skipped, j.label, j.target) is null
       and (j.status in ('failed', 'uncertain')
            or (j.status = 'sent_to_drafts' and c.by_hand_done_at is null)
            or (j.status = 'cancelled' and not c.autopost_off and mc.autopost_blocked(c.id) is null
@@ -542,7 +633,8 @@ as $$
       'uncertain', (select count(*) from problems x where x.kind = 'uncertain'),
       'drafts_waiting', (select count(*) from problems x where x.kind = 'sent_to_drafts')),
     'clock', (select jsonb_build_object('set', s.clock_set_at is not null,
-                'last_run', coalesce(s.last_claim_at, s.last_kick_at), 'work_due', mc.autopost_work_due())
+                'last_run', coalesce(s.last_claim_at, s.last_kick_at), 'work_due', mc.autopost_work_due(),
+                'work_due_since', mc.autopost_work_due_since())
               from mc.autopost_state s where s.id),
     'accounts', (select jsonb_build_object('chosen', count(*), 'working', count(*) filter (where x.ok),
                    'reconnect', coalesce(jsonb_agg(distinct x.provider order by x.provider) filter (where not x.ok), '[]'::jsonb),
@@ -550,6 +642,25 @@ as $$
                    'refused', coalesce(jsonb_agg(x.key order by x.key) filter (where not x.ok), '[]'::jsonb))
                  from (select d.key, d.provider, d.check_ok is distinct from false and cn.last_error is null as ok
                        from mc.autopost_destinations d join mc.autopost_connections cn on cn.provider = d.provider) x))
+$$;
+
+-- Keeps the owner's answers to the entries still in by_hand, and by_hand_done_at to "every entry has an answer" (an
+-- entry added later, such as a platform taken over after the others were answered, is asked about again).
+create or replace function mc.autopost_by_hand_settle(p_card uuid)
+returns void
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  update mc.marketing_cards c
+    set by_hand_posted = array(select x from unnest(c.by_hand_posted) x where x = any(c.by_hand)),
+        by_hand_skipped = array(select x from unnest(c.by_hand_skipped) x where x = any(c.by_hand)),
+        by_hand_done_at = case when cardinality(c.by_hand) > 0
+                                    and c.by_hand <@ (array(select x from unnest(c.by_hand_posted) x where x = any(c.by_hand))
+                                                      || array(select x from unnest(c.by_hand_skipped) x where x = any(c.by_hand)))
+                               then coalesce(c.by_hand_done_at, now()) end
+    where c.id = p_card
 $$;
 
 -- After a job posted (or sent to drafts, or the owner took it by hand): the post is out at its version. The first such
@@ -596,12 +707,13 @@ begin
   ) y;
   if v_c.in_apps_version is distinct from v_j.version then
     update mc.marketing_cards c set in_apps_version = v_j.version, by_hand = v_by_hand, by_hand_done_at = null,
-      updated_at = now()
+      by_hand_posted = '{}', by_hand_skipped = '{}', updated_at = now()
       where c.id = v_c.id;
   else
     -- A label (or a platform of one) Mission Control has now posted (its account came back) is never asked about again.
     update mc.marketing_cards c
-      set by_hand = (select coalesce(array_agg(distinct l), '{}') from unnest(c.by_hand || v_by_hand) l
+      set by_hand = (select coalesce(array_agg(n.l order by mc.autopost_by_hand_order(v_c.platforms, n.l)), '{}')
+                     from (select distinct l from unnest(c.by_hand || v_by_hand) l
                      where l not in (select x.label from (
                                        select t.label, bool_and(coalesce(j.status = 'posted', false)) as all_posted
                                        from mc.autopost_targets(v_c.platforms) t
@@ -612,9 +724,10 @@ begin
                        and l not in (select case j.target when 'facebook_reel' then 'Facebook Reels' else 'Instagram Reels' end
                                      from mc.autopost_jobs j
                                      where j.card_id = v_c.id and j.version = v_j.version and j.status = 'posted'
-                                       and j.target in ('facebook_reel', 'instagram_reel'))),
+                                       and j.target in ('facebook_reel', 'instagram_reel'))) n),
           updated_at = now()
       where c.id = v_c.id;
+    perform mc.autopost_by_hand_settle(v_c.id);
   end if;
 end;
 $$;
@@ -642,6 +755,172 @@ begin
            or (j.status = 'preparing' and j.target in ('facebook_reel', 'instagram_reel')))
     returning j.id)
   insert into mc.autopost_events (job_id, kind, note, actor) select l.id, 'uncertain', 'lease_lapsed', 'system' from lapsed l;
+end;
+$$;
+
+-- ================================================================================================ the owner's apps steps (recreated)
+-- As in the marketing module, plus the owner's answer per by_hand entry once the slot has begun (design review round
+-- 4): posted_there or not_posting_there (p_by_hand names the entries). posted_by_hand answers every open entry "posted";
+-- by_hand_done_at is set once every entry has an answer. Scheduling, removing or posting late starts the answers over.
+create or replace function mc_api.marketing_apps(p_card uuid, p_version integer, p_action text, p_by_hand text[])
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_refusal text := mc.gate('marketing.apps', false, 300);
+  v_c mc.marketing_cards%rowtype;
+  v_before mc.marketing_cards%rowtype;
+  v_tz text;
+  v_pack text;
+  v_wanted text[];
+  v_by_hand text[];
+  v_version integer;
+  v_note text;
+  v_kind text;
+begin
+  if v_refusal is not null then
+    return mc.refused(v_refusal);
+  end if;
+  perform mc.marketing_lock();
+  if p_action is null or p_action not in ('in_apps', 'removed_from_apps', 'posted_by_hand', 'posted_late', 'posted_there',
+                                          'not_posting_there') then
+    return mc.failed('invalid', 'Unknown action');
+  end if;
+  select * into v_c from mc.marketing_cards c where c.id = p_card for update;
+  if not found then
+    return mc.failed('not_found', 'There is no such post');
+  end if;
+  if p_version is distinct from v_c.current_version then
+    return mc.failed('stale_version', 'Claude changed this post a moment ago (now version ' || v_c.current_version || ').')
+      || jsonb_build_object('current_version', v_c.current_version, 'state', v_c.state);
+  end if;
+  v_before := v_c;
+  v_kind := p_action;
+  select p.tz, p.key into v_tz, v_pack from mc.marketing_packs p where p.id = v_c.pack_id;
+  if p_action = 'in_apps' then
+    if v_c.state <> 'approved' then
+      return mc.failed('bad_state', 'This post changed on another device. Reload to see it.')
+        || jsonb_build_object('state', v_c.state);
+    end if;
+    -- A "Get it on Google Play" post can be approved ahead of launch, but not scheduled: it would go out too early.
+    if mc.marketing_launch_too_early(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), v_c.slot_time is null, mc.marketing_pday()) then
+      return mc.failed('launch_not_live', 'Mark Lucento as live first: this post says “Get it on Google Play”.');
+    end if;
+    if mc.marketing_after_launch(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), mc.marketing_pday()) then
+      return mc.failed('launch_version_needed', 'This post says “coming soon” and its slot is after launch: ask Claude for a launch version first.');
+    end if;
+    v_wanted := array(select mc.marketing_text(h) from unnest(coalesce(p_by_hand, '{}'::text[])) h);
+    if not mc.text_items_ok(v_wanted, 8, 60) or not (v_wanted <@ v_c.platforms) then
+      return mc.failed('invalid', 'Choose the platforms you post by hand among this post''s platforms');
+    end if;
+    v_by_hand := array(select x.v from unnest(v_c.platforms) with ordinality x(v, o) where x.v = any(v_wanted) order by x.o);
+    update mc.marketing_cards c
+      set in_apps_version = c.current_version, by_hand = v_by_hand, by_hand_done_at = null, by_hand_posted = '{}',
+          by_hand_skipped = '{}', updated_at = now()
+      where c.id = p_card and c.current_version = p_version and c.state = 'approved'
+      returning * into v_c;
+    if not found then
+      return mc.failed('bad_state', 'This post changed on another device. Reload to see it.');
+    end if;
+    v_version := v_c.current_version;
+    v_note := case when cardinality(v_by_hand) > 0 then 'By hand at the time: ' || array_to_string(v_by_hand, ', ') end;
+  elsif p_action = 'posted_late' then
+    -- Approved but never scheduled, and its slot has begun: the owner posted it by hand (late). Recorded as posted by hand
+    -- on every platform, not as scheduled in the apps.
+    if v_c.state <> 'approved' or v_c.in_apps_version is not null then
+      return mc.failed('bad_state', 'This post changed on another device. Reload to see it.')
+        || jsonb_build_object('state', v_c.state);
+    end if;
+    if lower(mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz)) > now() then
+      return mc.failed('bad_state', 'Its time hasn''t come yet: schedule it instead.');
+    end if;
+    if mc.marketing_launch_too_early(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), v_c.slot_time is null, mc.marketing_pday()) then
+      return mc.failed('launch_not_live', 'Mark Lucento as live first: this post says “Get it on Google Play”.');
+    end if;
+    if mc.marketing_after_launch(v_c.phase, mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz), mc.marketing_pday()) then
+      return mc.failed('launch_version_needed', 'This post says “coming soon” and its slot is after launch: ask Claude for a launch version first.');
+    end if;
+    update mc.marketing_cards c
+      set in_apps_version = c.current_version, by_hand = c.platforms, by_hand_done_at = now(), by_hand_posted = c.platforms,
+          by_hand_skipped = '{}', updated_at = now()
+      where c.id = p_card and c.current_version = p_version and c.state = 'approved' and c.in_apps_version is null
+      returning * into v_c;
+    if not found then
+      return mc.failed('bad_state', 'This post changed on another device. Reload to see it.');
+    end if;
+    v_version := v_c.current_version;
+    v_note := 'Posted late, by hand';
+    v_kind := 'posted_by_hand';
+  elsif p_action = 'removed_from_apps' then
+    if v_c.in_apps_version is null then
+      return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
+    end if;
+    v_version := v_c.in_apps_version;
+    update mc.marketing_cards c set in_apps_version = null, by_hand = '{}', by_hand_done_at = null, by_hand_posted = '{}',
+      by_hand_skipped = '{}', updated_at = now()
+      where c.id = p_card and c.current_version = p_version and c.in_apps_version is not null
+      returning * into v_c;
+    if not found then
+      return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
+    end if;
+  else
+    -- posted_by_hand, posted_there, not_posting_there: answers about the by_hand entries, once the slot has begun.
+    if v_c.in_apps_version is null then
+      return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
+    end if;
+    if cardinality(v_c.by_hand) = 0 then
+      return mc.failed('bad_state', 'Nothing of this post is posted by hand.');
+    end if;
+    if lower(mc.marketing_slot(v_c.slot_day, v_c.slot_time, v_tz)) > now() then
+      return mc.failed('bad_state', 'Its time hasn''t come yet.');
+    end if;
+    if p_action = 'posted_by_hand' then
+      if v_c.by_hand_done_at is not null then
+        return jsonb_build_object('ok', true, 'already', true, 'state', v_c.state, 'in_apps_version', v_c.in_apps_version,
+          'by_hand', to_jsonb(v_c.by_hand), 'by_hand_done_at', v_c.by_hand_done_at);
+      end if;
+      -- Every entry still open: posted.
+      v_wanted := array(select x from unnest(v_c.by_hand) x where not (x = any(v_c.by_hand_skipped)));
+    else
+      v_wanted := array(select mc.marketing_text(h) from unnest(coalesce(p_by_hand, '{}'::text[])) h);
+      if cardinality(v_wanted) = 0 or not mc.text_items_ok(v_wanted, 8, 60) or not (v_wanted <@ v_c.by_hand) then
+        return mc.failed('invalid', 'Choose among the platforms you post by hand.');
+      end if;
+    end if;
+    v_version := v_c.in_apps_version;
+    update mc.marketing_cards c
+      set by_hand_posted = array(select x.v from unnest(c.by_hand) with ordinality x(v, o)
+                                 where case when p_action = 'not_posting_there' then x.v = any(c.by_hand_posted) and not (x.v = any(v_wanted))
+                                            else x.v = any(c.by_hand_posted) or x.v = any(v_wanted) end
+                                 order by x.o),
+          by_hand_skipped = array(select x.v from unnest(c.by_hand) with ordinality x(v, o)
+                                  where case when p_action = 'not_posting_there' then x.v = any(c.by_hand_skipped) or x.v = any(v_wanted)
+                                             else x.v = any(c.by_hand_skipped) and not (x.v = any(v_wanted)) end
+                                  order by x.o),
+          updated_at = now()
+      where c.id = p_card and c.current_version = p_version and c.in_apps_version is not null;
+    if not found then
+      return mc.failed('not_in_apps', 'This post isn''t marked as in the apps.');
+    end if;
+    perform mc.autopost_by_hand_settle(p_card);
+    select * into v_c from mc.marketing_cards c where c.id = p_card;
+    v_note := case when p_action = 'posted_by_hand' and cardinality(v_wanted) = cardinality(v_c.by_hand) then null
+                   else array_to_string(v_wanted, ', ') end;
+    v_kind := case when p_action = 'not_posting_there' then 'not_posted' else 'posted_by_hand' end;
+  end if;
+  insert into mc.marketing_log (card_id, version, kind, note, actor, admin_id)
+    values (v_c.id, v_version, v_kind, v_note, 'admin', auth.uid());
+  perform mc.audit('marketing.' || p_action, null, v_pack || '/' || v_c.key || ' v' || v_version, null, 'ok',
+    jsonb_build_object('in_apps_version', v_before.in_apps_version, 'by_hand', v_before.by_hand,
+                       'by_hand_posted', v_before.by_hand_posted, 'by_hand_skipped', v_before.by_hand_skipped),
+    jsonb_build_object('in_apps_version', v_c.in_apps_version, 'by_hand', v_c.by_hand,
+                       'by_hand_posted', v_c.by_hand_posted, 'by_hand_skipped', v_c.by_hand_skipped));
+  return jsonb_build_object('ok', true, 'state', v_c.state, 'in_apps_version', v_c.in_apps_version,
+    'by_hand', to_jsonb(v_c.by_hand), 'by_hand_done_at', v_c.by_hand_done_at,
+    'by_hand_posted', to_jsonb(v_c.by_hand_posted), 'by_hand_skipped', to_jsonb(v_c.by_hand_skipped));
 end;
 $$;
 
@@ -708,6 +987,8 @@ as $$
     'state', s.state, 'current_version', s.current_version, 'decided_at', c.decided_at,
     'decided_by', (select a.display_name from mc.admins a where a.user_id = c.decided_by),
     'in_apps_version', s.in_apps_version, 'by_hand', to_jsonb(c.by_hand), 'by_hand_done_at', c.by_hand_done_at,
+    'by_hand_posted', to_jsonb(array(select x from unnest(c.by_hand_posted) x where x = any(c.by_hand))),
+    'by_hand_skipped', to_jsonb(array(select x from unnest(c.by_hand_skipped) x where x = any(c.by_hand))),
     'withdrawn_reason', c.withdrawn_reason,
     'flags', jsonb_build_object('replace_after_launch', s.replace_after_launch, 'too_early', s.too_early,
       'apps_stale', s.apps_stale, 'due_soon', s.due_soon, 'needs_decision_soon', s.needs_decision_soon,
@@ -736,11 +1017,26 @@ as $$
                              and n.id > coalesce((select max(o.id) from mc.marketing_log o
                                                   where o.card_id = s.card_id and o.actor = 'admin'), 0)
                            order by n.id desc limit 1),
-    'log', (select coalesce(jsonb_agg(jsonb_build_object('id', g.id, 'version', g.version, 'kind', g.kind, 'note', g.note,
-              'tags', to_jsonb(g.tags), 'actor', g.actor,
-              'by', (select a.display_name from mc.admins a where a.user_id = g.admin_id), 'at', g.at)
-              order by g.id desc), '[]'::jsonb)
-            from (select x.* from mc.marketing_log x where x.card_id = s.card_id order by x.id desc limit 30) g),
+    -- History: the owner's and Claude's entries, and what auto-posting did on each platform (posted, sent to drafts,
+    -- didn't go out, couldn't be confirmed, stopped) with the owner's answers to it. An automatic entry's id is negative
+    -- (its event's), so it never meets a log entry's.
+    'log', (select coalesce(jsonb_agg(g.entry order by g.at desc, g.ord desc), '[]'::jsonb)
+            from (select h.* from (
+                    select x.at, x.id as ord,
+                           jsonb_build_object('id', x.id, 'version', x.version, 'kind', x.kind, 'note', x.note,
+                             'tags', to_jsonb(x.tags), 'actor', x.actor,
+                             'by', (select a.display_name from mc.admins a where a.user_id = x.admin_id), 'at', x.at) as entry
+                    from mc.marketing_log x where x.card_id = s.card_id
+                    union all
+                    select e.at, e.id,
+                           jsonb_build_object('id', -e.id, 'version', j.version, 'kind', 'autopost', 'event', e.kind,
+                             'target', j.target, 'note', e.note, 'tags', '[]'::jsonb, 'actor', e.actor,
+                             'by', (select a.display_name from mc.admins a where a.user_id = e.admin_id), 'at', e.at)
+                    from mc.autopost_events e join mc.autopost_jobs j on j.id = e.job_id
+                    where j.card_id = s.card_id
+                      and e.kind in ('posted', 'sent_to_drafts', 'failed', 'uncertain', 'cancelled', 'retry', 'by_hand',
+                                     'confirmed_posted', 'unconfirmed')) h
+                  order by h.at desc, h.ord desc limit 30) g),
     'autopost', mc.autopost_card_json(s.card_id))
   from mc.marketing_status(p_pday, p_card) s
   join mc.marketing_cards c on c.id = s.card_id
@@ -1252,8 +1548,10 @@ end;
 $$;
 
 -- The owner on one job: retry (a failed, unconfirmed or stopped one, when Mission Control may post it now: auto-posting
--- on, the post approved at this version, its account set), posted (an unconfirmed one is up after all) or by_hand (the
--- owner posts this platform: the job stops and the label joins "Did you post it on …?").
+-- on, the post approved at this version, its account set), posted (an unconfirmed one is up after all), by_hand (the
+-- owner posts this platform: the job stops and the label joins "Did you post it on …?"), not_posting (the owner won't
+-- post it there: as by_hand, answered "not posting there" at once) or not_posted (the owner's "It's posted" taken back:
+-- unconfirmed again; design review round 4).
 create or replace function mc_api.autopost_job_action(p_job uuid, p_action text)
 returns jsonb
 language plpgsql
@@ -1270,8 +1568,8 @@ begin
   if v_refusal is not null then
     return mc.refused(v_refusal);
   end if;
-  if p_action is null or p_action not in ('retry', 'posted', 'by_hand') then
-    return mc.failed('invalid', 'Retry, posted or by hand?');
+  if p_action is null or p_action not in ('retry', 'posted', 'by_hand', 'not_posting', 'not_posted') then
+    return mc.failed('invalid', 'Retry, posted, by hand, not posting or not posted?');
   end if;
   perform mc.marketing_lock();
   select * into v_j from mc.autopost_jobs j where j.id = p_job for update;
@@ -1317,6 +1615,26 @@ begin
     insert into mc.autopost_events (job_id, kind, actor, admin_id) values (p_job, 'confirmed_posted', 'admin', auth.uid());
     perform mc.autopost_mark_out(p_job);
     perform mc.audit('marketing.autopost_confirmed', null, v_ref, null, 'ok');
+  elsif p_action = 'not_posted' then
+    -- Only the owner's own "It's posted" can be taken back (never a post Mission Control saw go out).
+    if v_j.status <> 'posted' or coalesce((select e.kind from mc.autopost_events e
+                                           where e.job_id = p_job and e.kind in ('confirmed_posted', 'unconfirmed')
+                                           order by e.id desc limit 1), '') <> 'confirmed_posted' then
+      return mc.failed('bad_state', 'Only a post you marked as posted can be taken back.');
+    end if;
+    update mc.autopost_jobs j set status = 'uncertain', finished_at = now(), updated_at = now() where j.id = p_job;
+    insert into mc.autopost_events (job_id, kind, actor, admin_id) values (p_job, 'unconfirmed', 'admin', auth.uid());
+    -- Out only through its other platforms now; nothing else out: not in the apps any more.
+    if exists (select 1 from mc.autopost_jobs j where j.card_id = v_j.card_id and j.version = v_j.version
+               and j.status in ('posted', 'sent_to_drafts', 'by_hand')) then
+      perform mc.autopost_mark_out((select j.id from mc.autopost_jobs j where j.card_id = v_j.card_id and j.version = v_j.version
+                                    and j.status in ('posted', 'sent_to_drafts', 'by_hand') order by j.updated_at desc limit 1));
+    else
+      update mc.marketing_cards c set in_apps_version = null, by_hand = '{}', by_hand_posted = '{}', by_hand_skipped = '{}',
+        by_hand_done_at = null, updated_at = now()
+        where c.id = v_j.card_id and c.in_apps_version = v_j.version;
+    end if;
+    perform mc.audit('marketing.autopost_unconfirmed', null, v_ref, null, 'ok');
   else
     if v_j.status not in ('queued', 'preparing', 'ready', 'failed', 'uncertain', 'cancelled') then
       return mc.failed('bad_state', 'This one is already done.');
@@ -1324,9 +1642,27 @@ begin
     update mc.autopost_jobs j set status = 'by_hand', finished_at = now(), updated_at = now(), next_try_at = null,
       lease_id = null, lease_until = null
       where j.id = p_job;
-    insert into mc.autopost_events (job_id, kind, actor, admin_id) values (p_job, 'by_hand', 'admin', auth.uid());
+    insert into mc.autopost_events (job_id, kind, note, actor, admin_id)
+      values (p_job, 'by_hand', case when p_action = 'not_posting' then 'not_posting' end, 'admin', auth.uid());
     perform mc.autopost_mark_out(p_job);
-    perform mc.audit('marketing.autopost_by_hand', null, v_ref, null, 'ok');
+    if p_action = 'not_posting' then
+      -- The answer for its by_hand entry ("Instagram Reels", or the whole label): not posting there.
+      update mc.marketing_cards c
+        set by_hand_skipped = array(select x.v from unnest(c.by_hand) with ordinality x(v, o)
+                                    where x.v = any(c.by_hand_skipped) or x.v = mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target)
+                                    order by x.o),
+            by_hand_posted = array(select x from unnest(c.by_hand_posted) x
+                                   where x is distinct from mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target)),
+            updated_at = now()
+        where c.id = v_j.card_id and mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target) is not null;
+      perform mc.autopost_by_hand_settle(v_j.card_id);
+      insert into mc.marketing_log (card_id, version, kind, note, actor, admin_id)
+        select c.id, v_j.version, 'not_posted', mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target), 'admin', auth.uid()
+        from mc.marketing_cards c
+        where c.id = v_j.card_id and mc.autopost_by_hand_entry(c.by_hand, v_j.label, v_j.target) is not null;
+    end if;
+    perform mc.audit(case when p_action = 'not_posting' then 'marketing.autopost_not_posting' else 'marketing.autopost_by_hand' end,
+      null, v_ref, null, 'ok');
   end if;
   return jsonb_build_object('ok', true, 'status', (select j.status from mc.autopost_jobs j where j.id = p_job));
 end;
@@ -1684,6 +2020,7 @@ revoke all on all functions in schema mc from public, anon, authenticated, servi
 revoke all on function
   mc_api.marketing_board(text),
   mc_api.marketing_summary(),
+  mc_api.marketing_apps(uuid, integer, text, text[]),
   mc_api.autopost_settings(),
   mc_api.autopost_set_enabled(boolean),
   mc_api.autopost_save_connection(text, text, text, text, text, timestamptz, timestamptz, text[], jsonb),
@@ -1702,6 +2039,7 @@ revoke all on function
 grant execute on function
   mc_api.marketing_board(text),
   mc_api.marketing_summary(),
+  mc_api.marketing_apps(uuid, integer, text, text[]),
   mc_api.autopost_settings(),
   mc_api.autopost_set_enabled(boolean),
   mc_api.autopost_save_connection(text, text, text, text, text, timestamptz, timestamptz, text[], jsonb),

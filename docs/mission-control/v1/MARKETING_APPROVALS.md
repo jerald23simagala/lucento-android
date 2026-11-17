@@ -383,13 +383,14 @@ scroll):
 - Decision area by state: waiting → [Approve] [Ask for a change] and a disclosure "Don't post this one…" with [Skip it]
   [Skip it and ask Claude for another post]; approved → "I've scheduled it" with checkboxes "Except these, I'll post
   them by hand at the time" (one per platform) → [I've scheduled it]; [Undo approval]; [Ask for a change]; after the
-  slot with by-hand platforms: "Did you post it on TikTok? [Yes] [Not yet]"; changes → open requests with "Claude saw it
+  slot with by-hand platforms: "Did you post it on TikTok? [Yes] [Don't post it there]", one row per platform
+  (MARKETING_AUTOPOST.md, design review round 4); changes → open requests with "Claude saw it
   … / hasn't seen it yet", [Approve this version anyway], [Add to my request], [Cancel my request]; skipped → [Bring it
   back]; withdrawn → read-only; in the apps → [I've removed it from the apps] where relevant.
 - Ask-for-a-change form: textarea (3–2000) with "No names, handles or contact details", checkboxes (each a full-width
   48 px label) Video, Caption, YouTube text, Alt text, Timing, Other. Drafts saved to localStorage per card on every
   input (try/catch), offered on the next version, cleared on send, expired after 24 h and on sign-out.
-- After each decision: "Next post waiting for you ›" (anchor). Decisions run through a client wrapper: a failed action
+- After each decision: "1 more post needs you: Fri 13 Nov ›" (anchor; the page's "Needs you" rule). Decisions run through a client wrapper: a failed action
   shows inline "No connection: your choice wasn't saved. Tap again." instead of the error page. The pack refreshes when
   the tab regains focus ("Claude updated 1 post: [Show it]").
 - Numbers (Sunday): followers per channel (TikTok, Instagram, YouTube, Facebook Page, Community group), views per short

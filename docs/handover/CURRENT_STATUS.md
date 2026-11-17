@@ -606,8 +606,8 @@ needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mi
   renewal failed) posts nothing until reconnected; every stop records why (design review round 2); a two-platform
   label is asked about by the platform still the owner's, and the summary keeps an approved post's problems until
   handled, with the clock's state (round 3). Not applied anywhere yet (OT-36).
-- **Tests:** `tools/sql-verify` 11 suites, **512 checks, 0 failed** under both default-privilege variants
-  (`autopost_suite.sql` 56); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
+- **Tests:** `tools/sql-verify` 11 suites, **518 checks, 0 failed** under both default-privilege variants
+  (`autopost_suite.sql` 62); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
   handed out once); `catch_up_check.mjs` passes, including APPLY_AUTOPOST pasted twice (part E).
 - **Console** (`lucento-mission-control` PR #12, `feature/autopost`): Settings › Auto-posting (the switch, the posting
   clock with a stalled-clock warning, each platform's account with Connect / Reconnect / Check / Disconnect and each
@@ -615,9 +615,10 @@ needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mi
   the answer on to the gated /finish), `/api/autopost/tick` (claims up to 4 steps, runs them side by side under a
   40-second deadline, saves each result with retries; Facebook Reels, Instagram Reels, Page posts, YouTube, TikTok
   drafts), and on each post the plan, each platform's result with its link, and the owner's ways (Try again or Post it
-  now, I'll post it by hand, It's posted). **256 unit tests**, lint, build and the bundle check green; end to end on a
-  fresh local stack **26 passed** (`settings-autopost.spec.ts` 4, both phone specs). Not run against the real
-  platforms (OT-36, MC-12).
+  now, I'll post it by hand, It's posted, Don't post it there, Not posted after all). **273 unit tests**, lint, build
+  and the bundle check green (`npm run verify`, Next 16.4.6); end to end on a fresh local stack **26 passed, 1 skipped** (the optional tour;
+  `settings-autopost.spec.ts` 4, both phone specs); no sideways scroll at 360/393 px with 115–200 % text; studio
+  audit 0 FAIL. Not run against the real platforms (OT-36, MC-12).
 - **Reviews:** a security review (no critical or high; M1 and L1–L5 fixed, MARKETING_AUTOPOST.md §7) and the design
   critic's round 1 (REJECT 2.9: a post already in the apps would be posted again, a launch post promised, a dead
   "Posting now…" while off, "Went out" while a platform failed, a Check its status contradicted; all fixed, with
@@ -630,8 +631,14 @@ needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mi
   false "No other post waits for you"; by hand asked per label, risking a second Facebook post; plus plan sentences,
   TikTok's "connect it" with no Connect button, old failures off Overview, and copy): escalated; the owner chose "fix
   all, review again", a confirmation before posting a day or more late, failures kept until handled, Next 16.4.6
-  (MC-13) and every marketing post moved one week. All fixed but the week picker's count (notes); round 4 next (merge
-  only on APPROVE). Studio `critic/reports/2026-11-17-autopost-ui-r1.md`, `-r2.md`, `-r3.md`.
+  (MC-13) and every marketing post moved one week. All fixed but the week picker's count (notes). Round 4 (REJECT
+  3.0: after "I posted it" the card still said to delete the post in the apps; no truthful way to skip one platform;
+  "I posted it" as the main button beside "Post it now"; a "clock stopped" alarm right after "Post it now"; "No other
+  post waits" counting approvals only; plus seven medium items). The owner chose: fix all, a critic confirms only the
+  round-4 list item by item, then merge; per-platform "Don't post it there"; "Post it now" as the main button on a
+  missed post; Overview always shows auto-posting's lines. All fixed (MARKETING_AUTOPOST.md §6, round 4; database:
+  per-platform answers, `not_posting` / `not_posted`, `work_due_since`, History with the automatic steps). Studio
+  `critic/reports/2026-11-17-autopost-ui-r1.md` … `-r4.md`.
 
 ## Mission Control › Marketing approvals — 2026-11-16 (database: `feature/mc-marketing`; console: `lucento-mission-control` `feature/marketing`; tool: lucento-studio `6edd819`)
 
