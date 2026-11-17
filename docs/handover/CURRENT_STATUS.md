@@ -553,6 +553,15 @@ sentence, and its silence settings are only hints:
 **Owner's call (2026-11-13):** "push and merge when green". Then 0.5.8 with #65. At that release the Privacy Policy
 date goes to the release day and the website's `/privacy` is re-exported (KNOWN_ISSUES VI-3).
 
+## Release 0.5.11 (version code 16) — 2026-11-16 (`release/0.5.11`)
+
+The owner asked for a build that clears Play Console's edge-to-edge warnings on 0.5.10 ("Proceed"). App changes since
+0.5.10: #92, Lucento draws edge to edge without the window APIs Android 15 deprecated (KNOWN_ISSUES E2E-1…3; screens
+look the same), and #90, the Budget tab's "Safe per day" and the "You stayed within <month>'s budget" milestone count
+spending from wallets in other currencies (BF-1, BF-2). On main but not in the app: #91, Mission Control › Marketing
+(database and docs; OT-34). The Privacy Policy stays version **2026-11-14** and the website needs nothing: no network,
+permission or data change. Owner: upload to internal testing, then OT-35.
+
 ## Release 0.5.10 (version code 15) — 2026-11-15 (`release/0.5.10`)
 
 The owner asked for 0.5.10 to test on the phone ("Build 0.5.10 so I can test on my phone"). The only app change since
