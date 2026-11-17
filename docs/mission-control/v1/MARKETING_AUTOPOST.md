@@ -232,6 +232,12 @@ is listed with the failed ones (`stopped`). Each card's job says `confirmed` whe
     minutes early; YouTube, TikTok and Page posts start at the slot". Overview always shows auto-posting's lines (the
     three-line cap folds only the others). Accounts are named in lists ("Facebook, Instagram and YouTube"), never "its
     accounts"; quoted words on Marketing use “typographic” quotes.
+  - After the critic's confirmation (11 of 13 fixed): "Approved · didn't go out" for any approved post whose slot
+    passed without going out (the week's line says the same); "Partly posted · 3 platforms need you" counts every
+    platform the card asks about, a by-hand one still to answer included (each once); the account notice's button says
+    "Reconnect" (the notice names the account; screen readers hear it), full width in a narrow notice; a by-hand
+    platform's row says its answer ("Posted by you", "Not posting it there"); "Yours to post: …" under the results;
+    "What goes where" warns that YouTube may keep uploads private until Google has audited the app.
 
 ## 7. Security and privacy
 
