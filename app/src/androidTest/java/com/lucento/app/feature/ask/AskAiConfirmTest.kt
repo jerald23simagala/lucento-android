@@ -22,6 +22,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.lucento.app.LucentoApplication
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.data.ai.AskLucentoClient
+import com.lucento.app.data.billing.SimulatedPlan
 import com.lucento.app.domain.ask.LocalAnswers
 import com.lucento.app.feature.legal.LegalDocuments
 import kotlinx.coroutines.flow.first
@@ -59,14 +60,27 @@ class AskAiConfirmTest {
     /** Each time the client asks for the session's token: the first step of any request to Lucento's proxy. */
     private val tokenRequests = AtomicInteger(0)
 
-    @Before fun startFromTheDefault() = runBlocking { container.preferences.forgetAccountConsents() }
+    /** The simulated plan before this test (other tests in the same run choose their own, e.g. a Lifetime). */
+    private var planBefore: SimulatedPlan? = null
 
-    @After fun leaveTheDefault() = runBlocking { container.preferences.forgetAccountConsents() }
+    @Before fun startFromTheDefault() = runBlocking {
+        planBefore = simulator().current.value
+        container.preferences.forgetAccountConsents()
+    }
+
+    @After fun leaveTheDefault() = runBlocking {
+        container.preferences.forgetAccountConsents()
+        simulator().select(planBefore)
+        container.entitlements.refresh()
+        Unit
+    }
 
     @Test fun the_first_question_waits_for_the_person_and_goes_once_confirmed() {
+        usePlan(SimulatedPlan.FREE)
         open()
         askUntilTheCardShows(LocalAnswers.adviceSuggestions.first())
         compose.onNodeWithText(LegalDocuments.GEMINI_DATA_USE).assertExists()
+        // Free: AI answers are available, 10 a month (not "a day", and no Smarter reading).
         compose.onNodeWithText(AskAiCopy.allowance(perDay = false), substring = true).assertExists()
         assertEquals("nothing is requested before the person confirms", 0, tokenRequests.get())
         shot("1-first-question-card")
@@ -83,8 +97,11 @@ class AskAiConfirmTest {
     }
 
     @Test fun keeping_answers_on_the_phone_sends_nothing_and_turns_ai_answers_off() {
+        // A Lifetime in its included year: the same card, with Pro's daily allowance.
+        usePlan(SimulatedPlan.LIFETIME)
         open()
         askUntilTheCardShows(LocalAnswers.adviceSuggestions.first())
+        compose.onNodeWithText(AskAiCopy.allowance(perDay = true), substring = true).assertExists()
         compose.onNodeWithText(AskAiCopy.CONFIRM_KEEP).performScrollTo().performClick()
         waitForText("Nothing was sent")
         // The top bar's Gemini switch is always on screen (the status line scrolls away at large text).
@@ -120,6 +137,15 @@ class AskAiConfirmTest {
     }
 
     private fun geminiSwitch() = compose.onNode(hasText("Gemini") and isToggleable())
+
+    private fun simulator() = checkNotNull(container.planSimulator) { "Test builds have the plan simulator" }
+
+    /** The plan the card's allowance follows, through the test builds' plan simulator. */
+    private fun usePlan(plan: SimulatedPlan) = runBlocking {
+        simulator().select(plan)
+        container.entitlements.refresh()
+        Unit
+    }
 
     /** Taps the suggestion until the card shows: a tap while the records are still loading asks nothing. */
     private fun askUntilTheCardShows(question: String) {
