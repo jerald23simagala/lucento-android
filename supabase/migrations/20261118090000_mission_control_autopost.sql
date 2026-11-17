@@ -165,7 +165,8 @@ create table if not exists mc.autopost_connections (
   provider text primary key check (provider in ('meta', 'google', 'tiktok')),
   account_id text not null check (mc.autopost_id_ok(account_id)),
   account_name text not null default '' check (char_length(account_name) <= 200),
-  token_cipher text not null check (mc.autopost_cipher_ok(token_cipher)),
+  -- Meta posts with the Pages' own tokens (in options); its user token isn't kept (security review L5).
+  token_cipher text null check (token_cipher is null or mc.autopost_cipher_ok(token_cipher)),
   refresh_cipher text null check (refresh_cipher is null or mc.autopost_cipher_ok(refresh_cipher)),
   token_expires_at timestamptz null,
   refresh_expires_at timestamptz null,
@@ -175,7 +176,8 @@ create table if not exists mc.autopost_connections (
   connected_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   last_error text null check (char_length(last_error) <= 500),
-  last_error_at timestamptz null
+  last_error_at timestamptz null,
+  check (provider = 'meta' or token_cipher is not null)
 );
 
 -- Where each kind of post goes. A Page (and the Instagram account posted through its Page) carries that Page's own
@@ -306,7 +308,8 @@ as $$
     exists (select 1 from mc.autopost_candidates() x
             where x.due_at - mc.autopost_lead(x.target) <= now() and now() < x.late_until
               and not exists (select 1 from mc.autopost_jobs j
-                              where j.card_id = x.card_id and j.version = x.version and j.target = x.target))
+                              where j.card_id = x.card_id and j.version = x.version and j.target = x.target
+                                and j.status <> 'cancelled'))
     or exists (select 1 from mc.autopost_jobs j
                where j.status in ('queued', 'preparing', 'ready')
                  and (j.next_try_at is null or j.next_try_at <= now())
@@ -454,6 +457,32 @@ begin
           updated_at = now()
       where c.id = v_c.id;
   end if;
+end;
+$$;
+
+-- A step taken at or after the slot whose run never reported (it died, or its result couldn't be saved) may have
+-- posted: it becomes uncertain for the owner to look at, never handed out again (security review M1). Every result,
+-- retry, cancellation and miss clears the lease, so a lease left behind means exactly that. A step taken before the
+-- slot only prepared (a Reel's upload, an Instagram container, a status check): it goes out again.
+create or replace function mc.autopost_settle_lapsed()
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+begin
+  with lapsed as (
+    update mc.autopost_jobs j set status = 'uncertain', error_code = 'lease_lapsed', lease_id = null, lease_until = null,
+      next_try_at = null, finished_at = now(), updated_at = now(), attempts = least(j.attempts + 1, 20),
+      error = 'Mission Control may have posted this but couldn''t record it. Look on the platform, then tap It''s posted, or Try again if it isn''t there.'
+    where j.status in ('queued', 'preparing', 'ready') and j.lease_id is not null and j.lease_until < now()
+      and j.due_at <= j.lease_until - interval '3 minutes'
+      and (j.status = 'ready'
+           or (j.status = 'queued' and j.target in ('facebook_photo', 'klaroph_photo', 'youtube', 'tiktok'))
+           or (j.status = 'preparing' and j.target in ('facebook_reel', 'instagram_reel')))
+    returning j.id)
+  insert into mc.autopost_events (job_id, kind, note, actor) select l.id, 'uncertain', 'lease_lapsed', 'system' from lapsed l;
 end;
 $$;
 
@@ -717,6 +746,17 @@ begin
   end if;
   insert into mc.settings (key, value, updated_by, updated_at) values ('autopost_enabled', to_jsonb(p_on), auth.uid(), now())
     on conflict (key) do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at;
+  if not p_on then
+    -- The steps waiting stop now (a step under way finishes on its own); turning it on again starts them over.
+    perform mc.autopost_settle_lapsed();
+    with gone as (
+      update mc.autopost_jobs j set status = 'cancelled', finished_at = now(), updated_at = now(), next_try_at = null,
+        lease_id = null, lease_until = null
+      where j.status in ('queued', 'preparing', 'ready') and (j.lease_until is null or j.lease_until < now())
+      returning j.id)
+    insert into mc.autopost_events (job_id, kind, note, actor, admin_id)
+      select g.id, 'cancelled', 'Auto-posting turned off', 'admin', auth.uid() from gone g;
+  end if;
   perform mc.audit(case when p_on then 'marketing.autopost_on' else 'marketing.autopost_off' end, null, 'autopost', null, 'ok');
   return jsonb_build_object('ok', true, 'enabled', p_on);
 end;
@@ -819,7 +859,8 @@ begin
     return mc.failed('invalid', 'Unknown provider');
   end if;
   if not mc.autopost_id_ok(p_account_id) or char_length(coalesce(p_account_name, '')) > 200
-     or not mc.autopost_cipher_ok(p_token_cipher)
+     or (p_token_cipher is null and p_provider <> 'meta')
+     or (p_token_cipher is not null and not mc.autopost_cipher_ok(p_token_cipher))
      or (p_refresh_cipher is not null and not mc.autopost_cipher_ok(p_refresh_cipher))
      or not mc.text_items_ok(coalesce(p_scopes, '{}'), 30, 200)
      or not mc.autopost_options_ok(p_provider, coalesce(p_options, '[]'::jsonb)) then
@@ -928,8 +969,10 @@ begin
   if not found then
     return mc.failed('not_found', 'That account isn''t connected.');
   end if;
+  perform mc.autopost_settle_lapsed();
   with gone as (
-    update mc.autopost_jobs j set status = 'cancelled', finished_at = now(), updated_at = now(), next_try_at = null
+    update mc.autopost_jobs j set status = 'cancelled', finished_at = now(), updated_at = now(), next_try_at = null,
+      lease_id = null, lease_until = null
     where j.status in ('queued', 'preparing', 'ready') and (j.lease_until is null or j.lease_until < now())
       and j.destination in (select d.key from mc.autopost_destinations d where d.provider = p_provider)
     returning j.id)
@@ -968,9 +1011,10 @@ begin
 end;
 $$;
 
--- New tokens after a refresh (YouTube's hourly access token, TikTok's daily one), or the error that stopped it.
-create or replace function mc.autopost_put_token(p_provider text, p_token_cipher text, p_token_expires_at timestamptz,
-  p_refresh_cipher text, p_refresh_expires_at timestamptz, p_error text)
+-- New tokens after a refresh (YouTube's hourly access token, TikTok's daily one), or the error that stopped it. Only
+-- for the account it was renewed for: a reconnect meanwhile, as another account, is left alone (security review L2).
+create or replace function mc.autopost_put_token(p_provider text, p_account_id text, p_token_cipher text,
+  p_token_expires_at timestamptz, p_refresh_cipher text, p_refresh_expires_at timestamptz, p_error text)
 returns jsonb
 language plpgsql
 volatile
@@ -980,7 +1024,7 @@ as $$
 begin
   if p_error is not null then
     update mc.autopost_connections c set last_error = left(p_error, 500), last_error_at = now(), updated_at = now()
-      where c.provider = p_provider;
+      where c.provider = p_provider and c.account_id = p_account_id;
     return jsonb_build_object('ok', found);
   end if;
   if not mc.autopost_cipher_ok(p_token_cipher) or (p_refresh_cipher is not null and not mc.autopost_cipher_ok(p_refresh_cipher)) then
@@ -990,13 +1034,13 @@ begin
     refresh_cipher = coalesce(p_refresh_cipher, c.refresh_cipher),
     refresh_expires_at = case when p_refresh_cipher is null then c.refresh_expires_at else p_refresh_expires_at end,
     last_error = null, last_error_at = null, updated_at = now()
-    where c.provider = p_provider and c.provider in ('google', 'tiktok');
+    where c.provider = p_provider and c.account_id = p_account_id and c.provider in ('google', 'tiktok');
   return jsonb_build_object('ok', found);
 end;
 $$;
 
-create or replace function mc_api.autopost_save_token(p_provider text, p_token_cipher text, p_token_expires_at timestamptz,
-  p_refresh_cipher text, p_refresh_expires_at timestamptz, p_error text)
+create or replace function mc_api.autopost_save_token(p_provider text, p_account_id text, p_token_cipher text,
+  p_token_expires_at timestamptz, p_refresh_cipher text, p_refresh_expires_at timestamptz, p_error text)
 returns jsonb
 language plpgsql
 volatile
@@ -1009,7 +1053,8 @@ begin
   if v_refusal is not null then
     return mc.refused(v_refusal);
   end if;
-  return mc.autopost_put_token(p_provider, p_token_cipher, p_token_expires_at, p_refresh_cipher, p_refresh_expires_at, p_error);
+  return mc.autopost_put_token(p_provider, p_account_id, p_token_cipher, p_token_expires_at, p_refresh_cipher,
+                               p_refresh_expires_at, p_error);
 end;
 $$;
 
@@ -1053,6 +1098,7 @@ begin
       return mc.failed('bad_state', 'This post is no longer the approved version.');
     end if;
     update mc.autopost_jobs j set status = 'queued', attempts = 0, next_try_at = null, error = null, error_code = null,
+      lease_id = null, lease_until = null,
       due_at = least(j.due_at, now()), late_until = greatest(j.late_until, now() + interval '1 hour'),
       detail = '{}'::jsonb, external_id = null, external_url = null, finished_at = null, updated_at = now()
       where j.id = p_job;
@@ -1062,7 +1108,8 @@ begin
     if v_j.status <> 'uncertain' then
       return mc.failed('bad_state', 'Only an unconfirmed post can be marked as posted.');
     end if;
-    update mc.autopost_jobs j set status = 'posted', finished_at = now(), updated_at = now() where j.id = p_job;
+    update mc.autopost_jobs j set status = 'posted', finished_at = now(), updated_at = now(), lease_id = null,
+      lease_until = null where j.id = p_job;
     insert into mc.autopost_events (job_id, kind, actor, admin_id) values (p_job, 'confirmed_posted', 'admin', auth.uid());
     perform mc.autopost_mark_out(p_job);
     perform mc.audit('marketing.autopost_confirmed', null, v_ref, null, 'ok');
@@ -1070,7 +1117,8 @@ begin
     if v_j.status not in ('queued', 'preparing', 'ready', 'failed', 'uncertain') then
       return mc.failed('bad_state', 'This one is already done.');
     end if;
-    update mc.autopost_jobs j set status = 'by_hand', finished_at = now(), updated_at = now(), next_try_at = null
+    update mc.autopost_jobs j set status = 'by_hand', finished_at = now(), updated_at = now(), next_try_at = null,
+      lease_id = null, lease_until = null
       where j.id = p_job;
     insert into mc.autopost_events (job_id, kind, actor, admin_id) values (p_job, 'by_hand', 'admin', auth.uid());
     perform mc.autopost_mark_out(p_job);
@@ -1106,13 +1154,20 @@ begin
   if v_c.current_version <> p_version then
     return jsonb_build_object('ok', false, 'error', 'stale_version', 'current_version', v_c.current_version);
   end if;
+  -- A step under way may be posting right now (security review L1).
+  if p_off and exists (select 1 from mc.autopost_jobs j where j.card_id = p_card and j.version = p_version
+                       and j.lease_until > now()) then
+    return mc.failed('busy', 'Mission Control is posting this right now. Try again in a minute.');
+  end if;
+  perform mc.autopost_settle_lapsed();
   if p_off and exists (select 1 from mc.autopost_jobs j where j.card_id = p_card and j.version = p_version
                        and j.status in ('preparing', 'ready', 'posted', 'sent_to_drafts', 'uncertain')) then
     return mc.failed('already_started', 'Mission Control has already started posting this one.');
   end if;
   if p_off then
     with gone as (
-      update mc.autopost_jobs j set status = 'cancelled', finished_at = now(), updated_at = now(), next_try_at = null
+      update mc.autopost_jobs j set status = 'cancelled', finished_at = now(), updated_at = now(), next_try_at = null,
+        lease_id = null, lease_until = null
       where j.card_id = p_card and j.version = p_version and j.status = 'queued'
         and (j.lease_until is null or j.lease_until < now())
       returning j.id)
@@ -1151,20 +1206,29 @@ begin
     return jsonb_build_object('ok', true, 'enabled', false, 'jobs', '[]'::jsonb);
   end if;
 
-  -- New jobs: within their lead time and not missed.
+  -- New jobs: within their lead time and not missed. A cancelled one starts again (it never posted anything).
   with made as (
     insert into mc.autopost_jobs (card_id, version, target, destination, label, due_at, late_until)
     select x.card_id, x.version, x.target, x.destination, x.label, x.due_at, x.late_until
     from mc.autopost_candidates() x
     where x.due_at - mc.autopost_lead(x.target) <= now() and now() < x.late_until
-    on conflict (card_id, version, target) do nothing
+    on conflict (card_id, version, target) do update
+      set status = 'queued', destination = excluded.destination, label = excluded.label, due_at = excluded.due_at,
+          late_until = excluded.late_until, attempts = 0, lease_id = null, lease_until = null, next_try_at = null,
+          external_id = null, external_url = null, detail = '{}'::jsonb, error = null, error_code = null,
+          finished_at = null, updated_at = now()
+      where mc.autopost_jobs.status = 'cancelled'
     returning id)
   insert into mc.autopost_events (job_id, kind, actor) select m.id, 'created', 'system' from made m;
+
+  -- Steps whose run never reported: uncertain when they may have posted (security review M1).
+  perform mc.autopost_settle_lapsed();
 
   -- Jobs no longer allowed (undone, skipped, revised, turned to by hand, auto-posting's destination gone, launch rules)
   -- stop before their next step.
   with gone as (
-    update mc.autopost_jobs j set status = 'cancelled', finished_at = now(), updated_at = now(), next_try_at = null
+    update mc.autopost_jobs j set status = 'cancelled', finished_at = now(), updated_at = now(), next_try_at = null,
+      lease_id = null, lease_until = null
     where j.status in ('queued', 'preparing', 'ready') and (j.lease_until is null or j.lease_until < now())
       and not exists (select 1 from mc.autopost_candidates() x
                       where x.card_id = j.card_id and x.version = j.version and x.target = j.target)
@@ -1175,7 +1239,7 @@ begin
   -- Missed: past the last moment it may go out.
   with late as (
     update mc.autopost_jobs j set status = 'failed', error_code = 'missed', finished_at = now(), updated_at = now(),
-      next_try_at = null,
+      next_try_at = null, lease_id = null, lease_until = null,
       error = 'Mission Control couldn''t post it in time (within 3 hours of its slot). Post it by hand or skip it.'
     where j.status in ('queued', 'preparing', 'ready') and (j.lease_until is null or j.lease_until < now())
       and now() >= j.late_until
@@ -1269,7 +1333,7 @@ begin
   if not found then
     return mc.failed('not_found', 'There is no such job');
   end if;
-  if v_j.status in ('posted', 'sent_to_drafts') then
+  if v_j.status in ('posted', 'sent_to_drafts') or (v_j.status = 'uncertain' and v_status = 'uncertain') then
     return jsonb_build_object('ok', true, 'already', true, 'status', v_j.status);
   end if;
   if v_j.lease_id is distinct from p_lease and v_status not in ('posted', 'sent_to_drafts', 'uncertain') then
@@ -1311,8 +1375,8 @@ begin
 end;
 $$;
 
-create or replace function mc_api.ingest_autopost_token(p_app_secret text, p_provider text, p_token_cipher text,
-  p_token_expires_at timestamptz, p_refresh_cipher text, p_refresh_expires_at timestamptz, p_error text)
+create or replace function mc_api.ingest_autopost_token(p_app_secret text, p_provider text, p_account_id text,
+  p_token_cipher text, p_token_expires_at timestamptz, p_refresh_cipher text, p_refresh_expires_at timestamptz, p_error text)
 returns jsonb
 language plpgsql
 volatile
@@ -1323,7 +1387,8 @@ begin
   if not mc.ingest_secret_ok(p_app_secret, 'app') then
     return mc.refused('bad_secret');
   end if;
-  return mc.autopost_put_token(p_provider, p_token_cipher, p_token_expires_at, p_refresh_cipher, p_refresh_expires_at, p_error);
+  return mc.autopost_put_token(p_provider, p_account_id, p_token_cipher, p_token_expires_at, p_refresh_cipher,
+                               p_refresh_expires_at, p_error);
 end;
 $$;
 
@@ -1421,12 +1486,12 @@ revoke all on function
   mc_api.autopost_set_destination(text, text),
   mc_api.autopost_disconnect(text),
   mc_api.autopost_credentials(text),
-  mc_api.autopost_save_token(text, text, timestamptz, text, timestamptz, text),
+  mc_api.autopost_save_token(text, text, text, timestamptz, text, timestamptz, text),
   mc_api.autopost_job_action(uuid, text),
   mc_api.autopost_card(uuid, integer, boolean),
   mc_api.ingest_autopost_claim(text, text, integer),
   mc_api.ingest_autopost_result(text, uuid, uuid, jsonb),
-  mc_api.ingest_autopost_token(text, text, text, timestamptz, text, timestamptz, text)
+  mc_api.ingest_autopost_token(text, text, text, text, timestamptz, text, timestamptz, text)
   from public, anon, authenticated, service_role;
 
 grant execute on function
@@ -1438,7 +1503,7 @@ grant execute on function
   mc_api.autopost_set_destination(text, text),
   mc_api.autopost_disconnect(text),
   mc_api.autopost_credentials(text),
-  mc_api.autopost_save_token(text, text, timestamptz, text, timestamptz, text),
+  mc_api.autopost_save_token(text, text, text, timestamptz, text, timestamptz, text),
   mc_api.autopost_job_action(uuid, text),
   mc_api.autopost_card(uuid, integer, boolean)
   to authenticated;
@@ -1446,5 +1511,5 @@ grant execute on function
 grant execute on function
   mc_api.ingest_autopost_claim(text, text, integer),
   mc_api.ingest_autopost_result(text, uuid, uuid, jsonb),
-  mc_api.ingest_autopost_token(text, text, text, timestamptz, text, timestamptz, text)
+  mc_api.ingest_autopost_token(text, text, text, text, timestamptz, text, timestamptz, text)
   to anon;

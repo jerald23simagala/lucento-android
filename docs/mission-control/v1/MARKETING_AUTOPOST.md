@@ -37,8 +37,9 @@ Vercel Hobby's cron runs once a day, so the clock is in the database: pg_cron ev
 ## 3. Data model (schema `mc`)
 
 - `mc.autopost_connections`: one row per provider (`meta`, `google`, `tiktok`): account id and name, **encrypted**
-  access and refresh tokens with their expiry, scopes, `options` (what the account can post to: Pages with their own
-  encrypted tokens, Instagram accounts with the Page each is linked to, the channel, the TikTok account), last error.
+  access and refresh tokens with their expiry (none for Meta: it posts with the Pages' own tokens, and its user token
+  isn't kept), scopes, `options` (what the account can post to: Pages with their own encrypted tokens, Instagram
+  accounts with the Page each is linked to, the channel, the TikTok account), last error.
 - `mc.autopost_destinations`: `lucento_page`, `klaroph_page`, `instagram`, `youtube`, `tiktok`, each picked from the
   connection's options (a Page carries its token; Instagram carries its Page's token).
 - `mc.autopost_jobs`: one per (post, version, target), unique; due and late-until times; status `queued` → (`preparing`
@@ -48,8 +49,9 @@ Vercel Hobby's cron runs once a day, so the clock is in the database: pg_cron ev
 - `mc.marketing_cards.autopost_off`: the owner's "post this one by hand". Settings `autopost_enabled` (default false)
   and `autopost_tick_url`. Ingest-secret purpose `autopost` (the clock's). `job_runs.job` gains `autopost`.
 
-Tokens: AES-256-GCM in the console (`v1:<iv>:<ciphertext>:<tag>`, base64url, the provider and account as additional
-data); the key never reaches the database, and no answer to a page ever carries a ciphertext.
+Tokens: AES-256-GCM in the console (`v1:<iv>:<ciphertext>:<tag>`, base64url, the provider, the account and the
+token's purpose as additional data); the key never reaches the database, and no answer to a page ever carries a
+ciphertext.
 
 ## 4. Rules
 
@@ -64,7 +66,14 @@ data); the key never reaches the database, and no answer to a page ever carries 
   scheduled") leaves those out; a post with a manual label (the group) still raises it.
 - **Jobs** are created by the claim within their lead time (never at approval), stepped under a 3-minute lease, and
   re-checked at every step: a post undone, skipped, revised or turned to by hand, a destination gone, or auto-posting off
-  stops it before its next step (`cancelled`). Past late-until a job `failed` with `missed`.
+  stops it before its next step (`cancelled`; turning auto-posting off cancels the waiting steps at once). A cancelled
+  job starts over when its post can go out again (approved again, back to automatic, reconnected, on again): it never
+  posted anything. Past late-until a job `failed` with `missed`.
+- **A run that never reported** (`mc.autopost_settle_lapsed`, first in the claim, disconnecting and "post this one by
+  hand"): every result, retry, cancellation and miss clears the lease, so a lease left behind means the run died or its
+  result couldn't be saved. A step taken at or after the slot that publishes from its status (`ready`; `queued` Page,
+  YouTube and TikTok steps; `preparing` Reels) may have posted: it becomes `uncertain` (`lease_lapsed`) and is never
+  handed out again. A step taken earlier only prepared, and goes out again. (Security review M1.)
 - **Results**: `preparing` (checked again in a minute), `ready` (published at the slot), `posted`, `sent_to_drafts`,
   `failed` (retried up to 3 attempts when the console says it may help, at 30 s × attempts or as asked), `uncertain`
   (the platform may have posted it: never retried; the owner looks). A late "posted" from a lapsed lease is still
@@ -82,16 +91,17 @@ Owner (granted to authenticated; each calls `mc.gate` first, its own hourly coun
 |---|---|---|
 | `autopost_settings()` | marketing.read | enabled, the clock, connections (no tokens), destinations |
 | `autopost_set_enabled(p_on)` | marketing.autopost_enable, step-up to turn on, 20/h | refuses `clock_not_set`, `nothing_connected` |
-| `autopost_save_connection(provider, account_id, account_name, token_cipher, refresh_cipher, token_expires_at, refresh_expires_at, scopes, options)` | marketing.autopost_connect, step-up, 30/h | refreshes or clears this provider's destinations; picks the plain ones (Page named Lucento, Page named KlaroPH, the Instagram account linked to the Lucento Page, the only channel, the TikTok account) |
+| `autopost_save_connection(provider, account_id, account_name, token_cipher, refresh_cipher, token_expires_at, refresh_expires_at, scopes, options)` | marketing.autopost_connect, step-up, 30/h | `token_cipher` null for Meta only; refreshes or clears this provider's destinations; picks the plain ones (Page named Lucento, Page named KlaroPH, the Instagram account linked to the Lucento Page, the only channel, the TikTok account) |
 | `autopost_set_destination(key, option_id)` | marketing.autopost_destination, step-up, 60/h | only from the connection's options, of the right kind; null clears |
 | `autopost_disconnect(provider)` | marketing.autopost_disconnect, step-up, 20/h | cancels its jobs not under way; deletes tokens and destinations |
 | `autopost_credentials(key)` | marketing.autopost_credentials, 120/h | the destination's ciphertexts, for the console's Check |
-| `autopost_save_token(...)` | marketing.autopost_token, 120/h | after a refresh in a Check, or its error |
+| `autopost_save_token(provider, account_id, …)` | marketing.autopost_token, 120/h | after a refresh in a Check, or its error; only for that account (a reconnect meanwhile is left alone) |
 | `autopost_job_action(job, action)` | marketing.decide | `retry` (failed/uncertain, approved current version), `posted` (uncertain), `by_hand` |
-| `autopost_card(card, version, off)` | marketing.decide | `stale_version`; `already_started` once a step began |
+| `autopost_card(card, version, off)` | marketing.decide | `stale_version`; `busy` while a step is under way; `already_started` once a step began |
 
 Console (granted to anon; each checks its secret first): `ingest_autopost_claim(tick_secret, app_secret, limit)` (both
-secrets), `ingest_autopost_result(app_secret, job, lease, result)`, `ingest_autopost_token(app_secret, ...)`.
+secrets), `ingest_autopost_result(app_secret, job, lease, result)` (a repeated "posted" or "uncertain" changes
+nothing), `ingest_autopost_token(app_secret, provider, account_id, …)`.
 
 Clock: `mc.autopost_kick()` (pg_cron `mc-autopost`, every minute: off / no address / nothing due / a step still leased
 → nothing; else one `net.http_post` to the tick address with the Vault secret) and `mc.autopost_setup(url)` (owner,
@@ -104,9 +114,11 @@ uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
 ## 6. Console
 
 - `POST /api/autopost/tick` (exempt from the session gate; the bearer must be 64 hex; `maxDuration` 60 s): claim (up to
-  4) → each job's step, side by side → its result under its lease. Every request ends within 48 s of the start, and a
-  publishing call isn't started with less than 12 s left (an upload: 20 s), so the function never stops mid-publish.
-  Tokens are renewed once per provider per run. Never logs or answers a token, a caption or a link with a signature.
+  4) → each job's step, side by side → its result under its lease. Every platform request ends within 40 s of the
+  start, and a publishing call isn't started with less than 12 s left (an upload: 20 s), so the function never stops
+  mid-publish; each result is then saved with up to 3 time-limited tries by 56 s (if it still doesn't land, the next
+  claim judges the step as above). Tokens are renewed once per provider per run. Never logs or answers a token, a
+  caption or a link with a signature, and before the secrets are checked it says nothing about its configuration.
 - Steps per target:
   - **Facebook Reel**: start an upload session and let Meta fetch the video from a presigned Blob link (ahead) →
     `ready` → at the slot finish with `video_state=PUBLISHED` and the caption → `posted` (link `facebook.com/reel/<id>`).
@@ -139,14 +151,22 @@ uncertain[], drafts_waiting[], counts}` (each ≤ 10, by slot).
   isn't approved and due; the claim also needs the console's app secret.
 - What the platforms receive is what the owner approved (videos, pictures, captions, alt text), sent from the owner's
   console to the owner's accounts. No customer data, ever.
-- Revoking access: Disconnect in Settings, and/or remove the app in Facebook (Settings › Business integrations), Google
-  (Account › Security › Third-party access) or TikTok (Settings › Security › Manage app permissions).
+- Revoking access: Disconnect in Settings deletes the tokens and withdraws the sign-in at Google and TikTok (their
+  revoke endpoints; the answer says when it couldn't); Facebook's is removed in Facebook (Settings › Business
+  integrations), as for Google (Account › Security › Your connections to third-party apps) or TikTok (Settings and
+  privacy › Security › Manage app permissions) when the withdrawal didn't go through.
+- Security review (2026-11-17, before merging): no critical or high finding. Fixed: a post whose result wasn't saved
+  could be posted again (M1); "post this one by hand" while a step was posting (L1); a renewal overwriting a newer
+  connection (L2); a sign-in refusal or "connected" notice from a link that wasn't this sign-in's (L3); the tick naming
+  its missing settings (L4); the Meta user token kept and nothing revoked on Disconnect (L5). Kept on purpose: every
+  listed Page's own token (so a Page can be chosen without reconnecting; the owner's Pages are few).
 
 ## 8. Tests
 
-- SQL `tools/sql-verify/autopost_suite.sql` (38 checks: secrets and grants, the map, due times, connections and picks,
-  every job step and refusal, coverage and due_soon, cancellations, missed, launch rules, the clock's guards, the board,
-  the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
+- SQL `tools/sql-verify/autopost_suite.sql` (45 checks: secrets and grants, the map, due times, connections and picks,
+  every job step and refusal, coverage and due_soon, cancellations and starting over, missed, a run that never reported,
+  busy, renewals for one account only, Meta without a user token, launch rules, the clock's guards, the board, the
+  summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
   `catch_up_check.mjs` part E pastes APPLY_AUTOPOST.sql the owner's way.
 - Console (`lucento-mission-control`): unit tests `autopost-crypto` (encryption, additional data, the state cookie,
   PKCE), `autopost-runner` (every target's steps against fake platforms, the retry/uncertain rules, the deadline, one

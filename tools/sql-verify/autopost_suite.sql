@@ -221,7 +221,7 @@ begin
   v_j := mc_api.ingest_autopost_claim(v_mkt, v_app, 4);
   v_k := mc_api.ingest_autopost_claim(v_tick, v_mkt, 4);
   v_m := mc_api.ingest_autopost_result(v_tick, gen_random_uuid(), gen_random_uuid(), '{"status": "posted"}');
-  v_b := mc_api.ingest_autopost_token(v_mkt, 'google', v_cipher, now(), null, null, null);
+  v_b := mc_api.ingest_autopost_token(v_mkt, 'google', 'g-1', v_cipher, now(), null, null, null);
   v_s := mc_api.ingest_autopost_claim(v_tick, v_app, 4);
   execute 'reset role';
   r := r || case when v_j ->> 'error' = 'bad_secret' and v_k ->> 'error' = 'bad_secret' and v_m ->> 'error' = 'bad_secret'
@@ -604,8 +604,8 @@ begin
                  else 'FAIL P36 ' || left(coalesce(v_j::text, ''), 300) end;
 
   perform pg_temp.as_anon();
-  v_j := mc_api.ingest_autopost_token(v_app, 'google', v_page_cipher, now() + interval '1 hour', null, null, null);
-  v_k := mc_api.ingest_autopost_token(v_app, 'tiktok', null, null, null, null, 'refresh_token expired');
+  v_j := mc_api.ingest_autopost_token(v_app, 'google', 'g-1', v_page_cipher, now() + interval '1 hour', null, null, null);
+  v_k := mc_api.ingest_autopost_token(v_app, 'tiktok', 'open-1', null, null, null, null, 'refresh_token expired');
   execute 'reset role';
   r := r || case when (v_j ->> 'ok')::boolean and (select token_cipher from mc.autopost_connections where provider = 'google') = v_page_cipher
                       and (select refresh_cipher from mc.autopost_connections where provider = 'google') = v_cipher
@@ -613,13 +613,91 @@ begin
                  then 'ok  P37 a refreshed token replaces the old one (the refresh token kept); a failed refresh is recorded for Settings'
                  else 'FAIL P37 ' || coalesce(v_j::text, '') end;
 
+  -- ======================================================================== I: after the security review
+  -- Meta again, without its user token (it posts with the Pages' own); YouTube can't do without one.
+  v_j := pg_temp.owner_call(format('select mc_api.autopost_save_connection(%L, %L, %L, null, null, null, null, %L, %L::jsonb)',
+           'meta', '1001', 'Jerald', '{pages_manage_posts}',
+           jsonb_build_array(jsonb_build_object('kind', 'page', 'id', '501', 'name', 'Lucento', 'token_cipher', v_page_cipher),
+                             jsonb_build_object('kind', 'instagram', 'id', '17841', 'name', 'lucentoapp', 'page_id', '501'))));
+  v_k := pg_temp.owner_call(format('select mc_api.autopost_save_connection(%L, %L, %L, null, %L, null, null, %L, %L::jsonb)',
+           'google', 'g-1', 'Lucento', v_cipher, '{}',
+           jsonb_build_array(jsonb_build_object('kind', 'youtube', 'id', 'UCg8f6wbVTgYPnXBeMvD0FyA', 'name', 'Lucento'))));
+  r := r || case when (v_j ->> 'ok')::boolean and (select token_cipher from mc.autopost_connections where provider = 'meta') is null
+                      and (select token_cipher from mc.autopost_destinations where key = 'lucento_page') = v_page_cipher
+                      and v_k ->> 'error' = 'invalid'
+                      and (select token_cipher from mc.autopost_connections where provider = 'google') = v_page_cipher
+                 then 'ok  P38 a Meta account is kept without its user token (posting uses the Pages'' own); YouTube and TikTok still need theirs'
+                 else 'FAIL P38 ' || coalesce(v_j::text, '') || coalesce(v_k::text, '') end;
+
+  -- The post turned to by hand earlier is approved and its slot has passed; a new post's Reels start ahead of theirs.
+  update mc.marketing_cards set slot_day = (v_local - interval '1 minute')::date,
+                                slot_time = to_char(v_local - interval '1 minute', 'HH24:MI')::time where id = v_c6;
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-sec', v_soon_day, v_soon_time)));
+  perform pg_temp.decide(pg_temp.cid('A-sec'), 1, 'approve');
+  v_j := pg_temp.claim();
+  r := r || case when pg_temp.claimed(v_j, 'A-off', 'facebook_reel') is not null and pg_temp.claimed(v_j, 'A-off', 'youtube') is not null
+                      and (select count(*) from mc.autopost_events where job_id = (pg_temp.job(v_c6, 'facebook_reel')).id and kind = 'created') = 2
+                      and (pg_temp.job(v_c6, 'facebook_reel')).attempts = 0 and (pg_temp.job(v_c6, 'facebook_reel')).detail = '{}'::jsonb
+                      and pg_temp.claimed(v_j, 'A-sec', 'facebook_reel') is not null
+                 then 'ok  P39 a job cancelled earlier (account disconnected) starts over once its post can go out again'
+                 else 'FAIL P39 ' || left(coalesce(v_j::text, ''), 400) end;
+
+  -- The YouTube run dies after the slot (its lease lapses without a result); the Reels' run dies before theirs.
+  v_job := (pg_temp.job(v_c6, 'youtube')).id;
+  update mc.autopost_jobs set due_at = now() - interval '10 minutes', lease_until = now() - interval '1 second' where id = v_job;
+  update mc.autopost_jobs set lease_until = now() - interval '1 second' where card_id = pg_temp.cid('A-sec');
+  v_j := pg_temp.claim();
+  v_n := (pg_temp.job(v_c6, 'youtube')).attempts;
+  v_m := pg_temp.result(v_job, gen_random_uuid(), '{"status": "uncertain", "error": "late"}');
+  r := r || case when (pg_temp.job(v_c6, 'youtube')).status = 'uncertain' and (pg_temp.job(v_c6, 'youtube')).error_code = 'lease_lapsed'
+                      and (pg_temp.job(v_c6, 'youtube')).lease_id is null and pg_temp.claimed(v_j, 'A-off', 'youtube') is null
+                      and exists (select 1 from mc.autopost_events where job_id = v_job and kind = 'uncertain' and note = 'lease_lapsed')
+                      and pg_temp.claimed(v_j, 'A-sec', 'facebook_reel') is not null
+                      and (pg_temp.job(pg_temp.cid('A-sec'), 'facebook_reel')).status = 'queued'
+                      and (v_m ->> 'already')::boolean and (pg_temp.job(v_c6, 'youtube')).attempts = v_n
+                 then 'ok  P40 a step taken at its slot whose run never reported becomes uncertain, never handed out again; one taken before its slot only prepared and goes out again; a repeated "uncertain" changes nothing'
+                 else 'FAIL P40 ' || left(coalesce(v_j::text, ''), 400) end;
+
+  v_m := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''retry'')', v_job));
+  v_j := pg_temp.claim();
+  r := r || case when v_m ->> 'status' = 'queued' and pg_temp.claimed(v_j, 'A-off', 'youtube') is not null
+                      and (pg_temp.job(v_c6, 'youtube')).status = 'queued'
+                 then 'ok  P41 "Try again" clears the old lease, so the step is handed out again (not judged lapsed)'
+                 else 'FAIL P41 ' || coalesce(v_m::text, '') || left(coalesce(v_j::text, ''), 300) end;
+
+  v_m := pg_temp.owner_call(format('select mc_api.autopost_card(%L, 1, true)', v_c6));
+  r := r || case when v_m ->> 'error' = 'busy' and not (select autopost_off from mc.marketing_cards where id = v_c6)
+                 then 'ok  P42 "post this one by hand" waits while a step is under way (it may be posting right now)'
+                 else 'FAIL P42 ' || coalesce(v_m::text, '') end;
+
+  perform pg_temp.as_anon();
+  v_j := mc_api.ingest_autopost_token(v_app, 'tiktok', 'open-OTHER', v_page_cipher, now() + interval '1 day', null, null, null);
+  v_k := mc_api.ingest_autopost_token(v_app, 'tiktok', 'open-1', v_klaro_cipher, now() + interval '1 day', null, null, null);
+  execute 'reset role';
+  r := r || case when not (v_j ->> 'ok')::boolean and (v_k ->> 'ok')::boolean
+                      and (select token_cipher from mc.autopost_connections where provider = 'tiktok') = v_klaro_cipher
+                 then 'ok  P43 a renewed token is saved only for the account it was renewed for'
+                 else 'FAIL P43 ' || coalesce(v_j::text, '') || coalesce(v_k::text, '') end;
+
+  -- Off stops the steps waiting (not one under way); on again starts them over.
+  update mc.autopost_jobs set lease_until = now() - interval '1 second' where card_id = pg_temp.cid('A-sec');
+  v_m := pg_temp.owner_call('select mc_api.autopost_set_enabled(false)');
+  v_ok := (pg_temp.job(pg_temp.cid('A-sec'), 'facebook_reel')).status = 'cancelled'
+          and (pg_temp.job(v_c6, 'youtube')).status = 'queued';
+  v_k := pg_temp.owner_call('select mc_api.autopost_set_enabled(true)');
+  v_j := pg_temp.claim();
+  r := r || case when (v_m ->> 'ok')::boolean and v_ok and (v_k ->> 'ok')::boolean
+                      and pg_temp.claimed(v_j, 'A-sec', 'facebook_reel') is not null
+                 then 'ok  P44 turning auto-posting off stops the steps waiting (not one under way); on again starts them over'
+                 else 'FAIL P44 ' || coalesce(v_m::text, '') || left(coalesce(v_j::text, ''), 300) end;
+
   select string_agg(a, ',' order by a) into v_t from (
     select distinct substr(action, 11) as a from mc.audit_log where action like 'marketing.autopost%' and result = 'ok') x;
   r := r || case when v_t = 'autopost_by_hand,autopost_card_off,autopost_confirmed,autopost_connect,autopost_destination,autopost_disconnect,autopost_off,autopost_on,autopost_retry'
                       and not exists (select 1 from mc.audit_log where action like 'marketing.autopost%'
                                       and coalesce(detail, '') || coalesce(target_ref, '') || coalesce(before::text, '') || coalesce(after::text, '') like '%v1:%')
-                 then 'ok  P38 every auto-posting action is audited, never with a token'
-                 else 'FAIL P38 ' || coalesce(v_t, 'none') end;
+                 then 'ok  P45 every auto-posting action is audited, never with a token'
+                 else 'FAIL P45 ' || coalesce(v_t, 'none') end;
 
   raise exception E'VERIFY %/% failed\n%',
     (select count(*) from unnest(r) x where x like 'FAIL%'), array_length(r, 1), array_to_string(r, E'\n');
