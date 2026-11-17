@@ -17,7 +17,8 @@ posting run, the Marketing card) and the owner's setup (lucento-mission-control 
 3. After the slot the card shows each platform's result with a link (**Posted 19:31 · View**). TikTok says **"In your
    TikTok drafts: open TikTok and tap Post"**, and the existing "Did you post it on TikTok? [Yes]" follows.
 4. Something went wrong: the card and Overview say so (**"Instagram couldn't post Mon 19:30's video"**) with **Try
-   again** and **I'll post it by hand**. Mission Control never posts more than 3 hours late on its own.
+   again** and **I'll post it by hand**. Mission Control never posts more than 3 hours late on its own; a day or more
+   late, **Post it now** says how late and asks first.
 5. Before its slot, any post can still be undone, skipped or changed (nothing is posted), or turned to **"Post this one
    by hand"**. Turning auto-posting off stops everything not under way.
 
@@ -93,8 +94,11 @@ ciphertext.
 - **Out**: the first job posted (or sent to drafts, or taken by hand) sets `in_apps_version` to that version; `by_hand`
   gets the labels the owner still finishes (manual ones, a target sent to drafts or taken by hand, a target whose
   destination can't post and that didn't go out: not connected, disconnected or to reconnect), so the page asks "Did you
-  post it on …?" after the slot. A label Mission Control later posts on every platform (its account came back) leaves
-  `by_hand`. Nothing changes when the post was revised or undone meanwhile.
+  post it on …?" after the slot. A label shared by two platforms ("FB + IG Reels") whose one platform went out is kept
+  by its other platform's name ("Instagram Reels", `mc.autopost_by_hand_names`), so the question names only what is
+  still the owner's. A step that couldn't be confirmed (`uncertain`) isn't added: the owner looks first. A label Mission
+  Control later posts on every platform (its account came back) leaves `by_hand`. Nothing changes when the post was
+  revised or undone meanwhile.
 
 ## 5. SQL API
 
@@ -125,8 +129,10 @@ The board's cards gain `autopost {enabled, off, covers, posts_any, blocked, due_
 destination, mode, connected, destination_name, check_ok (false also while its account's renewal failed), checked_at,
 job (with `stop_note` when stopped)}]}`; the board gains `autopost` (the settings: the clock, connections, destinations
 with their last Check, and `work_due`); the summary gains `autopost {failed[], uncertain[], drafts_waiting[], counts,
-accounts {chosen, working, reconnect[], chosen_keys[], refused[]}}` (each list ≤ 10, by slot; one Page that
-can't post is named, not its whole account).
+accounts {chosen, working, reconnect[], chosen_keys[], refused[]}, clock {set, last_run, work_due}}` (each list ≤ 10,
+by slot; one Page that can't post is named, not its whole account). The lists keep an approved post's problems until
+they are handled, however old (owner, 17 Nov): a step stopped after its window closed (not by the owner, not blocked)
+is listed with the failed ones (`stopped`). Each card's job says `confirmed` when the owner answered "It's posted".
 
 ## 6. Console
 
@@ -167,8 +173,15 @@ can't post is named, not its whole account).
   when a Check just turned it so. With nothing that can post, the switch steps back ("Turn auto-posting on anyway").
   Turning on checks every account; an answer that still needs the owner is a warning. The posting clock: a label, its
   state (Set up, Not set up, Stalled) and, when it stalled with something due, what to check in Supabase.
+- Settings (design review round 3): the account's notice is the one place that says "reconnect" (its header chip gives
+  way to it); its rows say what that means for them ("Can't post · checked 2 min ago"). The technical aside is a
+  sentence ("If MC_TOKEN_KEY was changed in Vercel since this account was connected, the saved sign-in can no longer
+  be opened."). A stalled clock leads the switch ("On · nothing is posting"); with every account refused it says "On,
+  but nothing posts: every account below needs a reconnect." Rows let Check wrap under them at large text. Disconnect
+  says what happens per platform (Facebook's is removed in Facebook; Google and TikTok are withdrawn there).
 - Marketing and Overview: while auto-posting is on and accounts can't post, one line says so at the top of Marketing
-  and in Overview's "Needs you now", with the way to Settings.
+  and in Overview's "Needs you now", with the way to Settings. A posting clock that stopped with something due comes
+  first ("Auto-posting is on, but nothing is posting: the posting clock has stopped (its last run was 3 h ago)").
 - Marketing card: while auto-posting is on every post has a plan sentence, also one the owner posts all of ("Mission
   Control doesn't post this one: you post it in the Lucento Community group at the time"). Before the slot it names
   both sides ("posts it on Facebook, Instagram and YouTube Mon 19:30. TikTok goes to your drafts…; you post it on … at
@@ -182,6 +195,16 @@ can't post is named, not its whole account).
   (not blocked, an account that can post). The chip, banner and filters agree: "Partly posted · 2 need you" counts a
   platform that failed, couldn't be confirmed or was stopped after another went out; "Approved · reconnect needed"
   when every account it would go to needs one.
+- Marketing card (design review round 3): a step whose account can't post says "Won't post: reconnect needed" ("Post it
+  yourself, or reconnect YouTube in Settings"), and one waiting on a stopped clock "Waiting for the posting clock": the
+  chip and the "Needs you" filter count both, never "Posting…". A launch post approved early names where it goes on the
+  one condition ("posts it on Facebook, Instagram and YouTube Mon 19:30 if you've marked Lucento as live by then"). A
+  day or more late, the button says how late ("Post it now (2 days late)") and asks first (owner, 17 Nov: nothing goes
+  out late by surprise). "Posted · you confirmed it" when the owner answered for an unconfirmed step. A platform whose
+  app isn't set up says "Not set up" (no Connect offer), and no advice once its window is over. Where the card's own
+  "I posted it / Don't post it" block shows, the panel's buttons are secondary. A group post says what approving means
+  ("approve it, then you post it in the Lucento Community group at the time"); the page subtitle says what auto-posting
+  does. A code prompt can be put away (Cancel).
 
 ## 7. Security and privacy
 
@@ -202,11 +225,12 @@ can't post is named, not its whole account).
 
 ## 8. Tests
 
-- SQL `tools/sql-verify/autopost_suite.sql` (54 checks: secrets and grants, the map, due times, connections and picks,
+- SQL `tools/sql-verify/autopost_suite.sql` (56 checks: secrets and grants, the map, due times, connections and picks,
   every job step and refusal, coverage and due_soon, cancellations (with why) and starting over, missed, a run that
   never reported, busy, renewals for one account only, Meta without a user token, posts in the apps by hand and launch
   posts blocked, Checks kept and cleared, `work_due`, stopped steps sent now or taken by hand, the accounts' health, a
-  refused account posting nothing until reconnected, a disconnected platform asked about, launch rules, the clock's
+  refused account posting nothing until reconnected, a disconnected platform asked about, by hand per platform, the
+  summary keeping problems until handled (stopped ones too) with the clock, a confirmed post, launch rules, the clock's
   guards, the board, the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once: each job handed out once).
   `catch_up_check.mjs` part E pastes APPLY_AUTOPOST.sql the owner's way.
 - Console (`lucento-mission-control`): unit tests `autopost-crypto` (encryption, additional data, the state cookie,

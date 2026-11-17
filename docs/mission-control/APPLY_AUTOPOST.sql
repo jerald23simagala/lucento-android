@@ -132,6 +132,20 @@ as $$
     ) as t(key, target, destination, mode) on t.key = lower(btrim(l.label))
 $$;
 
+-- What "Did you post it on …?" may name: the post's labels, and one platform of a two-platform label ("Instagram Reels"
+-- of "FB + IG Reels") when Mission Control posted the other (design review round 3).
+create or replace function mc.autopost_by_hand_names(p_platforms text[])
+returns text[]
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_platforms, '{}'::text[])
+         || coalesce(array(select distinct case t.target when 'facebook_reel' then 'Facebook Reels' else 'Instagram Reels' end
+                           from mc.autopost_targets(p_platforms) t
+                           where t.target in ('facebook_reel', 'instagram_reel')), '{}'::text[])
+$$;
+
 -- When a post is due: its time on its day, or 10:00 for an "any time" day, in the pack's time zone.
 create or replace function mc.autopost_due_at(p_day date, p_time time, p_tz text)
 returns timestamptz
@@ -265,6 +279,11 @@ create table if not exists mc.autopost_state (
   updated_at timestamptz not null default now()
 );
 insert into mc.autopost_state (id) values (true) on conflict (id) do nothing;
+
+-- by_hand may name one platform of a label (mc.autopost_by_hand_names); the marketing module's own check named labels only.
+alter table mc.marketing_cards drop constraint if exists marketing_cards_by_hand_platforms;
+alter table mc.marketing_cards add constraint marketing_cards_by_hand_platforms
+  check (by_hand <@ mc.autopost_by_hand_names(platforms));
 
 -- ================================================================================================ rules
 -- Why Mission Control won't post this post whatever its approval, or null:
@@ -443,6 +462,8 @@ as $$
                              'error_code', j.error_code, 'due_at', j.due_at, 'late_until', j.late_until,
                              'finished_at', j.finished_at,
                              'next_try_at', j.next_try_at, 'updated_at', j.updated_at,
+                             'confirmed', exists (select 1 from mc.autopost_events e
+                                                  where e.job_id = j.id and e.kind = 'confirmed_posted'),
                              'stop_note', case when j.status = 'cancelled' then
                                             (select e.note from mc.autopost_events e
                                              where e.job_id = j.id and e.kind = 'cancelled' order by e.id desc limit 1) end)
@@ -485,9 +506,11 @@ as $$
     'work_due', mc.autopost_work_due())
 $$;
 
--- For the summary and Overview: posts whose automatic posting failed, couldn't be confirmed, or sit in TikTok drafts;
--- and the accounts' health (destinations chosen, those that should work, the platforms that need a reconnect: a refused
--- Check or a failed token renewal), so Overview can say when auto-posting is on but can't post.
+-- For the summary and Overview: approved posts whose automatic posting failed (or stopped and can no longer start
+-- again: its window is over), couldn't be confirmed, or sits in TikTok drafts, each until the owner handles it (owner,
+-- design review round 3: no week's limit); the accounts' health (destinations chosen, those that should work, the
+-- platforms that need a reconnect: a refused Check or a failed token renewal); and the posting clock, so Overview can
+-- say when auto-posting is on but can't post, or nothing is posting.
 create or replace function mc.autopost_summary_json()
 returns jsonb
 language sql
@@ -495,34 +518,43 @@ stable
 security definer
 set search_path = ''
 as $$
-  with problems as (
-    select j.*, c.key as card_key, c.title, c.slot_label, c.state, c.current_version, c.by_hand_done_at, p.key as pack_key,
-           row_number() over (partition by case when j.status = 'sent_to_drafts' then 'drafts' else j.status end
-                              order by j.due_at, j.target) as rn
+  with found as (
+    select j.*, case when j.status = 'cancelled' then 'failed' else j.status end as kind,
+           c.key as card_key, c.title, c.slot_label, c.state, c.current_version, c.by_hand_done_at, p.key as pack_key
     from mc.autopost_jobs j
     join mc.marketing_cards c on c.id = j.card_id
     join mc.marketing_packs p on p.id = c.pack_id
-    where j.version = c.current_version and c.state not in ('skipped', 'withdrawn')
-      and ((j.status in ('failed', 'uncertain') and j.updated_at > now() - interval '7 days')
-           or (j.status = 'sent_to_drafts' and c.by_hand_done_at is null and j.finished_at > now() - interval '3 days'))
+    where j.version = c.current_version and c.state = 'approved'
+      and (j.status in ('failed', 'uncertain')
+           or (j.status = 'sent_to_drafts' and c.by_hand_done_at is null)
+           or (j.status = 'cancelled' and not c.autopost_off and mc.autopost_blocked(c.id) is null
+               and now() >= mc.autopost_late_until(c.slot_day, c.slot_time, p.tz)))
+  ), problems as (
+    select f.*, row_number() over (partition by case when f.kind = 'sent_to_drafts' then 'drafts' else f.kind end
+                                   order by f.due_at, f.target) as rn
+    from found f
   )
   select jsonb_build_object('enabled', mc.setting_on('autopost_enabled'),
     'failed', coalesce((select jsonb_agg(jsonb_build_object('pack', x.pack_key, 'card', x.card_key, 'card_id', x.card_id,
-                 'title', x.title, 'target', x.target, 'label', x.label, 'error', x.error, 'error_code', x.error_code,
+                 'title', x.title, 'target', x.target, 'label', x.label, 'error', x.error,
+                 'error_code', case when x.status = 'cancelled' then 'stopped' else x.error_code end,
                  'slot', x.due_at, 'slot_label', x.slot_label, 'at', x.updated_at) order by x.due_at, x.target)
-               from problems x where x.status = 'failed' and x.rn <= 10), '[]'::jsonb),
+               from problems x where x.kind = 'failed' and x.rn <= 10), '[]'::jsonb),
     'uncertain', coalesce((select jsonb_agg(jsonb_build_object('pack', x.pack_key, 'card', x.card_key, 'card_id', x.card_id,
                  'title', x.title, 'target', x.target, 'label', x.label, 'error', x.error, 'slot', x.due_at,
                  'slot_label', x.slot_label, 'at', x.updated_at) order by x.due_at, x.target)
-               from problems x where x.status = 'uncertain' and x.rn <= 10), '[]'::jsonb),
+               from problems x where x.kind = 'uncertain' and x.rn <= 10), '[]'::jsonb),
     'drafts_waiting', coalesce((select jsonb_agg(jsonb_build_object('pack', x.pack_key, 'card', x.card_key,
                  'card_id', x.card_id, 'title', x.title, 'target', x.target, 'label', x.label, 'slot', x.due_at,
                  'slot_label', x.slot_label, 'at', x.finished_at) order by x.due_at)
-               from problems x where x.status = 'sent_to_drafts' and x.rn <= 10), '[]'::jsonb),
+               from problems x where x.kind = 'sent_to_drafts' and x.rn <= 10), '[]'::jsonb),
     'counts', jsonb_build_object(
-      'failed', (select count(*) from problems x where x.status = 'failed'),
-      'uncertain', (select count(*) from problems x where x.status = 'uncertain'),
-      'drafts_waiting', (select count(*) from problems x where x.status = 'sent_to_drafts')),
+      'failed', (select count(*) from problems x where x.kind = 'failed'),
+      'uncertain', (select count(*) from problems x where x.kind = 'uncertain'),
+      'drafts_waiting', (select count(*) from problems x where x.kind = 'sent_to_drafts')),
+    'clock', (select jsonb_build_object('set', s.clock_set_at is not null,
+                'last_run', coalesce(s.last_claim_at, s.last_kick_at), 'work_due', mc.autopost_work_due())
+              from mc.autopost_state s where s.id),
     'accounts', (select jsonb_build_object('chosen', count(*), 'working', count(*) filter (where x.ok),
                    'reconnect', coalesce(jsonb_agg(distinct x.provider order by x.provider) filter (where not x.ok), '[]'::jsonb),
                    'chosen_keys', coalesce(jsonb_agg(x.key order by x.key), '[]'::jsonb),
@@ -532,9 +564,11 @@ as $$
 $$;
 
 -- After a job posted (or sent to drafts, or the owner took it by hand): the post is out at its version. The first such
--- job marks the version as in the apps; the labels the owner still finishes by hand (manual ones, TikTok drafts, and any
--- the owner took over) go into by_hand, so the page asks "Did you post it on …?" after the slot. Nothing changes when
--- the post was revised or undone meanwhile.
+-- job marks the version as in the apps; what the owner still finishes by hand (manual labels, TikTok drafts, and any
+-- platform the owner took over) goes into by_hand, so the page asks "Did you post it on …?" after the slot. A label is
+-- named whole only when every platform of it is the owner's; else just those platforms are ("Instagram Reels" when the
+-- Facebook Reel went out), so the page never asks about one Mission Control posted (design review round 3). Nothing
+-- changes when the post was revised or undone meanwhile.
 create or replace function mc.autopost_mark_out(p_job uuid)
 returns void
 language plpgsql
@@ -552,25 +586,31 @@ begin
   if not found or v_c.current_version <> v_j.version then
     return;
   end if;
-  -- Labels the owner finishes: manual ones; a label with a target sent to drafts or taken by hand; a label with a
-  -- target whose destination can't post (not connected, disconnected or to reconnect) and that didn't go out.
-  select coalesce(array_agg(x.label order by x.ord), '{}') into v_by_hand
+  -- The owner's: a manual label; a target sent to drafts or taken by hand; a target whose destination can't post (not
+  -- connected, disconnected or to reconnect) and that didn't go out (one that may have, uncertain, has its own buttons).
+  select coalesce(array_agg(y.name order by y.ord), '{}') into v_by_hand
   from (
-    select t.label, min(t.ord) as ord
-    from mc.autopost_targets(v_c.platforms) t
-    left join mc.autopost_jobs j on j.card_id = v_c.id and j.version = v_j.version and j.target = t.target
-    group by t.label
-    having bool_or(t.target is null)
-        or coalesce(bool_or(j.status in ('sent_to_drafts', 'by_hand')), false)
-        or bool_or(t.target is not null and coalesce(j.status, '') not in ('posted', 'sent_to_drafts')
-                   and not mc.autopost_destination_ok(t.destination))
-  ) x;
+    select case when z.whole then z.label else z.platform end as name, min(z.ord) as ord
+    from (
+      select t.label, t.ord, b.mine, bool_and(b.mine) over (partition by t.label) as whole,
+             case t.target when 'facebook_reel' then 'Facebook Reels' when 'instagram_reel' then 'Instagram Reels'
+                           else t.label end as platform
+      from mc.autopost_targets(v_c.platforms) t
+      left join mc.autopost_jobs j on j.card_id = v_c.id and j.version = v_j.version and j.target = t.target
+      cross join lateral (select t.target is null
+                                 or coalesce(j.status in ('sent_to_drafts', 'by_hand'), false)
+                                 or (coalesce(j.status, '') not in ('posted', 'sent_to_drafts', 'uncertain')
+                                     and not mc.autopost_destination_ok(t.destination)) as mine) b
+    ) z
+    where z.mine
+    group by case when z.whole then z.label else z.platform end
+  ) y;
   if v_c.in_apps_version is distinct from v_j.version then
     update mc.marketing_cards c set in_apps_version = v_j.version, by_hand = v_by_hand, by_hand_done_at = null,
       updated_at = now()
       where c.id = v_c.id;
   else
-    -- A label Mission Control has now posted on every platform (its account came back) is never asked about again.
+    -- A label (or a platform of one) Mission Control has now posted (its account came back) is never asked about again.
     update mc.marketing_cards c
       set by_hand = (select coalesce(array_agg(distinct l), '{}') from unnest(c.by_hand || v_by_hand) l
                      where l not in (select x.label from (
@@ -579,7 +619,11 @@ begin
                                        left join mc.autopost_jobs j on j.card_id = v_c.id and j.version = v_j.version
                                                                    and j.target = t.target
                                        group by t.label) x
-                                     where x.all_posted)),
+                                     where x.all_posted)
+                       and l not in (select case j.target when 'facebook_reel' then 'Facebook Reels' else 'Instagram Reels' end
+                                     from mc.autopost_jobs j
+                                     where j.card_id = v_c.id and j.version = v_j.version and j.status = 'posted'
+                                       and j.target in ('facebook_reel', 'instagram_reel'))),
           updated_at = now()
       where c.id = v_c.id;
   end if;

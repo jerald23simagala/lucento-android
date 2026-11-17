@@ -868,13 +868,53 @@ begin
                  then 'ok  P53 reconnected, the stopped steps start over; a label Mission Control then posts is no longer asked about'
                  else 'FAIL P53 ' || coalesce(v_m::text, '') || left(coalesce(v_j::text, ''), 300) end;
 
+  -- ======================================================================== L: after the design review, round 3
+  -- "Did you post it on …?" names the platform the owner took over, never the label whose other platform went out.
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-plat', (v_local - interval '1 minute')::date,
+             to_char(v_local - interval '1 minute', 'HH24:MI'), jsonb_build_object('platforms', jsonb_build_array('FB + IG Reels')))));
+  perform pg_temp.decide(pg_temp.cid('A-plat'), 1, 'approve');
+  v_j := pg_temp.claim();
+  v_k := pg_temp.claimed(v_j, 'A-plat', 'facebook_reel');
+  v_m := pg_temp.result((v_k ->> 'id')::uuid, (v_k ->> 'lease_id')::uuid,
+           '{"status": "posted", "external_id": "r1", "external_url": "https://www.facebook.com/reel/r1"}');
+  update mc.autopost_jobs set lease_id = null, lease_until = null where card_id = pg_temp.cid('A-plat') and target = 'instagram_reel';
+  v_b := pg_temp.owner_call(format('select mc_api.autopost_job_action(%L, ''by_hand'')',
+           (pg_temp.job(pg_temp.cid('A-plat'), 'instagram_reel')).id));
+  r := r || case when (v_m ->> 'ok')::boolean and v_b ->> 'status' = 'by_hand'
+                      and (select by_hand from mc.marketing_cards where id = pg_temp.cid('A-plat')) = '{Instagram Reels}'
+                 then 'ok  P54 taking Instagram over after the Facebook Reel went out asks about Instagram Reels, never Facebook'
+                 else 'FAIL P54 ' || coalesce(v_b::text, '') || coalesce((select by_hand::text from mc.marketing_cards where id = pg_temp.cid('A-plat')), '') end;
+
+  -- Overview keeps a failure until it's handled (older than a week too) and lists a step stopped past its window; the
+  -- summary carries the posting clock; a post the owner confirmed is marked so on its card.
+  update mc.autopost_jobs set status = 'failed', error = 'Facebook refused the post.', error_code = 'refused', lease_id = null,
+    lease_until = null, finished_at = now() - interval '10 days', updated_at = now() - interval '10 days'
+    where card_id = pg_temp.cid('A-refused') and target = 'facebook_photo';
+  perform pg_temp.push(jsonb_build_array(pg_temp.mk_card('A-old', (v_local - interval '5 hours')::date,
+             to_char(v_local - interval '5 hours', 'HH24:MI'),
+             jsonb_build_object('kind', 'post', 'platforms', jsonb_build_array('Lucento Facebook Page')))));
+  perform pg_temp.decide(pg_temp.cid('A-old'), 1, 'approve');
+  insert into mc.autopost_jobs (card_id, version, target, destination, label, due_at, late_until, status, finished_at)
+    values (pg_temp.cid('A-old'), 1, 'facebook_photo', 'lucento_page', 'Lucento Facebook Page', now() - interval '5 hours',
+            now() - interval '2 hours', 'cancelled', now() - interval '5 hours');
+  v_s := pg_temp.summary();
+  v_b := pg_temp.board();
+  r := r || case when exists (select 1 from jsonb_array_elements(v_s #> '{autopost,failed}') x where x ->> 'card' = 'A-refused')
+                      and exists (select 1 from jsonb_array_elements(v_s #> '{autopost,failed}') x
+                                  where x ->> 'card' = 'A-old' and x ->> 'error_code' = 'stopped')
+                      and (v_s #> '{autopost,clock}') ? 'last_run' and (v_s #> '{autopost,clock,work_due}') is not null
+                      and (select bool_or((x #>> '{job,confirmed}')::boolean) from jsonb_array_elements(pg_temp.cardj(v_b, 'A-soon') #> '{autopost,targets}') x
+                           where x ->> 'target' = 'facebook_reel')
+                 then 'ok  P55 Overview keeps a failure until it''s handled and lists a step stopped past its window; the summary carries the clock; a post the owner confirmed says so'
+                 else 'FAIL P55 ' || left(coalesce((v_s -> 'autopost')::text, ''), 500) end;
+
   select string_agg(a, ',' order by a) into v_t from (
     select distinct substr(action, 11) as a from mc.audit_log where action like 'marketing.autopost%' and result = 'ok') x;
   r := r || case when v_t = 'autopost_by_hand,autopost_card_off,autopost_confirmed,autopost_connect,autopost_destination,autopost_disconnect,autopost_off,autopost_on,autopost_retry'
                       and not exists (select 1 from mc.audit_log where action like 'marketing.autopost%'
                                       and coalesce(detail, '') || coalesce(target_ref, '') || coalesce(before::text, '') || coalesce(after::text, '') like '%v1:%')
-                 then 'ok  P54 every auto-posting action is audited, never with a token'
-                 else 'FAIL P54 ' || coalesce(v_t, 'none') end;
+                 then 'ok  P56 every auto-posting action is audited, never with a token'
+                 else 'FAIL P56 ' || coalesce(v_t, 'none') end;
 
   raise exception E'VERIFY %/% failed\n%',
     (select count(*) from unnest(r) x where x like 'FAIL%'), array_length(r, 1), array_to_string(r, E'\n');

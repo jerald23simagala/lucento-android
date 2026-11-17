@@ -350,7 +350,8 @@ nothing added without a valid id. README and SECURITY_CONSIDERATIONS §7 updated
 Layout (phone-first column, max ≈ 42rem; every control ≥ 48 px on touch screens; works at 200 % text with no sideways
 scroll):
 - Nav: **Marketing** second (after Overview), badge `nav_badges.marketing` (missing key = 0).
-- Header: "Marketing" · "Posts Claude prepared for your yes. Schedule them from here." · on TEST: "These posts are real.
+- Header: "Marketing" · "Posts Claude prepared for your yes. Schedule them from here." (with auto-posting on: "…Mission
+  Control posts approved ones at their slots; the rest you schedule from here.", MARKETING_AUTOPOST.md) · on TEST: "These posts are real.
   TEST refers to the database." · one-line launch strip on phones (Closed test day N of 16 · Apply Mon 30 Nov · Launch
   expected 1–8 Dec / "Live on Google Play since Tue 2 Dec, 10:00"). "Claude last checked your requests 2 h ago" with a
   **Copy** button for "Check Mission Control marketing requests".

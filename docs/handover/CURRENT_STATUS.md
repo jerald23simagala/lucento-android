@@ -603,10 +603,11 @@ needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mi
   per post, version and platform (created within its lead time, stepped under a 3-minute lease, re-checked at every
   step), events and the clock (pg_cron every minute → pg_net → the console's tick, with its own Vault secret). Ten
   owner functions behind `mc.gate`, three ingest functions for the console. An account whose Check refused (or whose
-  renewal failed) posts nothing until reconnected; every stop records why (design review round 2). Not applied
-  anywhere yet (OT-36).
-- **Tests:** `tools/sql-verify` 11 suites, **510 checks, 0 failed** under both default-privilege variants
-  (`autopost_suite.sql` 54); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
+  renewal failed) posts nothing until reconnected; every stop records why (design review round 2); a two-platform
+  label is asked about by the platform still the owner's, and the summary keeps an approved post's problems until
+  handled, with the clock's state (round 3). Not applied anywhere yet (OT-36).
+- **Tests:** `tools/sql-verify` 11 suites, **512 checks, 0 failed** under both default-privilege variants
+  (`autopost_suite.sql` 56); the races **11/11** on a real Postgres (MC6: two posting runs claim at once, each job
   handed out once); `catch_up_check.mjs` passes, including APPLY_AUTOPOST pasted twice (part E).
 - **Console** (`lucento-mission-control` PR #12, `feature/autopost`): Settings › Auto-posting (the switch, the posting
   clock with a stalled-clock warning, each platform's account with Connect / Reconnect / Check / Disconnect and each
@@ -624,8 +625,13 @@ needed." Owner choice: all four platforms, TikTok via drafts. Contract: `docs/mi
   platform with no way back, the footer contradicting the results, the fix least visible in Settings, Page posts
   silent, no warning where the owner looks) all fixed: the switch says what will post, stopped posts say why with Post
   it now / I'll post it by hand, one notice per account with Reconnect first, a plan line on every post, a line on
-  Marketing and Overview, 48 px fields. Round 3 next (the last before escalating); studio
-  `critic/reports/2026-11-17-autopost-ui-r1.md`, `-r2.md`.
+  Marketing and Overview, 48 px fields. Round 3 (REJECT 3.2: Marketing scrolled sideways from 130 % text; a stalled
+  posting clock hidden where the owner looks; a step stuck after "Post it now" shown as "Posting…" and counted done; a
+  false "No other post waits for you"; by hand asked per label, risking a second Facebook post; plus plan sentences,
+  TikTok's "connect it" with no Connect button, old failures off Overview, and copy): escalated; the owner chose "fix
+  all, review again", a confirmation before posting a day or more late, failures kept until handled, Next 16.4.6
+  (MC-13) and every marketing post moved one week. All fixed but the week picker's count (notes); round 4 next (merge
+  only on APPROVE). Studio `critic/reports/2026-11-17-autopost-ui-r1.md`, `-r2.md`, `-r3.md`.
 
 ## Mission Control › Marketing approvals — 2026-11-16 (database: `feature/mc-marketing`; console: `lucento-mission-control` `feature/marketing`; tool: lucento-studio `6edd819`)
 
