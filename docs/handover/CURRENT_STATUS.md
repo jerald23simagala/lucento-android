@@ -554,6 +554,15 @@ sentence, and its silence settings are only hints:
 **Owner's call (2026-11-13):** "push and merge when green". Then 0.5.8 with #65. At that release the Privacy Policy
 date goes to the release day and the website's `/privacy` is re-exported (KNOWN_ISSUES VI-3).
 
+## Release 0.5.12 (version code 17) — 2026-11-17 (`release/0.5.12`)
+
+The owner chose "Build 0.5.12 + publish site" after #95. The only app change since 0.5.11 is #95: Ask Lucento's AI
+answers are on by default for a signed-in account, Free included (10 questions a month), and the first question shows
+what would be sent before anything leaves the phone; the free plan's allowance now says "this month" (KNOWN_ISSUES
+AI-1…4). The Privacy Policy and Terms go to version **2026-11-17**, and the website's /privacy, privacy table and FAQ
+are published with this build (lucento-website PR #36). Owner: upload to internal testing, then OT-36 (and OT-35 if
+0.5.11 wasn't uploaded: 0.5.12 carries its edge-to-edge fix too).
+
 ## Release 0.5.11 (version code 16) — 2026-11-16 (`release/0.5.11`)
 
 The owner asked for a build that clears Play Console's edge-to-edge warnings on 0.5.10 ("Proceed"). App changes since
