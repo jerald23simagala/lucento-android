@@ -553,6 +553,11 @@ class SettingsViewModel(
         viewModelScope.launch { preferences.setFxRatesOnline(enabled) }
     }
 
+    /** Settings › Money › "Show cents" (tester round, 2026-11-17): a display choice, nothing recorded changes. */
+    fun setShowCents(enabled: Boolean) {
+        viewModelScope.launch { preferences.setShowCents(enabled) }
+    }
+
     /** Switching a module never touches its data; it only changes what is shown. */
     /** Online voice; the screen shows the consent before passing true. */
     fun setOnlineVoice(enabled: Boolean) {

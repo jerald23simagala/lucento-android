@@ -151,4 +151,15 @@ class ThemeContrastTest {
         }
         assertNoFailures()
     }
+
+    @Test
+    fun `home shortcut glyphs stay legible on their tiles and on the page`() {
+        for ((name, palette) in lightPalettes + darkPalettes) {
+            val shortcuts = palette.extended.shortcuts
+            listOf("Goals", "Insights", "Awards", "Debts", "Scheduled").zip(shortcuts.all).forEach { (label, tone) ->
+                check(name, 3.0, tone.content, tone.container, "$label shortcut glyph on its tile")
+            }
+        }
+        assertNoFailures()
+    }
 }
