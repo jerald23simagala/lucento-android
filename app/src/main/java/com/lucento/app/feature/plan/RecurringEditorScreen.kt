@@ -333,8 +333,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
             .padding(horizontal = Spacing.gutter)
             .padding(top = Spacing.xs, bottom = Spacing.md),
     ) {
-        // Five kinds don't fit a segmented control at large text sizes: a dropdown then (tester round, 2026-11-17).
-        if (kinds.size > 4) {
+        // A segmented control only while every label fits (tester round, 2026-11-17: at 200 % text four segments cut
+        // "Income" and "Transfer"); otherwise a dropdown, which never clips.
+        val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+        val asDropdown = kinds.size > 4 || (kinds.size == 4 && fontScale > 1.15f) || (kinds.size == 3 && fontScale > 1.5f)
+        if (asDropdown) {
             IconFieldHeader(Icons.Outlined.Category, "Type")
             FilledDropdown(
                 label = "Type",

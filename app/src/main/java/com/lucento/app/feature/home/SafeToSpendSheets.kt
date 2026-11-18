@@ -230,9 +230,8 @@ private fun ExplainLine(label: String, money: Money) {
             label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Never cut off: at large text sizes a line wraps, so its date and name stay readable.
             modifier = Modifier.weight(1f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(Spacing.sm))
         AmountText(money, style = AmountStyles.row)
