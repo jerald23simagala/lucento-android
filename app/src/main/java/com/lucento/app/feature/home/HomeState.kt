@@ -50,6 +50,13 @@ data class BudgetFormula(
     /** Unpaid scheduled bills (any category; a debt payment's interest only) due by month end; null outside the current month. */
     val billsDue: Money?,
     val safeToSpend: Money?,
+    /**
+     * Tester round (2026-11-17): Safe to spend is the lower of what the budget allows and what the spending money allows.
+     * True when the money set it — the card then says so, since Remaining − Bills due is no longer the figure.
+     */
+    val limitedByMoney: Boolean = false,
+    /** With [limitedByMoney]: the spending wallets add up to zero or less, so there was nothing to spend to begin with. */
+    val moneyEmpty: Boolean = false,
 ) {
     /** Remaining reads "Overspent" (red) once spending passes the budget, "Remaining" (green) otherwise. */
     val overspent: Boolean get() = remaining.isNegative
@@ -59,6 +66,35 @@ data class BudgetFormula(
 
     /** Nothing is left to spend safely: bills due or overspending have taken the rest. The card then reads 0, in red. */
     val nothingSafe: Boolean get() = safeToSpend != null && safeToSpend.amountMinor <= 0L
+
+    /** Why Safe to spend reads what it does, when it needs saying: the spending money, overspending, bills due. */
+    val safeCaption: String?
+        get() = if (safeToSpend == null) null else caption(limitedByMoney, moneyEmpty, nothingSafe, overspent)
+
+    companion object {
+        const val CAPTION_MONEY_LIMITS = "Limited by your spending money"
+        const val CAPTION_MONEY_TAKEN = "What’s due takes your spending money"
+        const val CAPTION_MONEY_EMPTY = "Your spending wallets show no money"
+        const val CAPTION_OVER_BUDGET = "You’re over budget this month"
+        const val CAPTION_BILLS = "Bills due take what’s left"
+
+        /**
+         * The one reason Home's card, the Budget tile and the widget give, by its cause — empty spending wallets aren't
+         * "what's due" (QA, 2026-11-17). Null when the figure needs no reason.
+         */
+        fun caption(limitedByMoney: Boolean, moneyEmpty: Boolean, nothingSafe: Boolean, overspent: Boolean): String? = when {
+            limitedByMoney && moneyEmpty -> CAPTION_MONEY_EMPTY
+            limitedByMoney && nothingSafe -> CAPTION_MONEY_TAKEN
+            limitedByMoney -> CAPTION_MONEY_LIMITS
+            !nothingSafe -> null
+            overspent -> CAPTION_OVER_BUDGET
+            else -> CAPTION_BILLS
+        }
+
+        /** Whether [safe] was set by spending wallets that add up to zero or less. */
+        fun moneyEmpty(safe: SafeToSpend?): Boolean =
+            safe?.limitedByMoney == true && safe.moneyOnHand?.total?.let { it.amountMinor <= 0L } == true
+    }
 
     /** The figure the card shows: what is safe to spend, never below zero (owner, 2026-11-03). Null for a past month. */
     val safeToSpendShown: Money? get() = safeToSpend?.let { if (it.amountMinor < 0L) Money.zero(it.currencyCode) else it }
@@ -379,8 +415,9 @@ data class HomeUiState(
     /** Upcoming scheduled items due by the end of [month] (overdue included); empty for past months. */
     val scheduledThisMonth: List<UpcomingPayment> = emptyList(),
     /**
-     * Credit card payments due by the end of [month] (overdue included), from each card's billing days — reminders only,
-     * never part of [safeToSpend] (CreditCardMath). Empty for past months.
+     * Credit card payments due by the end of [month] (overdue included), from each card's billing days (CreditCardMath):
+     * reminders, never spending; Safe to spend's spending money sets them aside from the account that pays them
+     * (MoneyOnHand, tester round 2026-11-17). Empty for past months.
      */
     val cardDues: List<com.lucento.app.domain.CardDue> = emptyList(),
     /** Card payments overdue or due within a week, for the header bell beside [dueSoon]. */
@@ -505,7 +542,9 @@ object HomeStateBuilder {
             balanceHistory = history,
             balanceTrend = com.lucento.app.domain.BalanceHistory.comparableTrendPercent(history, valued, focus),
             safeToSpend = if (plan?.hasBudget == true && shown == current) {
-                CashflowCalculator.safeToSpend(focus, today, recorded, valued, budgets, activeSchedules, categories)
+                // Schedules from a valued foreign wallet at that wallet's rate, as its balance is (tester round, 2026-11-17).
+                val valuedSchedules = com.lucento.app.domain.fx.FxTranslation.valueSchedules(ledger, activeSchedules)
+                CashflowCalculator.safeToSpend(focus, today, recorded, valued, budgets, valuedSchedules, categories)
                     ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
             } else {
                 null
@@ -548,6 +587,8 @@ object HomeStateBuilder {
         remaining = plan.remaining,
         billsDue = safe?.committed,
         safeToSpend = safe?.amount,
+        limitedByMoney = safe?.limitedByMoney == true,
+        moneyEmpty = BudgetFormula.moneyEmpty(safe),
     )
 
     /** The dashboard's scheduled section lists at most this many. */

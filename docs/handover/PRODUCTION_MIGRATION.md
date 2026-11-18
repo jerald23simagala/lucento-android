@@ -1,5 +1,29 @@
 # Production migration runbook — 2026-11-03
 
+## Pending: wallet kinds, spending money and scheduled transfers (app schema v14, PR #101)
+
+**Status: not applied anywhere yet (owner to-do OT-38: lucento-test first, then production).** Owner-run, like the
+migrations below.
+
+| Migration | Effect | Data risk |
+|---|---|---|
+| `20261119090000_wallet_kinds_and_spending_money` | `wallets.kind`, `icon_key` (text), `spendable` (boolean), `spendable_credit_minor` (bigint), all nullable; `wallets_type_known` re-created with `INVESTMENT`, `recurring_type_known` with `TRANSFER_OUT`; four new checks on live rows (`NOT VALID`) | None: the new columns are null on every existing row, and no existing row is re-checked |
+
+- **Apply to lucento-test before a v14 debug build signs in there, and to production before any v14 release.** Without
+  it the server refuses an investment wallet, a wallet with a kind, an icon or a spending choice, and a scheduled
+  transfer. A refusal holds back the whole upload batch it is in, so other wallet or schedule changes in that batch
+  wait too, and transfers into a refused wallet wait with it (QA review, 2026-11-17). Nothing is lost: it all uploads
+  once the migration is applied.
+- Apply: paste `docs/handover/apply-v14-wallet-kinds.sql` into the SQL editor. It runs as one transaction, records
+  itself in the migration history when the project keeps one, and ends with one row of checks that should all read
+  `true`. Tested on PGlite (Postgres 17) on top of every earlier migration: pasted once and twice, with and without a
+  history table, then with live rows (an investment with a kind saves; a malformed kind, negative counted credit, and a
+  transfer schedule to itself or to nowhere are refused).
+- Smoke test: on a v14 build signed in to the project, add an investment with a kind and an icon, schedule a monthly
+  transfer into it, sync, and look at the new `wallets` and `recurring` rows.
+
+---
+
 ## Pending: receivable wallets (owner round 10, branch `feature/owner-round-10`)
 
 **Status: applied to production by the owner (2026-11-04); not yet on `lucento-test`.** Owner-run. No app schema

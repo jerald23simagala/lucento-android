@@ -218,6 +218,20 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   of each cycle without ever failing it. Pulled FX values that don't read right are dropped, never misread. **Rollout
   order:** `20261106090000_multicurrency.sql` must reach a project before a v13 phone syncs a ledger with a wallet in
   another currency (otherwise those uploads are refused and stay pending). docs/MULTICURRENCY.md.
+- **Wallet kinds, icons, spending money and scheduled transfers (v14, tester round 2026-11-17).** `wallets.kind` /
+  `icon_key` / `spendable` / `spendable_credit_minor` travel only in upload batches where a wallet has one set (nulls
+  included there); a phone that never sets them sends exactly what v13 sent. The editor keeps a choice once made (a
+  card's credit turned off becomes 0, not null), so a cleared value never needs the keys on its own. Pulled values are
+  checked (`PulledRowRules`: keys `^[a-z0-9_]{1,32}$`, credit 0…10^15); an unknown kind reads as none. Two new values
+  ride in existing columns: wallet type `INVESTMENT` and recurring type `TRANSFER_OUT` (a scheduled transfer: no
+  category, `to_wallet_id` the destination). **Rollout order:** `20261119090000_wallet_kinds_and_spending_money.sql`
+  must reach a project before a v14 build syncs an investment, a kind or a scheduled transfer there, or those uploads
+  are refused and stay pending. Older builds skip a pulled investment or scheduled transfer (counted, never misread), but a transfer into that
+  investment still arrives, so an older phone keeps it under a placeholder "Restored account" (cash) until it updates —
+  every phone on an account should be updated (KNOWN_ISSUES TR-2). Within a batch that carries the keys, an edited
+  wallet sends what this phone holds, nulls included: the last writer of the row wins, as for every other column. A
+  pulled scheduled transfer must join two money accounts in its currency, as in the editor and backups; anything else is
+  skipped (QA review, 2026-11-17).
 - **Lucento Shared (v12).** `transactions.created_by` / `updated_by` are stamped by the database from the session and
   only ever pulled; the app never sends them. `wallets.classification` is sent only when a wallet in that upload batch
   is classified, so a solo v12 phone sends exactly what v11 sent and older builds leave the value alone. **Rollout

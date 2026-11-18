@@ -53,6 +53,14 @@ data class WalletEntity(
     @ColumnInfo(name = "fx_basis_rate") val fxBasisRate: String? = null,
     /** v13: revalue this foreign wallet at each month end (unrealized FX gain or loss). */
     @ColumnInfo(name = "fx_revalue", defaultValue = "0") val fxRevalue: Boolean = false,
+    /** v14 (tester round, 2026-11-17): [com.lucento.app.domain.WalletKind] key ("stocks", "mp2"…); null = none. */
+    @ColumnInfo(name = "kind") val kind: String? = null,
+    /** v14: [com.lucento.app.domain.WalletIcon] key for a wallet without a bank logo; null = its kind's or type's own. */
+    @ColumnInfo(name = "icon_key") val iconKey: String? = null,
+    /** v14: counts towards Safe to spend's money on hand; null = the type's default (cash, bank and e-wallet). */
+    @ColumnInfo(name = "spendable") val spendable: Boolean? = null,
+    /** v14: a credit card's part of its credit counted as spending money, in minor units; null or 0 = none. */
+    @ColumnInfo(name = "spendable_credit_minor") val spendableCreditMinor: Long? = null,
 )
 
 /** Money can be posted to this wallet: it is active and not a manually valued asset (see WalletType.isValuedManually). */

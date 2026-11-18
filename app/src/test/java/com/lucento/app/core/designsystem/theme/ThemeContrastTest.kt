@@ -146,7 +146,7 @@ class ThemeContrastTest {
     fun `category and wallet glyphs stay legible on their tiles`() {
         for ((name, palette) in lightPalettes + darkPalettes) {
             val x = palette.extended
-            (x.categoryTones.values + x.categoryFallback + listOf(x.cash, x.bank, x.eWallet, x.savings, x.credit, x.loan))
+            (x.categoryTones.values + x.categoryFallback + listOf(x.cash, x.bank, x.eWallet, x.savings, x.credit, x.loan, x.investment))
                 .forEach { tone -> check(name, 3.0, tone.content, tone.container, "glyph on tile") }
         }
         assertNoFailures()

@@ -47,6 +47,7 @@ class AccountChoicesTest {
         // The pickers list families only, so a type without one would vanish from them.
         assertEquals(WalletType.entries.toSet(), WalletType.entries.filter { it.family in WalletFamily.entries }.toSet())
         assertEquals(WalletFamily.OWNED, WalletType.RECEIVABLE.family)
+        assertEquals(WalletFamily.SET_ASIDE, WalletType.INVESTMENT.family)
         assertEquals(WalletFamily.OWED, WalletType.LOAN.family)
     }
 

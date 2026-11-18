@@ -14,13 +14,14 @@ fun interface BackupMigrationStep {
 }
 
 object BackupMigrations {
-    const val CURRENT = 4
+    const val CURRENT = 5
 
     private val steps: Map<Int, BackupMigrationStep> = mapOf(
         0 to Migrate0To1,
         1 to Migrate1To2,
         2 to Migrate2To3,
         3 to Migrate3To4,
+        4 to Migrate4To5,
     )
 
     fun toCurrent(document: JsonValue.Obj): JsonValue.Obj {
@@ -44,6 +45,17 @@ object BackupMigrations {
         }
         return current
     }
+}
+
+/**
+ * Version 5 (app v14, tester round 2026-11-17) adds `kind`, `iconKey`, `spendable` and `spendableCreditMinor` to wallets,
+ * and lets a scheduled payment be a transfer between two of the person's accounts (type TRANSFER_OUT). A version 4 file
+ * has neither: its wallets keep their key set, read as "no kind, the type's icon and defaults". The bump makes an older
+ * app refuse a version 5 file as "from a newer Lucento" instead of calling it invalid.
+ */
+private object Migrate4To5 : BackupMigrationStep {
+    override fun migrate(document: JsonValue.Obj): JsonValue.Obj =
+        JsonValue.Obj(LinkedHashMap(document.fields).apply { put("schemaVersion", JsonValue.Num("5")) })
 }
 
 /**

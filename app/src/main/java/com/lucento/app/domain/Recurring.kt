@@ -7,7 +7,8 @@ import java.time.LocalDate
 enum class Frequency { WEEKLY, MONTHLY, YEARLY }
 
 /**
- * A planned, repeating income or expense (rent, salary, a subscription).
+ * A planned, repeating income or expense (rent, salary, a subscription), or a transfer between the user's own accounts
+ * (tester round, 2026-11-17: "₱1,000 into MP2 every month").
  *
  * Schedules are plans, not records: nothing is ever posted automatically. The user marks an occurrence
  * as paid (which records a real transaction, idempotently keyed by schedule and occurrence) or skips it.
@@ -35,6 +36,9 @@ data class RecurringSchedule(
      * Also set for a collection (an INCOME schedule, owner round 10): the receivable being repaid into [walletId].
      * Marking it received records the interest as income on the receivable and a transfer of [total] from it into
      * [walletId] — the mirror of a debt payment.
+     *
+     * And set for a scheduled transfer ([isTransfer], type TRANSFER_OUT): the account the money goes to from [walletId].
+     * Marking it done records one transfer of [amount]; it is never income or spending.
      */
     val toWalletId: Long? = null,
     val interest: Money = Money.zero(amount.currencyCode),
@@ -42,7 +46,10 @@ data class RecurringSchedule(
     val clientUuid: String? = null,
 ) {
     init {
-        require(type == TransactionType.EXPENSE || type == TransactionType.INCOME) { "Schedules are income or expense" }
+        require(
+            type == TransactionType.EXPENSE || type == TransactionType.INCOME ||
+                (type == TransactionType.TRANSFER_OUT && toWalletId != null && toWalletId != walletId),
+        ) { "Schedules are income, expense, or a transfer to another account" }
         require(!interest.isNegative && interest.currencyCode == amount.currencyCode) { "Interest must be a non-negative amount in the same currency" }
         require(interval >= 1) { "Interval must be at least 1" }
         require(nextIndex >= 0) { "Occurrence index cannot be negative" }
@@ -56,7 +63,10 @@ data class RecurringSchedule(
     /** An instalment collected from a receivable ([toWalletId]) into [walletId]. */
     val isCollection: Boolean get() = toWalletId != null && type == TransactionType.INCOME
 
-    /** A debt payment or a collection: its principal is a transfer between the user's own accounts. */
+    /** A transfer between the user's own accounts, from [walletId] to [toWalletId] (tester round, 2026-11-17). */
+    val isTransfer: Boolean get() = type == TransactionType.TRANSFER_OUT
+
+    /** A debt payment, a collection or a scheduled transfer: what moves is a transfer between the user's own accounts. */
     val isLinked: Boolean get() = toWalletId != null
 
     /** Everything that moves for one occurrence: the amount, plus interest for a debt payment or a collection. */

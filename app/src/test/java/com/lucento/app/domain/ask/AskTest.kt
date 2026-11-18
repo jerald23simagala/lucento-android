@@ -57,6 +57,16 @@ class AskTest {
         assertTrue(snapshot.byId.containsKey("sch_tr"))
     }
 
+    @Test fun safeToSpendComesWithBothFiguresBehindIt() {
+        val snapshot = AskSnapshotBuilder.build(AskFixtures.inputs(), "USD")
+        val safe = snapshot.byId.getValue("safe").amount!!
+        val budget = snapshot.byId.getValue("safe_budget").amount!!
+        val money = snapshot.byId.getValue("safe_money")
+        // Tester round (2026-11-17): Safe to spend is the lower of what the budget and the spending money allow.
+        assertEquals(minOf(budget, money.amount!!), safe)
+        assertTrue(money.label, money.label.endsWith("the lower one"))
+    }
+
     // ---- the check on every answer -----------------------------------------------------------
 
     private val snapshot = AskSnapshot("USD", today, listOf(SnapshotFigure("nw", "Net worth today", "$1,000.00")))

@@ -25,7 +25,8 @@ class TesterRound3RulesTest {
 
     @Test fun outsideMovementsAreAllowedWhereTheyMeanSomethingAndReadByTheirNote() {
         assertEquals(
-            setOf(WalletType.CASH, WalletType.BANK, WalletType.E_WALLET, WalletType.SAVINGS),
+            // An investment holds money too: selling and taking the cash out is a withdrawal (tester round, 2026-11-17).
+            setOf(WalletType.CASH, WalletType.BANK, WalletType.E_WALLET, WalletType.SAVINGS, WalletType.INVESTMENT),
             WalletType.entries.filter(OutsideMovement.WITHDRAWAL::allowedFor).toSet(),
         )
         assertEquals(

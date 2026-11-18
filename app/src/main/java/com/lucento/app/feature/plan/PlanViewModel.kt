@@ -224,7 +224,9 @@ class PlanViewModel(
     fun saveSchedule(input: RecurringRepository.Input, onResult: (RecurringRepository.SaveResult) -> Unit) =
         write({
             val withCategory = when {
-                input.toWalletId == null || input.categoryId != null -> input
+                // A scheduled transfer has no category: it is never spending or income (tester round, 2026-11-17).
+                input.toWalletId == null || input.categoryId != null ||
+                    input.type == com.lucento.app.domain.TransactionType.TRANSFER_OUT -> input
                 input.type == com.lucento.app.domain.TransactionType.INCOME ->
                     input.copy(categoryId = categories.ensure(DebtMath.INTEREST_INCOME_CATEGORY, CategoryKind.INCOME, DebtMath.INTEREST_INCOME_ICON))
                 else -> input.copy(categoryId = categories.ensure(DebtMath.INTEREST_CATEGORY, CategoryKind.EXPENSE, DebtMath.INTEREST_ICON))

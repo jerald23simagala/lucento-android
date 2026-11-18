@@ -677,6 +677,7 @@ private fun lerp(a: LucentoExtendedColors, b: LucentoExtendedColors, t: Float): 
     savings = lerp(a.savings, b.savings, t),
     credit = lerp(a.credit, b.credit, t),
     loan = lerp(a.loan, b.loan, t),
+    investment = lerp(a.investment, b.investment, t),
     categoryTones = if (a.categoryTones == b.categoryTones) b.categoryTones else b.categoryTones.mapValues { (key, to) ->
         a.categoryTones[key]?.let { from -> lerp(from, to, t) } ?: to
     },

@@ -9,6 +9,7 @@ import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.GoalCalculator
 import com.lucento.app.domain.Insights
 import com.lucento.app.domain.LoanMath
+import com.lucento.app.domain.SafeToSpend
 import com.lucento.app.domain.ScheduleOutlook
 import com.lucento.app.domain.ScheduledFlow
 import com.lucento.app.domain.ScheduledItem
@@ -265,7 +266,7 @@ object AskSnapshotBuilder {
         if (!totals.isEmpty) {
             money("sch_in", "Scheduled income still to come, ${monthName(current)}", totals.income)
             money("sch_out", "Scheduled bills still to pay, ${monthName(current)}", totals.expenses)
-            money("sch_tr", "Scheduled card and loan payments (transfers), ${monthName(current)}", totals.transfers)
+            money("sch_tr", "Scheduled transfers (card and loan payments, moves between accounts), ${monthName(current)}", totals.transfers)
             items.filter { it.amount.currencyCode == currency }.take(8).forEachIndexed { i, item ->
                 val what = when (item) {
                     is ScheduledItem.Occurrence -> item.schedule.name
@@ -289,6 +290,13 @@ object AskSnapshotBuilder {
         CashflowCalculator.safeToSpend(currency, today, inputs.transactions, inputs.wallets, inputs.budgets, inputs.schedules, inputs.categories)?.let { safe ->
             money("safe", "Safe to spend for the rest of ${monthName(current)} (as on Home)", safe.amount)
             safe.perDay?.let { money("safe_day", "Safe to spend a day for the rest of ${monthName(current)}", it) }
+            // Tester round (2026-11-17): the two figures behind it, so an answer can say which one set it.
+            // Labels stay under the 100-character cut.
+            safe.budgetAllows?.let { money("safe_budget", "What the budget allows, rest of ${monthName(current)} (budget − spent − bills due)", it) }
+            // Only when it takes part: with a budget, the spending money counts once money is recorded in a spending wallet.
+            safe.moneyOnHand?.takeIf { it.recorded || safe.basis == SafeToSpend.Basis.BALANCES }?.let {
+                money("safe_money", "What spending money allows, rest of ${monthName(current)} (after what’s due); Safe to spend is the lower one", it.allows)
+            }
         }
         val firstRecord = inputs.transactions.filter { it.currencyCode == currency && !it.isTransfer && !it.isAdjustment }.minOfOrNull { it.date }
         val fullMonths = if (firstRecord == null) emptyList() else

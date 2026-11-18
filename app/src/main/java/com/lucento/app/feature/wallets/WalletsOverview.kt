@@ -81,6 +81,7 @@ val WalletType.shortLabel: String
         WalletType.BANK -> "Bank"
         WalletType.E_WALLET -> "E-wallet"
         WalletType.SAVINGS -> "Savings"
+        WalletType.INVESTMENT -> "Investment"
         WalletType.CREDIT_CARD -> "Card"
         WalletType.LOAN -> "Loan"
         WalletType.RECEIVABLE -> "Owed to you"

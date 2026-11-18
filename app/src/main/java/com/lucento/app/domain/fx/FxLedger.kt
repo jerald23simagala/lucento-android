@@ -255,4 +255,26 @@ object FxTranslation {
         }
         return TranslatedLedger(translatedWallets, translatedTransactions, results, book)
     }
+
+    /**
+     * [schedules] valued like the wallets they are paid from (tester round, 2026-11-17), for Safe to spend: a schedule
+     * from a foreign wallet that [ledger] values is carried into the main currency at that wallet's average rate (or its
+     * starting rate while it holds nothing), amount and interest alike — the rate its own balance is counted at — so a
+     * foreign bill or transfer is set aside along with the money it will leave. A schedule from a wallet without a rate
+     * stays in its own currency, as the wallet does. For figures only: lists keep each schedule's own currency.
+     */
+    fun valueSchedules(ledger: TranslatedLedger, schedules: List<com.lucento.app.domain.RecurringSchedule>): List<com.lucento.app.domain.RecurringSchedule> {
+        val main = ledger.book.mainCurrency
+        val byId = ledger.wallets.associateBy { it.id }
+        return schedules.map { s ->
+            if (s.currencyCode == main) return@map s
+            val position = ledger.book.positions[s.walletId] ?: return@map s
+            // A rate that rounds to nothing (a tiny balance) can't value anything: fall back, or leave it alone.
+            val rate = position.averageRate?.takeIf { it.signum() > 0 }
+                ?: byId[s.walletId]?.fxBasisRate?.takeIf { it.signum() > 0 }
+                ?: return@map s
+            val fx = FxRate(s.currencyCode, main, rate)
+            s.copy(amount = fx.convert(s.amount), interest = fx.convert(s.interest))
+        }
+    }
 }

@@ -54,6 +54,8 @@ class SharedSpaceGuardsTest {
         assertEquals(WalletRepository.SaveResult.NotPermitted, wallets.update(bank, "Renamed", WalletType.BANK, Money(0, "PHP")))
         assertEquals(WalletRepository.SaveResult.NotPermitted, wallets.setClassification(bank, WalletClassification.PARTNER))
         assertEquals(WalletRepository.DeleteResult.NotPermitted, wallets.delete(bank))
+        // Tester round (2026-11-17): Safe to spend's spending-money choice is the Owner's too.
+        assertEquals(WalletRepository.SaveResult.NotPermitted, wallets.setSpendable(bank, false))
         assertEquals(before, walletDao.rows.value)
     }
 

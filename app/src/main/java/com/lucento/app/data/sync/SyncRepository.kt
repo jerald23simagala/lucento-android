@@ -614,6 +614,10 @@ class SyncRepository(
         // one already valued), and on none otherwise — a one-currency ledger sends exactly what v12 sent.
         val main = mainCurrency()
         val withFx = dirty.any { it.fxBasisRate != null || it.fxRevalue || (main != null && it.currencyCode != main) }
+        // v14, the same way: a kind or icon, and a spending-money choice, go on every wallet of a batch where one is set.
+        // The editor keeps a choice once made (it never goes back to null), so clearing one never needs the keys alone.
+        val withLook = dirty.any { it.kind != null || it.iconKey != null }
+        val withSpending = dirty.any { it.spendable != null || it.spendableCreditMinor != null }
         return pushRows(r, "wallets", dirty, { it.clientUuid!! }, {
             val t = terms[it.id]
             val json = encode(WalletRow.serializer(), WalletRow(
@@ -630,6 +634,14 @@ class SyncRepository(
                 if (withFx) {
                     put(FX_BASIS_RATE, it.fxBasisRate?.let(::JsonPrimitive) ?: JsonNull)
                     put(FX_REVALUE, JsonPrimitive(it.fxRevalue))
+                }
+                if (withLook) {
+                    put(KIND, it.kind?.let(::JsonPrimitive) ?: JsonNull)
+                    put(ICON_KEY, it.iconKey?.let(::JsonPrimitive) ?: JsonNull)
+                }
+                if (withSpending) {
+                    put(SPENDABLE, it.spendable?.let(::JsonPrimitive) ?: JsonNull)
+                    put(SPENDABLE_CREDIT_MINOR, it.spendableCreditMinor?.let(::JsonPrimitive) ?: JsonNull)
                 }
             }
             if (extra.isEmpty()) json else JsonObject(json + extra)
@@ -1000,6 +1012,14 @@ class SyncRepository(
                 if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { dao.findByClientUuid(row.id)?.updatedAt }) { dao.deleteById(local!!.id) }
                 val walletId = resolveWallet(row.walletId, row.currencyCode, s)
                 val toWalletId = row.toWalletId?.let { resolveWallet(it, row.currencyCode, s) }
+                // Tester round (2026-11-17): a scheduled transfer moves money between two money accounts in its currency,
+                // as the editor and backups require; a row that doesn't (a modified client's) is skipped, never kept.
+                if (row.type == com.lucento.app.domain.TransactionType.TRANSFER_OUT.name &&
+                    !scheduledTransferFits(walletId, toWalletId, row.currencyCode)
+                ) {
+                    s.invalidSkipped++
+                    return
+                }
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> dao.insert(row.toEntity(walletId, toWalletId, categoryId, syncedAt = clock()))
@@ -1123,6 +1143,17 @@ class SyncRepository(
      * The restored row is not dirty, so it is not pushed and does not undelete the parent for other devices.
      * The cursor is allowed to move: deferring here used to re-download every later row forever.
      */
+    /** Both ends of a scheduled transfer are money accounts in [currencyCode]: never a card, loan, receivable or valued asset. */
+    private suspend fun scheduledTransferFits(fromId: Long, toId: Long?, currencyCode: String): Boolean {
+        if (toId == null || toId == fromId) return false
+        return listOf(fromId, toId).all { id ->
+            val entity = wallets.getById(id) ?: return false
+            val type = com.lucento.app.domain.WalletType.entries.firstOrNull { it.name == entity.type } ?: return false
+            entity.currencyCode == currencyCode && !type.isLiability && !type.isValuedManually &&
+                type != com.lucento.app.domain.WalletType.RECEIVABLE
+        }
+    }
+
     private suspend fun resolveWallet(clientUuid: String, currencyCode: String, s: PullState): Long {
         wallets.findByClientUuid(clientUuid)?.let { return it.id }
         val restored = s.deletedWallets[clientUuid]
@@ -1240,6 +1271,10 @@ class SyncRepository(
         private const val CLASSIFICATION = "classification"
         private const val FX_BASIS_RATE = "fx_basis_rate"
         private const val FX_REVALUE = "fx_revalue"
+        private const val KIND = "kind"
+        private const val ICON_KEY = "icon_key"
+        private const val SPENDABLE = "spendable"
+        private const val SPENDABLE_CREDIT_MINOR = "spendable_credit_minor"
         private const val BASE_AMOUNT_MINOR = "base_amount_minor"
         private const val BASE_CURRENCY = "base_currency"
         private const val FX_SOURCE = "fx_source"
@@ -1266,6 +1301,11 @@ private fun WalletRow.toEntity(syncedAt: Long, id: Long = 0): WalletEntity = Wal
     // Multicurrency: a rate this version can't read is dropped (the wallet then shows unvalued) rather than misread.
     fxBasisRate = fxBasisRate?.takeIf { com.lucento.app.core.money.FxRate.parse(it) != null },
     fxRevalue = fxRevalue ?: false,
+    // v14: looks and choices only. A key this version doesn't know is kept as text and read as none.
+    kind = kind?.takeIf { com.lucento.app.domain.WalletKind.KEY_PATTERN.matches(it) },
+    iconKey = iconKey?.takeIf { com.lucento.app.domain.WalletKind.KEY_PATTERN.matches(it) },
+    spendable = spendable,
+    spendableCreditMinor = spendableCreditMinor?.takeIf { it >= 0L },
 )
 
 private fun CategoryRow.toEntity(syncedAt: Long, id: Long = 0): CategoryEntity = CategoryEntity(

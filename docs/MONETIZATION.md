@@ -191,7 +191,7 @@ Why no "advanced historical views" tier: nothing exists to sell; history is one 
 
 | Feature | Status | F | S | L | Offline | Gate |
 |---|---|---|---|---|---|---|
-| **Money wallets** (cash, bank, e-wallet, savings; 409 institutions) | Shipped | **3 active** (recommended; owner proposed 2 — D-1) | Unlimited | Unlimited | Yes | `WalletRepository.create` when `type in {CASH, BANK, E_WALLET, SAVINGS}` → `SaveResult.LimitReached(used, limit)`; `update` that changes type *into* a money type counts too |
+| **Money wallets** (cash, bank, e-wallet, savings, investments — added 2026-11-17, tester round; 409 institutions) | Shipped | **3 active** (recommended; owner proposed 2 — D-1) | Unlimited | Unlimited | Yes | `WalletRepository.create` when `type in {CASH, BANK, E_WALLET, SAVINGS, INVESTMENT}` → `SaveResult.LimitReached(used, limit)`; `update` that changes type *into* a money type counts too. An investment counts like savings: money the person moves in and out (`planFeature`) |
 | **Debt accounts** (credit cards, loans) with terms, cycles, amount due, payment reminders | Shipped | **2 active** (D-2) | Unlimited | Unlimited | Yes | same call, `type in {CREDIT_CARD, LOAN}` |
 | **Receivables** (money owed to you, instalments, interest) | Shipped | — | ✔ | ✔ | Yes | same call, `type == RECEIVABLE` → `ProRequired` |
 | **Manually valued assets** (home, car, investments) | Shipped | — | ✔ | ✔ | Yes | same call, `type == OTHER_ASSET` → `ProRequired` |

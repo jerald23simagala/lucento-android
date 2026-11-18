@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -302,7 +303,8 @@ fun RecurringScreen(
                 item(key = "rule") {
                     InfoNote(
                         "Scheduled items aren’t transactions until you mark them paid, so balances only change when money really moves. " +
-                            "Transfers pay a card or loan from your own money: they lower what you owe, aren’t spending, and stay out of net flow.",
+                            "Transfers move your own money — paying a card or loan, or putting money into savings or an investment: " +
+                            "they aren’t spending and stay out of net flow.",
                         modifier = Modifier.padding(top = Spacing.md),
                     )
                 }
@@ -320,7 +322,13 @@ fun RecurringScreen(
                     done(result)
                     // Only after the transaction(s) were recorded and the schedule advanced in one database transaction.
                     if (result is RecurringRepository.PayResult.Recorded) {
-                        confirmation = Confirmation(if (schedule.type == TransactionType.INCOME) "Income recorded" else "Payment recorded")
+                        confirmation = Confirmation(
+                            when {
+                                schedule.isTransfer -> "Transfer recorded"
+                                schedule.type == TransactionType.INCOME -> "Income recorded"
+                                else -> "Payment recorded"
+                            },
+                        )
                     }
                 }
             },
@@ -545,11 +553,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.agendaItems(
     ahead.forEach { (month, items) ->
         item(key = "head-$month") {
             val totals = ScheduleOutlook.totals(items, currency)
+            // The amount is net flow (income less bills), which transfers stay out of, so the caption says what it is. A
+            // month of transfers only has no net flow to show.
+            val net = totals.net.takeIf { !totals.income.isZero || !totals.expenses.isZero }
             AgendaHeader(
                 monthName(month) + if (month.year != today.year) " ${month.year}" else "",
-                if (items.size == 1) "1 item" else "${items.size} items",
-                // A month of transfers only has no net flow to show.
-                totals.net.takeIf { !totals.income.isZero || !totals.expenses.isZero },
+                (if (items.size == 1) "1 item" else "${items.size} items") + if (net != null) " · net flow" else "",
+                net,
             )
         }
         item(key = "month-$month") { AgendaCard(items, state, today, onOpen) }
@@ -630,7 +640,7 @@ private fun TransfersLine(transfers: Money) {
     val shown = -transfers
     LucentoCard(
         Modifier.fillMaxWidth().clearAndSetSemantics {
-            contentDescription = "Transfers ${fmt.spokenSigned(shown)}, card and loan payments from your own money, not in net flow"
+            contentDescription = "Transfers ${fmt.spokenSigned(shown)}, payments and moves between your own accounts, not in net flow"
         },
         contentPadding = Spacing.md,
         shape = RoundedCornerShape(16.dp),
@@ -647,7 +657,7 @@ private fun TransfersLine(transfers: Money) {
             Column(Modifier.weight(1f)) {
                 Text("Transfers", style = MaterialTheme.typography.titleSmall, maxLines = 1)
                 Text(
-                    "Card and loan payments · not in net flow",
+                    "Payments and moves between your accounts · not in net flow",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -709,6 +719,9 @@ private fun AgendaRow(item: ScheduledItem, state: PlanUiState, today: LocalDate,
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val roomForTile = maxWidth >= 340.dp && LocalDensity.current.fontScale < 1.3f
+        // At large text sizes the amount moves under the words, which then wrap freely (design review round 2: names
+        // and "→ MP2 2026" were still cut off at 200 %).
+        val stacked = LocalDensity.current.fontScale >= 1.3f
         Row(
             Modifier
                 .fillMaxWidth()
@@ -731,14 +744,29 @@ private fun AgendaRow(item: ScheduledItem, state: PlanUiState, today: LocalDate,
                 Spacer(Modifier.width(Spacing.sm + Spacing.xxs))
             }
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Wrap rather than cut off: "Everyday bank → MP2 2026" says where the money goes (design review, 2026-11-17).
+                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = if (stacked) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (stacked) Int.MAX_VALUE else 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (stacked) {
+                    Spacer(Modifier.height(Spacing.xxs))
+                    AmountText(money = signed(item), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
+                    if (item.overdue) StatusPill(relative, StatusTones.negative)
+                    else Text(relative, style = MaterialTheme.typography.labelMedium, color = if (days == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            Spacer(Modifier.width(Spacing.sm))
-            Column(horizontalAlignment = Alignment.End) {
-                AmountText(money = signed(item), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
-                if (item.overdue) StatusPill(relative, StatusTones.negative)
-                else Text(relative, style = MaterialTheme.typography.labelMedium, color = if (days == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            if (!stacked) {
+                Spacer(Modifier.width(Spacing.sm))
+                Column(horizontalAlignment = Alignment.End) {
+                    AmountText(money = signed(item), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
+                    if (item.overdue) StatusPill(relative, StatusTones.negative)
+                    else Text(relative, style = MaterialTheme.typography.labelMedium, color = if (days == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
             }
         }
     }
@@ -756,10 +784,11 @@ private fun DateBadge(date: LocalDate, today: LocalDate, overdue: Boolean) {
     }
     Column(
         Modifier
-            .width(44.dp)
+            // At least 44dp, wider when large text needs it ("MON" was clipped to "MO" at 200 %).
+            .widthIn(min = 44.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(container)
-            .padding(vertical = Spacing.xs)
+            .padding(vertical = Spacing.xs, horizontal = Spacing.xxs)
             .clearAndSetSemantics { },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -953,6 +982,8 @@ private fun ScheduleActionsSheet(
     val separator = remember { MoneyFormatter.decimalSeparator() }
     val due = schedule.nextDue
     val debt = schedule.toWalletId?.let { state.walletsById[it] }
+    // A debt payment or a collection (not a scheduled transfer) is split into principal and interest.
+    val split = debt != null && (schedule.isDebtPayment || schedule.isCollection)
     // For a debt payment this is the whole payment; the interest part is entered below and the rest is principal.
     var amountText by remember(schedule.id, schedule.nextIndex) { mutableStateOf(MoneyFormatter.formatPlain(schedule.total)) }
     var interestText by remember(schedule.id, schedule.nextIndex) { mutableStateOf("") }
@@ -989,10 +1020,13 @@ private fun ScheduleActionsSheet(
                         when (schedule.flow) {
                             ScheduledFlow.INCOME -> "Expected into ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
                             ScheduledFlow.EXPENSE -> "Paid from ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
-                            ScheduledFlow.TRANSFER -> if (schedule.isCollection) {
-                                "Transfer from ${debt?.name ?: "the receivable"} to ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
-                            } else {
-                                "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "the debt"}"
+                            ScheduledFlow.TRANSFER -> when {
+                                schedule.isCollection ->
+                                    "Transfer from ${debt?.name ?: "the receivable"} to ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
+                                schedule.isTransfer ->
+                                    "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "your other account"}"
+                                else ->
+                                    "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "the debt"}"
                             }
                         },
                         style = MaterialTheme.typography.labelMedium,
@@ -1018,8 +1052,15 @@ private fun ScheduleActionsSheet(
             }
             if (canEdit && due != null && !schedule.paused) {
                 LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
-                    FieldHeader(if (schedule.type == TransactionType.INCOME) "Record as received" else "Record as paid")
-                    if (debt != null) {
+                    FieldHeader(
+                        when {
+                            schedule.isTransfer -> "Record the transfer"
+                            schedule.type == TransactionType.INCOME -> "Record as received"
+                            else -> "Record as paid"
+                        },
+                    )
+                    // A debt payment or a collection splits into principal and interest; a plain transfer doesn't.
+                    if (split) {
                         PaymentSplitFields(
                             paymentText = amountText,
                             interestText = interestText,
@@ -1036,7 +1077,7 @@ private fun ScheduleActionsSheet(
                             onValueChange = { amountText = it; message = null },
                             label = "Amount",
                             currencyCode = schedule.currencyCode,
-                            supporting = "Change it if this bill varies.",
+                            supporting = if (schedule.isTransfer) "Change it if this one is different." else "Change it if this bill varies.",
                             error = message,
                         )
                     }
@@ -1044,7 +1085,11 @@ private fun ScheduleActionsSheet(
                     DateField(label = "Date", date = paidOn, onDate = { paidOn = it ?: due }, clearable = false)
                 }
                 LucentoPrimaryButton(
-                    text = if (schedule.type == TransactionType.INCOME) "Mark received" else "Mark paid",
+                    text = when {
+                        schedule.isTransfer -> "Mark done"
+                        schedule.type == TransactionType.INCOME -> "Mark received"
+                        else -> "Mark paid"
+                    },
                     onClick = {
                         val (money, error) = parsePositive(amountText, schedule.currencyCode, separator)
                         if (money == null) {
@@ -1056,13 +1101,13 @@ private fun ScheduleActionsSheet(
                             message = interestError?.message(schedule.currencyCode, separator)
                             return@LucentoPrimaryButton
                         }
-                        if (debt != null && interest.amountMinor > money.amountMinor) {
+                        if (split && interest.amountMinor > money.amountMinor) {
                             message = "The interest can’t be more than the payment."
                             return@LucentoPrimaryButton
                         }
                         // A debt payment records principal (payment − interest) against the debt and the interest as spending.
-                        val principal = if (debt != null) money - interest else money
-                        onMarkPaid(principal, interest.takeIf { debt != null }, paidOn) { result ->
+                        val principal = if (split) money - interest else money
+                        onMarkPaid(principal, interest.takeIf { split }, paidOn) { result ->
                             when (result) {
                                 is RecurringRepository.PayResult.Recorded -> onDismiss()
                                 RecurringRepository.PayResult.NotDue -> message = "This schedule has no more dates."

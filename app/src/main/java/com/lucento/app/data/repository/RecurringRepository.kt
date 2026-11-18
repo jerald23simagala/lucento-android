@@ -46,7 +46,10 @@ class RecurringRepository(
         val interval: Int,
         val startDate: LocalDate,
         val endDate: LocalDate?,
-        /** A debt payment: the card or loan paid from [walletId]. [amount] is then the part against the debt. */
+        /**
+         * A debt payment: the card or loan paid from [walletId]. [amount] is then the part against the debt. A scheduled
+         * transfer ([type] TRANSFER_OUT): the account the money goes to.
+         */
         val toWalletId: Long? = null,
         /** The interest part of a debt payment (user input; zero when none). */
         val interest: Money? = null,
@@ -68,6 +71,8 @@ class RecurringRepository(
         data object CategoryRequired : SaveResult
         /** A debt payment must go from a money account to a card or loan in the same currency, with interest >= 0. */
         data object InvalidDebt : SaveResult
+        /** A scheduled transfer moves money between two different money accounts in the same currency, no category. */
+        data object InvalidTransfer : SaveResult
         data object NotFound : SaveResult
     }
 
@@ -92,13 +97,24 @@ class RecurringRepository(
         if (!access.canManageStructure()) return SaveResult.NotPermitted
         val name = input.name.trim().take(MAX_NAME)
         if (name.isEmpty()) return SaveResult.BlankName
-        if (input.type.isTransfer) return SaveResult.InvalidType
+        // Income, an expense, or a transfer between the person's own accounts (TRANSFER_OUT, tester round 2026-11-17).
+        if (input.type.isTransfer && input.type != TransactionType.TRANSFER_OUT) return SaveResult.InvalidType
+        if (input.type.isAdjustment) return SaveResult.InvalidType
         if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
         if (input.interval !in 1..MAX_INTERVAL) return SaveResult.InvalidInterval
         if (input.endDate != null && input.endDate.isBefore(input.startDate)) return SaveResult.EndBeforeStart
         val wallet = wallets.getById(input.walletId)
         if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
         if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
+        if (input.type == TransactionType.TRANSFER_OUT) {
+            val to = input.toWalletId?.let { wallets.getById(it) }
+            if (to == null || !to.acceptsTransactions || to.id == wallet.id || to.currencyCode != wallet.currencyCode ||
+                !isMoneyAccount(wallet.type) || !isMoneyAccount(to.type) || input.categoryId != null ||
+                (input.interest != null && !input.interest.isZero)
+            ) {
+                return SaveResult.InvalidTransfer
+            }
+        }
         // A debt payment's category is only for its interest, filled in for the user (PlanViewModel.saveSchedule).
         if (input.categoryId == null && input.toWalletId == null) return SaveResult.CategoryRequired
         if (input.categoryId != null) {
@@ -106,7 +122,9 @@ class RecurringRepository(
             if (category.kind != input.type.name) return SaveResult.CategoryMismatch
         }
         val interest = input.interest ?: Money.zero(input.amount.currencyCode)
-        if (input.toWalletId != null) {
+        if (input.type == TransactionType.TRANSFER_OUT) {
+            // Checked above.
+        } else if (input.toWalletId != null) {
             val debt = wallets.getById(input.toWalletId)
             val debtType = debt?.let { runCatching { WalletType.valueOf(it.type) }.getOrNull() }
             // A debt payment (expense) goes to a card or loan; a collection (income, owner round 10) comes from a
@@ -195,6 +213,9 @@ class RecurringRepository(
         }
         if (schedule.isCollection) {
             return markCollected(entity, schedule, index, amount ?: schedule.amount, interest ?: schedule.interest, date ?: due)
+        }
+        if (schedule.isTransfer) {
+            return markTransferred(entity, schedule, index, amount ?: schedule.amount, date ?: due)
         }
         return runner.run {
             val result = transactions.save(
@@ -327,6 +348,41 @@ class RecurringRepository(
         }
     }
 
+    /**
+     * A scheduled transfer (tester round, 2026-11-17): one transfer of [amount] from the schedule's account into
+     * [RecurringSchedule.toWalletId], keyed by the occurrence so a second tap can't double it, and the schedule's advance,
+     * in one database transaction. Never income or spending.
+     */
+    private suspend fun markTransferred(
+        entity: RecurringEntity,
+        schedule: RecurringSchedule,
+        index: Int,
+        amount: Money,
+        date: LocalDate,
+    ): PayResult {
+        val toId = schedule.toWalletId ?: return PayResult.NotFound
+        return try {
+            runner.run {
+                val moved = transactions.saveTransfer(
+                    TransactionRepository.TransferInput(
+                        group = null,
+                        clientUuid = schedule.occurrenceKey(index),
+                        fromWalletId = schedule.walletId,
+                        toWalletId = toId,
+                        amount = amount,
+                        date = date,
+                        note = schedule.name,
+                    )
+                )
+                if (moved !is TransactionRepository.TransferResult.Saved) throw Rollback(PayResult.Rejected(moved))
+                dao.update(entity.copy(nextIndex = maxOf(entity.nextIndex, index + 1), updatedAt = clock()))
+                PayResult.Recorded(null)
+            }
+        } catch (e: Rollback) {
+            e.result
+        }
+    }
+
     /** Skips the waiting occurrence without recording a transaction. */
     suspend fun skip(id: Long) {
         if (!access.canManageStructure()) return
@@ -351,6 +407,15 @@ class RecurringRepository(
         const val MAX_NAME = 40
         const val MAX_INTERVAL = 52
     }
+}
+
+/**
+ * An account a scheduled transfer can move money between: one money moves through that the person owns — not a card,
+ * loan or receivable (their payments and collections have their own schedules), nor a valued asset.
+ */
+private fun isMoneyAccount(type: String): Boolean {
+    val walletType = WalletType.entries.firstOrNull { it.name == type } ?: return false
+    return walletType.acceptsTransactions && !walletType.isLiability && walletType != WalletType.RECEIVABLE
 }
 
 internal fun RecurringEntity.toDomainOrNull(): RecurringSchedule? = runCatching {

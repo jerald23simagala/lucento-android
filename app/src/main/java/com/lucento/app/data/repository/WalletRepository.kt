@@ -15,6 +15,8 @@ import com.lucento.app.domain.WalletBalanceCalculator
 import com.lucento.app.domain.WalletChangePolicy
 import com.lucento.app.domain.WalletChangeViolation
 import com.lucento.app.domain.WalletClassification
+import com.lucento.app.domain.WalletKind
+import com.lucento.app.domain.WalletIcon
 import com.lucento.app.domain.WalletType
 import com.lucento.app.domain.WalletUsage
 import com.lucento.app.domain.entitlement.Access
@@ -97,6 +99,8 @@ class WalletRepository(
          */
         unbilledAtSetup: Money? = null,
         setupDay: java.time.LocalDate = java.time.LocalDate.now(),
+        /** v14: kind, icon and the spending-money choice (tester round, 2026-11-17). */
+        extras: WalletExtras = WalletExtras(),
     ): SaveResult {
         if (!access.canManageStructure()) return SaveResult.NotPermitted
         val trimmed = name.trim()
@@ -123,7 +127,7 @@ class WalletRepository(
                     institutionId = institutionId?.takeIf(::isInstitutionId),
                     classification = classification?.name,
                     fxBasisRate = fxBasisRate?.takeIf { it.signum() > 0 }?.let(FxRate::encode),
-                )
+                ).withExtras(extras, type),
             )
             writeTerms(id, type, debt, now)
             if (unbilled != null) {
@@ -196,6 +200,8 @@ class WalletRepository(
         openingBalance: Money,
         debt: DebtTerms?,
         institutionId: String?,
+        /** v14: kind, icon and the spending-money choice; null keeps what is stored (only what fits the new type). */
+        extras: WalletExtras? = null,
     ): SaveResult {
         if (!access.canManageStructure()) return SaveResult.NotPermitted
         val existing = dao.getById(id) ?: return SaveResult.NotFound
@@ -232,7 +238,7 @@ class WalletRepository(
                     updatedAt = now,
                     // A rate belongs to a currency: a (still unused) wallet switched to another currency needs a new one.
                     fxBasisRate = existing.fxBasisRate.takeIf { existing.currencyCode == openingBalance.currencyCode },
-                )
+                ).withExtras(extras ?: existing.extras(), type),
             )
             writeTerms(id, type, debt, now)
         }
@@ -262,6 +268,19 @@ class WalletRepository(
                 dueDay = debt.dueDay.takeIf { card },
             )
         )
+    }
+
+    /**
+     * Counts wallet [id] as spending money for Safe to spend, or not (tester round, 2026-11-17: the "Choose spending
+     * wallets" sheet). Ignored for a type that can never be spending money. Bumps updated_at, so the choice syncs.
+     */
+    suspend fun setSpendable(id: Long, spendable: Boolean): SaveResult {
+        if (!access.canManageStructure()) return SaveResult.NotPermitted
+        val existing = dao.getById(id) ?: return SaveResult.NotFound
+        val type = WalletType.entries.firstOrNull { it.name == existing.type } ?: return SaveResult.NotFound
+        if (!type.canBeSpendingMoney || existing.spendable == spendable) return SaveResult.Saved(id)
+        dao.update(existing.copy(spendable = spendable, updatedAt = clock()))
+        return SaveResult.Saved(id)
     }
 
     /** Transactions (including transfer legs) and recurring schedules that reference wallet [id]. */
@@ -315,7 +334,8 @@ class WalletRepository(
 
 /** Which plan limit a wallet of [type] counts against (docs/MONETIZATION.md §3.2). */
 internal fun planFeature(type: WalletType): ProFeature = when (type) {
-    WalletType.CASH, WalletType.BANK, WalletType.E_WALLET, WalletType.SAVINGS -> ProFeature.MONEY_WALLETS
+    // An investment is money the person moves in and out, like savings (tester round, 2026-11-17).
+    WalletType.CASH, WalletType.BANK, WalletType.E_WALLET, WalletType.SAVINGS, WalletType.INVESTMENT -> ProFeature.MONEY_WALLETS
     WalletType.CREDIT_CARD, WalletType.LOAN -> ProFeature.DEBT_ACCOUNTS
     WalletType.RECEIVABLE -> ProFeature.RECEIVABLES
     WalletType.OTHER_ASSET -> ProFeature.VALUED_ASSETS
@@ -345,8 +365,45 @@ internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null, terms: DebtTerms
         classification = WalletClassification.fromKey(classification),
         fxBasisRate = FxRate.parse(fxBasisRate),
         fxRevalue = fxRevalue,
+        kind = WalletKind.fromKey(kind, walletType),
+        iconKey = iconKey?.takeIf { WalletIcon.fromKey(it) != null },
+        spendable = spendable?.takeIf { walletType.canBeSpendingMoney },
+        spendableCredit = spendableCreditMinor?.takeIf { walletType == WalletType.CREDIT_CARD && it > 0L }?.let { Money(it, currencyCode) },
     )
 }
+
+/**
+ * v14 (tester round, 2026-11-17): what the wallet editor sets beyond name, type and balance — the [kind] (investments,
+ * things owned, loans), the [iconKey] for a wallet without a bank logo, whether it is spending money for Safe to spend
+ * ([spendable], null = the type's default) and a card's [spendableCredit].
+ */
+data class WalletExtras(
+    val kind: WalletKind? = null,
+    val iconKey: String? = null,
+    val spendable: Boolean? = null,
+    val spendableCredit: Money? = null,
+)
+
+/** What is stored, as [WalletExtras], for an edit that doesn't touch it. */
+internal fun WalletEntity.extras(): WalletExtras {
+    val walletType = WalletType.entries.firstOrNull { it.name == type } ?: WalletType.CASH
+    return WalletExtras(
+        kind = WalletKind.fromKey(kind, walletType),
+        iconKey = iconKey,
+        spendable = spendable,
+        spendableCredit = spendableCreditMinor?.let { Money(it, currencyCode) },
+    )
+}
+
+/** [extras] written onto this row for a wallet of [type]: only what fits it (a stock kind never sticks to a bank account). */
+internal fun WalletEntity.withExtras(extras: WalletExtras, type: WalletType): WalletEntity = copy(
+    kind = extras.kind?.takeIf { it.type == type }?.key,
+    iconKey = extras.iconKey?.takeIf { WalletIcon.fromKey(it) != null },
+    spendable = extras.spendable?.takeIf { type.canBeSpendingMoney },
+    spendableCreditMinor = extras.spendableCredit
+        ?.takeIf { type == WalletType.CREDIT_CARD && it.currencyCode == currencyCode && !it.isNegative }
+        ?.amountMinor,
+)
 
 /** Stored terms that no longer pass validation (edited by hand, or from a future version) are dropped, not shown. */
 internal fun DebtTermsEntity.toDomain(currencyCode: String): DebtTerms? = runCatching {

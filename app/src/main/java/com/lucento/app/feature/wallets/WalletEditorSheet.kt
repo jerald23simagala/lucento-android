@@ -126,6 +126,10 @@ fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     statementDayText = debt?.statementDay?.toString().orEmpty(),
     dueDayText = debt?.dueDay?.toString().orEmpty(),
     fxRateText = fxBasisRate?.let(com.lucento.app.core.money.FxRate::encode).orEmpty(),
+    kind = kind,
+    iconKey = iconKey,
+    spendable = spendable,
+    spendableCreditText = spendableCredit?.takeIf { it.amountMinor > 0L }?.let { MoneyFormatter.formatPlain(it) }.orEmpty(),
 )
 
 /**
@@ -168,6 +172,9 @@ internal fun WalletDraft.previewWallet(decimalSeparator: Char): Wallet {
         openingBalance = amount,
         debt = terms,
         institutionId = institutionId,
+        kind = kind?.takeIf { it.type == type },
+        iconKey = iconKey,
+        spendable = spendable,
     )
 }
 
@@ -195,6 +202,8 @@ fun WalletEditorSheet(
     var error by remember { mutableStateOf<DraftError?>(null) }
     var pickingCurrency by remember { mutableStateOf(false) }
     var pickingInstitution by remember { mutableStateOf(false) }
+    var pickingType by remember { mutableStateOf(false) }
+    var pickingIcon by remember { mutableStateOf(false) }
     val institution = LocalInstitutions.current[draft.institutionId]
     var confirmingDelete by remember { mutableStateOf(false) }
     var blocked by remember { mutableStateOf<WalletRepository.DeleteResult?>(null) }
@@ -218,7 +227,7 @@ fun WalletEditorSheet(
             SheetHeader(
                 title = if (initial.id == null) "New wallet" else "Edit wallet",
                 subtitle = if (initial.id == null) "Build it below and watch it take shape." else initial.name,
-                leading = { WalletTypeTile(draft.type) },
+                leading = { DraftIconTile(draft) },
                 trailing = if (initial.id != null && onDelete != null) {
                     {
                         IconButton(onClick = { confirmingDelete = true }) {
@@ -233,6 +242,7 @@ fun WalletEditorSheet(
             val receivable = draft.type == WalletType.RECEIVABLE
             val amountLabel = when {
                 draft.type.isValuedManually -> "Estimated value"
+                draft.type == WalletType.INVESTMENT -> if (initial.id == null) "Current value" else "Starting value"
                 initial.id != null && draft.type.isLiability -> "Opening amount owed"
                 initial.id != null && receivable -> "Opening amount owed to you"
                 initial.id != null -> "Opening balance"
@@ -271,14 +281,8 @@ fun WalletEditorSheet(
 
             Spacer(Modifier.height(Spacing.md))
             IconFieldHeader(Icons.Outlined.Category, "Type")
-            TypeDropdown(
-                selected = draft.type,
-                onSelect = {
-                    haptics.tick()
-                    draft = draft.copy(type = it)
-                    if (error is DraftError.TypeLocked || error is DraftError.PlanLimit) error = null
-                },
-            )
+            // Tester round (2026-11-17): a sectioned picker with what each type is for, in place of a flat menu.
+            WalletTypeField(selected = draft.type, currencyCode = draft.currencyCode, onClick = { pickingType = true })
             (error as? DraftError.TypeLocked)?.let { locked ->
                 Text(
                     "“${initial.name}” has ${locked.usage.describe()}. Switching between an account you own and one you owe " +
@@ -290,6 +294,13 @@ fun WalletEditorSheet(
                 )
             }
 
+            // The kind of an investment, owned thing or loan: a label, an icon and a group in Net worth.
+            if (draft.type.hasKinds) {
+                Spacer(Modifier.height(Spacing.md))
+                IconFieldHeader(Icons.Outlined.Category, "Kind (optional)")
+                WalletKindChips(type = draft.type, currencyCode = draft.currencyCode, selected = draft.kind) { draft = draft.copy(kind = it) }
+            }
+
             if (draft.type != WalletType.CASH) {
                 Spacer(Modifier.height(Spacing.md))
                 IconFieldHeader(Icons.Outlined.AccountBalance, "Bank or provider (optional)")
@@ -298,6 +309,11 @@ fun WalletEditorSheet(
                     onClick = { pickingInstitution = true },
                     onClear = { draft = draft.copy(institutionId = null) },
                 )
+            }
+            // Without a bank logo, the wallet shows an icon the person can choose.
+            if (draft.type == WalletType.CASH || institution == null) {
+                Spacer(Modifier.height(Spacing.sm))
+                WalletIconField(draft = draft, onClick = { pickingIcon = true })
             }
 
             Spacer(Modifier.height(Spacing.md))
@@ -323,10 +339,11 @@ fun WalletEditorSheet(
                             WalletType.BANK -> "e.g. Everyday account"
                             WalletType.E_WALLET -> "e.g. Mobile wallet"
                             WalletType.SAVINGS -> "e.g. Emergency fund"
+                            WalletType.INVESTMENT -> if (draft.currencyCode == "PHP") "e.g. MP2 2026, Stock portfolio" else "e.g. Stock portfolio, Retirement fund"
                             WalletType.CREDIT_CARD -> "e.g. Travel card"
                             WalletType.LOAN -> "e.g. Car loan"
                             WalletType.RECEIVABLE -> "e.g. Loan to Ana"
-                            WalletType.OTHER_ASSET -> "e.g. Home, car, investments"
+                            WalletType.OTHER_ASSET -> "e.g. Home, car, jewellery"
                         }
                     )
                 },
@@ -430,6 +447,8 @@ fun WalletEditorSheet(
                             is DraftError.AmountUnclear -> e.message
                             else -> when {
                                 draft.type.isValuedManually -> "What it’s worth today. Update it whenever the value changes — no transactions needed."
+                                draft.type == WalletType.INVESTMENT && initial.id == null ->
+                                    "What it’s worth today. Money you put in or take out is a transfer; use Update value when it grows or falls."
                                 initial.id != null -> "Where this wallet started, before the transactions you record."
                                 draft.type == WalletType.LOAN -> "What you still owe on this loan. It counts against your net worth."
                                 receivable -> "What they still owe you. It counts towards your net worth, but not as money you can spend."
@@ -459,6 +478,21 @@ fun WalletEditorSheet(
                             error is DraftError.CreditLimitUnclear || error is DraftError.BillingDaysInvalid ||
                             error is DraftError.AmountDueInvalid || error is DraftError.AmountDueTooHigh
                         ) error = null
+                    },
+                )
+            }
+
+            // Tester round (2026-11-17): whether this wallet counts towards Safe to spend's money on hand.
+            if (draft.type.canBeSpendingMoney) {
+                Spacer(Modifier.height(Spacing.sm))
+                SpendingMoneySection(
+                    draft = draft,
+                    error = error,
+                    decimalSeparator = decimalSeparator,
+                    fieldColors = fieldColors,
+                    onChange = {
+                        draft = it
+                        if (error == DraftError.SpendableCreditInvalid || error == DraftError.SpendableCreditTooHigh) error = null
                     },
                 )
             }
@@ -505,6 +539,39 @@ fun WalletEditorSheet(
         }
     }
 
+    if (pickingType) {
+        WalletTypePickerSheet(
+            selected = draft.type,
+            currencyCode = draft.currencyCode,
+            proTypes = if (com.lucento.app.feature.pro.LocalEntitlements.current.has(
+                    com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, System.currentTimeMillis(),
+                )
+            ) {
+                emptySet()
+            } else {
+                setOf(WalletType.RECEIVABLE, WalletType.OTHER_ASSET)
+            },
+            onSelect = { type ->
+                // A kind belongs to its type; an icon the person chose stays.
+                draft = draft.copy(type = type, kind = draft.kind?.takeIf { it.type == type })
+                if (error is DraftError.TypeLocked || error is DraftError.PlanLimit) error = null
+                pickingType = false
+            },
+            onDismiss = { pickingType = false },
+        )
+    }
+    if (pickingIcon) {
+        WalletIconPickerSheet(
+            type = draft.type,
+            current = com.lucento.app.domain.WalletIcon.fromKey(draft.iconKey),
+            suggested = draft.kind?.defaultIcon,
+            onSelect = {
+                draft = draft.copy(iconKey = it.key)
+                pickingIcon = false
+            },
+            onDismiss = { pickingIcon = false },
+        )
+    }
     if (pickingCurrency) {
         CurrencyPickerSheet(
             selected = draft.currencyCode,
@@ -748,8 +815,8 @@ private fun CardDetails(
             "Enter both days, from 1 to 31, or leave both empty."
         } else {
             "Day of the month (a shorter month uses its last day). On the due day, Lucento reminds you of the amount due: " +
-                "what you owed on the statement day, less payments since. It isn’t counted in Safe to spend — your card " +
-                "purchases already are."
+                "what you owed on the statement day, less payments since. Your purchases already count as spending, so " +
+                "the payment isn’t spending again; Safe to spend sets it aside from the account that pays the card."
         },
         isError = daysError,
     )
@@ -861,50 +928,3 @@ private fun HintText(text: String, modifier: Modifier = Modifier, isError: Boole
     )
 }
 
-/** The wallet type as one dropdown field (its icon and name), so the sheet stays short; the menu lists every type with its icon. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TypeDropdown(selected: WalletType, onSelect: (WalletType) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val colors = MaterialTheme.colorScheme
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                .filledField(active = expanded)
-                .semantics { contentDescription = "Wallet type: ${selected.label}" }
-                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            WalletTypeTile(selected, size = 32.dp)
-            Spacer(Modifier.width(Spacing.md))
-            Text(selected.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-        }
-        val proTypes = if (com.lucento.app.feature.pro.LocalEntitlements.current.has(
-                com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, System.currentTimeMillis(),
-            )
-        ) {
-            emptySet()
-        } else {
-            setOf(WalletType.RECEIVABLE, WalletType.OTHER_ASSET)
-        }
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            WalletType.entries.forEach { type ->
-                DropdownMenuItem(
-                    text = { Text(type.label, fontWeight = if (type == selected) FontWeight.SemiBold else null) },
-                    leadingIcon = { WalletTypeTile(type, size = 28.dp) },
-                    // Lucento Pro: kinds the plan doesn't include carry a mark before they're chosen (display only).
-                    trailingIcon = if (type in proTypes) { { com.lucento.app.feature.pro.ProBadge() } } else null,
-                    onClick = {
-                        expanded = false
-                        onSelect(type)
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
-                )
-            }
-        }
-    }
-}

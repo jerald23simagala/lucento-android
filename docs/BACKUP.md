@@ -10,7 +10,7 @@ Schema version **1** (`BackupMigrations.CURRENT`). Top-level fields:
 
 | Field | Meaning |
 |---|---|
-| `schemaVersion` | Integer. This app writes 2 and can read older versions through `BackupMigrations`. A newer version is refused. |
+| `schemaVersion` | Integer. This app writes 5 (since the tester round, 2026-11-17: wallet kinds, icons, spending money and scheduled transfers) and reads every older version through `BackupMigrations`. A newer version is refused. |
 | `appVersion` | The Lucento version that wrote the file (`BuildConfig.VERSION_NAME`). |
 | `exportedAt` | ISO-8601 instant. |
 | `wallets`, `categories`, `transactions`, `budgets`, `goals`, `goalContributions`, `recurring`, `debtTerms` | The Room rows. |

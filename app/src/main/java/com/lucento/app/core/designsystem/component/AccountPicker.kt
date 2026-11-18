@@ -264,7 +264,7 @@ private fun rowMeta(wallet: Wallet): String? {
         wallet.type == WalletType.RECEIVABLE -> "Owed to you"
         else -> null
     }
-    return listOfNotNull(institution, owed).joinToString(" · ").ifEmpty { null }
+    return listOfNotNull(institution, wallet.kind?.labelFor(wallet.currencyCode), owed).joinToString(" · ").ifEmpty { null }
 }
 
 /**
@@ -277,5 +277,6 @@ private fun accountDetail(wallet: Wallet, spoken: Boolean = false): String {
     val worth = wallet.netWorthContribution
     val amount = if (spoken) spokenAmount(worth, signed = true) else shownAmount(worth, signed = true)
     val held = if (wallet.type == WalletType.RECEIVABLE) "$amount owed to you" else amount
-    return "${wallet.type.label} · $held"
+    // The kind where there is one ("Pag-IBIG MP2"), as the spending money sheet and Wallets say it (design review).
+    return "${wallet.kind?.labelFor(wallet.currencyCode) ?: wallet.type.label} · $held"
 }

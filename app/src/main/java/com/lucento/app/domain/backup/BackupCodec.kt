@@ -106,7 +106,10 @@ object BackupCodec {
         // write them.
         val legacy = setOf("id", "name", "type", "currency", "openingBalanceMinor", "sortOrder", "archived", "createdAt", "updatedAt")
         val withInstitution = legacy + "institutionId"
-        if (row.fields.keys != legacy && row.fields.keys != withInstitution) requireKeys(row, withInstitution + setOf("fxBasisRate", "fxRevalue"))
+        val withFx = withInstitution + setOf("fxBasisRate", "fxRevalue")
+        // Backup v5 (app v14) adds the kind, icon and Safe to spend keys; newer files always write them.
+        val withExtras = withFx + setOf("kind", "iconKey", "spendable", "spendableCreditMinor")
+        if (row.fields.keys != legacy && row.fields.keys != withInstitution && row.fields.keys != withFx) requireKeys(row, withExtras)
         val fxBasisRate = when (val value = row.fields["fxBasisRate"]) {
             null, JsonValue.Null -> null
             is JsonValue.Str -> value.value.takeIf { com.lucento.app.core.money.FxRate.parse(it) != null } ?: invalid()
@@ -119,6 +122,19 @@ object BackupCodec {
             null, JsonValue.Null -> null
             is JsonValue.Str -> value.value.takeIf { it.isNotEmpty() && it.length <= 128 && it.all { c -> c in 'a'..'z' || c in '0'..'9' || c == '_' } } ?: invalid()
             else -> invalid()
+        }
+        fun key(name: String): String? = when (val value = row.fields[name]) {
+            null, JsonValue.Null -> null
+            is JsonValue.Str -> value.value.takeIf { com.lucento.app.domain.WalletKind.KEY_PATTERN.matches(it) } ?: invalid()
+            else -> invalid()
+        }
+        val spendable = when (val value = row.fields["spendable"]) {
+            null, JsonValue.Null -> null
+            else -> row.bool("spendable")
+        }
+        val spendableCredit = when (row.fields["spendableCreditMinor"]) {
+            null, JsonValue.Null -> null
+            else -> row.long("spendableCreditMinor").also { if (it < 0L) invalid() }
         }
         return BackupWallet(
             id = row.id("id"),
@@ -133,6 +149,10 @@ object BackupCodec {
             institutionId = institution,
             fxBasisRate = fxBasisRate,
             fxRevalue = fxRevalue,
+            kind = key("kind"),
+            iconKey = key("iconKey"),
+            spendable = spendable,
+            spendableCreditMinor = spendableCredit,
         )
     }
 
@@ -382,19 +402,32 @@ object BackupCodec {
             if (goals[contribution.goalId] == null) invalid()
         }
         for (schedule in snapshot.recurring) {
-            if (schedule.type != TransactionType.INCOME && schedule.type != TransactionType.EXPENSE) invalid()
+            // Income, an expense, or a transfer between the person's own accounts (backup v5).
+            if (schedule.type != TransactionType.INCOME && schedule.type != TransactionType.EXPENSE &&
+                schedule.type != TransactionType.TRANSFER_OUT
+            ) {
+                invalid()
+            }
             val wallet = wallets[schedule.walletId] ?: invalid()
             if (!wallet.type.acceptsTransactions || wallet.currency != schedule.currency) invalid()
             val category = schedule.categoryId?.let { categories[it] ?: invalid() }
             if (category != null && category.kind.name != schedule.type.name) invalid()
+            if (schedule.type == TransactionType.TRANSFER_OUT && schedule.toWalletId == null) invalid()
             val to = schedule.toWalletId
             if (to != null) {
                 if (to == schedule.walletId || wallets[to] == null) invalid()
                 // A debt payment (expense) goes to a card or loan; a collection (income) comes from a receivable.
                 val toType = wallets.getValue(to).type
+                // A scheduled transfer moves money between two money accounts in the same currency.
+                val fromType = wallet.type
+                val moneyAccount: (com.lucento.app.domain.WalletType) -> Boolean = {
+                    it.acceptsTransactions && !it.isLiability && it != com.lucento.app.domain.WalletType.RECEIVABLE
+                }
                 val linked = when (schedule.type) {
                     TransactionType.EXPENSE -> toType.isLiability
                     TransactionType.INCOME -> toType == com.lucento.app.domain.WalletType.RECEIVABLE
+                    TransactionType.TRANSFER_OUT -> moneyAccount(fromType) && moneyAccount(toType) &&
+                        wallets.getValue(to).currency == wallet.currency && schedule.interestMinor == 0L
                     else -> false
                 }
                 if (!linked) invalid()
@@ -456,6 +489,10 @@ object BackupCodec {
         "institutionId" to jsonNullable(row.institutionId),
         "fxBasisRate" to jsonNullable(row.fxBasisRate),
         "fxRevalue" to JsonValue.Bool(row.fxRevalue),
+        "kind" to jsonNullable(row.kind),
+        "iconKey" to jsonNullable(row.iconKey),
+        "spendable" to (row.spendable?.let { JsonValue.Bool(it) } ?: JsonValue.Null),
+        "spendableCreditMinor" to (row.spendableCreditMinor?.let { jsonLong(it) } ?: JsonValue.Null),
     )
 
     private fun categoryJson(row: BackupCategory) = jsonObject(

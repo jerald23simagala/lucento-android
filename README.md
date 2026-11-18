@@ -22,8 +22,14 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   budget used vs month elapsed, a verdict in words and Lucento, the mascot, whose look follows it; **net worth** as
   assets − liabilities with shortcuts to goals, scheduled transactions, debts and categories; the savings goal closest
   to done; **scheduled transactions** (tap to review and mark paid).
-- **Wallets** include manually valued assets (home, car, investments): a valuation you update, counted in net worth,
-  never used for transactions.
+- **Wallets** include **investments** (stocks, funds, MP2, time deposits and more, each with a kind and an icon):
+  money moves in and out with transfers, and **Update value** records growth or loss as a balance adjustment, never as
+  income or spending. **Property & valuables** (home, car, jewellery) are valued by hand and never used for
+  transactions. Both count in net worth.
+- **Safe to spend** is the lower of what the budget allows and what your **spending money** allows: the wallets you
+  count as spending money (cash, bank and e-wallet by default; savings and investments when you switch them on; part of
+  a card's credit if you choose), less bills, loan and card payments and transfers out due this month. An (i) shows
+  both figures line by line. See [docs/CALCULATIONS.md](docs/CALCULATIONS.md).
 - **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
   the budget shown transparently; amounts per month and currency; manage categories (add, rename, reorder,
   deactivate, restore). Existing users keep their categories and can personalise them from presets.
@@ -37,7 +43,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Transfers** between your own accounts (two linked legs, atomic, never income or spending). From and To open one
   account picker — grouped into Everyday money, Set aside and growing, Things you own and What you owe, with balances,
   and search and recent accounts once there are more than six — also used by the transaction editor and the composer.
-- **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
+- **Wallets**: cash, bank, e-wallet, savings, investment, credit card, loan, money owed to you and property; a brand-blue net-worth card (assets above liabilities),
   assets and liabilities in separate cards (Debts & loans linked from Liabilities), each wallet shown as a bank-style card, warnings for balances that can't be right, and
   **Adjust balance** (the gap is recorded as a visible Balance adjustment, never income or spending); account detail with history.
   A wallet can show its bank or provider's logo and colours: 409 institutions in 48 countries are bundled offline (36 in
@@ -46,8 +52,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Savings goals**, **Debts & loans** (optional interest rate; loans: one-time or monthly amortization with an
   instalment bar and payment reminders; credit cards: credit limit, available credit, statement and due days with an
   amount-due reminder that is never counted in Safe to spend),
-  **Scheduled transactions** (bills, income and debt payments split into principal and interest; every bill and income
-  has a category; mark paid / skip / pause — never auto-posted). The Scheduled page lists every dated occurrence with
+  **Scheduled transactions** (bills, income, debt payments split into principal and interest, and transfers between
+  your own accounts such as a monthly MP2 contribution; every bill and income has a category; mark paid / skip / pause —
+  never auto-posted). The Scheduled page lists every dated occurrence with
   Transactions-style filters and a From–To range, summed up in the Transactions page's cards (income, expenses and net
   flow, with card and loan transfers apart).
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every

@@ -461,9 +461,24 @@ object Migrations {
         }
     }
 
+    /**
+     * v14 (tester round, 2026-11-17): a wallet's kind ("stocks", "mp2"…), its chosen icon, whether it counts as spending
+     * money for Safe to spend, and a card's part of its credit that does. All nullable: every existing wallet keeps its
+     * look and the type's defaults. The new INVESTMENT wallet type and scheduled transfers (recurring type TRANSFER_OUT)
+     * are values in existing text columns, so nothing else changes.
+     */
+    val MIGRATION_13_14: Migration = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `kind` TEXT")
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `icon_key` TEXT")
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `spendable` INTEGER")
+            db.execSQL("ALTER TABLE `wallets` ADD COLUMN `spendable_credit_minor` INTEGER")
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
     )
 }
 
