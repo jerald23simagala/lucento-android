@@ -657,7 +657,7 @@ private fun DebtDetails(
             error is DraftError.InstallmentUnclear -> HintText((error as DraftError.InstallmentUnclear).message, isError = true)
             suggested != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                 HintText(
-                    "${MoneyFormatter.format(suggested)} a month ${if (receivable) "pays back" else "repays"} ${MoneyFormatter.format(owed!!)} in ${if (months == 1) "1 month" else "$months months"}" +
+                    "${MoneyFormatter.format(suggested, wholeUnits = false)} a month ${if (receivable) "pays back" else "repays"} ${MoneyFormatter.format(owed!!, wholeUnits = false)} in ${if (months == 1) "1 month" else "$months months"}" +
                         (rate?.let { " at ${DebtMath.formatRate(it)}" } ?: "") + ".",
                     modifier = Modifier.weight(1f),
                 )

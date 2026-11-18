@@ -83,6 +83,7 @@ import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.data.preferences.ThemeMode
 import androidx.fragment.app.FragmentActivity
@@ -201,6 +202,7 @@ fun SettingsScreen(
                 page = page,
                 onOpenPage = onOpenPage,
                 onFxRatesOnline = viewModel::setFxRatesOnline,
+                onShowCents = viewModel::setShowCents,
                 onFeature = viewModel::setFeatureEnabled,
                 onSmartReading = viewModel::setSmartReading,
                 onAskLucentoAi = viewModel::setAskLucentoAi,
@@ -412,12 +414,22 @@ fun EnabledFeaturesSection(state: SettingsUiState, onFeature: (Feature, Boolean)
     }
 }
 
+/** "Off: ₱1,234.56 reads ₱1,235." in the main currency; nothing for a currency without cents (JPY). */
+private fun showCentsExample(currencyCode: String): String? {
+    val digits = Money.zero(currencyCode).fractionDigits
+    if (digits == 0) return null
+    val minor = java.math.BigDecimal("1234.56").setScale(digits, java.math.RoundingMode.HALF_UP).unscaledValue().longValueExact()
+    val sample = Money(minor, currencyCode)
+    return "Off: ${MoneyFormatter.format(sample, wholeUnits = false)} reads ${MoneyFormatter.format(sample, wholeUnits = true)}."
+}
+
 @Composable
 private fun SettingsContent(
     current: SettingsUiState,
     page: SettingsPage?,
     onOpenPage: (SettingsPage) -> Unit,
     onFxRatesOnline: (Boolean) -> Unit,
+    onShowCents: (Boolean) -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
     onSmartReading: (Boolean) -> Unit,
     onAskLucentoAi: (Boolean) -> Unit,
@@ -493,6 +505,16 @@ private fun SettingsContent(
             note = if (prefs.fxRatesOnline) null else "Off: you type rates, or use a wallet’s last or average rate.",
             checked = prefs.fxRatesOnline,
             onCheckedChange = onFxRatesOnline,
+        )
+        // Tester round (2026-11-17): figures without cents. A display choice; nothing recorded changes.
+        SectionHeader("Amounts", Modifier.padding(top = Spacing.section))
+        SwitchRow(
+            title = "Show cents",
+            description = "Off: the amounts you read are rounded to whole units, so lines may not add up to the cent. " +
+                "Where you type an amount or open one transaction, the cents stay.",
+            note = if (prefs.showCents) null else showCentsExample(prefs.primaryCurrency),
+            checked = prefs.showCents,
+            onCheckedChange = onShowCents,
         )
       }
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)

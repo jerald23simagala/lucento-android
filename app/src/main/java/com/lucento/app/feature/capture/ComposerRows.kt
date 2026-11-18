@@ -326,7 +326,7 @@ internal fun fxLine(quote: com.lucento.app.domain.fx.FxQuote, date: java.time.Lo
         com.lucento.app.domain.fx.FxSource.TRANSFER -> "the transfer’s rate"
     }
     val code = quote.value.currencyCode
-    return "≈ ${com.lucento.app.core.money.MoneyFormatter.format(quote.value)} · " +
+    return "≈ ${com.lucento.app.core.money.MoneyFormatter.format(quote.value, wholeUnits = false)} · " +
         "1 $from = ${com.lucento.app.core.money.FxRate.displayRate(quote.rate)} $code, $why"
 }
 
@@ -347,9 +347,9 @@ private fun AmountLabel(row: ReviewRow, status: RowStatus?, enabled: Boolean, on
         else -> MaterialTheme.colorScheme.onSurface
     }
     val text = when {
-        money != null && row.type.isTransfer -> MoneyFormatter.format(money)
-        money != null && row.type == TransactionType.INCOME -> MoneyFormatter.formatSigned(money, showPlus = true)
-        money != null -> MoneyFormatter.formatSigned(-money, showPlus = true)
+        money != null && row.type.isTransfer -> MoneyFormatter.format(money, wholeUnits = false)
+        money != null && row.type == TransactionType.INCOME -> MoneyFormatter.formatSigned(money, showPlus = true, wholeUnits = false)
+        money != null -> MoneyFormatter.formatSigned(-money, showPlus = true, wholeUnits = false)
         row.amountText.isNotBlank() -> row.amountText
         row.amountOptions.isNotEmpty() -> "Choose"
         else -> "Add amount"

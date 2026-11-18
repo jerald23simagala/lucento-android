@@ -1,7 +1,9 @@
 package com.lucento.app.core.money
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
 
@@ -52,5 +54,50 @@ class MoneyFormatterTest {
     fun `fraction span is absent for zero-decimal currencies`() {
         val jpy = MoneyFormatter.format(Money(1234, "JPY"), Locale.US)
         assertNull(MoneyFormatter.fractionSpan(jpy, 0, Locale.US))
+    }
+
+    // Settings › Money › "Show cents" off (tester round, 2026-11-17): whole units, half-up on the absolute value.
+
+    @Test
+    fun `whole units round half-up on the absolute value and keep the sign`() {
+        assertEquals("$1,235", MoneyFormatter.format(Money(123450, "USD"), Locale.US, wholeUnits = true))
+        assertEquals("$1,234", MoneyFormatter.format(Money(123449, "USD"), Locale.US, wholeUnits = true))
+        assertEquals("−$13", MoneyFormatter.formatSigned(Money(-1250, "USD"), locale = Locale.US, wholeUnits = true))
+        assertEquals("+$13", MoneyFormatter.formatSigned(Money(1250, "USD"), locale = Locale.US, wholeUnits = true))
+        assertEquals("$12", MoneyFormatter.formatSigned(Money(1249, "USD"), showPlus = false, locale = Locale.US, wholeUnits = true))
+        assertEquals("¥1,234", MoneyFormatter.format(Money(1234, "JPY"), Locale.US, wholeUnits = true))
+        assertTrue(MoneyFormatter.format(Money(1234567, "BHD"), Locale.US, wholeUnits = true).endsWith("1,235"))
+        assertTrue(MoneyFormatter.format(Money(123450, "EUR"), Locale.GERMANY, wholeUnits = true).startsWith("1.235"))
+    }
+
+    @Test
+    fun `an amount that rounds to zero shows no sign`() {
+        assertEquals("$0", MoneyFormatter.formatSigned(Money(-40, "USD"), locale = Locale.US, wholeUnits = true))
+        assertEquals("$0", MoneyFormatter.formatSigned(Money(40, "USD"), locale = Locale.US, wholeUnits = true))
+        // Half a unit still rounds away from zero, and keeps its sign.
+        assertEquals("−$1", MoneyFormatter.formatSigned(Money(-50, "USD"), locale = Locale.US, wholeUnits = true))
+    }
+
+    @Test
+    fun `whole units leave no fraction span to shrink`() {
+        val whole = MoneyFormatter.format(Money(123456, "USD"), Locale.US, wholeUnits = true)
+        assertNull(MoneyFormatter.fractionSpan(whole, 0, Locale.US))
+        assertNull(MoneyFormatter.fractionSpan(whole, 2, Locale.US))
+    }
+
+    @Test
+    fun `the saved choice is the default, and exact formatting can still be asked for`() {
+        assertFalse(MoneyFormatter.wholeUnits)
+        MoneyFormatter.wholeUnits = true
+        try {
+            assertEquals("$1,235", MoneyFormatter.format(Money(123450, "USD"), Locale.US))
+            assertEquals("−$13", MoneyFormatter.formatSigned(Money(-1250, "USD"), locale = Locale.US))
+            assertEquals("$1,234.50", MoneyFormatter.format(Money(123450, "USD"), Locale.US, wholeUnits = false))
+            // Masking and plain (input) forms never depend on it.
+            assertEquals("$••••", MoneyFormatter.masked("USD", Locale.US))
+            assertEquals("1234.50", MoneyFormatter.formatPlain(Money(123450, "USD"), Locale.US))
+        } finally {
+            MoneyFormatter.wholeUnits = false
+        }
     }
 }

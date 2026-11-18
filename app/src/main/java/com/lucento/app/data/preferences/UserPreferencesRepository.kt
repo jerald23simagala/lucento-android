@@ -134,6 +134,11 @@ data class UserPreferences(
      * phone's fingerprint, face or screen lock. A device choice like [appLock]: never in backups.
      */
     val hideAmounts: Boolean = false,
+    /**
+     * Settings › Money › "Show cents" (tester round, 2026-11-17). Off: the amounts people read are rounded to whole
+     * units; amount inputs and the transaction view keep their cents. A display choice on this phone.
+     */
+    val showCents: Boolean = true,
     /** P2-5: the user hid Home's "turn on" offers for modules that are off; Settings › Enabled features still has them. */
     val moduleOffersHidden: Boolean = false,
     /** How the user said they pay (onboarding); the guided setup suggests these account types first. Empty = not asked. */
@@ -245,6 +250,7 @@ class UserPreferencesRepository(
         val appLock = booleanPreferencesKey("app_lock")
         val hideInRecents = booleanPreferencesKey("hide_in_recents")
         val hideAmounts = booleanPreferencesKey("hide_amounts")
+        val showCents = booleanPreferencesKey("show_cents")
         val moduleOffersHidden = booleanPreferencesKey("module_offers_hidden")
         val spendTypes = stringSetPreferencesKey("spend_types")
         val achievementsSeen = stringSetPreferencesKey("achievements_seen")
@@ -293,6 +299,7 @@ class UserPreferencesRepository(
                 appLock = p[Keys.appLock] ?: false,
                 hideInRecents = p[Keys.hideInRecents] ?: false,
                 hideAmounts = p[Keys.hideAmounts] ?: false,
+                showCents = p[Keys.showCents] ?: true,
                 moduleOffersHidden = p[Keys.moduleOffersHidden] ?: false,
                 spendTypes = com.lucento.app.domain.SpendType.fromKeys(p[Keys.spendTypes].orEmpty()),
                 achievementsSeen = p[Keys.achievementsSeen]?.mapNotNull(com.lucento.app.domain.Achievement::fromKey)?.toSet(),
@@ -497,6 +504,10 @@ class UserPreferencesRepository(
 
     suspend fun setHideAmounts(hidden: Boolean) {
         context.dataStore.edit { it[Keys.hideAmounts] = hidden }
+    }
+
+    suspend fun setShowCents(shown: Boolean) {
+        context.dataStore.edit { it[Keys.showCents] = shown }
     }
 
     suspend fun setModuleOffersHidden(hidden: Boolean) {
