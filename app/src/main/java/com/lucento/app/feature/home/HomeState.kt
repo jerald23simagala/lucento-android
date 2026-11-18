@@ -36,10 +36,11 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 /**
- * The Monthly budget card's formula, read top to bottom (docs/CALCULATIONS.md):
- * budget − used = remaining, where used = budgeted + unbudgeted spending (every expense counts), and for this month
- * remaining − bills due = safe to spend. Each figure is taken from [BudgetPlan] or [SafeToSpend], never recomputed,
- * so the card can't disagree with the Budget tab.
+ * Safe to spend's figures as the home-screen widget reads them (docs/WIDGETS.md): budget − used = remaining, where
+ * used = budgeted + unbudgeted spending (every expense counts), and for this month the lower of remaining − bills due
+ * and the spending money. Each figure is taken from [BudgetPlan] or [SafeToSpend], never recomputed, so the widget can't
+ * disagree with Home's card or the Budget tab, which read the same [SafeToSpend] through [SpendingCapacity] (owner's
+ * redesign, 2026-11-18).
  */
 data class BudgetFormula(
     val budget: Money,
@@ -69,25 +70,35 @@ data class BudgetFormula(
 
     /** Why Safe to spend reads what it does, when it needs saying: the spending money, overspending, bills due. */
     val safeCaption: String?
-        get() = if (safeToSpend == null) null else caption(limitedByMoney, moneyEmpty, nothingSafe, overspent)
+        get() = if (safeToSpend == null) null else caption(limitedByMoney, moneyEmpty, nothingSafe, overspent, budgetUsedUp = remaining.amountMinor <= 0L)
 
     companion object {
-        const val CAPTION_MONEY_LIMITS = "Limited by your spending money"
-        const val CAPTION_MONEY_TAKEN = "What’s due takes your spending money"
+        // Short forms of the card's sentences (SpendingCapacity.headline), in its words (design review, 2026-11-18).
+        const val CAPTION_MONEY_LIMITS = "Limited by your spending wallets"
+        const val CAPTION_MONEY_TAKEN = "What’s due takes your spending wallets"
         const val CAPTION_MONEY_EMPTY = "Your spending wallets show no money"
         const val CAPTION_OVER_BUDGET = "You’re over budget this month"
         const val CAPTION_BILLS = "Bills due take what’s left"
+        const val CAPTION_BUDGET_USED = "This month’s budget is used up"
 
         /**
-         * The one reason Home's card, the Budget tile and the widget give, by its cause — empty spending wallets aren't
-         * "what's due" (QA, 2026-11-17). Null when the figure needs no reason.
+         * The widget's short reason, by its cause; Home's card says the same in a sentence ([SpendingCapacity.headline]).
+         * Empty spending wallets aren't "what's due" (QA, 2026-11-17), and a budget already used up before the bills
+         * isn't the bills' doing ([budgetUsedUp], QA 2026-11-18). Null when the figure needs no reason.
          */
-        fun caption(limitedByMoney: Boolean, moneyEmpty: Boolean, nothingSafe: Boolean, overspent: Boolean): String? = when {
+        fun caption(
+            limitedByMoney: Boolean,
+            moneyEmpty: Boolean,
+            nothingSafe: Boolean,
+            overspent: Boolean,
+            budgetUsedUp: Boolean = false,
+        ): String? = when {
             limitedByMoney && moneyEmpty -> CAPTION_MONEY_EMPTY
             limitedByMoney && nothingSafe -> CAPTION_MONEY_TAKEN
             limitedByMoney -> CAPTION_MONEY_LIMITS
             !nothingSafe -> null
             overspent -> CAPTION_OVER_BUDGET
+            budgetUsedUp -> CAPTION_BUDGET_USED
             else -> CAPTION_BILLS
         }
 

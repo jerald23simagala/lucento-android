@@ -13,9 +13,10 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 /**
- * The Budget hero's per-day figure. For the current month it is "Safe per day" (docs/CALCULATIONS.md): safe to spend —
- * the budget left after the bills due by month end — over the days left including today, the same calculation as
- * Home's "Safe to spend". A finished month shows what was spent per day instead.
+ * The Budget tab's per-day figure. For the current month it is "Safe per day" (docs/CALCULATIONS.md): safe to spend over
+ * the days left including today, the same [SafeToSpend] as Home's. Since the owner's redesign (2026-11-18) the tab shows
+ * it under Safe to spend, read from that [SafeToSpend]; these cases keep decision D1 pinned in tests. A finished month
+ * shows what was spent per day on the hero instead.
  */
 sealed interface DailyFigure {
     /**
@@ -52,13 +53,32 @@ fun budgetDailyFigure(
     budgets: List<Budget>,
     schedules: List<RecurringSchedule>,
     categories: List<Category>,
-): DailyFigure? {
-    if (plan.month != YearMonth.from(today)) return DailyFigure.DailyAverage(burn.dailyAverage, burn.daysInMonth)
-    // As on Home: a schedule from a valued foreign wallet counts at that wallet's rate (tester round, 2026-11-17).
+): DailyFigure? = dailyFigure(plan, burn, today, budgetSafeToSpend(plan, today, ledger, budgets, schedules, categories))
+
+/**
+ * Safe to spend for [plan]'s month on the Budget tab, the same calculation and inputs as Home's: the translated
+ * [ledger], with schedules from a valued foreign wallet at that wallet's rate (tester round, 2026-11-17). Null outside
+ * the current month, and when there is no budget in this currency to measure against. The per-day figure and the
+ * spending limits panel both read it, so they can't disagree.
+ */
+fun budgetSafeToSpend(
+    plan: BudgetPlan,
+    today: LocalDate,
+    ledger: TranslatedLedger,
+    budgets: List<Budget>,
+    schedules: List<RecurringSchedule>,
+    categories: List<Category>,
+): SafeToSpend? {
+    if (plan.month != YearMonth.from(today)) return null
     val valued = com.lucento.app.domain.fx.FxTranslation.valueSchedules(ledger, schedules)
-    val safe = CashflowCalculator.safeToSpend(plan.currencyCode, today, ledger.transactions, ledger.wallets, budgets, valued, categories)
+    return CashflowCalculator.safeToSpend(plan.currencyCode, today, ledger.transactions, ledger.wallets, budgets, valued, categories)
         ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
-        ?: return null
+}
+
+/** [plan]'s per-day figure from its [safe] to spend ([budgetSafeToSpend]); a finished month's daily average. */
+fun dailyFigure(plan: BudgetPlan, burn: BudgetBurn, today: LocalDate, safe: SafeToSpend?): DailyFigure? {
+    if (plan.month != YearMonth.from(today)) return DailyFigure.DailyAverage(burn.dailyAverage, burn.daysInMonth)
+    safe ?: return null
     val perDay = safe.perDay
     val empty = com.lucento.app.feature.home.BudgetFormula.moneyEmpty(safe)
     return if (perDay != null) DailyFigure.SafePerDay(perDay, safe.daysLeft, safe.committed, safe.limitedByMoney, empty)

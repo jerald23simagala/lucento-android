@@ -63,7 +63,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   idempotent). Interpretation runs on the phone, with no network; Smarter reading (Pro, switched on in Settings)
   sends the message to Gemini through Lucento's proxy instead. See [docs/CAPTURE.md](docs/CAPTURE.md).
 - **Home-screen widgets**: **Quick add** (the composer's own scan · mic · field bar — one tap into Type, Speak or Scan)
-  and **Safe to spend** (Home's Monthly budget card in brief, with Add). Same figures and words as Home; they follow
+  and **Safe to spend** (Home's Monthly budget card in brief, with Add). Same figures as Home, in its words; they follow
   Hide amounts, App lock and the chosen theme; home screen only; no permission, no network. Add them from Settings ›
   Home-screen widgets or the launcher's widget list. See [docs/WIDGETS.md](docs/WIDGETS.md).
 - **Appearance** (profile menu): five curated themes — Sunrise (the brand), Midnight (always dark), Grove, Mono and

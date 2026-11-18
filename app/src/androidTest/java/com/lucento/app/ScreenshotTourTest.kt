@@ -312,9 +312,10 @@ class ScreenshotTourTest {
         val total = MoneyFormatter.format(money(2_590))
         waitForText("Monthly budget")
         waitForText(total) // the pace card's budget figure is the sum of the category amounts
-        // Bills due counts every scheduled bill, whatever its category; Safe to spend always closes the card (0 in red
-        // once the bills take what's left).
-        waitForText("Bills due")
+        // Upcoming expenses counts every scheduled bill, whatever its category; Safe to spend always closes the card (0 in
+        // red once the bills take what's left), the lower of Budget remaining and Spendable wallets.
+        waitForText("Budget remaining")
+        waitForText("Spendable wallets")
         waitForText("Safe to spend")
         waitForToastsGone()
         shot("06-home-within-budget")

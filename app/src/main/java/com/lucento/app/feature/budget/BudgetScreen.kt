@@ -22,7 +22,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
 import com.lucento.app.core.designsystem.component.CardOverline
@@ -31,7 +34,13 @@ import com.lucento.app.core.designsystem.component.HeroStatTile
 import com.lucento.app.core.designsystem.component.ListSectionHeader
 import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.domain.BudgetBurn
+import com.lucento.app.feature.home.SpendingCapacity
+import com.lucento.app.feature.home.SpendingCapacityBlock
 import com.lucento.app.feature.home.daysLeftLabel
+import com.lucento.app.feature.wallets.WalletDraft
+import com.lucento.app.feature.wallets.WalletEditorSheet
+import com.lucento.app.feature.wallets.WalletsViewModel
+import com.lucento.app.feature.wallets.toDraft
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.foundation.layout.IntrinsicSize
 import com.lucento.app.core.designsystem.component.CardHeader
@@ -141,7 +150,11 @@ fun BudgetScreen(
     /** Budgets opens from Home's Quick links, so it has a way back. */
     onBack: (() -> Unit)? = null,
     onManageCategories: () -> Unit,
+    /** Opens Scheduled from how Safe to spend is worked out, where what's due by the month's end is listed. */
+    onOpenScheduled: (() -> Unit)? = null,
     viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.Factory),
+    /** Counts a wallet as spending money, and edits a card's counted credit, as Home's budget card does. */
+    walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     val fmt = amountFormat()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -166,6 +179,7 @@ fun BudgetScreen(
     }
     val isCurrentMonth = monthOffset == 0
     var editing by remember { mutableStateOf<CategoryBudgetLine?>(null) }
+    var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
     var showAllBudgeted by rememberSaveable { mutableStateOf(false) }
     // Lucento Shared: a Partner sees the whole budget; the Shared Space's Owner sets the amounts and categories.
     val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
@@ -275,10 +289,31 @@ fun BudgetScreen(
 
             item(key = "summary") {
                 val burn = remember(plan, state.today) { BudgetPlanner.burn(plan, state.today) }
-                val daily = remember(plan, burn, ledger, state.budgets, state.schedules, state.categories) {
-                    budgetDailyFigure(plan, burn, state.today, ledger, state.budgets, state.schedules, state.categories)
+                val safe = remember(plan, ledger, state.budgets, state.schedules, state.categories, state.today) {
+                    budgetSafeToSpend(plan, state.today, ledger, state.budgets, state.schedules, state.categories)
                 }
-                BudgetSummaryCard(plan, burn, isCurrentMonth = isCurrentMonth, daily = daily)
+                // A finished month's daily average for the hero; this month's per-day figure is under Safe to spend.
+                val average = remember(plan, burn, state.today) { dailyFigure(plan, burn, state.today, null) as? DailyFigure.DailyAverage }
+                val capacity = remember(safe) { safe?.let { SpendingCapacity.of(it) } }
+                BudgetSummaryCard(plan, burn, isCurrentMonth = isCurrentMonth, average = average, limitsBelow = capacity != null)
+                if (safe != null && capacity != null) {
+                    // Owner's redesign (2026-11-18): the same two limits and Safe to spend as Home's budget card, from the
+                    // same figures, with Safe per day under the verdict.
+                    Spacer(Modifier.height(Spacing.md))
+                    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+                        SpendingCapacityBlock(
+                            capacity = capacity,
+                            safe = safe,
+                            wallets = state.wallets,
+                            // The sheets speak of the figures' own currency (another budget currency included; QA L3).
+                            mainCurrency = plan.currencyCode,
+                            onSetSpendable = walletsViewModel::setSpendable,
+                            onEditCard = { editingWallet = it.toDraft() },
+                            onReviewDue = onOpenScheduled,
+                            showPerDay = true,
+                        )
+                    }
+                }
             }
 
             if (!plan.unbudgetedSpending.isZero) {
@@ -385,6 +420,14 @@ fun BudgetScreen(
             onDismiss = { editing = null },
         )
     }
+    editingWallet?.let { draft ->
+        WalletEditorSheet(
+            initial = draft,
+            onSave = walletsViewModel::save,
+            onDelete = walletsViewModel::delete,
+            onDismiss = { editingWallet = null },
+        )
+    }
 }
 
 /** A compact white pill: previous · month · next. The chevrons are 48dp touch targets around the 40dp pill. */
@@ -423,11 +466,19 @@ private fun MonthSwitcher(month: YearMonth, canGoForward: Boolean, onPrevious: (
 /**
  * The month's budget as the page's statement, on brand blue (navy at night): what is left is the largest figure, with
  * the share spent beside the title; the utilisation bar with a white marker for today; the elapsed and spent shares in
- * words with the pace verdict; then Spent and the per-day figure ([DailyFigure]) as two translucent sub-cards.
+ * words with the pace verdict; then Spent and a finished month's daily average as two translucent sub-cards. With
+ * [limitsBelow] (this month, owner's redesign 2026-11-18) the two limits, Safe to spend and Safe per day follow in their
+ * own card, as on Home, so the hero ends on what Spent is made of.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth: Boolean, daily: DailyFigure?) {
+private fun BudgetSummaryCard(
+    plan: BudgetPlan,
+    burn: BudgetBurn,
+    isCurrentMonth: Boolean,
+    average: DailyFigure.DailyAverage?,
+    limitsBelow: Boolean = false,
+) {
     val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     HeroCard {
@@ -460,7 +511,12 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
         // Signed: a negative remaining is the amount over budget.
         MoneyText(money = plan.remaining, style = AmountStyles.headline, color = ext.onHero, fractionScale = 1f, minScale = 0.5f)
         Text(
-            if (over) "Over your $total budget" else "Remaining of $total budget",
+            when {
+                over -> "Over your $total budget"
+                // The limits below take the upcoming expenses off this figure; saying so keeps the two apart (QA M2).
+                limitsBelow -> "Remaining of $total budget, before upcoming expenses"
+                else -> "Remaining of $total budget"
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = ext.onHeroMuted,
         )
@@ -493,6 +549,25 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
             val verdict = paceVerdict(plan, burn.pace, isCurrentMonth)
             StatusPill(verdict.label, verdictTone(verdict), Modifier.align(Alignment.CenterVertically))
         }
+        if (limitsBelow) {
+            // Spent is every expense, so say how it splits and the figure adds up (D1 / P2-3), as Home's card does.
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("Spent ${fmt.format(plan.spent)}") }
+                    append(" = ${fmt.format(plan.budgetedSpending)} budgeted + ${fmt.format(plan.unbudgetedSpending)} unbudgeted")
+                },
+                // Balanced lines, so "unbudgeted" never sits alone on the last one.
+                style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                color = ext.onHero,
+                modifier = Modifier.semantics {
+                    contentDescription = "Spent ${fmt.spoken(plan.spent)}: ${fmt.spoken(plan.budgetedSpending)} budgeted, " +
+                        "${fmt.spoken(plan.unbudgetedSpending)} unbudgeted"
+                },
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            return@HeroCard
+        }
         Spacer(Modifier.height(14.dp))
         val spentTile: @Composable (Modifier) -> Unit = { m ->
             HeroStatTile(
@@ -508,26 +583,13 @@ private fun BudgetSummaryCard(plan: BudgetPlan, burn: BudgetBurn, isCurrentMonth
             // Large text: each sub-card takes the full width so its label and caption are never cut off.
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 spentTile(Modifier.fillMaxWidth())
-                if (daily != null) DailyTile(daily, overspent = over, modifier = Modifier.fillMaxWidth())
+                if (average != null) DailyTile(average, modifier = Modifier.fillMaxWidth())
             }
         } else {
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 spentTile(Modifier.weight(1f).fillMaxHeight())
-                if (daily != null) DailyTile(daily, overspent = over, modifier = Modifier.weight(1f).fillMaxHeight())
+                if (average != null) DailyTile(average, modifier = Modifier.weight(1f).fillMaxHeight())
             }
-        }
-        val setAside = when (daily) {
-            is DailyFigure.SafePerDay -> daily.committed
-            is DailyFigure.NothingLeft -> daily.committed
-            else -> null
-        }
-        if (setAside != null && !setAside.isZero) {
-            Spacer(Modifier.height(Spacing.sm))
-            Text(
-                "${fmt.format(setAside)} of bills due by the end of ${monthLabel(plan.month)} is set aside first.",
-                style = MaterialTheme.typography.bodySmall,
-                color = ext.onHeroMuted,
-            )
         }
         // D1 / P2-3: Spent is every expense, so say how it splits — budgeted + unbudgeted — and the figure adds up.
         // Same words and order as the Home budget card's formula.
@@ -557,29 +619,14 @@ private fun HeroIndicator(figure: String, what: String, modifier: Modifier = Mod
     }
 }
 
-/** The hero's per-day sub-card: Safe per day this month, Safe to spend when nothing is left to spread, or a past month's daily average. */
-@OptIn(ExperimentalLayoutApi::class)
+/** The hero's per-day sub-card for a finished month: its daily average (this month's Safe per day is under Safe to spend). */
 @Composable
-private fun DailyTile(daily: DailyFigure, overspent: Boolean, modifier: Modifier) {
+private fun DailyTile(daily: DailyFigure.DailyAverage, modifier: Modifier) {
     val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
-    val (label, money, caption) = when (daily) {
-        is DailyFigure.SafePerDay -> Triple(
-            "Safe per day",
-            daily.perDay,
-            // Tester round (2026-11-17): say so when the spending money, not the budget, sets it.
-            "${daysLeftLabel(daily.daysLeft)} left" + if (daily.limitedByMoney) " · by spending money" else "",
-        )
-        // As on Home (owner, 2026-11-03): never below zero; the bills set aside are explained under the tiles.
-        is DailyFigure.NothingLeft -> Triple(
-            "Safe to spend",
-            if (daily.safe.isNegative) com.lucento.app.core.money.Money.zero(daily.safe.currencyCode) else daily.safe,
-            // The same reason Home's card gives (round 6): with budget still remaining, the bills due took the rest.
-            com.lucento.app.feature.home.BudgetFormula.caption(daily.limitedByMoney, daily.moneyEmpty, nothingSafe = true, overspent = overspent)
-                ?: com.lucento.app.feature.home.BudgetFormula.CAPTION_BILLS,
-        )
-        is DailyFigure.DailyAverage -> Triple("Daily average", daily.perDay, "over ${daysLeftLabel(daily.days)}")
-    }
+    val label = "Daily average"
+    val money = daily.perDay
+    val caption = "over ${daysLeftLabel(daily.days)}"
     HeroStatTile(
         label,
         Icons.Outlined.CalendarToday,
