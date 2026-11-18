@@ -2,8 +2,8 @@
 
 ## Pending: wallet kinds, spending money and scheduled transfers (app schema v14, PR #101)
 
-**Status: not applied anywhere yet (owner to-do OT-38: lucento-test first, then production).** Owner-run, like the
-migrations below.
+**Status: applied by the owner to lucento-test, then production (OT-38, 2026-11-18).** Claude checked production
+read-only the same day: every check in the paste file's last query is true, and the history records 20261119090000.
 
 | Migration | Effect | Data risk |
 |---|---|---|
