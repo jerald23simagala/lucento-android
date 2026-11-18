@@ -425,20 +425,26 @@ internal val DarkExtended = LucentoExtendedColors(
  * Sunrise's shortcut tiles: Goals in the brand blue (the theme's primary), Insights violet, Awards sunlight gold, Debts
  * coral and Scheduled teal. The tints come from the category palette's families, so they sit with the rest of Home.
  */
+/**
+ * Design review (2026-11-17): the first coral Debts, gold Awards and teal Scheduled sat within 3–9 OKLab ΔE of the
+ * negative, warning and positive tones, so a debt still read as an alarm. Now Awards is navy on sunlight (the brand's
+ * own pairing), Debts the slate of the debt category, Scheduled sky — every glyph but Goals ≥ 15 ΔE from every status
+ * tone in its mode (`ThemeInvarianceTest`).
+ */
 internal object SunriseShortcuts {
     val light = ShortcutTones(
         goals = TonePair(Palette.PaleSky, Palette.ElectricBlue),
         insights = TonePair(Color(0xFFF0EAFE), Color(0xFF7848E0)),
-        awards = TonePair(Palette.SunlightPale, Color(0xFF8A5200)),
-        debts = TonePair(Color(0xFFFDE8E4), Color(0xFFB4432A)),
-        scheduled = TonePair(Color(0xFFDDF4F1), Color(0xFF0D8478)),
+        awards = TonePair(Palette.SunlightPale, Palette.MidnightNavy),
+        debts = TonePair(Color(0xFFE9ECF2), Color(0xFF3F4A63)),
+        scheduled = TonePair(Color(0xFFE0F2FE), Color(0xFF0B5FA5)),
     )
     val dark = ShortcutTones(
         goals = TonePair(Color(0xFF26397A), Palette.BlueNight),
         insights = TonePair(Color(0xFF30215A), Color(0xFFC8B3FF)),
-        awards = TonePair(Color(0xFF3D3214), Color(0xFFFFD98A)),
-        debts = TonePair(Color(0xFF4A221D), Color(0xFFFFAA9C)),
-        scheduled = TonePair(Color(0xFF0F3A36), Color(0xFF7EDCD1)),
+        awards = TonePair(Palette.SunlightYellow, Palette.MidnightNavy),
+        debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
+        scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
     )
 }
 

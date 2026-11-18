@@ -302,9 +302,11 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
    open Transactions filtered to that category and month.
 4. **Shortcuts**: Goals · Insights · Awards · Debts · Scheduled (only modules that are on; switched-off ones offer
    "Turn on" or "Hide"). Each tile has its own hue from the theme (`ShortcutTones`, tester round 2026-11-17): in
-   Sunrise Goals brand blue, Insights violet, Awards sunlight gold, Debts coral, Scheduled teal. None is a status
-   colour (red, green and amber mean state on the same screen); Goals always carries the theme's primary; Mono keeps
-   all five graphite. Glyphs keep ≥ 3:1 on their tile (`ThemeContrastTest`).
+   Sunrise Goals brand blue, Insights violet, Awards navy on sunlight, Debts slate (the debt category's own tone),
+   Scheduled sky. None reads as a status colour (red, green and amber mean state on the same screen): every glyph but
+   Goals stays ≥ 15 OKLab ΔE from the positive, negative and warning tones of its mode (`ThemeInvarianceTest`; the
+   first coral, gold and teal sat within 3–9, design review 2026-11-17). Goals always carries the theme's primary;
+   Mono keeps all five graphite. Glyphs keep ≥ 3:1 on their tile (`ThemeContrastTest`).
 5. **Upcoming scheduled transactions** (≤ 3, two-line rows, never auto-recorded) and **Recent transactions** (≤ 5 in
    the shown month), each with "See all".
 Amounts on cards use the same size for whole units and decimals. Awards (milestones, docs/CALCULATIONS.md) are

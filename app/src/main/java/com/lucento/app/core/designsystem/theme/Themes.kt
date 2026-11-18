@@ -231,9 +231,9 @@ private object MidnightColors {
         shortcuts = ShortcutTones(
             goals = TonePair(Color(0xFF26335E), Color(0xFF8FA8FF)),
             insights = TonePair(Color(0xFF2E2552), Color(0xFFC4B5FF)),
-            awards = TonePair(Color(0xFF32290F), Color(0xFFE3C87E)),
-            debts = TonePair(Color(0xFF3F2026), Color(0xFFF0A6A0)),
-            scheduled = TonePair(Color(0xFF103735), Color(0xFF8FD8CF)),
+            awards = TonePair(Palette.SunlightYellow, Palette.MidnightNavy),
+            debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
+            scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
         ),
     )
 }
@@ -293,9 +293,9 @@ private object GroveColors {
         shortcuts = ShortcutTones(
             goals = TonePair(Color(0xFFDFF0E5), Color(0xFF2E7D5B)),
             insights = TonePair(Color(0xFFF1E9F7), Color(0xFF7A4A9E)),
-            awards = TonePair(Color(0xFFFAEFD3), Color(0xFF7E5A0B)),
-            debts = TonePair(Color(0xFFF9E6DF), Color(0xFFA8472C)),
-            scheduled = TonePair(Color(0xFFDDEFF3), Color(0xFF1F6F86)),
+            awards = TonePair(Palette.SunlightPale, Palette.MidnightNavy),
+            debts = TonePair(Color(0xFFE9ECF2), Color(0xFF3F4A63)),
+            scheduled = TonePair(Color(0xFFE0F2FE), Color(0xFF0B5FA5)),
         ),
     )
     val darkScheme = DarkColors.copy(
@@ -350,9 +350,9 @@ private object GroveColors {
         shortcuts = ShortcutTones(
             goals = TonePair(Color(0xFF1F4733), Color(0xFF83CCA5)),
             insights = TonePair(Color(0xFF33264A), Color(0xFFD3B8F0)),
-            awards = TonePair(Color(0xFF3A2F12), Color(0xFFE5BD5E)),
-            debts = TonePair(Color(0xFF45231C), Color(0xFFF2AE98)),
-            scheduled = TonePair(Color(0xFF12333D), Color(0xFF8ED1E3)),
+            awards = TonePair(Palette.SunlightYellow, Palette.MidnightNavy),
+            debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
+            scheduled = TonePair(Color(0xFF0C3A55), Color(0xFF7DD3FC)),
         ),
     )
 }
@@ -520,10 +520,10 @@ private object AuroraColors {
         categorical = series(0xFF795DBA, 0xFF3F842E, 0xFF3772BB, 0xFFB34F2A, 0xFF007CA5, 0xFF8A6E08, 0xFFA84B84),
         shortcuts = ShortcutTones(
             goals = TonePair(Color(0xFFECE6FC), Color(0xFF6C4DE0)),
-            insights = TonePair(Color(0xFFFBE4F1), Color(0xFFB0307A)),
-            awards = TonePair(Color(0xFFFFF2D2), Color(0xFF8A5600)),
-            debts = TonePair(Color(0xFFFDE7E2), Color(0xFFB4432A)),
-            scheduled = TonePair(Color(0xFFD9F3EF), Color(0xFF0A7467)),
+            insights = TonePair(Color(0xFFF7E6FB), Color(0xFFA21CAF)),
+            awards = TonePair(Palette.SunlightPale, Palette.MidnightNavy),
+            debts = TonePair(Color(0xFFE9ECF2), Color(0xFF3F4A63)),
+            scheduled = TonePair(Color(0xFFE0F2FE), Color(0xFF0B5FA5)),
         ),
     )
     val darkScheme = DarkColors.copy(
@@ -578,10 +578,10 @@ private object AuroraColors {
         categorical = series(0xFF8F77CF, 0xFF079E92, 0xFFA88400, 0xFFBF669B, 0xFF5B9C4D, 0xFF448DD4, 0xFFCA6B49),
         shortcuts = ShortcutTones(
             goals = TonePair(Color(0xFF342973), Color(0xFFA98FFF)),
-            insights = TonePair(Color(0xFF4A1C3A), Color(0xFFFFA6D8)),
-            awards = TonePair(Color(0xFF3C3012), Color(0xFFFFD27A)),
-            debts = TonePair(Color(0xFF48211C), Color(0xFFFFAD9E)),
-            scheduled = TonePair(Color(0xFF0E3A36), Color(0xFF4FD8C6)),
+            insights = TonePair(Color(0xFF4A1F52), Color(0xFFF0ABFC)),
+            awards = TonePair(Palette.SunlightYellow, Palette.MidnightNavy),
+            debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
+            scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
         ),
     )
 }
