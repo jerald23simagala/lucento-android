@@ -241,26 +241,17 @@ class WalletsViewModel(
             null
         }
 
-        // Tester round (2026-11-17): part of a card's credit counted as spending money, never more than its limit. Turned
-        // off after being set, it is kept as zero rather than cleared, so the change syncs. Without a limit (cleared, or a
-        // type changed to card) the choice is saved as off instead of refused: the switch can't be used without one, so
-        // refusing would leave no way to save (QA, 2026-11-17).
-        val cardCounts = draft.type == WalletType.CREDIT_CARD && draft.spendable == true && debt?.creditLimit != null
-        val spendableCredit = if (cardCounts) {
-            val limit = debt?.creditLimit ?: return onResult(DraftError.SpendableCreditInvalid, null)
-            val credit = (MoneyParser.parse(draft.spendableCreditText, draft.currencyCode, decimalSeparator) as? MoneyParser.Result.Success)
-                ?.money?.takeIf { it.amountMinor > 0L } ?: return onResult(DraftError.SpendableCreditInvalid, null)
-            if (credit > limit) return onResult(DraftError.SpendableCreditTooHigh, null)
-            credit
-        } else if (draft.type == WalletType.CREDIT_CARD && (draft.spendableCreditText.isNotBlank() || draft.spendable == true)) {
-            Money.zero(draft.currencyCode)
-        } else {
-            null
+        // Tester round (2026-11-17): the spending-money choice, and for a card the credit it counts ([CardSpending]).
+        val spending = CardSpending.of(draft.type, draft.spendable, draft.spendableCreditText, debt?.creditLimit, draft.currencyCode, decimalSeparator)
+        val (spendable, spendableCredit) = when (spending) {
+            CardSpending.Unreadable -> return onResult(DraftError.SpendableCreditInvalid, null)
+            CardSpending.AboveLimit -> return onResult(DraftError.SpendableCreditTooHigh, null)
+            is CardSpending.Save -> spending.spendable to spending.credit
         }
         val extras = com.lucento.app.data.repository.WalletExtras(
             kind = draft.kind?.takeIf { it.type == draft.type },
             iconKey = draft.iconKey,
-            spendable = if (draft.type == WalletType.CREDIT_CARD && draft.spendable == true && !cardCounts) false else draft.spendable,
+            spendable = spendable,
             spendableCredit = spendableCredit,
         )
 
@@ -390,5 +381,39 @@ class WalletsViewModel(
 
     companion object {
         val Factory = containerFactory { WalletsViewModel(it.wallets, it.preferences, it.categories, it.transactions) }
+    }
+}
+
+/**
+ * What the wallet editor saves for spending money (tester round, 2026-11-17). A card counts credit only with a limit:
+ * the credit entered must read as an amount ([Unreadable]) no larger than the limit ([AboveLimit]). Without a limit
+ * (cleared, or a type changed to card) the choice saves as off rather than being refused — the switch can't be used
+ * without one, so refusing would leave no way to save (QA, 2026-11-17). A card's credit turned off is kept as zero, not
+ * cleared, so the change syncs. Other types keep their choice and never count credit.
+ */
+internal sealed interface CardSpending {
+    data class Save(val spendable: Boolean?, val credit: Money?) : CardSpending
+    data object Unreadable : CardSpending
+    data object AboveLimit : CardSpending
+
+    companion object {
+        fun of(
+            type: WalletType,
+            spendable: Boolean?,
+            creditText: String,
+            limit: Money?,
+            currencyCode: String,
+            decimalSeparator: Char,
+        ): CardSpending {
+            if (type != WalletType.CREDIT_CARD) return Save(spendable, null)
+            if (spendable == true && limit != null) {
+                val credit = (MoneyParser.parse(creditText, currencyCode, decimalSeparator) as? MoneyParser.Result.Success)
+                    ?.money?.takeIf { it.amountMinor > 0L } ?: return Unreadable
+                return if (credit > limit) AboveLimit else Save(true, credit)
+            }
+            val choice = if (spendable == true) false else spendable
+            val credit = if (creditText.isNotBlank() || spendable == true) Money.zero(currencyCode) else null
+            return Save(choice, credit)
+        }
     }
 }

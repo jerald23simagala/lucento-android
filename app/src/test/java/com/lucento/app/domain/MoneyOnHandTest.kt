@@ -252,15 +252,24 @@ class MoneyOnHandTest {
         assertEquals(php(-2_000_00), source.amount)
     }
 
-    @Test fun `a refund on the card gives back what it took, and last month's charges don't count`() {
+    @Test fun `a refund settles what was owed when the month opened first, then gives back this month's charges`() {
         val refund = Transaction(131, TransactionType.INCOME, php(500_00), 6, null, LocalDate.parse("2026-10-15"), "", 0L)
         val lastMonth = charge(132, 4_000_00, "2026-09-28")
-        val source = compute(
+        // September's 4,000 is still owed: the refund goes to it, and October's 2,000 stays used.
+        val carried = compute(
             listOf(bank, card(owed = 5_500_00, chosen = 10_000_00)),
             transactions = listOf(charge(133, 2_000_00, "2026-10-09"), refund, lastMonth),
         )!!.sources.single { it.credit }
-        assertEquals(php(1_500_00), source.used)
-        assertEquals(php(8_500_00), source.amount)
+        assertEquals(php(2_000_00), carried.used)
+        assertEquals(php(8_000_00), carried.amount)
+        // With September paid off, the refund gives back what it took.
+        val paidSeptember = Transaction(134, TransactionType.TRANSFER_IN, php(4_000_00), 6, null, LocalDate.parse("2026-09-30"), "", 0L)
+        val clear = compute(
+            listOf(bank, card(owed = 1_500_00, chosen = 10_000_00)),
+            transactions = listOf(charge(133, 2_000_00, "2026-10-09"), refund, lastMonth, paidSeptember),
+        )!!.sources.single { it.credit }
+        assertEquals(php(1_500_00), clear.used)
+        assertEquals(php(8_500_00), clear.amount)
     }
 
     @Test fun `a loan payment left unmarked for months never takes more than the loan still owes`() {
@@ -301,5 +310,69 @@ class MoneyOnHandTest {
         // A starting balance counts as recorded too, and so does a card whose credit the person chose.
         assertTrue(MoneyOnHandCalculator.hasMoneyRecorded(bank, emptyList()))
         assertTrue(compute(listOf(card(owed = 0, chosen = 10_000_00)))!!.recorded)
+    }
+
+    // ---------------------------------------------------------------- QA re-check (2026-11-18): payments and refunds
+
+    /** A payment from [from] into the card: both legs, linked, as the transfer sheet saves them. */
+    private fun payCard(id: Long, minor: Long, date: String, from: Long = 1) = listOf(
+        Transaction(id, TransactionType.TRANSFER_OUT, php(minor), from, null, LocalDate.parse(date), "", 0L, "pay$id"),
+        Transaction(id + 1, TransactionType.TRANSFER_IN, php(minor), 6, null, LocalDate.parse(date), "", 0L, "pay$id"),
+    )
+
+    @Test fun `paying the card as you go leaves the figure where it was`() {
+        // N-A: 3,000 on the card, then paid from the bank two days later.
+        val bank20 = bank.copy(balance = php(20_000_00))
+        val before = compute(listOf(bank20, card(owed = 3_000_00, chosen = 10_000_00)), transactions = listOf(charge(160, 3_000_00, "2026-10-10")))!!
+        val after = compute(
+            listOf(bank.copy(balance = php(17_000_00)), card(owed = 0, chosen = 10_000_00)),
+            transactions = listOf(charge(160, 3_000_00, "2026-10-10")) + payCard(161, 3_000_00, "2026-10-12"),
+        )!!
+        assertEquals(php(27_000_00), before.allows)
+        assertEquals(php(27_000_00), after.allows)
+        assertEquals(php(0), after.sources.single { it.credit }.used)
+    }
+
+    @Test fun `paying the statement due this month leaves the figure where it was`() {
+        // Statement on the 5th (3,000), due on the 25th, paid from the bank on the 20th; 2,000 charged since.
+        val billed = charge(170, 3_000_00, "2026-10-03")
+        val since = charge(171, 2_000_00, "2026-10-10")
+        val before = compute(listOf(bank, card(owed = 5_000_00, chosen = 10_000_00, statementDay = 5, dueDay = 25)), transactions = listOf(billed, since))!!
+        val after = compute(
+            listOf(bank.copy(balance = php(6_120_00)), card(owed = 2_000_00, chosen = 10_000_00, statementDay = 5, dueDay = 25)),
+            transactions = listOf(billed, since) + payCard(172, 3_000_00, "2026-10-20"),
+        )!!
+        assertEquals(php(14_120_00), before.allows) // 9,120 + 8,000 − 3,000
+        assertEquals(php(14_120_00), after.allows)  // 6,120 + 8,000
+        assertTrue(after.deductions.none { it.kind == MoneyOnHand.Kind.CARD_PAYMENT })
+    }
+
+    @Test fun `a refund after the statement counts once`() {
+        // N-B: a 1,000 refund on the 16th lowers the statement's amount due; it doesn't also give back credit.
+        val billed = charge(180, 3_000_00, "2026-10-03")
+        val since = charge(181, 2_000_00, "2026-10-10")
+        val refund = Transaction(182, TransactionType.INCOME, php(1_000_00), 6, null, LocalDate.parse("2026-10-16"), "", 0L)
+        val before = compute(listOf(bank, card(owed = 5_000_00, chosen = 10_000_00, statementDay = 5, dueDay = 25)), transactions = listOf(billed, since))!!
+        val after = compute(listOf(bank, card(owed = 4_000_00, chosen = 10_000_00, statementDay = 5, dueDay = 25)), transactions = listOf(billed, since, refund))!!
+        assertEquals(php(1_000_00), after.allows - before.allows)
+    }
+
+    @Test fun `a statement paid from savings keeps its charges in the counted credit`() {
+        // N-C: the card is paid from savings (last payment came from there), so nothing is set aside from spending money
+        // for its statement, and the month's charges before it still use the counted credit.
+        val visa = card(owed = 5_000_00, chosen = 10_000_00, statementDay = 5, dueDay = 25)
+        val txs = listOf(charge(190, 3_000_00, "2026-10-03"), charge(191, 2_000_00, "2026-10-10")) + payCard(192, 1_000_00, "2026-09-24", from = 4)
+        val money = compute(listOf(bank, savings, visa), transactions = txs)!!
+        assertTrue(money.deductions.none { it.kind == MoneyOnHand.Kind.CARD_PAYMENT })
+        assertEquals(php(5_000_00), money.sources.single { it.credit }.used)
+        assertEquals(php(9_120_00 + 5_000_00), money.allows)
+    }
+
+    @Test fun `a debt payment held to what is owed says so`() {
+        val owedLoan = wallet(7, WalletType.LOAN, 20_000_00)
+        val instalment = schedule(30, TransactionType.EXPENSE, 12_000_00, wallet = 1, start = "2026-07-15", to = 7)
+        assertTrue(compute(listOf(bank, owedLoan), listOf(instalment))!!.deductions.single().capped)
+        val bigLoan = wallet(7, WalletType.LOAN, 500_000_00)
+        assertFalse(compute(listOf(bank, bigLoan), listOf(instalment))!!.deductions.single().capped)
     }
 }

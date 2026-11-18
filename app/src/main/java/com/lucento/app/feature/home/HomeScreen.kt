@@ -1584,6 +1584,8 @@ private fun MonthlyBudgetCard(
         if (choosingWallets) {
             SpendingWalletsSheet(
                 wallets = state.wallets,
+                mainCurrency = state.primaryCurrency,
+                money = state.safeToSpend?.moneyOnHand,
                 onToggle = onSetSpendable,
                 onDismiss = { choosingWallets = false },
                 onEditCard = { card ->

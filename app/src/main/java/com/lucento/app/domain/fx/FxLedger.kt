@@ -269,7 +269,10 @@ object FxTranslation {
         return schedules.map { s ->
             if (s.currencyCode == main) return@map s
             val position = ledger.book.positions[s.walletId] ?: return@map s
-            val rate = position.averageRate ?: byId[s.walletId]?.fxBasisRate ?: return@map s
+            // A rate that rounds to nothing (a tiny balance) can't value anything: fall back, or leave it alone.
+            val rate = position.averageRate?.takeIf { it.signum() > 0 }
+                ?: byId[s.walletId]?.fxBasisRate?.takeIf { it.signum() > 0 }
+                ?: return@map s
             val fx = FxRate(s.currencyCode, main, rate)
             s.copy(amount = fx.convert(s.amount), interest = fx.convert(s.interest))
         }

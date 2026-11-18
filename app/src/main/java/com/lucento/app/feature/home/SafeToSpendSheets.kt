@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
@@ -114,7 +115,8 @@ internal fun SafeToSpendSheet(
             if (money != null) {
                 SectionTitle("Your spending money allows", used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
                 money.sources.forEach { source -> ExplainLine(sourceLabel(source, fmt::format), source.amount) }
-                money.deductions.forEach { deduction -> ExplainLine(deductionLabel(deduction, today), -deduction.amount) }
+                val from = money.sources.singleOrNull()?.name
+                money.deductions.forEach { deduction -> ExplainLine(deductionLabel(deduction, today, from), -deduction.amount) }
                 TotalLine(money.allows, used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
                 if (!moneyCounts) {
                     Text(
@@ -137,17 +139,22 @@ internal fun SafeToSpendSheet(
             Spacer(Modifier.size(Spacing.xs))
             Text(
                 "Savings and investments count only when you switch them on. Property, loans and money you’re owed never " +
-                    "count, and income you expect isn’t added until it arrives. Below zero, Safe to spend shows 0.",
-                style = MaterialTheme.typography.bodySmall,
+                    "count, and income you expect isn’t added until it arrives. Safe to spend never shows less than 0.",
+                style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            // What's due comes from schedules (a card's own payment is on its page): mark paid or skip them there.
+            // What's due comes from schedules (a card's own payment is on its page): mark paid or skip them there. Aligned
+            // with the text above it, as a link (design review round 2: a centred button sat apart from it).
             if (onReviewDue != null && money?.deductions?.any { it.kind != MoneyOnHand.Kind.CARD_PAYMENT } == true) {
-                com.lucento.app.core.designsystem.component.LucentoTextButton(
-                    text = "Review what’s due in Scheduled",
-                    onClick = onReviewDue,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onReviewDue),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Text("Review what’s due in Scheduled", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                }
             }
             if (onChooseWallets != null) {
                 Spacer(Modifier.size(Spacing.xs))
@@ -172,8 +179,13 @@ internal fun SpendingWalletsSheet(
     onToggle: (Long, Boolean) -> Unit,
     onDismiss: () -> Unit,
     onEditCard: ((Wallet) -> Unit)? = null,
+    /** The main currency: a wallet in another one counts only at its rate. */
+    mainCurrency: String? = null,
+    /** What the spending money allows now, shown live as wallets are switched (design review round 2). */
+    money: MoneyOnHand? = null,
 ) {
     val fmt = amountFormat()
+    val fx = com.lucento.app.feature.fx.LocalFxDisplay.current
     val accounts = wallets.filter { it.type.canBeSpendingMoney && it.type != WalletType.CREDIT_CARD }
     val cards = wallets.filter { it.type == WalletType.CREDIT_CARD }
     LucentoBottomSheet(onDismissRequest = onDismiss) {
@@ -189,11 +201,29 @@ internal fun SpendingWalletsSheet(
                 subtitle = "Choose which wallets Safe to spend counts.",
                 icon = Icons.Outlined.AccountBalanceWallet,
             )
+            Text(
+                when {
+                    money == null -> "No wallet counts as spending money now."
+                    !money.recorded -> "Not counted yet: no money has been recorded in these wallets."
+                    else -> "Your spending money allows ${fmt.format(money.allows)} this month."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = Spacing.xs),
+            )
             accounts.forEach { wallet ->
+                // A wallet in another currency counts at its rate; without one it can't change the figure, and says so.
+                val unvalued = mainCurrency != null && wallet.currencyCode != mainCurrency && fx.netWorthValue(wallet) == null
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = 56.dp)
+                        // The whole row is the switch, as everywhere else (design review round 2: one stop for TalkBack).
+                        .toggleable(
+                            value = wallet.isSpendingMoney,
+                            role = androidx.compose.ui.semantics.Role.Switch,
+                            onValueChange = { onToggle(wallet.id, it) },
+                        )
                         .padding(vertical = Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -207,12 +237,15 @@ internal fun SpendingWalletsSheet(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (unvalued) {
+                            Text(
+                                "Counts once it has a rate to $mainCurrency",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                    Switch(
-                        checked = wallet.isSpendingMoney,
-                        onCheckedChange = { onToggle(wallet.id, it) },
-                        modifier = Modifier.semantics { contentDescription = "Count ${wallet.name} as spending money" },
-                    )
+                    Switch(checked = wallet.isSpendingMoney, onCheckedChange = null)
                 }
             }
             if (accounts.isEmpty()) {
@@ -231,7 +264,7 @@ internal fun SpendingWalletsSheet(
                         .padding(top = Spacing.md, bottom = Spacing.xxs)
                         .semantics { heading() },
                 )
-                cards.forEach { card -> CardCreditRow(card, fmt::format) { onEditCard(card) } }
+                cards.forEach { card -> CardCreditRow(card, fmt::format, mainCurrency) { onEditCard(card) } }
                 Text(
                     "Credit is borrowed money: count some only if you pay the card in full every month.",
                     style = MaterialTheme.typography.bodySmall,
@@ -246,9 +279,11 @@ internal fun SpendingWalletsSheet(
 
 /** A card in [SpendingWalletsSheet]: what of its credit counts, and the way to change it in the card's editor. */
 @Composable
-private fun CardCreditRow(card: Wallet, format: (Money) -> String, onClick: () -> Unit) {
+private fun CardCreditRow(card: Wallet, format: (Money) -> String, mainCurrency: String?, onClick: () -> Unit) {
     val limit = card.debt?.creditLimit
     val chosen = card.spendableCredit?.takeIf { card.isSpendingMoney && it.amountMinor > 0L }
+    // Only a card in the main currency can count credit (QA: a foreign card's credit isn't counted after conversion).
+    val foreign = mainCurrency != null && card.currencyCode != mainCurrency
     val action = if (chosen != null) "Change" else "Set amount"
     Row(
         Modifier
@@ -264,6 +299,7 @@ private fun CardCreditRow(card: Wallet, format: (Money) -> String, onClick: () -
             Text(card.name, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis)
             Text(
                 when {
+                    foreign -> "In ${card.currencyCode}: only cards in $mainCurrency can count credit"
                     limit == null -> "Add its credit limit to count some of it"
                     chosen != null -> "Counts up to ${format(chosen)} of its credit"
                     else -> "Its credit isn’t counted"
@@ -277,15 +313,19 @@ private fun CardCreditRow(card: Wallet, format: (Money) -> String, onClick: () -
     }
 }
 
-/** A source's line: a card shows what it counts and what this month has used of it, so the sum can be checked. */
+/**
+ * A source's line: a card shows what it counts, what this month has used of it, and the credit still available when
+ * that is less, so the sum can be checked (QA: "₱10,000 counted, less ₱2,000 used" beside ₱3,000 didn't add up).
+ */
 private fun sourceLabel(source: MoneyOnHand.Source, format: (Money) -> String): String {
     if (!source.credit) return source.name
-    val chosen = source.chosen
-    val used = source.used
-    return if (chosen != null && used != null && used.amountMinor > 0L) {
-        "${source.name} · ${format(chosen)} of credit you count, less ${format(used)} used this month"
-    } else {
-        "${source.name} · credit you count"
+    val chosen = source.chosen ?: return "${source.name} · credit you count"
+    val used = source.used?.takeIf { it.amountMinor > 0L }
+    val left = if (used == null) chosen else chosen - used
+    return buildString {
+        append(source.name).append(" · ").append(format(chosen)).append(" of credit you count")
+        if (used != null) append(", less ").append(format(used)).append(" used this month")
+        if (source.amount < left) append(", up to the ").append(format(source.amount)).append(" still available")
     }
 }
 
@@ -353,13 +393,20 @@ private fun TotalLine(money: Money, used: Boolean) {
 }
 
 /** "Bills (3)", "Car loan · due Nov 25", "Visa payment · due Nov 20", "MP2 contribution · Nov 30". */
-/** A deduction's line; one first due before [today] says it is overdue, and repeats say how many payments. */
-private fun deductionLabel(d: MoneyOnHand.Deduction, today: LocalDate): String {
+/**
+ * A deduction's line; one first due before [today] says it is overdue, repeats say how many payments, and a debt payment
+ * held to what the debt still owes says so. Bills name the wallet they come from when there is one ([from]).
+ */
+private fun deductionLabel(d: MoneyOnHand.Deduction, today: LocalDate, from: String?): String {
     val date = d.date?.let { if (it.isBefore(today)) "overdue since ${shortDate(it)}" else "due ${shortDate(it)}" }
     val times = d.count.takeIf { it > 1 }?.let { "$it payments" }
     return when (d.kind) {
-        MoneyOnHand.Kind.BILLS -> if (d.count == 1) "1 bill payment from them" else "${d.count} bill payments from them"
-        MoneyOnHand.Kind.DEBT_PAYMENT, MoneyOnHand.Kind.CARD_PAYMENT -> listOfNotNull(d.name, times, date).joinToString(" · ")
+        MoneyOnHand.Kind.BILLS -> {
+            val payments = if (d.count == 1) "1 bill payment" else "${d.count} bill payments"
+            "$payments from ${from ?: "these wallets"}"
+        }
+        MoneyOnHand.Kind.DEBT_PAYMENT, MoneyOnHand.Kind.CARD_PAYMENT ->
+            listOfNotNull(d.name, times, date, "no more than is owed".takeIf { d.capped }).joinToString(" · ")
         MoneyOnHand.Kind.TRANSFER -> listOfNotNull("Transfer: ${d.name}", times, date).joinToString(" · ")
     }
 }

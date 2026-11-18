@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -718,6 +719,9 @@ private fun AgendaRow(item: ScheduledItem, state: PlanUiState, today: LocalDate,
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val roomForTile = maxWidth >= 340.dp && LocalDensity.current.fontScale < 1.3f
+        // At large text sizes the amount moves under the words, which then wrap freely (design review round 2: names
+        // and "→ MP2 2026" were still cut off at 200 %).
+        val stacked = LocalDensity.current.fontScale >= 1.3f
         Row(
             Modifier
                 .fillMaxWidth()
@@ -741,14 +745,28 @@ private fun AgendaRow(item: ScheduledItem, state: PlanUiState, today: LocalDate,
             }
             Column(Modifier.weight(1f)) {
                 // Wrap rather than cut off: "Everyday bank → MP2 2026" says where the money goes (design review, 2026-11-17).
-                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = if (stacked) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (stacked) Int.MAX_VALUE else 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (stacked) {
+                    Spacer(Modifier.height(Spacing.xxs))
+                    AmountText(money = signed(item), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
+                    if (item.overdue) StatusPill(relative, StatusTones.negative)
+                    else Text(relative, style = MaterialTheme.typography.labelMedium, color = if (days == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            Spacer(Modifier.width(Spacing.sm))
-            Column(horizontalAlignment = Alignment.End) {
-                AmountText(money = signed(item), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
-                if (item.overdue) StatusPill(relative, StatusTones.negative)
-                else Text(relative, style = MaterialTheme.typography.labelMedium, color = if (days == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            if (!stacked) {
+                Spacer(Modifier.width(Spacing.sm))
+                Column(horizontalAlignment = Alignment.End) {
+                    AmountText(money = signed(item), style = AmountStyles.row, showPlus = true, color = scheduledFlowColor(item.flow))
+                    if (item.overdue) StatusPill(relative, StatusTones.negative)
+                    else Text(relative, style = MaterialTheme.typography.labelMedium, color = if (days == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
             }
         }
     }
@@ -766,10 +784,11 @@ private fun DateBadge(date: LocalDate, today: LocalDate, overdue: Boolean) {
     }
     Column(
         Modifier
-            .width(44.dp)
+            // At least 44dp, wider when large text needs it ("MON" was clipped to "MO" at 200 %).
+            .widthIn(min = 44.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(container)
-            .padding(vertical = Spacing.xs)
+            .padding(vertical = Spacing.xs, horizontal = Spacing.xxs)
             .clearAndSetSemantics { },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

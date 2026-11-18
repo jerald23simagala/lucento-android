@@ -74,7 +74,13 @@ class ReportsViewModel(
     ) { base, main ->
         base?.let {
             val ledger = com.lucento.app.domain.fx.FxTranslation.translate(main, it.wallets, it.transactions)
-            it.copy(wallets = ledger.wallets, transactions = ledger.withFxResults, categories = ledger.withFxCategories(it.categories))
+            it.copy(
+                wallets = ledger.wallets,
+                transactions = ledger.withFxResults,
+                categories = ledger.withFxCategories(it.categories),
+                // As on Home and in Ask: a schedule from a valued foreign wallet at that wallet's rate (2026-11-18).
+                schedules = com.lucento.app.domain.fx.FxTranslation.valueSchedules(ledger, it.schedules),
+            )
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 

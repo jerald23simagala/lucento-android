@@ -42,9 +42,16 @@ data class MoneyOnHand(
 
     /**
      * What leaves the spending money by the month's end: [count] payments, the first due on [date] (null for the bills,
-     * summed into one line).
+     * summed into one line). [capped]: a debt payment held to what the debt still owes.
      */
-    data class Deduction(val kind: Kind, val name: String, val date: LocalDate?, val amount: Money, val count: Int = 1)
+    data class Deduction(
+        val kind: Kind,
+        val name: String,
+        val date: LocalDate?,
+        val amount: Money,
+        val count: Int = 1,
+        val capped: Boolean = false,
+    )
 
     val total: Money get() = Money.sum(currencyCode, sources.map { it.amount })
 
@@ -70,7 +77,20 @@ object MoneyOnHandCalculator {
     ): MoneyOnHand? {
         val monthEnd = YearMonth.from(today).atEndOfMonth()
         val spending = wallets.filter { it.currencyCode == currencyCode && it.isSpendingMoney }
-        val sources = spending.mapNotNull { w -> source(w, transactions, today) }
+        val spendingIds = spending.map { it.id }.toSet()
+        // A scheduled payment (or a transfer schedule, which only a synced row could be) to a card due this month stands
+        // for the card's own payment, and says which account pays it.
+        val scheduledToCard = schedules
+            .filter { (it.isDebtPayment || it.isTransfer) && it.toWalletId != null && RecurringMath.countDueThrough(it, monthEnd) > 0 }
+            .associateBy { it.toWalletId!! }
+        val sources = spending.mapNotNull { w ->
+            val payer = if (w.type != WalletType.CREDIT_CARD) {
+                null
+            } else {
+                scheduledToCard[w.id]?.walletId ?: CreditCardMath.payingWallet(w, wallets, transactions)?.id
+            }
+            source(w, transactions, today, billedFromSpending = payer != null && payer in spendingIds)
+        }
         if (sources.isEmpty()) return null
         val ids = sources.map { it.walletId }.toSet()
         val byId = wallets.associateBy { it.id }
@@ -94,19 +114,15 @@ object MoneyOnHandCalculator {
         due.filter { (s, _) -> s.isDebtPayment }.forEach { (s, count) ->
             val owed = s.toWalletId?.let(byId::get)?.takeIf { it.type.isLiability && it.currencyCode == currencyCode }?.balance
             val planned = times(s.total, count)
-            val amount = if (owed == null) planned else minOf(planned, if (owed.isNegative) Money.zero(currencyCode) else owed)
+            val ceiling = owed?.let { if (it.isNegative) Money.zero(currencyCode) else it }
+            val amount = if (ceiling == null) planned else minOf(planned, ceiling)
             if (amount.amountMinor > 0L) {
-                deductions += MoneyOnHand.Deduction(MoneyOnHand.Kind.DEBT_PAYMENT, s.name, s.nextDue, amount, count)
+                deductions += MoneyOnHand.Deduction(MoneyOnHand.Kind.DEBT_PAYMENT, s.name, s.nextDue, amount, count, capped = amount < planned)
             }
         }
-        // A card's payment from its billing days, paid from spending money — unless a scheduled payment to the card due
-        // this month already stands for it (a transfer schedule into a card, which only a synced row could be, too).
-        val scheduledCards = schedules
-            .filter { (it.isDebtPayment || it.isTransfer) && RecurringMath.countDueThrough(it, monthEnd) > 0 }
-            .mapNotNull { it.toWalletId }
-            .toSet()
+        // A card's payment from its billing days, paid from spending money — unless a schedule due this month stands for it.
         CreditCardMath.dues(wallets.filter { it.currencyCode == currencyCode }, transactions, today, monthEnd)
-            .filter { it.wallet.id !in scheduledCards && it.payFromWalletId in ids }
+            .filter { it.wallet.id !in scheduledToCard && it.payFromWalletId in ids }
             .forEach { d ->
                 deductions += MoneyOnHand.Deduction(MoneyOnHand.Kind.CARD_PAYMENT, "${d.wallet.name} payment", d.cycle.dueDate, d.cycle.amountDue)
             }
@@ -118,24 +134,30 @@ object MoneyOnHandCalculator {
         return MoneyOnHand(currencyCode, sources, deductions, recorded)
     }
 
-    private fun source(wallet: Wallet, transactions: List<Transaction>, today: LocalDate): MoneyOnHand.Source? {
-        val amount = contribution(wallet, transactions, today) ?: return null
+    private fun source(wallet: Wallet, transactions: List<Transaction>, today: LocalDate, billedFromSpending: Boolean): MoneyOnHand.Source? {
+        val amount = contribution(wallet, transactions, today, billedFromSpending) ?: return null
         val card = wallet.type == WalletType.CREDIT_CARD
         return MoneyOnHand.Source(
             wallet.id, wallet.name, amount, credit = card,
             chosen = if (card) wallet.spendableCredit else null,
-            used = if (card) creditUsed(wallet, transactions, today) else null,
+            used = if (card) creditUsed(wallet, transactions, today, billedFromSpending) else null,
         )
     }
 
     /**
      * What [wallet] adds to the money on hand: an account's balance (below zero when overdrawn). For a card, the credit
-     * the person chose to count less [creditUsed] — so spending on the card, or a bill from it marked paid, uses the
-     * counted credit up — capped at what is still available (limit − owed, never below zero). It goes below zero once
-     * more was put on the card this month than they chose to count. Nothing without a credit limit. Null for a wallet
-     * that can't be spending money. Without [today], nothing counts as used.
+     * the person chose to count less [creditUsed] — so spending on the card uses the counted credit up, and paying the
+     * card or marking a bill from it paid leaves the figure where it was — capped at what is still available (limit −
+     * owed, never below zero). It goes below zero once more was put on the card this month than they chose to count.
+     * Nothing without a credit limit. Null for a wallet that can't be spending money. Without [today], nothing counts
+     * as used.
      */
-    fun contribution(wallet: Wallet, transactions: List<Transaction> = emptyList(), today: LocalDate? = null): Money? = when {
+    fun contribution(
+        wallet: Wallet,
+        transactions: List<Transaction> = emptyList(),
+        today: LocalDate? = null,
+        billedFromSpending: Boolean = true,
+    ): Money? = when {
         !wallet.type.canBeSpendingMoney -> null
         wallet.type == WalletType.CREDIT_CARD -> {
             val chosen = wallet.spendableCredit?.takeIf { it.currencyCode == wallet.currencyCode && it.amountMinor > 0L }
@@ -143,7 +165,7 @@ object MoneyOnHandCalculator {
             if (chosen == null || available == null) {
                 null
             } else {
-                val left = if (today == null) chosen else chosen - creditUsed(wallet, transactions, today)
+                val left = if (today == null) chosen else chosen - creditUsed(wallet, transactions, today, billedFromSpending)
                 minOf(left, if (available.isNegative) Money.zero(wallet.currencyCode) else available)
             }
         }
@@ -152,35 +174,56 @@ object MoneyOnHandCalculator {
     }
 
     /**
-     * What the month of [today] has put on [card] that no statement due this month already covers: its charges (spending
-     * and money moved off the card) less refunds, never below zero. It counts from the later of the month's first day and
-     * the day after this month's statement when that statement's payment is due by the month's end — those charges are
-     * that payment's, which is set aside from the paying account instead (counting them twice would understate).
+     * What the month of [today] has put on [card] that is still to be paid back: its charges (spending and money moved
+     * off the card) in the month, less the part of its payments and refunds left over once they have settled what was
+     * owed when the month opened — a statement already set aside, or last month's balance — never below zero.
+     *
+     * When this month's statement is due by the month's end and paid from spending money ([billedFromSpending]), the
+     * month opens the day after it instead: the charges before it are that payment's, which is set aside from the paying
+     * account, so they never count twice. Paid from elsewhere (savings), they stay here.
      */
-    fun creditUsed(card: Wallet, transactions: List<Transaction>, today: LocalDate): Money {
+    fun creditUsed(card: Wallet, transactions: List<Transaction>, today: LocalDate, billedFromSpending: Boolean = true): Money {
         val month = YearMonth.from(today)
         val code = card.currencyCode
-        val terms = card.debt
-        val statementDay = terms?.statementDay
-        val dueDay = terms?.dueDay
-        val billed = if (statementDay != null && dueDay != null) {
-            CreditCardMath.lastStatementDate(statementDay, today).takeIf {
-                YearMonth.from(it) == month && !CreditCardMath.dueDateAfter(it, dueDay).isAfter(month.atEndOfMonth())
-            }
-        } else {
-            null
-        }
-        val from = billed?.plusDays(1) ?: month.atDay(1)
-        var used = 0L
+        val from = billedStatementEnd(card, today, billedFromSpending)?.plusDays(1) ?: month.atDay(1)
+        var charges = 0L
+        var credits = 0L
+        // How much more is owed now than when the window opened, adjustments included.
+        var raised = 0L
         transactions.forEach { t ->
             if (t.walletId != card.id || t.amount.currencyCode != code || t.date.isBefore(from) || YearMonth.from(t.date) != month) return@forEach
-            used = when (t.type) {
-                TransactionType.EXPENSE, TransactionType.TRANSFER_OUT -> Math.addExact(used, t.amount.amountMinor)
-                TransactionType.INCOME -> Math.subtractExact(used, t.amount.amountMinor)
-                else -> used
+            val minor = t.amount.amountMinor
+            when (t.type) {
+                TransactionType.EXPENSE, TransactionType.TRANSFER_OUT -> {
+                    charges = Math.addExact(charges, minor)
+                    raised = Math.addExact(raised, minor)
+                }
+                TransactionType.INCOME, TransactionType.TRANSFER_IN -> {
+                    credits = Math.addExact(credits, minor)
+                    raised = Math.subtractExact(raised, minor)
+                }
+                TransactionType.ADJUSTMENT_OUT -> raised = Math.addExact(raised, minor)
+                TransactionType.ADJUSTMENT_IN -> raised = Math.subtractExact(raised, minor)
             }
         }
-        return Money(maxOf(used, 0L), code)
+        val owedAtStart = maxOf(Math.subtractExact(card.balance.amountMinor, raised), 0L)
+        val givenBack = maxOf(Math.subtractExact(credits, owedAtStart), 0L)
+        return Money(maxOf(Math.subtractExact(charges, givenBack), 0L), code)
+    }
+
+    /**
+     * This month's statement date when its payment is due by the month's end and comes from spending money; null
+     * otherwise (no billing days, a statement due next month, or one paid from elsewhere).
+     */
+    private fun billedStatementEnd(card: Wallet, today: LocalDate, billedFromSpending: Boolean): LocalDate? {
+        if (!billedFromSpending) return null
+        val terms = card.debt ?: return null
+        val statementDay = terms.statementDay ?: return null
+        val dueDay = terms.dueDay ?: return null
+        val month = YearMonth.from(today)
+        return CreditCardMath.lastStatementDate(statementDay, today).takeIf {
+            YearMonth.from(it) == month && !CreditCardMath.dueDateAfter(it, dueDay).isAfter(month.atEndOfMonth())
+        }
     }
 
     /**

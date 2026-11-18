@@ -455,7 +455,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
             }
             if (pickingFrom) {
                 com.lucento.app.core.designsystem.component.AccountPickerSheet(
-                    title = "Move money from",
+                    title = "From which account?",
                     wallets = sources,
                     selectedId = wallet?.id,
                     onPick = { from ->
@@ -469,7 +469,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
             }
             if (pickingTo) {
                 com.lucento.app.core.designsystem.component.AccountPickerSheet(
-                    title = "Move money to",
+                    title = "To which account?",
                     wallets = sources,
                     selectedId = destination?.id,
                     onPick = {
