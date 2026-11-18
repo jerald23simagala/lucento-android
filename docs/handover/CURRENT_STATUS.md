@@ -593,6 +593,16 @@ with kinds, and shortcut palette B.
   (`artifacts/tester-round-2026-11-17/`; rounds 1 and 2 in `r1/` and `r2/`) are local only, not committed.
 - **Not checked:** a real phone (OT-39), sync against a project with the migration (OT-38), and TalkBack.
 
+## Release 0.5.13 (version code 18) — 2026-11-18 (`release/0.5.13`)
+
+The owner said "Proceed" on building the tester round for OT-39 after OT-38 was applied to both Supabase projects. The app
+changes since 0.5.12 are #98–#102: Show cents, the shortcut palette, the account picker, investments with kinds and
+icons, spending money and the two-figure Safe to spend, scheduled transfers, and bar icons on dark sheets. #94 changed no
+app code. Room goes to v14 (migration 13 → 14 tested in CI) and backups to format v5. Both Supabase projects already
+have the v14 columns, so a 0.5.13 phone syncs investments, kinds, spending choices and scheduled transfers. Older phones
+on the same account skip what they can't read; KNOWN_ISSUES TR-2 explains the placeholder they may show. Owner: upload
+to Internal testing, then OT-39.
+
 ## Release 0.5.12 (version code 17) — 2026-11-17 (`release/0.5.12`)
 
 The owner chose "Build 0.5.12 + publish site" after #95. The only app change since 0.5.11 is #95: Ask Lucento's AI
