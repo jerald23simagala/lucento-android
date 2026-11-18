@@ -308,6 +308,14 @@ recurring-schedule sync, syncing preferences.
 - The allowance wording follows the plan ("N left this month" on Free, "N left today" with Pro). Privacy Policy and Terms
   2026-11-17; the website's /privacy, privacy table and FAQ go live with the release that ships it.
 
+## Built — Tester round (2026-11-17, PRs #98–#101)
+- **Show cents** (#98): Settings › Money; off rounds every amount people read to whole units, never what they type.
+- **Shortcut palette** (#99): Home's shortcut tiles take each theme's own hues, measured to stay clear of the money colours.
+- **Account picker** (#100): Transfer, the transaction editor and the composer choose accounts from one picker, grouped
+  into four families with balances.
+- **Investments, spending money, two-figure Safe to spend, scheduled transfers** (#101, Room v14, waits for OT-38):
+  docs/CALCULATIONS.md "Safe to spend", "Money on hand", "Investments", "Scheduled outlook".
+
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,

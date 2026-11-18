@@ -30,11 +30,13 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Insights**: income and expenses over 3/6/12 months (transfers excluded, with the change against the period before)
   and net-worth composition by account type.
 - **Ask Lucento** (from Insights): questions about your money and four statements — net worth, cash flow, budget vs
-  actual, debts & loans — calculated on the phone, saved or shared as PDFs. Optional AI answers (Gemini through
-  Lucento's proxy) only with consent, sending summaries of your figures, never transactions or notes. See
-  [docs/ASK.md](docs/ASK.md).
+  actual, debts & loans — calculated on the phone, saved or shared as PDFs. AI answers (Gemini through Lucento's
+  proxy) for a signed-in account, confirmed before the first question is sent: the question with a summary of your
+  finances, including recent transactions; "Keep answers on this phone" turns them off. See [docs/ASK.md](docs/ASK.md).
 - **Transactions**: search, filters (date, type incl. transfers, wallet, category), day groups, edit/delete.
-- **Transfers** between your own accounts (two linked legs, atomic, never income or spending).
+- **Transfers** between your own accounts (two linked legs, atomic, never income or spending). From and To open one
+  account picker — grouped into Everyday money, Set aside and growing, Things you own and What you owe, with balances,
+  and search and recent accounts once there are more than six — also used by the transaction editor and the composer.
 - **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
   assets and liabilities in separate cards (Debts & loans linked from Liabilities), each wallet shown as a bank-style card, warnings for balances that can't be right, and
   **Adjust balance** (the gap is recorded as a visible Balance adjustment, never income or spending); account detail with history.
@@ -51,7 +53,8 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,
-  idempotent). Interpretation runs on the phone — no AI service, no network. See [docs/CAPTURE.md](docs/CAPTURE.md).
+  idempotent). Interpretation runs on the phone, with no network; Smarter reading (Pro, switched on in Settings)
+  sends the message to Gemini through Lucento's proxy instead. See [docs/CAPTURE.md](docs/CAPTURE.md).
 - **Home-screen widgets**: **Quick add** (the composer's own scan · mic · field bar — one tap into Type, Speak or Scan)
   and **Safe to spend** (Home's Monthly budget card in brief, with Add). Same figures and words as Home; they follow
   Hide amounts, App lock and the chosen theme; home screen only; no permission, no network. Add them from Settings ›
@@ -59,14 +62,17 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Appearance** (profile menu): five curated themes — Sunrise (the brand), Midnight (always dark), Grove, Mono and
   Aurora — each with its own landscape, every one contrast-checked (WCAG AA) with colour-blind-safe chart colours, plus
   System / Light / Dark. Switching is instant; money colours (income, spending, warnings) never change between themes.
-- **Settings**: main currency, Enabled features, CSV export, JSON backup and restore, privacy facts, an
+  Home's five shortcut tiles take each theme's own hues, measured to stay clear of those money colours.
+- **Settings**: main currency, **Show cents** (off rounds every amount you read to whole units; where you type an
+  amount, and in a transaction's own view, it stays exact), Enabled features, CSV export, JSON backup and restore,
+  privacy facts, an
   optional app lock (fingerprint, face or screen lock) and Hide in recent apps. Signed in, **Delete account** removes the
   account and its cloud data (docs/ACCOUNT_DELETION.md); the Terms of Use and Privacy Policy open from Settings ›
   Privacy & security (docs/LEGAL.md).
 - **Motion**: the mascot's gentle float and pose cross-fades; original Lottie net-flow glyphs, onboarding mark,
   empty states, receipt scan beam, saved confirmation, milestones; awards as medals presented by the mascot — bundled and
   reduced-motion aware.
-- Exact money math in minor units; 497 JVM unit tests; an emulator screenshot tour in CI.
+- Exact money math in minor units; more than 1,500 JVM unit tests; an emulator screenshot tour in CI.
 - **Optional cloud sync** (Google Sign-In + Supabase, row-level security): off until you connect an account; every
   core feature works offline without it, and signing out keeps local data. See [docs/SYNC.md](docs/SYNC.md) —
   sign-in needs the Google OAuth setup listed there.
