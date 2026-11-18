@@ -563,24 +563,34 @@ with kinds, and shortcut palette B.
 
 | PR | Branch | What | State |
 |---|---|---|---|
-| #98 | `feature/show-cents` | Settings › Money › **Show cents**, on by default. Off rounds every amount people read to whole units, half-up; inputs, editors, a transaction's own view and every calculation stay exact | CI green |
-| #99 | `feature/shortcut-palette` | Home's five shortcut tiles take each theme's own hues (`ShortcutTones`); every glyph but Goals stays ≥ 15 OKLab ΔE from the status tones | CI green |
-| #100 | `feature/account-picker` | Transfer From/To, the editor's wallet and the composer's account chips open one account picker, grouped into four families with balances; search and Recent above six accounts; signed debts | CI green |
-| #101 | `feature/wallets-v14` | Room v14: **Investment** wallets with kinds and icons; per-wallet **spending money** and a card's counted credit; Safe to spend = the lower of the budget and the spending money, with an (i) that explains both; **scheduled transfers**; backup v5; Supabase migration `20261119090000` | Open: waits for OT-38 (includes #100) |
+| #98 | `feature/show-cents` | Settings › Money › **Show cents**, on by default. Off rounds every amount people read to whole units, half-up; inputs, editors, a transaction's own view and every calculation stay exact | Merged `110d50b` |
+| #99 | `feature/shortcut-palette` | Home's five shortcut tiles take each theme's own hues (`ShortcutTones`); every glyph but Goals (or a tile carrying more colour) stays ≥ 15 OKLab ΔE from the status tones | Merged `d045577` |
+| #100 | `feature/account-picker` | Transfer From/To, the editor's wallet and the composer's account chips open one account picker, grouped into four families with balances; search and Recent above six accounts; signed debts | Merged `94a8254` |
+| #101 | `feature/wallets-v14` | Room v14: **Investment** wallets with kinds and icons; per-wallet **spending money** and a card's counted credit; Safe to spend = the lower of the budget and the spending money, with an (i) that explains both; **scheduled transfers**; backup v5; Supabase migration `20261119090000` | Open: waits for OT-38 |
+| #102 | `fix/sheet-bar-icons` | Bottom sheets set their status and navigation bar icons from Lucento's theme, not the phone's dark setting (found by the design review; app-wide, pre-existing) | Open: CI |
 
-- **Reviews.** QA (lucento-qa) audited #101: not ready, with 2 blockers and 6 should-fixes (KNOWN_ISSUES TR-9). The
-  design critic (lucento-design-critic) rejected round 1 at 3.0/5. Its findings were a balance cut off at 200 %, 40 dp
-  chips, four names for one idea, a noisy picker, debts without a sign, and tiles close to status colours. All were
-  fixed on the branches; each PR's description lists them. Round 2 and the QA re-check: see the end of this section.
-- **Tests.** Full local `testDebugUnitTest`, 0 failures in each: #98 1,516; #99 1,514; #100 1,516; #101 1,555.
+- **Reviews.** QA (lucento-qa) audited #101: not ready, with 2 blockers and 6 should-fixes (KNOWN_ISSUES TR-9). Its
+  re-check found both blockers fixed and three second-order gaps in the card-credit rule, which are now fixed too. The
+  design critic (lucento-design-critic) rejected round 1 at 3.0/5: a balance cut off at 200 %, 40 dp chips, four names
+  for one idea, a noisy picker, debts without a sign, and tiles close to status colours. Round 2 gave REVISE at 3.5/5:
+  every hard gate passed and 13 of 15 items were fixed. Its remaining items are fixed: the dark Awards tile, Scheduled
+  at 200 %, consistent pickers and labels, whole-row switches, a live figure while choosing wallets, and wording.
+  Round 3 gave REJECT at 3.4/5 on new 360 dp evidence: the (i) button cut Home's "Safe to spend" to "Safe to". The
+  whole panel is now the button and the label wraps; the remaining items were fixed too (a live line TalkBack
+  announces, the card line, balanced lines, wording, and #102 for dark sheets). The loop stopped at three rounds;
+  instead, the fixes were checked on screen: the label is whole at 360 dp (100 % and 115 %), 393 dp (115 %) and 411 dp
+  (100 % and 130 %), dark sheets show white bar icons, and the card line shows what was used. The critic expected
+  about 3.9/5 once these were fixed; whether that is enough to ship is the owner's call.
+- **Tests.** Full local `testDebugUnitTest`, 0 failures in each: #98 1,516; #99 1,514; #100 1,516; #101 1,564.
   `assembleDebug` and `assembleDebugAndroidTest` passed on the combined branch. CI is green on #98–#100: unit tests,
   lint, debug and release builds, the SQL suites, the emulator migration tests and the tour.
 - **Database.** `docs/handover/apply-v14-wallet-kinds.sql` is on #101, with a copy in `Downloads\lucento-v14-database.sql`.
   It was tested on PGlite on top of every earlier migration: pasted once and twice, with and without a history table,
   then with live rows. All 19 checks passed.
-- **Device.** The API 35 emulator ran the combined build of all four PRs (local branch `test/tester-round-all`), with
-  24 screens captured at 100 % and 200 % text by the opt-in `TesterRoundShotsTest`. The test and the screenshots
-  (`artifacts/tester-round-2026-11-17/`, round 1 in `r1/`) are local only, not committed.
+- **Device.** The API 35 emulator ran the combined build of all four PRs (local branch `test/tester-round-all`). The
+  opt-in `TesterRoundShotsTest` captured 30 screens at 100 % and 200 % text and at 360 dp wide, including a counted
+  card, the state with no spending wallets, and the new sheets in dark. The test and the screenshots
+  (`artifacts/tester-round-2026-11-17/`; rounds 1 and 2 in `r1/` and `r2/`) are local only, not committed.
 - **Not checked:** a real phone (OT-39), sync against a project with the migration (OT-38), and TalkBack.
 
 ## Release 0.5.12 (version code 17) — 2026-11-17 (`release/0.5.12`)
