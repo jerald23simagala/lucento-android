@@ -346,7 +346,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                 else -> "Payment"
             },
             currencyCode = currency,
-            supporting = amortization?.let { "From ${debt.name}’s terms: ${MoneyFormatter.format(it)} a month." },
+            supporting = amortization?.let { "From ${debt.name}’s terms: ${MoneyFormatter.format(it, wholeUnits = false)} a month." },
             leadingIcon = Icons.Outlined.Payments,
             filled = true,
         )

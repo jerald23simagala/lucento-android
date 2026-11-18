@@ -454,7 +454,7 @@ private fun StartingBalanceCard(wallets: List<Wallet>, currency: String) {
         Column {
             Text("STARTING BALANCE", style = Hierarchy.cardOverline, color = ext.onHeroMuted, modifier = Modifier.semantics { contentDescription = "Starting balance" })
             Spacer(Modifier.height(Spacing.xs))
-            Text(MoneyFormatter.format(total), style = AmountStyles.hero, color = ext.onHero)
+            Text(MoneyFormatter.format(total, wholeUnits = false), style = AmountStyles.hero, color = ext.onHero)
             Text(
                 buildString {
                     append("Across ${counted} ${if (counted == 1) "account" else "accounts"}")
@@ -540,7 +540,7 @@ private fun BudgetHero(state: GuideUiState, text: (Long) -> String, separator: C
                 }
             }
             Spacer(Modifier.height(Spacing.xs))
-            Text(MoneyFormatter.format(total), style = AmountStyles.hero)
+            Text(MoneyFormatter.format(total, wholeUnits = false), style = AmountStyles.hero)
             Text(
                 "The sum of ${rows.size} of ${state.expenseCategories.size} categories",
                 style = MaterialTheme.typography.bodySmall,
@@ -642,7 +642,7 @@ private fun GoalStep(state: GuideUiState, onAdd: (String) -> Unit) {
                     IconTile(icon = Icons.Outlined.Flag, container = LucentoTheme.extendedColors.savings.container, content = LucentoTheme.extendedColors.savings.content)
                     Spacer(Modifier.width(Spacing.md))
                     Text(g.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text(MoneyFormatter.format(g.target), style = AmountStyles.row)
+                    Text(MoneyFormatter.format(g.target, wholeUnits = false), style = AmountStyles.row)
                 }
                 if (i < state.goals.lastIndex) Hairline()
             }
@@ -762,7 +762,7 @@ private fun ExampleConversation(currency: String) {
                         IconTile(icon, container = scheme.primaryContainer, content = scheme.onPrimaryContainer, size = 32.dp, shape = MaterialTheme.shapes.small)
                         Spacer(Modifier.width(Spacing.md))
                         Text(name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                        Text(MoneyFormatter.format(com.lucento.app.core.money.Money(-money.amountMinor, money.currencyCode)), style = AmountStyles.row)
+                        Text(MoneyFormatter.format(com.lucento.app.core.money.Money(-money.amountMinor, money.currencyCode), wholeUnits = false), style = AmountStyles.row)
                     }
                 }
             }
@@ -811,9 +811,9 @@ private fun WelcomeStep(state: GuideUiState) {
         LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
             val rows = buildList {
                 val counted = GuidedSetup.startingBalanceAccounts(state.wallets, state.currency)
-                add(Triple(state.assets.isNotEmpty(), "Accounts", if (state.assets.isEmpty()) "Not yet" else "${plural(state.wallets.size, "account", "accounts")} · ${MoneyFormatter.format(GuidedSetup.startingBalance(state.wallets, state.currency))}".takeIf { counted > 0 } ?: plural(state.wallets.size, "account", "accounts")))
+                add(Triple(state.assets.isNotEmpty(), "Accounts", if (state.assets.isEmpty()) "Not yet" else "${plural(state.wallets.size, "account", "accounts")} · ${MoneyFormatter.format(GuidedSetup.startingBalance(state.wallets, state.currency), wholeUnits = false)}".takeIf { counted > 0 } ?: plural(state.wallets.size, "account", "accounts")))
                 if (state.features.isEnabled(com.lucento.app.domain.Feature.BUDGETS)) {
-                    add(Triple(state.budgetedCount > 0, "Monthly budget", if (state.budgetedCount > 0) "${MoneyFormatter.format(budgetTotal)} across ${plural(state.budgetedCount, "category", "categories")}" else "Not set yet"))
+                    add(Triple(state.budgetedCount > 0, "Monthly budget", if (state.budgetedCount > 0) "${MoneyFormatter.format(budgetTotal, wholeUnits = false)} across ${plural(state.budgetedCount, "category", "categories")}" else "Not set yet"))
                 }
                 add(Triple(state.transactionCount > 0, "First transactions", if (state.transactionCount > 0) "${state.transactionCount} recorded" else "Tap + on Home to record one"))
                 if (state.features.isEnabled(com.lucento.app.domain.Feature.SAVINGS_GOALS)) {

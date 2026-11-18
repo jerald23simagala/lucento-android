@@ -894,8 +894,9 @@ private fun BatchBar(summary: BatchSummary, saving: Boolean, onSave: () -> Unit)
 
 private fun totalsLine(summary: BatchSummary): String? {
     val parts = ArrayList<String>()
-    if (summary.expenses.isNotEmpty()) parts += "Expenses " + summary.expenses.joinToString(" + ") { MoneyFormatter.formatSigned(-it, showPlus = true) }
-    if (summary.income.isNotEmpty()) parts += "Income " + summary.income.joinToString(" + ") { MoneyFormatter.formatSigned(it, showPlus = true) }
+    // Entries about to be saved are always shown exactly, whatever Settings › Money › Show cents says.
+    if (summary.expenses.isNotEmpty()) parts += "Expenses " + summary.expenses.joinToString(" + ") { MoneyFormatter.formatSigned(-it, showPlus = true, wholeUnits = false) }
+    if (summary.income.isNotEmpty()) parts += "Income " + summary.income.joinToString(" + ") { MoneyFormatter.formatSigned(it, showPlus = true, wholeUnits = false) }
     if (summary.transfers > 0) parts += if (summary.transfers == 1) "1 transfer" else "${summary.transfers} transfers"
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }

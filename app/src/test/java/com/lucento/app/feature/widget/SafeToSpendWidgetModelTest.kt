@@ -73,8 +73,8 @@ class SafeToSpendWidgetModelTest {
         billAmount: Long = 2_000,
     ): HomeUiState = HomeStateBuilder.build(spending, wallets, categories, "USD", today, budgets, listOf(bill(billAmount)), features)
 
-    private fun model(state: HomeUiState = home(), hide: Boolean = false, lock: Boolean = false, onboarded: Boolean = true) =
-        SafeToSpendWidgetModel.from(state, onboarded = onboarded, appLock = lock, hideAmounts = hide, locale = us)
+    private fun model(state: HomeUiState = home(), hide: Boolean = false, lock: Boolean = false, onboarded: Boolean = true, cents: Boolean = true) =
+        SafeToSpendWidgetModel.from(state, onboarded = onboarded, appLock = lock, hideAmounts = hide, locale = us, showCents = cents)
 
     private fun usd(minor: Long) = MoneyFormatter.format(Money(minor, "USD"), us)
 
@@ -93,6 +93,15 @@ class SafeToSpendWidgetModelTest {
         assertEquals(WidgetTone.POSITIVE, widget.figureTone)
         assertEquals(state.burn!!.consumedPercent, widget.usedPercent)
         assertEquals(paceVerdict(state.budget!!, state.burn!!.pace, state.isCurrentMonth).label, widget.verdict)
+    }
+
+    @Test fun withoutCentsTheWidgetRoundsLikeHome() {
+        // Settings › Money › Show cents off: whole units, rounded half-up; the figure itself is unchanged.
+        val widget = model(cents = false) as SafeToSpendWidgetModel.Budget
+        assertEquals("$458", widget.figure)
+        assertEquals("$38 a day · 12 days left", widget.perDay)
+        assertEquals("After $20 bills due", widget.bills)
+        assertTrue(widget.description.contains("$458"))
     }
 
     @Test fun hiddenAmountsMaskEveryAmountButKeepThePercentAndTheWords() {

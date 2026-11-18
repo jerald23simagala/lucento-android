@@ -71,7 +71,7 @@ object MoneyParser {
      */
     fun clarification(result: Result, decimalSeparator: Char, locale: Locale = Locale.getDefault()): String? = when (result) {
         is Result.Ambiguous -> {
-            val shown = result.options.joinToString(" or ") { MoneyFormatter.format(it, locale) }
+            val shown = result.options.joinToString(" or ") { MoneyFormatter.format(it, locale, wholeUnits = false) }
             val typed = result.options.joinToString(" or ") { "“${unambiguous(it, decimalSeparator)}”" }
             "This could be $shown. Type $typed to say which."
         }
