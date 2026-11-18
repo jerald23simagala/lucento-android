@@ -17,12 +17,18 @@ import com.lucento.app.core.money.Money
  * is still owed to them and counts towards net worth — not spendable, and it carries a loan's terms ([hasTerms]): a
  * rate, monthly instalments and a term. Instalments received are transfers out of it into a money account (scheduled as
  * collections, [RecurringSchedule.isCollection]); interest received is income.
+ *
+ * [INVESTMENT] (tester round, 2026-11-17) is stocks, funds, Pag-IBIG MP2, time deposits, crypto and the like: an asset
+ * money moves into and out of (contributions and withdrawals are transfers) whose value also changes on its own. "Update
+ * value" records that change as a balance adjustment, so a gain is never income and a loss never spending. It is not
+ * spending money unless the person says so ([Wallet.spendable]).
  */
 enum class WalletType(val isLiability: Boolean, val isSpendable: Boolean, val isValuedManually: Boolean = false) {
     CASH(isLiability = false, isSpendable = true),
     BANK(isLiability = false, isSpendable = true),
     E_WALLET(isLiability = false, isSpendable = true),
     SAVINGS(isLiability = false, isSpendable = false),
+    INVESTMENT(isLiability = false, isSpendable = false),
     CREDIT_CARD(isLiability = true, isSpendable = false),
     LOAN(isLiability = true, isSpendable = false),
     RECEIVABLE(isLiability = false, isSpendable = false),
@@ -37,6 +43,15 @@ enum class WalletType(val isLiability: Boolean, val isSpendable: Boolean, val is
 
     /** Repaid in monthly instalments over a term: a loan, or a receivable (its mirror). */
     val hasInstallments: Boolean get() = this == LOAN || this == RECEIVABLE
+
+    /**
+     * Can count towards Safe to spend's money on hand when the person says so (tester round, 2026-11-17): money accounts,
+     * and part of a card's credit. Loans, receivables and valued assets never do.
+     */
+    val canBeSpendingMoney: Boolean get() = !isValuedManually && this != LOAN && this != RECEIVABLE
+
+    /** Has kinds to choose from ([WalletKind]): investments, things owned, loans. */
+    val hasKinds: Boolean get() = WalletKind.entries.any { it.type == this }
 
     companion object {
         /** Stored names this version understands (sync and backup reject anything else). */
@@ -71,8 +86,25 @@ data class Wallet(
     val fxBasisRate: java.math.BigDecimal? = null,
     /** v13: revalue this foreign wallet at each month end (unrealized FX gain or loss). */
     val fxRevalue: Boolean = false,
+    /** v14 (tester round, 2026-11-17): what kind of investment, owned thing or loan it is; null = not said. */
+    val kind: WalletKind? = null,
+    /** v14: the icon chosen for a wallet without a bank logo ([WalletIcon] key); null = its kind's or type's own. */
+    val iconKey: String? = null,
+    /**
+     * v14: counts towards Safe to spend's money on hand (docs/CALCULATIONS.md "Safe to spend"). Null = the type's default:
+     * cash, bank and e-wallet yes; savings, investments and cards no. Never for loans, receivables or valued assets.
+     */
+    val spendable: Boolean? = null,
+    /**
+     * v14: a credit card's part of its credit the person counts as spending money; never more than is still available
+     * (`MoneyOnHandCalculator`). Null or zero = none.
+     */
+    val spendableCredit: Money? = null,
 ) {
     val currencyCode: String get() = balance.currencyCode
+
+    /** Counts towards money on hand: the person's choice, or the type's default ([WalletType.isSpendable]). */
+    val isSpendingMoney: Boolean get() = type.canBeSpendingMoney && (spendable ?: type.isSpendable)
 
     /** Signed effect of this wallet on net worth. */
     val netWorthContribution: Money get() = if (type.isLiability) -balance else balance

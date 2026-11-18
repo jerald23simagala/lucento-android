@@ -50,6 +50,11 @@ data class BudgetFormula(
     /** Unpaid scheduled bills (any category; a debt payment's interest only) due by month end; null outside the current month. */
     val billsDue: Money?,
     val safeToSpend: Money?,
+    /**
+     * Tester round (2026-11-17): Safe to spend is the lower of what the budget allows and what the spending money allows.
+     * True when the money set it — the card then says so, since Remaining − Bills due is no longer the figure.
+     */
+    val limitedByMoney: Boolean = false,
 ) {
     /** Remaining reads "Overspent" (red) once spending passes the budget, "Remaining" (green) otherwise. */
     val overspent: Boolean get() = remaining.isNegative
@@ -59,6 +64,24 @@ data class BudgetFormula(
 
     /** Nothing is left to spend safely: bills due or overspending have taken the rest. The card then reads 0, in red. */
     val nothingSafe: Boolean get() = safeToSpend != null && safeToSpend.amountMinor <= 0L
+
+    /** Why Safe to spend reads what it does, when it needs saying: the money on hand, overspending, bills due. */
+    val safeCaption: String?
+        get() = when {
+            safeToSpend == null -> null
+            limitedByMoney && nothingSafe -> CAPTION_MONEY_TAKEN
+            limitedByMoney -> CAPTION_MONEY_LIMITS
+            !nothingSafe -> null
+            overspent -> CAPTION_OVER_BUDGET
+            else -> CAPTION_BILLS
+        }
+
+    companion object {
+        const val CAPTION_MONEY_LIMITS = "Limited by your money on hand"
+        const val CAPTION_MONEY_TAKEN = "What’s due takes your money on hand"
+        const val CAPTION_OVER_BUDGET = "You’re over budget this month"
+        const val CAPTION_BILLS = "Bills due take what’s left"
+    }
 
     /** The figure the card shows: what is safe to spend, never below zero (owner, 2026-11-03). Null for a past month. */
     val safeToSpendShown: Money? get() = safeToSpend?.let { if (it.amountMinor < 0L) Money.zero(it.currencyCode) else it }
@@ -548,6 +571,7 @@ object HomeStateBuilder {
         remaining = plan.remaining,
         billsDue = safe?.committed,
         safeToSpend = safe?.amount,
+        limitedByMoney = safe?.limitedByMoney == true,
     )
 
     /** The dashboard's scheduled section lists at most this many. */

@@ -529,10 +529,11 @@ object ReportBuilder {
         WalletType.BANK -> "Bank account"
         WalletType.E_WALLET -> "E-wallet"
         WalletType.SAVINGS -> "Savings"
+        WalletType.INVESTMENT -> "Investment"
         WalletType.CREDIT_CARD -> "Credit card"
         WalletType.LOAN -> "Loan"
         WalletType.RECEIVABLE -> "Receivable"
-        WalletType.OTHER_ASSET -> "Other asset"
+        WalletType.OTHER_ASSET -> "Property or valuables"
     }
 
     private fun periodLabel(month: YearMonth, today: LocalDate): String =

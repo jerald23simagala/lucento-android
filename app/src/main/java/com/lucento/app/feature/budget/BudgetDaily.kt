@@ -18,11 +18,14 @@ import java.time.YearMonth
  * Home's "Safe to spend". A finished month shows what was spent per day instead.
  */
 sealed interface DailyFigure {
-    /** This month, money left to spread: [perDay] for each of [daysLeft] days, with [committed] bills set aside. */
-    data class SafePerDay(val perDay: Money, val daysLeft: Int, val committed: Money) : DailyFigure
+    /**
+     * This month, money left to spread: [perDay] for each of [daysLeft] days, with [committed] bills set aside.
+     * [limitedByMoney]: the spending money, not the budget, set it (tester round, 2026-11-17).
+     */
+    data class SafePerDay(val perDay: Money, val daysLeft: Int, val committed: Money, val limitedByMoney: Boolean = false) : DailyFigure
 
     /** This month, nothing left once bills due are set aside: safe to spend itself ([safe] is zero or negative). */
-    data class NothingLeft(val safe: Money, val committed: Money) : DailyFigure
+    data class NothingLeft(val safe: Money, val committed: Money, val limitedByMoney: Boolean = false) : DailyFigure
 
     /** A finished month: its average spending per day over [days] days. */
     data class DailyAverage(val perDay: Money, val days: Int) : DailyFigure
@@ -49,6 +52,6 @@ fun budgetDailyFigure(
         ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
         ?: return null
     val perDay = safe.perDay
-    return if (perDay != null) DailyFigure.SafePerDay(perDay, safe.daysLeft, safe.committed)
-    else DailyFigure.NothingLeft(safe.amount, safe.committed)
+    return if (perDay != null) DailyFigure.SafePerDay(perDay, safe.daysLeft, safe.committed, safe.limitedByMoney)
+    else DailyFigure.NothingLeft(safe.amount, safe.committed, safe.limitedByMoney)
 }

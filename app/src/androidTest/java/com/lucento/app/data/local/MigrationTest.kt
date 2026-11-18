@@ -508,6 +508,43 @@ class MigrationTest {
     }
 
     /**
+     * v14 (tester round, 2026-11-17): a wallet's kind, icon and Safe to spend choice arrive empty — every wallet keeps its
+     * look and the type's defaults — and nothing is marked for upload. An investment wallet and a scheduled transfer are
+     * values in existing columns, so they can be written straight away.
+     */
+    @Test
+    fun migrate13To14_addsWalletKindIconAndSpendingColumnsWithoutChangingAnything() {
+        helper.createDatabase(TEST_DB, 13).apply {
+            execSQL(
+                "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, dirty, synced_at) " +
+                    "VALUES (1, 'Bank', 'BANK', 'PHP', 100000, 0, 0, 1, 1, 'w-1', 0, 5)"
+            )
+            close()
+        }
+        val db = helper.runMigrationsAndValidate(TEST_DB, 14, true, Migrations.MIGRATION_13_14)
+
+        assertEquals(
+            1L,
+            db.long("SELECT COUNT(*) FROM wallets WHERE kind IS NULL AND icon_key IS NULL AND spendable IS NULL AND spendable_credit_minor IS NULL"),
+        )
+        assertEquals(100000L, db.long("SELECT opening_balance_minor FROM wallets WHERE id = 1"))
+        assertEquals("migrated rows are unchanged, so they do not re-upload", 0L, db.long("SELECT SUM(dirty) FROM wallets"))
+
+        SyncTriggers.ensure(db)
+        db.execSQL(
+            "INSERT INTO wallets (id, name, type, currency_code, opening_balance_minor, sort_order, archived, created_at, updated_at, client_uuid, kind, icon_key, spendable) " +
+                "VALUES (2, 'MP2', 'INVESTMENT', 'PHP', 50000, 1, 0, 2, 2, 'w-2', 'mp2', 'sprout', 0)"
+        )
+        db.execSQL(
+            "INSERT INTO recurring (id, name, type, amount_minor, currency_code, wallet_id, category_id, frequency, interval_count, start_on, next_index, paused, created_at, updated_at, to_wallet_id, client_uuid) " +
+                "VALUES (1, 'MP2 contribution', 'TRANSFER_OUT', 1000, 'PHP', 1, NULL, 'MONTHLY', 1, 20400, 0, 0, 2, 2, 2, 'r-1')"
+        )
+        db.execSQL("UPDATE wallets SET spendable = 0, updated_at = 3 WHERE id = 1")
+        assertEquals("a spending-money choice is an ordinary change and syncs", 1L, db.long("SELECT dirty FROM wallets WHERE id = 1"))
+        db.assertNoForeignKeyViolations()
+    }
+
+    /**
      * A fresh install never runs a migration — Room creates the tables from the entities — so the sync triggers must
      * come from the open callback. Before SyncTriggers, a new install had none: deletes never reached other devices and
      * edits after the first sync were never pushed.

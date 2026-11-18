@@ -255,6 +255,8 @@ data class HomeActions(
     val onDismissSpacePrompt: () -> Unit = {},
     /** A "top spending" tile: that category's transactions in the shown month. */
     val onOpenCategory: (Long, YearMonth) -> Unit = { _, _ -> },
+    /** Tester round (2026-11-17): counts a wallet as spending money for Safe to spend, or not. */
+    val onSetSpendable: (Long, Boolean) -> Unit = { _, _ -> },
 )
 
 /**
@@ -278,7 +280,8 @@ fun HomeScreen(
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     // The app's root provides LocalAmountsHidden from the same saved choice; the dashboard is where it's switched.
-    HomeDashboard(actions, scrollToTop, viewModel, walletsViewModel)
+    val withWallets = remember(actions, walletsViewModel) { actions.copy(onSetSpendable = walletsViewModel::setSpendable) }
+    HomeDashboard(withWallets, scrollToTop, viewModel, walletsViewModel)
 }
 
 @Composable
@@ -1059,6 +1062,7 @@ private fun Overview(
                 state, plan, burn,
                 open = if (state.expenseCategoryCount == 0) actions.onChooseCategories else actions.onOpenBudget,
                 onOpenCategory = { actions.onOpenCategory(it, state.month) },
+                onSetSpendable = actions.onSetSpendable,
             )
         } else {
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
@@ -1493,8 +1497,13 @@ private fun MonthlyBudgetCard(
     burn: BudgetBurn,
     open: () -> Unit,
     onOpenCategory: (Long) -> Unit,
+    onSetSpendable: (Long, Boolean) -> Unit = { _, _ -> },
 ) {
     val setupNeeded = state.expenseCategoryCount == 0
+    // Tester round (2026-11-17): the (i) beside Safe to spend explains both figures; wallets can be chosen from there.
+    var explaining by remember { mutableStateOf(false) }
+    var choosingWallets by remember { mutableStateOf(false) }
+    val explain: (() -> Unit)? = state.safeToSpend?.let { { explaining = true } }
     val verdict = paceVerdict(plan, burn.pace, state.isCurrentMonth)
     val showVerdict = !setupNeeded && plan.hasBudget
     LucentoCard(Modifier.fillMaxWidth(), onClick = open, contentPadding = Spacing.lg) {
@@ -1528,19 +1537,32 @@ private fun MonthlyBudgetCard(
                         MatchedHeightPair(
                             firstWidth = left,
                             gap = Spacing.lg,
-                            first = { BudgetFigures(plan, burn, formula, ringSize = left) },
+                            first = { BudgetFigures(plan, burn, formula, ringSize = left, explain = explain) },
                             second = { WatchPanel(state, onOpenCategory, onSeeAll = open, fillHeight = true) },
                         )
                     } else {
                         // The ring grows with the text inside it, so "100%" never spills over the stroke.
                         val ring = (140.dp * textScale.coerceIn(1f, 1.4f)).coerceAtMost(maxWidth)
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-                            BudgetFigures(plan, burn, formula, ringSize = ring)
+                            BudgetFigures(plan, burn, formula, ringSize = ring, explain = explain)
                             WatchPanel(state, onOpenCategory, onSeeAll = open, fillHeight = false)
                         }
                     }
                 }
             }
+        }
+        state.safeToSpend?.takeIf { explaining }?.let { safe ->
+            SafeToSpendSheet(
+                safe = safe,
+                onChooseWallets = {
+                    explaining = false
+                    choosingWallets = true
+                },
+                onDismiss = { explaining = false },
+            )
+        }
+        if (choosingWallets) {
+            SpendingWalletsSheet(wallets = state.wallets, onToggle = onSetSpendable, onDismiss = { choosingWallets = false })
         }
         if (state.otherBudgetCurrencies.isNotEmpty()) {
             Text(
@@ -1608,7 +1630,7 @@ private fun MatchedHeightPair(
  * line (0 in red once nothing is left). A past month closes on Remaining. Every figure is from [BudgetFormula].
  */
 @Composable
-private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn, formula: BudgetFormula, ringSize: Dp) {
+private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn, formula: BudgetFormula, ringSize: Dp, explain: (() -> Unit)? = null) {
     val used = burn.consumedPercent ?: 0
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         ProgressRing(
@@ -1624,12 +1646,12 @@ private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn, formula: BudgetFor
                 Text("spent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        BudgetFormulaLines(formula)
+        BudgetFormulaLines(formula, explain)
     }
 }
 
 @Composable
-private fun BudgetFormulaLines(formula: BudgetFormula) {
+private fun BudgetFormulaLines(formula: BudgetFormula, explain: (() -> Unit)? = null) {
     val ext = LucentoTheme.extendedColors
     val safe = formula.safeToSpend
     val bills = formula.billsDue
@@ -1650,16 +1672,14 @@ private fun BudgetFormulaLines(formula: BudgetFormula) {
             // A deduction, so it carries its minus sign as well as the red.
             FormulaLine("Bills due", -bills, ink = if (bills.isZero) null else ext.negative)
             Spacer(Modifier.height(Spacing.sm))
-            // Always here for this month: 0 in red once bills or overspending take the rest, and the caption says why.
+            // Always here for this month: 0 in red once bills or overspending take the rest, and the caption says why —
+            // including when the spending money, not the budget, set it (tester round, 2026-11-17).
             FormulaResult(
                 "Safe to spend",
                 formula.safeToSpendShown ?: safe,
                 warning = formula.nothingSafe,
-                caption = when {
-                    !formula.nothingSafe -> null
-                    formula.overspent -> "You’re over budget this month"
-                    else -> "Bills due take what’s left"
-                },
+                caption = formula.safeCaption,
+                onInfo = explain,
             )
         } else {
             Spacer(Modifier.height(Spacing.xxs))
@@ -1709,7 +1729,14 @@ private fun FormulaLine(label: String, money: Money, minor: Boolean = false, ink
  * ([warning]); [caption] says why in words, so the state never rests on colour.
  */
 @Composable
-private fun FormulaResult(label: String, money: Money, warning: Boolean = money.isNegative, caption: String? = null) {
+private fun FormulaResult(
+    label: String,
+    money: Money,
+    warning: Boolean = money.isNegative,
+    caption: String? = null,
+    /** Opens how the figure is worked out (the (i) beside the label); none when null. */
+    onInfo: (() -> Unit)? = null,
+) {
     val ext = LucentoTheme.extendedColors
     val negative = warning
     val ink = if (negative) ext.negative else ext.positive
@@ -1721,7 +1748,14 @@ private fun FormulaResult(label: String, money: Money, warning: Boolean = money.
             .padding(horizontal = Spacing.sm, vertical = Spacing.sm)
             .semantics(mergeDescendants = true) {},
     ) {
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = ink, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = ink, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+            if (onInfo != null) {
+                IconButton(onClick = onInfo, modifier = Modifier.size(Sizes.minTouch).offset(x = (-8).dp)) {
+                    Icon(Icons.Outlined.Info, contentDescription = "How $label is worked out", tint = ink, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
         MoneyText(
             money = money,
             style = AmountStyles.large,

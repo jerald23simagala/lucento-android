@@ -18,7 +18,7 @@ class ThemeInvarianceTest {
     private fun semantics(x: LucentoExtendedColors) = listOf(
         x.positive, x.positiveContainer, x.negative, x.negativeContainer, x.warning, x.warningContainer,
         x.warningIndicator, x.negativeIndicator, x.success,
-        x.cash, x.bank, x.eWallet, x.savings, x.credit, x.loan,
+        x.cash, x.bank, x.eWallet, x.savings, x.credit, x.loan, x.investment,
         x.categoryTones, x.categoryFallback,
         WalletType.entries.map { x.walletCard(it) },
     )

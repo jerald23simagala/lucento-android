@@ -254,9 +254,13 @@ fun WalletDetailScreen(
                     title = when {
                         loan -> "Adjust loan"
                         receivable -> "Adjust amount"
+                        wallet.type == WalletType.INVESTMENT -> "Update value"
                         else -> "Adjust balance"
                     },
                     body = when {
+                        // Tester round (2026-11-17): an investment's value moves on its own; the change is never income.
+                        wallet.type == WalletType.INVESTMENT ->
+                            "Worth more or less today? Enter its current value — the change is recorded as an adjustment, not income or spending."
                         loan -> "Lender’s statement says otherwise? Enter what you owe on a date — the gap is recorded as an adjustment, not borrowing or spending."
                         receivable -> "Agreed on a different amount? Enter what they still owe you — the gap is recorded as an adjustment, not income or spending."
                         liability -> "Card statement says otherwise? Enter what you owe — the gap is recorded as an adjustment, not a purchase or a payment."

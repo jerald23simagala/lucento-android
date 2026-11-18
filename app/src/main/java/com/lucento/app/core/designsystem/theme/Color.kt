@@ -234,6 +234,8 @@ data class LucentoExtendedColors(
     val savings: TonePair,
     val credit: TonePair,
     val loan: TonePair,
+    /** Investments (tester round, 2026-11-17): deep teal, from the category palette's savings family. */
+    val investment: TonePair,
     /**
      * Category tiles: a tonal tile (pale tint by day, deep tint at night) with a saturated glyph, one hue per family
      * of spending (food coral, transport green, shopping rose, bills amber…). Purely decorative — the row's text and
@@ -255,6 +257,8 @@ data class LucentoExtendedColors(
         WalletType.BANK -> TonePair(Palette.BlueHero, Color.White)
         WalletType.E_WALLET -> TonePair(Palette.BrightTangerine, Palette.MidnightNavy)
         WalletType.SAVINGS -> TonePair(Palette.PositiveText, Color.White)
+        // An investment: deep teal with white text at 5.5:1 (tester round, 2026-11-17).
+        WalletType.INVESTMENT -> TonePair(Color(0xFF0F766E), Color.White)
         WalletType.CREDIT_CARD -> TonePair(Palette.MidnightNavy, Color.White)
         WalletType.LOAN -> TonePair(Palette.BlueDeep, Color.White)
         // A receivable is money on its way back to the user: amber, with white text at 5.2:1.
@@ -273,6 +277,7 @@ data class LucentoExtendedColors(
         WalletType.BANK -> bank
         WalletType.E_WALLET -> eWallet
         WalletType.SAVINGS -> savings
+        WalletType.INVESTMENT -> investment
         WalletType.CREDIT_CARD -> credit
         WalletType.LOAN -> loan
         WalletType.RECEIVABLE -> savings
@@ -351,6 +356,7 @@ internal val LightExtended = LucentoExtendedColors(
     savings = TonePair(Color(0xFFE3F5EC), Palette.PositiveText),
     credit = TonePair(Color(0xFFFDE7E7), Color(0xFFB42318)),
     loan = TonePair(Color(0xFFEDE9FE), Color(0xFF5B21B6)),
+    investment = TonePair(Color(0xFFDDF1EE), Color(0xFF0F766E)),
     categoryTones = categoryPalette(night = false),
     categoryFallback = TonePair(Color(0xFFECEFF4), Color(0xFF56637D)),
 )
@@ -391,6 +397,7 @@ internal val DarkExtended = LucentoExtendedColors(
     savings = TonePair(Color(0xFF123B2A), Color(0xFFB8F0CC)),
     credit = TonePair(Color(0xFF4A1A1F), Color(0xFFFFC2C2)),
     loan = TonePair(Color(0xFF2E2157), Color(0xFFDDD3FF)),
+    investment = TonePair(Color(0xFF0E3532), Color(0xFF7FD6CB)),
     categoryTones = categoryPalette(night = true),
     categoryFallback = TonePair(Color(0xFF26304A), Color(0xFFB8C5DC)),
 )

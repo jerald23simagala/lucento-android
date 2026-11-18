@@ -17,10 +17,14 @@ import java.time.temporal.ChronoUnit
  *   currency, budgeted or not ([BudgetPlan.spent], owner decision D1), and so are the bills: once paid, each one is
  *   spending whatever its category, so it is subtracted before it is paid too (owner, 2026-11-03 — counting only
  *   budgeted categories left Bills due at zero). A debt payment counts only its interest: the rest is a transfer.
- * - [Basis.BALANCES] (no allocations): `spendable balances − unpaid recurring expenses due by month end`
- *   that are paid from a spendable account. Spendable balances are cash, bank and e-wallet only; savings and
- *   liabilities are excluded, and a bill paid from one of those is not subtracted again. This is an estimate
- *   and is labelled as one.
+ * - [Basis.BALANCES] (no allocations): what the spending money allows ([MoneyOnHand]): spending wallets' balances
+ *   (cash, bank and e-wallet unless the person chose otherwise, plus a card's chosen credit) less what leaves them by
+ *   month end — bills, loan and card payments, scheduled transfers into money that isn't for spending. An estimate,
+ *   labelled as one.
+ *
+ * Tester round (2026-11-17): with a budget, both are worked out and [amount] is the lower — a comfortable budget never
+ * hides a nearly empty account. [budgetAllows] and [moneyOnHand] keep both figures for the "How it's worked out" sheet;
+ * [limitedByMoney] says which one set it.
  *
  * Transfers never count as spending. The amount may be negative (over budget / overcommitted) and is
  * shown honestly rather than clamped.
@@ -39,12 +43,20 @@ data class SafeToSpend(
     val committed: Money,
     /** The category-derived budget total for [Basis.BUDGET]. */
     val budgetLimit: Money?,
-    /** Sum of spendable balances in this currency; null when the user has no spendable account in it. */
+    /** What the spending money adds up to in this currency ([MoneyOnHand.total]); null without spending wallets in it. */
     val spendableBalance: Money?,
+    /** [Basis.BUDGET]: budget − spent − bills due, the figure before the money on hand is looked at. */
+    val budgetAllows: Money? = null,
+    /** What the spending money allows ([MoneyOnHand]); null without spending wallets in this currency. */
+    val moneyOnHand: MoneyOnHand? = null,
 ) {
     enum class Basis { BUDGET, BALANCES }
 
     val currencyCode: String get() = amount.currencyCode
+
+    /** The money on hand, not the budget, set [amount]: the spending wallets hold less than the budget allows. */
+    val limitedByMoney: Boolean
+        get() = basis == Basis.BUDGET && budgetAllows != null && moneyOnHand != null && moneyOnHand.allows < budgetAllows
 
     /** Share of the budget already spent or committed (display only); null without a budget. */
     val budgetUsedFraction: Float?
@@ -98,28 +110,24 @@ object CashflowCalculator {
         val monthEnd = month.atEndOfMonth()
         val daysLeft = (ChronoUnit.DAYS.between(today, monthEnd) + 1).toInt()
         val plan = BudgetPlanner.plan(categories, budgets, transactions, currencyCode, month)
-        val spendableWallets = wallets.filter { it.type.isSpendable && it.currencyCode == currencyCode }
-        val spendable = if (spendableWallets.isEmpty()) null else Money.sum(currencyCode, spendableWallets.map { it.balance })
+        val money = MoneyOnHandCalculator.compute(currencyCode, today, wallets, transactions, schedules)
 
         val spent: Money
         val committed: Money
+        var budgetAllows: Money? = null
         val (basis, amount) = when {
             plan.hasBudget -> {
                 spent = plan.spent
                 committed = RecurringMath.committedExpenses(schedules, currencyCode, monthEnd, spendingOnly = true)
-                SafeToSpend.Basis.BUDGET to (plan.total - spent - committed)
+                val allowed = plan.total - spent - committed
+                budgetAllows = allowed
+                // The lower of what the budget and the spending money allow (tester round, 2026-11-17).
+                SafeToSpend.Basis.BUDGET to (money?.allows?.let { minOf(it, allowed) } ?: allowed)
             }
-            spendable != null -> {
+            money != null -> {
                 spent = expensesIn(transactions, currencyCode, month)
-                // Savings (and other non-spendable accounts) are already out of [spendable]. A bill paid from
-                // one of them must not be subtracted again.
-                val spendableIds = spendableWallets.map { it.id }.toSet()
-                committed = RecurringMath.committedExpenses(
-                    schedules.filter { it.walletId in spendableIds },
-                    currencyCode,
-                    monthEnd,
-                )
-                SafeToSpend.Basis.BALANCES to (spendable - committed)
+                committed = money.deducted
+                SafeToSpend.Basis.BALANCES to money.allows
             }
             else -> return null
         }
@@ -132,7 +140,9 @@ object CashflowCalculator {
             spentThisMonth = spent,
             committed = committed,
             budgetLimit = plan.total.takeIf { plan.hasBudget },
-            spendableBalance = spendable,
+            spendableBalance = money?.total,
+            budgetAllows = budgetAllows,
+            moneyOnHand = money,
         )
     }
 

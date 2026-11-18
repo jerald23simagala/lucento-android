@@ -51,6 +51,11 @@ data class BackupWallet(
     /** Multicurrency (backup v4): a foreign wallet's opening rate ("63.69"), or null; revaluation at month end. */
     val fxBasisRate: String? = null,
     val fxRevalue: Boolean = false,
+    /** Backup v5 (app v14, tester round 2026-11-17): kind and icon keys, the Safe to spend choice, a card's spendable credit. */
+    val kind: String? = null,
+    val iconKey: String? = null,
+    val spendable: Boolean? = null,
+    val spendableCreditMinor: Long? = null,
 )
 
 data class BackupCategory(

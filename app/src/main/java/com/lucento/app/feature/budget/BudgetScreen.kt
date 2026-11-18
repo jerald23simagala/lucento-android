@@ -564,13 +564,22 @@ private fun DailyTile(daily: DailyFigure, overspent: Boolean, modifier: Modifier
     val fmt = amountFormat()
     val ext = LucentoTheme.extendedColors
     val (label, money, caption) = when (daily) {
-        is DailyFigure.SafePerDay -> Triple("Safe per day", daily.perDay, "${daysLeftLabel(daily.daysLeft)} left")
+        is DailyFigure.SafePerDay -> Triple(
+            "Safe per day",
+            daily.perDay,
+            // Tester round (2026-11-17): say so when the spending money, not the budget, sets it.
+            "${daysLeftLabel(daily.daysLeft)} left" + if (daily.limitedByMoney) " · by money on hand" else "",
+        )
         // As on Home (owner, 2026-11-03): never below zero; the bills set aside are explained under the tiles.
         is DailyFigure.NothingLeft -> Triple(
             "Safe to spend",
             if (daily.safe.isNegative) com.lucento.app.core.money.Money.zero(daily.safe.currencyCode) else daily.safe,
             // The same reason Home's card gives (round 6): with budget still remaining, the bills due took the rest.
-            if (overspent) "You’re over budget this month" else "Bills due take what’s left",
+            when {
+                daily.limitedByMoney -> com.lucento.app.feature.home.BudgetFormula.CAPTION_MONEY_TAKEN
+                overspent -> com.lucento.app.feature.home.BudgetFormula.CAPTION_OVER_BUDGET
+                else -> com.lucento.app.feature.home.BudgetFormula.CAPTION_BILLS
+            },
         )
         is DailyFigure.DailyAverage -> Triple("Daily average", daily.perDay, "over ${daysLeftLabel(daily.days)}")
     }

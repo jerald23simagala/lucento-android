@@ -75,6 +75,7 @@ import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.DebtRepayment
 import com.lucento.app.domain.LoanProgress
 import com.lucento.app.domain.Wallet
+import com.lucento.app.core.designsystem.component.displayIcon
 import com.lucento.app.domain.WalletType
 import java.time.LocalDate
 
@@ -147,7 +148,7 @@ fun WalletCard(
                             )
                         }
                         Spacer(Modifier.width(Spacing.sm))
-                        TypeMark(wallet.type, ink)
+                        TypeMark(wallet.displayIcon, wallet.type.label, ink)
                     }
 
                     Column {
@@ -164,6 +165,7 @@ fun WalletCard(
                                 liability -> "Amount owed"
                                 wallet.type == WalletType.RECEIVABLE -> "Owed to you"
                                 valued -> "Estimated value"
+                                wallet.type == WalletType.INVESTMENT -> "Current value"
                                 else -> "Current balance"
                             },
                             loan = loan,
@@ -226,6 +228,7 @@ private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color,
             when {
                 wallet.type.isLiability -> "Owed at start"
                 wallet.type == WalletType.RECEIVABLE -> "Lent at start"
+                wallet.type == WalletType.INVESTMENT -> "Starting value"
                 else -> "Opening balance"
             },
             fmt.format(wallet.openingBalance),
@@ -359,6 +362,7 @@ private fun InstitutionWalletCard(
         liability -> "Amount owed"
         wallet.type == WalletType.RECEIVABLE -> "Owed to you"
         wallet.type.isValuedManually -> "Estimated value"
+        wallet.type == WalletType.INVESTMENT -> "Current value"
         else -> "Current balance"
     }
     val spoken = "${institution.name}, ${wallet.type.label}, ${wallet.name}${wallet.rateSuffix()}, ${label.lowercase()} " +
@@ -501,17 +505,17 @@ private fun TypeChip(type: WalletType, ink: Color, label: String = type.label, c
 
 /** The card network's place: the wallet type's glyph above its name in small capitals. */
 @Composable
-private fun TypeMark(type: WalletType, ink: Color) {
+private fun TypeMark(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, ink: Color) {
     Column(horizontalAlignment = Alignment.End) {
         Box(
             Modifier.size(36.dp).background(ink.copy(alpha = 0.14f), RoundedCornerShape(50)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(type.icon, contentDescription = null, tint = ink, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = ink, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.size(Spacing.xxs))
         Text(
-            type.label.uppercase(),
+            label.uppercase(),
             style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontWeight = FontWeight.Bold),
             color = ink,
             maxLines = 1,

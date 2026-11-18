@@ -953,6 +953,8 @@ private fun ScheduleActionsSheet(
     val separator = remember { MoneyFormatter.decimalSeparator() }
     val due = schedule.nextDue
     val debt = schedule.toWalletId?.let { state.walletsById[it] }
+    // A debt payment or a collection (not a scheduled transfer) is split into principal and interest.
+    val split = debt != null && (schedule.isDebtPayment || schedule.isCollection)
     // For a debt payment this is the whole payment; the interest part is entered below and the rest is principal.
     var amountText by remember(schedule.id, schedule.nextIndex) { mutableStateOf(MoneyFormatter.formatPlain(schedule.total)) }
     var interestText by remember(schedule.id, schedule.nextIndex) { mutableStateOf("") }
@@ -989,10 +991,13 @@ private fun ScheduleActionsSheet(
                         when (schedule.flow) {
                             ScheduledFlow.INCOME -> "Expected into ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
                             ScheduledFlow.EXPENSE -> "Paid from ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
-                            ScheduledFlow.TRANSFER -> if (schedule.isCollection) {
-                                "Transfer from ${debt?.name ?: "the receivable"} to ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
-                            } else {
-                                "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "the debt"}"
+                            ScheduledFlow.TRANSFER -> when {
+                                schedule.isCollection ->
+                                    "Transfer from ${debt?.name ?: "the receivable"} to ${state.walletsById[schedule.walletId]?.name ?: "your account"}"
+                                schedule.isTransfer ->
+                                    "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "your other account"}"
+                                else ->
+                                    "Transfer from ${state.walletsById[schedule.walletId]?.name ?: "your account"} to ${debt?.name ?: "the debt"}"
                             }
                         },
                         style = MaterialTheme.typography.labelMedium,
@@ -1018,8 +1023,15 @@ private fun ScheduleActionsSheet(
             }
             if (canEdit && due != null && !schedule.paused) {
                 LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.md) {
-                    FieldHeader(if (schedule.type == TransactionType.INCOME) "Record as received" else "Record as paid")
-                    if (debt != null) {
+                    FieldHeader(
+                        when {
+                            schedule.isTransfer -> "Record the transfer"
+                            schedule.type == TransactionType.INCOME -> "Record as received"
+                            else -> "Record as paid"
+                        },
+                    )
+                    // A debt payment or a collection splits into principal and interest; a plain transfer doesn't.
+                    if (split) {
                         PaymentSplitFields(
                             paymentText = amountText,
                             interestText = interestText,
@@ -1036,7 +1048,7 @@ private fun ScheduleActionsSheet(
                             onValueChange = { amountText = it; message = null },
                             label = "Amount",
                             currencyCode = schedule.currencyCode,
-                            supporting = "Change it if this bill varies.",
+                            supporting = if (schedule.isTransfer) "Change it if this one is different." else "Change it if this bill varies.",
                             error = message,
                         )
                     }
@@ -1044,7 +1056,11 @@ private fun ScheduleActionsSheet(
                     DateField(label = "Date", date = paidOn, onDate = { paidOn = it ?: due }, clearable = false)
                 }
                 LucentoPrimaryButton(
-                    text = if (schedule.type == TransactionType.INCOME) "Mark received" else "Mark paid",
+                    text = when {
+                        schedule.isTransfer -> "Mark done"
+                        schedule.type == TransactionType.INCOME -> "Mark received"
+                        else -> "Mark paid"
+                    },
                     onClick = {
                         val (money, error) = parsePositive(amountText, schedule.currencyCode, separator)
                         if (money == null) {
@@ -1056,13 +1072,13 @@ private fun ScheduleActionsSheet(
                             message = interestError?.message(schedule.currencyCode, separator)
                             return@LucentoPrimaryButton
                         }
-                        if (debt != null && interest.amountMinor > money.amountMinor) {
+                        if (split && interest.amountMinor > money.amountMinor) {
                             message = "The interest can’t be more than the payment."
                             return@LucentoPrimaryButton
                         }
                         // A debt payment records principal (payment − interest) against the debt and the interest as spending.
-                        val principal = if (debt != null) money - interest else money
-                        onMarkPaid(principal, interest.takeIf { debt != null }, paidOn) { result ->
+                        val principal = if (split) money - interest else money
+                        onMarkPaid(principal, interest.takeIf { split }, paidOn) { result ->
                             when (result) {
                                 is RecurringRepository.PayResult.Recorded -> onDismiss()
                                 RecurringRepository.PayResult.NotDue -> message = "This schedule has no more dates."

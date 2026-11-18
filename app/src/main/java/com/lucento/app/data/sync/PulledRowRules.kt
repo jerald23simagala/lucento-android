@@ -34,6 +34,10 @@ internal object PulledRowRules {
                 optionalRange(row, "credit_limit_minor", 1, MAX_MINOR),
                 optionalRange(row, "statement_day", 1, 31),
                 optionalRange(row, "due_day", 1, 31),
+                // v14 (tester round, 2026-11-17): kind and icon keys, and a card's spendable credit.
+                optionalMatch(row, "kind", KEY),
+                optionalMatch(row, "icon_key", KEY),
+                optionalRange(row, "spendable_credit_minor", 0, MAX_MINOR),
             )
             "categories" -> oneOf(row, "kind", setOf("EXPENSE", "INCOME"))
             "transactions" -> firstOf(currency(row), oneOf(row, "type", TRANSACTION_TYPES), range(row, "amount_minor", 0, MAX_MINOR))
@@ -48,7 +52,8 @@ internal object PulledRowRules {
             "goals" -> firstOf(currency(row), range(row, "target_minor", 0, MAX_MINOR))
             "recurring" -> firstOf(
                 currency(row),
-                oneOf(row, "type", setOf("EXPENSE", "INCOME")),
+                // TRANSFER_OUT: a scheduled transfer between the person's own accounts (v14).
+                oneOf(row, "type", setOf("EXPENSE", "INCOME", "TRANSFER_OUT")),
                 oneOf(row, "frequency", FREQUENCIES),
                 range(row, "interval_count", 1, Long.MAX_VALUE),
                 range(row, "amount_minor", 0, MAX_MINOR),
@@ -126,6 +131,9 @@ internal object PulledRowRules {
 
     private fun optionalMatch(row: JsonObject, key: String, pattern: Regex): String? =
         if (!row.isSet(key)) null else if (text(row, key)?.let(pattern::matches) == true) null else key
+
+    /** A wallet kind or icon key ([com.lucento.app.domain.WalletKind.KEY_PATTERN]). */
+    private val KEY = com.lucento.app.domain.WalletKind.KEY_PATTERN
 
     /** "yyyy-MM" with a real month (budget lifecycle, v10). */
     private val YEAR_MONTH = Regex("^\\d{4}-(0[1-9]|1[0-2])$")

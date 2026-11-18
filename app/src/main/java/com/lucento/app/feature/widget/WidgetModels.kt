@@ -63,8 +63,8 @@ sealed interface SafeToSpendWidgetModel {
     ) : SafeToSpendWidgetModel
 
     companion object {
-        const val OVER_BUDGET_REASON = "You’re over budget this month"
-        const val BILLS_REASON = "Bills due take what’s left"
+        const val OVER_BUDGET_REASON = com.lucento.app.feature.home.BudgetFormula.CAPTION_OVER_BUDGET
+        const val BILLS_REASON = com.lucento.app.feature.home.BudgetFormula.CAPTION_BILLS
         const val BUDGETS_OFF_NOTE = "Budgets is switched off, so this shows Net flow, as Home does."
 
         fun from(
@@ -123,11 +123,8 @@ sealed interface SafeToSpendWidgetModel {
                 label = "Safe to spend"
                 figureMoney = safeShown!!
                 nothing = formula.nothingSafe
-                reason = when {
-                    !nothing -> null
-                    formula.overspent -> OVER_BUDGET_REASON
-                    else -> BILLS_REASON
-                }
+                // Home's own caption, including when the spending money set it (tester round, 2026-11-17).
+                reason = formula.safeCaption
             } else {
                 // Home closes on Remaining (or Overspent) when there is no safe-to-spend figure.
                 label = if (formula.overspent) "Overspent" else "Remaining"

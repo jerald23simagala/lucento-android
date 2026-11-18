@@ -614,6 +614,10 @@ class SyncRepository(
         // one already valued), and on none otherwise — a one-currency ledger sends exactly what v12 sent.
         val main = mainCurrency()
         val withFx = dirty.any { it.fxBasisRate != null || it.fxRevalue || (main != null && it.currencyCode != main) }
+        // v14, the same way: a kind or icon, and a spending-money choice, go on every wallet of a batch where one is set.
+        // The editor keeps a choice once made (it never goes back to null), so clearing one never needs the keys alone.
+        val withLook = dirty.any { it.kind != null || it.iconKey != null }
+        val withSpending = dirty.any { it.spendable != null || it.spendableCreditMinor != null }
         return pushRows(r, "wallets", dirty, { it.clientUuid!! }, {
             val t = terms[it.id]
             val json = encode(WalletRow.serializer(), WalletRow(
@@ -630,6 +634,14 @@ class SyncRepository(
                 if (withFx) {
                     put(FX_BASIS_RATE, it.fxBasisRate?.let(::JsonPrimitive) ?: JsonNull)
                     put(FX_REVALUE, JsonPrimitive(it.fxRevalue))
+                }
+                if (withLook) {
+                    put(KIND, it.kind?.let(::JsonPrimitive) ?: JsonNull)
+                    put(ICON_KEY, it.iconKey?.let(::JsonPrimitive) ?: JsonNull)
+                }
+                if (withSpending) {
+                    put(SPENDABLE, it.spendable?.let(::JsonPrimitive) ?: JsonNull)
+                    put(SPENDABLE_CREDIT_MINOR, it.spendableCreditMinor?.let(::JsonPrimitive) ?: JsonNull)
                 }
             }
             if (extra.isEmpty()) json else JsonObject(json + extra)
@@ -1240,6 +1252,10 @@ class SyncRepository(
         private const val CLASSIFICATION = "classification"
         private const val FX_BASIS_RATE = "fx_basis_rate"
         private const val FX_REVALUE = "fx_revalue"
+        private const val KIND = "kind"
+        private const val ICON_KEY = "icon_key"
+        private const val SPENDABLE = "spendable"
+        private const val SPENDABLE_CREDIT_MINOR = "spendable_credit_minor"
         private const val BASE_AMOUNT_MINOR = "base_amount_minor"
         private const val BASE_CURRENCY = "base_currency"
         private const val FX_SOURCE = "fx_source"
@@ -1266,6 +1282,11 @@ private fun WalletRow.toEntity(syncedAt: Long, id: Long = 0): WalletEntity = Wal
     // Multicurrency: a rate this version can't read is dropped (the wallet then shows unvalued) rather than misread.
     fxBasisRate = fxBasisRate?.takeIf { com.lucento.app.core.money.FxRate.parse(it) != null },
     fxRevalue = fxRevalue ?: false,
+    // v14: looks and choices only. A key this version doesn't know is kept as text and read as none.
+    kind = kind?.takeIf { com.lucento.app.domain.WalletKind.KEY_PATTERN.matches(it) },
+    iconKey = iconKey?.takeIf { com.lucento.app.domain.WalletKind.KEY_PATTERN.matches(it) },
+    spendable = spendable,
+    spendableCreditMinor = spendableCreditMinor?.takeIf { it >= 0L },
 )
 
 private fun CategoryRow.toEntity(syncedAt: Long, id: Long = 0): CategoryEntity = CategoryEntity(

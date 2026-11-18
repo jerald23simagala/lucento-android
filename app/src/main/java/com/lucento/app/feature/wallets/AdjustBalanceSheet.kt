@@ -89,6 +89,8 @@ fun AdjustBalanceSheet(
     var error by remember { mutableStateOf<AdjustError?>(null) }
 
     val liability = wallet.type.isLiability
+    // Tester round (2026-11-17): for an investment the same sheet updates its value.
+    val investment = wallet.type == com.lucento.app.domain.WalletType.INVESTMENT
     val tracked = WalletBalanceCalculator.balanceOn(wallet.openingBalance, wallet.type, wallet.id, history, date)
     val parsedActual = MoneyParser.parse(amountText, wallet.currencyCode, decimalSeparator)
     val actual = (parsedActual as? MoneyParser.Result.Success)?.money
@@ -118,7 +120,7 @@ fun AdjustBalanceSheet(
                 .imePadding(),
         ) {
             SheetHeader(
-                title = "Adjust balance",
+                title = if (investment) "Update value" else "Adjust balance",
                 subtitle = wallet.name,
                 leading = { com.lucento.app.core.designsystem.component.WalletIdentityTile(wallet) },
             )
@@ -169,7 +171,7 @@ fun AdjustBalanceSheet(
                     if (error != null && error != AdjustError.FutureDate) error = null
                 },
                 filter = { it.take(20) },
-                label = { Text(if (liability) "Actual amount owed" else "Actual balance") },
+                label = { Text(if (liability) "Actual amount owed" else if (investment) "Value today" else "Actual balance") },
                 prefix = { Text(MoneyFormatter.currencySymbol(wallet.currencyCode) + " ") },
                 placeholder = { Text("0") },
                 isError = amountError,
@@ -184,7 +186,11 @@ fun AdjustBalanceSheet(
                             AdjustError.AmountTooLarge -> "That amount is larger than Lucento supports."
                             is AdjustError.AmountUnclear -> e.message
                             AdjustError.Failed -> "Couldn’t save the adjustment. Nothing was changed."
-                            else -> liveClarification ?: if (liability) "From your latest statement or lender’s app." else "From your bank app, statement or a count of your cash."
+                            else -> liveClarification ?: when {
+                                liability -> "From your latest statement or lender’s app."
+                                investment -> "From your broker, fund or Pag-IBIG app, or your latest statement."
+                                else -> "From your bank app, statement or a count of your cash."
+                            }
                         }
                     )
                 },
@@ -219,7 +225,7 @@ fun AdjustBalanceSheet(
 
             Spacer(Modifier.height(Spacing.lg))
             LucentoPrimaryButton(
-                text = "Adjust balance",
+                text = if (investment) "Update value" else "Adjust balance",
                 enabled = plan != null && !date.isAfter(today),
                 onClick = {
                     onAdjust(amountText, decimalSeparator, date, clientUuid) { result ->
