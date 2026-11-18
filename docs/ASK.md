@@ -94,7 +94,8 @@ with an id, all in the main currency and calculated on the phone:
 - **Summaries**: net worth, assets and amounts owed, each wallet's balance, income, expenses and net flow for each of
   the last 12 months, spending and income by category for this month and last, this month's budget by category, what's
   still scheduled this month.
-- **Projections**: daily pace and projected spending for this month, days gone and left, safe to spend (Home's figure),
+- **Projections**: daily pace and projected spending for this month, days gone and left, safe to spend (Home's figure, with
+  what the budget and the spending money each allow; tester round 2026-11-17),
   average income, expenses and net flow over the last full months (up to three), the share of income kept, average
   spending by category, money on hand and savings.
 - **Goals**: target, saved, still to save, share saved, target date, the monthly amount needed, the projected date.

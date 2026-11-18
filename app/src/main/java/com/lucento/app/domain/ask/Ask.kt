@@ -289,6 +289,12 @@ object AskSnapshotBuilder {
         CashflowCalculator.safeToSpend(currency, today, inputs.transactions, inputs.wallets, inputs.budgets, inputs.schedules, inputs.categories)?.let { safe ->
             money("safe", "Safe to spend for the rest of ${monthName(current)} (as on Home)", safe.amount)
             safe.perDay?.let { money("safe_day", "Safe to spend a day for the rest of ${monthName(current)}", it) }
+            // Tester round (2026-11-17): the two figures behind it, so an answer can say which one set it.
+            // Labels stay under the 100-character cut.
+            safe.budgetAllows?.let { money("safe_budget", "What the budget allows, rest of ${monthName(current)} (budget − spent − bills due)", it) }
+            safe.moneyOnHand?.let {
+                money("safe_money", "What spending money allows, rest of ${monthName(current)} (after what’s due); Safe to spend is the lower one", it.allows)
+            }
         }
         val firstRecord = inputs.transactions.filter { it.currencyCode == currency && !it.isTransfer && !it.isAdjustment }.minOfOrNull { it.date }
         val fullMonths = if (firstRecord == null) emptyList() else
