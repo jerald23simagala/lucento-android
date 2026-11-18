@@ -41,6 +41,72 @@ class ThemeInvarianceTest {
     }
 
     @Test
+    fun `home shortcuts follow the theme with one hue each and never a status colour`() {
+        for (spec in ThemeSpec.all) {
+            for ((mode, colors) in listOfNotNull(spec.light?.let { "light" to it }, "dark" to spec.dark)) {
+                val x = colors.extended
+                val tones = x.shortcuts.all
+                val status = listOf(
+                    TonePair(x.positiveContainer, x.positive),
+                    TonePair(x.negativeContainer, x.negative),
+                    TonePair(x.warningContainer, x.warning),
+                )
+                tones.forEach { tone ->
+                    assertFalse("${spec.displayName} $mode: a shortcut uses a status tone", tone in status)
+                }
+                if (spec.id == ThemeId.MONO) {
+                    assertEquals("Mono keeps one graphite tone", 1, tones.toSet().size)
+                } else {
+                    // Design review (2026-11-17): not just different values — far enough from red, amber and green that
+                    // no tile reads as a state. Goals is exempt: it carries the theme's primary (Grove's is green).
+                    val shortcuts = x.shortcuts
+                    listOf("Insights" to shortcuts.insights, "Awards" to shortcuts.awards, "Debts" to shortcuts.debts, "Scheduled" to shortcuts.scheduled)
+                        .forEach { (name, tone) ->
+                            // The glyph, or the tile when it carries more colour than the glyph (a solid tile is what the
+                            // eye reads: design review round 2, a sunlight tile at night sat 5.7 from the warning amber).
+                            val dominant = if (okLabChroma(tone.container) > okLabChroma(tone.content)) tone.container else tone.content
+                            listOf("positive" to x.positive, "negative" to x.negative, "warning" to x.warning).forEach { (state, color) ->
+                                val distance = okLabDistance(dominant, color)
+                                assertTrue(
+                                    "${spec.displayName} $mode: $name is ${"%.1f".format(distance)} ΔE from $state (needs ≥ 15)",
+                                    distance >= 15.0,
+                                )
+                            }
+                        }
+                    assertEquals("${spec.displayName} $mode: five distinct shortcut glyphs", 5, tones.map { it.content }.toSet().size)
+                    // Goals carries the theme's own primary, so the row always says which theme is on.
+                    assertEquals("${spec.displayName} $mode: Goals in the theme's primary", colors.scheme.primary, x.shortcuts.goals.content)
+                }
+            }
+        }
+    }
+
+    private fun lin(c: Float): Double = if (c <= 0.04045f) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4)
+
+    private fun okLab(c: androidx.compose.ui.graphics.Color): DoubleArray {
+        val r = lin(c.red)
+        val g = lin(c.green)
+        val bl = lin(c.blue)
+        val l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * bl)
+        val m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl)
+        val s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl)
+        return doubleArrayOf(
+            0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+            1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+            0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
+        )
+    }
+
+    /** OKLab distance ×100 (as `DataSeriesTest` measures it): about 15 is where two colours stop reading as one. */
+    private fun okLabDistance(a: androidx.compose.ui.graphics.Color, b: androidx.compose.ui.graphics.Color): Double {
+        val p = okLab(a)
+        val q = okLab(b)
+        return 100 * Math.sqrt((p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]) + (p[2] - q[2]) * (p[2] - q[2]))
+    }
+
+    private fun okLabChroma(c: androidx.compose.ui.graphics.Color): Double = okLab(c).let { Math.hypot(it[1], it[2]) }
+
+    @Test
     fun `sunrise is the shipped palette, untouched`() {
         assertSame(LightColors, ThemeSpec.Sunrise.light!!.scheme)
         assertSame(DarkColors, ThemeSpec.Sunrise.dark.scheme)
