@@ -231,7 +231,7 @@ private object MidnightColors {
         shortcuts = ShortcutTones(
             goals = TonePair(Color(0xFF26335E), Color(0xFF8FA8FF)),
             insights = TonePair(Color(0xFF2E2552), Color(0xFFC4B5FF)),
-            awards = TonePair(Palette.SunlightYellow, Palette.MidnightNavy),
+            awards = TonePair(Color(0xFF3D3214), Palette.SunlightPale),
             debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
             scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
         ),
@@ -350,7 +350,7 @@ private object GroveColors {
         shortcuts = ShortcutTones(
             goals = TonePair(Color(0xFF1F4733), Color(0xFF83CCA5)),
             insights = TonePair(Color(0xFF33264A), Color(0xFFD3B8F0)),
-            awards = TonePair(Palette.SunlightYellow, Palette.MidnightNavy),
+            awards = TonePair(Color(0xFF3D3214), Palette.SunlightPale),
             debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
             scheduled = TonePair(Color(0xFF0C3A55), Color(0xFF7DD3FC)),
         ),
@@ -579,7 +579,7 @@ private object AuroraColors {
         shortcuts = ShortcutTones(
             goals = TonePair(Color(0xFF342973), Color(0xFFA98FFF)),
             insights = TonePair(Color(0xFF4A1F52), Color(0xFFF0ABFC)),
-            awards = TonePair(Palette.SunlightYellow, Palette.MidnightNavy),
+            awards = TonePair(Color(0xFF3D3214), Palette.SunlightPale),
             debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
             scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
         ),

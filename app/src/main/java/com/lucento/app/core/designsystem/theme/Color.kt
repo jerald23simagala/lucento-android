@@ -427,9 +427,10 @@ internal val DarkExtended = LucentoExtendedColors(
  */
 /**
  * Design review (2026-11-17): the first coral Debts, gold Awards and teal Scheduled sat within 3–9 OKLab ΔE of the
- * negative, warning and positive tones, so a debt still read as an alarm. Now Awards is navy on sunlight (the brand's
- * own pairing), Debts the slate of the debt category, Scheduled sky — every glyph but Goals ≥ 15 ΔE from every status
- * tone in its mode (`ThemeInvarianceTest`).
+ * negative, warning and positive tones, so a debt still read as an alarm. Now Awards is navy on sunlight by day (the
+ * brand's own pairing) and cream on deep gold at night (a sunlight tile there outshone the + button and sat 5.7 from the
+ * warning amber), Debts the slate of the debt category, Scheduled sky — every glyph but Goals, or the tile when it carries
+ * more colour, ≥ 15 ΔE from every status tone in its mode (`ThemeInvarianceTest`).
  */
 internal object SunriseShortcuts {
     val light = ShortcutTones(
@@ -442,7 +443,7 @@ internal object SunriseShortcuts {
     val dark = ShortcutTones(
         goals = TonePair(Color(0xFF26397A), Palette.BlueNight),
         insights = TonePair(Color(0xFF30215A), Color(0xFFC8B3FF)),
-        awards = TonePair(Palette.SunlightYellow, Palette.MidnightNavy),
+        awards = TonePair(Color(0xFF3D3214), Palette.SunlightPale),
         debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
         scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
     )
