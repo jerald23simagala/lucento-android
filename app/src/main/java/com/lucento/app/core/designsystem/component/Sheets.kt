@@ -91,6 +91,18 @@ fun LucentoBottomSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
+        // The sheet's own window takes its bar icons from the phone's dark setting, not Lucento's theme: with Lucento dark
+        // on a light phone the clock and battery went dark on the dark sheet (design review, 2026-11-18). Match the theme.
+        val view = androidx.compose.ui.platform.LocalView.current
+        val dark = LucentoTheme.isDark
+        androidx.compose.runtime.SideEffect {
+            (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.let { window ->
+                androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
+        }
         Column(
             Modifier
                 .fillMaxWidth()
