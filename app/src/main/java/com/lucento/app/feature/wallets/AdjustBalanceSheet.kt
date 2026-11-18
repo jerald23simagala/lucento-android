@@ -214,7 +214,7 @@ fun AdjustBalanceSheet(
                     // Signed from the wallet's point of view, as it will read in Transactions.
                     val signed = if (plan.type.isInflow) plan.amount else -plan.amount
                     InfoNote(
-                        "Balance adjustment of ${MoneyFormatter.formatSigned(signed)} ${onDay(date, today)}. " +
+                        "Balance adjustment of ${MoneyFormatter.formatSigned(signed, wholeUnits = false)} ${onDay(date, today)}. " +
                             "It shows in Transactions but isn’t counted as income or spending. Later transactions " +
                             "still apply on top.",
                         icon = Icons.Outlined.WarningAmber,

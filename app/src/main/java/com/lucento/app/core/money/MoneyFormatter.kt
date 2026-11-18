@@ -1,5 +1,6 @@
 package com.lucento.app.core.money
 
+import java.math.RoundingMode
 import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.util.Currency
@@ -7,25 +8,48 @@ import java.util.Locale
 
 object MoneyFormatter {
 
-    /** Locale-aware currency string, e.g. "$1,234.56" (en-US) or "1.234,56 €" (de-DE). */
-    fun format(money: Money, locale: Locale = Locale.getDefault()): String {
+    /**
+     * Settings › Money › "Show cents" off (tester round, 2026-11-17): the amounts people read are rounded to whole units,
+     * half-up on their absolute value (−₱12.50 → −₱13). A display choice only: storage, parsing, sync, exports and every
+     * calculation stay exact. Set from the saved preference at start and on every change (`LucentoApplication`) for
+     * everything outside Compose (Ask's answers, report PDFs, widgets); Compose reads the same choice through
+     * `LocalWholeUnits`, so a switch redraws every open amount. Places that must stay exact — amount inputs, the
+     * transaction view — pass `wholeUnits = false`. Currencies without a minor unit (JPY) are unchanged.
+     */
+    @Volatile
+    var wholeUnits: Boolean = false
+
+    /** Locale-aware currency string, e.g. "$1,234.56" (en-US) or "1.234,56 €" (de-DE); "$1,235" with [wholeUnits]. */
+    fun format(money: Money, locale: Locale = Locale.getDefault(), wholeUnits: Boolean = this.wholeUnits): String {
         val nf = NumberFormat.getCurrencyInstance(locale)
         runCatching { nf.currency = Currency.getInstance(money.currencyCode) }
-        nf.minimumFractionDigits = money.fractionDigits
-        nf.maximumFractionDigits = money.fractionDigits
+        val digits = if (wholeUnits) 0 else money.fractionDigits
+        nf.minimumFractionDigits = digits
+        nf.maximumFractionDigits = digits
+        nf.roundingMode = RoundingMode.HALF_UP
         return nf.format(money.toBigDecimal())
     }
+
+    /** True when [money] shows as zero at the current precision, so a rounded "−$0" never gets its sign. */
+    private fun showsAsZero(money: Money, wholeUnits: Boolean): Boolean =
+        if (wholeUnits) money.toBigDecimal().abs().setScale(0, RoundingMode.HALF_UP).signum() == 0 else money.isZero
 
     /**
      * Formats with an explicit, typographic sign so direction never depends on colour alone:
      * "−$12.50" (U+2212 minus) for negative values and, when [showPlus], "+$12.50" for positive ones.
      * Zero is shown unsigned.
      */
-    fun formatSigned(money: Money, showPlus: Boolean = true, locale: Locale = Locale.getDefault()): String {
-        val body = format(money.abs(), locale)
+    fun formatSigned(
+        money: Money,
+        showPlus: Boolean = true,
+        locale: Locale = Locale.getDefault(),
+        wholeUnits: Boolean = this.wholeUnits,
+    ): String {
+        val body = format(money.abs(), locale, wholeUnits)
+        val zero = showsAsZero(money, wholeUnits)
         return when {
-            money.isNegative -> "$MINUS$body"
-            showPlus && !money.isZero -> "+$body"
+            money.isNegative && !zero -> "$MINUS$body"
+            showPlus && !zero -> "+$body"
             else -> body
         }
     }

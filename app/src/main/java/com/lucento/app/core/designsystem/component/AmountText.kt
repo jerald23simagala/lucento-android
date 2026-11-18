@@ -44,6 +44,14 @@ import androidx.compose.ui.semantics.contentDescription
  */
 val LocalAmountsHidden = staticCompositionLocalOf { false }
 
+/**
+ * True while Settings › Money › "Show cents" is off (tester round, 2026-11-17): the amounts people read are whole units
+ * ([MoneyFormatter.wholeUnits] does the same for text built outside Compose). Provided at the app's root from the saved
+ * choice. [AmountsShown] (editors, the composer, setup) and [AmountsExact] (the transaction view) set it back to false:
+ * where someone types an amount or checks one entry, the cents stay.
+ */
+val LocalWholeUnits = staticCompositionLocalOf { false }
+
 /** What screen readers hear for a hidden amount. */
 const val HIDDEN_AMOUNT_DESCRIPTION = "Amount hidden"
 
@@ -52,16 +60,17 @@ const val HIDDEN_AMOUNT_DESCRIPTION = "Amount hidden"
  * helper functions that build sentences: get it once with [amountFormat] and use it wherever an amount is written out.
  * [spoken] is for content descriptions, where a hidden amount is "Amount hidden" rather than read-out dots.
  */
-class AmountFormat internal constructor(val hidden: Boolean) {
-    fun format(money: Money): String = if (hidden) MoneyFormatter.masked(money.currencyCode) else MoneyFormatter.format(money)
+class AmountFormat internal constructor(val hidden: Boolean, val wholeUnits: Boolean = false) {
+    fun format(money: Money): String =
+        if (hidden) MoneyFormatter.masked(money.currencyCode) else MoneyFormatter.format(money, wholeUnits = wholeUnits)
 
     fun signed(money: Money, showPlus: Boolean = true): String =
-        if (hidden) MoneyFormatter.masked(money.currencyCode) else MoneyFormatter.formatSigned(money, showPlus)
+        if (hidden) MoneyFormatter.masked(money.currencyCode) else MoneyFormatter.formatSigned(money, showPlus, wholeUnits = wholeUnits)
 
-    fun spoken(money: Money): String = if (hidden) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.format(money)
+    fun spoken(money: Money): String = if (hidden) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.format(money, wholeUnits = wholeUnits)
 
     fun spokenSigned(money: Money, showPlus: Boolean = true): String =
-        if (hidden) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.formatSigned(money, showPlus)
+        if (hidden) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.formatSigned(money, showPlus, wholeUnits = wholeUnits)
 
     companion object {
         val Shown = AmountFormat(false)
@@ -69,15 +78,28 @@ class AmountFormat internal constructor(val hidden: Boolean) {
     }
 }
 
-/** The [AmountFormat] for this place in the UI. */
+/** The [AmountFormat] for this place in the UI: hidden or not, cents or whole units. */
 @Composable
 @ReadOnlyComposable
-fun amountFormat(): AmountFormat = if (LocalAmountsHidden.current) AmountFormat.Hidden else AmountFormat.Shown
+fun amountFormat(): AmountFormat = AmountFormat(LocalAmountsHidden.current, LocalWholeUnits.current)
 
-/** Shows real amounts inside [content] whatever the user chose: editors, the composer, anything that takes input. */
+/**
+ * Shows real, exact amounts inside [content] whatever the user chose: editors, the composer, anything that takes input.
+ * Nobody can type an amount they can't see, and nobody should save one they see rounded.
+ */
 @Composable
 fun AmountsShown(content: @Composable () -> Unit) {
-    androidx.compose.runtime.CompositionLocalProvider(LocalAmountsHidden provides false, content = content)
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalAmountsHidden provides false,
+        LocalWholeUnits provides false,
+        content = content,
+    )
+}
+
+/** Keeps the cents inside [content] (the transaction view) while still honouring hidden amounts. */
+@Composable
+fun AmountsExact(content: @Composable () -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalWholeUnits provides false, content = content)
 }
 
 /** [money] as words on screen — or its hidden form where amounts are hidden ([LocalAmountsHidden]). */
@@ -85,8 +107,8 @@ fun AmountsShown(content: @Composable () -> Unit) {
 @ReadOnlyComposable
 fun shownAmount(money: Money, signed: Boolean = false, showPlus: Boolean = false): String = when {
     LocalAmountsHidden.current -> MoneyFormatter.masked(money.currencyCode)
-    signed -> MoneyFormatter.formatSigned(money, showPlus)
-    else -> MoneyFormatter.format(money)
+    signed -> MoneyFormatter.formatSigned(money, showPlus, wholeUnits = LocalWholeUnits.current)
+    else -> MoneyFormatter.format(money, wholeUnits = LocalWholeUnits.current)
 }
 
 /** [money] for a content description: "Amount hidden" where amounts are hidden, so TalkBack never reads them out. */
@@ -253,9 +275,10 @@ private fun ShrinkingMoney(
     modifier: Modifier,
 ) {
     val hidden = LocalAmountsHidden.current
+    val fractionDigits = if (LocalWholeUnits.current) 0 else money.fractionDigits
     val formatted = shownAmount(money, signed = true, showPlus = showPlus)
-    val text = remember(formatted, style, fractionScale) {
-        if (hidden) AnnotatedString(formatted) else typeset(formatted, money.fractionDigits, style, fractionScale)
+    val text = remember(formatted, style, fractionScale, fractionDigits) {
+        if (hidden) AnnotatedString(formatted) else typeset(formatted, fractionDigits, style, fractionScale)
     }
     FittingText(text, style, color, minScale, modifier.hiddenAmountSemantics(hidden))
 }

@@ -1962,18 +1962,19 @@ private fun ShortcutRow(
     val ext = LucentoTheme.extendedColors
     var offering by remember { mutableStateOf<Feature?>(null) }
     val offers = if (state.moduleOffersHidden) emptySet() else f.rediscoverable().toSet()
-    val brand = TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
+    // One hue per shortcut from the theme (tester round, 2026-11-17); status colours stay for state.
+    val tones = ext.shortcuts
     fun module(feature: Feature, tone: TonePair, open: () -> Unit): Shortcut? = when {
         f.isEnabled(feature) -> Shortcut(quickLinkName(feature), shortcutSpokenName(feature), shortcutIcon(feature), tone, open)
         feature in offers -> Shortcut(quickLinkName(feature), shortcutSpokenName(feature), shortcutIcon(feature), tone, { offering = feature }, off = feature)
         else -> null
     }
     val items = listOfNotNull(
-        module(Feature.SAVINGS_GOALS, brand, actions.onOpenGoals),
-        module(Feature.INSIGHTS, brand, actions.onOpenInsights),
-        Shortcut("Awards", "Awards", Icons.Outlined.EmojiEvents, TonePair(ext.warningContainer, ext.warning), onOpenMilestones),
-        module(Feature.DEBTS_LOANS, TonePair(ext.negativeContainer, ext.negative), actions.onOpenDebts),
-        module(Feature.RECURRING, TonePair(ext.positiveContainer, ext.positive)) { actions.onOpenRecurring(null) },
+        module(Feature.SAVINGS_GOALS, tones.goals, actions.onOpenGoals),
+        module(Feature.INSIGHTS, tones.insights, actions.onOpenInsights),
+        Shortcut("Awards", "Awards", Icons.Outlined.EmojiEvents, tones.awards, onOpenMilestones),
+        module(Feature.DEBTS_LOANS, tones.debts, actions.onOpenDebts),
+        module(Feature.RECURRING, tones.scheduled) { actions.onOpenRecurring(null) },
     )
     val haptics = rememberHaptics()
     val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)

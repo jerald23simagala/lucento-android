@@ -73,13 +73,16 @@ sealed interface SafeToSpendWidgetModel {
             appLock: Boolean,
             hideAmounts: Boolean,
             locale: Locale = Locale.getDefault(),
+            /** Settings › Money › Show cents; off rounds the widget's figures like every other amount people read. */
+            showCents: Boolean = true,
         ): SafeToSpendWidgetModel {
             if (!onboarded) return NotSetUp
             if (appLock) return Locked(MoneyFormatter.masked(home.focusCurrency, locale))
             val month = monthLabel(home.month, locale)
+            val whole = !showCents
             fun shown(money: Money) =
-                if (hideAmounts) MoneyFormatter.masked(money.currencyCode, locale) else MoneyFormatter.format(money, locale)
-            fun spoken(money: Money) = if (hideAmounts) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.format(money, locale)
+                if (hideAmounts) MoneyFormatter.masked(money.currencyCode, locale) else MoneyFormatter.format(money, locale, wholeUnits = whole)
+            fun spoken(money: Money) = if (hideAmounts) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.format(money, locale, wholeUnits = whole)
 
             val plan = home.budget
             val burn = home.burn
@@ -91,7 +94,7 @@ sealed interface SafeToSpendWidgetModel {
                 val figure = if (hideAmounts) {
                     MoneyFormatter.masked(net.currencyCode, locale)
                 } else {
-                    MoneyFormatter.formatSigned(net, showPlus = true, locale = locale)
+                    MoneyFormatter.formatSigned(net, showPlus = true, locale = locale, wholeUnits = whole)
                 }
                 val tone = when {
                     hideAmounts -> WidgetTone.NEUTRAL
@@ -99,7 +102,7 @@ sealed interface SafeToSpendWidgetModel {
                     net.isNegative -> WidgetTone.NEGATIVE
                     else -> WidgetTone.NEUTRAL
                 }
-                val spokenNet = if (hideAmounts) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.formatSigned(net, showPlus = true, locale = locale)
+                val spokenNet = if (hideAmounts) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.formatSigned(net, showPlus = true, locale = locale, wholeUnits = whole)
                 return NetFlow(
                     monthLabel = month,
                     figure = figure,

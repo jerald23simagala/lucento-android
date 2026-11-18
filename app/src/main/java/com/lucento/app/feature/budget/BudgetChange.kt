@@ -64,9 +64,9 @@ data class BudgetChangeContext(
     /** Where [month]'s amount comes from, when that isn't obvious. Null when nothing needs saying. */
     val status: String?
         get() = when {
-            removedThisMonth && usual != null -> "Removed for $name only. Other months use ${MoneyFormatter.format(usual)}."
+            removedThisMonth && usual != null -> "Removed for $name only. Other months use ${MoneyFormatter.format(usual, wholeUnits = false)}."
             removedThisMonth -> null
-            hasOwnAmount && usual != null -> "$name has its own amount. Other months use ${MoneyFormatter.format(usual)}."
+            hasOwnAmount && usual != null -> "$name has its own amount. Other months use ${MoneyFormatter.format(usual, wholeUnits = false)}."
             hasOwnAmount -> "This amount is for $name only."
             else -> null
         }
@@ -85,7 +85,7 @@ data class BudgetChangeContext(
         val before = monthName(month.minusMonths(1))
         return buildString {
             if (removing || amount == null) append("$categoryName will have no amount from $name on.")
-            else append("$categoryName becomes ${MoneyFormatter.format(amount)} a month from $name on.")
+            else append("$categoryName becomes ${MoneyFormatter.format(amount, wholeUnits = false)} a month from $name on.")
             append(" $before and earlier keep their amounts.")
             if (laterOwnAmounts > 0) append(" Months you changed on their own keep theirs.")
             if (removing) append(" Your transactions are not affected.")

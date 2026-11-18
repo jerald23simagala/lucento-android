@@ -42,6 +42,8 @@ import com.lucento.app.domain.backup.BackupEngine
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.map
+import com.lucento.app.core.money.MoneyFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
@@ -68,6 +70,11 @@ class LucentoApplication : Application() {
         if (container.pendingRevokes.all().isNotEmpty()) com.lucento.app.data.sync.RevokeScheduler.schedule(this)
         // The welcome email (docs/EMAILS.md): asked for once per signed-in account; nothing while signed out.
         container.welcomeEmail.start(CoroutineScope(SupervisorJob() + Dispatchers.Default), container.auth.observeUserId())
+        // Settings › Money › Show cents: the formatter's whole-units choice for every amount written outside Compose
+        // (Ask's answers, report PDFs, notifications). Compose reads the same preference through LocalWholeUnits.
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            container.preferences.preferences.map { !it.showCents }.distinctUntilChanged().collect { MoneyFormatter.wholeUnits = it }
+        }
         // Home-screen widgets (docs/WIDGETS.md): redrawn after every change to what they show, and just after midnight.
         com.lucento.app.feature.widget.WidgetRefresher.start(this)
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {

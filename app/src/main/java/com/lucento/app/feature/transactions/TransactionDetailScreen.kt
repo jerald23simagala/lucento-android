@@ -171,17 +171,20 @@ fun TransactionDetailScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(Spacing.xxs))
-                        AmountText(
-                            money = if (isTransfer) transaction.amount else transaction.signedAmount,
-                            style = AmountStyles.hero,
-                            signed = !isTransfer,
-                            showPlus = true,
-                            color = tone.content,
-                        )
-                        // Multicurrency: its value in the main currency, under the amount.
-                        com.lucento.app.feature.fx.LocalFxDisplay.current
-                            .value(transaction, sign = if (isTransfer) 0 else if (transaction.signedAmount.isNegative) -1 else 1)
-                            ?.let { com.lucento.app.core.designsystem.component.EquivalentAmount(it, signed = !isTransfer) }
+                        // One entry is always shown to the cent, whatever Settings › Money › Show cents says.
+                        com.lucento.app.core.designsystem.component.AmountsExact {
+                            AmountText(
+                                money = if (isTransfer) transaction.amount else transaction.signedAmount,
+                                style = AmountStyles.hero,
+                                signed = !isTransfer,
+                                showPlus = true,
+                                color = tone.content,
+                            )
+                            // Multicurrency: its value in the main currency, under the amount.
+                            com.lucento.app.feature.fx.LocalFxDisplay.current
+                                .value(transaction, sign = if (isTransfer) 0 else if (transaction.signedAmount.isNegative) -1 else 1)
+                                ?.let { com.lucento.app.core.designsystem.component.EquivalentAmount(it, signed = !isTransfer) }
+                        }
                         Spacer(Modifier.height(Spacing.sm))
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                             Pill(kindLabel, tone)

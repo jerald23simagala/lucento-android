@@ -228,6 +228,13 @@ private object MidnightColors {
         chartHighlight = Color(0xFF8FA8FF),
         track = Color(0xFF242E4A),
         categorical = series(0xFF7482D1, 0xFFC66878, 0xFF2A94C7, 0xFF609B53, 0xFFA472BB, 0xFFA5851D, 0xFF079E92),
+        shortcuts = ShortcutTones(
+            goals = TonePair(Color(0xFF26335E), Color(0xFF8FA8FF)),
+            insights = TonePair(Color(0xFF2E2552), Color(0xFFC4B5FF)),
+            awards = TonePair(Color(0xFF3D3214), Palette.SunlightPale),
+            debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
+            scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
+        ),
     )
 }
 
@@ -283,6 +290,13 @@ private object GroveColors {
         chartHighlight = Color(0xFF2E7D5B),
         track = Color(0xFFE3E8DC),
         categorical = series(0xFF008757, 0xFF8E57A5, 0xFFAE5528, 0xFF007CA5, 0xFF8A6E08, 0xFF3772BB, 0xFFAA4D75),
+        shortcuts = ShortcutTones(
+            goals = TonePair(Color(0xFFDFF0E5), Color(0xFF2E7D5B)),
+            insights = TonePair(Color(0xFFF1E9F7), Color(0xFF7A4A9E)),
+            awards = TonePair(Palette.SunlightPale, Palette.MidnightNavy),
+            debts = TonePair(Color(0xFFE9ECF2), Color(0xFF3F4A63)),
+            scheduled = TonePair(Color(0xFFE0F2FE), Color(0xFF0B5FA5)),
+        ),
     )
     val darkScheme = DarkColors.copy(
         primary = Color(0xFF83CCA5),
@@ -333,6 +347,13 @@ private object GroveColors {
         chartHighlight = Color(0xFF83CCA5),
         track = Color(0xFF2B3B2F),
         categorical = series(0xFF379F70, 0xFF548BD0, 0xFFC1688D, 0xFFA5851D, 0xFFA472BB, 0xFFC47048, 0xFF179AAC),
+        shortcuts = ShortcutTones(
+            goals = TonePair(Color(0xFF1F4733), Color(0xFF83CCA5)),
+            insights = TonePair(Color(0xFF33264A), Color(0xFFD3B8F0)),
+            awards = TonePair(Color(0xFF3D3214), Palette.SunlightPale),
+            debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
+            scheduled = TonePair(Color(0xFF0C3A55), Color(0xFF7DD3FC)),
+        ),
     )
 }
 
@@ -388,6 +409,7 @@ private object MonoColors {
         chartHighlight = Color(0xFF46557A),
         track = Color(0xFFE8E9EC),
         categorical = series(0xFF4A70B7, 0xFF33854A, 0xFF875CA5, 0xFFA65C20, 0xFF007CA5, 0xFF86700A, 0xFFA4517B),
+        shortcuts = ShortcutTones.uniform(TonePair(Color(0xFFE7EAF1), Color(0xFF46557A))),
     )
     val darkScheme = DarkColors.copy(
         primary = Color(0xFFA8B6D8),
@@ -438,6 +460,7 @@ private object MonoColors {
         chartHighlight = Color(0xFFA8B6D8),
         track = Color(0xFF2D3038),
         categorical = series(0xFF6088D2, 0xFFC0743B, 0xFF1996C3, 0xFF4D9D61, 0xFF9F73BF, 0xFFA0881E, 0xFFBE6993),
+        shortcuts = ShortcutTones.uniform(TonePair(Color(0xFF323C52), Color(0xFFA8B6D8))),
     )
 }
 
@@ -495,6 +518,13 @@ private object AuroraColors {
         chartHighlight = Color(0xFF6C4DE0),
         track = Color(0xFFE9E5F4),
         categorical = series(0xFF795DBA, 0xFF3F842E, 0xFF3772BB, 0xFFB34F2A, 0xFF007CA5, 0xFF8A6E08, 0xFFA84B84),
+        shortcuts = ShortcutTones(
+            goals = TonePair(Color(0xFFECE6FC), Color(0xFF6C4DE0)),
+            insights = TonePair(Color(0xFFF7E6FB), Color(0xFFA21CAF)),
+            awards = TonePair(Palette.SunlightPale, Palette.MidnightNavy),
+            debts = TonePair(Color(0xFFE9ECF2), Color(0xFF3F4A63)),
+            scheduled = TonePair(Color(0xFFE0F2FE), Color(0xFF0B5FA5)),
+        ),
     )
     val darkScheme = DarkColors.copy(
         primary = Color(0xFFA98FFF),
@@ -546,6 +576,13 @@ private object AuroraColors {
         chartHighlight = Color(0xFFA98FFF),
         track = Color(0xFF2D2558),
         categorical = series(0xFF8F77CF, 0xFF079E92, 0xFFA88400, 0xFFBF669B, 0xFF5B9C4D, 0xFF448DD4, 0xFFCA6B49),
+        shortcuts = ShortcutTones(
+            goals = TonePair(Color(0xFF342973), Color(0xFFA98FFF)),
+            insights = TonePair(Color(0xFF4A1F52), Color(0xFFF0ABFC)),
+            awards = TonePair(Color(0xFF3D3214), Palette.SunlightPale),
+            debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
+            scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
+        ),
     )
 }
 
@@ -646,4 +683,13 @@ private fun lerp(a: LucentoExtendedColors, b: LucentoExtendedColors, t: Float): 
     },
     categoryFallback = lerp(a.categoryFallback, b.categoryFallback, t),
     heroEnd = mix(a.heroEnd, b.heroEnd, t),
+    shortcuts = lerp(a.shortcuts, b.shortcuts, t),
+)
+
+private fun lerp(a: ShortcutTones, b: ShortcutTones, t: Float): ShortcutTones = if (a == b) a else ShortcutTones(
+    goals = lerp(a.goals, b.goals, t),
+    insights = lerp(a.insights, b.insights, t),
+    awards = lerp(a.awards, b.awards, t),
+    debts = lerp(a.debts, b.debts, t),
+    scheduled = lerp(a.scheduled, b.scheduled, t),
 )

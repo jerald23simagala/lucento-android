@@ -182,6 +182,28 @@ internal val DarkColors = darkColorScheme(
 @Immutable
 data class TonePair(val container: Color, val content: Color)
 
+/**
+ * Home's shortcut tiles (tester round, 2026-11-17): one hue per shortcut, so each is recognisable at a glance, and none
+ * of them a status colour — red, green and amber mean over, fine and close on the same screen. A brand token: every
+ * theme gives its own set ([BrandColors.shortcuts]) and Mono keeps all five graphite. The glyphs need non-text
+ * contrast (≥ 3:1) on their tile; the label under each tile names it (`ThemeContrastTest`).
+ */
+@Immutable
+data class ShortcutTones(
+    val goals: TonePair,
+    val insights: TonePair,
+    val awards: TonePair,
+    val debts: TonePair,
+    val scheduled: TonePair,
+) {
+    val all: List<TonePair> get() = listOf(goals, insights, awards, debts, scheduled)
+
+    companion object {
+        /** The same tone on every tile (Mono: the money is the colour). */
+        fun uniform(tone: TonePair) = ShortcutTones(tone, tone, tone, tone, tone)
+    }
+}
+
 /** Semantic colours Material does not model directly. Read through `LucentoTheme.extendedColors`. */
 @Immutable
 data class LucentoExtendedColors(
@@ -236,6 +258,8 @@ data class LucentoExtendedColors(
     val loan: TonePair,
     /** Investments (tester round, 2026-11-17): deep teal, from the category palette's savings family. */
     val investment: TonePair,
+    /** Home's shortcut tiles; a brand token, so it follows the theme ([ShortcutTones]). */
+    val shortcuts: ShortcutTones = SunriseShortcuts.light,
     /**
      * Category tiles: a tonal tile (pale tint by day, deep tint at night) with a saturated glyph, one hue per family
      * of spending (food coral, transport green, shopping rose, bills amber…). Purely decorative — the row's text and
@@ -357,6 +381,7 @@ internal val LightExtended = LucentoExtendedColors(
     credit = TonePair(Color(0xFFFDE7E7), Color(0xFFB42318)),
     loan = TonePair(Color(0xFFEDE9FE), Color(0xFF5B21B6)),
     investment = TonePair(Color(0xFFDDF1EE), Color(0xFF0F766E)),
+    shortcuts = SunriseShortcuts.light,
     categoryTones = categoryPalette(night = false),
     categoryFallback = TonePair(Color(0xFFECEFF4), Color(0xFF56637D)),
 )
@@ -398,9 +423,38 @@ internal val DarkExtended = LucentoExtendedColors(
     credit = TonePair(Color(0xFF4A1A1F), Color(0xFFFFC2C2)),
     loan = TonePair(Color(0xFF2E2157), Color(0xFFDDD3FF)),
     investment = TonePair(Color(0xFF0E3532), Color(0xFF7FD6CB)),
+    shortcuts = SunriseShortcuts.dark,
     categoryTones = categoryPalette(night = true),
     categoryFallback = TonePair(Color(0xFF26304A), Color(0xFFB8C5DC)),
 )
+
+/**
+ * Sunrise's shortcut tiles: Goals in the brand blue (the theme's primary), Insights violet, Awards sunlight gold, Debts
+ * coral and Scheduled teal. The tints come from the category palette's families, so they sit with the rest of Home.
+ */
+/**
+ * Design review (2026-11-17): the first coral Debts, gold Awards and teal Scheduled sat within 3–9 OKLab ΔE of the
+ * negative, warning and positive tones, so a debt still read as an alarm. Now Awards is navy on sunlight by day (the
+ * brand's own pairing) and cream on deep gold at night (a sunlight tile there outshone the + button and sat 5.7 from the
+ * warning amber), Debts the slate of the debt category, Scheduled sky — every glyph but Goals, or the tile when it carries
+ * more colour, ≥ 15 ΔE from every status tone in its mode (`ThemeInvarianceTest`).
+ */
+internal object SunriseShortcuts {
+    val light = ShortcutTones(
+        goals = TonePair(Palette.PaleSky, Palette.ElectricBlue),
+        insights = TonePair(Color(0xFFF0EAFE), Color(0xFF7848E0)),
+        awards = TonePair(Palette.SunlightPale, Palette.MidnightNavy),
+        debts = TonePair(Color(0xFFE9ECF2), Color(0xFF3F4A63)),
+        scheduled = TonePair(Color(0xFFE0F2FE), Color(0xFF0B5FA5)),
+    )
+    val dark = ShortcutTones(
+        goals = TonePair(Color(0xFF26397A), Palette.BlueNight),
+        insights = TonePair(Color(0xFF30215A), Color(0xFFC8B3FF)),
+        awards = TonePair(Color(0xFF3D3214), Palette.SunlightPale),
+        debts = TonePair(Color(0xFF2A3346), Color(0xFF94A3B8)),
+        scheduled = TonePair(Color(0xFF113A44), Color(0xFF67E8F9)),
+    )
+}
 
 /**
  * Categorical chart series, separate from the UI accents. Each theme's 7 slots were generated in OKLCH inside the
@@ -416,7 +470,8 @@ internal object SunriseSeries {
 internal fun series(vararg argb: Long): List<Color> = argb.map { Color(it) }
 
 /**
- * The tokens a theme may change. Everything else in [LucentoExtendedColors] — positive / negative / warning and their
+ * The tokens a theme may change (Home's shortcut tiles among them). Everything else in [LucentoExtendedColors] —
+ * positive / negative / warning and their
  * containers and indicators, progress success, category tiles and wallet tones — is the financial semantics, fixed per
  * light/dark mode for every theme (they come from [LightExtended] / [DarkExtended] via [withBrand]), so no theme can
  * re-colour a debt or an overspend. `ThemeInvarianceTest` guards this.
@@ -443,6 +498,8 @@ internal data class BrandColors(
     val chartHighlight: Color,
     val track: Color,
     val categorical: List<Color>,
+    /** Home's shortcut tiles in this theme ([ShortcutTones]). */
+    val shortcuts: ShortcutTones,
 )
 
 /** These semantics with a theme's [brand] tokens on top. */
@@ -467,4 +524,5 @@ internal fun LucentoExtendedColors.withBrand(brand: BrandColors): LucentoExtende
     chartHighlight = brand.chartHighlight,
     track = brand.track,
     categorical = brand.categorical,
+    shortcuts = brand.shortcuts,
 )
