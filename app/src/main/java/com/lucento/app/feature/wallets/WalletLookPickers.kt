@@ -359,7 +359,7 @@ internal fun SpendingMoneySection(
             value = draft.spendableCreditText,
             onValueChange = { onChange(draft.copy(spendableCreditText = it)) },
             filter = { it.take(20) },
-            label = { Text("Spendable credit") },
+            label = { Text("Credit you count each month") },
             prefix = { Text(com.lucento.app.core.money.MoneyFormatter.currencySymbol(draft.currencyCode) + " ") },
             placeholder = { Text("0") },
             isError = invalid,

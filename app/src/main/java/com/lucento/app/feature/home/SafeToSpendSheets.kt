@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,12 +141,14 @@ internal fun SafeToSpendSheet(
             Text(
                 "Savings and investments count only when you switch them on. Property, loans and money you’re owed never " +
                     "count, and income you expect isn’t added until it arrives. Safe to spend never shows less than 0.",
-                style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph),
+                style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             // What's due comes from schedules (a card's own payment is on its page): mark paid or skip them there. Aligned
             // with the text above it, as a link (design review round 2: a centred button sat apart from it).
-            if (onReviewDue != null && money?.deductions?.any { it.kind != MoneyOnHand.Kind.CARD_PAYMENT } == true) {
+            val scheduledDue = safe.committed.amountMinor > 0L ||
+                money?.deductions?.any { it.kind != MoneyOnHand.Kind.CARD_PAYMENT } == true
+            if (onReviewDue != null && scheduledDue) {
                 androidx.compose.foundation.layout.Box(
                     Modifier
                         .fillMaxWidth()
@@ -201,15 +204,18 @@ internal fun SpendingWalletsSheet(
                 subtitle = "Choose which wallets Safe to spend counts.",
                 icon = Icons.Outlined.AccountBalanceWallet,
             )
+            // Live as wallets are switched, and read out when it changes (design review round 3).
             Text(
                 when {
-                    money == null -> "No wallet counts as spending money now."
-                    !money.recorded -> "Not counted yet: no money has been recorded in these wallets."
+                    money == null -> "No wallet counts as spending money, so Safe to spend follows your budget."
+                    !money.recorded -> "Not counted yet: no money has been recorded in these wallets, so Safe to spend follows your budget."
                     else -> "Your spending money allows ${fmt.format(money.allows)} this month."
                 },
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = Spacing.xs),
+                modifier = Modifier
+                    .padding(bottom = Spacing.xs)
+                    .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
             )
             accounts.forEach { wallet ->
                 // A wallet in another currency counts at its rate; without one it can't change the figure, and says so.
@@ -301,7 +307,7 @@ private fun CardCreditRow(card: Wallet, format: (Money) -> String, mainCurrency:
                 when {
                     foreign -> "In ${card.currencyCode}: only cards in $mainCurrency can count credit"
                     limit == null -> "Add its credit limit to count some of it"
-                    chosen != null -> "Counts up to ${format(chosen)} of its credit"
+                    chosen != null -> "Credit you count: up to ${format(chosen)} a month"
                     else -> "Its credit isn’t counted"
                 },
                 style = MaterialTheme.typography.bodySmall,
@@ -322,6 +328,7 @@ private fun sourceLabel(source: MoneyOnHand.Source, format: (Money) -> String): 
     val chosen = source.chosen ?: return "${source.name} · credit you count"
     val used = source.used?.takeIf { it.amountMinor > 0L }
     val left = if (used == null) chosen else chosen - used
+    if (used == null && source.amount >= left) return "${source.name} · credit you count"
     return buildString {
         append(source.name).append(" · ").append(format(chosen)).append(" of credit you count")
         if (used != null) append(", less ").append(format(used)).append(" used this month")
@@ -359,7 +366,7 @@ private fun ExplainLine(label: String, money: Money) {
     ) {
         Text(
             label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             // Never cut off: at large text sizes a line wraps, so its date and name stay readable.
             modifier = Modifier.weight(1f),

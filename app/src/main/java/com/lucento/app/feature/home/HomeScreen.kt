@@ -1764,7 +1764,7 @@ private fun FormulaResult(
     money: Money,
     warning: Boolean = money.isNegative,
     caption: String? = null,
-    /** Opens how the figure is worked out (the (i) beside the label); none when null. */
+    /** Opens how the figure is worked out: the whole panel is then the button, with an (i) after the label. */
     onInfo: (() -> Unit)? = null,
 ) {
     val ext = LucentoTheme.extendedColors
@@ -1775,15 +1775,29 @@ private fun FormulaResult(
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .background(if (negative) ext.negativeContainer else ext.positiveContainer)
-            .padding(horizontal = Spacing.sm, vertical = Spacing.sm)
-            .semantics(mergeDescendants = true) {},
+            // Design review round 3: a 48dp (i) button beside the label cut it to "Safe to" on a 360dp phone. The panel
+            // itself is the button now (a far larger target), and the label wraps rather than clipping.
+            .then(
+                if (onInfo != null) {
+                    Modifier.clickable(role = Role.Button, onClickLabel = "How $label is worked out", onClick = onInfo)
+                } else {
+                    Modifier.semantics(mergeDescendants = true) {}
+                },
+            )
+            .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = ink, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                fontWeight = FontWeight.Bold,
+                color = ink,
+                maxLines = 2,
+                modifier = Modifier.weight(1f, fill = false),
+            )
             if (onInfo != null) {
-                IconButton(onClick = onInfo, modifier = Modifier.size(Sizes.minTouch).offset(x = (-8).dp)) {
-                    Icon(Icons.Outlined.Info, contentDescription = "How $label is worked out", tint = ink, modifier = Modifier.size(18.dp))
-                }
+                Spacer(Modifier.width(Spacing.xxs))
+                Icon(Icons.Outlined.Info, contentDescription = null, tint = ink, modifier = Modifier.padding(top = 1.dp).size(16.dp))
             }
         }
         MoneyText(
