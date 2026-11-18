@@ -41,6 +41,31 @@ class ThemeInvarianceTest {
     }
 
     @Test
+    fun `home shortcuts follow the theme with one hue each and never a status colour`() {
+        for (spec in ThemeSpec.all) {
+            for ((mode, colors) in listOfNotNull(spec.light?.let { "light" to it }, "dark" to spec.dark)) {
+                val x = colors.extended
+                val tones = x.shortcuts.all
+                val status = listOf(
+                    TonePair(x.positiveContainer, x.positive),
+                    TonePair(x.negativeContainer, x.negative),
+                    TonePair(x.warningContainer, x.warning),
+                )
+                tones.forEach { tone ->
+                    assertFalse("${spec.displayName} $mode: a shortcut uses a status tone", tone in status)
+                }
+                if (spec.id == ThemeId.MONO) {
+                    assertEquals("Mono keeps one graphite tone", 1, tones.toSet().size)
+                } else {
+                    assertEquals("${spec.displayName} $mode: five distinct shortcut glyphs", 5, tones.map { it.content }.toSet().size)
+                    // Goals carries the theme's own primary, so the row always says which theme is on.
+                    assertEquals("${spec.displayName} $mode: Goals in the theme's primary", colors.scheme.primary, x.shortcuts.goals.content)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `sunrise is the shipped palette, untouched`() {
         assertSame(LightColors, ThemeSpec.Sunrise.light!!.scheme)
         assertSame(DarkColors, ThemeSpec.Sunrise.dark.scheme)

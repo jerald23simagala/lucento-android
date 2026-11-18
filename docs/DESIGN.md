@@ -82,8 +82,8 @@ palette cross-fades for 250 ms (instant under reduced motion), nothing restarts.
 | **Aurora** | Violet `#6C4DE0` with teal `#2BB8A8` and magenta accents; the hero panel carries the system's only gradient (`#4B37B8 → #2F4DB0`, AA at both ends). | Both |
 
 - **What a theme may change** (`BrandColors`): surfaces, ink, primary and containers, outline, accent / accent text /
-  warm accent, highlight, the hero panel (+ gradient end), chart bar/track tokens, the categorical series, and its
-  landscape. **What it can't** (financial semantics, fixed per light/dark mode): positive / negative / warning and their
+  warm accent, highlight, the hero panel (+ gradient end), chart bar/track tokens, the categorical series, Home's
+  shortcut tiles (`ShortcutTones`) and its landscape. **What it can't** (financial semantics, fixed per light/dark mode): positive / negative / warning and their
   containers and indicators, progress success, error roles, category tiles, wallet tones and wallet card faces.
   Themes are built as `LightExtended/DarkExtended.withBrand(…)`, and `ThemeInvarianceTest` checks it.
 - The approved logo, wordmark and mascot art are never re-tinted; launcher icon and splash stay Sunrise. Lottie files
@@ -301,7 +301,10 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
    Under budget · Ahead of pace · On track), and a subtle italic "Top 2 spending categories" note above two tiles that
    open Transactions filtered to that category and month.
 4. **Shortcuts**: Goals · Insights · Awards · Debts · Scheduled (only modules that are on; switched-off ones offer
-   "Turn on" or "Hide").
+   "Turn on" or "Hide"). Each tile has its own hue from the theme (`ShortcutTones`, tester round 2026-11-17): in
+   Sunrise Goals brand blue, Insights violet, Awards sunlight gold, Debts coral, Scheduled teal. None is a status
+   colour (red, green and amber mean state on the same screen); Goals always carries the theme's primary; Mono keeps
+   all five graphite. Glyphs keep ≥ 3:1 on their tile (`ThemeContrastTest`).
 5. **Upcoming scheduled transactions** (≤ 3, two-line rows, never auto-recorded) and **Recent transactions** (≤ 5 in
    the shown month), each with "See all".
 Amounts on cards use the same size for whole units and decimals. Awards (milestones, docs/CALCULATIONS.md) are
