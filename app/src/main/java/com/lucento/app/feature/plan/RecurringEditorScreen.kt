@@ -438,20 +438,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
         Spacer(Modifier.height(Spacing.lg))
         if (isTransfer) {
             IconFieldHeader(Icons.Outlined.SwapHoriz, "Accounts")
-            FilledDropdown(
-                label = "From",
-                options = sources,
-                selected = wallet,
-                onSelect = { from ->
-                    // A destination in another currency, or the source itself, no longer fits.
-                    val keep = destination?.takeIf { it.id != from.id && it.currencyCode == from.currencyCode }
-                    update(draft.copy(walletId = from.id, toWalletId = keep?.id))
-                },
-                text = { it.name },
-                detail = walletDetail,
-                leading = walletTile,
-                placeholder = "Choose an account",
-            )
+            // The Transfer sheet's own fields and picker (design review, 2026-11-17: this was the one place still using a
+            // filled dropdown, where a pale bank tile vanished into the field).
+            var pickingFrom by remember { mutableStateOf(false) }
+            var pickingTo by remember { mutableStateOf(false) }
+            com.lucento.app.core.designsystem.component.AccountField(wallet = wallet, onClick = { pickingFrom = true }, label = "From")
             Spacer(Modifier.height(Spacing.sm))
             if (wallet != null && destinations.isEmpty()) {
                 Text(
@@ -460,15 +451,41 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
-                FilledDropdown(
-                    label = "To",
-                    options = destinations,
-                    selected = destination,
-                    onSelect = { update(draft.copy(toWalletId = it.id)) },
-                    text = { it.name },
-                    detail = walletDetail,
-                    leading = walletTile,
-                    placeholder = "Choose an account",
+                com.lucento.app.core.designsystem.component.AccountField(wallet = destination, onClick = { pickingTo = true }, label = "To")
+            }
+            if (pickingFrom) {
+                com.lucento.app.core.designsystem.component.AccountPickerSheet(
+                    title = "Move money from",
+                    wallets = sources,
+                    selectedId = wallet?.id,
+                    onPick = { from ->
+                        // A destination in another currency, or the source itself, no longer fits.
+                        val keep = destination?.takeIf { it.id != from.id && it.currencyCode == from.currencyCode }
+                        update(draft.copy(walletId = from.id, toWalletId = keep?.id))
+                        pickingFrom = false
+                    },
+                    onDismiss = { pickingFrom = false },
+                )
+            }
+            if (pickingTo) {
+                com.lucento.app.core.designsystem.component.AccountPickerSheet(
+                    title = "Move money to",
+                    wallets = sources,
+                    selectedId = destination?.id,
+                    onPick = {
+                        update(draft.copy(toWalletId = it.id))
+                        pickingTo = false
+                    },
+                    onDismiss = { pickingTo = false },
+                    // Every money account stays listed; the ones that can't receive this transfer say why.
+                    unavailable = { w ->
+                        when {
+                            w.id == wallet?.id -> "The money leaves this account"
+                            wallet != null && w.currencyCode != wallet.currencyCode ->
+                                "Uses ${w.currencyCode}. A scheduled transfer stays in one currency"
+                            else -> null
+                        }
+                    },
                 )
             }
             Spacer(Modifier.height(Spacing.sm))

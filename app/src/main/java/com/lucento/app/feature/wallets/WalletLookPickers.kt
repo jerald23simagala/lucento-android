@@ -63,7 +63,9 @@ import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.domain.WalletIcon
 import com.lucento.app.domain.WalletKind
+import com.lucento.app.domain.WalletFamily
 import com.lucento.app.domain.WalletType
+import com.lucento.app.domain.family
 
 /*
  * The wallet editor's look and kind (tester round, 2026-11-17): a sectioned type picker in place of the flat dropdown,
@@ -95,13 +97,9 @@ internal fun WalletType.pickerHint(currencyCode: String): String =
         WalletType.LOAN -> "Car, home, salary loans, buy now pay later"
     }
 
-/** The picker's sections, in the order the Net worth breakdown uses. */
-private val TypeSections: List<Pair<String, List<WalletType>>> = listOf(
-    "Everyday money" to listOf(WalletType.CASH, WalletType.BANK, WalletType.E_WALLET),
-    "Set aside and growing" to listOf(WalletType.SAVINGS, WalletType.INVESTMENT),
-    "Things you own" to listOf(WalletType.OTHER_ASSET, WalletType.RECEIVABLE),
-    "What you owe" to listOf(WalletType.CREDIT_CARD, WalletType.LOAN),
-)
+/** The picker's sections: the four families the account picker groups by too, so both read the same. */
+private val TypeSections: List<Pair<String, List<WalletType>>> =
+    WalletFamily.entries.map { family -> family.label to WalletType.entries.filter { it.family == family } }
 
 /** The chosen type as one filled field (its tile and name), opening [WalletTypePickerSheet]. */
 @Composable

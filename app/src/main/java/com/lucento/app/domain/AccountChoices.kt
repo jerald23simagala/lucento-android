@@ -15,7 +15,7 @@ enum class WalletFamily(val label: String) {
 val WalletType.family: WalletFamily
     get() = when (this) {
         WalletType.CASH, WalletType.BANK, WalletType.E_WALLET -> WalletFamily.EVERYDAY
-        WalletType.SAVINGS -> WalletFamily.SET_ASIDE
+        WalletType.SAVINGS, WalletType.INVESTMENT -> WalletFamily.SET_ASIDE
         WalletType.OTHER_ASSET, WalletType.RECEIVABLE -> WalletFamily.OWNED
         WalletType.CREDIT_CARD, WalletType.LOAN -> WalletFamily.OWED
     }
