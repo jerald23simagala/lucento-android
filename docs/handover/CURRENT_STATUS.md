@@ -554,6 +554,35 @@ sentence, and its silence settings are only hints:
 **Owner's call (2026-11-13):** "push and merge when green". Then 0.5.8 with #65. At that release the Privacy Policy
 date goes to the release day and the website's `/privacy` is re-exported (KNOWN_ISSUES VI-3).
 
+## Tester round: investments, spending money, transfers, Show cents, shortcut colours — 2026-11-17 (PRs #98–#101)
+
+Testers asked for five things. The proposal and the owner's choices are at
+https://claude.ai/artifact/BaDJo5SeufjU886Z4TSAUU (private). The owner chose every recommended option: Show cents
+rounds everywhere you read, Safe to spend shows the lower of two figures, scheduled transfers now, one Investment type
+with kinds, and shortcut palette B.
+
+| PR | Branch | What | State |
+|---|---|---|---|
+| #98 | `feature/show-cents` | Settings › Money › **Show cents**, on by default. Off rounds every amount people read to whole units, half-up; inputs, editors, a transaction's own view and every calculation stay exact | CI green |
+| #99 | `feature/shortcut-palette` | Home's five shortcut tiles take each theme's own hues (`ShortcutTones`); every glyph but Goals stays ≥ 15 OKLab ΔE from the status tones | CI green |
+| #100 | `feature/account-picker` | Transfer From/To, the editor's wallet and the composer's account chips open one account picker, grouped into four families with balances; search and Recent above six accounts; signed debts | CI green |
+| #101 | `feature/wallets-v14` | Room v14: **Investment** wallets with kinds and icons; per-wallet **spending money** and a card's counted credit; Safe to spend = the lower of the budget and the spending money, with an (i) that explains both; **scheduled transfers**; backup v5; Supabase migration `20261119090000` | Open: waits for OT-38 (includes #100) |
+
+- **Reviews.** QA (lucento-qa) audited #101: not ready, with 2 blockers and 6 should-fixes (KNOWN_ISSUES TR-9). The
+  design critic (lucento-design-critic) rejected round 1 at 3.0/5. Its findings were a balance cut off at 200 %, 40 dp
+  chips, four names for one idea, a noisy picker, debts without a sign, and tiles close to status colours. All were
+  fixed on the branches; each PR's description lists them. Round 2 and the QA re-check: see the end of this section.
+- **Tests.** Full local `testDebugUnitTest`, 0 failures in each: #98 1,516; #99 1,514; #100 1,516; #101 1,555.
+  `assembleDebug` and `assembleDebugAndroidTest` passed on the combined branch. CI is green on #98–#100: unit tests,
+  lint, debug and release builds, the SQL suites, the emulator migration tests and the tour.
+- **Database.** `docs/handover/apply-v14-wallet-kinds.sql` is on #101, with a copy in `Downloads\lucento-v14-database.sql`.
+  It was tested on PGlite on top of every earlier migration: pasted once and twice, with and without a history table,
+  then with live rows. All 19 checks passed.
+- **Device.** The API 35 emulator ran the combined build of all four PRs (local branch `test/tester-round-all`), with
+  24 screens captured at 100 % and 200 % text by the opt-in `TesterRoundShotsTest`. The test and the screenshots
+  (`artifacts/tester-round-2026-11-17/`, round 1 in `r1/`) are local only, not committed.
+- **Not checked:** a real phone (OT-39), sync against a project with the migration (OT-38), and TalkBack.
+
 ## Release 0.5.12 (version code 17) — 2026-11-17 (`release/0.5.12`)
 
 The owner chose "Build 0.5.12 + publish site" after #95. The only app change since 0.5.11 is #95: Ask Lucento's AI
