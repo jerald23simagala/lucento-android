@@ -89,7 +89,8 @@ internal fun SafeToSpendSheet(
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             SheetHeader(
-                title = "How Safe to spend is worked out",
+                // Short enough for one line at normal sizes (design review: "out" ended alone on the second line).
+                title = "How Safe to spend works",
                 subtitle = if (safe.basis == SafeToSpend.Basis.BUDGET && moneyCounts) {
                     "Two ways to look at $month. Lucento shows the smaller one."
                 } else if (safe.basis == SafeToSpend.Basis.BUDGET) {
