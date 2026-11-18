@@ -122,6 +122,9 @@ internal fun SafeToSpendSheet(safe: SafeToSpend, onChooseWallets: (() -> Unit)?,
             if (onChooseWallets != null) {
                 Spacer(Modifier.size(Spacing.xs))
                 LucentoSecondaryButton(text = "Choose spending wallets", onClick = onChooseWallets, modifier = Modifier.fillMaxWidth())
+            } else {
+                // A Partner in a Shared Space: the Owner chooses (nothing shows outside a Shared Space).
+                com.lucento.app.feature.sharedspace.OwnerManagesNote("wallets", Modifier.padding(top = Spacing.xs))
             }
             Spacer(Modifier.size(Spacing.lg))
         }

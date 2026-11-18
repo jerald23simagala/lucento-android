@@ -1552,11 +1552,17 @@ private fun MonthlyBudgetCard(
             }
         }
         state.safeToSpend?.takeIf { explaining }?.let { safe ->
+            // Lucento Shared: only the Owner manages wallets, so a Partner reads why instead of a button that can't save.
+            val canChooseWallets = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
             SafeToSpendSheet(
                 safe = safe,
-                onChooseWallets = {
-                    explaining = false
-                    choosingWallets = true
+                onChooseWallets = if (canChooseWallets) {
+                    {
+                        explaining = false
+                        choosingWallets = true
+                    }
+                } else {
+                    null
                 },
                 onDismiss = { explaining = false },
             )
