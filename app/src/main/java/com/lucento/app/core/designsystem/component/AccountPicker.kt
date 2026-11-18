@@ -267,16 +267,15 @@ private fun rowMeta(wallet: Wallet): String? {
     return listOfNotNull(institution, owed).joinToString(" · ").ifEmpty { null }
 }
 
-/** "Bank account · ₱6,210.40", "Credit card · −₱18,400.00 owed": what the account is and what it adds to net worth. */
+/**
+ * "Bank account · ₱6,210.40", "Credit card · −₱18,400.00": what the account is and what it adds to net worth. A debt's
+ * minus sign says it is owed, so no second word repeats it (design review); money owed to you says so in words.
+ */
 @Composable
 @ReadOnlyComposable
 private fun accountDetail(wallet: Wallet, spoken: Boolean = false): String {
     val worth = wallet.netWorthContribution
     val amount = if (spoken) spokenAmount(worth, signed = true) else shownAmount(worth, signed = true)
-    val held = when {
-        wallet.type.isLiability -> "$amount owed"
-        wallet.type == WalletType.RECEIVABLE -> "$amount owed to you"
-        else -> amount
-    }
+    val held = if (wallet.type == WalletType.RECEIVABLE) "$amount owed to you" else amount
     return "${wallet.type.label} · $held"
 }

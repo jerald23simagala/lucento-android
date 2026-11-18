@@ -316,7 +316,8 @@ fun TransferEditorSheet(
     if (pickingTo) {
         AccountPickerSheet(
             title = "To which account?",
-            wallets = destinations,
+            // Every account stays listed, as in the schedule editor; the one the money leaves says so (design review).
+            wallets = wallets,
             selectedId = draft.toWalletId,
             recentIds = AccountChoices.recentDestinations(recentTransfers, draft.fromWalletId),
             onPick = { picked ->
@@ -325,6 +326,7 @@ fun TransferEditorSheet(
                 pickingTo = false
             },
             onDismiss = { pickingTo = false },
+            unavailable = { if (it.id == draft.fromWalletId) "The money leaves this account" else null },
         )
     }
 
