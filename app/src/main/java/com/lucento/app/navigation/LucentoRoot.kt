@@ -943,6 +943,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 transferNote = null
             },
             sourceNote = transferNote,
+            recentTransfers = editorState.transfers.values,
         )
     }
 }

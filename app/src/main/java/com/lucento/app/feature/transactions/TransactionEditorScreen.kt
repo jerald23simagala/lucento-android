@@ -1,5 +1,7 @@
 package com.lucento.app.feature.transactions
 
+import com.lucento.app.core.designsystem.component.AccountPickerSheet
+import com.lucento.app.core.designsystem.component.AccountField
 import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -498,87 +500,26 @@ private fun WalletDropdown(
     isError: Boolean,
     onSelect: (Long) -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val density = LocalDensity.current
-    var expanded by remember { mutableStateOf(false) }
-    var fieldWidth by remember { mutableStateOf(0.dp) }
-    val selected = wallets.firstOrNull { it.id == selectedId }
-    val mixedCurrencies = wallets.map { it.currencyCode }.distinct().size > 1
-    val border by animateColorAsState(
-        when {
-            isError -> colors.error
-            expanded -> colors.primary
-            else -> colors.outlineVariant
-        },
-        tween(160),
-        label = "wallet-field",
+    // Tester round (2026-11-17): the same account picker as transfers and the composer — grouped, with balances.
+    var picking by remember { mutableStateOf(false) }
+    AccountField(
+        wallet = wallets.firstOrNull { it.id == selectedId },
+        onClick = { picking = true },
+        label = label,
+        placeholder = "Choose a wallet",
+        isError = isError,
     )
-    fun detail(w: Wallet) = if (mixedCurrencies) "${w.type.label} · ${w.currencyCode}" else w.type.label
-
-    Box(Modifier.fillMaxWidth()) {
-        Surface(
-            onClick = { expanded = true },
-            shape = MaterialTheme.shapes.small,
-            color = colors.surfaceContainerLowest,
-            border = BorderStroke(if (expanded || isError) 1.5.dp else 1.dp, border),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
-                .semantics {
-                    role = Role.DropdownList
-                    contentDescription = "$label, ${selected?.name ?: "none chosen"}"
-                },
-        ) {
-            Row(
-                Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (selected != null) {
-                    WalletIdentityTile(selected, size = 32.dp)
-                } else {
-                    IconTile(Icons.Outlined.AccountBalanceWallet, size = 32.dp, content = colors.onSurfaceVariant, shape = RoundedCornerShape(8.dp))
-                }
-                Spacer(Modifier.width(Spacing.md))
-                Column(Modifier.weight(1f)) {
-                    Text(label, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
-                    Text(
-                        selected?.name ?: "Choose a wallet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (selected != null) colors.onSurface else colors.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                selected?.let {
-                    Text(detail(it), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant, maxLines = 1)
-                    Spacer(Modifier.width(Spacing.xs))
-                }
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = colors.onSurfaceVariant)
-            }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.width(fieldWidth).heightIn(max = 360.dp),
-        ) {
-            wallets.forEach { w ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(w.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(detail(w), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
-                        }
-                    },
-                    leadingIcon = { WalletIdentityTile(w, size = 28.dp) },
-                    trailingIcon = if (w.id == selectedId) ({ Icon(Icons.Filled.Check, contentDescription = "Selected", tint = colors.primary) }) else null,
-                    onClick = {
-                        expanded = false
-                        onSelect(w.id)
-                    },
-                )
-            }
-        }
+    if (picking) {
+        AccountPickerSheet(
+            title = "Which wallet?",
+            wallets = wallets,
+            selectedId = selectedId,
+            onPick = {
+                picking = false
+                onSelect(it.id)
+            },
+            onDismiss = { picking = false },
+        )
     }
 }
 

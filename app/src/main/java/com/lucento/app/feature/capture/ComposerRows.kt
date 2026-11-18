@@ -1,5 +1,6 @@
 package com.lucento.app.feature.capture
 
+import com.lucento.app.core.designsystem.component.AccountPickerSheet
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -289,7 +290,19 @@ internal fun ReviewRowItem(
                     AccountChip("From", row.walletId, wallets, attention(RowField.WALLET), enabled, fill = true, modifier = Modifier.weight(1f)) {
                         onEdit(RowEdit.Account(it))
                     }
-                    AccountChip("To", row.toWalletId, wallets, attention(RowField.TO_WALLET), enabled, fill = true, modifier = Modifier.weight(1f)) {
+                    val source = wallets.firstOrNull { it.id == row.walletId }
+                    AccountChip(
+                        "To", row.toWalletId, wallets, attention(RowField.TO_WALLET), enabled, fill = true, modifier = Modifier.weight(1f),
+                        // The composer keeps a transfer in one currency (Transfer itself moves money between currencies).
+                        unavailable = { w ->
+                            when {
+                                source == null -> null
+                                w.id == source.id -> "The money comes from this account"
+                                w.currencyCode != source.currencyCode -> "Uses ${w.currencyCode}. Use Transfer to move money between currencies"
+                                else -> null
+                            }
+                        },
+                    ) {
                         onEdit(RowEdit.ToAccount(it))
                     }
                 } else {
@@ -560,6 +573,7 @@ private fun AccountChip(
     small: Boolean = false,
     fill: Boolean = false,
     modifier: Modifier = Modifier,
+    unavailable: (Wallet) -> String? = { null },
     onChoose: (Long) -> Unit,
 ) {
     val name = wallets.firstOrNull { it.id == walletId }?.name
@@ -583,14 +597,24 @@ private fun AccountChip(
             fill = fill,
             modifier = if (fill) Modifier.fillMaxWidth() else Modifier,
         )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            wallets.forEach { w ->
-                DropdownMenuItem(text = { Text("${w.name} · ${w.currencyCode}") }, onClick = {
-                    open = false
-                    onChoose(w.id)
-                })
-            }
-        }
+    }
+    // Tester round (2026-11-17): the shared account picker, grouped by kind with balances, instead of a plain menu.
+    if (open) {
+        AccountPickerSheet(
+            title = when (prefix) {
+                "From" -> "From which account?"
+                "To" -> "To which account?"
+                else -> "Which account?"
+            },
+            wallets = wallets,
+            selectedId = walletId,
+            unavailable = unavailable,
+            onPick = {
+                open = false
+                onChoose(it.id)
+            },
+            onDismiss = { open = false },
+        )
     }
 }
 
