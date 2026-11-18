@@ -79,7 +79,7 @@ fun WalletRow(
             )
             Text(
                 // Tester round (2026-11-17): the kind ("Pag-IBIG MP2", "Car loan") says more than the type when there is one.
-                listOfNotNull(walletOwnership(wallet), wallet.institution()?.name, wallet.kind?.label ?: wallet.type.label, wallet.currencyCode).joinToString(" · "),
+                listOfNotNull(walletOwnership(wallet), wallet.institution()?.name, wallet.kind?.labelFor(wallet.currencyCode) ?: wallet.type.label, wallet.currencyCode).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

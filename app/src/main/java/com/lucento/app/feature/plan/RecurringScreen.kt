@@ -302,7 +302,8 @@ fun RecurringScreen(
                 item(key = "rule") {
                     InfoNote(
                         "Scheduled items aren’t transactions until you mark them paid, so balances only change when money really moves. " +
-                            "Transfers pay a card or loan from your own money: they lower what you owe, aren’t spending, and stay out of net flow.",
+                            "Transfers move your own money — paying a card or loan, or putting money into savings or an investment: " +
+                            "they aren’t spending and stay out of net flow.",
                         modifier = Modifier.padding(top = Spacing.md),
                     )
                 }
@@ -320,7 +321,13 @@ fun RecurringScreen(
                     done(result)
                     // Only after the transaction(s) were recorded and the schedule advanced in one database transaction.
                     if (result is RecurringRepository.PayResult.Recorded) {
-                        confirmation = Confirmation(if (schedule.type == TransactionType.INCOME) "Income recorded" else "Payment recorded")
+                        confirmation = Confirmation(
+                            when {
+                                schedule.isTransfer -> "Transfer recorded"
+                                schedule.type == TransactionType.INCOME -> "Income recorded"
+                                else -> "Payment recorded"
+                            },
+                        )
                     }
                 }
             },
@@ -545,11 +552,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.agendaItems(
     ahead.forEach { (month, items) ->
         item(key = "head-$month") {
             val totals = ScheduleOutlook.totals(items, currency)
+            // The amount is net flow (income less bills), which transfers stay out of, so the caption says what it is. A
+            // month of transfers only has no net flow to show.
+            val net = totals.net.takeIf { !totals.income.isZero || !totals.expenses.isZero }
             AgendaHeader(
                 monthName(month) + if (month.year != today.year) " ${month.year}" else "",
-                if (items.size == 1) "1 item" else "${items.size} items",
-                // A month of transfers only has no net flow to show.
-                totals.net.takeIf { !totals.income.isZero || !totals.expenses.isZero },
+                (if (items.size == 1) "1 item" else "${items.size} items") + if (net != null) " · net flow" else "",
+                net,
             )
         }
         item(key = "month-$month") { AgendaCard(items, state, today, onOpen) }
@@ -731,8 +740,9 @@ private fun AgendaRow(item: ScheduledItem, state: PlanUiState, today: LocalDate,
                 Spacer(Modifier.width(Spacing.sm + Spacing.xxs))
             }
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Wrap rather than cut off: "Everyday bank → MP2 2026" says where the money goes (design review, 2026-11-17).
+                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
             Spacer(Modifier.width(Spacing.sm))
             Column(horizontalAlignment = Alignment.End) {

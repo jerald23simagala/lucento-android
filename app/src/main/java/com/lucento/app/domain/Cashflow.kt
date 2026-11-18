@@ -24,7 +24,8 @@ import java.time.temporal.ChronoUnit
  *
  * Tester round (2026-11-17): with a budget, both are worked out and [amount] is the lower — a comfortable budget never
  * hides a nearly empty account. [budgetAllows] and [moneyOnHand] keep both figures for the "How it's worked out" sheet;
- * [limitedByMoney] says which one set it.
+ * [limitedByMoney] says which one set it. The spending money only takes part once money has been recorded in a spending
+ * wallet ([MoneyOnHand.recorded]): a ledger of expenses alone has balances that only ever go down.
  *
  * Transfers never count as spending. The amount may be negative (over budget / overcommitted) and is
  * shown honestly rather than clamped.
@@ -56,7 +57,8 @@ data class SafeToSpend(
 
     /** The money on hand, not the budget, set [amount]: the spending wallets hold less than the budget allows. */
     val limitedByMoney: Boolean
-        get() = basis == Basis.BUDGET && budgetAllows != null && moneyOnHand != null && moneyOnHand.allows < budgetAllows
+        get() = basis == Basis.BUDGET && budgetAllows != null && moneyOnHand != null && moneyOnHand.recorded &&
+            moneyOnHand.allows < budgetAllows
 
     /** Share of the budget already spent or committed (display only); null without a budget. */
     val budgetUsedFraction: Float?
@@ -121,8 +123,9 @@ object CashflowCalculator {
                 committed = RecurringMath.committedExpenses(schedules, currencyCode, monthEnd, spendingOnly = true)
                 val allowed = plan.total - spent - committed
                 budgetAllows = allowed
-                // The lower of what the budget and the spending money allow (tester round, 2026-11-17).
-                SafeToSpend.Basis.BUDGET to (money?.allows?.let { minOf(it, allowed) } ?: allowed)
+                // The lower of what the budget and the spending money allow (tester round, 2026-11-17), once money has
+                // been recorded in a spending wallet.
+                SafeToSpend.Basis.BUDGET to (money?.takeIf { it.recorded }?.allows?.let { minOf(it, allowed) } ?: allowed)
             }
             money != null -> {
                 spent = expensesIn(transactions, currencyCode, month)

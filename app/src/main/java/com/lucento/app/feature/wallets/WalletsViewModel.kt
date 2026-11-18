@@ -242,14 +242,17 @@ class WalletsViewModel(
         }
 
         // Tester round (2026-11-17): part of a card's credit counted as spending money, never more than its limit. Turned
-        // off after being set, it is kept as zero rather than cleared, so the change syncs.
-        val spendableCredit = if (draft.type == WalletType.CREDIT_CARD && draft.spendable == true) {
+        // off after being set, it is kept as zero rather than cleared, so the change syncs. Without a limit (cleared, or a
+        // type changed to card) the choice is saved as off instead of refused: the switch can't be used without one, so
+        // refusing would leave no way to save (QA, 2026-11-17).
+        val cardCounts = draft.type == WalletType.CREDIT_CARD && draft.spendable == true && debt?.creditLimit != null
+        val spendableCredit = if (cardCounts) {
             val limit = debt?.creditLimit ?: return onResult(DraftError.SpendableCreditInvalid, null)
             val credit = (MoneyParser.parse(draft.spendableCreditText, draft.currencyCode, decimalSeparator) as? MoneyParser.Result.Success)
                 ?.money?.takeIf { it.amountMinor > 0L } ?: return onResult(DraftError.SpendableCreditInvalid, null)
             if (credit > limit) return onResult(DraftError.SpendableCreditTooHigh, null)
             credit
-        } else if (draft.type == WalletType.CREDIT_CARD && draft.spendableCreditText.isNotBlank()) {
+        } else if (draft.type == WalletType.CREDIT_CARD && (draft.spendableCreditText.isNotBlank() || draft.spendable == true)) {
             Money.zero(draft.currencyCode)
         } else {
             null
@@ -257,7 +260,7 @@ class WalletsViewModel(
         val extras = com.lucento.app.data.repository.WalletExtras(
             kind = draft.kind?.takeIf { it.type == draft.type },
             iconKey = draft.iconKey,
-            spendable = draft.spendable,
+            spendable = if (draft.type == WalletType.CREDIT_CARD && draft.spendable == true && !cardCounts) false else draft.spendable,
             spendableCredit = spendableCredit,
         )
 

@@ -265,7 +265,7 @@ object AskSnapshotBuilder {
         if (!totals.isEmpty) {
             money("sch_in", "Scheduled income still to come, ${monthName(current)}", totals.income)
             money("sch_out", "Scheduled bills still to pay, ${monthName(current)}", totals.expenses)
-            money("sch_tr", "Scheduled card and loan payments (transfers), ${monthName(current)}", totals.transfers)
+            money("sch_tr", "Scheduled transfers (card and loan payments, moves between accounts), ${monthName(current)}", totals.transfers)
             items.filter { it.amount.currencyCode == currency }.take(8).forEachIndexed { i, item ->
                 val what = when (item) {
                     is ScheduledItem.Occurrence -> item.schedule.name

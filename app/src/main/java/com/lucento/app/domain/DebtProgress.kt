@@ -120,7 +120,9 @@ object CreditCardMath {
             .filter { it.walletId == wallet.id && it.type == ownLeg && it.transferGroup != null }
             .sortedWith(compareByDescending<Transaction> { it.date }.thenByDescending { it.createdAtEpochMillis })
             .firstNotNullOfOrNull { leg -> others[leg.transferGroup]?.walletId?.let(byId::get) }
-        return last ?: candidates.filter { it.type.isSpendable }.maxByOrNull { it.balance.amountMinor }
+        // Tester round (2026-11-17): the person's own spending choice, not only the type's default, so Safe to spend sets
+        // a card's payment aside from the money it will come from.
+        return last ?: candidates.filter { it.isSpendingMoney }.maxByOrNull { it.balance.amountMinor }
             ?: candidates.maxByOrNull { it.balance.amountMinor }
     }
 }

@@ -207,4 +207,99 @@ class MoneyOnHandTest {
         assertEquals(WalletKind.entries.size, WalletKind.entries.map { it.key }.toSet().size)
         assertEquals(WalletIcon.entries.size, WalletIcon.entries.map { it.key }.toSet().size)
     }
+
+    // ---------------------------------------------------------------- reviews of 2026-11-17 (QA and design)
+
+    private fun charge(id: Long, minor: Long, date: String, wallet: Long = 6) =
+        Transaction(id, TransactionType.EXPENSE, php(minor), wallet, 5, LocalDate.parse(date), "", 0L)
+
+    @Test fun `counted credit is used up by what this month puts on the card, and a bill marked paid leaves the figure as it was`() {
+        // Limit 60,000, 10,000 counted; 5,000 in the bank.
+        val bank5 = bank.copy(balance = php(5_000_00))
+        val spentOnCard = compute(listOf(bank5, card(owed = 9_000_00, chosen = 10_000_00)), transactions = listOf(charge(110, 9_000_00, "2026-10-12")))!!
+        val source = spentOnCard.sources.single { it.credit }
+        assertEquals(php(9_000_00), source.used)
+        assertEquals(php(1_000_00), source.amount)
+        assertEquals(php(6_000_00), spentOnCard.total)
+
+        // A 1,000 bill from the card: due before Mark paid, spent on the card after. The figure is the same either way.
+        val bill = schedule(20, TransactionType.EXPENSE, 1_000_00, wallet = 6, start = "2026-10-25")
+        val before = compute(listOf(bank5, card(owed = 0, chosen = 10_000_00)), listOf(bill))!!
+        val after = compute(
+            listOf(bank5, card(owed = 1_000_00, chosen = 10_000_00)), listOf(bill.copy(nextIndex = 1)),
+            listOf(charge(111, 1_000_00, "2026-10-25")),
+        )!!
+        assertEquals(php(14_000_00), before.allows)
+        assertEquals(php(14_000_00), after.allows)
+    }
+
+    @Test fun `charges already in a statement due this month are that payment's, never counted twice`() {
+        // Statement on the 5th, due on the 25th, both in October; today is the 22nd.
+        val visa = card(owed = 5_000_00, chosen = 10_000_00, statementDay = 5, dueDay = 25)
+        val billed = charge(120, 3_000_00, "2026-10-03")
+        val since = charge(121, 2_000_00, "2026-10-10")
+        val money = compute(listOf(bank, visa), transactions = listOf(billed, since))!!
+        val source = money.sources.single { it.credit }
+        assertEquals(php(2_000_00), source.used)
+        assertEquals(php(8_000_00), source.amount)
+        // The 3,000 statement comes off the bank instead, as the card's payment due on the 25th.
+        assertEquals(php(3_000_00), money.deductions.single { it.kind == MoneyOnHand.Kind.CARD_PAYMENT }.amount)
+    }
+
+    @Test fun `more put on the card than is counted comes off the spending money`() {
+        val source = compute(listOf(bank, card(owed = 12_000_00, chosen = 10_000_00)), transactions = listOf(charge(130, 12_000_00, "2026-10-08")))!!
+            .sources.single { it.credit }
+        assertEquals(php(-2_000_00), source.amount)
+    }
+
+    @Test fun `a refund on the card gives back what it took, and last month's charges don't count`() {
+        val refund = Transaction(131, TransactionType.INCOME, php(500_00), 6, null, LocalDate.parse("2026-10-15"), "", 0L)
+        val lastMonth = charge(132, 4_000_00, "2026-09-28")
+        val source = compute(
+            listOf(bank, card(owed = 5_500_00, chosen = 10_000_00)),
+            transactions = listOf(charge(133, 2_000_00, "2026-10-09"), refund, lastMonth),
+        )!!.sources.single { it.credit }
+        assertEquals(php(1_500_00), source.used)
+        assertEquals(php(8_500_00), source.amount)
+    }
+
+    @Test fun `a loan payment left unmarked for months never takes more than the loan still owes`() {
+        // 12,000 a month since July, never marked paid: four payments due by October's end, but only 20,000 is owed.
+        val owedLoan = wallet(7, WalletType.LOAN, 20_000_00)
+        val instalment = schedule(30, TransactionType.EXPENSE, 12_000_00, wallet = 1, start = "2026-07-15", to = 7)
+        val payment = compute(listOf(bank.copy(balance = php(90_000_00)), owedLoan), listOf(instalment))!!
+            .deductions.single { it.kind == MoneyOnHand.Kind.DEBT_PAYMENT }
+        assertEquals(4, payment.count)
+        assertEquals(php(20_000_00), payment.amount)
+    }
+
+    @Test fun `a transfer schedule into a card stands for the card's payment, so it isn't taken twice`() {
+        // Only a synced row from a modified client can be one (the editor and backups refuse it).
+        val visa = card(owed = 5_000_00, chosen = null, spendable = null, statementDay = 5, dueDay = 25)
+        val topUp = schedule(31, TransactionType.TRANSFER_OUT, 5_000_00, wallet = 1, start = "2026-10-24", to = 6)
+        val money = compute(listOf(bank, visa), listOf(topUp), listOf(charge(140, 5_000_00, "2026-10-02")))!!
+        assertTrue(money.deductions.none { it.kind == MoneyOnHand.Kind.CARD_PAYMENT })
+        assertEquals(php(5_000_00), money.deducted)
+    }
+
+    @Test fun `wallets with nothing but spending recorded leave Safe to spend to the budget`() {
+        // Cash started at zero and only ever had expenses: its −8,000 is minus what was spent, not money on hand.
+        val cashOnly = Wallet(3, "Cash", WalletType.CASH, php(-8_000_00), 0L, openingBalance = php(0))
+        val spend = Transaction(150, TransactionType.EXPENSE, php(8_000_00), 3, 5, LocalDate.parse("2026-10-05"), "", 0L)
+        val safe = CashflowCalculator.safeToSpend("PHP", today, listOf(spend), listOf(cashOnly), budget, emptyList(), listOf(food))!!
+        assertFalse(safe.moneyOnHand!!.recorded)
+        assertFalse(safe.limitedByMoney)
+        assertEquals(php(34_590_00), safe.amount) // 42,590 − 8,000
+        // Once money is recorded in it — income here — it counts.
+        val salary = Transaction(151, TransactionType.INCOME, php(1_000_00), 3, null, LocalDate.parse("2026-10-06"), "", 0L)
+        val counted = CashflowCalculator.safeToSpend(
+            "PHP", today, listOf(spend, salary), listOf(cashOnly.copy(balance = php(-7_000_00))), budget, emptyList(), listOf(food),
+        )!!
+        assertTrue(counted.moneyOnHand!!.recorded)
+        assertTrue(counted.limitedByMoney)
+        assertEquals(php(-7_000_00), counted.amount)
+        // A starting balance counts as recorded too, and so does a card whose credit the person chose.
+        assertTrue(MoneyOnHandCalculator.hasMoneyRecorded(bank, emptyList()))
+        assertTrue(compute(listOf(card(owed = 0, chosen = 10_000_00)))!!.recorded)
+    }
 }

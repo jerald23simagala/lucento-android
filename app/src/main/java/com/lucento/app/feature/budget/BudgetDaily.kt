@@ -22,10 +22,16 @@ sealed interface DailyFigure {
      * This month, money left to spread: [perDay] for each of [daysLeft] days, with [committed] bills set aside.
      * [limitedByMoney]: the spending money, not the budget, set it (tester round, 2026-11-17).
      */
-    data class SafePerDay(val perDay: Money, val daysLeft: Int, val committed: Money, val limitedByMoney: Boolean = false) : DailyFigure
+    data class SafePerDay(
+        val perDay: Money,
+        val daysLeft: Int,
+        val committed: Money,
+        val limitedByMoney: Boolean = false,
+        val moneyEmpty: Boolean = false,
+    ) : DailyFigure
 
     /** This month, nothing left once bills due are set aside: safe to spend itself ([safe] is zero or negative). */
-    data class NothingLeft(val safe: Money, val committed: Money, val limitedByMoney: Boolean = false) : DailyFigure
+    data class NothingLeft(val safe: Money, val committed: Money, val limitedByMoney: Boolean = false, val moneyEmpty: Boolean = false) : DailyFigure
 
     /** A finished month: its average spending per day over [days] days. */
     data class DailyAverage(val perDay: Money, val days: Int) : DailyFigure
@@ -48,10 +54,13 @@ fun budgetDailyFigure(
     categories: List<Category>,
 ): DailyFigure? {
     if (plan.month != YearMonth.from(today)) return DailyFigure.DailyAverage(burn.dailyAverage, burn.daysInMonth)
-    val safe = CashflowCalculator.safeToSpend(plan.currencyCode, today, ledger.transactions, ledger.wallets, budgets, schedules, categories)
+    // As on Home: a schedule from a valued foreign wallet counts at that wallet's rate (tester round, 2026-11-17).
+    val valued = com.lucento.app.domain.fx.FxTranslation.valueSchedules(ledger, schedules)
+    val safe = CashflowCalculator.safeToSpend(plan.currencyCode, today, ledger.transactions, ledger.wallets, budgets, valued, categories)
         ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
         ?: return null
     val perDay = safe.perDay
-    return if (perDay != null) DailyFigure.SafePerDay(perDay, safe.daysLeft, safe.committed, safe.limitedByMoney)
-    else DailyFigure.NothingLeft(safe.amount, safe.committed, safe.limitedByMoney)
+    val empty = com.lucento.app.feature.home.BudgetFormula.moneyEmpty(safe)
+    return if (perDay != null) DailyFigure.SafePerDay(perDay, safe.daysLeft, safe.committed, safe.limitedByMoney, empty)
+    else DailyFigure.NothingLeft(safe.amount, safe.committed, safe.limitedByMoney, empty)
 }

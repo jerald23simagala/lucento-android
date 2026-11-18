@@ -155,6 +155,8 @@ class AskLucentoViewModel(
         base.copy(
             wallets = ledger.wallets,
             transactions = ledger.withFxResults,
+            // A schedule from a valued foreign wallet at that wallet's rate, so "safe" is Home's figure (2026-11-17).
+            schedules = com.lucento.app.domain.fx.FxTranslation.valueSchedules(ledger, base.schedules),
             categories = ledger.withFxCategories(base.categories),
             goals = g,
             contributions = contributions,

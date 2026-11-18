@@ -125,8 +125,13 @@ fun AdjustBalanceSheet(
                 leading = { com.lucento.app.core.designsystem.component.WalletIdentityTile(wallet) },
             )
             Text(
-                "Can’t find what’s missing? Enter what ${if (liability) "you really owe on" else "is really in"} " +
-                    "“${wallet.name}” and Lucento records the difference as a Balance adjustment.",
+                if (investment) {
+                    "Enter what “${wallet.name}” is worth now. Lucento records the change as a Balance adjustment, so a " +
+                        "gain is never income and a loss never spending."
+                } else {
+                    "Can’t find what’s missing? Enter what ${if (liability) "you really owe on" else "is really in"} " +
+                        "“${wallet.name}” and Lucento records the difference as a Balance adjustment."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -188,7 +193,8 @@ fun AdjustBalanceSheet(
                             AdjustError.Failed -> "Couldn’t save the adjustment. Nothing was changed."
                             else -> liveClarification ?: when {
                                 liability -> "From your latest statement or lender’s app."
-                                investment -> "From your broker, fund or Pag-IBIG app, or your latest statement."
+                                investment -> if (wallet.currencyCode == "PHP") "From your broker, fund or Pag-IBIG app, or your latest statement."
+                                else "From your broker or fund’s app, or your latest statement."
                                 else -> "From your bank app, statement or a count of your cash."
                             }
                         }

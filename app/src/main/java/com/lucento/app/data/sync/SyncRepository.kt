@@ -1012,6 +1012,14 @@ class SyncRepository(
                 if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { dao.findByClientUuid(row.id)?.updatedAt }) { dao.deleteById(local!!.id) }
                 val walletId = resolveWallet(row.walletId, row.currencyCode, s)
                 val toWalletId = row.toWalletId?.let { resolveWallet(it, row.currencyCode, s) }
+                // Tester round (2026-11-17): a scheduled transfer moves money between two money accounts in its currency,
+                // as the editor and backups require; a row that doesn't (a modified client's) is skipped, never kept.
+                if (row.type == com.lucento.app.domain.TransactionType.TRANSFER_OUT.name &&
+                    !scheduledTransferFits(walletId, toWalletId, row.currencyCode)
+                ) {
+                    s.invalidSkipped++
+                    return
+                }
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> dao.insert(row.toEntity(walletId, toWalletId, categoryId, syncedAt = clock()))
@@ -1135,6 +1143,17 @@ class SyncRepository(
      * The restored row is not dirty, so it is not pushed and does not undelete the parent for other devices.
      * The cursor is allowed to move: deferring here used to re-download every later row forever.
      */
+    /** Both ends of a scheduled transfer are money accounts in [currencyCode]: never a card, loan, receivable or valued asset. */
+    private suspend fun scheduledTransferFits(fromId: Long, toId: Long?, currencyCode: String): Boolean {
+        if (toId == null || toId == fromId) return false
+        return listOf(fromId, toId).all { id ->
+            val entity = wallets.getById(id) ?: return false
+            val type = com.lucento.app.domain.WalletType.entries.firstOrNull { it.name == entity.type } ?: return false
+            entity.currencyCode == currencyCode && !type.isLiability && !type.isValuedManually &&
+                type != com.lucento.app.domain.WalletType.RECEIVABLE
+        }
+    }
+
     private suspend fun resolveWallet(clientUuid: String, currencyCode: String, s: PullState): Long {
         wallets.findByClientUuid(clientUuid)?.let { return it.id }
         val restored = s.deletedWallets[clientUuid]

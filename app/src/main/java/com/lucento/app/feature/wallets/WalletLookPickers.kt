@@ -81,14 +81,14 @@ internal fun DraftIconTile(draft: WalletDraft, size: androidx.compose.ui.unit.Dp
     IconTile(draft.icon(), container = tone.container, content = tone.content, size = size)
 }
 
-/** One line under each type in the picker: what it is for. */
-internal val WalletType.pickerHint: String
-    get() = when (this) {
+/** One line under each type in the picker: what it is for (MP2, a Philippine scheme, only for wallets in pesos). */
+internal fun WalletType.pickerHint(currencyCode: String): String =
+    when (this) {
         WalletType.CASH -> "Notes and coins"
         WalletType.BANK -> "Payroll, checking or current account"
         WalletType.E_WALLET -> "Mobile wallets and payment apps"
         WalletType.SAVINGS -> "Money set aside"
-        WalletType.INVESTMENT -> "Stocks, funds, MP2, time deposits, crypto"
+        WalletType.INVESTMENT -> if (currencyCode == "PHP") "Stocks, funds, MP2, time deposits, crypto" else "Stocks, funds, time deposits, crypto"
         WalletType.OTHER_ASSET -> "A home, a car, jewellery — valued by you"
         WalletType.RECEIVABLE -> "Money someone owes you"
         WalletType.CREDIT_CARD -> "Buy now, pay the card later"
@@ -105,7 +105,7 @@ private val TypeSections: List<Pair<String, List<WalletType>>> = listOf(
 
 /** The chosen type as one filled field (its tile and name), opening [WalletTypePickerSheet]. */
 @Composable
-internal fun WalletTypeField(selected: WalletType, onClick: () -> Unit) {
+internal fun WalletTypeField(selected: WalletType, currencyCode: String, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -120,7 +120,7 @@ internal fun WalletTypeField(selected: WalletType, onClick: () -> Unit) {
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
             Text(selected.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(selected.pickerHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            Text(selected.pickerHint(currencyCode), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
         }
         Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -129,7 +129,13 @@ internal fun WalletTypeField(selected: WalletType, onClick: () -> Unit) {
 /** Every wallet type in sections, each with what it is for; types the plan doesn't include carry the Pro mark. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun WalletTypePickerSheet(selected: WalletType, proTypes: Set<WalletType>, onSelect: (WalletType) -> Unit, onDismiss: () -> Unit) {
+internal fun WalletTypePickerSheet(
+    selected: WalletType,
+    currencyCode: String,
+    proTypes: Set<WalletType>,
+    onSelect: (WalletType) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val haptics = rememberHaptics()
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
@@ -155,7 +161,7 @@ internal fun WalletTypePickerSheet(selected: WalletType, proTypes: Set<WalletTyp
                             Spacer(Modifier.width(Spacing.md))
                             Column(Modifier.weight(1f)) {
                                 Text(type.label, style = MaterialTheme.typography.bodyLarge, fontWeight = if (chosen) FontWeight.SemiBold else null)
-                                Text(type.pickerHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(type.pickerHint(currencyCode), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (type in proTypes) com.lucento.app.feature.pro.ProBadge()
                             if (chosen) {
@@ -174,14 +180,15 @@ internal fun WalletTypePickerSheet(selected: WalletType, proTypes: Set<WalletTyp
 /** The kinds a type offers, as chips; one is chosen at a time. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun WalletKindChips(type: WalletType, selected: WalletKind?, onSelect: (WalletKind) -> Unit) {
+internal fun WalletKindChips(type: WalletType, currencyCode: String, selected: WalletKind?, onSelect: (WalletKind) -> Unit) {
     val haptics = rememberHaptics()
+    // 48dp chips with room between them (design review, 2026-11-17: 40dp chips 4dp apart were too easy to miss).
     FlowRow(
         Modifier.fillMaxWidth().selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        WalletKind.of(type).forEach { kind ->
+        WalletKind.of(type, currencyCode, selected).forEach { kind ->
             val chosen = kind == selected
             val colors = MaterialTheme.colorScheme
             Surface(
@@ -189,18 +196,20 @@ internal fun WalletKindChips(type: WalletType, selected: WalletKind?, onSelect: 
                 color = if (chosen) colors.primaryContainer else colors.surfaceContainerLowest,
                 border = BorderStroke(if (chosen) 1.5.dp else 1.dp, if (chosen) colors.primary else LucentoTheme.extendedColors.borderDefault),
                 modifier = Modifier
-                    .heightIn(min = 40.dp)
                     .selectable(selected = chosen, role = Role.RadioButton) {
                         haptics.tick()
                         onSelect(kind)
                     },
             ) {
-                Row(Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.heightIn(min = 48.dp).padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     if (chosen) {
                         Icon(Icons.Filled.Check, contentDescription = null, tint = colors.primary, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(Spacing.xxs))
                     }
-                    Text(kind.label, style = MaterialTheme.typography.labelLarge, color = if (chosen) colors.primary else colors.onSurface)
+                    Text(kind.labelFor(currencyCode), style = MaterialTheme.typography.labelLarge, color = if (chosen) colors.primary else colors.onSurface)
                 }
             }
         }
@@ -228,11 +237,12 @@ internal fun WalletIconField(draft: WalletDraft, onClick: () -> Unit) {
             Text(
                 when {
                     chosen != null -> chosen.label
-                    suggested != null -> "${suggested.label} · suggested for ${draft.kind!!.label}"
+                    suggested != null -> "${suggested.label} · suggested for ${draft.kind!!.labelFor(draft.currencyCode)}"
                     else -> "The ${draft.type.label.lowercase()} icon"
                 },
                 style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
+                // Wraps at large text sizes instead of cutting off what is suggested (design review, 2026-11-17).
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -333,7 +343,7 @@ internal fun SpendingMoneySection(
         as? com.lucento.app.core.money.MoneyParser.Result.Success)?.money?.takeIf { it.amountMinor > 0L }
     val on = draft.spendable == true
     com.lucento.app.core.designsystem.component.SwitchRow(
-        title = "Count part of the credit as spending money",
+        title = "Count credit as spending money",
         description = if (limit == null) {
             "Add the card’s credit limit above to use this."
         } else {
@@ -361,7 +371,7 @@ internal fun SpendingMoneySection(
                     when (error) {
                         DraftError.SpendableCreditInvalid -> "Enter how much of the credit counts, like 5000${decimalSeparator}00."
                         DraftError.SpendableCreditTooHigh -> "That’s more than the card’s ${fmt.format(limit)} limit."
-                        else -> "Safe to spend counts up to this much, never more than is still available on the card."
+                        else -> "Safe to spend counts up to this much each month, less what you put on the card, and never more than is still available."
                     },
                 )
             },

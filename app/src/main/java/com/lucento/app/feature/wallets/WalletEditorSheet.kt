@@ -282,7 +282,7 @@ fun WalletEditorSheet(
             Spacer(Modifier.height(Spacing.md))
             IconFieldHeader(Icons.Outlined.Category, "Type")
             // Tester round (2026-11-17): a sectioned picker with what each type is for, in place of a flat menu.
-            WalletTypeField(selected = draft.type, onClick = { pickingType = true })
+            WalletTypeField(selected = draft.type, currencyCode = draft.currencyCode, onClick = { pickingType = true })
             (error as? DraftError.TypeLocked)?.let { locked ->
                 Text(
                     "“${initial.name}” has ${locked.usage.describe()}. Switching between an account you own and one you owe " +
@@ -298,7 +298,7 @@ fun WalletEditorSheet(
             if (draft.type.hasKinds) {
                 Spacer(Modifier.height(Spacing.md))
                 IconFieldHeader(Icons.Outlined.Category, "Kind (optional)")
-                WalletKindChips(type = draft.type, selected = draft.kind) { draft = draft.copy(kind = it) }
+                WalletKindChips(type = draft.type, currencyCode = draft.currencyCode, selected = draft.kind) { draft = draft.copy(kind = it) }
             }
 
             if (draft.type != WalletType.CASH) {
@@ -339,7 +339,7 @@ fun WalletEditorSheet(
                             WalletType.BANK -> "e.g. Everyday account"
                             WalletType.E_WALLET -> "e.g. Mobile wallet"
                             WalletType.SAVINGS -> "e.g. Emergency fund"
-                            WalletType.INVESTMENT -> "e.g. MP2 2026, Stock portfolio"
+                            WalletType.INVESTMENT -> if (draft.currencyCode == "PHP") "e.g. MP2 2026, Stock portfolio" else "e.g. Stock portfolio, Retirement fund"
                             WalletType.CREDIT_CARD -> "e.g. Travel card"
                             WalletType.LOAN -> "e.g. Car loan"
                             WalletType.RECEIVABLE -> "e.g. Loan to Ana"
@@ -542,6 +542,7 @@ fun WalletEditorSheet(
     if (pickingType) {
         WalletTypePickerSheet(
             selected = draft.type,
+            currencyCode = draft.currencyCode,
             proTypes = if (com.lucento.app.feature.pro.LocalEntitlements.current.has(
                     com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, System.currentTimeMillis(),
                 )

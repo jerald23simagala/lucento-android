@@ -136,7 +136,8 @@ sealed interface SafeToSpendWidgetModel {
             val dayAmount = if (safe != null && hasSafe && !nothing) safe.perDay else null
             val days = safe?.daysLeft ?: 0
             val perDay = dayAmount?.let { "${shown(it)} a day · ${daysLeft(days)}" }
-            val billsDue = formula.billsDue?.takeIf { hasSafe && !nothing && !it.isZero }
+            // The budget's bills explain the budget's figure only; when the spending money set it, the reason says so.
+            val billsDue = formula.billsDue?.takeIf { hasSafe && !nothing && !it.isZero && !formula.limitedByMoney }
             val bills = billsDue?.let { "After ${shown(it)} bills due" }
             val used = burn.consumedPercent ?: 0
             val verdict = paceVerdict(plan, burn.pace, home.isCurrentMonth)

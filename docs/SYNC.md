@@ -226,7 +226,12 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   ride in existing columns: wallet type `INVESTMENT` and recurring type `TRANSFER_OUT` (a scheduled transfer: no
   category, `to_wallet_id` the destination). **Rollout order:** `20261119090000_wallet_kinds_and_spending_money.sql`
   must reach a project before a v14 build syncs an investment, a kind or a scheduled transfer there, or those uploads
-  are refused and stay pending. Older builds skip a pulled investment or scheduled transfer (counted, never misread).
+  are refused and stay pending. Older builds skip a pulled investment or scheduled transfer (counted, never misread), but a transfer into that
+  investment still arrives, so an older phone keeps it under a placeholder "Restored account" (cash) until it updates —
+  every phone on an account should be updated (KNOWN_ISSUES TR-2). Within a batch that carries the keys, an edited
+  wallet sends what this phone holds, nulls included: the last writer of the row wins, as for every other column. A
+  pulled scheduled transfer must join two money accounts in its currency, as in the editor and backups; anything else is
+  skipped (QA review, 2026-11-17).
 - **Lucento Shared (v12).** `transactions.created_by` / `updated_by` are stamped by the database from the session and
   only ever pulled; the app never sends them. `wallets.classification` is sent only when a wallet in that upload batch
   is classified, so a solo v12 phone sends exactly what v11 sent and older builds leave the value alone. **Rollout

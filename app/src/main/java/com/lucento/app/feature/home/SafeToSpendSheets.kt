@@ -1,5 +1,6 @@
 package com.lucento.app.feature.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -59,13 +60,25 @@ import java.util.Locale
  * schedule; "Choose spending wallets" opens [SpendingWalletsSheet].
  */
 
-/** Both figures behind Safe to spend for [safe]'s month, and which one is shown. */
+/**
+ * Both figures behind Safe to spend for [safe]'s month, and which one is shown. [onReviewDue] opens Scheduled, where what
+ * is due is marked paid or skipped; [onChooseWallets] is null on a Partner's phone (the Owner chooses).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SafeToSpendSheet(safe: SafeToSpend, onChooseWallets: (() -> Unit)?, onDismiss: () -> Unit) {
+internal fun SafeToSpendSheet(
+    safe: SafeToSpend,
+    onChooseWallets: (() -> Unit)?,
+    onDismiss: () -> Unit,
+    onReviewDue: (() -> Unit)? = null,
+) {
     val month = safe.month.month.getDisplayName(TextStyle.FULL_STANDALONE, Locale.getDefault())
     val money = safe.moneyOnHand
     val byMoney = safe.limitedByMoney
+    // With a budget, the spending money takes part once money has been recorded in a spending wallet (QA, 2026-11-17).
+    val moneyCounts = money != null && (money.recorded || safe.basis == SafeToSpend.Basis.BALANCES)
+    val today = safe.month.atEndOfMonth().minusDays((safe.daysLeft - 1).toLong())
+    val fmt = amountFormat()
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier
@@ -77,7 +90,7 @@ internal fun SafeToSpendSheet(safe: SafeToSpend, onChooseWallets: (() -> Unit)?,
         ) {
             SheetHeader(
                 title = "How Safe to spend is worked out",
-                subtitle = if (safe.basis == SafeToSpend.Basis.BUDGET && money != null) {
+                subtitle = if (safe.basis == SafeToSpend.Basis.BUDGET && moneyCounts) {
                     "Two ways to look at $month. Lucento shows the smaller one."
                 } else if (safe.basis == SafeToSpend.Basis.BUDGET) {
                     "What your budget allows for the rest of $month."
@@ -98,12 +111,20 @@ internal fun SafeToSpendSheet(safe: SafeToSpend, onChooseWallets: (() -> Unit)?,
                 }
             }
             if (money != null) {
-                SectionTitle("Your money allows", used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
-                money.sources.forEach { source ->
-                    ExplainLine(if (source.credit) "${source.name} · credit you count" else source.name, source.amount)
-                }
-                money.deductions.forEach { deduction -> ExplainLine(deductionLabel(deduction), -deduction.amount) }
+                SectionTitle("Your spending money allows", used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
+                money.sources.forEach { source -> ExplainLine(sourceLabel(source, fmt::format), source.amount) }
+                money.deductions.forEach { deduction -> ExplainLine(deductionLabel(deduction, today), -deduction.amount) }
                 TotalLine(money.allows, used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
+                if (!moneyCounts) {
+                    Text(
+                        "Not counted yet: no money has been recorded in these wallets — no starting balance, income or " +
+                            "transfer in — so Safe to spend follows your budget. Give a wallet its real balance with " +
+                            "Adjust balance to count it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = Spacing.xxs),
+                    )
+                }
             } else {
                 Text(
                     "None of your wallets in ${safe.currencyCode} counts as spending money, so only your budget is used.",
@@ -114,11 +135,19 @@ internal fun SafeToSpendSheet(safe: SafeToSpend, onChooseWallets: (() -> Unit)?,
             }
             Spacer(Modifier.size(Spacing.xs))
             Text(
-                "Savings, investments, property and money you’re owed aren’t counted unless you say so. Income you expect " +
-                    "isn’t added until it arrives. Below zero, Safe to spend shows 0.",
+                "Savings and investments count only when you switch them on. Property, loans and money you’re owed never " +
+                    "count, and income you expect isn’t added until it arrives. Below zero, Safe to spend shows 0.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // What's due comes from schedules (a card's own payment is on its page): mark paid or skip them there.
+            if (onReviewDue != null && money?.deductions?.any { it.kind != MoneyOnHand.Kind.CARD_PAYMENT } == true) {
+                com.lucento.app.core.designsystem.component.LucentoTextButton(
+                    text = "Review what’s due in Scheduled",
+                    onClick = onReviewDue,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             if (onChooseWallets != null) {
                 Spacer(Modifier.size(Spacing.xs))
                 LucentoSecondaryButton(text = "Choose spending wallets", onClick = onChooseWallets, modifier = Modifier.fillMaxWidth())
@@ -132,12 +161,17 @@ internal fun SafeToSpendSheet(safe: SafeToSpend, onChooseWallets: (() -> Unit)?,
 }
 
 /**
- * Which wallets count as spending money, each with a switch (the same choice as the wallet editor's). A card's part of
- * its credit is set in the card's own editor, where its limit is.
+ * Which wallets count as spending money, each with a switch (the same choice as the wallet editor's). Cards follow, each
+ * opening its own editor through [onEditCard], where its limit and the credit it counts are set.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SpendingWalletsSheet(wallets: List<Wallet>, onToggle: (Long, Boolean) -> Unit, onDismiss: () -> Unit) {
+internal fun SpendingWalletsSheet(
+    wallets: List<Wallet>,
+    onToggle: (Long, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    onEditCard: ((Wallet) -> Unit)? = null,
+) {
     val fmt = amountFormat()
     val accounts = wallets.filter { it.type.canBeSpendingMoney && it.type != WalletType.CREDIT_CARD }
     val cards = wallets.filter { it.type == WalletType.CREDIT_CARD }
@@ -164,14 +198,13 @@ internal fun SpendingWalletsSheet(wallets: List<Wallet>, onToggle: (Long, Boolea
                 ) {
                     WalletIdentityTile(wallet, size = 36.dp)
                     Spacer(Modifier.width(Spacing.md))
+                    // Both lines wrap at large text sizes: the balance is what the choice is made on (design review).
                     Column(Modifier.weight(1f)) {
-                        Text(wallet.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(wallet.name, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis)
                         Text(
-                            "${wallet.kind?.label ?: wallet.type.label} · ${fmt.format(wallet.balance)}",
+                            "${wallet.kind?.labelFor(wallet.currencyCode) ?: wallet.type.label} · ${fmt.format(wallet.balance)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     Switch(
@@ -188,16 +221,70 @@ internal fun SpendingWalletsSheet(wallets: List<Wallet>, onToggle: (Long, Boolea
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (cards.isNotEmpty()) {
-                Spacer(Modifier.size(Spacing.sm))
+            if (cards.isNotEmpty() && onEditCard != null) {
                 Text(
-                    "To count part of a card’s credit, open the card in Wallets, tap Edit and say how much counts.",
+                    "CREDIT CARDS",
+                    style = OverlineStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(top = Spacing.md, bottom = Spacing.xxs)
+                        .semantics { heading() },
+                )
+                cards.forEach { card -> CardCreditRow(card, fmt::format) { onEditCard(card) } }
+                Text(
+                    "Credit is borrowed money: count some only if you pay the card in full every month.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.xs),
                 )
             }
             Spacer(Modifier.size(Spacing.lg))
         }
+    }
+}
+
+/** A card in [SpendingWalletsSheet]: what of its credit counts, and the way to change it in the card's editor. */
+@Composable
+private fun CardCreditRow(card: Wallet, format: (Money) -> String, onClick: () -> Unit) {
+    val limit = card.debt?.creditLimit
+    val chosen = card.spendableCredit?.takeIf { card.isSpendingMoney && it.amountMinor > 0L }
+    val action = if (chosen != null) "Change" else "Set amount"
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "$action the credit ${card.name} counts", onClick = onClick)
+            .padding(vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        WalletIdentityTile(card, size = 36.dp)
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(1f)) {
+            Text(card.name, style = MaterialTheme.typography.bodyLarge, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(
+                when {
+                    limit == null -> "Add its credit limit to count some of it"
+                    chosen != null -> "Counts up to ${format(chosen)} of its credit"
+                    else -> "Its credit isn’t counted"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+/** A source's line: a card shows what it counts and what this month has used of it, so the sum can be checked. */
+private fun sourceLabel(source: MoneyOnHand.Source, format: (Money) -> String): String {
+    if (!source.credit) return source.name
+    val chosen = source.chosen
+    val used = source.used
+    return if (chosen != null && used != null && used.amountMinor > 0L) {
+        "${source.name} · ${format(chosen)} of credit you count, less ${format(used)} used this month"
+    } else {
+        "${source.name} · credit you count"
     }
 }
 
@@ -265,14 +352,14 @@ private fun TotalLine(money: Money, used: Boolean) {
 }
 
 /** "Bills (3)", "Car loan · due Nov 25", "Visa payment · due Nov 20", "MP2 contribution · Nov 30". */
-private fun deductionLabel(d: MoneyOnHand.Deduction): String {
-    val date = d.date?.let { shortDate(it) }
+/** A deduction's line; one first due before [today] says it is overdue, and repeats say how many payments. */
+private fun deductionLabel(d: MoneyOnHand.Deduction, today: LocalDate): String {
+    val date = d.date?.let { if (it.isBefore(today)) "overdue since ${shortDate(it)}" else "due ${shortDate(it)}" }
+    val times = d.count.takeIf { it > 1 }?.let { "$it payments" }
     return when (d.kind) {
-        MoneyOnHand.Kind.BILLS -> if (d.count == 1) "1 bill paid from them" else "${d.count} bills paid from them"
-        MoneyOnHand.Kind.DEBT_PAYMENT, MoneyOnHand.Kind.CARD_PAYMENT ->
-            listOfNotNull(d.name, date?.let { "due $it" }, d.count.takeIf { it > 1 }?.let { "× $it" }).joinToString(" · ")
-        MoneyOnHand.Kind.TRANSFER ->
-            listOfNotNull("Transfer: ${d.name}", date, d.count.takeIf { it > 1 }?.let { "× $it" }).joinToString(" · ")
+        MoneyOnHand.Kind.BILLS -> if (d.count == 1) "1 bill payment from them" else "${d.count} bill payments from them"
+        MoneyOnHand.Kind.DEBT_PAYMENT, MoneyOnHand.Kind.CARD_PAYMENT -> listOfNotNull(d.name, times, date).joinToString(" · ")
+        MoneyOnHand.Kind.TRANSFER -> listOfNotNull("Transfer: ${d.name}", times, date).joinToString(" · ")
     }
 }
 

@@ -154,7 +154,8 @@ fun WalletCard(
                     Column {
                         Spacer(Modifier.size(Spacing.sm))
                         // An instalment loan gives the chip's room to its repayment bar.
-                        if (loan == null) {
+                        // An investment isn't a payment card, so it has no chip (design review, 2026-11-17).
+                        if (loan == null && wallet.type != WalletType.INVESTMENT) {
                             CardChip()
                             Spacer(Modifier.size(Spacing.sm))
                         }
@@ -413,7 +414,7 @@ private fun InstitutionWalletCard(
                 }
                 Column {
                     Spacer(Modifier.size(Spacing.md))
-                    if (loan == null) {
+                    if (loan == null && wallet.type != WalletType.INVESTMENT) {
                         CardChip()
                         Spacer(Modifier.size(Spacing.md))
                     }

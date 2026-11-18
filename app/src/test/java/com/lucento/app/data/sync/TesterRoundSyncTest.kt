@@ -161,4 +161,25 @@ class TesterRoundSyncTest {
         assertNull(PulledRowRules.problem("recurring", schedule("TRANSFER_OUT")))
         assertEquals("type", PulledRowRules.problem("recurring", schedule("TRANSFER_IN")))
     }
+
+    @Test
+    fun `a pulled scheduled transfer into a card is skipped, as the editor and backups refuse it`() = runTest {
+        // QA, 2026-11-17: the server only checks that it has a destination; the phone holds it to the editor's rules.
+        val first = Device()
+        val bank = first.wallet("Bank", "BANK")
+        val card = first.wallet("Visa", "CREDIT_CARD")
+        first.recurring.insert(
+            RecurringEntity(
+                name = "Visa top-up", type = "TRANSFER_OUT", amountMinor = 100_000, currencyCode = "PHP", walletId = bank.id,
+                categoryId = null, frequency = "MONTHLY", intervalCount = 1, startOn = 20_400, endOn = null, nextIndex = 0,
+                paused = false, createdAt = first.now, updatedAt = first.now, toWalletId = card.id, clientUuid = UUID.randomUUID().toString(),
+            ),
+        )
+        success(first.sync())
+
+        val second = Device()
+        success(second.sync())
+        assertTrue(second.recurring.getAll().isEmpty())
+        assertEquals(setOf("Bank", "Visa"), second.wallets.rows.value.map { it.name }.toSet())
+    }
 }

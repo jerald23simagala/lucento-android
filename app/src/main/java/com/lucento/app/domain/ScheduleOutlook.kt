@@ -4,9 +4,10 @@ import com.lucento.app.core.money.Money
 import java.time.LocalDate
 
 /**
- * How a scheduled item moves money: [INCOME] in, an [EXPENSE] (a bill: spending), or a [TRANSFER] to a card or loan —
- * money leaving an account to pay down a debt, which is not spending — or from a receivable, an instalment someone
- * repays the user, which is not income (docs/CALCULATIONS.md "Scheduled outlook").
+ * How a scheduled item moves money: [INCOME] in, an [EXPENSE] (a bill: spending), or a [TRANSFER] — to a card or loan,
+ * money leaving an account to pay down a debt, which is not spending; from a receivable, an instalment someone repays the
+ * user, which is not income; or between two of the user's own accounts, such as a monthly MP2 contribution (tester
+ * round, 2026-11-17) (docs/CALCULATIONS.md "Scheduled outlook").
  */
 enum class ScheduledFlow { INCOME, EXPENSE, TRANSFER }
 
@@ -21,7 +22,7 @@ val RecurringSchedule.signedOccurrence: Money
         else -> -total
     }
 
-/** A debt payment or a collection is a transfer; any other expense schedule is a bill, any other income income. */
+/** A debt payment, a collection or a scheduled transfer is a transfer; any other expense is a bill, other income income. */
 val RecurringSchedule.flow: ScheduledFlow
     get() = when {
         isLinked -> ScheduledFlow.TRANSFER

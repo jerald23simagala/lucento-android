@@ -32,9 +32,24 @@ enum class WalletKind(val key: String, val type: WalletType, val label: String, 
     BORROWED("borrowed", WalletType.LOAN, "Borrowed from someone", WalletIcon.HANDSHAKE),
     ;
 
+    /** A Philippine scheme, offered only for wallets in pesos: elsewhere the name reads as jargon. */
+    val pesoOnly: Boolean get() = this == MP2
+
+    /** The label for a wallet in [currencyCode]: UITFs are Philippine, so other currencies read just "Mutual fund". */
+    fun labelFor(currencyCode: String): String = if (this == FUNDS && currencyCode != PESO) "Mutual fund" else label
+
     companion object {
         /** The kinds a wallet of [type] can be, in picker order; empty for types without kinds. */
         fun of(type: WalletType): List<WalletKind> = entries.filter { it.type == type }
+
+        /**
+         * The kinds offered for a wallet of [type] in [currencyCode]: a Philippine scheme ([pesoOnly]) only for pesos,
+         * unless it is already [current], so a wallet keeps what it has.
+         */
+        fun of(type: WalletType, currencyCode: String, current: WalletKind? = null): List<WalletKind> =
+            of(type).filter { !it.pesoOnly || currencyCode == PESO || it == current }
+
+        private const val PESO = "PHP"
 
         /** The kind stored as [key] when it belongs to [type]; null for none, an unknown key or another type's kind. */
         fun fromKey(key: String?, type: WalletType): WalletKind? = entries.firstOrNull { it.key == key && it.type == type }

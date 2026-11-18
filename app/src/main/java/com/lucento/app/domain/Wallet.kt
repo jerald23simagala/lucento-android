@@ -9,8 +9,9 @@ import com.lucento.app.core.money.Money
  * net worth. [isSpendable] accounts hold money available for everyday spending (used by Safe to Spend);
  * savings are deliberately excluded so money set aside is not presented as spendable.
  *
- * [isValuedManually] assets (a home, a car, investments) have no money movements: their balance is a valuation the
- * user enters and updates. They count towards net worth but never appear where a transaction, transfer or
+ * [isValuedManually] assets (a home, a car, valuables) have no money movements: their balance is a valuation the
+ * user enters and updates. An [INVESTMENT] is not one of them: money moves in and out, and its value is updated with a
+ * balance adjustment (tester round, 2026-11-17). They count towards net worth but never appear where a transaction, transfer or
  * recurring payment picks an account, and the repositories refuse to post movements to them.
  *
  * [RECEIVABLE] (owner round 10) is a loan in reverse: money someone owes the user. It is an asset — its balance is what

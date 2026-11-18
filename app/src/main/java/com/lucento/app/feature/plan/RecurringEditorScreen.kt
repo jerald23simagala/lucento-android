@@ -154,6 +154,17 @@ internal fun PlanUiState.debtDraft(debt: Wallet, firstDue: LocalDate): ScheduleD
 }
 
 /** An existing schedule as an editable draft; a debt payment's whole payment (principal + any interest) is its amount. */
+/**
+ * The draft as another kind of schedule. What the person typed — the name and amount — stays between a bill, income and
+ * a transfer; a debt payment's and a collection's are filled in from the debt, so they start again (design review,
+ * 2026-11-17: switching wiped what had been typed).
+ */
+internal fun ScheduleDraft.switchedTo(picked: ScheduleKind): ScheduleDraft {
+    val typed = setOf(ScheduleKind.BILL, ScheduleKind.INCOME, ScheduleKind.TRANSFER)
+    val keep = kind in typed && picked in typed
+    return copy(kind = picked, name = if (keep) name else "", amountText = if (keep) amountText else "", toWalletId = null, categoryId = null)
+}
+
 internal fun RecurringSchedule.toDraft(): ScheduleDraft = ScheduleDraft(
     id = id,
     name = name,
@@ -311,7 +322,10 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
     fun transferFrom(base: ScheduleDraft): ScheduleDraft {
         val accounts = state.payingWallets()
         val from = accounts.firstOrNull { it.id == base.walletId } ?: accounts.firstOrNull()
-        val to = accounts.firstOrNull { it.id != from?.id && it.currencyCode == from?.currencyCode && !it.isSpendingMoney }
+        // Savings or an investment first (design review, 2026-11-17: a cash wallet kept out of spending isn't the usual place).
+        val others = accounts.filter { it.id != from?.id && it.currencyCode == from?.currencyCode }
+        val to = others.firstOrNull { it.type == WalletType.SAVINGS || it.type == WalletType.INVESTMENT }
+            ?: others.firstOrNull { !it.isSpendingMoney }
         return base.copy(kind = ScheduleKind.TRANSFER, walletId = from?.id, toWalletId = to?.id, categoryId = null)
     }
 
@@ -345,7 +359,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                 selected = draft.kind,
                 onSelect = { picked ->
                     if (picked == draft.kind) return@FilledDropdown
-                    val fresh = draft.copy(kind = picked, name = "", amountText = "", toWalletId = null, categoryId = null)
+                    val fresh = draft.switchedTo(picked)
                     update(
                         when (picked) {
                             ScheduleKind.DEBT -> payTo(debts.firstOrNull(), fresh)
@@ -371,7 +385,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                     if (picked == draft.kind) return@SegmentedToggle
                     // Each kind starts clean: a name, amount, category or debt from another kind never carries over
                     // (a debt payment then fills its name and amount from the chosen loan's terms).
-                    val fresh = draft.copy(kind = picked, name = "", amountText = "", toWalletId = null, categoryId = null)
+                    val fresh = draft.switchedTo(picked)
                     update(
                         when (picked) {
                             ScheduleKind.DEBT -> payTo(debts.firstOrNull(), fresh)

@@ -200,6 +200,7 @@ import java.time.LocalDate
 import com.lucento.app.domain.WellnessTier
 import com.lucento.app.feature.wallets.WalletDraft
 import com.lucento.app.feature.wallets.WalletEditorSheet
+import com.lucento.app.feature.wallets.toDraft
 import com.lucento.app.feature.wallets.WalletsViewModel
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -257,6 +258,8 @@ data class HomeActions(
     val onOpenCategory: (Long, YearMonth) -> Unit = { _, _ -> },
     /** Tester round (2026-11-17): counts a wallet as spending money for Safe to spend, or not. */
     val onSetSpendable: (Long, Boolean) -> Unit = { _, _ -> },
+    /** Opens a wallet's editor on the dashboard (a card's counted credit, from the spending money sheet). */
+    val onEditWallet: (com.lucento.app.domain.Wallet) -> Unit = {},
 )
 
 /**
@@ -293,6 +296,7 @@ private fun HomeDashboard(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
+    val dashboardActions = remember(actions) { actions.copy(onEditWallet = { editingWallet = it.toDraft() }) }
     var showSync by remember { mutableStateOf(false) }
     var showAwards by remember { mutableStateOf(false) }
     // The award being presented. Saved, so a ceremony isn't lost to rotation after its award was acknowledged.
@@ -393,7 +397,7 @@ private fun HomeDashboard(
                 }
                 HomeContent.Overview -> Overview(
                     state = state,
-                    actions = actions,
+                    actions = dashboardActions,
                     onSelectMonth = viewModel::selectMonth,
                     onDismissLocalDataNotice = viewModel::dismissLocalDataNotice,
                     onDismissOverridden = viewModel::dismissOverridden,
@@ -1063,6 +1067,8 @@ private fun Overview(
                 open = if (state.expenseCategoryCount == 0) actions.onChooseCategories else actions.onOpenBudget,
                 onOpenCategory = { actions.onOpenCategory(it, state.month) },
                 onSetSpendable = actions.onSetSpendable,
+                onEditCard = actions.onEditWallet,
+                onReviewDue = { actions.onOpenRecurring(null) },
             )
         } else {
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
@@ -1245,7 +1251,7 @@ private val CardFigureStyle = AmountStyles.large.copy(fontSize = 20.sp, letterSp
 /**
  * The dashboard's focal point, drawn as a physical card: ID-1 proportions (it only grows for large text), a soft drop
  * shadow, a thin light edge, a glossy sheen across the top and a faint guilloché pattern like printed security lines.
- * Label and amount sit together at the top; Wallets and Debt & Loans along the bottom edge. Opens Wallets.
+ * Label and amount sit together at the top; Wallets and Debts & loans along the bottom edge. Opens Wallets.
  */
 @Composable
 private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthComposition, onOpen: () -> Unit) {
@@ -1262,7 +1268,7 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
     val spoken = buildString {
         append("$label $netWorthSpoken. ")
         append("Wallets $assetsSpoken. ")
-        append("Debt and loans $owedSpoken. ")
+        append("Debts and loans $owedSpoken. ")
         if (history.size > 1) {
             append("Compared with the end of ${monthLabel(history.first().month)}: ")
             append(changeSpoken)
@@ -1359,12 +1365,12 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                     if (cardWidth >= 330.dp * textScale) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                             CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Wallets", composition.totalAssets, Modifier.weight(1f))
-                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debt & Loans", owed, Modifier.weight(1f))
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debts & loans", owed, Modifier.weight(1f))
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                             CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Wallets", composition.totalAssets, Modifier.fillMaxWidth())
-                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debt & Loans", owed, Modifier.fillMaxWidth())
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debts & loans", owed, Modifier.fillMaxWidth())
                         }
                     }
                 }
@@ -1498,6 +1504,8 @@ private fun MonthlyBudgetCard(
     open: () -> Unit,
     onOpenCategory: (Long) -> Unit,
     onSetSpendable: (Long, Boolean) -> Unit = { _, _ -> },
+    onEditCard: (com.lucento.app.domain.Wallet) -> Unit = {},
+    onReviewDue: (() -> Unit)? = null,
 ) {
     val setupNeeded = state.expenseCategoryCount == 0
     // Tester round (2026-11-17): the (i) beside Safe to spend explains both figures; wallets can be chosen from there.
@@ -1565,10 +1573,24 @@ private fun MonthlyBudgetCard(
                     null
                 },
                 onDismiss = { explaining = false },
+                onReviewDue = onReviewDue?.let { review ->
+                    {
+                        explaining = false
+                        review()
+                    }
+                },
             )
         }
         if (choosingWallets) {
-            SpendingWalletsSheet(wallets = state.wallets, onToggle = onSetSpendable, onDismiss = { choosingWallets = false })
+            SpendingWalletsSheet(
+                wallets = state.wallets,
+                onToggle = onSetSpendable,
+                onDismiss = { choosingWallets = false },
+                onEditCard = { card ->
+                    choosingWallets = false
+                    onEditCard(card)
+                },
+            )
         }
         if (state.otherBudgetCurrencies.isNotEmpty()) {
             Text(
@@ -1769,7 +1791,15 @@ private fun FormulaResult(
             fractionScale = 1f,
             minScale = 0.6f,
         )
-        if (caption != null) Text(caption, style = MaterialTheme.typography.labelSmall, color = ink, maxLines = 2)
+        // Balanced lines, so a reason never ends on one stray word; three at most at large text sizes.
+        if (caption != null) {
+            Text(
+                caption,
+                style = MaterialTheme.typography.labelSmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                color = ink,
+                maxLines = 3,
+            )
+        }
     }
 }
 
