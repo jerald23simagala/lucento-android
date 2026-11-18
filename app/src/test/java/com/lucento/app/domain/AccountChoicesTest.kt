@@ -34,24 +34,38 @@ class AccountChoicesTest {
     }
 
     @Test
-    fun `accounts are grouped by kind in the app's order, keeping their order inside a group`() {
+    fun `accounts are grouped into the four families, in type order, keeping their order inside a type`() {
         val sections = AccountChoices.sections(all, emptyList(), "", labels)
-        assertEquals(
-            listOf(WalletType.CASH, WalletType.BANK, WalletType.E_WALLET, WalletType.SAVINGS, WalletType.CREDIT_CARD),
-            sections.map { it.type },
-        )
-        assertEquals(listOf(maya, gcash), sections.first { it.type == WalletType.E_WALLET }.wallets)
-        assertEquals(listOf(bpi, bdo), sections.first { it.type == WalletType.BANK }.wallets)
+        assertEquals(listOf(WalletFamily.EVERYDAY, WalletFamily.SET_ASIDE, WalletFamily.OWED), sections.map { it.family })
+        assertEquals(listOf(cash, bpi, bdo, maya, gcash), sections.first().wallets)
+        assertEquals(listOf(emergency), sections[1].wallets)
         assertEquals(all.size, sections.sumOf { it.wallets.size })
     }
 
     @Test
-    fun `recent accounts lead, newest first, at most three, only ones that are listed`() {
+    fun `every type has a family`() {
+        // The pickers list families only, so a type without one would vanish from them.
+        assertEquals(WalletType.entries.toSet(), WalletType.entries.filter { it.family in WalletFamily.entries }.toSet())
+        assertEquals(WalletFamily.OWNED, WalletType.RECEIVABLE.family)
+        assertEquals(WalletFamily.OWED, WalletType.LOAN.family)
+    }
+
+    @Test
+    fun `recent accounts lead a long list, newest first, at most three, only ones that are listed`() {
         val sections = AccountChoices.sections(all, listOf(4, 99, 4, 2, 3, 1), "", labels)
-        assertEquals(null, sections.first().type)
+        assertEquals(null, sections.first().family)
         assertEquals(listOf(emergency, bpi, gcash), sections.first().wallets)
-        // They still appear in their own group as well.
-        assertTrue(sections.first { it.type == WalletType.SAVINGS }.wallets.contains(emergency))
+        // They still appear in their own family as well.
+        assertTrue(sections.first { it.family == WalletFamily.SET_ASIDE }.wallets.contains(emergency))
+    }
+
+    @Test
+    fun `a short list has no Recent, since it is quick to scan and repeats would only lengthen it`() {
+        val six = listOf(cash, bpi, gcash, emergency, visa, maya)
+        assertEquals(AccountChoices.SEARCH_FROM, six.size)
+        val sections = AccountChoices.sections(six, listOf(4, 2), "", labels)
+        assertTrue(sections.none { it.family == null })
+        assertEquals(six.size, sections.sumOf { it.wallets.size })
     }
 
     @Test

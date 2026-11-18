@@ -19,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -34,7 +33,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -121,10 +119,10 @@ fun AccountField(
 }
 
 /**
- * Every account to choose from, grouped by kind with its balance. [recentIds] lead under "Recent" (the transfer sheet
- * passes where money last went); a search box appears above [AccountChoices.SEARCH_FROM] accounts. An account that
- * [unavailable] gives a reason for stays listed, dimmed, with that reason. Picking calls [onPick]; the caller closes the
- * sheet.
+ * Every account to choose from, grouped into the four families with its balance (headings only when there are two or
+ * more groups). Above [AccountChoices.SEARCH_FROM] accounts a search box appears and [recentIds] lead under "Recent"
+ * (the transfer sheet passes where money last went). An account that [unavailable] gives a reason for stays listed,
+ * dimmed, with that reason. Picking calls [onPick]; the caller closes the sheet.
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -163,13 +161,13 @@ fun AccountPickerSheet(
                     .weight(1f, fill = false)
                     .selectableGroup(),
             ) {
+                val headed = sections.size > 1
                 sections.forEach { section ->
-                    val recent = section.type == null
-                    item(key = "header-${section.type?.name ?: "recent"}") {
-                        PickerGroupHeader(
-                            icon = section.type?.icon ?: Icons.Outlined.History,
-                            title = if (recent) "Recent" else section.type!!.groupLabel,
-                        )
+                    val recent = section.family == null
+                    if (headed) {
+                        item(key = "header-${section.family?.name ?: "recent"}") {
+                            PickerGroupHeader(title = section.family?.label ?: "Recent")
+                        }
                     }
                     items(section.wallets, key = { (if (recent) "recent-" else "account-") + it.id }) { wallet ->
                         AccountRow(
@@ -199,22 +197,21 @@ fun AccountPickerSheet(
     }
 }
 
+/** A family's heading: words only, since every row already carries its own tile. */
 @Composable
-private fun PickerGroupHeader(icon: ImageVector, title: String) {
-    Row(
-        Modifier
+private fun PickerGroupHeader(title: String) {
+    Text(
+        title.uppercase(),
+        style = OverlineStyle,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
             .fillMaxWidth()
             .padding(top = Spacing.md, bottom = Spacing.xxs, start = Spacing.xs)
             .clearAndSetSemantics {
                 heading()
                 contentDescription = title
             },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(Spacing.sm))
-        Text(title.uppercase(), style = OverlineStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    )
 }
 
 /** One account: its tile, name and what it is or why it can't be chosen, then its balance and a check when chosen. */
@@ -248,7 +245,8 @@ private fun AccountRow(wallet: Wallet, selected: Boolean, reason: String?, onCli
             }
         }
         Spacer(Modifier.width(Spacing.sm))
-        AmountText(wallet.balance, style = AmountStyles.row, color = colors.onSurfaceVariant, modifier = dim)
+        // As in Wallets: what it adds to net worth, so an amount owed reads −₱18,400.00 beside "Amount owed".
+        AmountText(wallet.netWorthContribution, style = AmountStyles.row, color = colors.onSurfaceVariant, modifier = dim)
         if (selected) {
             Spacer(Modifier.width(Spacing.xs))
             Icon(Icons.Filled.Check, contentDescription = "Selected", tint = colors.primary)
@@ -269,11 +267,12 @@ private fun rowMeta(wallet: Wallet): String? {
     return listOfNotNull(institution, owed).joinToString(" · ").ifEmpty { null }
 }
 
-/** "Bank account · ₱6,210.40", "Credit card · ₱18,400.00 owed": what the account is and what it holds. */
+/** "Bank account · ₱6,210.40", "Credit card · −₱18,400.00 owed": what the account is and what it adds to net worth. */
 @Composable
 @ReadOnlyComposable
 private fun accountDetail(wallet: Wallet, spoken: Boolean = false): String {
-    val amount = if (spoken) spokenAmount(wallet.balance, signed = true) else shownAmount(wallet.balance, signed = true)
+    val worth = wallet.netWorthContribution
+    val amount = if (spoken) spokenAmount(worth, signed = true) else shownAmount(worth, signed = true)
     val held = when {
         wallet.type.isLiability -> "$amount owed"
         wallet.type == WalletType.RECEIVABLE -> "$amount owed to you"
