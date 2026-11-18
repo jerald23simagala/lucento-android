@@ -9,6 +9,7 @@ import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.GoalCalculator
 import com.lucento.app.domain.Insights
 import com.lucento.app.domain.LoanMath
+import com.lucento.app.domain.SafeToSpend
 import com.lucento.app.domain.ScheduleOutlook
 import com.lucento.app.domain.ScheduledFlow
 import com.lucento.app.domain.ScheduledItem
@@ -292,7 +293,8 @@ object AskSnapshotBuilder {
             // Tester round (2026-11-17): the two figures behind it, so an answer can say which one set it.
             // Labels stay under the 100-character cut.
             safe.budgetAllows?.let { money("safe_budget", "What the budget allows, rest of ${monthName(current)} (budget − spent − bills due)", it) }
-            safe.moneyOnHand?.let {
+            // Only when it takes part: with a budget, the spending money counts once money is recorded in a spending wallet.
+            safe.moneyOnHand?.takeIf { it.recorded || safe.basis == SafeToSpend.Basis.BALANCES }?.let {
                 money("safe_money", "What spending money allows, rest of ${monthName(current)} (after what’s due); Safe to spend is the lower one", it.allows)
             }
         }
