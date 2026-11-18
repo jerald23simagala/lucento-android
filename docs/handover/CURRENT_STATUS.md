@@ -637,14 +637,22 @@ wallets side by side; Safe to spend as the conclusion) and for the Budget tab to
   - the verdict's line at 0;
   - a 600 ms gauge.
 
-  Open for the owner (NEXT_TASKS OT-40): bills in both limits, which goes against the brief's wording (KNOWN_ISSUES
-  BC-1), and whether Safe to spend should come right after the overview (the critic's P1: at 360dp it's below the
-  fold). Not re-reviewed after the fixes.
+  The owner answered OT-40 the same day. Bills stay in both limits (KNOWN_ISSUES BC-1). The order stays, but "the
+  result of both budget and wallet shown", with fewer words and lines that balance between the two columns. So:
+  - each limit is now its figure and two short parts: "₱30,920.10 unspent" and "−₱15,649.90 upcoming", "₱31,064.30
+    in wallets" and "−₱29,394.30 due";
+  - each part sits on one line when all four fit, otherwise every amount sits over its word in both columns;
+  - the captions are gone, and the verdict's second line appears only when the wallets don't take part;
+  - the Budget hero reads "Unspent of your ₱X budget".
+
+  Not re-reviewed by the critic after these changes.
 - **Device.** On the API 35 emulator, the local `BudgetCardShotsTest` (not committed) captured:
   - 23 states each at 411dp and 360dp;
   - 54 shots at 360, 393 and 411dp × 115, 130 and 200 %, light and dark.
 
-  After round 2 there is no clipping and no broken word. An accessibility dump shows each limit and the verdict read as
+  Round 4, after the owner's answers, checked the same sets again: 411dp shows both limits and Safe to spend on one
+  screen, and the two columns have equal line counts at every size. After round 2 there is no clipping and no broken
+  word. An accessibility dump shows each limit and the verdict read as
   one sentence with all their figures. Screenshots: `artifacts/budget-card-2026-11-18/` (local).
 - **Not checked:** a real phone, TalkBack's actual speech (only the accessibility tree), a Partner's phone, and windows
   600dp or wider.

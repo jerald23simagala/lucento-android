@@ -12,11 +12,11 @@ import com.lucento.app.domain.SafeToSpend
  * - **Budget remaining** = budget − spent − upcoming expenses ([SafeToSpend.budgetAllows]), shown with its two parts:
  *   [remainingBeforeUpcoming] (budget − spent) and [upcomingExpenses] (unpaid bills due by the month's end).
  * - **Spendable wallets** = what the spending wallets hold, less everything due from them by the month's end
- *   ([MoneyOnHand]): [walletBills], the bills paid from them, which are among the upcoming expenses too, and
- *   [walletOutflows], loan and card payments and transfers into money that isn't for spending. The bills come off both
- *   limits on purpose. Each limit has to cover them on its own, and the verdict takes the lower of the two, never their
- *   sum, so they are taken once. Leaving them out of the wallets would promise money the bills are about to take
- *   (docs/CALCULATIONS.md "Home budget card and the Budget tab").
+ *   ([MoneyOnHand]): the bills paid from them, which are among the upcoming expenses too, loan and card payments, and
+ *   transfers into money that isn't for spending. The bills come off both limits on purpose (owner, 2026-11-18). Each
+ *   limit has to cover them on its own, and the verdict takes the lower of the two, never their sum, so they are taken
+ *   once. Leaving them out of the wallets would promise money the bills are about to take (docs/CALCULATIONS.md "Home
+ *   budget card and the Budget tab").
  * - **Safe to spend** = the lower of the two ([SafeToSpend.amount]), never shown below zero.
  */
 data class SpendingCapacity(
@@ -53,15 +53,6 @@ data class SpendingCapacity(
 
     val nothingSafe: Boolean get() = safeToSpend.amountMinor <= 0L
 
-    /** The bills due from the spending wallets: they are among [upcomingExpenses] too. Null without spending wallets. */
-    val walletBills: Money?
-        get() = wallets?.let { money ->
-            Money.sum(money.currencyCode, money.deductions.filter { it.kind == MoneyOnHand.Kind.BILLS }.map { it.amount })
-        }
-
-    /** The rest of what is due from them: loan and card payments, and transfers out of spending money. */
-    val walletOutflows: Money? get() = wallets?.let { it.deducted - walletBills!! }
-
     /** The verdict in one sentence: which limit sets the figure, or at zero what took it. */
     val headline: String
         get() = when {
@@ -77,15 +68,14 @@ data class SpendingCapacity(
         }
 
     /**
-     * The line under it: how the figure was chosen, or why the wallets don't take part. At zero the shown figure isn't
-     * the lower one (that may be below zero), so it says the floor instead (design review, 2026-11-18).
+     * A second line, only when the wallets don't take part: it says why only the budget is used. Otherwise [headline]
+     * says it all (owner, 2026-11-18: fewer words).
      */
-    val detail: String
+    val detail: String?
         get() = when {
             wallets == null -> NO_SPENDING_WALLETS
             !walletsCounted -> NOTHING_RECORDED
-            nothingSafe -> NEVER_BELOW_ZERO
-            else -> LOWER_OF_BOTH
+            else -> null
         }
 
     companion object {
@@ -97,8 +87,6 @@ data class SpendingCapacity(
         const val OVER_BUDGET = "You’re over budget this month."
         const val BUDGET_USED = "This month’s budget is used up."
         const val BILLS_TAKE_BUDGET = "Bills due take what’s left of your budget."
-        const val LOWER_OF_BOTH = "Lower of budget remaining and spendable wallets."
-        const val NEVER_BELOW_ZERO = "Safe to spend never shows less than zero."
         const val NO_SPENDING_WALLETS = "No wallet counts as spending money, so only your budget is used."
         const val NOTHING_RECORDED = "No money is recorded in your spending wallets yet, so only your budget is used."
 

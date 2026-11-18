@@ -513,8 +513,8 @@ private fun BudgetSummaryCard(
         Text(
             when {
                 over -> "Over your $total budget"
-                // The limits below take the upcoming expenses off this figure; saying so keeps the two apart (QA M2).
-                limitsBelow -> "Remaining of $total budget, before upcoming expenses"
+                // The limits below take the upcoming expenses off this figure: it is their "unspent" part (QA M2).
+                limitsBelow -> "Unspent of your $total budget"
                 else -> "Remaining of $total budget"
             },
             style = MaterialTheme.typography.bodyMedium,

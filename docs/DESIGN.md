@@ -302,12 +302,14 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
    spent in its hollow and "spent of <budget>" under it, a "N% spent" pill, and "Budgeted ₱X • Unbudgeted ₱Y"; at 130 %
    text and above (over 120 %), or when "spent of" would need a second line, the pill takes the hollow and the amounts
    move under the gauge. **B**: **Budget remaining** and **Spendable wallets** side by side with a hairline between
-   (stacked in a panel under 280dp or from 130 % text): the caps name with a chevron (each column is a button), the
-   figure in neutral ink at one size shared by both (red with its minus sign below zero), a line on what it is and its
-   two parts as plain lines (no icon tiles or tinted boxes: design review 2026-11-18). **C**: **Safe to spend** in a
-   green panel with a check (red with an alert at 0, never negative) and a chevron, the loudest figure on the card
-   (36sp; the spent figure is 32sp, the limits up to 22sp), and the sentence that says which limit set it; the whole
-   panel opens how it is worked out. TalkBack reads each column and the verdict as one button with one sentence. A
+   (stacked in a panel under 280dp or from 130 % text), set out alike so their lines balance (owner, 2026-11-18): the
+   caps name with a chevron (each column is a button), the figure in neutral ink at one size shared by both (red with
+   its minus sign below zero), then two short parts, "₱30,920.10 unspent" / "−₱15,649.90 upcoming" and "₱31,064.30 in
+   wallets" / "−₱29,394.30 due", each on one line when all four fit, otherwise each amount over its word in both
+   columns. No captions, icon tiles or tinted boxes. **C**: **Safe to spend** in a green panel with a check (red with
+   an alert at 0, never negative) and a chevron, the loudest figure on the card (36sp; the spent figure is 32sp, the
+   limits up to 22sp), and the sentence that says which limit set it (a second line only when the wallets don't take
+   part); the whole panel opens how it is worked out. TalkBack reads each column and the verdict as one button with one sentence. A
    past month ends on Remaining / Overspent. The Budget tab shows the same B and C under its hero, with Safe per day
    (`SpendingCapacityPanel.kt`).
    **To watch** follows as its own card: up to five budgeted categories closest to their limit, the name and what's

@@ -10,6 +10,7 @@ import com.lucento.app.domain.DebtTerms
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
 import com.lucento.app.domain.Frequency
+import com.lucento.app.domain.MoneyOnHand
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.TransactionType
@@ -82,7 +83,8 @@ class SpendingCapacityTest {
         assertEquals(php(1_200_00), c.perDay)
         assertEquals(10, c.daysLeft)
         assertEquals(SpendingCapacity.LIMITED_BY_BUDGET, c.headline)
-        assertEquals(SpendingCapacity.LOWER_OF_BOTH, c.detail)
+        // The sentence says it all; a second line appears only when the wallets don't take part.
+        assertNull(c.detail)
     }
 
     // ---------------------------------------------------------------- Spendable wallets
@@ -271,9 +273,9 @@ class SpendingCapacityTest {
         val c = capacity(listOf(bank.copy(balance = php(9_120_00)), loan), listOf(spent(5_000_00)), listOf(payment))
         assertEquals(php(500_00), c.upcomingExpenses)
         assertEquals(php(2_000_00), c.wallets!!.deducted)
-        // Not a bill: it shows under payments and transfers, so nothing reads as counted twice.
-        assertTrue(c.walletBills!!.isZero)
-        assertEquals(php(2_000_00), c.walletOutflows)
+        // Not a bill: the wallets take it off as a debt payment, in full.
+        assertTrue(c.wallets!!.deductions.none { it.kind == MoneyOnHand.Kind.BILLS })
+        assertEquals(MoneyOnHand.Kind.DEBT_PAYMENT, c.wallets!!.deductions.single().kind)
     }
 
     @Test fun `a bill paid from savings lowers the budget's limit but not the wallets'`() {
@@ -283,16 +285,17 @@ class SpendingCapacityTest {
         assertEquals(php(9_120_00), c.wallets!!.allows)
     }
 
-    @Test fun `what's due from the wallets splits into their bills and everything else, and adds up`() {
+    @Test fun `the wallets take off their own bills and transfers, the budget every bill`() {
         val c = capacity(
             listOf(bank.copy(balance = php(9_120_00)), savings),
             listOf(spent(5_000_00)),
             listOf(bill(3_000_00), bill(800_00, wallet = 4), transfer(1_000_00, from = 1, to = 4)),
         )
-        assertEquals(php(3_000_00), c.walletBills) // the bank's bill; the one from savings isn't on hand
-        assertEquals(php(1_000_00), c.walletOutflows)
-        assertEquals(c.wallets!!.deducted, c.walletBills!! + c.walletOutflows!!)
-        // The wallets' bills are among the upcoming expenses, which also hold the one from savings.
+        val byKind = c.wallets!!.deductions.groupBy({ it.kind }, { it.amount })
+        assertEquals(listOf(php(3_000_00)), byKind[MoneyOnHand.Kind.BILLS]) // the bank's bill; the one from savings isn't on hand
+        assertEquals(listOf(php(1_000_00)), byKind[MoneyOnHand.Kind.TRANSFER])
+        assertEquals(php(4_000_00), c.wallets!!.deducted)
+        // The budget counts both bills, the one paid from savings too.
         assertEquals(php(3_800_00), c.upcomingExpenses)
     }
 
@@ -350,6 +353,6 @@ class SpendingCapacityTest {
         val fromBudget = SpendingCapacity.of(budgetSafeToSpend(plan, today, ledger, budgets, listOf(yenBill), categories)!!)!!
         assertEquals(fromHome, fromBudget)
         assertEquals(php(3_800_00), fromHome.upcomingExpenses)
-        assertEquals(php(3_800_00), fromHome.walletBills)
+        assertEquals(php(3_800_00), fromHome.wallets!!.deducted)
     }
 }
