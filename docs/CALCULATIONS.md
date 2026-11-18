@@ -198,8 +198,9 @@ Optional per card (`debt_terms.credit_limit_minor`, `statement_day`, `due_day`; 
 - **Available credit** = credit limit − owed now; negative when over the limit (`CreditCardMath.available`).
 - **Payment reminder**: with billing days set, the due date becomes a reminder on Home (Upcoming card and the bell)
   showing the amount due, while there is something to pay. It is derived every time, never stored as a recurring
-  payment, and **never counted in Safe to spend**: the card's purchases were already counted as spending, and paying the
-  card is a transfer (Debt rules above). A tap (the bell, Upcoming, or Payment on the card) opens that transfer filled
+  payment, and **never counted as spending** (budget, Bills due): the card's purchases were already counted as spending,
+  and paying the card is a transfer (Debt rules above). Since the tester round (2026-11-17) Safe to spend's money on
+  hand sets it aside from the paying account when that account is spending money (above). A tap (the bell, Upcoming, or Payment on the card) opens that transfer filled
   in: the amount due, today, the note "<card> payment", to the card, from the **paying account** — the account that paid
   the card last (the source of the latest transfer into it), otherwise the cash, bank or e-wallet account in the card's
   currency with the most money (savings only when there is no everyday account), never another card or loan or another

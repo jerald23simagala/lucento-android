@@ -630,7 +630,7 @@ private fun TransfersLine(transfers: Money) {
     val shown = -transfers
     LucentoCard(
         Modifier.fillMaxWidth().clearAndSetSemantics {
-            contentDescription = "Transfers ${fmt.spokenSigned(shown)}, card and loan payments from your own money, not in net flow"
+            contentDescription = "Transfers ${fmt.spokenSigned(shown)}, payments and moves between your own accounts, not in net flow"
         },
         contentPadding = Spacing.md,
         shape = RoundedCornerShape(16.dp),
@@ -647,7 +647,7 @@ private fun TransfersLine(transfers: Money) {
             Column(Modifier.weight(1f)) {
                 Text("Transfers", style = MaterialTheme.typography.titleSmall, maxLines = 1)
                 Text(
-                    "Card and loan payments · not in net flow",
+                    "Payments and moves between your accounts · not in net flow",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -68,7 +68,7 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.TwoWheeler
 import androidx.compose.material.icons.outlined.Watch
-import androidx.compose.material.icons.outlined.Work
+import androidx.compose.material.icons.outlined.WorkOutline
 import androidx.compose.material.icons.outlined.WorkspacePremium
 
 val WalletType.icon: ImageVector
@@ -169,7 +169,7 @@ val WalletIcon.vector: ImageVector
         WalletIcon.FAMILY -> Icons.Outlined.FamilyRestroom
         WalletIcon.SCHOOL -> Icons.Outlined.School
         WalletIcon.TRAVEL -> Icons.Outlined.Flight
-        WalletIcon.WORK -> Icons.Outlined.Work
+        WalletIcon.WORK -> Icons.Outlined.WorkOutline
         WalletIcon.BAG -> Icons.Outlined.ShoppingBag
         WalletIcon.HANDSHAKE -> Icons.Outlined.Handshake
         WalletIcon.DOCUMENT -> Icons.Outlined.RequestQuote

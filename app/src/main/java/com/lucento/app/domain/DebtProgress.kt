@@ -20,8 +20,8 @@ data class CardCycle(
 
 /**
  * A credit card's payment reminder: derived from its billing days and transactions every time, never stored as a
- * schedule, and never part of Safe to spend — the card's purchases were already counted as spending, so paying the card
- * is a transfer.
+ * schedule, and never spending — the card's purchases were already counted, so paying the card is a transfer. Safe to
+ * spend's money on hand sets it aside from the paying account ([MoneyOnHandCalculator], tester round 2026-11-17).
  */
 data class CardDue(
     val wallet: Wallet,

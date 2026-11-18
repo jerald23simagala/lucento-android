@@ -814,8 +814,8 @@ private fun CardDetails(
             "Enter both days, from 1 to 31, or leave both empty."
         } else {
             "Day of the month (a shorter month uses its last day). On the due day, Lucento reminds you of the amount due: " +
-                "what you owed on the statement day, less payments since. It isn’t counted in Safe to spend — your card " +
-                "purchases already are."
+                "what you owed on the statement day, less payments since. Your purchases already count as spending, so " +
+                "the payment isn’t spending again; Safe to spend sets it aside from the account that pays the card."
         },
         isError = daysError,
     )

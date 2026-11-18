@@ -2131,7 +2131,9 @@ private fun CardDueRow(item: CardDue, today: LocalDate, onClick: () -> Unit) {
             Spacer(Modifier.height(Spacing.xs))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "${item.cycle.dueDate.format(dateFormat)} · Not in Safe to spend",
+                    // Not a bill: the purchases were spending already (tester round, 2026-11-17: the money on hand does
+                    // set the payment aside, so "not in Safe to spend" no longer held).
+                    "${item.cycle.dueDate.format(dateFormat)} · Not new spending",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

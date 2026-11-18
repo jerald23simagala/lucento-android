@@ -198,7 +198,8 @@ fun WalletDetailScreen(
                     onAction = { adjusting = true },
                 )
                 wallet.type == WalletType.SAVINGS -> InfoNote(
-                    "Savings aren’t counted in Safe to spend, so money you set aside stays set aside.",
+                    if (wallet.isSpendingMoney) "You count these savings as spending money, so Safe to spend includes them. Change it in Edit."
+                    else "Savings aren’t counted in Safe to spend, so money you set aside stays set aside.",
                     modifier = notes,
                 )
             }
@@ -301,7 +302,8 @@ fun WalletDetailScreen(
                         cycle != null ->
                             "Amount due ${fmt.format(cycle.amountDue)} by ${shortDate(cycle.dueDate)}: you owed " +
                                 "${fmt.format(cycle.statementBalance)} on the ${shortDate(cycle.statementDate)} statement, less payments since. " +
-                                "It’s a reminder, not a bill in Safe to spend — the card’s purchases were already counted as spending."
+                                "It’s a reminder, not a bill — the card’s purchases were already counted as spending. Safe to spend " +
+                                "sets the payment aside from the account that pays the card."
                         else ->
                             "Add card purchases with + — they’re spending. Paying the card from another account is a transfer, " +
                                 "so the same purchase is never counted twice."
