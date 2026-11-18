@@ -103,15 +103,16 @@ fun AccountField(
             Spacer(Modifier.width(Spacing.md))
             Column(Modifier.weight(1f)) {
                 if (label != null) Text(label, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
+                // Two lines each at most, so a long name or the balance wraps at large text sizes instead of being cut off.
                 Text(
                     wallet?.name ?: placeholder,
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (wallet != null) colors.onSurface else colors.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (detail != null) {
-                    Text(detail, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(detail, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
             }
             Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = if (isError) colors.error else colors.onSurfaceVariant)
@@ -241,9 +242,9 @@ private fun AccountRow(wallet: Wallet, selected: Boolean, reason: String?, onCli
         WalletIdentityTile(wallet, dim, size = 36.dp)
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
-            Text(wallet.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = dim)
+            Text(wallet.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = dim)
             if (meta != null) {
-                Text(meta, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(meta, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
         }
         Spacer(Modifier.width(Spacing.sm))
