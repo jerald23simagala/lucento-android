@@ -593,6 +593,22 @@ with kinds, and shortcut palette B.
   (`artifacts/tester-round-2026-11-17/`; rounds 1 and 2 in `r1/` and `r2/`) are local only, not committed.
 - **Not checked:** a real phone (OT-39), sync against a project with the migration (OT-38), and TalkBack.
 
+## Release 0.5.14 (version code 19) — 2026-11-19 (`release/0.5.14`)
+
+The owner chose "Yes, build 0.5.14" for OT-41. The app changes since 0.5.13 are #106–#110 and #112:
+- The three-part Monthly budget card, with the Budget tab aligned to it.
+- The credit card as the default wallet for expenses, with "Assets" on Home and "Select wallet to use" in the composer.
+- Select mode in Scheduled › All schedules: change the day or amount, pause or resume, delete. A warning shows when a
+  loan or card already has a payment plan.
+- Free limits in setup, and one Pro dialog at the tap everywhere.
+- The Pro experience: a short message with Unlock when a wall is met again in a session, the Insights 6- and 12-month
+  preview from the person's own months, and the theme try-on.
+- The owner's calls: "See Lucento Plan" as the one label, a tried theme applied after a purchase, and setup lines that
+  promise nothing Free doesn't give.
+
+#111 changed docs only. Room stays at v14, backups at format v5 and sync is untouched, so no Supabase change is needed.
+Owner: upload to Internal testing, then OT-41.
+
 ## Release 0.5.13 (version code 18) — 2026-11-18 (`release/0.5.13`)
 
 The owner said "Proceed" on building the tester round for OT-39 after OT-38 was applied to both Supabase projects. The app
