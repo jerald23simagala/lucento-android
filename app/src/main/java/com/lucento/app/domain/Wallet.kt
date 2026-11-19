@@ -51,6 +51,13 @@ enum class WalletType(val isLiability: Boolean, val isSpendable: Boolean, val is
      */
     val canBeSpendingMoney: Boolean get() = !isValuedManually && this != LOAN && this != RECEIVABLE
 
+    /**
+     * Can be the default wallet new transactions go to: cash, bank and e-wallets, and credit cards (tester round,
+     * 2026-11-18). With a card as the default only expenses go to it; income and transfers go to a money account
+     * ([com.lucento.app.domain.capture.InterpretationContext.walletFor]).
+     */
+    val canBeDefault: Boolean get() = isSpendable || this == CREDIT_CARD
+
     /** Has kinds to choose from ([WalletKind]): investments, things owned, loans. */
     val hasKinds: Boolean get() = WalletKind.entries.any { it.type == this }
 

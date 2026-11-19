@@ -148,7 +148,7 @@ internal object RemoteCandidates {
                 type = type,
                 amount = amount,
                 amountOptions = readingChoice.orEmpty(),
-                walletId = wallet ?: context.defaultWalletId,
+                walletId = wallet ?: context.walletFor(type),
                 toWalletId = toWallet,
                 categoryId = category?.id,
                 date = date ?: context.today,

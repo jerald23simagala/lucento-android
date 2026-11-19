@@ -1363,12 +1363,12 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                     val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
                     if (cardWidth >= 330.dp * textScale) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Wallets", composition.totalAssets, Modifier.weight(1f))
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Assets", composition.totalAssets, Modifier.weight(1f))
                             CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debts & loans", owed, Modifier.weight(1f))
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Wallets", composition.totalAssets, Modifier.fillMaxWidth())
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Assets", composition.totalAssets, Modifier.fillMaxWidth())
                             CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debts & loans", owed, Modifier.fillMaxWidth())
                         }
                     }

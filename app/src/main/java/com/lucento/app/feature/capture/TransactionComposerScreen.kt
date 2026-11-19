@@ -633,7 +633,7 @@ private fun WalletChip(
     }
 }
 
-/** "Where should these go?" — asked when there are several accounts and no default or entry wallet. */
+/** "Select wallet to use": asked when there are several accounts and no default or entry wallet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WalletPickerSheet(wallets: List<Wallet>, onChoose: (Long, Boolean) -> Unit, onDismiss: () -> Unit) {
@@ -641,7 +641,7 @@ private fun WalletPickerSheet(wallets: List<Wallet>, onChoose: (Long, Boolean) -
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter).navigationBarsPadding()) {
             SheetHeader(
-                title = "Where should these go?",
+                title = "Select wallet to use",
                 subtitle = "New transactions go to this wallet unless you name another. You can switch any time from the wallet bar.",
                 icon = Icons.Outlined.AccountBalanceWallet,
             )
@@ -650,14 +650,14 @@ private fun WalletPickerSheet(wallets: List<Wallet>, onChoose: (Long, Boolean) -
                 WalletRow(
                     wallet = wallet,
                     modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Use this wallet") {
-                        onChoose(wallet.id, remember && wallet.type.isSpendable)
+                        onChoose(wallet.id, remember && wallet.type.canBeDefault)
                     },
                 )
             }
             Spacer(Modifier.height(Spacing.sm))
             SwitchRow(
                 title = "Remember as my default",
-                description = "Cash, bank and e-wallets can be the default. You can change it in the wallet’s settings.",
+                description = "Cash, bank, e-wallets and credit cards can be the default. You can change it in the wallet’s settings.",
                 checked = remember,
                 onCheckedChange = { remember = it },
             )
