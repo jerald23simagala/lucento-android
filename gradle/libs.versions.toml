@@ -17,7 +17,7 @@ room = "2.8.5"
 # BOM's 1.7.8. CI's emulator run then crashed on a FlowRow overload (NoSuchMethodError, PR #68).
 datastore = "1.1.1"
 splashscreen = "1.0.1"
-kotlinxSerialization = "1.12.0"
+kotlinxSerialization = "1.13.0"
 coroutines = "1.11.0"
 # Airbnb Lottie for Compose. 6.6.7 is the last release before the library moved to compileSdk 36 (6.6.8);
 # it was built against Compose BOM 2024.02 / Kotlin 1.9, so this project's newer Compose and Kotlin win resolution.
@@ -36,7 +36,7 @@ supabase = "3.1.4"
 ktor = "3.0.3"
 # Held at 0.6.1: 0.7+ turns kotlinx.datetime.Instant into kotlin.time.Instant, and Supabase 3.1.4 is built against the
 # old class (SessionStoreTest: NoSuchMethodError on UserSession). Moves with Supabase 3.9, which needs compileSdk 37.
-kotlinxDatetime = "0.6.1"
+kotlinxDatetime = "0.8.0"
 workManager = "2.10.0"
 credentials = "1.3.0"
 googleid = "1.1.1"
