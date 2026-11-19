@@ -332,15 +332,15 @@ private fun endsText(before: RecurringSchedule, after: RecurringSchedule?): Stri
     return " · ends " + whole(end.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())))
 }
 
-/** The Change day sheet’s note, for what is selected: weekly plans only when there are some, and overdue when it applies. */
-private fun dayNote(months: Boolean, weeks: Boolean, weekSpan: String, overdue: Boolean): String {
+/** The Change day sheet’s note, for what is selected: weekly plans only when there are some (overdue is the footer’s). */
+private fun dayNote(months: Boolean, weeks: Boolean, weekSpan: String): String {
     val where = when {
         months && weeks -> "in the same month (weekly plans: the same week, $weekSpan)"
         weeks -> "in the same week, $weekSpan"
         else -> "in the same month"
     }
     return "Each plan’s next date moves to this day $where, so nothing is skipped. How often it repeats stays, and what it " +
-        "already recorded stays as it was." + if (overdue) " A day before today makes that date overdue." else ""
+        "already recorded stays as it was."
 }
 
 /**
@@ -575,7 +575,7 @@ internal fun ChangeDaySheet(
                     }
                 }
                 ChangePreview(lines)
-                InfoNote(dayNote(byMonth.isNotEmpty(), byWeek.isNotEmpty(), weekSpan, lines.any { it.overdue }))
+                InfoNote(dayNote(byMonth.isNotEmpty(), byWeek.isNotEmpty(), weekSpan))
             }
             Spacer(Modifier.height(Spacing.xs))
         }

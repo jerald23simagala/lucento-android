@@ -63,8 +63,14 @@
 - Device: TalkBack through Select mode (rows are checkboxes, day cells a radio group, "N selected" and the duplicate
   warning are announced), a Partner's phone (no Select pill, no long press), "Don't keep activities" with a sheet and
   the delete dialog open, and a second phone receiving a bulk change and a bulk delete (dirty flags and tombstones).
-- A phone frame check (`dumpsys gfxinfo`, Select all over about 40 plans › Change day › apply): the emulator can only
-  compare screens with each other (its GPU path makes every screen read janky).
+- A phone frame check (`dumpsys gfxinfo`, Select all over about 40 plans › Change day › apply, and once with about 10
+  weekly plans ending in two years, the preview's costliest path): the emulator can only compare screens with each
+  other (its GPU path makes every screen read janky).
+- On a phone: the confirmation's check and its 1.3 s hold after a bulk change, Change amount with the keyboard up, and
+  one recorded entry into Scheduled (the one-frame empty state the critic caught is fixed in code, not re-recorded).
+- Design critic P3s left (APPROVE 4.1, round 4): rows jump when the list re-sorts after a change (the rows sit in one
+  lazy item, so `animateItem()` needs them split into items); in the Save check, Cancel reads stronger than Add
+  another (shared `ConfirmDialog` styling); the pale "Adjust existing" button on the amber warning.
 - Owner calls, if testers ask: an earlier day applying from next month instead of making this month's date overdue
   (today the preview marks it "(overdue)"); Change amount by +/−/% instead of one amount.
 

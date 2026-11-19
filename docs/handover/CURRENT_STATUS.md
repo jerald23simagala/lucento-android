@@ -658,7 +658,8 @@ Adjust existing".
   no-break spaces in dates and before arrows), pinned sheet buttons with a hairline edge and "N dates will be overdue",
   a note built from the selection, an opaque band under the action bar, the Save dialog naming the plan(s), and one
   list decision per composition (a live `state.loading` read inside the list drew the empty state beside a loaded
-  page for one frame); the "Adjust existing" selection waits for the plans and is applied once.
+  page for one frame); the "Adjust existing" selection waits for the plans and is applied once. Round 4: **APPROVE
+  4.1**, no gate failing; P3s left in NEXT_TASKS.
 - **Frame check (emulator, animations on, `dumpsys gfxinfo`):** Select all over 40 plans › Change day › apply › Done:
   59–60 frames, median 53–57 ms, 90th 105–117 ms. Existing screens measured the same way (a plan's sheet, scrolling,
   Upcoming): median 97–101 ms, 90th 200–250 ms. Every screen reads as janky here (emulated GPU: "issue draw commands"
