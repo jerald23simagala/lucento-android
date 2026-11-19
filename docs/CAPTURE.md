@@ -55,10 +55,14 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
 
 ## Active wallet
 
-- One wallet can be the **default** ("Default wallet" switch in the wallet editor; cash, bank and e-wallets only). It is a
-  device preference (`UserPreferences.defaultWalletId`), not a database column; a stale id is ignored.
+- One wallet can be the **default** ("Default wallet" switch in the wallet editor; cash, bank, e-wallets and credit cards,
+  `WalletType.canBeDefault`). It is a device preference (`UserPreferences.defaultWalletId`), not a database column; a
+  stale id is ignored. A **credit card default takes expenses only** (tester round, 2026-11-18, owner's choice): while
+  the active wallet is that default and the person hasn't picked it, income, transfers and a new transfer's "from" go to
+  the first cash, bank or e-wallet (`InterpretationContext.moneyWalletId` / `walletFor`). A card picked in the wallet bar,
+  or the wallet the composer was opened from, takes every type.
 - The active wallet is, in order: the pill the user tapped, the wallet the composer was opened from, the default, or the
-  only account. With several accounts and none of these, the composer asks "Where should these go?" (with "Remember as
+  only account. With several accounts and none of these, the composer asks "Select wallet to use" (with "Remember as
   my default"), and a message sent before answering waits for the answer.
 - With two or more accounts a pinned **wallet bar** sits under the banner: one pill per account, the active one filled.
   Tapping another moves the unsaved rows that were only following it (`BatchReview.retarget`); rows whose words named an

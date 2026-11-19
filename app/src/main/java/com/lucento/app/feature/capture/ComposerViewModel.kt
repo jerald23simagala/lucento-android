@@ -252,7 +252,7 @@ class ComposerViewModel(
 
     // ------------------------------------------------------------------ the active wallet
 
-    /** Opens the "Where should these go?" picker (shown only while several accounts exist and none is active). */
+    /** Opens the "Select wallet to use" picker (shown only while several accounts exist and none is active). */
     fun askForWallet() = session.update { it.copy(showWalletPicker = true) }
 
     /**
@@ -268,7 +268,7 @@ class ComposerViewModel(
 
     /**
      * Makes [walletId] the active wallet: later messages go there, and unsaved rows that were only following the
-     * previous active wallet move with it. [remember] also makes it the default wallet (cash, bank or e-wallet only).
+     * previous active wallet move with it. [remember] also makes it the default wallet (cash, bank, e-wallet or credit card).
      */
     fun chooseWallet(walletId: Long, remember: Boolean = false) {
         val wallet = state.value.wallets.firstOrNull { it.id == walletId } ?: return
@@ -281,7 +281,7 @@ class ComposerViewModel(
                 pending = null,
             )
         }
-        if (remember && wallet.type.isSpendable && preferences != null) {
+        if (remember && wallet.type.canBeDefault && preferences != null) {
             viewModelScope.launch { preferences.setDefaultWallet(walletId) }
         }
         pending?.let { (text, source) -> send(text, source, chosen = walletId) }
@@ -291,7 +291,8 @@ class ComposerViewModel(
     fun startTransfer() {
         val current = state.value
         if (!current.loaded || !current.transfersAllowed || current.saving) return
-        val from = current.wallets.firstOrNull { it.id == current.activeWalletId }
+        // A transfer starts from a money account when the active wallet is only a card default (owner, 2026-11-18).
+        val from = current.wallets.firstOrNull { it.id == (moneyWalletFor(current) ?: current.activeWalletId) }
         val id = nextMessageId++
         val text = if (from != null) "New transfer from ${from.name}" else "New transfer"
         val candidate = TransactionCandidate(
@@ -378,7 +379,22 @@ class ComposerViewModel(
             decimalSeparator = separator,
             spaceGrouping = java.text.DecimalFormatSymbols.getInstance().groupingSeparator in setOf(' ', ' ', ' ', ' '),
             dayFirst = phoneDayFirst(),
+            moneyWalletId = moneyWalletFor(loaded),
         )
+    }
+
+    /**
+     * Where income and transfers go while the active wallet is the saved default and that default is a credit card: the
+     * first cash, bank or e-wallet (owner, 2026-11-18). Null when the person picked the wallet (here, or by opening the
+     * composer from it), when the default isn't a card, or when there is no money account to use instead.
+     */
+    private fun moneyWalletFor(state: ComposerState): Long? {
+        val s = session.value
+        val picked = listOf(s.chosenWalletId, s.entryWalletId).any { id -> id != null && state.wallets.any { it.id == id } }
+        if (picked) return null
+        val active = state.wallets.firstOrNull { it.id == state.activeWalletId } ?: return null
+        if (active.type != com.lucento.app.domain.WalletType.CREDIT_CARD) return null
+        return state.wallets.firstOrNull { it.type.isSpendable }?.id
     }
 
     /** The account of the most recently recorded income or expense, so the usual account is the default. */

@@ -296,7 +296,7 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
 2. **Net Wallet Balance card**: an ID-1-proportioned blue card (theme-independent, like a physical card) with a
    guilloché texture, the Lucento mark, a decorative gold chip and a contactless glyph; the signed balance (info
    tooltip explains assets − owed), "vs last month" mini-bars with a % only when comparable (docs/CALCULATIONS.md),
-   then **Wallets** (assets) and **Debt & Loans** (signed, −) figures. Empty: mascot on the left with a short prompt.
+   then **Assets** (everything held; "Wallets" until the tester round of 2026-11-18) and **Debt & Loans** (signed, −) figures. Empty: mascot on the left with a short prompt.
 3. **Monthly budget** (owner's redesign, 2026-11-18), one card in three parts, with the pace chip in words (Over
    budget · Under budget · Ahead of pace · On track) in its header. **A**: a half gauge (health colour) with the amount
    spent in its hollow and "spent of <budget>" under it, a "N% spent" pill, and "Budgeted ₱X • Unbudgeted ₱Y"; at 130 %

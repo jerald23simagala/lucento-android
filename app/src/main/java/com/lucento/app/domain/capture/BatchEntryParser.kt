@@ -169,7 +169,8 @@ object BatchEntryParser {
     private fun build(raw: Raw, type: TransactionType, date: LocalDate, context: InterpretationContext): TransactionCandidate {
         // Account mentions, transfer roles and the named currency come from the single-entry parser.
         val proposal = QuickEntryParser.parse(raw.clean, context.wallets, context.categories, context.today)
-        val defaultWallet = context.wallets.firstOrNull { it.id == context.defaultWalletId }?.id ?: context.wallets.firstOrNull()?.id
+        // A card default takes expenses; income and transfers go to a money account (InterpretationContext.walletFor).
+        val defaultWallet = context.walletFor(type)
         var walletId: Long?
         var toWalletId: Long? = null
         if (type.isTransfer) {

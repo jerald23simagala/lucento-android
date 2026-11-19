@@ -497,11 +497,16 @@ fun WalletEditorSheet(
                 )
             }
 
-            if (draft.type.isSpendable) {
+            if (draft.type.canBeDefault) {
                 Spacer(Modifier.height(Spacing.sm))
                 SwitchRow(
                     title = "Default wallet",
-                    description = "New transactions go here unless you pick another wallet in the composer.",
+                    description = if (draft.type == WalletType.CREDIT_CARD) {
+                        // Tester round (2026-11-18): a card can be the default; income and transfers still go to cash or a bank.
+                        "New expenses go here unless you pick another wallet. Income and transfers go to your cash, bank or e-wallet."
+                    } else {
+                        "New transactions go here unless you pick another wallet in the composer."
+                    },
                     checked = draft.isDefault,
                     onCheckedChange = { draft = draft.copy(isDefault = it) },
                 )

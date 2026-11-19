@@ -55,7 +55,18 @@ data class InterpretationContext(
     val spaceGrouping: Boolean = false,
     /** The phone writes dates day first ("03/11"); used only when a scanned statement's own dates can't settle it. */
     val dayFirst: Boolean? = null,
+    /**
+     * Where income and transfers go when the default is a credit card the person didn't pick for this entry (owner,
+     * 2026-11-18): the first cash, bank or e-wallet. Null otherwise: [defaultWalletId] then serves every type.
+     */
+    val moneyWalletId: Long? = null,
 ) {
+    /** The account a [type] goes to when the words don't name one: the default, but income and transfers never a card's. */
+    fun walletFor(type: TransactionType?): Long? {
+        val money = moneyWalletId?.takeIf { type != TransactionType.EXPENSE && wallets.any { it.id == moneyWalletId } }
+        return money ?: wallets.firstOrNull { it.id == defaultWalletId }?.id ?: wallets.firstOrNull()?.id
+    }
+
     /** Minor-unit digits of the account amounts go to by default (2 when there is none), for reading written numbers. */
     val fractionDigits: Int
         get() = (wallets.firstOrNull { it.id == defaultWalletId } ?: wallets.firstOrNull())

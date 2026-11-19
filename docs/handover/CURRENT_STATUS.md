@@ -603,6 +603,22 @@ have the v14 columns, so a 0.5.13 phone syncs investments, kinds, spending choic
 on the same account skip what they can't read; KNOWN_ISSUES TR-2 explains the placeholder they may show. Owner: upload
 to Internal testing, then OT-39.
 
+## Tester round 2026-11-18, part A — 2026-11-19 (`feature/card-default-wallet`)
+
+The owner relayed tester requests and chose the options (memory: tester round 2026-11-18).
+- **A credit card can be the default wallet** (`WalletType.canBeDefault`). Expenses go to it. Income, transfers and a new
+  transfer's "from" go to the first cash, bank or e-wallet, but only while the card is just the saved default
+  (`InterpretationContext.moneyWalletId` and `walletFor`). A card picked in the wallet bar, or the wallet the composer
+  opened from, takes every type. The wallet editor's switch says so on a card.
+- **Wording.** Home's hero now reads "Assets" (was "Wallets"; the figure is total assets). The composer's picker now
+  reads "Select wallet to use" (was "Where should these go?").
+- **Tests.** `CardDefaultWalletTest` (6). Full local `testDebugUnitTest`: 1,600 tests, 0 failures. `assembleDebug`
+  and `lintDebug` pass.
+- **Emulator (API 35, local capture):** the hero's "Assets", and the switch on a card. In the composer, with the card as
+  default, "Lunch 250" went to the card and "Salary 35000" to Everyday bank.
+- **Still to come:** Scheduled bulk edit and the duplicate warning (part B), and Free limits in setup plus the Pro wall
+  dialog (part C).
+
 ## Monthly budget card redesign — 2026-11-18 (`feature/budget-card-constraints`)
 
 The owner asked for Home's Monthly budget card in three parts (how much is spent; Budget remaining and Spendable

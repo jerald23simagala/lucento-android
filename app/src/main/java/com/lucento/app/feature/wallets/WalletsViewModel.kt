@@ -62,7 +62,7 @@ data class WalletDraft(
     val type: WalletType = WalletType.CASH,
     val currencyCode: String,
     val amountText: String = "",
-    /** "Default wallet": new transactions go here. Only kept for spendable types (cash, bank, e-wallet). */
+    /** "Default wallet": new transactions go here. Kept for cash, bank, e-wallets and credit cards (expenses only). */
     val isDefault: Boolean = false,
     // Debt details, kept only for a card or loan (see DebtTerms).
     /** Yearly interest rate as typed, e.g. "12.5"; optional. */
@@ -364,7 +364,7 @@ class WalletsViewModel(
     private suspend fun applyDefault(id: Long, draft: WalletDraft) {
         val current = preferences.preferences.first().defaultWalletId
         when {
-            draft.isDefault && draft.type.isSpendable -> if (current != id) preferences.setDefaultWallet(id)
+            draft.isDefault && draft.type.canBeDefault -> if (current != id) preferences.setDefaultWallet(id)
             current == id -> preferences.setDefaultWallet(null)
         }
     }
