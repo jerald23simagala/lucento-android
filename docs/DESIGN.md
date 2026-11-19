@@ -415,8 +415,8 @@ gone). `ProBadge` still marks locked wallet types in the type picker (also when 
 Pro-only kind is marked) and locked themes. Add wallet opens the editor on Cash while money wallets fit; when they are
 full it opens the type sheet first, with the money types marked, so nobody lands in a form that silently starts as a
 card; the dialog appears only when nothing fits. Getting started has no dialog and no
-mention of Pro: at the Free numbers an accounts step swaps its "Add another" chips for a quiet line, "You can add more
-later, from Wallets.", and its header for "These are the accounts you’re starting with." (or "…cards and loans…"); the
+mention of Pro: at the Free numbers an accounts step swaps its "Add another" chips for a quiet line, "You can edit
+these any time in Wallets." (owner, 2026-11-19: nothing promised that Free doesn't give), and its header for "These are the accounts you’re starting with." (or "…cards and loans…"); the
 setup editor leaves locked types out of its picker, and from 130 % text an account row puts its amount under the name
 so neither is cut. Copy: customer copy D-0 / D-0a.
 

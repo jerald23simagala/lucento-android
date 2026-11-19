@@ -914,4 +914,4 @@ private fun DoneRow(done: Boolean, title: String, detail: String) {
 }
 
 /** Where the guided setup's add options were, once the plan holds no more of a kind (owner, 2026-11-18: no Pro mention). */
-internal const val SETUP_MORE_LATER = "You can add more later, from Wallets."
+internal const val SETUP_MORE_LATER = "You can edit these any time in Wallets."

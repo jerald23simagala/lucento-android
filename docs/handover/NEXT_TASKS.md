@@ -65,10 +65,9 @@
   mid-trial (no flash), closing the sheet; TalkBack on the message, the preview and the try-on note.
 - Compose UI tests: `ProWallDialog` first tap and repeat (one `onDismiss`, Unlock calls `open`), the message landing in
   the open sheet, the theme trial ending with the sheet, the preview's semantics (one description, no digits).
-- Owner calls from the design review (2026-11-19, REVISE 3.3): keep a half-filled form across Unlock or See Lucento Plan
-  (today the sheet closes and its draft goes, as #109's dialog did); apply a tried theme once Pro arrives; one label for
-  the plan page (the profile card's "See Lucento Pro", approved 2026-11-09, beside the walls' "See Lucento Plan"); the
-  word "Unlock". A 130 % capture set and a 360 dp set at 100 %.
+- Decided by the owner (2026-11-19): drafts stay as they are (the form closes on the way to the plan page); a tried
+  theme bought from its note is applied once Pro arrives; "See Lucento Plan" is the one label; "Unlock" stays (built in
+  `feature/owner-calls-2026-11-19`). Still to do: a 130 % capture set and a 360 dp set at 100 %.
 
 ## Free limits and the Pro dialog — follow-ups (2026-11-19, `feature/free-limits-pro-dialog`)
 
@@ -80,9 +79,9 @@
 - At 200 % on a 360 dp phone the wallet editor's live card truncates its name and currency (FL-5, older than this change).
 - Older layout seen by the critic (FL-6): status-bar padding on the New wallet sheet's header, Skip once a setup step
   has entries, tappable setup rows, the goal sheet's Name label.
-- Owner calls from the design critic (2026-11-19, REVISE 3.2): the setup line "You can add more later, from Wallets."
-  (the owner's "set up the rest later") versus a line that promises nothing ("You can edit these any time in Wallets.");
-  start-aligned dialog bodies longer than two lines and centred buttons (shared `ConfirmDialog`).
+- Decided by the owner (2026-11-19): setup's line is "You can edit these any time in Wallets." (it promises nothing).
+  Still open (design opinion): start-aligned dialog bodies longer than two lines and centred buttons (shared
+  `ConfirmDialog`).
 
 ## Scheduled bulk edit — follow-ups (2026-11-19, `feature/scheduled-bulk-edit`)
 
@@ -99,8 +98,8 @@
 - Design critic P3s left (APPROVE 4.1, round 4): rows jump when the list re-sorts after a change (the rows sit in one
   lazy item, so `animateItem()` needs them split into items); in the Save check, Cancel reads stronger than Add
   another (shared `ConfirmDialog` styling); the pale "Adjust existing" button on the amber warning.
-- Owner calls, if testers ask: an earlier day applying from next month instead of making this month's date overdue
-  (today the preview marks it "(overdue)"); Change amount by +/−/% instead of one amount.
+- Decided by the owner (2026-11-19): an earlier day makes this month's date overdue, as built. If testers ask: Change
+  amount by +/−/% instead of one amount.
 
 ## Monthly budget card — follow-ups (2026-11-18, `feature/budget-card-constraints`)
 

@@ -670,6 +670,20 @@ Adjust existing".
   promising 2 changes where 3 were made (Rent moving from the 30th to the 31st only from December); the preview now
   shows the first date that changes, and a plan already on the chosen day is skipped.
 
+## Owner calls — 2026-11-19 (`feature/owner-calls-2026-11-19`)
+
+The owner answered the open calls from the tester round and the Pro experience (multiple choice):
+- **Kept as built:** an earlier Change day makes this month's date overdue; a half-filled form closes on the way to the
+  plan page; the message's "Unlock".
+- **One label:** every button to the plan page reads "See Lucento Plan" (the profile menu's Pro card and the plan-ended
+  sheet changed from "See Lucento Pro"; `ProCopy.WALL_SEE_PLAN`).
+- **A tried theme bought from its note** becomes the theme once Pro arrives (`ThemeTrial.afterPurchase`, in memory;
+  `LucentoRoot` applies it only when the real plan includes it and lets go once the saved theme is that one).
+- **Setup promises nothing Free doesn't give:** "You can edit these any time in Wallets." under the accounts; "Setup adds
+  up to 3 accounts and 2 cards or loans. You can edit them any time in Wallets." and "Setup adds up to 2 goals. You can
+  edit them any time in Goals." where a save in setup meets a count.
+- **Next:** build 0.5.14 for internal testing (owner: yes), for OT-41.
+
 ## Pro experience: walls met again, previews — 2026-11-19 (`feature/pro-repeat-taps-previews`)
 
 **Merged** as #110 (`df50cb5`, 2026-11-19) after all six CI checks passed (unit tests, lint, debug and release builds;

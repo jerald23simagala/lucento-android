@@ -303,17 +303,21 @@ expenses, with the figures hidden."
 > are always free.
 > [ See Lucento Plan ]  [ Done ]
 
-The tried theme's tile reads "Trying" (TalkBack: "Trying, not saved"); the saved theme keeps its check.
+The tried theme's tile reads "Trying" (TalkBack: "Trying, not saved"); the saved theme keeps its check. Taken to the
+plan page from this note and bought, it becomes the theme once Pro arrives (owner, 2026-11-19). Every button to the plan
+page reads "See Lucento Plan" (owner, 2026-11-19), the profile card's and the plan-ended sheet's included.
 
 **D-0a Free limits while setting up (no dialog, no mention of Pro).** At the Free numbers the guided setup hides its
 add options and says:
-- Accounts, and cards and loans: "You can add more later, from Wallets." (the step's header then reads "These are the
+- Accounts, and cards and loans: "You can edit these any time in Wallets." (owner, 2026-11-19; the step's header then reads "These are the
   accounts you’re starting with." or "These are the cards and loans you’re starting with.")
-- The wallet editor in setup, if a save meets a count anyway: "You can add more of these later, from Wallets."; a
+- The wallet editor in setup, if a save meets a count anyway: "Setup adds up to 3 accounts and 2 cards or loans. You
+  can edit them any time in Wallets."; a
   currency the plan doesn't include: "Setup uses your main currency, PHP." (what setup does; it promises nothing the plan
   doesn't give). At the limit the step's title reads "Your accounts" or "Your cards and loans"
 - Goals: setup's goal step adds one goal, under the free two, and its "Kept in" offers no Add wallet at three money
-  wallets; a goal save in setup that meets the count anyway says "You can add more goals later, from Goals."
+  wallets; a goal save in setup that meets the count anyway says "Setup adds up to 2 goals. You can edit them any time
+  in Goals."
 
 **D-1 Wallet limit reached (money wallet)**
 > **You have {3} money wallets — the most on the free plan**

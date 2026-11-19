@@ -102,7 +102,7 @@ fun ProInviteCard(onOpen: () -> Unit, modifier: Modifier = Modifier) {
                 }
             }
         }
-        LucentoPrimaryButton(text = "See Lucento Pro", onClick = onOpen)
+        LucentoPrimaryButton(text = ProCopy.WALL_SEE_PLAN, onClick = onOpen)
     }
 }
 
@@ -267,7 +267,7 @@ fun PlanNoticeSheet(notice: PlanNotice, onSeePro: () -> Unit, onDismiss: () -> U
             Spacer(Modifier.height(Spacing.sm))
             Text(copy.body, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(Spacing.lg))
-            LucentoPrimaryButton(text = "See Lucento Pro", onClick = onSeePro, modifier = Modifier.fillMaxWidth())
+            LucentoPrimaryButton(text = ProCopy.WALL_SEE_PLAN, onClick = onSeePro, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(Spacing.xs))
             LucentoTextButton(text = "OK", onClick = onDismiss)
             Spacer(Modifier.height(Spacing.lg))
