@@ -66,7 +66,28 @@ fun DebtsScreen(
     val totals = debts.groupBy { it.currencyCode }
         .map { (code, list) -> Money.sum(code, list.map { it.balance }) }
         .sortedWith(compareBy<Money> { it.currencyCode != state.primaryCurrency }.thenBy { it.currencyCode })
-    val newDebt = { WalletDraft(type = WalletType.LOAN, currencyCode = state.primaryCurrency) }
+    // Add: a loan or card while the plan holds one more, otherwise the Pro dialog (owner, 2026-11-18).
+    val walletsState by walletsViewModel.uiState.collectAsStateWithLifecycle()
+    val plan = com.lucento.app.feature.pro.LocalEntitlements.current
+    var wall by remember { mutableStateOf<com.lucento.app.feature.pro.ProWall?>(null) }
+    val newDebt: () -> WalletDraft? = {
+        val capabilities = plan.capabilities(System.currentTimeMillis())
+        val gates = com.lucento.app.domain.entitlement.ProGates
+        // While the wallet list is still loading there is no early answer: a loan, and the save still checks.
+        val type = if (walletsState.loading) {
+            WalletType.LOAN
+        } else {
+            gates.firstAddableWalletType(
+                listOf(WalletType.LOAN, WalletType.CREDIT_CARD), state.primaryCurrency, state.primaryCurrency, walletsState.wallets, capabilities,
+            )
+        }
+        if (type == null) {
+            wall = com.lucento.app.feature.pro.ProWall.of(
+                gates.walletAccess(WalletType.LOAN, state.primaryCurrency, null, state.primaryCurrency, walletsState.wallets, capabilities),
+            )
+        }
+        type?.let { WalletDraft(type = it, currencyCode = state.primaryCurrency) }
+    }
     // Lucento Shared: a Partner sees every debt; the Shared Space's Owner adds and changes them.
     val canEdit = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
 
@@ -136,12 +157,15 @@ fun DebtsScreen(
         }
     }
 
+    wall?.let { met -> com.lucento.app.feature.pro.ProWallDialog(met, onDismiss = { wall = null }) }
     adding?.let { draft ->
         WalletEditorSheet(
             initial = draft,
             onSave = walletsViewModel::save,
             onDelete = null,
             onDismiss = { adding = null },
+            activeWallets = walletsState.planWallets,
+            mainCurrency = state.primaryCurrency,
             onPlanPayment = onPlanDebtPayment?.let { plan ->
                 { id, date ->
                     adding = null

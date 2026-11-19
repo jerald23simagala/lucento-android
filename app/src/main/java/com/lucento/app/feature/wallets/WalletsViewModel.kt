@@ -53,6 +53,12 @@ data class WalletsUiState(
 
     /** What the list shows after the side filter. */
     val shown: List<Wallet> get() = WalletsOverview.filter(wallets, side)
+
+    /** The wallets for the editor's early plan check, or null while the list is still loading (the save still checks). */
+    val planWallets: List<Wallet>? get() = if (loading) null else wallets
+
+    /** The main currency for that check: null while loading, never the "USD" placeholder. */
+    val planMainCurrency: String? get() = if (loading) null else primaryCurrency
 }
 
 /** Editable form state for creating or updating a wallet. */
@@ -107,7 +113,12 @@ sealed interface DraftError {
     data class TypeLocked(val usage: WalletUsage) : DraftError
     data object NotFound : DraftError
     /** Lucento Pro: the plan doesn't allow this wallet; [message] says the limit and that nothing existing changes. */
-    data class PlanLimit(val feature: com.lucento.app.domain.entitlement.ProFeature, val message: String) : DraftError
+    data class PlanLimit(
+        val feature: com.lucento.app.domain.entitlement.ProFeature,
+        val message: String,
+        val used: Int? = null,
+        val limit: com.lucento.app.domain.entitlement.Limit? = null,
+    ) : DraftError
     data object InterestInvalid : DraftError
     data object TermInvalid : DraftError
     data object InstallmentInvalid : DraftError
@@ -297,6 +308,8 @@ class WalletsViewModel(
                     WalletRepository.SaveResult.NotFound, WalletRepository.SaveResult.NotPermitted -> DraftError.NotFound
                     is WalletRepository.SaveResult.LimitReached -> DraftError.PlanLimit(
                         result.feature, com.lucento.app.feature.pro.ProCopy.limitReachedLine(result.feature, result.used, result.limit),
+                        used = result.used,
+                        limit = result.limit,
                     )
                     is WalletRepository.SaveResult.ProRequired ->
                         DraftError.PlanLimit(result.feature, com.lucento.app.feature.pro.ProCopy.lockedLine(result.feature))
@@ -358,6 +371,16 @@ class WalletsViewModel(
             ?.money?.takeIf { it.amountMinor > 0 }
             ?: return DebtParse.Error(DraftError.InstallmentInvalid)
         return DebtParse.Valid(DebtTerms(interestRateBps = rate, repayment = DebtRepayment.MONTHLY, termMonths = months, installment = installment))
+    }
+
+    /**
+     * The editor's draft of [wallet] with its real Default switch, once the list (and so the default) has loaded: a tap
+     * on Edit while it loads opens the editor a moment later rather than with the switch off, which saving would apply
+     * (a default card edited from the budget card stopped being the default; QA 2026-11-19).
+     */
+    suspend fun draftFor(wallet: Wallet): WalletDraft {
+        val loaded = uiState.first { !it.loading }
+        return wallet.toDraft(isDefault = wallet.id == loaded.defaultWalletId)
     }
 
     /** Makes the saved wallet the default, or stops it being one (unticked, or changed to a non-spending type). */

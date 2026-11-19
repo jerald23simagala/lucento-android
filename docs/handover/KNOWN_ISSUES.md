@@ -15,6 +15,17 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Free limits and the Pro dialog (2026-11-19, `feature/free-limits-pro-dialog`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| FL-1 | In the Compose test only: recreating the activity while the guided setup is pending (the text size changed right after "Continue to set up") threw "You must call setGraph() before calling getGraph()" from `MainScaffold`'s guide effect (`LucentoRoot.kt`), which pushes the guide while `currentDestination` is null. On a phone the effect runs after the first layout, when the NavHost has set its graph; the test runs effects early. Older than this change | Verified (emulator, `FreeLimitsShotsTest` at 200 %, 2026-11-19); code reading for the phone | Harden: skip the push while the destination is null (the effect re-runs once the graph is set), with a recreation test |
+| FL-2 | A wallet whose stored type this version can't read shows as Cash and counts as a money wallet on screen, while the save's count skips it: with 2 money wallets and 1 of a newer version's type, Add shows the dialog where the save would accept (QA L7) | Code reading | Rare (needs a newer version's type); count it apart if it is ever seen |
+| FL-3 | Cold start: the plan reads Free until its cache loads, while the repository waits for the cache; a Pro person's very first tap in that moment could meet a dialog (QA L9). The launch animation covers the window | Code reading; not seen | Hold the dialogs until `EntitlementManager.ready` if it is ever seen |
+| FL-4 | Home's sync sheet, when paused, stays a status sheet with its own button rather than the dialog (it explains a state, customer copy D-4b; QA L6). Its button now reads "See Lucento Plan" and a Lifetime owner without Lucento Cloud reads "Cloud sync comes with Lucento Cloud" | Verified: JVM (`SyncPausedByPlanTest`) | — (by design) |
+| FL-6 | Older than this change, seen by the design critic: the New wallet sheet's header starts about 17 dp from the top, under the status bar; at 200 % its title touches the clock, and a phone with a cutout could overlap them. Also: Skip on the cards step does what Continue does even with cards added; setup's rows can't be tapped to fix a balance; the goal sheet's Name label bites into its field | Verified (emulator, `fl-06`, `fl-xl-06`, `fl-02b`) | NEXT_TASKS "Free limits — follow-ups" |
+| FL-5 | Older than this change: at 200 % text on a 360 dp phone the wallet editor's live card shows "Your credi…" and "PHP · Ph…"; the fields under it show both in full | Verified (emulator, `fl-xl-06`) | NEXT_TASKS "Free limits — follow-ups" |
+
 ## Scheduled bulk edit (2026-11-19, `feature/scheduled-bulk-edit`)
 
 | Id | Issue | Evidence | Next step |

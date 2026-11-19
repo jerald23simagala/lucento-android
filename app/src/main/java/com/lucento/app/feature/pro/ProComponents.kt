@@ -43,7 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.component.Hairline
-import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
@@ -57,13 +56,16 @@ import com.lucento.app.domain.entitlement.ComparisonRow
 import com.lucento.app.domain.entitlement.PlanNotice
 import com.lucento.app.domain.entitlement.ProFeature
 
-/** A small "Pro" mark beside something the current plan doesn't include. Read as "Lucento Pro feature" by TalkBack. */
+/**
+ * A small "Pro" mark beside something the current plan doesn't include. TalkBack reads [description]: "Lucento Pro feature",
+ * or for a count the plan fact ("The Free plan includes 3 money wallets").
+ */
 @Composable
-fun ProBadge(modifier: Modifier = Modifier) {
+fun ProBadge(modifier: Modifier = Modifier, description: String = "Lucento Pro feature") {
     StatusPill(
         text = "Pro",
         tone = StatusTones.brand,
-        modifier = modifier.clearAndSetSemantics { contentDescription = "Lucento Pro feature" },
+        modifier = modifier.clearAndSetSemantics { contentDescription = description },
     )
 }
 
@@ -102,23 +104,6 @@ fun ProInviteCard(onOpen: () -> Unit, modifier: Modifier = Modifier) {
         }
         LucentoPrimaryButton(text = "See Lucento Pro", onClick = onOpen)
     }
-}
-
-/**
- * Every lock in Lucento looks the same: one quiet note, where the person is, saying what isn't on their plan and what
- * stays free, with a link to the Lucento Pro page — never a pop-up over what they were doing (docs/MONETIZATION.md §6.1).
- * [open] replaces the default navigation when the note sits in a sheet that must close first.
- */
-@Composable
-fun ProNote(text: String, from: ProFeature?, modifier: Modifier = Modifier, open: ((ProFeature?) -> Unit)? = null) {
-    val openPro = LocalOpenPro.current
-    InfoNote(
-        text = text,
-        modifier = modifier,
-        icon = Icons.Outlined.WorkspacePremium,
-        actionLabel = "See Lucento Pro",
-        onAction = { (open ?: openPro)(from) },
-    )
 }
 
 /** Width of each plan column in the comparison table: fits "No limit" and "1 Partner" at the default text size. */

@@ -156,6 +156,7 @@ fun BudgetScreen(
     /** Counts a wallet as spending money, and edits a card's counted credit, as Home's budget card does. */
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
+    val budgetWallets by walletsViewModel.uiState.collectAsStateWithLifecycle()
     val fmt = amountFormat()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var monthOffset by rememberSaveable { mutableIntStateOf(0) }
@@ -180,6 +181,7 @@ fun BudgetScreen(
     val isCurrentMonth = monthOffset == 0
     var editing by remember { mutableStateOf<CategoryBudgetLine?>(null) }
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
+    val walletScope = rememberCoroutineScope()
     var showAllBudgeted by rememberSaveable { mutableStateOf(false) }
     // Lucento Shared: a Partner sees the whole budget; the Shared Space's Owner sets the amounts and categories.
     val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
@@ -308,7 +310,8 @@ fun BudgetScreen(
                             // The sheets speak of the figures' own currency (another budget currency included; QA L3).
                             mainCurrency = plan.currencyCode,
                             onSetSpendable = walletsViewModel::setSpendable,
-                            onEditCard = { editingWallet = it.toDraft() },
+                            // With its real Default switch, so a default card stays the default.
+                            onEditCard = { card -> walletScope.launch { editingWallet = walletsViewModel.draftFor(card) } },
                             onReviewDue = onOpenScheduled,
                             showPerDay = true,
                         )
@@ -426,6 +429,8 @@ fun BudgetScreen(
             onSave = walletsViewModel::save,
             onDelete = walletsViewModel::delete,
             onDismiss = { editingWallet = null },
+            activeWallets = budgetWallets.planWallets,
+            mainCurrency = budgetWallets.planMainCurrency,
         )
     }
 }

@@ -32,6 +32,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,6 +107,7 @@ fun WalletDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val walletsState by walletsViewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
+    val editScope = rememberCoroutineScope()
     var adjusting by remember { mutableStateOf(false) }
     var outsideSheet by remember { mutableStateOf<com.lucento.app.domain.OutsideMovement?>(null) }
     var statement by remember { mutableStateOf<com.lucento.app.domain.ask.Report?>(null) }
@@ -129,7 +132,7 @@ fun WalletDetailScreen(
                 actions = {
                     // A Partner sees the wallet but doesn't change it (the Shared Space's Owner does).
                     if (wallet != null && access.canManageStructure) {
-                        IconButton(onClick = { editing = wallet.toDraft(isDefault = wallet.id == walletsState.defaultWalletId) }) {
+                        IconButton(onClick = { editScope.launch { editing = walletsViewModel.draftFor(wallet) } }) {
                             Icon(Icons.Outlined.Edit, contentDescription = "Edit account")
                         }
                     }
@@ -164,7 +167,7 @@ fun WalletDetailScreen(
                         container = ext.warningContainer,
                         content = ext.warning,
                         actionLabel = if (com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure) "Set rate" else null,
-                        onAction = { editing = wallet.toDraft(isDefault = wallet.id == walletsState.defaultWalletId) },
+                        onAction = { editScope.launch { editing = walletsViewModel.draftFor(wallet) } },
                     )
                 } else {
                     val worth = fx.carrying?.let { com.lucento.app.core.money.MoneyFormatter.format(if (liability) -it else it) }
@@ -395,6 +398,8 @@ fun WalletDetailScreen(
             onSave = walletsViewModel::save,
             onDelete = walletsViewModel::delete,
             onDismiss = { editing = null },
+            activeWallets = walletsState.planWallets,
+            mainCurrency = walletsState.planMainCurrency,
             onPlanPayment = onPlanDebtPayment?.let { plan ->
                 { id, date ->
                     editing = null

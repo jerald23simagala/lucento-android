@@ -192,6 +192,14 @@ fun WalletEditorSheet(
      * reminder comes from its due day instead (CreditCardMath), so it never opens one.
      */
     onPlanPayment: ((Long, LocalDate) -> Unit)? = null,
+    /**
+     * The active wallets and the main currency, so a type or currency the plan doesn’t include is met when it is chosen,
+     * not after the form is filled in (owner, 2026-11-18). Null skips that check; Save still applies the plan.
+     */
+    activeWallets: List<Wallet>? = null,
+    mainCurrency: String? = null,
+    /** The guided setup: what the plan doesn’t include isn’t offered, and nothing here mentions Pro (owner, 2026-11-18). */
+    inSetup: Boolean = false,
 ) = AmountsShown {
     val sheetState = com.lucento.app.core.designsystem.component.rememberStickySheetState()
     val scope = rememberCoroutineScope()
@@ -207,6 +215,28 @@ fun WalletEditorSheet(
     val institution = LocalInstitutions.current[draft.institutionId]
     var confirmingDelete by remember { mutableStateOf(false) }
     var blocked by remember { mutableStateOf<WalletRepository.DeleteResult?>(null) }
+    // A Pro wall met in this sheet (the dialog), or in the guided setup a plain note instead.
+    var wall by remember { mutableStateOf<com.lucento.app.feature.pro.ProWall?>(null) }
+    var setupNote by remember { mutableStateOf<String?>(null) }
+    val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+    val plan = com.lucento.app.feature.pro.LocalEntitlements.current
+    val capabilities = remember(plan) { plan.capabilities(System.currentTimeMillis()) }
+    val editingWallet = activeWallets?.firstOrNull { it.id == initial.id }
+
+    // The early check needs the wallet list and, for an edit, the wallet in it; until then (still loading) the save decides.
+    val planKnown = activeWallets != null && (initial.id == null || editingWallet != null)
+
+    /**
+     * What the plan says to this wallet being [type] in [currency] (the repository’s own rule, asked early). An edit across
+     * the balance side (own ↔ owe, or into or out of something valued by hand) gets no early answer: a wallet with history
+     * can't make it on any plan, and the save says which (QA 2026-11-19).
+     */
+    fun planAccess(type: WalletType, currency: String): com.lucento.app.domain.entitlement.Access =
+        if (planKnown && !(editingWallet != null && com.lucento.app.domain.WalletChangePolicy.crossesBalanceSide(editingWallet.type, type))) {
+            com.lucento.app.domain.entitlement.ProGates.walletAccess(type, currency, editingWallet, mainCurrency, activeWallets.orEmpty(), capabilities)
+        } else {
+            com.lucento.app.domain.entitlement.Access.Allowed
+        }
 
     // Onboarding's filled fields: tinted, rounded, outlined only while focused.
     val fieldColors = LucentoFields.filledColors()
@@ -512,15 +542,10 @@ fun WalletEditorSheet(
                 )
             }
 
-            // Lucento Pro: a plan limit isn't a mistake in the form; it is said here, by the button, with the way out.
-            (error as? DraftError.PlanLimit)?.let { limit ->
-                val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+            // The guided setup says plainly that more can come later, never "Pro" (owner, 2026-11-18).
+            setupNote?.let { note ->
                 Spacer(Modifier.height(Spacing.md))
-                com.lucento.app.feature.pro.ProNote(
-                    limit.message,
-                    from = limit.feature,
-                    open = { feature -> close { onDismiss(); openPro(feature) } },
-                )
+                com.lucento.app.core.designsystem.component.InfoNote(note)
             }
             Spacer(Modifier.height(Spacing.lg))
             LucentoPrimaryButton(
@@ -529,6 +554,16 @@ fun WalletEditorSheet(
                     onSave(draft, decimalSeparator) { result, savedId ->
                         val remind = draft.reminderDate
                         when {
+                            // A plan limit met at Save (the early check missed it, or wasn’t asked): the Pro dialog, or in
+                            // the guided setup the plain note.
+                            result is DraftError.PlanLimit -> {
+                                haptics.reject()
+                                if (inSetup) {
+                                    setupNote = setupLine(result.feature, mainCurrency)
+                                } else {
+                                    wall = com.lucento.app.feature.pro.ProWall(result.feature, result.used, result.limit)
+                                }
+                            }
                             result != null -> {
                                 haptics.reject()
                                 error = result
@@ -545,24 +580,52 @@ fun WalletEditorSheet(
     }
 
     if (pickingType) {
+        // Types the plan doesn’t include now: marked Pro (picking one opens the dialog), or in the guided setup not offered.
+        val locked = if (planKnown) {
+            WalletType.entries.filter { planAccess(it, draft.currencyCode) != com.lucento.app.domain.entitlement.Access.Allowed }.toSet()
+        } else if (plan.has(com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, System.currentTimeMillis())) {
+            emptySet()
+        } else {
+            // Without the list: the Pro-only kinds, never the wallet's own type (one kept from Pro stays editable).
+            setOf(WalletType.RECEIVABLE, WalletType.OTHER_ASSET) - initial.type
+        }
         WalletTypePickerSheet(
             selected = draft.type,
             currencyCode = draft.currencyCode,
-            proTypes = if (com.lucento.app.feature.pro.LocalEntitlements.current.has(
-                    com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, System.currentTimeMillis(),
-                )
-            ) {
-                emptySet()
-            } else {
-                setOf(WalletType.RECEIVABLE, WalletType.OTHER_ASSET)
+            proTypes = if (inSetup) emptySet() else locked,
+            hidden = if (inSetup) locked else emptySet(),
+            proLabel = { type ->
+                com.lucento.app.feature.pro.ProWall.of(planAccess(type, draft.currencyCode))
+                    ?.let { com.lucento.app.feature.pro.ProCopy.wallTitle(it) } ?: "Lucento Pro feature"
             },
             onSelect = { type ->
-                // A kind belongs to its type; an icon the person chose stays.
-                draft = draft.copy(type = type, kind = draft.kind?.takeIf { it.type == type })
-                if (error is DraftError.TypeLocked || error is DraftError.PlanLimit) error = null
-                pickingType = false
+                val met = com.lucento.app.feature.pro.ProWall.of(planAccess(type, draft.currencyCode))
+                if (met != null && !inSetup) {
+                    // The dialog at the tap that would cross the limit; the type stays as it was (owner, 2026-11-18).
+                    pickingType = false
+                    wall = met
+                } else {
+                    // A kind belongs to its type; an icon the person chose stays.
+                    draft = draft.copy(type = type, kind = draft.kind?.takeIf { it.type == type })
+                    if (error is DraftError.TypeLocked || error is DraftError.PlanLimit) error = null
+                    setupNote = null
+                    pickingType = false
+                }
             },
             onDismiss = { pickingType = false },
+        )
+    }
+    wall?.let { met ->
+        com.lucento.app.feature.pro.ProWallDialog(
+            met,
+            onDismiss = { wall = null },
+            // The sheet closes first, then the plan page opens.
+            open = { feature ->
+                close {
+                    onDismiss()
+                    openPro(feature)
+                }
+            },
         )
     }
     if (pickingIcon) {
@@ -580,10 +643,19 @@ fun WalletEditorSheet(
     if (pickingCurrency) {
         CurrencyPickerSheet(
             selected = draft.currencyCode,
-            onSelect = {
-                draft = draft.copy(currencyCode = it)
-                if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked || error is DraftError.PlanLimit) error = null
+            onSelect = { code ->
+                val met = com.lucento.app.feature.pro.ProWall.of(planAccess(draft.type, code))
                 pickingCurrency = false
+                when {
+                    // Another currency the plan doesn’t include yet: the dialog, or in the guided setup a plain note.
+                    met != null && !inSetup -> wall = met
+                    met != null -> setupNote = setupLine(met.feature, mainCurrency)
+                    else -> {
+                        draft = draft.copy(currencyCode = code)
+                        if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked || error is DraftError.PlanLimit) error = null
+                        setupNote = null
+                    }
+                }
             },
             onDismiss = { pickingCurrency = false },
         )
@@ -933,3 +1005,16 @@ private fun HintText(text: String, modifier: Modifier = Modifier, isError: Boole
     )
 }
 
+/** The guided setup’s plain words when the plan holds no more of a kind (owner, 2026-11-18: no mention of Pro). */
+/**
+ * The guided setup's plain line for a limit, with no mention of Pro: the count, or for another currency what setup does
+ * ("Setup uses your main currency, PHP."), which promises nothing the plan doesn't give.
+ */
+private fun setupLine(feature: com.lucento.app.domain.entitlement.ProFeature, mainCurrency: String?): String =
+    if (feature == com.lucento.app.domain.entitlement.ProFeature.FOREIGN_CURRENCY_WALLETS) {
+        "Setup uses your main currency${mainCurrency?.let { ", $it" }.orEmpty()}."
+    } else {
+        SETUP_ADD_LATER
+    }
+
+private const val SETUP_ADD_LATER = "You can add more of these later, from Wallets."

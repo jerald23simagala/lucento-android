@@ -132,6 +132,13 @@ fun AskLucentoScreen(
     viewModel: AskLucentoViewModel = viewModel(factory = AskLucentoViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // The free plan's monthly AI questions used up: the Pro dialog, once (owner, 2026-11-18).
+    if (state.allowanceWall) {
+        com.lucento.app.feature.pro.ProWallDialog(
+            com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.AI_ADVISER),
+            onDismiss = viewModel::dismissAllowanceWall,
+        )
+    }
     val haptics = rememberHaptics()
     var input by rememberSaveable { mutableStateOf("") }
     // The microphone's one-line note ("Didn’t catch anything…", "Try online voice"); cleared when something is asked.

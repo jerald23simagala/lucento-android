@@ -484,7 +484,8 @@ class SettingsViewModel(
     private suspend fun enableSyncAndRun() {
         // Lucento Pro: the account stays connected (free AI allowance, Shared invitations); only the upload waits for a plan.
         if (!planAllowsSyncNow()) {
-            syncMessage.value = "Cloud sync is part of Lucento Pro. You’re signed in, and everything stays on this phone; a backup file is always free."
+            val plan = entitlements?.value?.displayPlan(System.currentTimeMillis()) ?: com.lucento.app.domain.entitlement.DisplayPlan.FREE
+            syncMessage.value = com.lucento.app.feature.pro.ProCopy.syncLockedNote(paused = false, plan = plan)
             return
         }
         syncPreferences.setEnabled(true)

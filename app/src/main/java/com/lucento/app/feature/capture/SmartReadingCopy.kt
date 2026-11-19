@@ -27,6 +27,10 @@ object SmartReadingCopy {
     const val PAUSED =
         "Smarter reading is paused: it’s part of Lucento Pro. Your messages are read on this phone until your plan includes it."
 
+    /** The same for Pro Lifetime without Lucento Cloud, whose way back is Lucento Cloud. */
+    const val PAUSED_CLOUD =
+        "Smarter reading is paused: it comes with Lucento Cloud. Your messages are read on this phone until Lucento Cloud is on."
+
     /** Under the composer's examples: who reads the messages, so how fast rows appear, and where that is changed. */
     fun composerNote(geminiReads: Boolean): String =
         if (geminiReads) {

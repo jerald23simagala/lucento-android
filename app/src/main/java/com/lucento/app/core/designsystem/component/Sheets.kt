@@ -228,6 +228,8 @@ fun ConfirmDialog(
     secondaryLabel: String? = null,
     onSecondary: (() -> Unit)? = null,
     secondaryDestructive: Boolean = false,
+    /** The tile’s icon instead of the warning or question mark (the Pro dialog’s crest). */
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val ext = LucentoTheme.extendedColors
@@ -238,14 +240,21 @@ fun ConfirmDialog(
         containerColor = colors.surfaceContainerLowest,
         icon = {
             IconTile(
-                icon = if (destructive) Icons.Outlined.WarningAmber else Icons.AutoMirrored.Outlined.HelpOutline,
+                icon = icon ?: if (destructive) Icons.Outlined.WarningAmber else Icons.AutoMirrored.Outlined.HelpOutline,
                 container = tone.container,
                 content = tone.content,
                 size = 52.dp,
                 shape = CircleShape,
             )
         },
-        title = { Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center) },
+        // Balanced lines: "Grove is part of / Lucento Pro", never a last word alone.
+        title = {
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineSmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                textAlign = TextAlign.Center,
+            )
+        },
         // Scrolls when it can't fit (large text, a short screen): the dialog then shrinks the text, never the buttons,
         // and without this the end of a long explanation was cut off where nobody could read it.
         text = {

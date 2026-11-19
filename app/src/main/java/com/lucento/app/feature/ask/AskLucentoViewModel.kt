@@ -99,6 +99,8 @@ data class AskUiState(
     val hasRecords: Boolean = false,
     /** Lucento Pro: statements as PDF are Pro; on screen they are always free (docs/MONETIZATION.md §3.4). */
     val pdfLocked: Boolean = false,
+    /** The free plan's monthly AI questions just ran out: show the Pro dialog. */
+    val allowanceWall: Boolean = false,
 ) {
     val aiAvailable: Boolean get() = aiConfigured && signedIn
     val aiActive: Boolean get() = aiAvailable && aiOn
@@ -136,6 +138,8 @@ class AskLucentoViewModel(
         /** How the server said the allowance runs (true: per day); null until it has answered. */
         val remainingPerDay: Boolean? = null,
         val nextId: Long = 1,
+        /** The free plan's monthly allowance just ran out: the Pro dialog, once (owner, 2026-11-18). */
+        val allowanceWall: Boolean = false,
     )
 
     private val inputs: StateFlow<ReportInputs?> = combine(
@@ -181,8 +185,14 @@ class AskLucentoViewModel(
                 ?: (plan != null && com.lucento.app.domain.entitlement.ProGates.aiAllowancePerDay(plan, System.currentTimeMillis())),
             hasRecords = data != null && (data.transactions.isNotEmpty() || data.wallets.isNotEmpty()),
             pdfLocked = plan != null && !com.lucento.app.domain.entitlement.ProGates.pdfAllowed(plan, System.currentTimeMillis()),
+            allowanceWall = chat.allowanceWall,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AskUiState())
+
+    /** The allowance dialog was answered (See Lucento Plan or Not now). */
+    fun dismissAllowanceWall() {
+        conversation.update { it.copy(allowanceWall = false) }
+    }
 
     private fun pdfAllowedNow(): Boolean =
         entitlements?.value?.let { com.lucento.app.domain.entitlement.ProGates.pdfAllowed(it, System.currentTimeMillis()) } ?: true
@@ -384,6 +394,16 @@ class AskLucentoViewModel(
                 )
             }
             else -> {
+                // The free plan's monthly questions are used up: the answer still comes from the phone, and the Pro
+                // dialog says what the plan includes (owner, 2026-11-18). Pro's own daily limit has no dialog.
+                // The server's last word can lag a purchase it hasn't checked yet: a phone that already holds Pro's daily
+                // allowance never gets the Free dialog.
+                val phonePerDay = entitlements?.value?.let {
+                    com.lucento.app.domain.entitlement.ProGates.aiAllowancePerDay(it, System.currentTimeMillis())
+                } ?: false
+                if (result == AskLucentoClient.Result.LimitReached && !state.aiPerDay && !phonePerDay) {
+                    conversation.update { it.copy(allowanceWall = true) }
+                }
                 val reason = failureReason(result, state.signedIn)
                 // Worth asking again: Gemini was busy, slow or unreachable. Not a used-up allowance or an ended session.
                 val retry = text.takeIf { result is AskLucentoClient.Result.Failed || result == null }

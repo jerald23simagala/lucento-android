@@ -191,10 +191,10 @@ Why no "advanced historical views" tier: nothing exists to sell; history is one 
 
 | Feature | Status | F | S | L | Offline | Gate |
 |---|---|---|---|---|---|---|
-| **Money wallets** (cash, bank, e-wallet, savings, investments — added 2026-11-17, tester round; 409 institutions) | Shipped | **3 active** (recommended; owner proposed 2 — D-1) | Unlimited | Unlimited | Yes | `WalletRepository.create` when `type in {CASH, BANK, E_WALLET, SAVINGS, INVESTMENT}` → `SaveResult.LimitReached(used, limit)`; `update` that changes type *into* a money type counts too. An investment counts like savings: money the person moves in and out (`planFeature`) |
+| **Money wallets** (cash, bank, e-wallet, savings, investments — added 2026-11-17, tester round; 409 institutions) | Shipped | **3 active** (recommended; owner proposed 2 — D-1) | Unlimited | Unlimited | Yes | `WalletRepository.create` when `type in {CASH, BANK, E_WALLET, SAVINGS, INVESTMENT}` → `SaveResult.LimitReached(used, limit)`; `update` that changes type *into* a money type counts too. An investment counts like savings: money the person moves in and out (`ProGates.walletFeature`) |
 | **Debt accounts** (credit cards, loans) with terms, cycles, amount due, payment reminders | Shipped | **2 active** (D-2) | Unlimited | Unlimited | Yes | same call, `type in {CREDIT_CARD, LOAN}` |
 | **Receivables** (money owed to you, instalments, interest) | Shipped | — | ✔ | ✔ | Yes | same call, `type == RECEIVABLE` → `ProRequired` |
-| **Manually valued assets** (home, car, investments) | Shipped | — | ✔ | ✔ | Yes | same call, `type == OTHER_ASSET` → `ProRequired` |
+| **Manually valued assets** (home, car, jewellery; investments are a money wallet since 2026-11-17) | Shipped | — | ✔ | ✔ | Yes | same call, `type == OTHER_ASSET` → `ProRequired` |
 | Adjust balance, institution logos and card faces, reorder | Shipped | ✔ | ✔ | ✔ | Yes | none |
 | **Wallets in another currency** (FX valuation, realized gains, cross-currency transfers) | Shipped (v13) | — (main currency only) | ✔ | ✔ | Yes (rates optional) | `WalletRepository.create` with `currency != main`, `WalletChangePolicy` currency change → `ProRequired` |
 | Month-end FX revaluation | **Planned** (stage 2) | — | ✔ when built | ✔ when built | Yes | — |
@@ -556,9 +556,45 @@ entitlement is DataStore, server state is new Supabase tables.
 
 ### 6.1 Tone and placement
 
-No launch interstitials, no repeated popups, no countdowns, no red badges, no pre-checked boxes. The upgrade sheet
-opens only from the tap that would have used the locked thing. "Not now" is remembered per place per session. A
-dedicated **Lucento Pro** page lives in the profile menu and Settings; it is the only place that *initiates* selling.
+No launch interstitials, no repeated popups, no countdowns, no red badges, no pre-checked boxes.
+
+**Every Pro wall is one dialog at the tap** (owner, 2026-11-18: "anyone hitting a Pro wall should be prompted with a
+dialog to be directed to the Lucento Plan page"; it replaced the inline lock notes, `ProNote`). `ProWallDialog`
+(`feature/pro/ProWall.kt`) opens only from the tap that would have crossed the wall: Add on a full count (Wallets,
+Debts, Goals, a goal's Restore), a locked wallet type or currency in the wallet editor, a 6- or 12-month period in
+Insights, Save as PDF / Share on a statement, a locked theme, Sync now, turning on Smarter reading, creating or inviting
+in Lucento Shared, and a question past the free AI allowance. Its title says what the Free plan includes ("The Free
+plan includes 3 money wallets") or what is Pro ("Grove is part of Lucento Pro"); its body gives the person's own number
+for a count, then what Pro adds and what stays free, never the title again (`ProCopy.wallTitle` / `wallBody`, customer
+copy D-0). Buttons: **See Lucento Plan** (the Lucento Pro page, naming the feature) and **Not now**, which closes it and
+changes nothing. Not now is not remembered: the dialog only ever answers a tap, so the next tap shows it again and no
+control goes dead. Where Pro would not help (20 active goals is the most on any plan) there is no dialog, only a plain
+note. Add wallet (Wallets, Home) opens the editor on Cash while money wallets fit; when they are full but a card or
+loan still fits, it opens the type sheet first (money types marked `ProBadge`, picking one opens the dialog), never a
+form that silently starts as a card; the dialog when nothing fits (`ProGates.addWalletStart`). Retyping an existing
+wallet into another kind counts as a new one of that kind (cash into a receivable, a third card or loan, a fourth money
+wallet out of a receivable kept from Pro): on the screen, where those types carry the badge, and in
+`WalletRepository.update` (QA 2026-11-19; the repository had only checked a move into another currency). The words
+follow what the person holds: a Pro Lifetime owner without Lucento Cloud meets "Cloud sync comes with Lucento Cloud",
+not "the Free plan" (`ProCopy.cloudWall`, keyed on `DisplayPlan.LIFETIME`, the plan the plan page offers Lucento Cloud
+to; customer copy D-0), and so do the plain notes beside those walls (Settings' sync and Smarter reading notes, the
+message after signing in, Home's paused sync sheet, whose button is now "See Lucento Plan" too). With every wallet kind
+full, Add names both counts in one dialog. Statements say "Save as PDF · Pro" and "Share · Pro" before the tap, like
+"6 months · Pro", and a marked wallet type reads its plan fact to TalkBack ("The Free plan includes 3 money wallets"),
+not "Lucento Pro feature".
+
+**Free limits in onboarding and the guided setup** (owner, 2026-11-18). Setting up past the Free numbers never shows the
+dialog and never mentions Pro. At the Free numbers (3 money wallets, 2 cards or loans) the accounts steps hide their
+add options, say "You can add more later, from Wallets." and carry on; the rest can be added later, where the dialog
+applies. The goal step adds one goal, under the free two; its "Kept in" Add wallet is left out at three money wallets,
+and a goal save in setup that meets the count anyway says "You can add more goals later, from Goals." The wallet editor
+opened from setup (also from the goal sheet's Kept in) hides locked types, and a currency or count it can't take is
+answered with a quiet line naming which (`WalletEditorSheet(inSetup = true)`, `GoalEditorSheet(inSetup = true)`). The
+check is `ProGates.walletAccess` / `firstAddableWalletType`, the repository's own rule, so the screen and the save
+agree; while the wallet list is still loading the screen gives no early answer and the save decides. (A returning account whose plan doesn't include restoring still gets its own page in onboarding, with
+the plan page one tap away: that is not a limit, it explains why the data stays in the account.)
+
+A dedicated **Lucento Pro** page lives in the profile menu and Settings; it is the only place that *initiates* selling.
 The mascot appears on that page, and in the welcome after a purchase (§6.5). Badges (`ProBadge`, "Pro") sit inline next to labels; a person who holds the
 capability never sees them. All copy is in `CUSTOMER_COPY.md` D.
 
@@ -887,7 +923,8 @@ show the plan), every lock note, the paused-sync sheet. **Locks are one inline p
 from §5.1): `ProNote` = the existing note with a "See Lucento Pro" link, where the person is — wallet editor (by the
 button, no longer a red name field), goal editor, goal Restore (fixes a Phase 2 defect: a refused restore confirmed and
 closed), Insights, the report sheet, Settings › Account, the theme picker; a sheet over an editor sheet would stack two
-modals and lose the draft. `ProBadge` marks locked themes and the Receivable / Asset wallet types. The one-time
+modals and lose the draft. *(Superseded 2026-11-18: every lock is now one `ProWallDialog` at the tap, §6.1. A dialog
+hosted by the editor itself keeps the draft; `ProNote` was removed.)* `ProBadge` marks locked themes and the Receivable / Asset wallet types. The one-time
 **plan-ended notice** (`PlanNotices`, `PlanNoticeSheet`, last plan in `entitlement_preferences`) waits for the first
 refresh (`EntitlementManager.ready`) so a cold start never reads as a downgrade. Insights opens on 3 months on the free
 plan; the note appears only when a locked period is picked. `ScreenshotTourTest` runs on a simulated Pro plan and adds

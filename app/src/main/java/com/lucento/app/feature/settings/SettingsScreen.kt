@@ -688,6 +688,11 @@ internal fun CloudSyncSection(
     showHeader: Boolean = true,
     onDeleteAccount: () -> Unit = {},
 ) {
+    // Sync now while the plan doesn't include cloud sync: the Pro dialog (owner, 2026-11-18).
+    var syncWall by remember { mutableStateOf(false) }
+    if (syncWall) {
+        com.lucento.app.feature.pro.ProWallDialog(com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.CLOUD_SYNC), onDismiss = { syncWall = false })
+    }
     Column {
         if (showHeader) SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
         when {
@@ -734,7 +739,11 @@ internal fun CloudSyncSection(
                 Spacer(Modifier.height(Spacing.sm))
                 // Sync now stands alone here: signing out removes records, so it sits with the account's other
                 // lasting actions further down rather than beside an everyday button.
-                OutlinedButton(onClick = onSyncNow, enabled = !state.syncing, modifier = Modifier.heightIn(min = Sizes.minTouch)) {
+                OutlinedButton(
+                    onClick = { if (state.lockedByPlan) syncWall = true else onSyncNow() },
+                    enabled = !state.syncing,
+                    modifier = Modifier.heightIn(min = Sizes.minTouch),
+                ) {
                     if (state.syncing) {
                         CircularProgressIndicator(Modifier.size(Sizes.iconTile / 2), strokeWidth = 2.dp)
                     } else {
@@ -805,13 +814,14 @@ internal fun CloudSyncSection(
             }
         }
         // Lucento Pro: signed in, but the plan doesn't include cloud sync (docs/MONETIZATION.md §3.5). Nothing is lost.
+        // Said plainly; Sync now opens the Pro dialog (owner, 2026-11-18).
         if (state.lockedByPlan && state.signedInEmail != null) {
             Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.feature.pro.ProNote(
-                from = com.lucento.app.domain.entitlement.ProFeature.CLOUD_SYNC,
-                text =
-                if (state.status.enabled) "Cloud sync is paused: it’s part of Lucento Pro. Everything stays on this phone and in your account; uploads resume when your plan includes it. A backup file is always free."
-                else "Cloud sync is part of Lucento Pro. You’re signed in; everything stays on this phone. A backup file is always free.",
+            InfoNote(
+                com.lucento.app.feature.pro.ProCopy.syncLockedNote(
+                    paused = state.status.enabled,
+                    plan = com.lucento.app.feature.pro.LocalEntitlements.current.displayPlan(System.currentTimeMillis()),
+                ),
             )
         }
         // The status line already shows the stored error; don't print the same sentence twice (account mismatch).
@@ -910,13 +920,21 @@ private fun Fact(icon: ImageVector, title: String, body: String) {
 @Composable
 private fun SmartReadingSection(on: Boolean, signedIn: Boolean, locked: Boolean, onChange: (Boolean) -> Unit) {
     var asking by remember { mutableStateOf(false) }
+    var wall by remember { mutableStateOf(false) }
     SectionHeader("Smarter reading", Modifier.padding(top = Spacing.section))
     SwitchRow(
         title = "Read messages with Gemini",
         checked = on,
-        onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
-        // Turning it off always works, so a consent given earlier can be taken back while it is paused.
-        enabled = (signedIn && !locked) || on,
+        // Turning it on outside the plan opens the Pro dialog (owner, 2026-11-18); off always works.
+        onCheckedChange = { wanted ->
+            when {
+                !wanted -> onChange(false)
+                locked -> wall = true
+                else -> asking = true
+            }
+        },
+        // Off always works, so a consent given earlier can be taken back while it is paused.
+        enabled = signedIn || on,
         description = "Better at messy, multi-item messages. Off, Lucento reads them on this phone straight away.",
         // The cost stays in view, on or off: it's why the composer has no switch of its own.
         note = when {
@@ -925,13 +943,17 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, locked: Boolean,
             else -> com.lucento.app.feature.capture.SmartReadingCopy.SLOWER
         },
     )
-    if (locked) {
-        // Like cloud sync: an earlier "on" is paused, not lost, and says so; otherwise, why it can't be turned on.
-        com.lucento.app.feature.pro.ProNote(
-            text = if (on) com.lucento.app.feature.capture.SmartReadingCopy.PAUSED
-            else com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.SMART_READING),
-            from = com.lucento.app.domain.entitlement.ProFeature.SMART_READING,
+    if (locked && on) {
+        // Like cloud sync: an earlier "on" is paused, not lost, and says so plainly.
+        val lifetimeWithoutCloud = com.lucento.app.feature.pro.LocalEntitlements.current.displayPlan(System.currentTimeMillis()) ==
+            com.lucento.app.domain.entitlement.DisplayPlan.LIFETIME
+        InfoNote(
+            if (lifetimeWithoutCloud) com.lucento.app.feature.capture.SmartReadingCopy.PAUSED_CLOUD
+            else com.lucento.app.feature.capture.SmartReadingCopy.PAUSED,
         )
+    }
+    if (wall) {
+        com.lucento.app.feature.pro.ProWallDialog(com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.SMART_READING), onDismiss = { wall = false })
     }
     if (asking) {
         ConfirmDialog(

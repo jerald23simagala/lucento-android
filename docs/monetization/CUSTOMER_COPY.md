@@ -240,8 +240,57 @@ questions a month; everything you own is untouched.
 
 ## D. In-app messages
 
-Format: title · body · buttons. `{n}` values come from the evaluator or the server, never typed into copy. Each sheet
-is opened only by the tap that would have used the feature; "Not now" is remembered for the rest of the session.
+Format: title · body · buttons. `{n}` values come from the evaluator or the server, never typed into copy.
+
+**D-0 The Pro dialog (shipped 2026-11-18; owner: one dialog at the tap, directing to the Lucento Plan page).** Every Pro
+wall uses this one dialog (`ProWallDialog`; strings in `ProCopy.wallTitle` / `wallBody`), opened only by the tap that
+would have crossed the wall. The title says what the Free plan includes or what is Pro; the body never repeats it. Not
+now closes it; the next tap shows it again (MONETIZATION §6.1). It supersedes the draft sheets D-1 to D-4 and the free
+case of D-5 below, which stay for the reasoning.
+
+| Wall | Title | Body |
+|---|---|---|
+| Money wallets | The Free plan includes 3 money wallets | You have {n}. Lucento Pro and Pro Lifetime have no limit. Everything in the wallets you have keeps working. |
+| Cards or loans | The Free plan includes 2 cards or loans | You have {n}. Lucento Pro and Pro Lifetime have no limit. Payments and reminders on the ones you have carry on as usual. |
+| Every wallet kind full (Add wallet) | The Free plan includes 3 money wallets and 2 cards or loans | You have {n} money wallets and {m} cards or loans. Lucento Pro and Pro Lifetime have no limit. Everything in the ones you have keeps working. |
+| Savings goals | The Free plan includes 2 active goals | You have {n}. Lucento Pro and Pro Lifetime allow 20. When a goal is reached, archiving it frees a slot. Nothing happens to the goals you have. |
+| AI questions | The Free plan includes 10 AI questions a month | Lucento Pro gives you 50 a day. Until your questions return, Lucento answers what it can on this phone. |
+| Receivable | Money owed to you is part of Lucento Pro | Track what someone owes you and each instalment they pay back. You can always record what they pay as income. |
+| Valued asset | Things you own are part of Lucento Pro | Add a home, a car or jewellery at a value you set, so your net worth is complete. Your wallets and debts already count. |
+| Other currency | Wallets in other currencies are part of Lucento Pro | A wallet in your main currency is always free. |
+| Insights 6 / 12 months | 6 and 12 months are part of Lucento Pro | See longer trends in what came in, what went out and how your net worth moved. Your last 3 months are always free. |
+| PDF statement | PDF statements are part of Lucento Pro | Everything on this screen is always free. Pro adds saving or sharing it as a PDF. |
+| Theme | {Grove} is part of Lucento Pro | Pro adds Grove, Mono and Aurora. Sunrise and Midnight are always free. |
+| Cloud sync | Cloud sync is part of Lucento Pro | Your data stays on this phone whatever you choose, and a backup file is always free. |
+| Restore from account | Restoring from your account is part of Lucento Pro | Restoring a backup file is always free. |
+| Smarter reading | Smarter reading is part of Lucento Pro | Without it, Lucento reads your messages on this phone straight away, always free. |
+| Lucento Shared | Inviting a Partner is part of Lucento Pro | Being someone’s Partner is always free. |
+
+For **Pro Lifetime without Lucento Cloud** (its included year over), the online services name Lucento Cloud instead
+(`ProCopy.cloudWall`):
+
+| Wall | Title | Body |
+|---|---|---|
+| AI questions | Pro Lifetime includes 10 AI questions a month | Lucento Cloud gives you 50 a day. Until your questions return, Lucento answers what it can on this phone. |
+| Cloud sync | Cloud sync comes with Lucento Cloud | Everything on this phone stays yours with Pro Lifetime. Lucento Cloud adds cloud sync, Lucento Shared, Smarter reading and more AI questions. |
+| Restore from account | Restoring from your account comes with Lucento Cloud | (as above) |
+| Smarter reading | Smarter reading comes with Lucento Cloud | (as above) |
+| Lucento Shared | Inviting a Partner comes with Lucento Cloud | (as above) |
+
+> [ Not now ]  [ See Lucento Plan ]
+
+At 20 active goals (the most on any plan) there is no dialog, only the plain line "20 active goals is the most on any
+plan. Archive a goal you’ve reached to make room."
+
+**D-0a Free limits while setting up (no dialog, no mention of Pro).** At the Free numbers the guided setup hides its
+add options and says:
+- Accounts, and cards and loans: "You can add more later, from Wallets." (the step's header then reads "These are the
+  accounts you’re starting with." or "These are the cards and loans you’re starting with.")
+- The wallet editor in setup, if a save meets a count anyway: "You can add more of these later, from Wallets."; a
+  currency the plan doesn't include: "Setup uses your main currency, PHP." (what setup does; it promises nothing the plan
+  doesn't give). At the limit the step's title reads "Your accounts" or "Your cards and loans"
+- Goals: setup's goal step adds one goal, under the free two, and its "Kept in" offers no Add wallet at three money
+  wallets; a goal save in setup that meets the count anyway says "You can add more goals later, from Goals."
 
 **D-1 Wallet limit reached (money wallet)**
 > **You have {3} money wallets — the most on the free plan**
