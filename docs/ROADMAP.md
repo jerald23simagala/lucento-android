@@ -316,14 +316,18 @@ recurring-schedule sync, syncing preferences.
 - **Investments, spending money, two-figure Safe to spend, scheduled transfers** (#101, Room v14, waits for OT-38):
   docs/CALCULATIONS.md "Safe to spend", "Money on hand", "Investments", "Scheduled outlook".
 
-## Built — Tester round 2026-11-18 (`feature/card-default-wallet` #107, `feature/scheduled-bulk-edit`)
+## Built — Tester round 2026-11-18 (`feature/card-default-wallet` #107, `feature/scheduled-bulk-edit` #108, `feature/free-limits-pro-dialog`)
 - **A credit card can be the default wallet** (#107): expenses go to it; income and transfers go to cash, a bank or an
   e-wallet. Home's hero reads "Assets"; the composer's picker "Select wallet to use".
 - **Scheduled bulk edit**: All schedules has a Select mode (Select all; Change day, Change amount, Pause / Resume,
   Delete), each change in one step (docs/CALCULATIONS.md "Scheduled outlook").
 - **A second payment plan for one debt**: the scheduled-payment editor warns, with "Adjust existing" (Select mode with
   that debt's plans selected) and "Add another".
-- Still to come in this round: Free limits in the guided setup and one Pro dialog wherever a Free limit is reached.
+- **Free limits while setting up**: at 3 money wallets or 2 cards or loans the guided setup hides its add options and
+  says "You can add more later, from Wallets.", with no mention of Pro; setup carries on.
+- **One Pro dialog at the tap**: every Pro wall (Add on a full count, a locked wallet type or currency, 6 / 12 months,
+  PDF statements, themes, sync, Smarter reading, Shared invites, the free AI allowance) is one dialog saying what the
+  Free plan includes, with **See Lucento Plan** and **Not now**; the inline lock notes are gone (docs/MONETIZATION.md §6.1).
 
 ## Built — Monthly budget card in three parts (2026-11-18, `feature/budget-card-constraints`)
 - Home's card: how much of the budget is spent (a half gauge), then Budget remaining and Spendable wallets side by side,

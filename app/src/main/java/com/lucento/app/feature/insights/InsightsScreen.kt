@@ -114,14 +114,14 @@ fun InsightsScreen(
     val reportsState by reports.uiState.collectAsStateWithLifecycle()
     var openReport by remember { mutableStateOf<com.lucento.app.domain.ask.Report?>(null) }
     var chosenPeriod by rememberSaveable { mutableStateOf<TrendPeriod?>(null) }
-    // Lucento Pro: 6 and 12 months are Pro (docs/MONETIZATION.md §3.4). The free plan opens on its own 3 months, and the
-    // note appears only when someone picks a locked period — never as a greeting.
+    // Lucento Pro: 6 and 12 months are Pro (docs/MONETIZATION.md §3.4). The free plan opens on its own 3 months; picking a
+    // locked period opens the Pro dialog and the period stays as it was (owner, 2026-11-18) — never a greeting.
+    var periodWall by remember { mutableStateOf<com.lucento.app.feature.pro.ProWall?>(null) }
     val locked = data.longPeriodsLocked
     val period = when (val chosen = chosenPeriod) {
         null -> if (locked) TrendPeriod.THREE else TrendPeriod.SIX
         else -> if (locked && chosen != TrendPeriod.THREE) TrendPeriod.THREE else chosen
     }
-    val lockedPeriodChosen = locked && chosenPeriod != null && chosenPeriod != TrendPeriod.THREE
     var currencyChoice by rememberSaveable { mutableStateOf<String?>(null) }
     val currencies = remember(data.wallets, data.transactions, data.focusCurrency) {
         (listOf(data.focusCurrency) +
@@ -158,18 +158,18 @@ fun InsightsScreen(
             SegmentedToggle(
                 options = TrendPeriod.entries.map { it to (if (locked && it != TrendPeriod.THREE) "${it.label} · Pro" else it.label) },
                 selected = period,
-                onSelect = { chosenPeriod = it },
+                onSelect = { picked ->
+                    if (locked && picked != TrendPeriod.THREE) {
+                        periodWall = com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS)
+                    } else {
+                        chosenPeriod = picked
+                    }
+                },
                 compact = true,
                 selectedTone = { com.lucento.app.core.designsystem.theme.TonePair(colors.primary, colors.onPrimary) },
             )
         }
-        if (lockedPeriodChosen) {
-            Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.feature.pro.ProNote(
-                com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS),
-                from = com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS,
-            )
-        }
+        periodWall?.let { met -> com.lucento.app.feature.pro.ProWallDialog(met, onDismiss = { periodWall = null }) }
         Spacer(Modifier.height(Spacing.section))
 
         TrendSection(data, currency, period)

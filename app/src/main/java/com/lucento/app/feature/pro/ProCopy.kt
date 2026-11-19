@@ -190,6 +190,126 @@ object ProCopy {
         ProFeature.SHARED_SPACE -> "Inviting a Partner is part of Lucento Pro. Being someone’s Partner is always free."
     }
 
+    // ------------------------------------------------------------------------------------------------ Pro walls
+
+    /** The Pro dialog’s actions (owner, 2026-11-18). */
+    const val WALL_SEE_PLAN = "See Lucento Plan"
+    const val WALL_NOT_NOW = "Not now"
+
+    /**
+     * Whether [wall] is about the online services for a Pro Lifetime owner without them (its included year over, no
+     * Lucento Cloud): their way back is Lucento Cloud, which the plan page offers them, not "the Free plan" (QA 2026-11-19).
+     */
+    fun cloudWall(wall: ProWall, plan: DisplayPlan): Boolean =
+        wall.feature.requires != Capability.LOCAL_PRO && plan == DisplayPlan.LIFETIME
+
+    /**
+     * The Pro dialog’s title: what the Free plan includes ("The Free plan includes 3 money wallets"), what is Pro, or for
+     * Pro Lifetime without Lucento Cloud what comes with Lucento Cloud. [plan] is the plan the person holds.
+     */
+    fun wallTitle(wall: ProWall, plan: DisplayPlan = DisplayPlan.FREE): String {
+        if (cloudWall(wall, plan)) {
+            return when (wall.feature) {
+                ProFeature.AI_ADVISER -> "Pro Lifetime includes ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} AI questions a month"
+                ProFeature.CLOUD_SYNC -> "Cloud sync comes with Lucento Cloud"
+                ProFeature.CLOUD_RESTORE -> "Restoring from your account comes with Lucento Cloud"
+                ProFeature.SMART_READING -> "Smarter reading comes with Lucento Cloud"
+                ProFeature.SHARED_SPACE -> "Inviting a Partner comes with Lucento Cloud"
+                else -> "This comes with Lucento Cloud"
+            }
+        }
+        val max = wall.limit?.maxOrNull
+        val debts = wall.alsoFull?.takeIf { it.feature == ProFeature.DEBT_ACCOUNTS }
+        if (wall.feature == ProFeature.MONEY_WALLETS && debts != null) {
+            return "The Free plan includes ${max ?: PlanCatalog.FREE_MONEY_WALLETS} money wallets and " +
+                "${debts.limit?.maxOrNull ?: PlanCatalog.FREE_DEBT_ACCOUNTS} cards or loans"
+        }
+        return when (wall.feature) {
+            ProFeature.MONEY_WALLETS -> "The Free plan includes ${max ?: PlanCatalog.FREE_MONEY_WALLETS} money wallets"
+            ProFeature.DEBT_ACCOUNTS -> "The Free plan includes ${max ?: PlanCatalog.FREE_DEBT_ACCOUNTS} cards or loans"
+            ProFeature.SAVINGS_GOALS -> "The Free plan includes ${max ?: PlanCatalog.FREE_ACTIVE_GOALS} active goals"
+            ProFeature.AI_ADVISER -> "The Free plan includes ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} AI questions a month"
+            ProFeature.RECEIVABLES -> "Money owed to you is part of Lucento Pro"
+            ProFeature.VALUED_ASSETS -> "Things you own are part of Lucento Pro"
+            ProFeature.FOREIGN_CURRENCY_WALLETS -> "Wallets in other currencies are part of Lucento Pro"
+            ProFeature.INSIGHTS_LONG_PERIODS -> "6 and 12 months are part of Lucento Pro"
+            ProFeature.PDF_STATEMENTS -> "PDF statements are part of Lucento Pro"
+            ProFeature.EXTRA_THEMES -> "${wall.subject ?: "This theme"} is part of Lucento Pro"
+            ProFeature.CLOUD_SYNC -> "Cloud sync is part of Lucento Pro"
+            ProFeature.CLOUD_RESTORE -> "Restoring from your account is part of Lucento Pro"
+            ProFeature.SMART_READING -> "Smarter reading is part of Lucento Pro"
+            ProFeature.SHARED_SPACE -> "Inviting a Partner is part of Lucento Pro"
+        }
+    }
+
+    /**
+     * The Pro dialog’s text, under a title that has already said what the Free plan includes or what is Pro: for a
+     * count the person’s own number, then what Pro adds and what stays as it is or is always free. Never the title again.
+     */
+    fun wallBody(wall: ProWall, plan: DisplayPlan = DisplayPlan.FREE): String {
+        if (cloudWall(wall, plan)) {
+            return if (wall.feature == ProFeature.AI_ADVISER) {
+                "Lucento Cloud gives you ${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day. Until your questions return, Lucento " +
+                    "answers what it can on this phone."
+            } else {
+                "Everything on this phone stays yours with Pro Lifetime. Lucento Cloud adds cloud sync, Lucento Shared, " +
+                    "Smarter reading and more AI questions."
+            }
+        }
+        val have = wall.used?.let { "You have $it. " }.orEmpty()
+        val debts = wall.alsoFull?.takeIf { it.feature == ProFeature.DEBT_ACCOUNTS }
+        if (wall.feature == ProFeature.MONEY_WALLETS && debts != null) {
+            val counts = if (wall.used != null && debts.used != null) {
+                "You have ${wall.used} money wallets and ${debts.used} cards or loans. "
+            } else {
+                ""
+            }
+            return "${counts}Lucento Pro and Pro Lifetime have no limit. Everything in the ones you have keeps working."
+        }
+        return when (wall.feature) {
+            ProFeature.MONEY_WALLETS ->
+                "${have}Lucento Pro and Pro Lifetime have no limit. Everything in the wallets you have keeps working."
+            ProFeature.DEBT_ACCOUNTS ->
+                "${have}Lucento Pro and Pro Lifetime have no limit. Payments and reminders on the ones you have carry on as usual."
+            ProFeature.SAVINGS_GOALS ->
+                "${have}Lucento Pro and Pro Lifetime allow ${PlanCatalog.PRO_ACTIVE_GOALS}. When a goal is reached, archiving it " +
+                    "frees a slot. Nothing happens to the goals you have."
+            ProFeature.AI_ADVISER ->
+                "Lucento Pro gives you ${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day. Until your questions return, Lucento " +
+                    "answers what it can on this phone."
+            ProFeature.RECEIVABLES ->
+                "Track what someone owes you and each instalment they pay back. You can always record what they pay as income."
+            ProFeature.VALUED_ASSETS ->
+                "Add a home, a car or jewellery at a value you set, so your net worth is complete. Your wallets and debts " +
+                    "already count."
+            ProFeature.FOREIGN_CURRENCY_WALLETS -> "A wallet in your main currency is always free."
+            ProFeature.INSIGHTS_LONG_PERIODS ->
+                "See longer trends in what came in, what went out and how your net worth moved. Your last 3 months are always free."
+            ProFeature.PDF_STATEMENTS -> "Everything on this screen is always free. Pro adds saving or sharing it as a PDF."
+            ProFeature.EXTRA_THEMES -> "Pro adds Grove, Mono and Aurora. Sunrise and Midnight are always free."
+            ProFeature.CLOUD_SYNC -> "Your data stays on this phone whatever you choose, and a backup file is always free."
+            ProFeature.CLOUD_RESTORE -> "Restoring a backup file is always free."
+            ProFeature.SMART_READING -> "Without it, Lucento reads your messages on this phone straight away, always free."
+            ProFeature.SHARED_SPACE -> "Being someone’s Partner is always free."
+        }
+    }
+
+    /**
+     * Signed in, but cloud sync isn't on the plan: Settings' plain note ([paused] when sync was on) and the message after
+     * signing in. Pro Lifetime without Lucento Cloud hears about Lucento Cloud, like the dialog.
+     */
+    fun syncLockedNote(paused: Boolean, plan: DisplayPlan): String {
+        val cloud = plan == DisplayPlan.LIFETIME
+        return if (paused) {
+            "Cloud sync is paused: ${if (cloud) "it comes with Lucento Cloud" else "it’s part of Lucento Pro"}. Everything " +
+                "stays on this phone and in your account; uploads resume when ${if (cloud) "Lucento Cloud is on" else "your plan includes it"}. " +
+                "A backup file is always free."
+        } else {
+            "${if (cloud) "Cloud sync comes with Lucento Cloud" else "Cloud sync is part of Lucento Pro"}. You’re signed in; " +
+                "everything stays on this phone. A backup file is always free."
+        }
+    }
+
     /** Whether a plan lifts [limit] for [feature]: false at the most any plan allows (20 goals). */
     fun upgradeHelps(feature: ProFeature, limit: Limit): Boolean =
         PlanCatalog.limit(feature, PlanCatalog.PRO_CAPABILITIES) != limit

@@ -630,13 +630,15 @@ class ScreenshotTourTest {
         back()
         // Back lands on Home (the Pro page opened from its profile menu); the dock returns after the page's exit animation.
         waitForText("Monthly budget")
-        // Insights opens on the free plan's 3 months; a locked period explains itself only when picked.
+        // Insights opens on the free plan's 3 months; a locked period opens the Pro dialog only when picked (owner,
+        // 2026-11-18: one dialog at the tap, where an inline note used to be).
         compose.onNodeWithContentDescription("Insights").performScrollTo().performClick()
         waitForText("6 months · Pro")
         shot("24e-insights-free")
         click("6 months · Pro")
-        waitForText("Trends over 6 and 12 months are part of Lucento Pro")
+        waitForText("6 and 12 months are part of Lucento Pro")
         shot("24f-insights-locked-period")
+        click("Not now")
 
         // ---------------------------------------------------------------- Lucento Pro: buying (Phase 4), with the test store
         // Test builds fake Google Play's purchase flow: nothing is charged and every price says "test". The plan that

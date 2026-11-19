@@ -388,6 +388,23 @@ that already has a payment plan shows an amber warning right under **Pay to**, a
 **Adjust existing** (opens Select mode with them selected and a note saying so) and **Add another** (deep blue for
 contrast on amber). Saving while it is unanswered asks the same question in a dialog.
 
+## Pro walls and Free limits (tester round, 2026-11-18)
+Every Pro wall is one dialog at the tap that would cross it (`ProWallDialog` in `feature/pro/ProWall.kt`, built on
+`ConfirmDialog` and its `icon` slot): the WorkspacePremium ribbon in a pale circle, a centred title saying what the Free
+plan includes ("The Free plan includes 3 money wallets") or what is Pro ("Grove is part of Lucento Pro"), a body with the
+person's own number and what stays free (never the title again), then **Not now** (text) and **See Lucento Plan**
+(primary). Dialog titles break in balanced lines (`LineBreak.Heading`), so no word sits alone on the last line. The
+dialog is hosted where the wall is met, inside an editor sheet when that is where it happens, so a draft is never lost;
+See Lucento Plan closes the sheet before the plan page opens. There are no inline lock notes any more (`ProNote` is
+gone). `ProBadge` still marks locked wallet types in the type picker (also when editing: a retype into a full or
+Pro-only kind is marked) and locked themes. Add wallet opens the editor on Cash while money wallets fit; when they are
+full it opens the type sheet first, with the money types marked, so nobody lands in a form that silently starts as a
+card; the dialog appears only when nothing fits. Getting started has no dialog and no
+mention of Pro: at the Free numbers an accounts step swaps its "Add another" chips for a quiet line, "You can add more
+later, from Wallets.", and its header for "These are the accounts you’re starting with." (or "…cards and loans…"); the
+setup editor leaves locked types out of its picker, and from 130 % text an account row puts its amount under the name
+so neither is cut. Copy: customer copy D-0 / D-0a.
+
 ## Insights (v0.5)
 *Tester round 3, second pass (2026-11-11):* Ask Lucento stays on top; the built-in **reports** sit right under it as
 one list (wallet statement first), each opening the shared report sheet (headline panel, group headings, section

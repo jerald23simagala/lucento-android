@@ -616,8 +616,7 @@ The owner relayed tester requests and chose the options (memory: tester round 20
   and `lintDebug` pass.
 - **Emulator (API 35, local capture):** the hero's "Assets", and the switch on a card. In the composer, with the card as
   default, "Lunch 250" went to the card and "Salary 35000" to Everyday bank.
-- **Still to come:** Scheduled bulk edit and the duplicate warning (part B), and Free limits in setup plus the Pro wall
-  dialog (part C).
+- **Since:** part B (Scheduled bulk edit, the duplicate warning) merged as #108; part C below.
 
 ## Tester round 2026-11-18, part B — 2026-11-19 (`feature/scheduled-bulk-edit`)
 
@@ -670,6 +669,39 @@ Adjust existing".
   existing), again at 200 % text on a 360 dp screen, and in the dark theme. The first pass caught the Change day preview
   promising 2 changes where 3 were made (Rent moving from the 30th to the 31st only from December); the preview now
   shows the first date that changes, and a plan already on the chosen day is skipped.
+
+## Tester round 2026-11-18, part C — 2026-11-19 (`feature/free-limits-pro-dialog`)
+
+Owner's choices: in setup, hide the add options at the Free numbers (3 money wallets, 2 cards or loans, 2 savings goals)
+and never mention Pro; everywhere else, a Pro dialog when they tap, for every wall.
+- **Setup** (`GuideScreen`): at the limit the "Add another" chips give way to "You can add more later, from Wallets.",
+  the title to "Your accounts" / "Your cards and loans" and the header to "These are the … you’re starting with." The
+  setup editor leaves locked types out; another currency gets "Setup uses your main currency, PHP."; the goal sheet's
+  Kept in offers no Add wallet at three money wallets. From 130 % text an account row puts its amount under the name,
+  and the guide's content scrolls clear of the dock's fade.
+- **One Pro dialog** (`feature/pro/ProWall.kt`, `ProCopy.wallTitle` / `wallBody`): the plan fact as title, the
+  person's own number and what stays free as body, See Lucento Plan / Not now. It replaced `ProNote` in the wallet editor
+  (type, currency, Save), Wallets and Home Add (the type sheet when money wallets are full, one dialog with both counts
+  when everything is), Debts Add, Goals Add / Restore / editor, Insights 6 and 12 months, statements ("Save as PDF · Pro",
+  "Share · Pro"), themes, Sync now, Smarter reading, Lucento Shared create / invite and Ask's AI allowance. A Pro
+  Lifetime owner without Lucento Cloud hears about Lucento Cloud, in the dialog and in the plain notes beside it.
+  Dialog titles break in balanced lines (shared `ConfirmDialog`).
+- **Plan-rule fixes found by QA:** retyping a wallet into another kind counts as a new one of it
+  (`WalletRepository.update`, `ProGates.walletAccess`); before, cash into a receivable or a third card got around the
+  limits. While the wallet list loads the screen gives no early answer (`planWallets`). Editing a default card from
+  Home's or Budget's card no longer clears the default (`WalletsViewModel.draftFor`).
+- **Tests.** `WalletAccessTest` (6), `ProWallTest` (9), `PlanGateRepositoryTest` +1 (retype), `SyncPausedByPlanTest`
+  updated. Full local `testDebugUnitTest`: **1,648 tests, 0 failures**; `assembleDebug`; `lintDebug` 0 errors.
+- **Reviews.** QA round 1: not ready (H1 the retype bypass, H2 Pro in setup's goal sheet, M1–M4, L1–L12); fixed or
+  logged (FL-2, FL-3, FL-4); the re-check confirmed the blockers fixed, then its M4 notes and N1 (no early dialog for an
+  edit across the balance side, which a wallet's history can block on any plan) were fixed too. Design critic round 1:
+  REVISE 3.2 with no gate failing; fixed: the dark evidence, the combined wall, the step titles, the statement markers,
+  TalkBack labels on marked types, copy (jewellery, goals, setup's currency line). Owner calls left: the setup line's
+  wording, dialog composition (NEXT_TASKS).
+- **Emulator (API 35, local capture `FreeLimitsShotsTest`, not committed):** 12 steps at 100 %, at 200 % text on a
+  360 dp screen and in the dark theme (the phone in night mode), from the guide at its limits to the plan page that See
+  Lucento Plan opens. Found on the way: FL-1 (the guide's effect navigating before the NavHost's graph, in the Compose
+  test only) and FL-5 / FL-6 (older layout at 200 %).
 
 ## Monthly budget card redesign — 2026-11-18 (`feature/budget-card-constraints`)
 

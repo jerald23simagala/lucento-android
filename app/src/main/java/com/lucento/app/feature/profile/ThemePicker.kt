@@ -85,10 +85,10 @@ fun ThemePicker(
                     locked = spec.id in lockedThemes,
                     onSelect = {
                         if (spec.id in lockedThemes) {
+                            // The Pro dialog at the tap; the theme isn't applied (owner, 2026-11-18).
                             lockedTapped.value = spec
                         } else if (spec.id != selected) {
                             haptics.tick()
-                            lockedTapped.value = null
                             onTheme(spec.id)
                         }
                     },
@@ -102,10 +102,9 @@ fun ThemePicker(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         lockedTapped.value?.let { spec ->
-            Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.feature.pro.ProNote(
-                "${spec.displayName} is part of Lucento Pro. Sunrise and Midnight are always free.",
-                from = com.lucento.app.domain.entitlement.ProFeature.EXTRA_THEMES,
+            com.lucento.app.feature.pro.ProWallDialog(
+                com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.EXTRA_THEMES, subject = spec.displayName),
+                onDismiss = { lockedTapped.value = null },
             )
         }
         Spacer(Modifier.height(Spacing.md))

@@ -30,9 +30,13 @@ class SyncPausedByPlanTest {
         assertEquals("Cloud sync is part of Lucento Pro", copy.headline)
         assertTrue(copy.body.contains("Nothing in your account is deleted"))
         assertTrue(copy.body.contains("backup file"))
-        assertEquals("See Lucento Pro", copy.action)
+        assertEquals("See Lucento Plan", copy.action)
         assertTrue(copy.actionOpensPro)
         assertFalse(copy.actionOpensSettings)
+        // Pro Lifetime without Lucento Cloud: its way back is Lucento Cloud.
+        val lifetime = syncSheetCopy(CloudStatus.PAUSED, details, 1_000L, com.lucento.app.domain.entitlement.DisplayPlan.LIFETIME)
+        assertEquals("Cloud sync comes with Lucento Cloud", lifetime.headline)
+        assertTrue(lifetime.body.contains("when Lucento Cloud is on"))
     }
 
     @Test fun background_and_launch_sync_wait_for_the_plan() {

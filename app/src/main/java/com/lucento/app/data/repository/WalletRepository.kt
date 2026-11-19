@@ -223,6 +223,10 @@ class WalletRepository(
                 is WalletChangeViolation.TypeLocked -> return SaveResult.TypeLocked(violation.usage)
                 null -> Unit
             }
+            // A wallet changing *into* another kind is a new one of that kind as far as the plan is concerned (§6.3): cash
+            // into a receivable, a fourth money wallet out of a receivable kept from Pro. A card into a loan is the same kind.
+            val gates = com.lucento.app.domain.entitlement.ProGates
+            if (currentType == null || gates.walletFeature(currentType) != gates.walletFeature(type)) planGate(type)?.let { return it }
             // A wallet changing *into* another currency is a new foreign wallet as far as the plan is concerned.
             if (existing.currencyCode != openingBalance.currencyCode) foreignCurrencyGate(openingBalance.currencyCode)?.let { return it }
         }
@@ -303,8 +307,10 @@ class WalletRepository(
      * manually valued assets are Pro kinds. Counts are of active wallets of the same kind, so what exists is never affected.
      */
     private suspend fun planGate(type: WalletType): SaveResult? {
-        val feature = planFeature(type)
-        val used = dao.observeActive().first().count { row -> WalletType.entries.firstOrNull { it.name == row.type }?.let(::planFeature) == feature }
+        val feature = com.lucento.app.domain.entitlement.ProGates.walletFeature(type)
+        val used = dao.observeActive().first().count { row ->
+            WalletType.entries.firstOrNull { it.name == row.type }?.let(com.lucento.app.domain.entitlement.ProGates::walletFeature) == feature
+        }
         return when (val access = gate.check(feature, used)) {
             Access.Allowed -> null
             is Access.Locked -> SaveResult.ProRequired(access.feature)
@@ -330,15 +336,6 @@ class WalletRepository(
         dao.countActiveWithName(name, excludeId) > 0 -> SaveResult.DuplicateName
         else -> null
     }
-}
-
-/** Which plan limit a wallet of [type] counts against (docs/MONETIZATION.md §3.2). */
-internal fun planFeature(type: WalletType): ProFeature = when (type) {
-    // An investment is money the person moves in and out, like savings (tester round, 2026-11-17).
-    WalletType.CASH, WalletType.BANK, WalletType.E_WALLET, WalletType.SAVINGS, WalletType.INVESTMENT -> ProFeature.MONEY_WALLETS
-    WalletType.CREDIT_CARD, WalletType.LOAN -> ProFeature.DEBT_ACCOUNTS
-    WalletType.RECEIVABLE -> ProFeature.RECEIVABLES
-    WalletType.OTHER_ASSET -> ProFeature.VALUED_ASSETS
 }
 
 internal fun WalletEntity.toDomain(flow: WalletFlowRow? = null, terms: DebtTermsEntity? = null): Wallet {

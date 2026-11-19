@@ -292,8 +292,16 @@ private fun HomeDashboard(
     walletsViewModel: WalletsViewModel,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // The plan check reads Home's own wallet list (the active wallets), null while Home is still loading.
+    val planWallets = if (state.loading) null else state.wallets
+    val walletScope = rememberCoroutineScope()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
-    val dashboardActions = remember(actions) { actions.copy(onEditWallet = { editingWallet = it.toDraft() }) }
+    // A card from the budget card opens with its real Default switch, so a default card stays the default.
+    val dashboardActions = remember(actions) {
+        actions.copy(onEditWallet = { wallet -> walletScope.launch { editingWallet = walletsViewModel.draftFor(wallet) } })
+    }
+    // Add wallet: the editor on Cash, the type sheet when money wallets are full, or the Pro dialog (owner, 2026-11-18).
+    val addWallet = com.lucento.app.feature.wallets.rememberAddWallet(planWallets, state.primaryCurrency) { editingWallet = it }
     var showSync by remember { mutableStateOf(false) }
     var showAwards by remember { mutableStateOf(false) }
     // The award being presented. Saved, so a ceremony isn't lost to rotation after its award was acknowledged.
@@ -386,7 +394,7 @@ private fun HomeDashboard(
                     WelcomePanel(
                         // A Partner's phone: the Shared Space's Owner adds wallets (the panel then says so).
                         onAddWallet = if (com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure) {
-                            { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) }
+                            addWallet
                         } else {
                             null
                         },
@@ -400,7 +408,7 @@ private fun HomeDashboard(
                     onDismissOverridden = viewModel::dismissOverridden,
                     onTurnOn = viewModel::turnOn,
                     onHideOffers = viewModel::hideModuleOffers,
-                    onAddWallet = { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) },
+                    onAddWallet = addWallet,
                     onOpenMilestones = { showAwards = true },
                     onDismissSpotlight = viewModel::dismissAddSpotlight,
                 )
@@ -431,6 +439,8 @@ private fun HomeDashboard(
             onSave = walletsViewModel::save,
             onDelete = walletsViewModel::delete,
             onDismiss = { editingWallet = null },
+            activeWallets = planWallets,
+            mainCurrency = state.primaryCurrency.takeIf { planWallets != null },
         )
     }
     if (showAwards) {

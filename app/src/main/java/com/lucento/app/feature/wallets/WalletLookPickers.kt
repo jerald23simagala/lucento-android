@@ -128,18 +128,25 @@ internal fun WalletTypeField(selected: WalletType, currencyCode: String, onClick
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WalletTypePickerSheet(
-    selected: WalletType,
+    /** The current type, checked; null when the sheet is choosing what to add. */
+    selected: WalletType?,
     currencyCode: String,
     proTypes: Set<WalletType>,
     onSelect: (WalletType) -> Unit,
     onDismiss: () -> Unit,
+    /** Types not offered at all (the guided setup leaves out what the plan doesn’t include, without mentioning Pro). */
+    hidden: Set<WalletType> = emptySet(),
+    /** What TalkBack reads for a marked type: the plan fact behind its mark. */
+    proLabel: (WalletType) -> String = { "Lucento Pro feature" },
 ) {
     val haptics = rememberHaptics()
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             SheetHeader(title = "Type of wallet", subtitle = "It decides how its money is counted.", icon = Icons.Outlined.Category)
             LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).selectableGroup()) {
-                TypeSections.forEach { (title, types) ->
+                TypeSections.forEach { (title, all) ->
+                    val types = all.filter { it !in hidden || it == selected }
+                    if (types.isEmpty()) return@forEach
                     item(key = "header-$title") { PickerSectionHeader(title) }
                     items(types, key = { it.name }) { type ->
                         val chosen = type == selected
@@ -161,7 +168,10 @@ internal fun WalletTypePickerSheet(
                                 Text(type.label, style = MaterialTheme.typography.bodyLarge, fontWeight = if (chosen) FontWeight.SemiBold else null)
                                 Text(type.pickerHint(currencyCode), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            if (type in proTypes) com.lucento.app.feature.pro.ProBadge()
+                            if (type in proTypes) {
+                                Spacer(Modifier.width(Spacing.sm))
+                                com.lucento.app.feature.pro.ProBadge(description = proLabel(type))
+                            }
                             if (chosen) {
                                 Spacer(Modifier.width(Spacing.xs))
                                 Icon(Icons.Filled.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
