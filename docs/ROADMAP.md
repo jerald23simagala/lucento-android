@@ -316,7 +316,7 @@ recurring-schedule sync, syncing preferences.
 - **Investments, spending money, two-figure Safe to spend, scheduled transfers** (#101, Room v14, waits for OT-38):
   docs/CALCULATIONS.md "Safe to spend", "Money on hand", "Investments", "Scheduled outlook".
 
-## Built — Tester round 2026-11-18 (`feature/card-default-wallet` #107, `feature/scheduled-bulk-edit` #108, `feature/free-limits-pro-dialog`)
+## Built — Tester round 2026-11-18 (`feature/card-default-wallet` #107, `feature/scheduled-bulk-edit` #108, `feature/free-limits-pro-dialog` #109)
 - **A credit card can be the default wallet** (#107): expenses go to it; income and transfers go to cash, a bank or an
   e-wallet. Home's hero reads "Assets"; the composer's picker "Select wallet to use".
 - **Scheduled bulk edit**: All schedules has a Select mode (Select all; Change day, Change amount, Pause / Resume,
@@ -328,6 +328,13 @@ recurring-schedule sync, syncing preferences.
 - **One Pro dialog at the tap**: every Pro wall (Add on a full count, a locked wallet type or currency, 6 / 12 months,
   PDF statements, themes, sync, Smarter reading, Shared invites, the free AI allowance) is one dialog saying what the
   Free plan includes, with **See Lucento Plan** and **Not now**; the inline lock notes are gone (docs/MONETIZATION.md §6.1).
+
+## Built — Pro experience: walls met again, previews (owner, 2026-11-19, `feature/pro-repeat-taps-previews`)
+- **A wall met again** in the same session is a short message with Unlock, in the app or inside the open sheet; the
+  first tap is still the dialog (#109).
+- **Insights 6 and 12 months**: a preview of the person's own months with the figures hidden, under the plan fact.
+- **Themes**: a Pro theme can be tried on in the profile sheet, never saved.
+- Audit and decisions: docs/monetization/PRO_EXPERIENCE_AUDIT_2026-11-19.md (no Home card, the dialog kept as built).
 
 ## Built — Monthly budget card in three parts (2026-11-18, `feature/budget-card-constraints`)
 - Home's card: how much of the budget is spent (a half gauge), then Budget remaining and Spendable wallets side by side,

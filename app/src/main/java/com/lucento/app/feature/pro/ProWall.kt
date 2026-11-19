@@ -3,6 +3,8 @@ package com.lucento.app.feature.pro
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.domain.entitlement.Access
 import com.lucento.app.domain.entitlement.Limit
@@ -46,6 +48,23 @@ fun ProWallDialog(wall: ProWall, onDismiss: () -> Unit, open: ((ProFeature?) -> 
     val openPro = LocalOpenPro.current
     // The words follow the plan held: Pro Lifetime without Lucento Cloud hears about Lucento Cloud.
     val plan = LocalEntitlements.current.displayPlan(System.currentTimeMillis())
+    // The first tap on a feature this session shows the dialog; a later one, the plan fact as a short message with
+    // Unlock (owner, 2026-11-19). Without a place for the message (previews, tests) it is always the dialog.
+    val hosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
+    val memory = LocalProWallMemory.current
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val firstTime = remember(wall) { hosts?.top == null || !memory.met(wall.feature) }
+    if (!firstTime) {
+        LaunchedEffect(wall) {
+            // The keyboard would cover the message and the tap would look dead (QA 2026-11-19).
+            keyboard?.hide()
+            hosts?.top?.show(ProCopy.wallTitle(wall, plan), ProCopy.WALL_UNLOCK) { (open ?: openPro)(wall.feature) }
+            onDismiss()
+        }
+        return
+    }
+    // Remembered once the dialog is really there, not while it is only being composed.
+    if (hosts?.top != null) LaunchedEffect(wall) { memory.markMet(wall.feature) }
     ConfirmDialog(
         title = ProCopy.wallTitle(wall, plan),
         text = ProCopy.wallBody(wall, plan),

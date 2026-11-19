@@ -282,6 +282,13 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     val haptics = rememberHaptics()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // Short messages (a Pro wall met again, owner 2026-11-19) show in the app's snackbar unless a sheet is open.
+    val messageHosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
+    androidx.compose.runtime.DisposableEffect(messageHosts, snackbarHostState, scope) {
+        val appHost = com.lucento.app.core.designsystem.component.MessageHost(snackbarHostState, scope)
+        messageHosts?.app = appHost
+        onDispose { if (messageHosts?.app === appHost) messageHosts.app = null }
+    }
     val generation = preferences.setupGeneration
     val appViewModel: AppViewModel = viewModel(key = "app-$generation", factory = AppViewModel.Factory)
 
@@ -304,6 +311,9 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
     var showProfile by rememberSaveable { mutableStateOf(false) }
+    // A Pro theme tried on lasts while the profile sheet is open (owner, 2026-11-19).
+    val themeTrial = com.lucento.app.feature.profile.LocalThemeTrial.current
+    LaunchedEffect(showProfile) { if (!showProfile) themeTrial.end() }
     // The tab a pushed screen belongs to, so the dock keeps it highlighted (e.g. Goals opened from Home).
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     // Each tap on Home in the dock asks Home to show its top (owner round 10); Back from a sub-page keeps the place.
@@ -460,14 +470,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 },
                 containerColor = MaterialTheme.colorScheme.background,
                 snackbarHost = {
-                    SnackbarHost(snackbarHostState) { data ->
-                        Snackbar(
-                            snackbarData = data,
-                            shape = MaterialTheme.shapes.medium,
-                            containerColor = MaterialTheme.colorScheme.inverseSurface,
-                            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                        )
-                    }
+                    SnackbarHost(snackbarHostState) { data -> com.lucento.app.core.designsystem.component.LucentoSnackbar(data) }
                 },
                 bottomBar = {
                     AnimatedVisibility(

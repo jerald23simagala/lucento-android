@@ -161,6 +161,12 @@ class AppContainer(application: Application) {
     /** P2-10: whether this process has been unlocked. Process-wide, so rotation never re-locks and a cold start does. */
     val appLock: com.lucento.app.core.security.AppLockSession by lazy { com.lucento.app.core.security.AppLockSession() }
 
+    /** Pro walls met this session (owner, 2026-11-19): the first tap a dialog, later taps a short message. In memory. */
+    val proWalls: com.lucento.app.feature.pro.ProWallMemory by lazy { com.lucento.app.feature.pro.ProWallMemory() }
+
+    /** A Pro theme tried on in the profile sheet, never saved (owner, 2026-11-19). In memory. */
+    val themeTrial: com.lucento.app.feature.profile.ThemeTrial by lazy { com.lucento.app.feature.profile.ThemeTrial() }
+
     /** Background and launch sync wait for this (P0-2); onboarding's own restore syncs directly. */
     suspend fun onboardingComplete(): Boolean = preferences.preferences.first().onboardingComplete
     val backup: BackupEngine by lazy {

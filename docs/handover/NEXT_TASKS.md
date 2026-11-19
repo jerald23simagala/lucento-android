@@ -56,6 +56,19 @@
 | OT-40 | **Two choices about the redesigned Monthly budget card** (PR for `feature/budget-card-constraints`). 1. Bills: keep taking upcoming bills off both Budget remaining and Spendable wallets (Safe to spend takes the lower, so each bill counts once), or follow the brief's wallet formula, which leaves bills out of the wallets. 2. Order: keep overview, the two limits, then Safe to spend (your mockup), or put Safe to spend right after the overview | **Done** (owner, 2026-11-18): keep bills in both limits; keep the order, showing both limits' results with fewer words and lines that balance between the two columns (built on the same PR) | The brief asked for both the literal formula and "no double counting"; they disagree when the wallets are the lower limit (KNOWN_ISSUES BC-1). The design review found the answer below the fold on small phones |
 
 
+## Pro experience — follow-ups (2026-11-19, `feature/pro-repeat-taps-previews`)
+
+- On a phone, Free plan: a wall met twice (the dialog, then the message with Unlock) on Wallets, in the wallet editor,
+  on Lucento Shared with the email field focused (the keyboard should close first) and in Ask past the allowance;
+  Insights 6 and 12 months (the preview, then buying from it lands on that period); trying Grove, picking Sunrise
+  mid-trial (no flash), closing the sheet; TalkBack on the message, the preview and the try-on note.
+- Compose UI tests: `ProWallDialog` first tap and repeat (one `onDismiss`, Unlock calls `open`), the message landing in
+  the open sheet, the theme trial ending with the sheet, the preview's semantics (one description, no digits).
+- Owner calls from the design review (2026-11-19, REVISE 3.3): keep a half-filled form across Unlock or See Lucento Plan
+  (today the sheet closes and its draft goes, as #109's dialog did); apply a tried theme once Pro arrives; one label for
+  the plan page (the profile card's "See Lucento Pro", approved 2026-11-09, beside the walls' "See Lucento Plan"); the
+  word "Unlock". A 130 % capture set and a 360 dp set at 100 %.
+
 ## Free limits and the Pro dialog — follow-ups (2026-11-19, `feature/free-limits-pro-dialog`)
 
 - On a phone, Free plan: the guided setup at 3 accounts and 2 cards or loans (no add options, the quiet line, nothing

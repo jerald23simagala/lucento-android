@@ -196,6 +196,24 @@ object ProCopy {
     const val WALL_SEE_PLAN = "See Lucento Plan"
     const val WALL_NOT_NOW = "Not now"
 
+    /** The short message's action when a wall is met again in the same session (owner, 2026-11-19). */
+    const val WALL_UNLOCK = "Unlock"
+
+    /** Insights' preview of 6 or 12 months on a plan without them: the person's own shape, with the figures hidden. */
+    fun longPeriodPreviewBody(months: Int, hasData: Boolean): String =
+        (if (hasData) "This is the shape of your last $months months, with the figures hidden. " else "") +
+            "Lucento Pro shows every figure for 6 and 12 months, where your money went and how your net worth moved. " +
+            "Your last 3 months are always free."
+
+    const val LONG_PERIOD_BACK = "Back to 3 months"
+
+    /** A Pro theme tried on: shown now, nothing saved, and what it goes back to. */
+    fun themeTrialBody(saved: String): String =
+        "Lucento is showing it now and nothing is saved: Done, or closing this sheet, goes back to $saved. Sunrise and " +
+            "Midnight are always free."
+
+    const val THEME_TRIAL_DONE = "Done"
+
     /**
      * Whether [wall] is about the online services for a Pro Lifetime owner without them (its included year over, no
      * Lucento Cloud): their way back is Lucento Cloud, which the plan page offers them, not "the Free plan" (QA 2026-11-19).

@@ -670,6 +670,37 @@ Adjust existing".
   promising 2 changes where 3 were made (Rent moving from the 30th to the 31st only from December); the preview now
   shows the first date that changes, and a plan already on the chosen day is skipped.
 
+## Pro experience: walls met again, previews — 2026-11-19 (`feature/pro-repeat-taps-previews`)
+
+The owner's monetization brief, audited first (`docs/monetization/PRO_EXPERIENCE_AUDIT_2026-11-19.md`: matrix, gaps).
+Then the owner decided: keep the #109 dialog (plan fact first; See Lucento Plan / Not now), a short message on repeat
+taps per session, no Home card, previews for Insights' 6 and 12 months and for Pro themes. Billing, entitlements, limits
+and the data model are unchanged.
+- **A wall met again** in the same app session is a snackbar with the plan fact, **Unlock** and a close button
+  (`ProWallDialog` decides; `ProWallMemory` in the container, in memory only). Every `LucentoBottomSheet` has its own
+  snackbar, and `MessageHosts` sends a message to the newest open sheet, otherwise the app's, so it never sits behind a
+  sheet. The keyboard closes first, Unlock ignores taps in its first 600 ms (a quick second tap on Save can't take it),
+  the action goes under the message from 130 % text (`LucentoSnackbar`), and Unlock from a sheet inside a sheet (goal
+  sheet → wallet editor) or from Ask's sheets closes them before the plan page opens.
+- **Insights' 6 and 12 months** on the Free plan are a preview (`LongPeriodPreview`): the person's own income and
+  expenses for the period with a legend, softened (blurred on Android 12+), the axis blank and one spoken line, under
+  the plan fact, See Lucento Plan and Back to 3 months; buying from it lands on that period.
+- **A Pro theme is tried on** in the profile sheet (`ThemeTrial`, in memory): Lucento recolours at once, a note says
+  nothing is saved and what it goes back to; it ends with Done, a theme of one's own (no flash), or the sheet closing.
+- **Tests.** `ProWallMemoryTest` (2), `ThemeTrialTest` (1), `MessageHostsTest` (1), `MessageHostTest` (2), `ProWallTest`
+  +1. Full local `testDebugUnitTest`: **1,655 tests, 0 failures**; `assembleDebug`; `lintDebug` 0 errors.
+  `ScreenshotTourTest` leaves the locked period with "Back to 3 months".
+- **Reviews.** QA: not ready on H1 (a repeat with the keyboard up showed its message under it); fixed with M1 (Unlock
+  from nested sheets), M2–M6 and R1/R3/R4/R5/R9; R6–R8 logged (KNOWN_ISSUES PX-1…PX-3). Design critic: REVISE 3.3 with
+  no gate failing (the preview reveals no figures); fixed: a sheet's message moved to its top (it covered Save), 10 s
+  with an action, the tried theme's "Trying" state and description line, the note's plan button secondary and its
+  copy, the snackbar's edge margin, the legend matching the softened bars, the note's motion. Owner calls left in
+  NEXT_TASKS (drafts across Unlock, a tried theme after purchase, one plan-page label, the word "Unlock").
+- **Emulator (API 35, local capture `ProExperienceShotsTest`, not committed):** 10 steps at 100 %, at 200 % text on a
+  360 dp screen and in the dark theme: the first tap's dialog and the second's message (on Wallets and in the wallet
+  editor), Unlock to the plan page (also from the goal sheet, which closes), the Insights preview with seven months of
+  real data, Grove tried on and gone when the sheet closes. Evidence: `artifacts/pro-experience-2026-11-19/`.
+
 ## Tester round 2026-11-18, part C — 2026-11-19 (`feature/free-limits-pro-dialog`)
 
 Owner's choices: in setup, hide the add options at the Free numbers (3 money wallets, 2 cards or loans, 2 savings goals)

@@ -50,6 +50,15 @@ class ProWallTest {
         assertFalse(ProCopy.wallBody(ProWall(ProFeature.VALUED_ASSETS)).contains("investments"))
     }
 
+    @Test fun `the preview and the try-on say what they show and that nothing is saved`() {
+        assertTrue(ProCopy.longPeriodPreviewBody(6, hasData = true).startsWith("This is the shape of your last 6 months, with the figures hidden. "))
+        // Nothing recorded: no picture, so no sentence about one.
+        assertFalse(ProCopy.longPeriodPreviewBody(12, hasData = false).contains("shape"))
+        assertTrue(ProCopy.longPeriodPreviewBody(12, hasData = false).endsWith("Your last 3 months are always free."))
+        assertTrue(ProCopy.themeTrialBody("Sunrise").contains("nothing is saved: Done, or closing this sheet, goes back to Sunrise."))
+        assertEquals("Unlock", ProCopy.WALL_UNLOCK)
+    }
+
     @Test fun `every feature has a title and a body`() {
         ProFeature.entries.forEach { feature ->
             val wall = ProWall(feature)

@@ -388,6 +388,21 @@ that already has a payment plan shows an amber warning right under **Pay to**, a
 **Adjust existing** (opens Select mode with them selected and a note saying so) and **Add another** (deep blue for
 contrast on amber). Saving while it is unanswered asks the same question in a dialog.
 
+## Pro walls met again, and two previews (owner, 2026-11-19)
+A Pro wall met again in the same app session is a snackbar with the plan fact and **Unlock**, not the dialog again; it
+shows where the person is: every `LucentoBottomSheet` carries its own snackbar host (a sheet is a window above the app,
+so the app's would sit behind it), and `MessageHosts` sends a message to the newest open sheet, otherwise the app. In a
+sheet it sits at the top, below the status bar, never over the sheet's own buttons; it stays 10 s with a close button
+when it has an action, which ignores taps in its first 600 ms; from 130 % text the action goes under the message
+(`LucentoSnackbar`, shared by the app and every sheet).
+Insights' 6 and 12 months on the Free plan are a preview card: the person's own income-and-expense chart for the
+period at 45 % opacity (blurred on Android 12+), its axis blank (the hidden-amounts mode), one spoken line, then the
+plan fact, See Lucento Plan and Back to 3 months; the segmented control shows the period as chosen. A Pro theme tapped
+in the profile sheet is tried on: Lucento (the sheet included) recolours at once; the tried tile is ringed and reads
+"Trying", the description line is the tried theme's, and a note expands under the themes with the plan fact, that
+nothing is saved and what it returns to, See Lucento Plan (secondary, as the Pro card below has the filled button) and
+Done; the saved theme keeps its check.
+
 ## Pro walls and Free limits (tester round, 2026-11-18)
 Every Pro wall is one dialog at the tap that would cross it (`ProWallDialog` in `feature/pro/ProWall.kt`, built on
 `ConfirmDialog` and its `icon` slot): the WorkspacePremium ribbon in a pale circle, a centred title saying what the Free
