@@ -1533,8 +1533,7 @@ private fun MonthlyBudgetCard(
                 // spending (Budget remaining and Spendable wallets); C, Safe to spend, the lower of the two. B and C are the
                 // Budget tab's panel too, so the two pages can't disagree.
                 BudgetOverview(plan, burn)
-                Spacer(Modifier.height(Spacing.lg))
-                Hairline()
+                // The limits' grid has its own outline, so space alone separates it from the overview.
                 Spacer(Modifier.height(Spacing.lg))
                 val safe = state.safeToSpend
                 val capacity = safe?.let { SpendingCapacity.of(it) }

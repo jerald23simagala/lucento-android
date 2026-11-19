@@ -645,6 +645,15 @@ wallets side by side; Safe to spend as the conclusion) and for the Budget tab to
   - the captions are gone, and the verdict's second line appears only when the wallets don't take part;
   - the Budget hero reads "Unspent of your ₱X budget".
 
+  A second round followed, also from the owner. They asked for smaller fonts if needed, the description before the
+  amount, amounts aligned, proper spacing and section separation, and subtle grids. B is now:
+  - a subtle grid of two cells (outline, a centre divider, a rule under the headers);
+  - in each cell, the centred name and a smaller figure (18sp);
+  - then a ledger: "Unspent ₱30,920.10", "Upcoming −₱15,649.90", "In wallets ₱31,064.30" and "Due −₱29,394.30", with
+    the amounts aligned right at one size.
+
+  The hairline between the overview and the grid is gone; space and the grid's outline separate them.
+
   Not re-reviewed by the critic after these changes.
 - **Device.** On the API 35 emulator, the local `BudgetCardShotsTest` (not committed) captured:
   - 23 states each at 411dp and 360dp;

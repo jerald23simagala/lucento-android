@@ -301,12 +301,14 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
    budget · Under budget · Ahead of pace · On track) in its header. **A**: a half gauge (health colour) with the amount
    spent in its hollow and "spent of <budget>" under it, a "N% spent" pill, and "Budgeted ₱X • Unbudgeted ₱Y"; at 130 %
    text and above (over 120 %), or when "spent of" would need a second line, the pill takes the hollow and the amounts
-   move under the gauge. **B**: **Budget remaining** and **Spendable wallets** side by side with a hairline between
-   (stacked in a panel under 280dp or from 130 % text), set out alike so their lines balance (owner, 2026-11-18): the
-   caps name with a chevron (each column is a button), the figure in neutral ink at one size shared by both (red with
-   its minus sign below zero), then two short parts, "₱30,920.10 unspent" / "−₱15,649.90 upcoming" and "₱31,064.30 in
-   wallets" / "−₱29,394.30 due", each on one line when all four fit, otherwise each amount over its word in both
-   columns. No captions, icon tiles or tinted boxes. **C**: **Safe to spend** in a green panel with a check (red with
+   move under the gauge. **B**: **Budget remaining** and **Spendable wallets** as a subtle grid (owner, 2026-11-18):
+   a 1dp outline in `borderDefault` with the card's corner radius, a divider between the two cells (stacked in a panel
+   under 280dp or from 130 % text), and in each cell the caps name and the figure centred (18sp, one size for both,
+   neutral ink, red with its minus sign below zero; a chevron in the corner, as each cell is a button), then under a
+   rule the two parts as a small ledger: "Unspent ₱30,920.10" / "Upcoming −₱15,649.90" and "In wallets ₱31,064.30" /
+   "Due −₱29,394.30", descriptions left and amounts aligned right, one size for all four (smaller when the widest needs
+   it). Both names take the same number of lines, so the rules and rows line up. No captions, icon tiles or tinted
+   boxes. **C**: **Safe to spend** in a green panel with a check (red with
    an alert at 0, never negative) and a chevron, the loudest figure on the card (36sp; the spent figure is 32sp, the
    limits up to 22sp), and the sentence that says which limit set it (a second line only when the wallets don't take
    part); the whole panel opens how it is worked out. TalkBack reads each column and the verdict as one button with one sentence. A

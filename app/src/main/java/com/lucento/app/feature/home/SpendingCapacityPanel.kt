@@ -2,6 +2,7 @@ package com.lucento.app.feature.home
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.lucento.app.core.designsystem.component.MoneyText
 import com.lucento.app.core.designsystem.component.StatusPill
 import com.lucento.app.core.designsystem.component.amountFormat
@@ -82,8 +84,9 @@ import java.util.Locale
  * card's conclusion. B and C are shared with the Budget tab ([SpendingCapacityBlock]) so the two pages never disagree;
  * every figure comes from [SpendingCapacity], read from SafeToSpend.
  *
- * Owner, 2026-11-18 (after the design review): keep this order, show both limits' results, fewer words, and lines
- * that balance between the two columns: each limit is its figure and two short parts ("₱30,920.10 unspent").
+ * Owner, 2026-11-18: keep this order and show both limits' results with fewer words, in lines that balance; then, B as
+ * a subtle grid: each limit's name and figure centred (the figure smaller), and under a rule its two parts as a small
+ * ledger, the description first and the amounts aligned on the right ("Unspent ₱30,920.10").
  *
  * TalkBack: each limit and the verdict is one button with one sentence that carries every figure in it (a description
  * on a single child would have replaced the others in what it reads).
@@ -147,7 +150,7 @@ internal fun BudgetOverview(plan: BudgetPlan, burn: BudgetBurn) {
             }
             Spacer(Modifier.height(Spacing.sm))
             if (below) figures() else share()
-            Spacer(Modifier.height(Spacing.sm))
+            Spacer(Modifier.height(Spacing.md))
             SpendingSplit(plan)
         }
     }
@@ -294,14 +297,30 @@ internal fun SpendingCapacityBlock(
     }
 }
 
-/** One of a limit's two parts: the amount as shown, a word or two, and the amount itself (for its sign and speech). */
-private data class Part(val shown: String, val word: String, val money: Money)
+/** One of a limit's two parts: its description, the amount as shown, and the amount itself (for its sign and speech). */
+private data class Part(val label: String, val shown: String, val money: Money)
+
+/** A limit's figure: smaller than the gauge's and the verdict's (owner, 2026-11-18), as the Budget hero's tiles. */
+private val LimitFigureStyle = AmountStyles.medium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
 
 private val PartAmountStyle = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold)
 
 /**
- * Sections B and C: the two limits side by side (stacked when narrow or at large text), then the verdict. Both limits
- * share one figure size and one way of setting out their parts, so their lines balance (owner, 2026-11-18).
+ * Inside a grid cell: the padding on each side, the room kept for the chevron either side of the centred name, and the
+ * least space between a part's description and its amount.
+ */
+private val CellPadding = Spacing.sm + Spacing.xxs
+private val ChevronRoom = 16.dp
+private val PartGap = Spacing.xs + Spacing.xxs
+
+/** Below this the parts would be too small to read on one line: each description goes over its amount instead. */
+private const val SMALLEST_PART_SCALE = 0.85f
+
+/**
+ * Sections B and C. B is a subtle grid of two cells, side by side (stacked when narrow or at large text): in each, the
+ * limit's name and figure centred, then under a rule its two parts as a small ledger, the description first and the
+ * amount aligned on the right. Both cells share one figure size, one part size and the same number of title lines, so
+ * their rules and rows line up (owner, 2026-11-18).
  */
 @Composable
 internal fun SpendingCapacityPanel(
@@ -314,63 +333,79 @@ internal fun SpendingCapacityPanel(
 ) {
     val density = LocalDensity.current
     val fontScale = density.fontScale
-    val divider = LucentoTheme.extendedColors.borderDefault
+    val grid = LucentoTheme.extendedColors.borderDefault
+    val shape = MaterialTheme.shapes.medium
     val measurer = rememberTextMeasurer()
-    val partStyle = MaterialTheme.typography.bodySmall
+    val labelStyle = MaterialTheme.typography.bodySmall
     val counted = capacity.wallets?.takeIf { capacity.walletsCounted }
     // Budget remaining = unspent budget − upcoming expenses; Spendable wallets = what's in them − what's due from them.
     val budgetParts = listOf(
-        Part(shownAmount(capacity.remainingBeforeUpcoming, signed = true), "unspent", capacity.remainingBeforeUpcoming),
-        Part(shownAmount(-capacity.upcomingExpenses, signed = true), "upcoming", -capacity.upcomingExpenses),
+        Part("Unspent", shownAmount(capacity.remainingBeforeUpcoming, signed = true), capacity.remainingBeforeUpcoming),
+        Part("Upcoming", shownAmount(-capacity.upcomingExpenses, signed = true), -capacity.upcomingExpenses),
     )
     val walletParts = if (counted == null) {
         emptyList()
     } else {
         listOf(
-            Part(shownAmount(counted.total, signed = true), "in wallets", counted.total),
-            Part(shownAmount(-counted.deducted, signed = true), "due", -counted.deducted),
+            Part("In wallets", shownAmount(counted.total, signed = true), counted.total),
+            Part("Due", shownAmount(-counted.deducted, signed = true), -counted.deducted),
         )
     }
     val budgetFigure = shownAmount(capacity.budgetRemaining, signed = true)
     val walletsFigure = counted?.allows?.let { shownAmount(it, signed = true) }.orEmpty()
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    val budgetTitle = "Budget remaining"
+    val walletsTitle = "Spendable wallets"
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val isStacked = stacked(maxWidth, fontScale)
-            // A column's own width, less its padding.
-            val room = if (isStacked) maxWidth - Spacing.xs * 2 else maxWidth / 2 - Spacing.sm - Spacing.xs * 2
-            val roomPx = with(density) { room.toPx() }
+            val cellWidth = if (isStacked) maxWidth else maxWidth / 2
+            val innerPx = with(density) { (cellWidth - CellPadding * 2).toPx() }
+            val titleRoomPx = with(density) { (cellWidth - CellPadding * 2 - ChevronRoom * 2).roundToPx() }
+            val gapPx = with(density) { PartGap.toPx() }
             // One size for both figures, set by the wider of the two, so side by side they never differ.
-            val figureStyle = remember(budgetFigure, walletsFigure, roomPx, density) {
-                val base = AmountStyles.large
+            val figureStyle = remember(budgetFigure, walletsFigure, innerPx, density) {
                 val widest = maxOf(
-                    measurer.measure(budgetFigure, base).size.width,
-                    if (walletsFigure.isEmpty()) 0 else measurer.measure(walletsFigure, base).size.width,
+                    measurer.measure(budgetFigure, LimitFigureStyle).size.width,
+                    if (walletsFigure.isEmpty()) 0 else measurer.measure(walletsFigure, LimitFigureStyle).size.width,
                 ).toFloat()
-                if (widest <= roomPx) base else (roomPx / widest).let { base.copy(fontSize = base.fontSize * it, lineHeight = base.lineHeight * it) }
+                LimitFigureStyle.scaledToFit(widest, innerPx)
             }
-            // Each part on one line ("₱30,920.10 unspent") when all of them fit; otherwise every amount sits over its word,
-            // in both columns alike, so the two keep the same number of lines.
-            val partsInline = remember(budgetParts, walletParts, roomPx, partStyle, density) {
-                (budgetParts + walletParts).all { part ->
-                    measurer.measure(part.shown, PartAmountStyle).size.width + measurer.measure(" ${part.word}", partStyle).size.width <= roomPx
-                }
+            // One size for all four parts, small enough for the widest description and amount to share a line.
+            val partScale = remember(budgetParts, walletParts, innerPx, labelStyle, density) {
+                val widest = (budgetParts + walletParts).maxOfOrNull { part ->
+                    measurer.measure(part.label, labelStyle).size.width + gapPx + measurer.measure(part.shown, PartAmountStyle).size.width
+                } ?: 0f
+                if (widest <= innerPx) 1f else innerPx / widest.toFloat()
             }
-            val budget: @Composable (Modifier) -> Unit = { m ->
-                LimitColumn(
-                    title = "Budget remaining",
+            val partsOnOneLine = partScale >= SMALLEST_PART_SCALE
+            val partLabel = if (partsOnOneLine) labelStyle.scaled(partScale) else labelStyle
+            val partAmount = if (partsOnOneLine) PartAmountStyle.scaled(partScale) else PartAmountStyle
+            // Both names take as many lines as the longer needs, so the rules under the figures run straight across.
+            val titleLines = remember(titleRoomPx, density) {
+                listOf(budgetTitle, walletsTitle).maxOf { title ->
+                    measurer.measure(title.uppercase(Locale.getDefault()), OverlineStyle, constraints = Constraints(maxWidth = titleRoomPx)).lineCount
+                }.coerceIn(1, 3)
+            }
+            val budgetCell: @Composable (Modifier) -> Unit = { m ->
+                LimitCell(
+                    title = budgetTitle,
+                    titleLines = titleLines,
                     amount = capacity.budgetRemaining,
                     note = null,
                     parts = budgetParts,
-                    partsInline = partsInline,
                     figureStyle = figureStyle,
+                    partLabel = partLabel,
+                    partAmount = partAmount,
+                    partsOnOneLine = partsOnOneLine,
                     clickLabel = "Show how budget remaining is worked out",
                     onClick = onBudgetRemaining,
                     modifier = m,
                 )
             }
-            val walletsColumn: @Composable (Modifier) -> Unit = { m ->
-                LimitColumn(
-                    title = "Spendable wallets",
+            val walletsCell: @Composable (Modifier) -> Unit = { m ->
+                LimitCell(
+                    title = walletsTitle,
+                    titleLines = titleLines,
                     // Until money is recorded in them they don't take part: "—", not a figure the verdict doesn't use.
                     amount = counted?.allows,
                     note = when {
@@ -379,30 +414,34 @@ internal fun SpendingCapacityPanel(
                         else -> null
                     },
                     parts = walletParts,
-                    partsInline = partsInline,
                     figureStyle = figureStyle,
+                    partLabel = partLabel,
+                    partAmount = partAmount,
+                    partsOnOneLine = partsOnOneLine,
                     clickLabel = walletsClickLabel,
                     onClick = onWallets,
                     modifier = m,
                 )
             }
             if (isStacked) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    budget(Modifier.fillMaxWidth())
-                    walletsColumn(Modifier.fillMaxWidth())
+                Column(Modifier.fillMaxWidth().clip(shape).border(1.dp, grid, shape)) {
+                    budgetCell(Modifier.fillMaxWidth())
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(grid))
+                    walletsCell(Modifier.fillMaxWidth())
                 }
             } else {
-                // One hairline down the middle, as tall as the taller column.
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .clip(shape)
+                        .border(1.dp, grid, shape)
                         .drawBehind {
                             val x = size.width / 2f
-                            drawLine(divider, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
+                            drawLine(grid, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
                         },
                 ) {
-                    budget(Modifier.weight(1f).padding(end = Spacing.sm))
-                    walletsColumn(Modifier.weight(1f).padding(start = Spacing.sm))
+                    budgetCell(Modifier.weight(1f))
+                    walletsCell(Modifier.weight(1f))
                 }
             }
         }
@@ -410,19 +449,28 @@ internal fun SpendingCapacityPanel(
     }
 }
 
+/** [this] at the size that fits [width] pixels into [room], or as it is when it already fits. */
+private fun TextStyle.scaledToFit(width: Float, room: Float): TextStyle = if (width <= room) this else scaled(room / width)
+
+private fun TextStyle.scaled(scale: Float): TextStyle =
+    if (scale >= 1f) this else copy(fontSize = fontSize * scale, lineHeight = lineHeight * scale)
+
 /**
- * One limit: its name with a chevron (it opens more), the figure (signed; red below zero, the minus sign says it too)
- * in neutral ink, green being kept for the verdict, then its two parts, or [note] when it has no figure. The whole
- * column is one button, read as one sentence.
+ * One grid cell: the limit's name (with a chevron in the corner: it opens more) and its figure centred, signed and red
+ * below zero, in neutral ink, green being kept for the verdict; under a rule, its two parts as a small ledger, or [note]
+ * when it has no figure. The whole cell is one button, read as one sentence.
  */
 @Composable
-private fun LimitColumn(
+private fun LimitCell(
     title: String,
+    titleLines: Int,
     amount: Money?,
     note: String?,
     parts: List<Part>,
-    partsInline: Boolean,
     figureStyle: TextStyle,
+    partLabel: TextStyle,
+    partAmount: TextStyle,
+    partsOnOneLine: Boolean,
     clickLabel: String,
     onClick: () -> Unit,
     modifier: Modifier,
@@ -435,11 +483,10 @@ private fun LimitColumn(
         if (amount != null) append(", ").append(fmt.spokenSigned(amount, showPlus = false))
         if (note != null) append(". ").append(note)
         append('.')
-        parts.forEach { part -> append(' ').append(fmt.spokenSigned(part.money, showPlus = false)).append(' ').append(part.word).append('.') }
+        parts.forEach { part -> append(' ').append(part.label).append(' ').append(fmt.spokenSigned(part.money, showPlus = false)).append('.') }
     }
     Column(
         modifier
-            .clip(MaterialTheme.shapes.medium)
             .clickable(role = Role.Button, onClickLabel = clickLabel, onClick = onClick)
             .clearAndSetSemantics {
                 text = AnnotatedString(title)
@@ -449,56 +496,90 @@ private fun LimitColumn(
                     onClick()
                     true
                 }
-            }
-            .padding(Spacing.xs),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+            },
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                title.uppercase(Locale.getDefault()),
-                style = OverlineStyle,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                modifier = Modifier.weight(1f),
+        Box(Modifier.fillMaxWidth().padding(horizontal = CellPadding, vertical = Spacing.md)) {
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                // Only the name keeps clear of the chevron; the figure has the cell's full width (its size is set for it).
+                Text(
+                    title.uppercase(Locale.getDefault()),
+                    style = OverlineStyle,
+                    color = muted,
+                    textAlign = TextAlign.Center,
+                    minLines = titleLines,
+                    maxLines = titleLines,
+                    modifier = Modifier.padding(horizontal = ChevronRoom),
+                )
+                if (amount != null) {
+                    MoneyText(
+                        money = amount,
+                        style = figureStyle,
+                        color = if (amount.isNegative) ext.negative else MaterialTheme.colorScheme.onSurface,
+                        fractionScale = 1f,
+                        minScale = 0.55f,
+                    )
+                } else {
+                    Text("—", style = figureStyle, color = muted)
+                }
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = muted,
+                modifier = Modifier.align(Alignment.TopEnd).size(ChevronRoom),
             )
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = muted, modifier = Modifier.size(18.dp))
         }
-        if (amount != null) {
-            MoneyText(
-                money = amount,
-                style = figureStyle,
-                color = if (amount.isNegative) ext.negative else MaterialTheme.colorScheme.onSurface,
-                fractionScale = 1f,
-                minScale = 0.55f,
-            )
-        } else {
-            Text("—", style = figureStyle, color = muted)
+        Box(Modifier.fillMaxWidth().height(1.dp).background(LucentoTheme.extendedColors.borderDefault))
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = CellPadding, vertical = Spacing.sm + Spacing.xxs),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            if (note != null) {
+                Text(note, style = partLabel, color = muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            }
+            parts.forEach { part -> PartRow(part, partLabel, partAmount, partsOnOneLine) }
         }
-        if (note != null) Text(note, style = MaterialTheme.typography.bodySmall, color = muted)
-        parts.forEach { part -> PartLine(part, partsInline) }
     }
 }
 
-/** A part: its amount (a deduction in red, with its minus sign) and its word, on one line or the amount over the word. */
+/**
+ * A part: its description on the left and its amount aligned on the right (a deduction in red, with its minus sign).
+ * When the two can't share a line ([oneLine] false for every part, or this row alone being too wide), the description
+ * sits over the amount, which stays on the right: a word is never broken to make room (360dp at 200 % broke "Upcoming").
+ */
 @Composable
-private fun PartLine(part: Part, inline: Boolean) {
+private fun PartRow(part: Part, label: TextStyle, amount: TextStyle, oneLine: Boolean) {
     val ink = if (part.money.isNegative) LucentoTheme.extendedColors.negative else MaterialTheme.colorScheme.onSurface
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val wordStyle = MaterialTheme.typography.bodySmall
-    if (inline) {
-        Text(
-            buildAnnotatedString {
-                withStyle(PartAmountStyle.toSpanStyle().copy(color = ink)) { append(part.shown) }
-                append(' ')
-                append(part.word)
-            },
-            style = wordStyle,
-            color = muted,
-        )
-    } else {
-        Column {
-            Text(part.shown, style = PartAmountStyle, color = ink)
-            Text(part.word, style = wordStyle, color = muted)
+    Layout(
+        content = {
+            Text(part.label, style = label, color = muted)
+            Text(part.shown, style = amount, color = ink, maxLines = 1, softWrap = false)
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) { measurables, constraints ->
+        val (labelMeasurable, amountMeasurable) = measurables
+        val gap = PartGap.roundToPx()
+        val amountPlaceable = amountMeasurable.measure(Constraints())
+        val labelWidth = labelMeasurable.maxIntrinsicWidth(Constraints.Infinity)
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else labelWidth + gap + amountPlaceable.width
+        if (oneLine && labelWidth + gap + amountPlaceable.width <= width) {
+            val labelPlaceable = labelMeasurable.measure(Constraints(maxWidth = width - gap - amountPlaceable.width))
+            val height = maxOf(labelPlaceable.height, amountPlaceable.height)
+            layout(width, height) {
+                labelPlaceable.placeRelative(0, (height - labelPlaceable.height) / 2)
+                amountPlaceable.placeRelative(width - amountPlaceable.width, (height - amountPlaceable.height) / 2)
+            }
+        } else {
+            val labelPlaceable = labelMeasurable.measure(Constraints(maxWidth = width))
+            layout(width, labelPlaceable.height + amountPlaceable.height) {
+                labelPlaceable.placeRelative(0, 0)
+                amountPlaceable.placeRelative(maxOf(0, width - amountPlaceable.width), labelPlaceable.height)
+            }
         }
     }
 }
