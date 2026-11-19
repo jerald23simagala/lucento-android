@@ -19,4 +19,16 @@ class ThemeTrialTest {
         trial.end()
         assertNull(trial.trying.value)
     }
+
+    @Test fun `a theme taken to the plan page waits for the purchase, and a theme of one's own drops it`() {
+        val trial = ThemeTrial()
+        assertNull(trial.afterPurchase.value)
+        trial.keepAfterPurchase(ThemeId.GROVE)
+        assertEquals(ThemeId.GROVE, trial.afterPurchase.value)
+        // Ending the try-on (the sheet closes on the way to the plan page) doesn't drop it.
+        trial.end()
+        assertEquals(ThemeId.GROVE, trial.afterPurchase.value)
+        trial.clearAfterPurchase()
+        assertNull(trial.afterPurchase.value)
+    }
 }

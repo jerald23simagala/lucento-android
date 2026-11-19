@@ -105,6 +105,8 @@ fun ThemePicker(
                             else -> {
                                 haptics.tick()
                                 if (trying != null) trial.start(spec.id)
+                                // A theme of one's own replaces one waiting for a purchase.
+                                trial.clearAfterPurchase()
                                 onTheme(spec.id)
                             }
                         }
@@ -136,7 +138,11 @@ fun ThemePicker(
                 ThemeTrialNote(
                     theme = ThemeSpec.of(id).displayName,
                     saved = current.displayName,
-                    onSeePlan = { openPro(com.lucento.app.domain.entitlement.ProFeature.EXTRA_THEMES) },
+                    onSeePlan = {
+                        // Bought from here, Pro brings this theme with it (owner, 2026-11-19).
+                        trial.keepAfterPurchase(id)
+                        openPro(com.lucento.app.domain.entitlement.ProFeature.EXTRA_THEMES)
+                    },
                     onDone = { trial.end() },
                 )
             }

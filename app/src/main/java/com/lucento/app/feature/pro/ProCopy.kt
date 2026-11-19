@@ -192,7 +192,7 @@ object ProCopy {
 
     // ------------------------------------------------------------------------------------------------ Pro walls
 
-    /** The Pro dialog’s actions (owner, 2026-11-18). */
+    /** The Pro dialog’s actions (owner, 2026-11-18); the one label for every way to the plan page (owner, 2026-11-19). */
     const val WALL_SEE_PLAN = "See Lucento Plan"
     const val WALL_NOT_NOW = "Not now"
 

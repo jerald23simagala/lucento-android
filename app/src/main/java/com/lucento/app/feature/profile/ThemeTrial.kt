@@ -24,6 +24,22 @@ class ThemeTrial {
     fun end() {
         current.value = null
     }
+
+    private val pending = MutableStateFlow<ThemeId?>(null)
+
+    /**
+     * A theme tried on and taken to the plan page (See Lucento Plan from the try-on note): applied once the plan includes
+     * it (owner, 2026-11-19). In memory only, like the trial; picking a theme of one's own drops it.
+     */
+    val afterPurchase: StateFlow<ThemeId?> = pending.asStateFlow()
+
+    fun keepAfterPurchase(theme: ThemeId) {
+        pending.value = theme
+    }
+
+    fun clearAfterPurchase() {
+        pending.value = null
+    }
 }
 
 /** Provided by MainActivity from the app container; a fresh one in previews and tests. */

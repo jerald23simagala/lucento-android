@@ -573,7 +573,8 @@ Lucento Plan), in the app or inside the open sheet (`ProWallMemory` in memory, `
 when Lucento restarts). So no control goes dead and no dialog repeats. Two walls are previews instead of a dialog
 (owner, 2026-11-19): **Insights' 6 and 12 months** show the person's own income and expenses for that period, softened
 with every figure hidden, under the plan fact (never made-up numbers), and **a Pro theme is tried on** while the profile
-sheet is open, never saved. Audit, matrix and decisions: `docs/monetization/PRO_EXPERIENCE_AUDIT_2026-11-19.md`. Where
+sheet is open, never saved; taken to the plan page from the try-on note and bought, it becomes the theme once Pro
+arrives (owner, 2026-11-19; in memory, the real plan decides). Audit, matrix and decisions: `docs/monetization/PRO_EXPERIENCE_AUDIT_2026-11-19.md`. Where
 Pro would not help (20 active goals is the most on any plan) there is no dialog, only a plain
 note. Add wallet (Wallets, Home) opens the editor on Cash while money wallets fit; when they are full but a card or
 loan still fits, it opens the type sheet first (money types marked `ProBadge`, picking one opens the dialog), never a
@@ -591,9 +592,10 @@ not "Lucento Pro feature".
 
 **Free limits in onboarding and the guided setup** (owner, 2026-11-18). Setting up past the Free numbers never shows the
 dialog and never mentions Pro. At the Free numbers (3 money wallets, 2 cards or loans) the accounts steps hide their
-add options, say "You can add more later, from Wallets." and carry on; the rest can be added later, where the dialog
-applies. The goal step adds one goal, under the free two; its "Kept in" Add wallet is left out at three money wallets,
-and a goal save in setup that meets the count anyway says "You can add more goals later, from Goals." The wallet editor
+add options, say "You can edit these any time in Wallets." (owner, 2026-11-19: setup promises nothing the Free plan
+doesn't give) and carry on. The goal step adds one goal, under the free two; its "Kept in" Add wallet is left out at
+three money wallets, and a goal save in setup that meets the count anyway says "Setup adds up to 2 goals. You can edit
+them any time in Goals." The wallet editor
 opened from setup (also from the goal sheet's Kept in) hides locked types, and a currency or count it can't take is
 answered with a quiet line naming which (`WalletEditorSheet(inSetup = true)`, `GoalEditorSheet(inSetup = true)`). The
 check is `ProGates.walletAccess` / `firstAddableWalletType`, the repository's own rule, so the screen and the save
@@ -610,7 +612,8 @@ button on every main screen — inside the 48dp button, clear of the Shared pill
 (`MemberChip`) after their name in the profile menu, whose Lucento Plan tile turns gold. The coin is never the blue
 `ProBadge`, which means "locked". TalkBack reads the plan in words. Only the person's own plan counts
 (`ProCopy.memberMark`). On the free plan with no purchase waiting, the profile menu shows a **Lucento Pro card**
-(`ProInviteCard`: what Pro adds, one "See Lucento Pro" button) in place of the plain plan row (`ProCopy.offersPro`).
+(`ProInviteCard`: what Pro adds, one "See Lucento Plan" button; the one label for every way to the plan page since the
+owner's 2026-11-19 call, the plan-ended sheet included) in place of the plain plan row (`ProCopy.offersPro`).
 No prices on it; nothing on Home (option G, a Home card, was not chosen; the owner kept it so on 2026-11-19 when the
 monetization brief asked for one).
 

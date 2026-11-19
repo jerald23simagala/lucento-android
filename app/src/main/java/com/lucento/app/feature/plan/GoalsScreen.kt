@@ -1280,4 +1280,5 @@ internal fun rememberGoalPhoto(path: String?): ImageBitmap? {
 }
 
 /** The guided setup's plain words when the plan holds no more active goals (owner, 2026-11-18: no mention of Pro). */
-private const val GOALS_LATER = "You can add more goals later, from Goals."
+private val GOALS_LATER =
+    "Setup adds up to ${com.lucento.app.domain.entitlement.PlanCatalog.FREE_ACTIVE_GOALS} goals. You can edit them any time in Goals."

@@ -64,7 +64,7 @@ class ProRevealCaptureTest {
             simulator.setTestStore(true)
             compose.onNodeWithContentDescription("Profile and settings").performClick()
             compose.waitForIdle()
-            click("See Lucento Pro") // the free plan's card
+            click("See Lucento Plan") // the free plan's card
             waitForText("Buy Lifetime", 15_000)
             compose.onNodeWithText("Buy Lifetime").performScrollTo().performClick()
         }

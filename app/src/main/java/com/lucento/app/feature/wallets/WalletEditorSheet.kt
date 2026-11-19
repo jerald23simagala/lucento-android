@@ -1017,4 +1017,6 @@ private fun setupLine(feature: com.lucento.app.domain.entitlement.ProFeature, ma
         SETUP_ADD_LATER
     }
 
-private const val SETUP_ADD_LATER = "You can add more of these later, from Wallets."
+private val SETUP_ADD_LATER =
+    "Setup adds up to ${com.lucento.app.domain.entitlement.PlanCatalog.FREE_MONEY_WALLETS} accounts and " +
+        "${com.lucento.app.domain.entitlement.PlanCatalog.FREE_DEBT_ACCOUNTS} cards or loans. You can edit them any time in Wallets."

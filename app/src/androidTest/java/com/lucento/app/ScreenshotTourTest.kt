@@ -619,7 +619,7 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
         // On the free plan the profile menu shows the Lucento Pro card in place of the plan row (owner, 2026-11-09).
-        click("See Lucento Pro")
+        click("See Lucento Plan")
         waitForText("What each plan includes")
         shot("24b-pro-page-free")
         runCatching { compose.onNodeWithText("Pro Lifetime").performScrollTo() }
@@ -654,7 +654,7 @@ class ScreenshotTourTest {
         simulator.setTestStore(true)
         compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
-        click("See Lucento Pro")
+        click("See Lucento Plan")
         waitForText("Start 7-day free trial")
         runCatching { compose.onNodeWithText("Start 7-day free trial").performScrollTo() }
         shot("24g-pro-page-buy")

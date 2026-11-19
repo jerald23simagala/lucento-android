@@ -314,6 +314,19 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     // A Pro theme tried on lasts while the profile sheet is open (owner, 2026-11-19).
     val themeTrial = com.lucento.app.feature.profile.LocalThemeTrial.current
     LaunchedEffect(showProfile) { if (!showProfile) themeTrial.end() }
+    // A theme tried on and taken to the plan page becomes the theme once Pro arrives (owner, 2026-11-19). The real plan
+    // decides (never the view model's first, empty list), and it is let go only once the saved theme is that one.
+    val themeAfterPurchase by themeTrial.afterPurchase.collectAsStateWithLifecycle()
+    val heldPlan = com.lucento.app.feature.pro.LocalEntitlements.current
+    val lockedForSave by appViewModel.lockedThemes.collectAsStateWithLifecycle()
+    LaunchedEffect(themeAfterPurchase, heldPlan, lockedForSave, preferences.themeId) {
+        val theme = themeAfterPurchase ?: return@LaunchedEffect
+        val unlocked = theme.name !in com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(heldPlan, System.currentTimeMillis())
+        when {
+            preferences.themeId == theme -> themeTrial.clearAfterPurchase()
+            unlocked -> appViewModel.setThemeId(theme)
+        }
+    }
     // The tab a pushed screen belongs to, so the dock keeps it highlighted (e.g. Goals opened from Home).
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     // Each tap on Home in the dock asks Home to show its top (owner round 10); Back from a sub-page keeps the place.

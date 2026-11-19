@@ -324,7 +324,7 @@ recurring-schedule sync, syncing preferences.
 - **A second payment plan for one debt**: the scheduled-payment editor warns, with "Adjust existing" (Select mode with
   that debt's plans selected) and "Add another".
 - **Free limits while setting up**: at 3 money wallets or 2 cards or loans the guided setup hides its add options and
-  says "You can add more later, from Wallets.", with no mention of Pro; setup carries on.
+  says "You can edit these any time in Wallets.", with no mention of Pro; setup carries on.
 - **One Pro dialog at the tap**: every Pro wall (Add on a full count, a locked wallet type or currency, 6 / 12 months,
   PDF statements, themes, sync, Smarter reading, Shared invites, the free AI allowance) is one dialog saying what the
   Free plan includes, with **See Lucento Plan** and **Not now**; the inline lock notes are gone (docs/MONETIZATION.md §6.1).
