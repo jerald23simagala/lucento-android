@@ -15,6 +15,16 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Scheduled bulk edit (2026-11-19, `feature/scheduled-bulk-edit`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| SB-1 | Moving to a day of the month that the waiting date's month lacks (the 31st from November) anchors the plan on an earlier month that has it, so the editor's "First date" then shows that earlier date (Oct 31) though the plan never had it as an occurrence. Its waiting date and every later one are right | Verified: JVM (`ScheduleBulkTest`, "the 31st survives short months") | — (the editor shows the first date the dates are computed from) |
+| SB-2 | Change day restarts the occurrence count, as an edit of the timing in the editor does; anything recorded keeps its own key and date. A weekly plan's "same week" is the phone's week (the sheet names it, e.g. "Sun to Sat") | By design; Verified: JVM (`ScheduleBulkTest`, "a weekday move stays in the week the phone shows") | — |
+| SB-3 | The duplicate warning compares by the debt only: two plans paying one loan from different accounts (half from each) also warn, and "Add another" carries on | By design | — |
+| SB-4 | Schedules sync whole rows, last writer wins (`SyncRepository`). If one phone marks November paid offline while another, not yet synced, moves the plan's day, the moved row can win and November's occurrence is due again under a new date key, so it could be paid twice. Editor edits have the same risk; bulk changes make it likelier | Code-only (QA, 2026-11-19) | A merge rule for `next_index` (keep the higher) would close it; not in this change |
+| SB-5 | Rotating the phone in the moment a bulk change is being written can lose its confirmation (the change is saved; the sheet stays open). Mark paid has the same window | Code-only (QA, 2026-11-19) | — |
+
 ## Monthly budget card redesign (2026-11-18, `feature/budget-card-constraints`)
 
 | Id | Issue | Evidence | Next step |

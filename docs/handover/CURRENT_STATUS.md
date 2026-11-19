@@ -619,6 +619,58 @@ The owner relayed tester requests and chose the options (memory: tester round 20
 - **Still to come:** Scheduled bulk edit and the duplicate warning (part B), and Free limits in setup plus the Pro wall
   dialog (part C).
 
+## Tester round 2026-11-18, part B — 2026-11-19 (`feature/scheduled-bulk-edit`)
+
+Owner's choices: bulk Change day, Change amount, Pause / resume and Delete with Select all; for a duplicate, "Warn +
+Adjust existing".
+- **Select mode** on Scheduled › All schedules (`ScheduleBulkUi.kt`, `RecurringScreen`): the Select pill or a long
+  press, checks on rows, Select all / "N selected" / Done, and an action bar above the dock. Change day and Change
+  amount open sheets with a "What changes" list; Delete confirms first. The selection follows the filters and survives
+  rotation.
+- **Rules** (`domain/ScheduleBulk.kt`; CALCULATIONS "Scheduled outlook"): a new day moves the occurrence still waiting
+  within its month or week, so none is skipped or added; the 31st survives short months; an end date keeps the number of
+  dates left. A new amount is the whole payment (interest part cleared). Ended plans and plans in another currency are
+  skipped and counted.
+- **Writes** (`RecurringRepository.moveDay`, `setAmount`, `setPaused`, `delete(ids)`, `BulkResult`): one database
+  transaction each, refused on a Partner's phone; changed rows get a new `updated_at`, so sync sends them.
+- **Duplicate warning** (`DuplicatePlanWarning`, `ScheduleBulk.paymentPlansFor`): the scheduled-payment editor (the one
+  funnel for planning a debt payment, from Scheduled, Debts, a wallet page or the wallet editor's reminder) warns while
+  the card or loan already has an unfinished plan. "Adjust existing" opens `RecurringRoute(selectWalletId)`: All
+  schedules filtered to that debt, its plans selected.
+- **Large text.** From 130 % a schedule row gives its name the whole width with the amount underneath (at 200 % on a
+  360 dp phone names had been cut to a few letters, before this change too), and the selection bar and the sheets’
+  "What changes" lines stack.
+- **Editor fix found on the way:** switching "Pay to" left the name filled in from the first debt ("One-time Payment -
+  Visa card" for Car loan). A name or amount filled in from one debt now follows the next; anything typed stays.
+- **Tests.** `ScheduleBulkTest` (20) and `ScheduleBulkRepositoryTest` (12): a rollback when a write fails part-way, a
+  plan already on the chosen day skipped rather than rewritten, Mark paid after a move to the 31st (Nov 30, then Dec 31),
+  a debt payment's new amount stored without an interest part, missing plans counted alike by every change.
+- **Reviews.** Design critic round 1: REJECT 3.1 on one gate ("Add another" at 4.37:1 on the amber box). QA:
+  conditionally ready, no critical or high defect; M1, restoring after Android ends the app (the selection was wiped
+  while loading and a delete confirmation stayed armed). Fixed since: the contrast (deep blue, 6.6:1); previews that say
+  when the next date stays, mark overdue dates, show a moved end date and sign amounts; the warning under "Pay to",
+  announced, with the same question at Save; Change amount counting its changes and off when none; a sticky selection
+  bar, the dock hidden in Select mode, a partial Select all, named multi-delete, firmer check rings (shared `CheckMark`
+  and `RadioMark`: full outline colour); M1 (no pruning while loading, no sheet or armed dialog without a selection);
+  "nothing changed" and failed writes said in place; weekday moves in the phone's week; a one-date-left plan no longer
+  turning into "Once"; one auto-filled payment rule for the reminder hand-off and "Pay to"; guarded navigation.
+  Critic rounds 2 (REVISE 3.8) and 3 (REVISE 3.94), no gate failing: amounts kept whole (a word joiner after the sign,
+  no-break spaces in dates and before arrows), pinned sheet buttons with a hairline edge and "N dates will be overdue",
+  a note built from the selection, an opaque band under the action bar, the Save dialog naming the plan(s), and one
+  list decision per composition (a live `state.loading` read inside the list drew the empty state beside a loaded
+  page for one frame); the "Adjust existing" selection waits for the plans and is applied once. Round 4: **APPROVE
+  4.1**, no gate failing; P3s left in NEXT_TASKS.
+- **Frame check (emulator, animations on, `dumpsys gfxinfo`):** Select all over 40 plans › Change day › apply › Done:
+  59–60 frames, median 53–57 ms, 90th 105–117 ms. Existing screens measured the same way (a plan's sheet, scrolling,
+  Upcoming): median 97–101 ms, 90th 200–250 ms. Every screen reads as janky here (emulated GPU: "issue draw commands"
+  dominate, GPU timings aren't real), so this shows no regression against the rest of the app, not smoothness; a phone
+  check is in NEXT_TASKS.
+- **Emulator (API 35, local capture `ScheduledBulkShotsTest`, not committed):** every step at 100 % (Select, Select all,
+  long press, Change day to the 31st, Change amount, Pause / Resume, Delete confirm, the duplicate warning and Adjust
+  existing), again at 200 % text on a 360 dp screen, and in the dark theme. The first pass caught the Change day preview
+  promising 2 changes where 3 were made (Rent moving from the 30th to the 31st only from December); the preview now
+  shows the first date that changes, and a plan already on the chosen day is skipped.
+
 ## Monthly budget card redesign — 2026-11-18 (`feature/budget-card-constraints`)
 
 The owner asked for Home's Monthly budget card in three parts (how much is spent; Budget remaining and Spendable

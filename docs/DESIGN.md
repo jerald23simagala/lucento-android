@@ -370,6 +370,24 @@ categories: add, rename, reorder, deactivate (archive) and restore. Existing use
 yours" card (choose from presets or keep their categories); a pre-0.5 overall limit is explained once and can be
 removed. Users with no categories see "Finish setting up your budget".
 
+## Scheduled: Select mode (tester round, 2026-11-18)
+All schedules has a quiet **Select** pill above the list, and a long press on a row also starts Select mode with that
+row selected. Rows then show a check (the setup kit's `CheckMark`, its empty ring at the full outline colour for 3:1)
+and toggle on tap; the check alone marks a selected row, as in the account picker. The bar above the list, pinned
+while the list scrolls, reads **Select all** (empty, checked, or a dash when only some are selected), "N selected" and
+**Done**. The dock steps aside (`LocalHideDock`) and a floating action bar takes its place: **Change day**, **Change
+amount**, **Pause** (or **Resume** when every plan that can change is paused) and **Delete**, as icon-over-label
+buttons, two rows of two from 130 % text. Change day and Change amount open sheets with a **What changes** list that
+says exactly what will happen: "Nov 23 → Nov 5 (overdue)", "Stays Nov 30 · Dec 30 → Dec 31" when the next date stays,
+"· ends …" when an end date moves, signed amounts ("−₱350.00 → −₱1,650.00"); their buttons count the plans that change
+and are off when none would. Delete asks first and names the plans. Back, the top bar's back and Done leave Select mode;
+a filter that hides a plan drops it from the selection. Confirmations play only after the write; a change that changed
+nothing, or failed, says so in place. From 130 % text a schedule row stacks (name and account full width, amount and
+status under them), as do the selection bar and the What changes lines. In the scheduled-payment editor, a card or loan
+that already has a payment plan shows an amber warning right under **Pay to**, announced to TalkBack, with those plans,
+**Adjust existing** (opens Select mode with them selected and a note saying so) and **Add another** (deep blue for
+contrast on amber). Saving while it is unanswered asks the same question in a dialog.
+
 ## Insights (v0.5)
 *Tester round 3, second pass (2026-11-11):* Ask Lucento stays on top; the built-in **reports** sit right under it as
 one list (wallet statement first), each opening the shared report sheet (headline panel, group headings, section

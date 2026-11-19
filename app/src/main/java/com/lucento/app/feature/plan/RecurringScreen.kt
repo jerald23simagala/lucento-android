@@ -2,8 +2,12 @@ package com.lucento.app.feature.plan
 
 import com.lucento.app.core.designsystem.component.AmountsShown
 import com.lucento.app.core.designsystem.component.amountFormat
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +47,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -65,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.AmountText
 import com.lucento.app.core.designsystem.component.CategoryTile
+import com.lucento.app.core.designsystem.component.CheckMark
 import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.component.ConfirmDialog
 import com.lucento.app.core.designsystem.component.Confirmation
@@ -92,6 +100,7 @@ import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.component.ToneSectionHeader
 import com.lucento.app.core.designsystem.component.WalletIdentityTile
 import com.lucento.app.core.designsystem.component.icon
+import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.component.scheduledFlowColor
 import com.lucento.app.core.designsystem.theme.AmountStyles
 import com.lucento.app.core.designsystem.theme.LucentoTheme
@@ -105,6 +114,7 @@ import com.lucento.app.domain.CreditCardMath
 import com.lucento.app.domain.FlowTotals
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.RecurringSchedule
+import com.lucento.app.domain.ScheduleBulk
 import com.lucento.app.domain.ScheduleOutlook
 import com.lucento.app.domain.ScheduledFlow
 import com.lucento.app.domain.ScheduledItem
@@ -167,11 +177,17 @@ internal data class ScheduledFilter(val flow: ScheduledFlow? = null, val walletI
  * then today to the month's end by default) that the filters and a From–To range reshape, summed up under the filters as
  * on Transactions — income, expenses and their net, with transfers apart. "All schedules" lists each plan once.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecurringScreen(
     onBack: () -> Unit,
     /** Opens straight into this schedule's review sheet (from Home's upcoming payments), where it can be marked paid. */
     openScheduleId: Long? = null,
+    /**
+     * Opens All schedules in Select mode, filtered to this card or loan with its payment plans selected: the editor’s
+     * “Adjust existing” when a second plan for the same debt was about to be added (tester round, 2026-11-18).
+     */
+    selectWalletId: Long? = null,
     /** Opens the full-page editor for a new schedule. */
     onAddSchedule: () -> Unit = {},
     /** Opens the full-page editor for this schedule. */
@@ -192,6 +208,19 @@ fun RecurringScreen(
     var categoryFilter by rememberSaveable { mutableStateOf<Long?>(null) }
     var actingOn by rememberSaveable { mutableStateOf(openScheduleId) }
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
+    // Select mode in All schedules (tester round, 2026-11-18): change the day or amount of several plans, pause or
+    // resume them, or delete them, each in one step.
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    var selectedIds by rememberSaveable(stateSaver = ScheduleIdsSaver) { mutableStateOf(emptySet<Long>()) }
+    var bulkSheet by rememberSaveable { mutableStateOf<BulkSheet?>(null) }
+    var bulkError by remember { mutableStateOf<String?>(null) }
+    var confirmingBulkDelete by rememberSaveable { mutableStateOf(false) }
+    var preselected by rememberSaveable { mutableStateOf(false) }
+    // The plans from "Adjust existing" are selected once: Done doesn't bring them back on the next change.
+    var preselectDone by rememberSaveable { mutableStateOf(false) }
+    // The card or loan whose plans were selected from the editor’s "Adjust existing", for the note that says so.
+    var arrivedFor by rememberSaveable { mutableStateOf<Long?>(null) }
+    var barHeight by remember { mutableStateOf(0.dp) }
 
     val filter = ScheduledFilter(flowFilter, walletFilter, categoryFilter)
     val today = state.today
@@ -206,23 +235,108 @@ fun RecurringScreen(
         ScheduleOutlook.items(active, cardDues, today, from, to).filter(filter::matches)
     }
     val hasAnything = state.schedules.isNotEmpty() || cardDues.isNotEmpty()
+    // Decided here, from this composition’s state, not read again inside the list: a live read there met a stale
+    // "nothing yet" for one frame and drew the empty state beside a loaded page (design review, 2026-11-19).
+    val loaded = !state.loading
     // Lucento Shared: a Partner sees every schedule and reminder; the Shared Space's Owner manages and records them.
     val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
     val canEdit = access.canManageStructure
 
+    val shownSchedules = remember(state.schedules, filter) { state.schedules.filter(filter::matches) }
+    val selection = shownSchedules.filter { it.id in selectedIds }
+    val selectMode = selecting && canEdit && view == ScheduledView.SCHEDULES
+    fun exitSelection() {
+        selecting = false
+        selectedIds = emptySet()
+        bulkSheet = null
+        bulkError = null
+        confirmingBulkDelete = false
+        arrivedFor = null
+    }
+
+    /**
+     * After a bulk write: the confirmation (only once it was written). When nothing changed, [nothing] says why and an
+     * open sheet stays open, never closing without a word (design review, 2026-11-19).
+     */
+    fun finishBulk(result: RecurringRepository.BulkResult, nothing: String, clear: Boolean = false, message: (Int, Int) -> String) {
+        when (result) {
+            RecurringRepository.BulkResult.NotPermitted -> bulkError = BULK_NOT_PERMITTED
+            RecurringRepository.BulkResult.Failed -> bulkError = BULK_FAILED
+            is RecurringRepository.BulkResult.Done -> {
+                if (result.changed == 0) {
+                    bulkError = nothing
+                    return
+                }
+                bulkSheet = null
+                bulkError = null
+                confirmation = Confirmation(message(result.changed, result.changed + result.skipped))
+                if (clear) exitSelection()
+            }
+        }
+    }
+    BackHandler(enabled = selectMode) { exitSelection() }
+    // Select mode’s actions take the dock’s place at the bottom; the dock comes back when it ends or the page closes.
+    val hideDock = com.lucento.app.core.designsystem.component.LocalHideDock.current
+    DisposableEffect(selectMode) {
+        hideDock(selectMode)
+        onDispose { hideDock(false) }
+    }
+    // What you see is what is selected: a plan hidden by a filter, or deleted, leaves the selection. Never while the
+    // plans are still loading: after Android ends the app in the background the restored selection would be wiped
+    // against an empty list (QA, 2026-11-19).
+    LaunchedEffect(shownSchedules, loaded) {
+        if (!loaded) return@LaunchedEffect
+        // Nothing left to act on (another phone deleted them, say): no sheet or confirmation stays open, or armed, for it.
+        if (shownSchedules.isEmpty()) {
+            bulkSheet = null
+            confirmingBulkDelete = false
+            // Ids are kept, never wiped against an empty list (ids aren’t reused, so a stale one can’t select a new plan).
+            return@LaunchedEffect
+        }
+        val shownIds = shownSchedules.map { it.id }.toSet()
+        if (!shownIds.containsAll(selectedIds)) selectedIds = selectedIds intersect shownIds
+        if (selectedIds.isEmpty()) {
+            bulkSheet = null
+            confirmingBulkDelete = false
+        }
+    }
+    // From the editor’s “Adjust existing”: All schedules for that card or loan, with its payment plans selected. The view
+    // and filter are set once; the selection waits until the plans are there (design review, 2026-11-19), so it is
+    // never lost to a first state without them.
+    LaunchedEffect(loaded, state.schedules, selectWalletId) {
+        if (!loaded || selectWalletId == null) return@LaunchedEffect
+        if (!preselected) {
+            preselected = true
+            view = ScheduledView.SCHEDULES
+            walletFilter = selectWalletId
+        }
+        if (preselectDone) return@LaunchedEffect
+        val plans = ScheduleBulk.paymentPlansFor(state.schedules, selectWalletId)
+        if (canEdit && plans.isNotEmpty()) {
+            preselectDone = true
+            selecting = true
+            selectedIds = plans.map { it.id }.toSet()
+            arrivedFor = selectWalletId
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = Spacing.gutter, end = Spacing.gutter, bottom = Spacing.fabClearance),
+            contentPadding = PaddingValues(
+                start = Spacing.gutter,
+                end = Spacing.gutter,
+                bottom = Spacing.fabClearance + if (selectMode) barHeight else 0.dp,
+            ),
         ) {
             item(key = "bar") {
-                LucentoTopBar(title = "Scheduled", onBack = onBack, actions = {
-                    if (canEdit && state.schedules.isNotEmpty() && state.wallets.isNotEmpty()) {
+                LucentoTopBar(title = "Scheduled", onBack = if (selectMode) ({ exitSelection() }) else onBack, actions = {
+                    if (!selectMode && canEdit && state.schedules.isNotEmpty() && state.wallets.isNotEmpty()) {
                         com.lucento.app.core.designsystem.component.AddPillButton("Add", onClick = onAddSchedule, contentDescription = "Add scheduled transaction")
                     }
                 })
             }
-            if (!state.loading && !hasAnything) {
+            if (loaded && !hasAnything) {
                 item(key = "empty") {
                     EmptyState(
                         title = "Nothing scheduled yet",
@@ -247,7 +361,10 @@ fun RecurringScreen(
                     SegmentedToggle(
                         options = ScheduledView.entries.map { it to it.label },
                         selected = view,
-                        onSelect = { view = it },
+                        onSelect = {
+                            view = it
+                            if (it != ScheduledView.SCHEDULES) exitSelection()
+                        },
                         compact = true,
                         selectedTone = { TonePair(colors.primary, colors.onPrimary) },
                         modifier = Modifier.padding(top = Spacing.xs),
@@ -278,6 +395,42 @@ fun RecurringScreen(
                         },
                     )
                 }
+                // In Select mode the bar stays even when a filter shows nothing, so Done is always there (QA, 2026-11-19).
+                if (view == ScheduledView.SCHEDULES && canEdit && (shownSchedules.isNotEmpty() || selectMode)) {
+                    val bar: @Composable () -> Unit = {
+                        SelectionBar(
+                            selecting = selectMode,
+                            selectedCount = selection.size,
+                            shownCount = shownSchedules.size,
+                            onStart = { selecting = true },
+                            onSelectAll = { all -> selectedIds = if (all) shownSchedules.map { it.id }.toSet() else emptySet() },
+                            onDone = { exitSelection() },
+                            error = bulkError.takeIf { bulkSheet == null },
+                        )
+                    }
+                    // In Select mode the count, Select all and Done stay in view while the list scrolls (design review,
+                    // 2026-11-19: at 200 % text they scrolled away).
+                    if (selectMode) {
+                        stickyHeader(key = "select") {
+                            Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(bottom = Spacing.xs)) { bar() }
+                        }
+                    } else {
+                        item(key = "select") { bar() }
+                    }
+                    val arrived = arrivedFor?.let { state.walletsById[it] }
+                    if (selectMode && arrived != null && selection.isNotEmpty()) {
+                        item(key = "arrived") {
+                            InfoNote(
+                                if (selection.size == 1) {
+                                    "${arrived.name}’s payment plan is selected. Change its day or amount, pause it or delete it below."
+                                } else {
+                                    "${arrived.name}’s payment plans are selected. Change their day or amount, pause them or delete them below."
+                                },
+                                modifier = Modifier.padding(bottom = Spacing.xs),
+                            )
+                        }
+                    }
+                }
                 when (view) {
                     ScheduledView.AGENDA -> agendaItems(
                         agenda = agenda,
@@ -293,7 +446,21 @@ fun RecurringScreen(
                             }
                         },
                     )
-                    ScheduledView.SCHEDULES -> scheduleItems(state, filter, onOpen = { actingOn = it })
+                    ScheduledView.SCHEDULES -> scheduleItems(
+                        state = state,
+                        filter = filter,
+                        onOpen = { actingOn = it },
+                        selected = if (selectMode) selectedIds else null,
+                        onToggle = { id -> selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id },
+                        onLongPress = if (canEdit) {
+                            { id ->
+                                selecting = true
+                                selectedIds = selectedIds + id
+                            }
+                        } else {
+                            null
+                        },
+                    )
                 }
                 if (!canEdit) {
                     item(key = "owner-manages") {
@@ -310,7 +477,84 @@ fun RecurringScreen(
                 }
             }
         }
+        if (selectMode) {
+            val pausable = selection.filter { !it.isFinished }
+            val resume = pausable.isNotEmpty() && pausable.all { it.paused }
+            val density = LocalDensity.current
+            BulkActionBar(
+                hasSelection = selection.isNotEmpty(),
+                canPause = pausable.isNotEmpty(),
+                resume = resume,
+                onDay = {
+                    bulkError = null
+                    bulkSheet = BulkSheet.DAY
+                },
+                onAmount = {
+                    bulkError = null
+                    bulkSheet = BulkSheet.AMOUNT
+                },
+                onPause = {
+                    viewModel.setPaused(pausable.map { it.id }, paused = !resume) { result ->
+                        finishBulk(result, nothing = "Nothing to ${if (resume) "resume" else "pause"}: they already are.") { n, _ ->
+                            (if (resume) "Resumed " else "Paused ") + schedulesCount(n)
+                        }
+                    }
+                },
+                onDelete = { confirmingBulkDelete = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+            )
+        }
         ConfirmationHost(confirmation = confirmation, onDismissed = { confirmation = null })
+    }
+
+    if (selectMode && loaded) {
+        when (bulkSheet) {
+            BulkSheet.DAY -> ChangeDaySheet(
+                schedules = selection,
+                today = today,
+                error = bulkError,
+                onApply = { monthDay, weekday, firstDayOfWeek ->
+                    viewModel.moveDay(selection.map { it.id }, monthDay, weekday, firstDayOfWeek) { result ->
+                        finishBulk(result, nothing = "These schedules are already on that day.") { n, total -> bulkDone("Day changed", n, total) }
+                    }
+                },
+                onDismiss = { bulkSheet = null },
+            )
+            BulkSheet.AMOUNT -> ChangeAmountSheet(
+                schedules = selection,
+                error = bulkError,
+                onApply = { amount ->
+                    viewModel.setAmount(selection.map { it.id }, amount) { result ->
+                        finishBulk(result, nothing = "These schedules already have that amount.") { n, total -> bulkDone("Amount changed", n, total) }
+                    }
+                },
+                onDismiss = { bulkSheet = null },
+            )
+            null -> Unit
+        }
+    }
+    if (selectMode && loaded && confirmingBulkDelete && selection.isNotEmpty()) {
+        val one = selection.singleOrNull()
+        ConfirmDialog(
+            title = if (one != null) "Delete “${one.name}”?" else "Delete ${selection.size} schedules?",
+            // Several: which ones, by name (design review, 2026-11-19).
+            text = if (one != null) {
+                "Future reminders stop. Transactions it already recorded stay in your history."
+            } else {
+                "${scheduleNames(selection.map { it.name })}.\n\nFuture reminders stop. Transactions they already recorded stay in your history."
+            },
+            confirmLabel = "Delete",
+            destructive = true,
+            onConfirm = {
+                confirmingBulkDelete = false
+                viewModel.deleteSchedules(selection.map { it.id }) { result ->
+                    finishBulk(result, nothing = "These schedules were already deleted.", clear = true) { n, _ -> "Deleted " + schedulesCount(n) }
+                }
+            },
+            onDismiss = { confirmingBulkDelete = false },
+        )
     }
 
     state.schedules.firstOrNull { it.id == actingOn }?.let { schedule ->
@@ -811,7 +1055,16 @@ private fun DateBadge(date: LocalDate, today: LocalDate, overdue: Boolean) {
 }
 
 /** Each schedule once, filtered by kind, wallet and category, in Active, Paused and Ended groups. */
-private fun androidx.compose.foundation.lazy.LazyListScope.scheduleItems(state: PlanUiState, filter: ScheduledFilter, onOpen: (Long) -> Unit) {
+private fun androidx.compose.foundation.lazy.LazyListScope.scheduleItems(
+    state: PlanUiState,
+    filter: ScheduledFilter,
+    onOpen: (Long) -> Unit,
+    /** Select mode: the ids selected (rows then toggle instead of opening); null outside it. */
+    selected: Set<Long>? = null,
+    onToggle: (Long) -> Unit = {},
+    /** A long press on a row starts Select mode with it selected; null where Select mode isn’t offered. */
+    onLongPress: ((Long) -> Unit)? = null,
+) {
     val shown = state.schedules.filter(filter::matches)
     val groups = listOf(
         "Active" to shown.filter { !it.paused && !it.isFinished },
@@ -840,7 +1093,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.scheduleItems(state: 
         item(key = "list-$title") {
             LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
                 list.sortedBy { it.nextDue ?: LocalDate.MAX }.forEachIndexed { index, schedule ->
-                    ScheduleRow(schedule, state, onClick = { onOpen(schedule.id) })
+                    ScheduleRow(
+                        schedule = schedule,
+                        state = state,
+                        onClick = { onOpen(schedule.id) },
+                        selected = selected?.let { schedule.id in it },
+                        onToggle = { onToggle(schedule.id) },
+                        onLongClick = onLongPress?.let { press -> { press(schedule.id) } },
+                    )
                     if (index < list.lastIndex) Hairline(strong = true)
                 }
             }
@@ -848,20 +1108,58 @@ private fun androidx.compose.foundation.lazy.LazyListScope.scheduleItems(state: 
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick: () -> Unit) {
+private fun ScheduleRow(
+    schedule: RecurringSchedule,
+    state: PlanUiState,
+    onClick: () -> Unit,
+    /** Select mode: whether this row is selected (a tap then toggles it); null outside Select mode. */
+    selected: Boolean? = null,
+    onToggle: () -> Unit = {},
+    /** Starts Select mode with this row selected; null where Select mode isn’t offered. */
+    onLongClick: (() -> Unit)? = null,
+) {
     val fmt = amountFormat()
+    val haptics = rememberHaptics()
     val due = schedule.nextDue
     val overdue = due != null && due.isBefore(state.today)
     val debt = schedule.toWalletId?.let { state.walletsById[it] }
+    // Large text: the name gets the whole width and the amount moves under it, so a plan stays recognisable (to select).
+    val stacked = LocalDensity.current.fontScale >= 1.3f
+    val lines = if (stacked) 2 else 1
+    val detailLines = if (stacked || selected != null) 2 else 1
+    val interaction = when {
+        // The check alone marks a selected row, as in the account picker (a tint hid blue category tiles).
+        selected != null -> Modifier
+            .toggleable(value = selected, role = Role.Checkbox) {
+                haptics.tick()
+                onToggle()
+            }
+        onLongClick != null -> Modifier.combinedClickable(
+            role = Role.Button,
+            onClickLabel = "Open ${schedule.name}",
+            onLongClickLabel = "Select",
+            onLongClick = {
+                haptics.tick()
+                onLongClick()
+            },
+            onClick = onClick,
+        )
+        else -> Modifier.clickable(role = Role.Button, onClickLabel = "Open ${schedule.name}", onClick = onClick)
+    }
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clickable(role = Role.Button, onClickLabel = "Open ${schedule.name}", onClick = onClick)
+            .then(interaction)
             .padding(horizontal = Spacing.md, vertical = Spacing.xs + Spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (selected != null) {
+            CheckMark(selected)
+            Spacer(Modifier.width(Spacing.md - Spacing.xxs))
+        }
         if (debt != null) {
             WalletIdentityTile(debt, size = 36.dp)
         } else {
@@ -869,7 +1167,7 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
         }
         Spacer(Modifier.width(Spacing.md - Spacing.xxs))
         Column(Modifier.weight(1f)) {
-            Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(schedule.name, style = MaterialTheme.typography.titleSmall, maxLines = lines, overflow = TextOverflow.Ellipsis)
             Text(
                 buildString {
                     append(schedule.repeatLabel())
@@ -883,7 +1181,7 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = detailLines,
                 overflow = TextOverflow.Ellipsis,
             )
             if (schedule.isLinked && !schedule.interest.isZero) {
@@ -891,26 +1189,51 @@ private fun ScheduleRow(schedule: RecurringSchedule, state: PlanUiState, onClick
                     "${fmt.format(schedule.amount)} principal · ${fmt.format(schedule.interest)} interest",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = lines,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        Spacer(Modifier.width(Spacing.sm))
-        Column(horizontalAlignment = Alignment.End) {
-            AmountText(
-                money = schedule.signedOccurrence,
-                style = AmountStyles.row,
-                showPlus = true,
-                color = scheduledFlowColor(schedule.flow),
-            )
-            when {
-                schedule.paused -> StatusPill("Paused", StatusTones.neutral)
-                due == null -> StatusPill("Ended", StatusTones.neutral)
-                overdue -> StatusPill("Overdue", StatusTones.negative)
-                else -> Text(com.lucento.app.feature.transactions.shortDayLabel(due, state.today), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (stacked) {
+                Spacer(Modifier.height(Spacing.xxs))
+                // The status wraps under the amount when both don’t fit, so the amount keeps its size.
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+                ) {
+                    ScheduleFigure(schedule)
+                    ScheduleStatus(schedule, due, overdue, state.today)
+                }
             }
         }
+        if (!stacked) {
+            Spacer(Modifier.width(Spacing.sm))
+            Column(horizontalAlignment = Alignment.End) {
+                ScheduleFigure(schedule)
+                ScheduleStatus(schedule, due, overdue, state.today)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleFigure(schedule: RecurringSchedule, modifier: Modifier = Modifier) {
+    AmountText(
+        money = schedule.signedOccurrence,
+        style = AmountStyles.row,
+        showPlus = true,
+        color = scheduledFlowColor(schedule.flow),
+        modifier = modifier,
+    )
+}
+
+/** Paused, Ended, Overdue, or when it is next due. */
+@Composable
+private fun ScheduleStatus(schedule: RecurringSchedule, due: LocalDate?, overdue: Boolean, today: LocalDate) {
+    when {
+        schedule.paused -> StatusPill("Paused", StatusTones.neutral)
+        due == null -> StatusPill("Ended", StatusTones.neutral)
+        overdue -> StatusPill("Overdue", StatusTones.negative)
+        else -> Text(com.lucento.app.feature.transactions.shortDayLabel(due, today), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

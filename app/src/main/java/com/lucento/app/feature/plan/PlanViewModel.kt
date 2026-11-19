@@ -243,6 +243,35 @@ class PlanViewModel(
 
     fun deleteSchedule(id: Long) = write({ recurring.delete(id) }) {}
 
+    // Scheduled › All schedules, Select mode (tester round, 2026-11-18): one change to several plans, in one step.
+
+    fun moveDay(
+        ids: Collection<Long>,
+        monthDay: Int?,
+        weekday: java.time.DayOfWeek?,
+        firstDayOfWeek: java.time.DayOfWeek,
+        onResult: (RecurringRepository.BulkResult) -> Unit,
+    ) = write({ guarded { recurring.moveDay(ids, monthDay, weekday, firstDayOfWeek) } }, onResult)
+
+    fun setAmount(ids: Collection<Long>, amount: Money, onResult: (RecurringRepository.BulkResult) -> Unit) =
+        write({ guarded { recurring.setAmount(ids, amount) } }, onResult)
+
+    fun setPaused(ids: Collection<Long>, paused: Boolean, onResult: (RecurringRepository.BulkResult) -> Unit) =
+        write({ guarded { recurring.setPaused(ids, paused) } }, onResult)
+
+    fun deleteSchedules(ids: Collection<Long>, onResult: (RecurringRepository.BulkResult) -> Unit) =
+        write({ guarded { recurring.delete(ids) } }, onResult)
+
+    /** A failed bulk change (rolled back in its one transaction) comes back as Failed, so the screen can say so. */
+    private suspend fun guarded(block: suspend () -> RecurringRepository.BulkResult): RecurringRepository.BulkResult = try {
+        block()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        android.util.Log.w("Lucento", "Bulk schedule change failed and was rolled back", e)
+        RecurringRepository.BulkResult.Failed
+    }
+
     companion object {
         val Factory = containerFactory {
             PlanViewModel(it.transactions, it.wallets, it.categories, it.budgets, it.goals, it.recurring, it.preferences)

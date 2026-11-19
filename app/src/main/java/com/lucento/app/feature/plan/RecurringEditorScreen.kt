@@ -40,6 +40,8 @@ import com.lucento.app.domain.DebtMath
 import com.lucento.app.domain.DebtRepayment
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.RecurringSchedule
+import com.lucento.app.domain.ScheduleBulk
+import com.lucento.app.domain.signedOccurrence
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletType
@@ -132,10 +134,19 @@ internal fun PlanUiState.receivables(): List<Wallet> = wallets.filter { it.type 
  * monthly amortization over the remaining months, or "One-time Payment - Card" for what is owed. The split into
  * principal and interest is entered when each payment is marked paid.
  */
+/**
+ * The payment filled in for [debt]: its monthly amortization, or for a one-time debt what is owed (or owed to you). One
+ * rule for the reminder hand-off and for switching "Pay to" (QA, 2026-11-19), so a filled-in amount always follows.
+ */
+internal fun autoPayment(debt: Wallet): com.lucento.app.core.money.Money? {
+    val terms = debt.debt
+    return if (terms?.repayment == DebtRepayment.MONTHLY) terms.installment else debt.balance.takeIf { it.amountMinor > 0 }
+}
+
 internal fun PlanUiState.debtDraft(debt: Wallet, firstDue: LocalDate): ScheduleDraft {
     val terms = debt.debt
     val monthly = terms?.repayment == DebtRepayment.MONTHLY
-    val amount = if (monthly) terms?.installment else debt.balance.takeIf { it.amountMinor > 0 }
+    val amount = autoPayment(debt)
     // A receivable's reminder is a collection: "Monthly Collection - Loan to Ana", into a money account.
     val collection = debt.type == WalletType.RECEIVABLE
     val repayment = terms?.repayment ?: DebtRepayment.ONE_TIME
@@ -197,6 +208,11 @@ fun RecurringEditorScreen(
     scheduleId: Long? = null,
     prefillDebt: Pair<Long, LocalDate>? = null,
     onSaved: () -> Unit = onBack,
+    /**
+     * Opens Scheduled with the plans already paying this card or loan (or collecting from this receivable) selected:
+     * the duplicate warning’s “Adjust existing” (tester round, 2026-11-18).
+     */
+    onAdjustExisting: (Long) -> Unit = {},
     viewModel: PlanViewModel = viewModel(factory = PlanViewModel.Factory),
 ) = AmountsShown {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -232,6 +248,8 @@ fun RecurringEditorScreen(
             ScheduleEditorBody(
                 draft = current,
                 isNew = scheduleId == null,
+                editingId = scheduleId,
+                onAdjustExisting = onAdjustExisting,
                 state = state,
                 onChange = { draft = it },
                 onSave = { input, done -> viewModel.saveSchedule(input, done) },
@@ -245,6 +263,8 @@ fun RecurringEditorScreen(
 private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
     draft: ScheduleDraft,
     isNew: Boolean,
+    editingId: Long?,
+    onAdjustExisting: (Long) -> Unit,
     state: PlanUiState,
     onChange: (ScheduleDraft) -> Unit,
     onSave: (RecurringRepository.Input, (RecurringRepository.SaveResult) -> Unit) -> Unit,
@@ -285,6 +305,14 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
         emptyList()
     }
     val destination = draft.toWalletId?.let { state.walletsById[it] }?.takeIf { isTransfer && it in destinations }
+    // A second payment plan for the same card or loan (or collection plan for a receivable) reminds twice (tester round,
+    // 2026-11-18): warn, with the plans it already has, until the person adjusts those or chooses to add another.
+    var addingAnotherFor by rememberSaveable { mutableStateOf<Long?>(null) }
+    var confirmingDuplicate by remember { mutableStateOf(false) }
+    val existingPlans = if (isDebt && debt != null) ScheduleBulk.paymentPlansFor(state.schedules, debt.id, except = editingId) else emptyList()
+    // Only a new plan, or one moved to another debt: an existing pair the person kept doesn’t warn on every edit.
+    val sameDebtAsBefore = editingId != null && state.schedules.firstOrNull { it.id == editingId }?.toWalletId == debt?.id
+    val duplicateUnanswered = debt != null && existingPlans.isNotEmpty() && addingAnotherFor != debt.id && !sameDebtAsBefore
     fun update(next: ScheduleDraft) {
         error = null
         onChange(next)
@@ -296,22 +324,22 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
      */
     fun payTo(to: Wallet?, base: ScheduleDraft): ScheduleDraft {
         val paying = state.payingWallets(to?.currencyCode)
-        val terms = to?.debt
-        val installment = terms?.installment?.takeIf { terms.repayment == DebtRepayment.MONTHLY }
         val collection = base.kind == ScheduleKind.COLLECTION
-        val repayment = terms?.repayment ?: DebtRepayment.ONE_TIME
+        fun nameFor(w: Wallet?): String = w?.let {
+            val repayment = it.debt?.repayment ?: DebtRepayment.ONE_TIME
+            if (collection) DebtMath.collectionName(repayment, it.name, RecurringRepository.MAX_NAME)
+            else DebtMath.reminderName(repayment, it.name, RecurringRepository.MAX_NAME)
+        }.orEmpty()
+        fun amountFor(w: Wallet?): String = w?.let(::autoPayment)?.let { MoneyFormatter.formatPlain(it) }.orEmpty()
+        // A name or amount filled in from the debt chosen before follows the new one; anything typed stays.
+        val previous = base.toWalletId?.let { state.walletsById[it] }
         return base.copy(
             kind = if (collection) ScheduleKind.COLLECTION else ScheduleKind.DEBT,
             toWalletId = to?.id,
             walletId = paying.firstOrNull { it.id == base.walletId }?.id ?: paying.firstOrNull()?.id,
             categoryId = null,
-            name = base.name.ifBlank {
-                to?.let {
-                    if (collection) DebtMath.collectionName(repayment, it.name, RecurringRepository.MAX_NAME)
-                    else DebtMath.reminderName(repayment, it.name, RecurringRepository.MAX_NAME)
-                }.orEmpty()
-            },
-            amountText = base.amountText.ifBlank { installment?.let { MoneyFormatter.formatPlain(it) }.orEmpty() },
+            name = if (base.name.isBlank() || base.name == nameFor(previous)) nameFor(to) else base.name,
+            amountText = if (base.amountText.isBlank() || base.amountText == amountFor(previous)) amountFor(to) else base.amountText,
         )
     }
 
@@ -506,6 +534,18 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
                 leading = walletTile,
                 placeholder = if (isCollection) "Choose a receivable" else "Choose a card or loan",
             )
+            // Right where the debt is chosen (design review, 2026-11-19: at the top it could be off screen).
+            if (debt != null && duplicateUnanswered) {
+                Spacer(Modifier.height(Spacing.sm))
+                DuplicatePlanWarning(
+                    debtName = debt.name,
+                    collection = isCollection,
+                    plans = existingPlans,
+                    today = state.today,
+                    onAdjust = { onAdjustExisting(debt.id) },
+                    onAddAnother = { addingAnotherFor = debt.id },
+                )
+            }
             Spacer(Modifier.height(Spacing.sm))
             if (sources.isEmpty()) {
                 Text(
@@ -622,85 +662,116 @@ private fun androidx.compose.foundation.layout.ColumnScope.ScheduleEditorBody(
         }
     }
 
+    fun save() {
+        val w = wallet
+        val problem = when {
+            w == null -> when {
+                isCollection -> "Choose the account it’s received into."
+                isDebt -> "Choose the account it’s paid from."
+                isTransfer -> "Choose the account the money moves from."
+                else -> "Choose an account."
+            }
+            isTransfer && destination == null -> "Choose the account the money moves to."
+            isCollection && debt == null -> "Choose who it’s collected from."
+            isDebt && debt == null -> "Choose the card or loan it pays."
+            draft.name.isBlank() -> "Give it a name."
+            !isDebt && !isTransfer && categories.none { it.id == draft.categoryId } -> "Choose a category."
+            else -> null
+        }
+        if (problem != null || w == null) {
+            haptics.reject()
+            error = problem
+            return
+        }
+        val (money, amountError) = parsePositive(draft.amountText, w.currencyCode, separator)
+        if (money == null) {
+            haptics.reject()
+            error = amountError?.message(w.currencyCode, separator)
+            return
+        }
+        onSave(
+            RecurringRepository.Input(
+                id = draft.id,
+                name = draft.name,
+                type = when {
+                    isTransfer -> TransactionType.TRANSFER_OUT
+                    draft.kind == ScheduleKind.INCOME || isCollection -> TransactionType.INCOME
+                    else -> TransactionType.EXPENSE
+                },
+                amount = money,
+                walletId = w.id,
+                categoryId = draft.categoryId.takeIf { !isTransfer },
+                frequency = if (draft.once) Frequency.MONTHLY else draft.frequency,
+                interval = if (draft.once) 1 else draft.interval,
+                startDate = draft.startDate,
+                endDate = if (draft.once) draft.startDate else draft.endDate,
+                toWalletId = when {
+                    isDebt -> debt?.id
+                    isTransfer -> destination?.id
+                    else -> null
+                },
+            ),
+        ) { result ->
+            error = when (result) {
+                is RecurringRepository.SaveResult.Saved -> {
+                    onSaved()
+                    null
+                }
+                RecurringRepository.SaveResult.BlankName -> "Give it a name."
+                RecurringRepository.SaveResult.AmountNotPositive -> "The amount must be greater than zero."
+                RecurringRepository.SaveResult.EndBeforeStart -> "The end date is before the first date."
+                RecurringRepository.SaveResult.WalletNotFound -> "That account no longer exists."
+                RecurringRepository.SaveResult.CurrencyMismatch -> "The amount must be in the account’s currency."
+                RecurringRepository.SaveResult.CategoryMismatch -> "That category doesn’t match the type."
+                RecurringRepository.SaveResult.CategoryRequired -> "Choose a category."
+                RecurringRepository.SaveResult.InvalidDebt ->
+                    if (isCollection) "Collect from a receivable into a money account in the same currency."
+                    else "Pay a card or loan from a money account in the same currency."
+                RecurringRepository.SaveResult.InvalidTransfer ->
+                    "Move money between two different accounts in the same currency."
+                RecurringRepository.SaveResult.InvalidInterval,
+                RecurringRepository.SaveResult.InvalidType,
+                RecurringRepository.SaveResult.NotFound -> "This schedule couldn’t be saved."
+                RecurringRepository.SaveResult.NotPermitted -> "Only the Shared Space’s owner can change this."
+            }
+            if (error != null) haptics.reject()
+        }
+    }
+
     // Pinned save, clear of the keyboard.
     Hairline()
     Box(Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter, vertical = Spacing.sm)) {
         LucentoPrimaryButton(
             text = if (isNew) "Save schedule" else "Save changes",
             onClick = {
-                val w = wallet
-                val problem = when {
-                    w == null -> when {
-                        isCollection -> "Choose the account it’s received into."
-                        isDebt -> "Choose the account it’s paid from."
-                        isTransfer -> "Choose the account the money moves from."
-                        else -> "Choose an account."
-                    }
-                    isTransfer && destination == null -> "Choose the account the money moves to."
-                    isCollection && debt == null -> "Choose who it’s collected from."
-                    isDebt && debt == null -> "Choose the card or loan it pays."
-                    draft.name.isBlank() -> "Give it a name."
-                    !isDebt && !isTransfer && categories.none { it.id == draft.categoryId } -> "Choose a category."
-                    else -> null
-                }
-                if (problem != null || w == null) {
-                    haptics.reject()
-                    error = problem
-                    return@LucentoPrimaryButton
-                }
-                val (money, amountError) = parsePositive(draft.amountText, w.currencyCode, separator)
-                if (money == null) {
-                    haptics.reject()
-                    error = amountError?.message(w.currencyCode, separator)
-                    return@LucentoPrimaryButton
-                }
-                onSave(
-                    RecurringRepository.Input(
-                        id = draft.id,
-                        name = draft.name,
-                        type = when {
-                            isTransfer -> TransactionType.TRANSFER_OUT
-                            draft.kind == ScheduleKind.INCOME || isCollection -> TransactionType.INCOME
-                            else -> TransactionType.EXPENSE
-                        },
-                        amount = money,
-                        walletId = w.id,
-                        categoryId = draft.categoryId.takeIf { !isTransfer },
-                        frequency = if (draft.once) Frequency.MONTHLY else draft.frequency,
-                        interval = if (draft.once) 1 else draft.interval,
-                        startDate = draft.startDate,
-                        endDate = if (draft.once) draft.startDate else draft.endDate,
-                        toWalletId = when {
-                            isDebt -> debt?.id
-                            isTransfer -> destination?.id
-                            else -> null
-                        },
-                    ),
-                ) { result ->
-                    error = when (result) {
-                        is RecurringRepository.SaveResult.Saved -> {
-                            onSaved()
-                            null
-                        }
-                        RecurringRepository.SaveResult.BlankName -> "Give it a name."
-                        RecurringRepository.SaveResult.AmountNotPositive -> "The amount must be greater than zero."
-                        RecurringRepository.SaveResult.EndBeforeStart -> "The end date is before the first date."
-                        RecurringRepository.SaveResult.WalletNotFound -> "That account no longer exists."
-                        RecurringRepository.SaveResult.CurrencyMismatch -> "The amount must be in the account’s currency."
-                        RecurringRepository.SaveResult.CategoryMismatch -> "That category doesn’t match the type."
-                        RecurringRepository.SaveResult.CategoryRequired -> "Choose a category."
-                        RecurringRepository.SaveResult.InvalidDebt ->
-                            if (isCollection) "Collect from a receivable into a money account in the same currency."
-                            else "Pay a card or loan from a money account in the same currency."
-                        RecurringRepository.SaveResult.InvalidTransfer ->
-                            "Move money between two different accounts in the same currency."
-                        RecurringRepository.SaveResult.InvalidInterval,
-                        RecurringRepository.SaveResult.InvalidType,
-                        RecurringRepository.SaveResult.NotFound -> "This schedule couldn’t be saved."
-                        RecurringRepository.SaveResult.NotPermitted -> "Only the Shared Space’s owner can change this."
-                    }
-                    if (error != null) haptics.reject()
-                }
+                // A second plan for this debt: ask first, with the warning’s two choices (design review, 2026-11-19).
+                if (duplicateUnanswered) confirmingDuplicate = true else save()
+            },
+        )
+    }
+    if (confirmingDuplicate && debt != null) {
+        val fmt = com.lucento.app.core.designsystem.component.amountFormat()
+        // Which plans, by name (with the one plan’s amount and repeat), and singular or plural (design review, 2026-11-19).
+        val already = existingPlans.singleOrNull()?.let { plan ->
+            val repeat = if (ScheduleBulk.isOnce(plan)) "once" else frequencyLabel(plan.frequency, plan.interval).lowercase()
+            // Whole, so the sign never wraps away from the amount (design review, 2026-11-19).
+            "Already planned: ${plan.name}, ${wholeAmount(fmt.signed(plan.signedOccurrence))} $repeat."
+        } ?: "Already planned: ${scheduleNames(existingPlans.map { it.name })}."
+        com.lucento.app.core.designsystem.component.ConfirmDialog(
+            title = duplicateTitle(debt.name, isCollection, existingPlans.size),
+            text = "$already ${duplicateBody(isCollection)} " +
+                if (existingPlans.size == 1) "Adjust the plan you have, or add this one too." else "Adjust the plans you have, or add this one too.",
+            confirmLabel = "Adjust existing",
+            onConfirm = {
+                confirmingDuplicate = false
+                onAdjustExisting(debt.id)
+            },
+            onDismiss = { confirmingDuplicate = false },
+            secondaryLabel = "Add another",
+            onSecondary = {
+                confirmingDuplicate = false
+                addingAnotherFor = debt.id
+                save()
             },
         )
     }

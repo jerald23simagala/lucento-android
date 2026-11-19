@@ -56,7 +56,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   your own accounts such as a monthly MP2 contribution; every bill and income has a category; mark paid / skip / pause —
   never auto-posted). The Scheduled page lists every dated occurrence with
   Transactions-style filters and a From–To range, summed up in the Transactions page's cards (income, expenses and net
-  flow, with card and loan transfers apart).
+  flow, with card and loan transfers apart). All schedules has a Select mode: change the day or amount of several
+  plans, pause or resume them, or delete them, in one step; the editor warns when a card or loan already has a
+  payment plan.
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,

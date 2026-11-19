@@ -316,6 +316,15 @@ recurring-schedule sync, syncing preferences.
 - **Investments, spending money, two-figure Safe to spend, scheduled transfers** (#101, Room v14, waits for OT-38):
   docs/CALCULATIONS.md "Safe to spend", "Money on hand", "Investments", "Scheduled outlook".
 
+## Built — Tester round 2026-11-18 (`feature/card-default-wallet` #107, `feature/scheduled-bulk-edit`)
+- **A credit card can be the default wallet** (#107): expenses go to it; income and transfers go to cash, a bank or an
+  e-wallet. Home's hero reads "Assets"; the composer's picker "Select wallet to use".
+- **Scheduled bulk edit**: All schedules has a Select mode (Select all; Change day, Change amount, Pause / Resume,
+  Delete), each change in one step (docs/CALCULATIONS.md "Scheduled outlook").
+- **A second payment plan for one debt**: the scheduled-payment editor warns, with "Adjust existing" (Select mode with
+  that debt's plans selected) and "Add another".
+- Still to come in this round: Free limits in the guided setup and one Pro dialog wherever a Free limit is reached.
+
 ## Built — Monthly budget card in three parts (2026-11-18, `feature/budget-card-constraints`)
 - Home's card: how much of the budget is spent (a half gauge), then Budget remaining and Spendable wallets side by side,
   then Safe to spend, the lower of them, with the sentence that says which one set it. "To watch" has its own card.
