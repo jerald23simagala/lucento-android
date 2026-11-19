@@ -454,7 +454,8 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         openBudgets()
-        waitForText("Remaining of $total")
+        // This month the hero's figure is the limits' "unspent" part (owner, 2026-11-18): "Unspent of your $… budget".
+        waitForText("Unspent of your $total")
         shot("15-budget")
         compose.onNodeWithContentDescription("Manage categories").performClick()
         compose.waitForIdle()
