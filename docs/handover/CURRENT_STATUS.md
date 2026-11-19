@@ -672,6 +672,9 @@ Adjust existing".
 
 ## Pro experience: walls met again, previews — 2026-11-19 (`feature/pro-repeat-taps-previews`)
 
+**Merged** as #110 (`df50cb5`, 2026-11-19) after all six CI checks passed (unit tests, lint, debug and release builds;
+Supabase suites; Room migrations and the screenshot tour on the emulator). Not in a release build yet.
+
 The owner's monetization brief, audited first (`docs/monetization/PRO_EXPERIENCE_AUDIT_2026-11-19.md`: matrix, gaps).
 Then the owner decided: keep the #109 dialog (plan fact first; See Lucento Plan / Not now), a short message on repeat
 taps per session, no Home card, previews for Insights' 6 and 12 months and for Pro themes. Billing, entitlements, limits
@@ -702,6 +705,8 @@ and the data model are unchanged.
   real data, Grove tried on and gone when the sheet closes. Evidence: `artifacts/pro-experience-2026-11-19/`.
 
 ## Tester round 2026-11-18, part C — 2026-11-19 (`feature/free-limits-pro-dialog`)
+
+**Merged** as #109 (`929e3a6`, 2026-11-19) after all six CI checks passed. Not in a release build yet.
 
 Owner's choices: in setup, hide the add options at the Free numbers (3 money wallets, 2 cards or loans, 2 savings goals)
 and never mention Pro; everywhere else, a Pro dialog when they tap, for every wall.
