@@ -561,14 +561,20 @@ No launch interstitials, no repeated popups, no countdowns, no red badges, no pr
 **Every Pro wall is one dialog at the tap** (owner, 2026-11-18: "anyone hitting a Pro wall should be prompted with a
 dialog to be directed to the Lucento Plan page"; it replaced the inline lock notes, `ProNote`). `ProWallDialog`
 (`feature/pro/ProWall.kt`) opens only from the tap that would have crossed the wall: Add on a full count (Wallets,
-Debts, Goals, a goal's Restore), a locked wallet type or currency in the wallet editor, a 6- or 12-month period in
-Insights, Save as PDF / Share on a statement, a locked theme, Sync now, turning on Smarter reading, creating or inviting
-in Lucento Shared, and a question past the free AI allowance. Its title says what the Free plan includes ("The Free
+Debts, Goals, a goal's Restore), a locked wallet type or currency in the wallet editor, Save as PDF / Share on a
+statement, Sync now, turning on Smarter reading, creating or inviting in Lucento Shared, and a question past the free AI
+allowance. (Insights' 6 and 12 months and a locked theme are previews instead, below.) Its title says what the Free plan includes ("The Free
 plan includes 3 money wallets") or what is Pro ("Grove is part of Lucento Pro"); its body gives the person's own number
 for a count, then what Pro adds and what stays free, never the title again (`ProCopy.wallTitle` / `wallBody`, customer
 copy D-0). Buttons: **See Lucento Plan** (the Lucento Pro page, naming the feature) and **Not now**, which closes it and
-changes nothing. Not now is not remembered: the dialog only ever answers a tap, so the next tap shows it again and no
-control goes dead. Where Pro would not help (20 active goals is the most on any plan) there is no dialog, only a plain
+changes nothing. **A wall met again in the same app session is a short message** (owner, 2026-11-19): the first tap
+on a feature in a session is the dialog, a later one the plan fact as a snackbar with **Unlock** (the same as See
+Lucento Plan), in the app or inside the open sheet (`ProWallMemory` in memory, `MessageHosts`; nothing stored, reset
+when Lucento restarts). So no control goes dead and no dialog repeats. Two walls are previews instead of a dialog
+(owner, 2026-11-19): **Insights' 6 and 12 months** show the person's own income and expenses for that period, softened
+with every figure hidden, under the plan fact (never made-up numbers), and **a Pro theme is tried on** while the profile
+sheet is open, never saved. Audit, matrix and decisions: `docs/monetization/PRO_EXPERIENCE_AUDIT_2026-11-19.md`. Where
+Pro would not help (20 active goals is the most on any plan) there is no dialog, only a plain
 note. Add wallet (Wallets, Home) opens the editor on Cash while money wallets fit; when they are full but a card or
 loan still fits, it opens the type sheet first (money types marked `ProBadge`, picking one opens the dialog), never a
 form that silently starts as a card; the dialog when nothing fits (`ProGates.addWalletStart`). Retyping an existing
@@ -605,7 +611,8 @@ button on every main screen — inside the 48dp button, clear of the Shared pill
 `ProBadge`, which means "locked". TalkBack reads the plan in words. Only the person's own plan counts
 (`ProCopy.memberMark`). On the free plan with no purchase waiting, the profile menu shows a **Lucento Pro card**
 (`ProInviteCard`: what Pro adds, one "See Lucento Pro" button) in place of the plain plan row (`ProCopy.offersPro`).
-No prices on it; nothing on Home (option G, a Home card, was not chosen).
+No prices on it; nothing on Home (option G, a Home card, was not chosen; the owner kept it so on 2026-11-19 when the
+monetization brief asked for one).
 
 ### 6.2 Plan indicator
 

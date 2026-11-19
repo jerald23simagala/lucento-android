@@ -15,6 +15,15 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Pro experience: walls met again, previews (2026-11-19, `feature/pro-repeat-taps-previews`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| PX-1 | Insights' preview draws its bars on the same scale as the free 3 months, so older months can be told apart by proportion (the owner's "real shape without readable figures"); below Android 12 only transparency softens them, as blur needs 12 (QA R8) | Code reading | Owner call, if wanted: a stronger veil or each period on its own scale |
+| PX-2 | The session's memory of walls met is process-wide: it survives an account switch or a sign-out wipe (QA R6) | Code reading | — (a dialog seen is a dialog seen) |
+| PX-3 | With money wallets and cards both full, the combined wall is remembered as money wallets: someone who met the money-wallet dialog first gets the combined one as the short message (QA R7) | Code reading | — |
+| PX-4 | Not seen on a phone yet: the keyboard closing before a repeat message (Lucento Shared, Ask; QA H1, fixed in code), the sheet's message on gesture navigation, TalkBack on the message, the preview card and the try-on note | Emulator (3-button navigation) only | NEXT_TASKS "Pro experience — follow-ups" |
+
 ## Free limits and the Pro dialog (2026-11-19, `feature/free-limits-pro-dialog`)
 
 | Id | Issue | Evidence | Next step |

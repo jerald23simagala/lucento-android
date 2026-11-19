@@ -124,7 +124,12 @@ class MainActivity : FragmentActivity() {
             val state by appViewModel.uiState.collectAsStateWithLifecycle()
             val ready = state as? AppUiState.Ready
             val themeMode = ready?.preferences?.themeMode ?: ThemeMode.SYSTEM
-            val themeId = ready?.preferences?.themeId ?: ThemeId.SUNRISE
+            val savedThemeId = ready?.preferences?.themeId ?: ThemeId.SUNRISE
+            // A Pro theme tried on in the profile sheet shows instead while it lasts; it is never saved (owner, 2026-11-19).
+            val trial by (application as LucentoApplication).container.themeTrial.trying.collectAsStateWithLifecycle()
+            val themeId = trial ?: savedThemeId
+            // Where short messages show: the app's snackbar, or an open sheet's (owner, 2026-11-19).
+            val messageHosts = androidx.compose.runtime.remember { com.lucento.app.core.designsystem.component.MessageHosts() }
             // A dark-only theme (Midnight) is dark whatever the mode, and the system bars follow it.
             val dark = ThemeSpec.of(themeId).isDark(themeMode.isDark())
 
@@ -161,6 +166,10 @@ class MainActivity : FragmentActivity() {
                                 com.lucento.app.feature.fx.LocalMainCurrency provides ready.preferences.primaryCurrency,
                                 com.lucento.app.feature.fx.LocalFxRates provides (application as LucentoApplication).container.fxRates,
                                 com.lucento.app.feature.pro.LocalEntitlements provides entitlements,
+                                // A Pro wall met again this session is a short message (owner, 2026-11-19).
+                                com.lucento.app.core.designsystem.component.LocalMessageHosts provides messageHosts,
+                                com.lucento.app.feature.pro.LocalProWallMemory provides (application as LucentoApplication).container.proWalls,
+                                com.lucento.app.feature.profile.LocalThemeTrial provides (application as LucentoApplication).container.themeTrial,
                                 // Overlays that would sit above the lock screen or the launch logo (Lucento Pro's welcome) wait.
                                 com.lucento.app.navigation.LocalAppObscured provides (locked || launching),
                             ) {

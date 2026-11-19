@@ -1164,6 +1164,16 @@ private fun GoalEditorSheet(
 
     // Add wallet from "Kept in": a savings wallet in the goal's currency by default; once saved it is the one chosen.
     addingWallet?.let { walletDraft ->
+        // The plan page from the wallet editor opens over Goals: this sheet closes too, not only the wallet's (QA M1).
+        androidx.compose.runtime.CompositionLocalProvider(
+            com.lucento.app.feature.pro.LocalOpenPro provides { feature ->
+                addingWallet = null
+                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                    dismiss()
+                    openPro(feature)
+                }
+            },
+        ) {
         WalletEditorSheet(
             initial = walletDraft,
             onSave = { d, sep, done ->
@@ -1178,6 +1188,7 @@ private fun GoalEditorSheet(
             mainCurrency = walletsState.planMainCurrency,
             inSetup = inSetup,
         )
+        }
     }
 }
 

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -83,6 +84,15 @@ fun LucentoBottomSheet(
     LaunchedEffect(Unit) {
         if (!reducedMotion) appear.animateTo(1f, tween(durationMillis = 320, delayMillis = 60, easing = FastOutSlowInEasing))
     }
+    // A short message asked for while this sheet is open (a Pro wall met again) shows in the sheet, not behind it.
+    val messageHosts = LocalMessageHosts.current
+    val sheetMessages = remember { androidx.compose.material3.SnackbarHostState() }
+    val messageScope = androidx.compose.runtime.rememberCoroutineScope()
+    val sheetHost = remember(sheetMessages, messageScope) { MessageHost(sheetMessages, messageScope) }
+    androidx.compose.runtime.DisposableEffect(messageHosts, sheetHost) {
+        messageHosts?.enterSheet(sheetHost)
+        onDispose { messageHosts?.leaveSheet(sheetHost) }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
@@ -103,26 +113,47 @@ fun LucentoBottomSheet(
                 }
             }
         }
-        Column(
+        // The message overlays the sheet's foot rather than adding to its height.
+        androidx.compose.foundation.layout.Box(
             Modifier
                 .fillMaxWidth()
+                // A sheet only Back closes stays put for a drag that starts on its message, too.
                 .then(
                     if (dragToDismiss) {
-                        Modifier.nestedScroll(KeepFlingInSheet)
-                    } else {
                         Modifier
-                            .padding(top = Spacing.md)
-                            .nestedScroll(KeepAllInSheet)
-                            // A drag on the form's still parts (not taken by a scrolling list) goes no further either.
-                            .pointerInput(Unit) { detectVerticalDragGestures { change, _ -> change.consume() } }
+                    } else {
+                        Modifier.pointerInput(Unit) { detectVerticalDragGestures { change, _ -> change.consume() } }
                     },
-                )
-                .graphicsLayer {
-                    alpha = 0.35f + 0.65f * appear.value
-                    translationY = (1f - appear.value) * 20.dp.toPx()
-                },
-            content = content,
-        )
+                ),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (dragToDismiss) {
+                            Modifier.nestedScroll(KeepFlingInSheet)
+                        } else {
+                            Modifier
+                                .padding(top = Spacing.md)
+                                .nestedScroll(KeepAllInSheet)
+                                // A drag on the form's still parts (not taken by a scrolling list) goes no further either.
+                                .pointerInput(Unit) { detectVerticalDragGestures { change, _ -> change.consume() } }
+                        },
+                    )
+                    .graphicsLayer {
+                        alpha = 0.35f + 0.65f * appear.value
+                        translationY = (1f - appear.value) * 20.dp.toPx()
+                    },
+                content = content,
+            )
+            // At the sheet's top, never over its own buttons at the foot (Save at a limit; design review 2026-11-19).
+            androidx.compose.material3.SnackbarHost(
+                sheetMessages,
+                Modifier
+                    .align(androidx.compose.ui.Alignment.TopCenter)
+                    .statusBarsPadding(),
+            ) { data -> LucentoSnackbar(data) }
+        }
     }
 }
 

@@ -132,13 +132,6 @@ fun AskLucentoScreen(
     viewModel: AskLucentoViewModel = viewModel(factory = AskLucentoViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    // The free plan's monthly AI questions used up: the Pro dialog, once (owner, 2026-11-18).
-    if (state.allowanceWall) {
-        com.lucento.app.feature.pro.ProWallDialog(
-            com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.AI_ADVISER),
-            onDismiss = viewModel::dismissAllowanceWall,
-        )
-    }
     val haptics = rememberHaptics()
     var input by rememberSaveable { mutableStateOf("") }
     // The microphone's one-line note ("Didn’t catch anything…", "Try online voice"); cleared when something is asked.
@@ -150,6 +143,21 @@ fun AskLucentoScreen(
     var openReport by remember { mutableStateOf<Report?>(null) }
     var menu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    // The free plan's monthly AI questions used up: the Pro dialog, then a short message (owner, 2026-11-18, 2026-11-19).
+    // The plan page opens over Ask, so Ask's own sheets close first.
+    if (state.allowanceWall) {
+        val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+        com.lucento.app.feature.pro.ProWallDialog(
+            com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.AI_ADVISER),
+            onDismiss = viewModel::dismissAllowanceWall,
+            open = { feature ->
+                askingConsent = false
+                reviewingCard = null
+                openReport = null
+                openPro(feature)
+            },
+        )
+    }
 
     // Keep the newest message in view as the conversation grows.
     LaunchedEffect(state.messages.size, state.thinking) {

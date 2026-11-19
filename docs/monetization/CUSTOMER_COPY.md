@@ -282,6 +282,29 @@ For **Pro Lifetime without Lucento Cloud** (its included year over), the online 
 At 20 active goals (the most on any plan) there is no dialog, only the plain line "20 active goals is the most on any
 plan. Archive a goal you’ve reached to make room."
 
+**D-0b A wall met again in the same session (owner, 2026-11-19).** A snackbar for 10 seconds with a close button, at the
+foot of the app or at the top of the open sheet (never over the sheet's own buttons):
+> {the dialog's title}  [ Unlock ]
+
+e.g. "The Free plan includes 3 money wallets · Unlock". Unlock opens the plan page, as See Lucento Plan does.
+
+**D-0c Insights, 6 or 12 months on the Free plan (a preview).** Under the person's own chart, softened, figures hidden:
+> **6 and 12 months are part of Lucento Pro**
+> This is the shape of your last 6 months, with the figures hidden. Lucento Pro shows every figure for 6 and 12 months,
+> where your money went and how your net worth moved. Your last 3 months are always free.
+> [ See Lucento Plan ]  [ Back to 3 months ]
+
+(With nothing recorded, the first sentence is left out.) TalkBack reads the picture as "Your last 6 months of income and
+expenses, with the figures hidden."
+
+**D-0d A Pro theme tried on.** Under the themes while Lucento shows it:
+> **Grove is part of Lucento Pro**
+> Lucento is showing it now and nothing is saved: Done, or closing this sheet, goes back to Sunrise. Sunrise and Midnight
+> are always free.
+> [ See Lucento Plan ]  [ Done ]
+
+The tried theme's tile reads "Trying" (TalkBack: "Trying, not saved"); the saved theme keeps its check.
+
 **D-0a Free limits while setting up (no dialog, no mention of Pro).** At the Free numbers the guided setup hides its
 add options and says:
 - Accounts, and cards and loans: "You can add more later, from Wallets." (the step's header then reads "These are the
