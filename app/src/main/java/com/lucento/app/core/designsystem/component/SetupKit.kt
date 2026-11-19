@@ -257,7 +257,8 @@ fun CheckMark(checked: Boolean, modifier: Modifier = Modifier, size: Dp = 24.dp)
             .size(size)
             .clip(CircleShape)
             .background(if (checked) scheme.primary else Color.Transparent)
-            .then(if (checked) Modifier else Modifier.border(2.dp, scheme.outline.copy(alpha = 0.7f), CircleShape)),
+            // The full outline colour: at 70 % the empty ring fell to about 2.3:1 (design review, 2026-11-19).
+            .then(if (checked) Modifier else Modifier.border(2.dp, scheme.outline, CircleShape)),
         contentAlignment = Alignment.Center,
     ) {
         if (checked) Icon(Icons.Filled.Check, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(size * 0.66f))
@@ -269,7 +270,7 @@ fun CheckMark(checked: Boolean, modifier: Modifier = Modifier, size: Dp = 24.dp)
 fun RadioMark(selected: Boolean, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     Box(
-        modifier.size(24.dp).border(2.dp, if (selected) scheme.primary else scheme.outline.copy(alpha = 0.7f), CircleShape),
+        modifier.size(24.dp).border(2.dp, if (selected) scheme.primary else scheme.outline, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         if (selected) Box(Modifier.size(12.dp).clip(CircleShape).background(scheme.primary))

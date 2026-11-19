@@ -56,6 +56,18 @@
 | OT-40 | **Two choices about the redesigned Monthly budget card** (PR for `feature/budget-card-constraints`). 1. Bills: keep taking upcoming bills off both Budget remaining and Spendable wallets (Safe to spend takes the lower, so each bill counts once), or follow the brief's wallet formula, which leaves bills out of the wallets. 2. Order: keep overview, the two limits, then Safe to spend (your mockup), or put Safe to spend right after the overview | **Done** (owner, 2026-11-18): keep bills in both limits; keep the order, showing both limits' results with fewer words and lines that balance between the two columns (built on the same PR) | The brief asked for both the literal formula and "no double counting"; they disagree when the wallets are the lower limit (KNOWN_ISSUES BC-1). The design review found the answer below the fold on small phones |
 
 
+## Scheduled bulk edit — follow-ups (2026-11-19, `feature/scheduled-bulk-edit`)
+
+- A Compose UI test for Select mode: Select all and its partial state, the action bar's states, Back and Done leaving
+  it, a filter pruning the selection, the "Adjust existing" preselect, and restoring after Android ends the app.
+- Device: TalkBack through Select mode (rows are checkboxes, day cells a radio group, "N selected" and the duplicate
+  warning are announced), a Partner's phone (no Select pill, no long press), "Don't keep activities" with a sheet and
+  the delete dialog open, and a second phone receiving a bulk change and a bulk delete (dirty flags and tombstones).
+- A phone frame check (`dumpsys gfxinfo`, Select all over about 40 plans › Change day › apply): the emulator can only
+  compare screens with each other (its GPU path makes every screen read janky).
+- Owner calls, if testers ask: an earlier day applying from next month instead of making this month's date overdue
+  (today the preview marks it "(overdue)"); Change amount by +/−/% instead of one amount.
+
 ## Monthly budget card — follow-ups (2026-11-18, `feature/budget-card-constraints`)
 
 - To watch: colour a category by the percentage it shows, or show the percentage rounded down, with a JVM test

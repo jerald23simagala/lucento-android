@@ -10,6 +10,7 @@ import com.lucento.app.domain.DebtPaymentLink
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
+import com.lucento.app.domain.ScheduleBulk
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.flow.Flow
@@ -399,6 +400,93 @@ class RecurringRepository(
     /** Deleting a schedule keeps every transaction it already recorded. */
     suspend fun delete(id: Long) {
         if (access.canManageStructure()) dao.deleteById(id)
+    }
+
+    // ------------------------------------------------------------------ several at once (tester round, 2026-11-18)
+
+    /** What a change to several plans did. */
+    sealed interface BulkResult {
+        /** [changed] plans took the change; [skipped] couldn't (a weekly plan offered only a day of the month, say). */
+        data class Done(val changed: Int, val skipped: Int) : BulkResult
+
+        /** A Partner's phone: schedules are changed by the Shared Space's Owner. Nothing was written. */
+        data object NotPermitted : BulkResult
+
+        /** The write failed and its one transaction was rolled back: nothing changed (reported by the view model). */
+        data object Failed : BulkResult
+    }
+
+    /**
+     * Moves the plans in [ids] to a new day, in one step: weekly ones to [weekday], every other one to [monthDay]
+     * ([ScheduleBulk.onWeekday], [ScheduleBulk.onMonthDay]). Each restarts from its next occurrence, moved to that day in
+     * the same week or month; a plan whose day wasn't given, or that has ended, is skipped.
+     */
+    suspend fun moveDay(
+        ids: Collection<Long>,
+        monthDay: Int?,
+        weekday: java.time.DayOfWeek?,
+        /** Where the phone’s week starts, so a weekday stays in the week the person sees (as the sheet draws it). */
+        firstDayOfWeek: java.time.DayOfWeek = java.time.DayOfWeek.MONDAY,
+    ): BulkResult = bulk(ids) { schedule ->
+        if (ScheduleBulk.takesWeekday(schedule)) {
+            weekday?.let { ScheduleBulk.onWeekday(schedule, it, firstDayOfWeek) }
+        } else {
+            monthDay?.let { ScheduleBulk.onMonthDay(schedule, it) }
+        }
+    }
+
+    /** Gives the plans in [ids] one new [amount], in one step; plans in another currency, or ended, are skipped. */
+    suspend fun setAmount(ids: Collection<Long>, amount: Money): BulkResult = bulk(ids) { ScheduleBulk.withAmount(it, amount) }
+
+    /** Pauses or resumes the plans in [ids], in one step; ended plans and those already that way are skipped. */
+    suspend fun setPaused(ids: Collection<Long>, paused: Boolean): BulkResult = bulk(ids) { ScheduleBulk.withPaused(it, paused) }
+
+    /** Deletes the plans in [ids] in one step; every transaction they already recorded stays. */
+    suspend fun delete(ids: Collection<Long>): BulkResult {
+        if (!access.canManageStructure()) return BulkResult.NotPermitted
+        return runner.run {
+            var deleted = 0
+            for (id in ids.distinct()) {
+                if (dao.getById(id) == null) continue
+                dao.deleteById(id)
+                deleted++
+            }
+            BulkResult.Done(deleted, ids.distinct().size - deleted)
+        }
+    }
+
+    private suspend fun bulk(ids: Collection<Long>, change: (RecurringSchedule) -> RecurringSchedule?): BulkResult {
+        if (!access.canManageStructure()) return BulkResult.NotPermitted
+        return runner.run {
+            var changed = 0
+            var skipped = 0
+            for (id in ids.distinct()) {
+                // Gone already (another phone deleted it): skipped and counted, as delete counts it.
+                val entity = dao.getById(id)
+                if (entity == null) {
+                    skipped++
+                    continue
+                }
+                val next = entity.toDomainOrNull()?.let(change)
+                if (next == null) {
+                    skipped++
+                    continue
+                }
+                dao.update(
+                    entity.copy(
+                        startOn = next.startDate.toEpochDay(),
+                        endOn = next.endDate?.toEpochDay(),
+                        nextIndex = next.nextIndex,
+                        amountMinor = next.amount.amountMinor,
+                        interestMinor = next.interest.amountMinor,
+                        paused = next.paused,
+                        updatedAt = clock(),
+                    ),
+                )
+                changed++
+            }
+            BulkResult.Done(changed, skipped)
+        }
     }
 
     suspend fun countForWallet(walletId: Long): Int = dao.countForWallet(walletId)

@@ -267,6 +267,31 @@ For a loan repaid monthly with a term (`LoanMath.progress`):
 - **Category required**: a scheduled bill or income must have a category (`RecurringRepository.SaveResult.CategoryRequired`,
   owner 2026-11-03); a debt payment gets the shared "Debt interest" category for its interest. Older schedules without
   one keep working and ask for one when edited.
+- **Changing several at once** (Scheduled › All schedules, Select mode; tester round, 2026-11-18; `ScheduleBulk`, pure,
+  unit-tested). Each change is one database transaction (`RecurringRepository.moveDay`, `setAmount`, `setPaused`,
+  `delete`): every plan selected takes it, or none does, and a plan that can't take it is skipped and counted.
+  - **Change day**: weekly plans take a weekday; every other plan, one-time ones included, a day of the month. The
+    occurrence still waiting moves to that day in the same month (weekly: the same week, as the phone's calendar starts
+    it, so a Sunday plan moved to Monday goes to the next day where weeks start on Sunday), so none is gained or lost.
+    One moved before today is then overdue, and an overdue one moved after today no longer is; the preview marks both.
+    The plan restarts there: its first date is the moved date and the count starts again, as when the editor changes
+    the timing. A plan already on that day isn't rewritten. A month shorter than the day uses its last day and later
+    months keep the day (Nov 30, then Dec 31): the plan is anchored on an earlier occurrence month that has the day,
+    with the occurrences before the waiting one counted as handled (a yearly February plan moved to the 29th or 30th
+    gets Feb 29 in leap years). A plan with an end date keeps the same number of dates left: the end date stays when
+    they fit, and otherwise becomes the new last date (the preview says "ends …"); with one date left that moves past
+    the end, the end date becomes the day before the date after it, so the plan isn't stored as one-time. Recorded
+    transactions never change. The waiting date's idempotency key is dated, and it stays in the month or week whose
+    date was still waiting, so it can't match a payment the plan recorded for an earlier month or week.
+  - **Change amount**: one amount for plans in one currency; plans in another, or ended, are skipped. A debt payment's
+    amount is its whole payment, as the editor plans it, so an older plan's interest part is cleared (the split is
+    entered at Mark paid).
+  - **Pause / Resume** skips ended plans and plans already that way. **Delete** keeps every transaction the plans
+    recorded.
+- **A second payment plan for one debt** (`ScheduleBulk.paymentPlansFor`): any unfinished plan paying that card or loan,
+  or collecting from that receivable, paused ones included (resuming one would remind twice). The scheduled-payment
+  editor warns while one exists, listing them: "Adjust existing" opens All schedules filtered to that debt with those
+  plans selected; "Add another" carries on. Nothing blocks a second plan.
 
 ## Ask Lucento reports
 *Since tester round 3 these built-in reports are listed on Insights, under Ask Lucento; an Ask answer can still show one. The wallet statement is described above.*

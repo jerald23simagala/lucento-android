@@ -132,7 +132,11 @@ import androidx.compose.ui.focus.focusProperties
 @Serializable data class WalletDetailRoute(val walletId: Long)
 @Serializable data object GoalsRoute
 @Serializable data object DebtsRoute
-@Serializable data class RecurringRoute(val scheduleId: Long = NO_SCHEDULE)
+/**
+ * Scheduled: [scheduleId] opens one schedule’s review sheet; [selectWalletId] opens All schedules in Select mode with the
+ * plans paying that card or loan selected (the editor’s “Adjust existing”).
+ */
+@Serializable data class RecurringRoute(val scheduleId: Long = NO_SCHEDULE, val selectWalletId: Long = NO_SCHEDULE)
 
 /**
  * The full-page recurring payment editor: [scheduleId] edits one; [debtWalletId] + [firstDueEpochDay] start a debt
@@ -435,8 +439,14 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     }
     val back: () -> Unit = { navController.popBackStack() }
     val focused = currentDestination.isFocused()
+    // A screen’s own bottom bar can stand in for the dock (Scheduled’s Select mode, LocalHideDock).
+    var dockHidden by remember { mutableStateOf(false) }
+    val hideDock: (Boolean) -> Unit = remember { { hidden -> dockHidden = hidden } }
 
-    CompositionLocalProvider(com.lucento.app.core.designsystem.component.LocalSpotlight provides spotlight) {
+    CompositionLocalProvider(
+        com.lucento.app.core.designsystem.component.LocalSpotlight provides spotlight,
+        com.lucento.app.core.designsystem.component.LocalHideDock provides hideDock,
+    ) {
         Box(Modifier.fillMaxSize()) {
             Scaffold(
                 // While the welcome covers the app, only it is there for TalkBack and focus (like the lock screen):
@@ -461,7 +471,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 },
                 bottomBar = {
                     AnimatedVisibility(
-                        visible = !focused,
+                        visible = !focused && !dockHidden,
                         enter = slideInVertically { it } + fadeIn(),
                         exit = slideOutVertically { it } + fadeOut(),
                     ) {
@@ -648,6 +658,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     RecurringScreen(
                                         onBack = back,
                                         openScheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE },
+                                        selectWalletId = route.selectWalletId.takeIf { it != NO_SCHEDULE },
                                         onAddSchedule = { push(RecurringEditRoute()) },
                                         onEditSchedule = { id -> push(RecurringEditRoute(scheduleId = id)) },
                                         onOpenWallet = { id -> push(WalletDetailRoute(id)) },
@@ -667,6 +678,16 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         onSaved = {
                                             back()
                                             notify("Recurring payment saved")
+                                        },
+                                        // The duplicate warning’s “Adjust existing”: leave the editor (and a Scheduled page under it, so
+                                        // Back doesn’t land on a second one) for Scheduled with that debt’s plans selected.
+                                        onAdjustExisting = { debtId ->
+                                            // Only from the editor on top: a second tap during the exit does nothing.
+                                            if (navController.currentBackStackEntry?.id == entry.id) {
+                                                navController.popBackStack()
+                                                if (navController.currentDestination?.hasRoute(RecurringRoute::class) == true) navController.popBackStack()
+                                                push(RecurringRoute(selectWalletId = debtId))
+                                            }
                                         },
                                     )
                                   }
