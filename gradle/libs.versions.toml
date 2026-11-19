@@ -32,7 +32,7 @@ mlkitTextRecognition = "16.0.1"
 # Optional cloud sync (see docs/SYNC.md) — the only reason this app ever talks to the network, and only once
 # the user explicitly opts in. supabase-kt needs one Ktor HTTP engine and kotlinx-datetime; WorkManager runs
 # the background push/pull; Credential Manager + the Google ID library drive Google Sign-In.
-supabase = "3.1.4"
+supabase = "3.9.0"
 ktor = "3.0.3"
 # Held at 0.6.1: 0.7+ turns kotlinx.datetime.Instant into kotlin.time.Instant, and Supabase 3.1.4 is built against the
 # old class (SessionStoreTest: NoSuchMethodError on UserSession). Moves with Supabase 3.9, which needs compileSdk 37.
