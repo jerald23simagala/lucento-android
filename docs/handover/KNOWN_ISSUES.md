@@ -15,6 +15,16 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Monthly budget card redesign (2026-11-18, `feature/budget-card-constraints`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| BC-1 | The brief defined Spendable wallets as the selected wallets less upcoming transfers that aren't expenses, and asked that no upcoming obligation come off both limits. Lucento's figure subtracts upcoming bills and loan and card payments too (the money-on-hand rule since the tester round), so bills come off both limits. That is deliberate: the verdict takes the lower figure, never the sum, so nothing is taken twice, and leaving bills out would let Safe to spend promise money they are about to take. Example: ₱20,000 in the wallets, ₱6,000 of bills and ₱4,000 to savings due leave ₱10,000; the brief's formula would show ₱16,000. The sheet lists the bills under both | Verified: JVM (`SpendingCapacityTest`, "an upcoming bill comes off both limits…") | **Decided** (owner, 2026-11-18, OT-40): keep bills in both |
+| BC-2 | A bill paid from a wallet that isn't spending money (savings, say) lowers Budget remaining but not Spendable wallets: the budget counts every expense, the wallets only what leaves them | Code-only (`MoneyOnHandCalculator`: deductions come from spending wallets only) | By design |
+| BC-3 | The widget's reasons are short forms of the card's sentences, in its words since QA round 1 (2026-11-18), which also fixed a wrong one: a budget spent to the last peso said "Bills due take what’s left" with nothing left before the bills. With equal limits the widget gives no reason (Home says "Both…") | Verified: JVM (`SafeToSpendCaptionTest`) | — |
+| BC-4 | With Show cents off, a limit's two parts may not add up to its figure by a peso: each rounds on its own (TR-3) | By design (TR-3) | — |
+| BC-5 | Seen in the design review, older than this change: To watch colours a category by its exact share while the percentage is rounded, so 79.95 % shows "80 %" in green beside a real 80 % in amber; "days elapsed" and the days left both count today | Design review 2026-11-18 (w411/03, w411/06) | NEXT_TASKS "Monthly budget card — follow-ups" |
+
 ## Tester round (2026-11-17, PRs #98–#101)
 
 | Id | Issue | Evidence | Next step |

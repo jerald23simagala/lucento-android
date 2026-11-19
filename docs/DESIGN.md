@@ -297,9 +297,25 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
    guilloché texture, the Lucento mark, a decorative gold chip and a contactless glyph; the signed balance (info
    tooltip explains assets − owed), "vs last month" mini-bars with a % only when comparable (docs/CALCULATIONS.md),
    then **Wallets** (assets) and **Debt & Loans** (signed, −) figures. Empty: mascot on the left with a short prompt.
-3. **Monthly Budget**: spent (hero) "of <total> budget", % used, a 7dp bar, a verdict chip in words (Over budget ·
-   Under budget · Ahead of pace · On track), and a subtle italic "Top 2 spending categories" note above two tiles that
-   open Transactions filtered to that category and month.
+3. **Monthly budget** (owner's redesign, 2026-11-18), one card in three parts, with the pace chip in words (Over
+   budget · Under budget · Ahead of pace · On track) in its header. **A**: a half gauge (health colour) with the amount
+   spent in its hollow and "spent of <budget>" under it, a "N% spent" pill, and "Budgeted ₱X • Unbudgeted ₱Y"; at 130 %
+   text and above (over 120 %), or when "spent of" would need a second line, the pill takes the hollow and the amounts
+   move under the gauge. **B**: **Budget remaining** and **Spendable wallets** as a subtle grid (owner, 2026-11-18):
+   a 1dp outline in `borderDefault` with the card's corner radius, a divider between the two cells (stacked in a panel
+   under 280dp or from 130 % text), and in each cell the caps name and the figure centred (18sp, one size for both,
+   neutral ink, red with its minus sign below zero; a chevron in the corner, as each cell is a button), then under a
+   rule the two parts as a small ledger: "Unspent ₱30,920.10" / "Upcoming −₱15,649.90" and "In wallets ₱31,064.30" /
+   "Due −₱29,394.30", descriptions left and amounts aligned right, one size for all four (smaller when the widest needs
+   it). Both names take the same number of lines, so the rules and rows line up. No captions, icon tiles or tinted
+   boxes. **C**: **Safe to spend** in a green panel with a check (red with
+   an alert at 0, never negative) and a chevron, the loudest figure on the card (36sp; the spent figure is 32sp, the
+   limits up to 22sp), and the sentence that says which limit set it (a second line only when the wallets don't take
+   part); the whole panel opens how it is worked out. TalkBack reads each column and the verdict as one button with one sentence. A
+   past month ends on Remaining / Overspent. The Budget tab shows the same B and C under its hero, with Safe per day
+   (`SpendingCapacityPanel.kt`).
+   **To watch** follows as its own card: up to five budgeted categories closest to their limit, the name and what's
+   left on one line (under the bar at large text), the bar and % below; "See all" opens the Budget tab.
 4. **Shortcuts**: Goals · Insights · Awards · Debts · Scheduled (only modules that are on; switched-off ones offer
    "Turn on" or "Hide"). Each tile has its own hue from the theme (`ShortcutTones`, tester round 2026-11-17): in
    Sunrise Goals brand blue, Insights violet, Awards navy on sunlight (cream on deep gold at night), Debts slate (the

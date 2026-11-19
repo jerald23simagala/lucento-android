@@ -312,9 +312,10 @@ class ScreenshotTourTest {
         val total = MoneyFormatter.format(money(2_590))
         waitForText("Monthly budget")
         waitForText(total) // the pace card's budget figure is the sum of the category amounts
-        // Bills due counts every scheduled bill, whatever its category; Safe to spend always closes the card (0 in red
-        // once the bills take what's left).
-        waitForText("Bills due")
+        // Upcoming expenses counts every scheduled bill, whatever its category; Safe to spend always closes the card (0 in
+        // red once the bills take what's left), the lower of Budget remaining and Spendable wallets.
+        waitForText("Budget remaining")
+        waitForText("Spendable wallets")
         waitForText("Safe to spend")
         waitForToastsGone()
         shot("06-home-within-budget")
@@ -453,7 +454,8 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         openBudgets()
-        waitForText("Remaining of $total")
+        // This month the hero's figure is the limits' "unspent" part (owner, 2026-11-18): "Unspent of your $… budget".
+        waitForText("Unspent of your $total")
         shot("15-budget")
         compose.onNodeWithContentDescription("Manage categories").performClick()
         compose.waitForIdle()

@@ -605,6 +605,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         onBack = null,
                                         onChooseCategories = { push(CategorySetupRoute) },
                                         onManageCategories = { push(CategoriesRoute) },
+                                        onOpenScheduled = { push(RecurringRoute()) },
                                     )
                                 }
                             }

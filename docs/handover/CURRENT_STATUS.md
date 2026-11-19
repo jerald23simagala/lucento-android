@@ -603,6 +603,69 @@ have the v14 columns, so a 0.5.13 phone syncs investments, kinds, spending choic
 on the same account skip what they can't read; KNOWN_ISSUES TR-2 explains the placeholder they may show. Owner: upload
 to Internal testing, then OT-39.
 
+## Monthly budget card redesign — 2026-11-18 (`feature/budget-card-constraints`)
+
+The owner asked for Home's Monthly budget card in three parts (how much is spent; Budget remaining and Spendable
+wallets side by side; Safe to spend as the conclusion) and for the Budget tab to match.
+- **Calculation reused, not changed.** Budget remaining is `SafeToSpend.budgetAllows`, Spendable wallets is
+  `MoneyOnHand.allows`, Safe to spend is `SafeToSpend.amount`; `SpendingCapacity.of` only reads them. The brief's wallet
+  figure subtracted only transfers that aren't expenses. Lucento's also subtracts bills and loan and card payments,
+  because the verdict takes the lower figure and leaving bills out would promise money they are about to take
+  (CALCULATIONS "Home budget card and the Budget tab"; KNOWN_ISSUES BC-1).
+- **Home.** `BudgetOverview` (half gauge, "spent of" the budget, % pill, Budgeted • Unbudgeted), then
+  `SpendingCapacityBlock`: the two columns and the verdict, each opening its sheet. "To watch" is its own card below. A
+  past month closes on Remaining / Overspent.
+- **Budget tab.** The same block under the hero this month, with Safe per day in the verdict; the hero's two tiles and
+  its set-aside line give way to "Spent ₱X = ₱Y budgeted + ₱Z unbudgeted". Past months are unchanged. A card's counted
+  credit can be edited from there, and "How Safe to spend works" opens Scheduled, as on Home.
+- **Tests.** `SpendingCapacityTest` (22) and a new `SafeToSpendCaptionTest` case. Full local `testDebugUnitTest`:
+  1,594 tests, 0 failures; `assembleDebug`, `assembleDebugAndroidTest` and `lintDebug` pass, with no lint finding in
+  the changed files. `ScreenshotTourTest` and `ReconciliationTest` (both run by CI) now look for the new words.
+- **Reviews.** QA (lucento-qa) found no wrong figure. Fixed:
+  - "—" for wallets not counted yet;
+  - the Budget hero's "Remaining" now says "before upcoming expenses";
+  - the widget said "Bills due take what’s left" with nothing left before the bills, and now uses the card's words;
+  - the gauge's figures move under it when "spent of" would wrap;
+  - one TalkBack sentence per button: a child's description had hidden the amounts;
+  - the wallet sheet's currency on another budget currency;
+  - a self-consistent `SpendingCapacity.of(safe)`.
+
+  The design critic (lucento-design-critic) gave round 1 REVISE at 3.3/5, with every gate passing. Fixed:
+  - one term per idea across the card, its sheets and the widget;
+  - chevrons and "Show how…" click labels;
+  - no icon tiles or tinted boxes in the limits, which share one figure size;
+  - the verdict's line at 0;
+  - a 600 ms gauge.
+
+  The owner answered OT-40 the same day. Bills stay in both limits (KNOWN_ISSUES BC-1). The order stays, but "the
+  result of both budget and wallet shown", with fewer words and lines that balance between the two columns. So:
+  - each limit is now its figure and two short parts: "₱30,920.10 unspent" and "−₱15,649.90 upcoming", "₱31,064.30
+    in wallets" and "−₱29,394.30 due";
+  - each part sits on one line when all four fit, otherwise every amount sits over its word in both columns;
+  - the captions are gone, and the verdict's second line appears only when the wallets don't take part;
+  - the Budget hero reads "Unspent of your ₱X budget".
+
+  A second round followed, also from the owner. They asked for smaller fonts if needed, the description before the
+  amount, amounts aligned, proper spacing and section separation, and subtle grids. B is now:
+  - a subtle grid of two cells (outline, a centre divider, a rule under the headers);
+  - in each cell, the centred name and a smaller figure (18sp);
+  - then a ledger: "Unspent ₱30,920.10", "Upcoming −₱15,649.90", "In wallets ₱31,064.30" and "Due −₱29,394.30", with
+    the amounts aligned right at one size.
+
+  The hairline between the overview and the grid is gone; space and the grid's outline separate them.
+
+  Not re-reviewed by the critic after these changes.
+- **Device.** On the API 35 emulator, the local `BudgetCardShotsTest` (not committed) captured:
+  - 23 states each at 411dp and 360dp;
+  - 54 shots at 360, 393 and 411dp × 115, 130 and 200 %, light and dark.
+
+  Round 4, after the owner's answers, checked the same sets again: 411dp shows both limits and Safe to spend on one
+  screen, and the two columns have equal line counts at every size. After round 2 there is no clipping and no broken
+  word. An accessibility dump shows each limit and the verdict read as
+  one sentence with all their figures. Screenshots: `artifacts/budget-card-2026-11-18/` (local).
+- **Not checked:** a real phone, TalkBack's actual speech (only the accessibility tree), a Partner's phone, and windows
+  600dp or wider.
+
 ## Release 0.5.12 (version code 17) — 2026-11-17 (`release/0.5.12`)
 
 The owner chose "Build 0.5.12 + publish site" after #95. The only app change since 0.5.11 is #95: Ask Lucento's AI

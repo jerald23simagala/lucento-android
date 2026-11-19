@@ -43,6 +43,24 @@ class SafeToSpendCaptionTest {
         assertNull(BudgetFormula.caption(limitedByMoney = false, moneyEmpty = false, nothingSafe = false, overspent = false))
         assertEquals(BudgetFormula.CAPTION_OVER_BUDGET, BudgetFormula.caption(limitedByMoney = false, moneyEmpty = false, nothingSafe = true, overspent = true))
         assertEquals(BudgetFormula.CAPTION_BILLS, BudgetFormula.caption(limitedByMoney = false, moneyEmpty = false, nothingSafe = true, overspent = false))
+        assertEquals(
+            BudgetFormula.CAPTION_BUDGET_USED,
+            BudgetFormula.caption(limitedByMoney = false, moneyEmpty = false, nothingSafe = true, overspent = false, budgetUsedUp = true),
+        )
+    }
+
+    @Test fun `a budget spent to the last peso says so, even with bills still due`() {
+        // QA 2026-11-18: the widget said "Bills due take what's left" with nothing left before them.
+        val bank = Wallet(1, "Bank", WalletType.BANK, php(90_000_00), 0L)
+        val used = Transaction(101, TransactionType.EXPENSE, php(15_000_00), 1, 5, LocalDate.parse("2026-10-11"), "", 0L)
+        val safe = CashflowCalculator.safeToSpend("PHP", today, listOf(spent, used), listOf(bank), budget, emptyList(), listOf(food))
+        val plan = BudgetPlanner.plan(listOf(food), budget, listOf(spent, used), "PHP", YearMonth.from(today))
+        assertEquals(BudgetFormula.CAPTION_BUDGET_USED, HomeStateBuilder.budgetFormula(plan, safe).safeCaption)
+        val rent = RecurringSchedule(
+            9, "Rent", TransactionType.EXPENSE, php(1_000_00), 1L, 5L, Frequency.MONTHLY, 1, LocalDate.parse("2026-10-28"), null, 0, false,
+        )
+        val billed = CashflowCalculator.safeToSpend("PHP", today, listOf(spent, used), listOf(bank), budget, listOf(rent), listOf(food))
+        assertEquals(BudgetFormula.CAPTION_BUDGET_USED, HomeStateBuilder.budgetFormula(plan, billed).safeCaption)
     }
 
     @Test fun `an overdrawn wallet with nothing due says it shows no money, not that something is due`() {

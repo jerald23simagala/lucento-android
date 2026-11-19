@@ -106,19 +106,20 @@ internal fun SafeToSpendSheet(
                 val budget = safe.budgetLimit
                 val allows = safe.budgetAllows
                 if (budget != null && allows != null) {
-                    SectionTitle("Your budget allows", used = !byMoney)
+                    // The card's own words (design review, 2026-11-18): each section ends on the figure the card shows.
+                    SectionTitle("From your budget", used = !byMoney)
                     ExplainLine("Budget", budget)
                     ExplainLine("Spent so far", -safe.spentThisMonth)
-                    ExplainLine("Bills still due", -safe.committed)
-                    TotalLine(allows, used = !byMoney)
+                    ExplainLine("Upcoming expenses", -safe.committed)
+                    TotalLine("Budget remaining", allows, used = !byMoney)
                 }
             }
             if (money != null) {
-                SectionTitle("Your spending money allows", used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
+                SectionTitle("From your spending wallets", used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
                 money.sources.forEach { source -> ExplainLine(sourceLabel(source, fmt::format), source.amount) }
                 val from = money.sources.singleOrNull()?.name
                 money.deductions.forEach { deduction -> ExplainLine(deductionLabel(deduction, today, from), -deduction.amount) }
-                TotalLine(money.allows, used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
+                TotalLine("Spendable wallets", money.allows, used = byMoney || safe.basis == SafeToSpend.Basis.BALANCES)
                 if (!moneyCounts) {
                     Text(
                         "Not counted yet: no money has been recorded in these wallets — no starting balance, income or " +
@@ -200,7 +201,7 @@ internal fun SpendingWalletsSheet(
                 .navigationBarsPadding(),
         ) {
             SheetHeader(
-                title = "Spending money",
+                title = "Spendable wallets",
                 subtitle = "Choose which wallets Safe to spend counts.",
                 icon = Icons.Outlined.AccountBalanceWallet,
             )
@@ -209,7 +210,7 @@ internal fun SpendingWalletsSheet(
                 when {
                     money == null -> "No wallet counts as spending money, so Safe to spend follows your budget."
                     !money.recorded -> "Not counted yet: no money has been recorded in these wallets, so Safe to spend follows your budget."
-                    else -> "Your spending money allows ${fmt.format(money.allows)} this month."
+                    else -> "Your spendable wallets allow ${fmt.format(money.allows)} this month."
                 },
                 style = MaterialTheme.typography.bodyMedium.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
                 fontWeight = FontWeight.SemiBold,
@@ -377,7 +378,7 @@ private fun ExplainLine(label: String, money: Money) {
 }
 
 @Composable
-private fun TotalLine(money: Money, used: Boolean) {
+private fun TotalLine(label: String, money: Money, used: Boolean) {
     val ext = LucentoTheme.extendedColors
     Row(
         Modifier
@@ -386,7 +387,7 @@ private fun TotalLine(money: Money, used: Boolean) {
             .semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Allows", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         AmountText(
             money,
             style = AmountStyles.medium,

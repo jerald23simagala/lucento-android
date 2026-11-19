@@ -7,7 +7,7 @@ owner narrowed the scope from widgets + notification + Share to widgets only).
 | Widget | What it shows | Taps |
 |---|---|---|
 | **Quick add** (4×1, down to 2×1) | The composer's own bar: scanner, mic, and the "Add a transaction" field, in the composer's order. No amounts. | Field → composer (Type); mic → composer (Speak); scanner → composer (Scan) |
-| **Safe to spend** (4×2, down to 3×2) | Home's Monthly budget card in brief: Safe to spend, "a day · days left", "After … bills due", the bar with "72% spent" (Home's ring) and Home's verdict chip — or Home's Net flow when the Budgets module is off | Body → Home; "+ Add" → composer; "Set amounts" → Budget; "Choose categories" → category setup |
+| **Safe to spend** (4×2, down to 3×2) | Home's Monthly budget card in brief: Safe to spend, "a day · days left", "After … bills due", the bar with "72% spent" (Home's gauge) and Home's verdict chip — or Home's Net flow when the Budgets module is off | Body → Home; "+ Add" → composer; "Set amounts" → Budget; "Choose categories" → category setup |
 
 ## Rules
 
@@ -16,10 +16,12 @@ owner narrowed the scope from widgets + notification + Share to widgets only).
   `MainActivity` hands it to the main scaffold, which opens it once and never over the guided setup. Under App lock it
   lands behind the lock screen. Speak or Scan asked of a composer that is already open starts there, keeping what's
   written; the microphone and camera open only once the launch logo and the lock screen are gone.
-- **The same figures and words as Home.** `SafeToSpendWidget` builds `HomeStateBuilder.build(...)` for today and
+- **The same figures as Home, in its words.** `SafeToSpendWidget` builds `HomeStateBuilder.build(...)` for today and
   `SafeToSpendWidgetModel.from(...)` reads it: the figure is `BudgetFormula.safeToSpendShown`, the per-day amount is
   `SafeToSpend.perDay` (rounded down), the bar is `BudgetBurn.consumedPercent` coloured by budget health, the chip is
-  `paceVerdict(...)`. Zero states use Home's captions: "Bills due take what’s left", "You’re over budget this month".
+  `paceVerdict(...)`. Its reasons are short forms of the sentence under Home's Safe to spend (`BudgetFormula.caption`):
+  "Limited by your spending wallets", "What’s due takes your spending wallets", "Your spending wallets show no money",
+  "You’re over budget this month", "This month’s budget is used up", "Bills due take what’s left".
   No budget yet and no categories yet use Home's own prompts ("Set amounts", "Choose categories"). Budgets switched
   off → Net flow, as Home's Cash flow card.
 - **Privacy.** Hide amounts masks every amount ("₱••••"; percentages and words stay, as in the app). App lock shows

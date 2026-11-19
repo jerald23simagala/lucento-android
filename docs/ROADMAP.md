@@ -316,6 +316,12 @@ recurring-schedule sync, syncing preferences.
 - **Investments, spending money, two-figure Safe to spend, scheduled transfers** (#101, Room v14, waits for OT-38):
   docs/CALCULATIONS.md "Safe to spend", "Money on hand", "Investments", "Scheduled outlook".
 
+## Built — Monthly budget card in three parts (2026-11-18, `feature/budget-card-constraints`)
+- Home's card: how much of the budget is spent (a half gauge), then Budget remaining and Spendable wallets side by side,
+  then Safe to spend, the lower of them, with the sentence that says which one set it. "To watch" has its own card.
+- The Budget tab shows the same two limits and Safe to spend under its hero, with Safe per day. The calculation is
+  the tester round's, unchanged (docs/CALCULATIONS.md "Home budget card and the Budget tab").
+
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,
