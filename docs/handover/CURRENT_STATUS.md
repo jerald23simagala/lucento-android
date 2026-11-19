@@ -609,6 +609,10 @@ The owner chose "Yes, build 0.5.14" for OT-41. The app changes since 0.5.13 are 
 #111 changed docs only. Room stays at v14, backups at format v5 and sync is untouched, so no Supabase change is needed.
 Owner: upload to Internal testing, then OT-41.
 
+**Checked on a phone (owner, 2026-11-19):** "All worked fine" on 0.5.14 vc 19. OT-41 (setup at the Free numbers,
+walls met twice, the Insights preview, the Grove try-on, Scheduled Select, TalkBack), OT-39 (the 2026-11-17 tester
+round), OT-36 (AI answers on by default) and OT-35 (Play's two edge-to-edge warnings gone) are done.
+
 ## Release 0.5.13 (version code 18) — 2026-11-18 (`release/0.5.13`)
 
 The owner said "Proceed" on building the tester round for OT-39 after OT-38 was applied to both Supabase projects. The app
