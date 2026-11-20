@@ -252,22 +252,22 @@ Status re-checked on 0.5.14 (2026-11-19) after each item.
    (`ProGates.smartReadingAllowed` in `ComposerViewModel` and Settings), so a Free phone never calls the proxy. The
    server's counting order wasn't re-checked.
 2. Home's info tooltip still says "Nothing is converted between currencies." (`feature/home/HomeScreen.kt:1428`),
-   which is no longer true with multicurrency. **Fixed on `fix/discovery-issues-0514`** (not merged yet).
+   which is no longer true with multicurrency. **Fixed in #116** (merged 2026-11-19; not in a release build yet).
 3. The Ask Lucento hero types "What's my top 5 spending categories?" (`feature/ask/AskLucentoHero.kt:51`, now also on
-   Insights); the chip reads "What are my top 5…". **Fixed on `fix/discovery-issues-0514`.**
+   Insights); the chip reads "What are my top 5…". **Fixed in #116.**
 4. The AI counter said "N left today" even though Free's allowance is per month. **Fixed:** "N left this month" on
    Free, "N left today" on Pro (`feature/ask/AskAiCopy.kt:21`).
 5. Onboarding's "Never miss a bill" (`domain/Features.kt:86`) leans on in-app reminders only (no notifications). The
    owner accepts this wording (2026-11-14) and the film uses it for Scheduled transactions. **Unchanged.**
 6. The onboarding summary's "Synced with your account" (`feature/onboarding/OnboardingScreen.kt:1571`) doesn't say
-   sync is Pro; on Free, sync stays off after setup. **Fixed on `fix/discovery-issues-0514`.**
+   sync is Pro; on Free, sync stays off after setup. **Fixed in #116.**
 7. The plan page says debts are "free on every plan, with no limits" (`feature/pro/ProScreen.kt:187`), but Free tracks
-   2 cards or loans (`PlanCatalog.FREE_DEBT_ACCOUNTS`). **Fixed on `fix/discovery-issues-0514`.**
-8. The editor allows "No category" while the composer requires one. **Confirmed on 0.5.14; fixed on `fix/discovery-issues-0514`.**
-9. Rows beyond 30 in one message are dropped without a message (`BatchEntryParser.kt:37`). **Fixed on `fix/discovery-issues-0514`.**
+   2 cards or loans (`PlanCatalog.FREE_DEBT_ACCOUNTS`). **Fixed in #116.**
+8. The editor allows "No category" while the composer requires one. **Confirmed on 0.5.14; fixed in #116.**
+9. Rows beyond 30 in one message are dropped without a message (`BatchEntryParser.kt:37`). **Fixed in #116.**
 10. README and CHANGELOG are stale: the "Short first run" was reverted on 2026-10-29; Lucento Shared is merged; Ask's AI
     answers include the last 60 days of transactions (consent v2); Insights no longer shows net worth by account type.
-    **Fixed on `fix/discovery-issues-0514`.**
+    **Fixed in #116.**
 
 ## 7. What changed for the film between 0.5.8 and 0.5.14
 
