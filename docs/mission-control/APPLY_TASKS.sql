@@ -2573,6 +2573,28 @@ as $$
   where t.id = p_task
 $$;
 
+-- A task as a row of the Tasks list: no write-up (the page fetches the one task it opens), but its step count, time,
+-- the first words of why it matters, the open question, and what is new to the owner since p_seen.
+create or replace function mc.task_row(p_task uuid, p_seen bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select mc.task_json(t.id, false, 0) || jsonb_build_object(
+    'steps', (select coalesce(sum(jsonb_array_length(p -> 'steps')), 0) from jsonb_array_elements(t.content -> 'parts') p),
+    'minutes', case when jsonb_typeof(t.content -> 'minutes') = 'number' then (t.content ->> 'minutes')::integer end,
+    'why', left(t.content ->> 'why', 240),
+    'question', case when t.status = 'asked' then (select e.note from mc.task_events e where e.task_id = t.id and e.kind = 'asked'
+                                                   order by e.id desc limit 1) end,
+    'new', exists (select 1 from mc.task_events e where e.task_id = t.id and e.kind = 'created' and e.id > p_seen),
+    'answered', exists (select 1 from mc.task_events e where e.task_id = t.id and e.kind = 'answered' and e.id > p_seen),
+    'updated', exists (select 1 from mc.task_events e where e.task_id = t.id and e.kind = 'updated' and e.id > p_seen))
+  from mc.tasks t
+  where t.id = p_task
+$$;
+
 -- ================================================================================================ Claude's functions
 -- Up to 40 tasks, all or nothing: every task is checked before anything is written. A new code creates the task (open,
 -- or waiting with what it waits for); an existing one gets a new version when its title, area, priority, due date or
@@ -2853,9 +2875,9 @@ end;
 $$;
 
 -- ================================================================================================ the owner's functions
--- The Tasks page: every task still open, asked or waiting with its write-up and its newest 50 history entries; the 50
--- most recently closed without; when Claude last read the list. Opening it moves the owner's read position (what the
--- page marks as new is what came after the previous one).
+-- The Tasks page's list: every task still open, asked or waiting, and the 50 most recently closed, as rows (no write-up:
+-- task_get gives the one the page opens); when Claude last read the list. Opening it moves the owner's read position
+-- (what the rows mark as new is what came after the previous one).
 create or replace function mc_api.tasks_board()
 returns jsonb
 language plpgsql
@@ -2877,9 +2899,9 @@ begin
   update mc.tasks_state s set owner_seen_event_id = greatest(s.owner_seen_event_id, v_max) where s.id;
   return jsonb_build_object('ok', true, 'now', now(), 'tz', mc.tz(), 'today', (now() at time zone mc.tz())::date,
     'claude_read_at', v_s.claude_read_at, 'seen_before', v_s.owner_seen_event_id,
-    'tasks', (select coalesce(jsonb_agg(mc.task_json(t.id, true, 50) order by mc.task_rank(t.status, t.priority, t.due_on), t.code), '[]'::jsonb)
+    'tasks', (select coalesce(jsonb_agg(mc.task_row(t.id, v_s.owner_seen_event_id) order by mc.task_rank(t.status, t.priority, t.due_on), t.code), '[]'::jsonb)
               from mc.tasks t where t.status in ('open', 'asked', 'waiting')),
-    'closed', (select coalesce(jsonb_agg(mc.task_json(c.id, false, 0) order by c.status_at desc, c.code), '[]'::jsonb)
+    'closed', (select coalesce(jsonb_agg(mc.task_row(c.id, v_s.owner_seen_event_id) order by c.status_at desc, c.code), '[]'::jsonb)
                from (select t.id, t.status_at, t.code from mc.tasks t where t.status in ('done', 'dropped')
                      order by t.status_at desc, t.code limit 50) c),
     'closed_count', (select count(*) from mc.tasks t where t.status in ('done', 'dropped')));
@@ -2989,7 +3011,7 @@ end;
 $$;
 
 -- Overview › Needs you now: tasks overdue or due within two days, what Claude answered or added since the owner last
--- opened Tasks, and the counts.
+-- opened Tasks, and the counts ("to do" leaves out the tasks that can wait: priority later, counted apart).
 create or replace function mc_api.tasks_summary()
 returns jsonb
 language plpgsql
@@ -3007,7 +3029,8 @@ begin
   end if;
   select s.owner_seen_event_id into v_seen from mc.tasks_state s where s.id;
   return jsonb_build_object('ok', true, 'today', v_today,
-    'open', (select count(*) from mc.tasks t where t.status = 'open'),
+    'open', (select count(*) from mc.tasks t where t.status = 'open' and t.priority <> 'later'),
+    'later', (select count(*) from mc.tasks t where t.status = 'open' and t.priority = 'later'),
     'asked', (select count(*) from mc.tasks t where t.status = 'asked'),
     'waiting', (select count(*) from mc.tasks t where t.status = 'waiting'),
     'due', (select coalesce(jsonb_agg(jsonb_build_object('code', t.code, 'title', t.title, 'due_on', t.due_on,
@@ -3026,7 +3049,7 @@ begin
 end;
 $$;
 
--- The same answer as before plus the open tasks (the owner's turn).
+-- The same answer as before plus the open tasks (the owner's turn), leaving out those that can wait.
 create or replace function mc_api.nav_badges()
 returns jsonb
 language plpgsql
@@ -3047,7 +3070,7 @@ begin
                            where s.status in ('degraded', 'down') and s.checked_at >= now() - interval '10 minutes'),
     'records_view_enabled', coalesce((select (s.value #>> '{}')::boolean from mc.settings s where s.key = 'records_view_enabled'), false),
     'marketing', (mc.marketing_waiting() ->> 'count')::integer,
-    'tasks', (select count(*) from mc.tasks t where t.status = 'open'));
+    'tasks', (select count(*) from mc.tasks t where t.status = 'open' and t.priority <> 'later'));
 end;
 $$;
 

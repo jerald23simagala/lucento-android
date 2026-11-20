@@ -257,12 +257,13 @@ begin
   v_b := pg_temp.owner('select mc_api.tasks_board()');
   r := r || case when v_b ->> 'ok' = 'true'
                       and (select string_agg(x ->> 'code', ',' order by ord) from jsonb_array_elements(v_b -> 'tasks') with ordinality t(x, ord)) = 'OT-91,OT-92'
-                      and v_b #>> '{tasks,0,content,parts,0,steps,0,link,url}' = 'https://supabase.com/dashboard'
-                      and jsonb_array_length(v_b #> '{tasks,0,events}') = 2
-                      and v_b #>> '{tasks,0,events,0,by}' = 'Claude'
+                      and v_b #> '{tasks,0,content}' is null and v_b #> '{tasks,0,events}' is null
+                      and v_b #>> '{tasks,0,steps}' = '2' and v_b #>> '{tasks,0,minutes}' = '5'
+                      and v_b #>> '{tasks,0,why}' = 'Because the test needs a task that changed.'
+                      and v_b #>> '{tasks,0,new}' = 'true' and v_b #>> '{tasks,0,answered}' = 'false'
                       and v_b ->> 'seen_before' = '0' and v_b ->> 'claude_read_at' is null
                       and jsonb_array_length(v_b -> 'closed') = 0
-                 then 'ok  T11 the board lists open before waiting, with write-ups and history, and when Claude last read (never yet)'
+                 then 'ok  T11 the board lists open before waiting as rows (no write-up: steps, time, why, new), and when Claude last read (never yet)'
                  else 'FAIL T11 ' || left(v_b::text, 400) end;
 
   select row_version into v_rv from mc.tasks where code = 'OT-91';
@@ -387,7 +388,7 @@ begin
 
   v_b := pg_temp.owner('select mc_api.tasks_board()');
   r := r || case when jsonb_array_length(v_b -> 'closed') = 1 and v_b #>> '{closed,0,code}' = 'OT-91'
-                      and v_b #> '{closed,0,content}' is null and v_b ->> 'closed_count' = '1'
+                      and v_b #> '{closed,0,content}' is null and v_b #>> '{closed,0,steps}' = '2' and v_b ->> 'closed_count' = '1'
                       and (v_b ->> 'seen_before')::bigint > 0 and v_b ->> 'claude_read_at' is not null
                  then 'ok  T27 closed tasks are listed without their write-ups; the board shows when Claude read'
                  else 'FAIL T27 ' || left(v_b::text, 400) end;
@@ -412,16 +413,16 @@ begin
   r := r || case when v_j ->> 'ok' = 'true'
                       and (select string_agg(x ->> 'code', ',' order by ord) from jsonb_array_elements(v_j -> 'due') with ordinality t(x, ord)) = 'OT-89,OT-97'
                       and (select string_agg(x ->> 'code', ',' order by x ->> 'code') from jsonb_array_elements(v_j -> 'added') x) = 'OT-89,OT-97,OT-98'
-                      and v_j #>> '{answered,0,code}' = 'OT-92' and v_j ->> 'open' = '4'
-                 then 'ok  T29 Overview gets what is overdue or due within two days, and what Claude added or answered since the board was opened'
+                      and v_j #>> '{answered,0,code}' = 'OT-92' and v_j ->> 'open' = '3' and v_j ->> 'later' = '1'
+                 then 'ok  T29 Overview gets what is overdue or due within two days, what Claude added or answered since the board was opened, and the counts (to do apart from what can wait)'
                  else 'FAIL T29 ' || v_j::text end;
 
   perform pg_temp.owner('select mc_api.tasks_board()');
   v_j := pg_temp.owner('select mc_api.tasks_summary()');
   v_k := pg_temp.owner('select mc_api.nav_badges()');
   r := r || case when jsonb_array_length(v_j -> 'added') = 0 and jsonb_array_length(v_j -> 'answered') = 0
-                      and v_k ->> 'tasks' = '4' and v_k ? 'marketing' and v_k ? 'open_tickets' and v_k ? 'services_attention'
-                 then 'ok  T30 opening the board clears those; the badge counts the open tasks beside the earlier badges'
+                      and v_k ->> 'tasks' = '3' and v_k ? 'marketing' and v_k ? 'open_tickets' and v_k ? 'services_attention'
+                 then 'ok  T30 opening the board clears those; the badge counts the tasks to do (not those that can wait) beside the earlier badges'
                  else 'FAIL T30 ' || v_j::text || v_k::text end;
 
   insert into mc.rate_counters (admin_id, action, hour, count) values (v_admin, 'tasks.act', date_trunc('hour', now()), 300)
