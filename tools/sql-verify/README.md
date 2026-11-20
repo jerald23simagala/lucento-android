@@ -18,8 +18,8 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm run concur
 ```
 
 Exit code 0 means every check passed. Each suite runs on a fresh database; the output lists every check, for example
-`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (11 suites, 518 checks on
-2026-11-17). Run both variants: a migration must be safe whichever default privileges the project has.
+`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (12 suites, 550 checks on
+2026-11-20). Run both variants: a migration must be safe whichever default privileges the project has.
 
 `node run.mjs <migrations dir> <suite.sql> [skip …]` runs one suite. By default it skips `usage_events_purge_schedule`,
 because PGlite has no `pg_cron`.
@@ -37,7 +37,9 @@ package was used on Windows). Never point it at lucento-test or production.
 `catch_up_check.mjs` (run by hand: `node catch_up_check.mjs`) pastes the owner's SQL files the way the owner will: the
 lucento-test catch-up, `APPLY_MISSION_CONTROL.sql` and its VERIFY, and (part D) `APPLY_MARKETING.sql` twice on top with
 both VERIFY files all true; it also checks that `APPLY_MARKETING.sql` is current
-(`python tools/supabase/build_marketing_apply.py --check`).
+(`python tools/supabase/build_marketing_apply.py --check`). Part E pastes `APPLY_AUTOPOST.sql` on top; part F pastes
+`APPLY_TASKS.sql` twice, makes the tasks key, pastes `APPLY_AUTOPOST.sql` again after it (the key must survive), and
+checks that all four VERIFY files stay true.
 
 ## Suites
 
@@ -88,6 +90,20 @@ both VERIFY files all true; it also checks that `APPLY_MARKETING.sql` is current
   balances per docs/CALCULATIONS.md, another admin's session refused); activity, Overview, the nightly roll-up;
   Resend events (KlaroPH's anonymous); Google Play orders (test orders excluded, unknown orders not asked again, MRR,
   reported net).
+
+- `tasks_suite.sql` — Mission Control › Tasks, the owner's to-do list (docs/mission-control/v1/OWNER_TASKS.md), 32
+  checks: the fifth secret purpose `tasks`; a customer refused by all five page functions, the page's functions for
+  signed-in callers only and Claude's four for anon only, no table readable; a push creates tasks (open, or waiting with
+  what it waits for), changes nothing when nothing changed, makes a new version with its change note and never changes a
+  status; all or nothing, with the problem named by index and code; 29 broken write-ups each refused (unknown fields,
+  short or long text, http, localhost, an address or a user name in a link, too many steps, minutes, waiting rules, a
+  status on push, a bad date, control characters, key-like text); 1 to 40 tasks a push; the board's order, write-ups
+  and history; a stale row version refused; done, ask, note, not needed and reopen by the owner (audited, CRLF kept as
+  LF, key-like notes refused, a question needs words); Claude's read position (oldest first, open questions, read again
+  with since=0, a position past the end starts over); Claude's answer, wait and open, check (done only), reopen and
+  done (with a reason), unknown codes and actions; the closed list without write-ups; one task with its history and
+  versions; Overview's summary (overdue, due within two days, added and answered since the board was opened); the badge
+  beside the earlier ones; 300 actions an hour; history and versions append-only.
 
 - `security_remediation_suite.sql` — the security remediation (docs/security/REMEDIATION_REPORT.md), 78 checks: the
   Cloud write gate (Free refused, Pro accepted, a lapsed account reads and cleans up, renewal resumes, a Partner on the

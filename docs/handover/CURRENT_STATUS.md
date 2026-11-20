@@ -1083,3 +1083,33 @@ periods as a future task (NEXT_TASKS › "Custom budget periods").
   budgeted spending only; a pointer to the periods rules), NEXT_TASKS "Custom budget periods" (future Pro: rules,
   decisions, outline), ROADMAP M3, CLAUDE.md (who reads `BudgetPlan`; the `budgets` table rule), KNOWN_ISSUES BF-1/BF-2.
 - **Not checked:** a phone (logic only; the screen's layout is unchanged).
+
+## Mission Control › Tasks, the owner's to-do list — 2026-11-20 (branch `feature/mc-owner-tasks`; console `feature/tasks`; tool in `lucento-studio/mission-control`; database not applied yet: OT-42)
+
+Owner: "start streamlining my to do list to be part of the mission control. That will be our main interface for you and
+me to update status of." Contract: `docs/mission-control/v1/OWNER_TASKS.md`.
+
+- **Database** (`supabase/migrations/20261120090000_mission_control_tasks.sql`; one paste `docs/mission-control/
+  APPLY_TASKS.sql` = auto-posting's migration, then Tasks', since both change the ingest-secret purposes; check
+  `VERIFY_TASKS.sql`): tasks with a structured write-up (checked field by field, no markup, https links only, nothing
+  key-like), immutable versions, append-only history, both read positions. A fifth secret purpose `tasks` (the
+  auto-posting migration now lists it too, so pasting that file again after Tasks keeps the key). Owner functions
+  behind `mc.gate` (board, one task, act: done / ask / note / not needed / reopen with the row version, 300 an hour,
+  audited; Overview's summary; `nav_badges` + `tasks`), four ingest functions for Claude's tool.
+- **Console**: Tasks second in the menu with the count to do; To do / Asked Claude / Waiting / Done; each task opens to
+  its steps (tick boxes kept in the browser, Copy for text to paste, link hosts shown), notes and history, and one
+  Note-for-Claude box for every action; a stale task or a refusal never loses what was typed. Overview: overdue, due
+  within two days, Claude's answers and new tasks, the count. Four routes for the tool (`/api/tasks/*`, exempt from
+  the session gate, bearer checked first). DEPLOYMENT.md part K is the owner's setup.
+- **Tool** (`lucento-studio/mission-control/tasks.mjs`): setup / check / status / show / push / set; settings outside
+  every repo; checks every write-up with the database's rules before sending. **17 task write-ups** in
+  `owner-tasks/` (OT-16, 25, 26, 28–32, 34, 37, 43–49), drafted from DEPLOYMENT.md, PLAY_STORE_SUBMISSION.md,
+  OWNER_ACTIONS_REQUIRED.md and the app's own strings, then reviewed: the page's real labels, OT-48 without the call
+  the owner already answered, OT-37 without a paste the Tasks setup already did, OT-28 with "tell Claude first" before
+  the switch (MC-15).
+- **Verified**: `tools/sql-verify` 12 suites, 550 checks, 0 failed under both default-privilege variants (new
+  `tasks_suite.sql`, 32); `catch_up_check.mjs` parts A–F all ok; console lint, types, 325 unit tests; Tasks
+  end-to-end on the local stack (5 tests); all 17 write-ups accepted by the local database through the tool.
+- **Desktop app**: explored, not built: `docs/mission-control/v1/DESKTOP_APP.md` recommends the installable app (PWA)
+  and, later, Windows notifications; a Tauri or Electron shell would break auto-posting's account connections (Google
+  and Facebook refuse embedded browsers) and needs a yearly signing certificate.

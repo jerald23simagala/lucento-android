@@ -166,7 +166,8 @@ begin
     v_t := sqlerrm;
   end;
   r := r || case when v_tick ~ '^[0-9a-f]{64}$' and v_tick not in (v_app, v_mkt)
-                      and v_t like '%purpose is app, backup, marketing or autopost%'
+                      -- Later migrations add purposes (Tasks: `tasks`); this one's own four must all be named.
+                      and v_t like '%purpose is app, backup, marketing%autopost%'
                       and (select value from mc.settings where key = 'autopost_enabled') = 'false'::jsonb
                  then 'ok  P1 a fourth secret purpose, autopost (the clock); auto-posting starts off'
                  else 'FAIL P1 ' || coalesce(v_t, 'null') end;
