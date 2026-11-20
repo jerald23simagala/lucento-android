@@ -125,17 +125,22 @@ token into Mission Control: keys go straight from the clipboard into the tool th
 
 ## 5. Console
 
-- **Tasks** in the navigation, second, with the count of open tasks. The page lists **To do**, **Asked Claude**,
-  **Waiting** and **Done** (done and not needed, newest first, 50 shown); each task opens to its full write-up: why, time,
-  what to have ready, numbered steps (with a tick box kept in this browser only, a Copy button for text to paste, the
-  link's host shown), done when, if stuck, links, then its notes and history and the actions for its state.
-- The page shows when Claude last read the list and offers the sentence to paste into Claude ("Check my Mission Control
-  tasks"), the same way as Marketing (no scheduled checker, MC-11).
-- Under each task, one **Note for Claude** box serves every action: **Mark done** (a note optional), **Ask Claude** (the
-  note is the question), **Save note**, **Not needed** (a reason optional); on a closed task **Reopen** and **Save note**.
-  After an action the page opens that task with a line saying what happened.
+- **Tasks** in the navigation, second, with the count to do (tasks that can wait are left out of it). The list is
+  navigation: one **Start here** card (overdue first, then due today, then priority `now`, then by due date), then
+  **To do**, **Asked Claude**, **Waiting**, **Can wait** (priority `later`) and **Closed** (done and not needed, 50
+  shown). Each row shows its code, due date, what it waits for, how far the owner ticked, and what is new.
+- One task opens beside the list (above it on phones), fetched alone with `task_get`: why, what to have ready, the
+  steps by part (numbered 6.3, each number a tick box kept in this browser only, Copy for text to paste, each link with
+  its host), done when, if stuck, links, then notes and history. A sticky bar under the console's header keeps the
+  progress ("23 of 94 ticked · Continue at step 6.3") and the actions in reach; the same buttons follow the last step.
+- Every action opens one dialog: **Ask Claude** (filled with the step the owner is on; a question is required),
+  **Mark done**, **Add a note**, **Not needed**, **Reopen**. The note being written is kept in the tab (sessionStorage)
+  until it is saved, so a refusal, a stale task or a sign-in never loses it. A success comes back to the same step,
+  with a line in the bar saying what happened; a question's line offers the sentence to paste into Claude.
+- The page shows when Claude last read the list and offers that sentence ("Check my Mission Control tasks") with a
+  Copy button, the same way as Marketing (no scheduled checker, MC-11), and warns five minutes before the idle sign-out.
 - **Overview › Needs you now**: tasks overdue (red) or due within two days, then what Claude answered or added since the
-  owner last opened Tasks (three lines at most), then how many tasks are to do ("9 tasks to do").
+  owner last opened Tasks (three lines at most), then the count ("9 tasks to do (4 more can wait)").
 
 ## 6. Claude's tool (`lucento-studio/mission-control/tasks.mjs`)
 
