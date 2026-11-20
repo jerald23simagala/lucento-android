@@ -1260,7 +1260,7 @@ private val CardFigureStyle = AmountStyles.large.copy(fontSize = 20.sp, letterSp
 /**
  * The dashboard's focal point, drawn as a physical card: ID-1 proportions (it only grows for large text), a soft drop
  * shadow, a thin light edge, a glossy sheen across the top and a faint guilloché pattern like printed security lines.
- * Label and amount sit together at the top; Wallets and Debts & loans along the bottom edge. Opens Wallets.
+ * Label and amount sit together at the top; Assets and Debts & loans along the bottom edge. Opens Wallets.
  */
 @Composable
 private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthComposition, onOpen: () -> Unit) {
@@ -1276,7 +1276,7 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
     val changeSpoken = if (history.size > 1) spokenAmount(history.last().netWorth - history.first().netWorth, signed = true, showPlus = true) else ""
     val spoken = buildString {
         append("$label $netWorthSpoken. ")
-        append("Wallets $assetsSpoken. ")
+        append("Assets $assetsSpoken. ") // the label the card shows
         append("Debts and loans $owedSpoken. ")
         if (history.size > 1) {
             append("Compared with the end of ${monthLabel(history.first().month)}: ")
@@ -1417,6 +1417,11 @@ private fun DrawScope.drawCardSurface() {
     )
 }
 
+/** What net wallet balance means, for the (i) beside it. */
+internal const val BALANCE_INFO = "What you have in your wallets minus what you owe on cards and loans. Wallets in other " +
+    "currencies count at their value in your main currency, from the rates saved with their movements. A wallet with no " +
+    "rate yet isn’t included."
+
 /** The (i) beside the label: what the figure means, one tap away (tooltip; also on long-press). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1425,7 +1430,9 @@ private fun BalanceInfo() {
     val scope = rememberCoroutineScope()
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text("What you have in your wallets minus what you owe on cards and loans. Nothing is converted between currencies.") } },
+        // Multicurrency (docs/CALCULATIONS.md "Exchange rates"): foreign wallets count at their carrying value from the
+        // rates saved with their movements; one with no rate yet stays out ("Not in your totals yet" on its page).
+        tooltip = { PlainTooltip { Text(BALANCE_INFO) } },
         state = tip,
     ) {
         IconButton(onClick = { scope.launch { tip.show() } }, modifier = Modifier.size(Sizes.minTouch)) {

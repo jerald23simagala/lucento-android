@@ -96,9 +96,14 @@ sealed interface TransactionDraftError {
     data object AmountTooLarge : TransactionDraftError
     /** Ambiguous, or another currency's symbol: [message] says what to type (MoneyParser.clarification). */
     data class AmountUnclear(val message: String) : TransactionDraftError
+    /** Every income and expense needs a category (owner, 2026-11-04), in the editor as in the composer. */
+    data object CategoryRequired : TransactionDraftError
     /** The save was rejected by repository rules (e.g. the wallet or category changed underneath). */
     data object Rejected : TransactionDraftError
 }
+
+/** The editor's category rule, shared with the composer's: income and expenses need one; other kinds don't. */
+internal fun categoryMissing(type: TransactionType, categoryId: Long?): Boolean = type.isCashFlow && categoryId == null
 
 data class TransactionEditorState(
     val loaded: Boolean = false,
@@ -194,6 +199,7 @@ class TransactionEditorViewModel(
                 return onResult(TransactionDraftError.AmountUnclear(MoneyParser.clarification(parsed, decimalSeparator).orEmpty()))
         }
         if (amount.amountMinor <= 0L) return onResult(TransactionDraftError.AmountZero)
+        if (categoryMissing(draft.type, draft.categoryId)) return onResult(TransactionDraftError.CategoryRequired)
 
         saving = true
         viewModelScope.launch {

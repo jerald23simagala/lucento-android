@@ -1,5 +1,6 @@
 package com.lucento.app.data.ai
 
+import com.lucento.app.domain.capture.CaptureLimits
 import com.lucento.app.domain.capture.Interpretation
 import com.lucento.app.domain.capture.InterpretationContext
 import com.lucento.app.domain.capture.InterpreterEngine
@@ -33,7 +34,11 @@ class HybridTransactionInterpreter(
         }
         val fallbackReason = when (result) {
             is RemoteTransactionInterpreter.Result.Read ->
-                if (result.items.isNotEmpty()) return Interpretation.Candidates(result.items, GEMINI) else "Gemini found nothing"
+                if (result.items.isNotEmpty()) {
+                    return Interpretation.Candidates(result.items, GEMINI, CaptureLimits.note(result.leftOut, result.inputCut))
+                } else {
+                    "Gemini found nothing"
+                }
             RemoteTransactionInterpreter.Result.LimitReached -> "the Gemini allowance is used up for now"
             RemoteTransactionInterpreter.Result.ProRequired -> "Smarter reading is part of Lucento Pro"
             RemoteTransactionInterpreter.Result.NotSignedIn -> "Gemini needs your sync account"

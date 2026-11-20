@@ -183,7 +183,8 @@ fun ProScreen(
         SectionHeader(
             "What each plan includes",
             Modifier.padding(top = Spacing.section),
-            supporting = "Recording, history, budgets, schedules, debts, Ask Lucento on this phone, backup files and CSV are " +
+            // Not "debts": Free tracks a set number of cards and loans (PlanCatalog.FREE_DEBT_ACCOUNTS), shown below.
+            supporting = "Recording, history, budgets, schedules, Ask Lucento on this phone, backup files and CSV are " +
                 "free on every plan, with no limits.",
         )
         PlanComparison(PlanCatalog.comparisonRows())

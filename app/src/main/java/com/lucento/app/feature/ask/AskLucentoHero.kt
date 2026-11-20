@@ -47,8 +47,11 @@ import com.lucento.app.core.designsystem.component.rememberHaptics
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 
-/** The question the hero types out, as the owner asked (2026-11-03). */
-const val ASK_HERO_QUESTION = "What’s my top 5 spending categories?"
+/**
+ * The question the hero types out, as the owner asked (2026-11-03), worded like Ask's own suggestion chip (owner,
+ * 2026-11-19: fix the "What's my top 5" grammar). It routes to the same report (AskHeroTypingTest).
+ */
+const val ASK_HERO_QUESTION = "What are my top 5 spending categories?"
 
 /**
  * Insights' entrance to Ask Lucento: the mascot beside "Ask Lucento", and a chat box showing a question, which clears and

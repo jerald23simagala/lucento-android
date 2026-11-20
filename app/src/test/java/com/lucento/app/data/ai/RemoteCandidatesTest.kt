@@ -111,4 +111,12 @@ class RemoteCandidatesTest {
         assertTrue(CandidateFlag.AMOUNT_UNVERIFIED in rows[0].flags) // the model read 12,50 as 1250
         assertTrue(CandidateFlag.AMOUNT_UNVERIFIED !in rows[1].flags) // number words are read on the device too
     }
+
+    @Test fun rowsPastTheLimitAreCountedForTheReply() {
+        val many = (1..34).map { RemoteItem(description = "Lunch", type = "EXPENSE", amount = "${100 + it}", walletId = 1, categoryId = 10) }
+        assertEquals(30, RemoteCandidates.toCandidates(many, context, many.joinToString(", ") { "lunch ${it.amount}" }).size)
+        assertEquals(4, RemoteCandidates.leftOut(many.size))
+        assertEquals(0, RemoteCandidates.leftOut(30))
+        assertEquals(0, RemoteCandidates.leftOut(2))
+    }
 }

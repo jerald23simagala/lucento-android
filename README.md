@@ -10,7 +10,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 > [docs/QUALITY.md](docs/QUALITY.md) for exactly what was and wasn't verified. Also: [docs/ROADMAP.md](docs/ROADMAP.md),
 > [docs/DESIGN.md](docs/DESIGN.md), [docs/CALCULATIONS.md](docs/CALCULATIONS.md), [CHANGELOG.md](CHANGELOG.md).
 
-## What works today (0.5.0)
+## What works today (0.5.14)
 - **Navigation**: a persistent dock — **Home · Transactions · (+) · Budget · Wallets** — whose central **+** opens the
   **transaction composer**; Insights, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
   links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
@@ -33,10 +33,12 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
   the budget shown transparently; amounts per month and currency; manage categories (add, rename, reorder,
   deactivate, restore). Existing users keep their categories and can personalise them from presets.
-- **Insights**: income and expenses over 3/6/12 months (transfers excluded, with the change against the period before)
-  and net-worth composition by account type.
-- **Ask Lucento** (from Insights): questions about your money and four statements — net worth, cash flow, budget vs
-  actual, debts & loans — calculated on the phone, saved or shared as PDFs. AI answers (Gemini through Lucento's
+- **Insights**: the Ask Lucento card and the Reports list, then income and expenses over 3/6/12 months (transfers
+  excluded, with the change against the period before; 6 and 12 months are Pro, previewed with the figures hidden on
+  Free), where your money went, and net worth over time.
+- **Ask Lucento** (from Insights): questions about your money, typed or spoken, and six statements — wallet statement,
+  cash flow, net worth, budget vs actual, debts & loans, top spending categories — calculated on the phone, saved or
+  shared as PDFs. AI answers (Gemini through Lucento's
   proxy) for a signed-in account, confirmed before the first question is sent: the question with a summary of your
   finances, including recent transactions; "Keep answers on this phone" turns them off. See [docs/ASK.md](docs/ASK.md).
 - **Transactions**: search, filters (date, type incl. transfers, wallet, category), day groups, edit/delete.
@@ -85,15 +87,13 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Optional cloud sync** (Google Sign-In + Supabase, row-level security): off until you connect an account; every
   core feature works offline without it, and signing out keeps local data. See [docs/SYNC.md](docs/SYNC.md) —
   sign-in needs the Google OAuth setup listed there.
-- **Lucento Shared** (on `feature/lucento-shared`, awaiting product testing): one person's finances shared with a
-  Partner who signs in with their own account. Both see everything and add, edit or delete transactions; the Owner
+- **Lucento Shared**: one person's finances shared with a Partner who signs in with their own account. Both see everything and add, edit or delete transactions; the Owner
   manages wallets, budgets, goals, categories and schedules. Built on cloud sync; needs its Supabase migrations on the
   project. See [docs/shared/](docs/shared/).
 - Android cloud backup disabled.
 
 ## Not yet
-Reminder notifications, cross-currency transfers, automatic principal/interest
-split, budget periods other than calendar months. See the roadmap.
+Reminder notifications and budget periods other than calendar months. See the roadmap.
 
 ## Tech
 Kotlin · Jetpack Compose · Material 3 · Room · DataStore · ViewModel · Coroutines/Flow · Navigation Compose (type-safe).
