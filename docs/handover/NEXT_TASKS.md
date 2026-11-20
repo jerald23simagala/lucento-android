@@ -10,7 +10,7 @@
 
 ## Owner to-dos (open, for the owner to run)
 
-> **Launch film (2026-11-14):** watch `Downloads/lucento-launch-film/lucento-launch-film.mp4` (and the 30 s and 15 s cuts); decide on narration (script in `docs/marketing/launch-film/VOICEOVER.md`), the vertical version and a real two-account Shared capture; the 10 product issues it surfaced are in `KNOWN_ISSUES.md`.
+> **Launch film (2026-11-14, refreshed with 0.5.14 screens on 2026-11-19):** watch `Downloads/lucento-launch-film/lucento-launch-film.mp4` (and the vertical version, the 30 s and 15 s cuts; the 0.5.8 versions are in `previous-0.5.8/` beside them); decide on narration (script in `docs/marketing/launch-film/VOICEOVER.md`) and a real two-account Shared capture; the product issues it surfaced (5 still open on 0.5.14, 2 not re-checked) are in `KNOWN_ISSUES.md`.
 
 | # | To-do | Status | Why it matters |
 |---|---|---|---|

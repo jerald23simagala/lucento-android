@@ -5,14 +5,19 @@ unless stated otherwise.
 
 ## App screens (53 + 1 stitched)
 
-**Source:** Lucento 0.5.8 debug build, `main` at `1608e50` (the same UI as `0679ccf`). It ran on the API 35 shots
-emulator (`Lucento_Shots_API35`, 1080 × 2400, 420 dpi) on 2026-11-14, with the clock set to 2026-11-08 10:00 to match
-the demo month used on the website and Play listing.
+**Source:** Lucento 0.5.14 debug build (version code 19), `main` at `c4458d9`. It ran on the API 35 shots emulator
+(`Lucento_Shots_API35`, 1080 × 2400, 420 dpi) on 2026-11-19, with the clock set to 2026-11-08 10:00 to match the demo
+month used on the website and Play listing. (The first cut, 2026-11-14, used 0.5.8; the discovery report's section 7
+lists what changed on screen.)
 
 **Processing:** `tools/prepare_screens.py` crops the emulator status bar (top 68 px) and the 3-button navigation bar
 with the debug build's TEST badge (bottom 126 px). That's the same crop the website uses. It then saves WebP quality 92
 to `public/launch-film/screens/` and writes `screens.json` plus `src/launch-film/screens.generated.ts`. Nothing inside
 a screen is altered.
+
+`tools/capture/run_test_capture.sh` compiles the app ahead of time after installing it. On a memory-starved PC the
+instrumented debug build otherwise misses Android's startup timeout ("failed to complete startup", killed as a
+background ANR). After an app update, `tools/remap_boxes.py` finds where each crop box in the scenes moved.
 
 **Capture runs:**
 
@@ -34,13 +39,13 @@ The film adds only what was entered on screen during the capture:
 
 - Lunch 500 (not saved)
 - Groceries 850 (not saved)
-- Coffee 180, lunch 250, Grab 240, load 300 (saved)
-- Family dinner 1,280 (saved)
+- Coffee 180, lunch 250, Grab 240, load 300 (saved, into Everyday bank: the default wallet)
+- Family dinner 1,280 (saved, into Everyday bank)
 
 **Staging disclosures:**
 
-- **Voice (S04):** the Listening sheet is a real capture with online voice switched on. The emulator can't hear speech,
-  so the phrase was then entered as text. The row card it produces is identical to the spoken result. The spoken words
+- **Voice (S04):** the Listening sheet is a real capture in the app's default offline mode ("Your words are turned into
+  text on this phone"). The emulator can't hear speech, so the phrase was then entered as text. The row card it produces is identical to the spoken result. The spoken words
   are a caption beside the phone, not text drawn into the app. In the app, a spoken message also carries a small
   "Spoken" label, which this capture doesn't show.
 - **Typing (S04, S07):** each still already contains the real typed text. Covers in the field's own colour (#18233F)
@@ -49,8 +54,9 @@ The film adds only what was entered on screen during the capture:
   therefore camera work on full-resolution stills: pans, push-ins, cross-fades, slide-ups and reveals of the screens'
   own pixels. The bar and donut "draw" reveals use the real chart pixels. The mic ring pulse mirrors the app's own
   voice-level animation.
-- **Dashboard scroll (S02):** three real captures stitched at offsets 972 px and 1,750 px (template match 0.9999 and
-  0.9996). The header and dock are pinned, as they are in the app.
+- **Dashboard scroll (S02):** three real captures stitched at offsets 995 px and 1,766 px (template match above 0.98),
+  each seam halfway through the overlap. The header and dock are pinned, as they are in the app, and the app's 48 px
+  fade into the dock (measured from the captures) is drawn at the dock edge.
 - **Shared (S07):** both phones show real screens of the same ledger, staged like the Play listing's Shared graphic. A
   real two-account capture (sign-in and sync on the test project) is listed as future work.
 
@@ -82,7 +88,7 @@ The random seed is fixed, so it regenerates exactly.
 | `public/launch-film/audio/score.wav` (and `score-30.wav`, `score-15.wav` for the cuts) | 90 BPM, D major ambient electronic: detuned-saw pads, FM bell arpeggio, sine sub bass, soft kick, hats and claps arriving scene by scene, risers into the two logo moments, a shared convolution reverb. Builds from about −21 dB RMS to −14 dB at the peak, peak −2.4 dBFS | 93.3 s |
 | `sfx/tap.wav`, `tick.wav`, `pop.wav`, `mic.wav`, `confirm.wav`, `whoosh.wav`, `swell.wav`, `shimmer.wav` | UI and transition effects, placed on screen events in `src/launch-film/audio/Soundtrack.tsx` | 1–4 s |
 
-To swap in a licensed track, replace `score.wav` (82.7 s, or trim it in `Soundtrack.tsx`). The edit points sit on a
+To swap in a licensed track, replace `score.wav` (93.3 s, or trim it in `Soundtrack.tsx`). The edit points sit on a
 90 BPM grid.
 
 ## Other

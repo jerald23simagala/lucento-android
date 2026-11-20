@@ -31,13 +31,13 @@ The emotional arc follows the light:
 
 ## Scenes
 
-Timecodes are mm:ss.f. "Real" means a capture of Lucento 0.5.8. Every screen in the film is real; the motion is
+Timecodes are mm:ss.f. "Real" means a capture of Lucento 0.5.14 (the first cut used 0.5.8). Every screen in the film is real; the motion is
 camera work on those captures, and nothing inside a screen was drawn.
 
 ### 01 · Introduction (0:00.0–0:05.3, bars 0–1)
 - **Shot:**
   - Night sky over the Midnight ridges, with the moon.
-  - Seven real UI fragments drift in depth, with blur on the far ones: the net wallet balance card, the monthly budget ring, the Japan trip goal, the yen wallet card, the income/expenses chart, an Ask Lucento answer and today's transactions.
+  - Seven real UI fragments drift in depth, with blur on the far ones: the net wallet balance card, the monthly budget gauge, the Japan trip goal, the yen wallet card, the income/expenses chart, an Ask Lucento answer and today's transactions.
   - They gather to the centre and become the three bars of the Rising Crest as the music lands (frame 80).
   - The dot rises, the wordmark draws in, and the logo lifts away.
 - **Text:** "Your entire financial world." (appears at 0:00.5, before the logo forms).
@@ -46,7 +46,7 @@ camera work on those captures, and nothing inside a screen was drawn.
 ### 02 · Financial clarity (0:05.3–0:13.3, bars 2–4)
 - **Shot:**
   - The phone rises out of the dark with the real Dashboard: net wallet balance ₱258,108.10, shortcuts, monthly budget at 89% "Ahead of pace".
-  - The Dashboard then scrolls through the budget detail, Safe to spend and Upcoming. The scroll is a pan over three stitched real captures, with the header and dock pinned as they are in the app.
+  - The Dashboard then scrolls until the whole budget card shows: the gauge, Budget remaining beside Spendable wallets with what is upcoming and due, Safe to spend, then To watch. The scroll is a pan over three stitched real captures, with the header and dock pinned as they are in the app.
   - The phone glides to centre and its screen changes to Wallets.
 - **Text:** "Everything, / in one clear view." + "Know where you stand at a glance."
 - **Sound:** arpeggio enters; whoosh as the phone rises.
@@ -84,7 +84,7 @@ camera work on those captures, and nothing inside a screen was drawn.
 - **Shot:**
   - The real onboarding step "What do you spend on?" appears beside a large "82".
   - The five pre-ticked chips glow in turn: Rent, Electricity, Water, Internet, Mobile phone.
-  - Then three phones slide in: Goals (Emergency fund 42%, Japan trip 55%), Budget (November, ₱2,920.10 left) and Scheduled (overdue and upcoming bills).
+  - Then three phones slide in: Goals (Emergency fund 42%, Japan trip 55%), Budget (November, ₱2,920.10 unspent of ₱25,900.00) and Scheduled (overdue and upcoming bills).
 - **Text:** "Plan today. Feel confident tomorrow." · "82 / ready-made categories / Twelve everyday ones are picked for you." · labels "Goals", "Budget", "Scheduled".
 - **Sound:** soft kick on 1 and 3; whoosh as the trio arrives.
 
@@ -147,13 +147,13 @@ camera work on those captures, and nothing inside a screen was drawn.
 
 ## Pro features shown
 
-Multicurrency wallets (S03), Lucento Shared (S07), three of the five themes (S08) and cloud sync (S09) are Lucento
-Pro. The end card says
+Multicurrency wallets (S03), the 6-month Insights view (S06), Lucento Shared (S07), three of the five themes (S08) and
+cloud sync (S09) are Lucento Pro. The end card says
 so, as the Play listing does. No prices appear, because they come from Google Play and aren't confirmed.
 
 ## Claims deliberately left out
 
-These are true limits of 0.5.8 (see `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §5):
+These are true limits of 0.5.14 (see `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §5):
 
 - notifications or alerts ("Never miss a bill" is used for Scheduled at the owner's call, 2026-11-14; reminders
   are in the app, so no notification imagery)
