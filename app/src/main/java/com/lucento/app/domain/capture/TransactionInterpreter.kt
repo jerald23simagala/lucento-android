@@ -104,7 +104,10 @@ data class TransactionCandidate(
 data class InterpreterEngine(val label: String, val onDevice: Boolean)
 
 sealed interface Interpretation {
-    /** [note]: a line for the reply about what was read ("Read as a statement: 7 transactions…"); null for messages. */
+    /**
+     * [note]: a line for the reply about what was read ("Read as a statement: 7 transactions…", or a message that held
+     * more than is read at once, [CaptureLimits]); null when there is nothing to add.
+     */
     data class Candidates(val items: List<TransactionCandidate>, val engine: InterpreterEngine, val note: String? = null) : Interpretation
     /** Nothing that looks like a transaction; [message] says what would help. */
     data class NothingFound(val message: String) : Interpretation
@@ -130,11 +133,11 @@ class LocalTransactionInterpreter : TransactionInterpreter {
     override val engine = InterpreterEngine(label = "On this phone", onDevice = true)
 
     override suspend fun interpretText(text: String, context: InterpretationContext): Interpretation {
-        val items = BatchEntryParser.parse(text, context)
-        return if (items.isEmpty()) {
+        val message = BatchEntryParser.parseMessage(text, context)
+        return if (message.items.isEmpty()) {
             Interpretation.NothingFound("Nothing to record was found. Include an amount, like “coffee 180”.")
         } else {
-            Interpretation.Candidates(items, engine)
+            Interpretation.Candidates(message.items, engine, CaptureLimits.note(message.leftOut, message.inputCut))
         }
     }
 

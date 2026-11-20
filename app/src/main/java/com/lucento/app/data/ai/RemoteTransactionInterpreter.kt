@@ -24,7 +24,8 @@ class RemoteTransactionInterpreter(
     private val endpoint: String = BuildConfig.AI_INTERPRET_URL,
 ) {
     sealed interface Result {
-        data class Read(val items: List<TransactionCandidate>, val remainingToday: Int?) : Result
+        /** [leftOut]: rows past the 30 read at once; [inputCut]: text past the 2,000 characters sent (CaptureLimits). */
+        data class Read(val items: List<TransactionCandidate>, val remainingToday: Int?, val leftOut: Int = 0, val inputCut: Boolean = false) : Result
         /** The account's AI allowance is used up for now (a day for Pro, a month on the free plan). */
         data object LimitReached : Result
         /** Lucento Pro: Smarter reading is a Pro feature; the free allowance covers Ask Lucento only. */
@@ -43,7 +44,12 @@ class RemoteTransactionInterpreter(
         when (reply.code) {
             200 -> {
                 val read = json.decodeFromString(InterpretResponse.serializer(), reply.body.orEmpty())
-                Result.Read(RemoteCandidates.toCandidates(read.items, context, text), read.remaining)
+                Result.Read(
+                    RemoteCandidates.toCandidates(read.items, context, text),
+                    read.remaining,
+                    leftOut = RemoteCandidates.leftOut(read.items.size),
+                    inputCut = text.length > InterpretRequest.MAX_TEXT,
+                )
             }
             401 -> Result.NotSignedIn
             403 -> Result.ProRequired
@@ -108,6 +114,9 @@ internal data class RemoteItem(
  * review row (exactly as the local interpreter flags it). Nothing is saved without the user's review either way.
  */
 internal object RemoteCandidates {
+    /** How many of the model's rows fall past the [MAX_ROWS] read at once (the reply says so, CaptureLimits). */
+    fun leftOut(returned: Int): Int = (returned - MAX_ROWS).coerceAtLeast(0)
+
     fun toCandidates(items: List<RemoteItem>, context: InterpretationContext, source: String): List<TransactionCandidate> {
         val walletIds = context.wallets.map { it.id }.toSet()
         val categories = context.categories.filter { !it.archived }.associateBy { it.id }

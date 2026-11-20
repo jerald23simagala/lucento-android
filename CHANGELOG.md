@@ -1,5 +1,8 @@
 # Changelog
 
+> This file was last kept up to date on 2026-11-01. What each 0.5.x release changed since is recorded in
+> `docs/handover/CURRENT_STATUS.md` (one row per piece of work, with its pull request).
+
 ## Unreleased — JSON backup and restore
 
 - **Settings → Your data**: export a versioned JSON backup (`schemaVersion`, app version, export time) and restore it.
@@ -21,7 +24,10 @@
   Sign-in, crash reports, sync cursors and goal photo files are not in the backup. CSV export is unchanged.
 - Goal photos stay on the device. A goal restored from a file keeps its scene and not a custom photo.
 
-## Unreleased — Short first run
+## Reverted — Short first run
+
+**Reverted on 2026-10-29:** onboarding kept its full steps, including choosing your spending categories. Kept here
+for the record.
 
 - First run is four screens: welcome (data stays on this phone; uninstalling erases it unless sync is on), main
   currency, a starting balance, then the composer. Theme stays System, sync stays off, and the recommended spending

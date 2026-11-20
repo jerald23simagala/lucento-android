@@ -28,21 +28,31 @@ object BatchEntryParser {
     const val MAX_ROWS = 30
     const val MAX_INPUT = 2_000
 
-    fun parse(text: String, context: InterpretationContext): List<TransactionCandidate> {
+    /**
+     * One message read: [items] (at most [MAX_ROWS]), how many more transactions it held past that limit ([leftOut]),
+     * and whether text past [MAX_INPUT] characters went unread ([inputCut]). The composer says so instead of dropping
+     * them silently ([CaptureLimits.note]).
+     */
+    data class Message(val items: List<TransactionCandidate>, val leftOut: Int = 0, val inputCut: Boolean = false)
+
+    fun parse(text: String, context: InterpretationContext): List<TransactionCandidate> = parseMessage(text, context).items
+
+    fun parseMessage(text: String, context: InterpretationContext): Message {
+        val inputCut = text.length > MAX_INPUT
         val input = QuickEntryParser.asciiDigits(NumberWords.normalize(text.take(MAX_INPUT)), context.decimalSeparator).trim()
-        if (input.isBlank()) return emptyList()
-        val raws = segments(input, context.today)
+        if (input.isBlank()) return Message(emptyList())
+        val relevant = segments(input, context.today)
             .map { read(it, context) }
             .filter { it.relevant }
-            .take(MAX_ROWS)
-        if (raws.isEmpty()) return emptyList()
+        val raws = relevant.take(MAX_ROWS)
+        if (raws.isEmpty()) return Message(emptyList())
 
         val explicitDates = raws.mapNotNull { it.explicitDate }.distinct()
         val shared = explicitDates.singleOrNull()
         var carriedDate: LocalDate? = null
         var previousType: TransactionType? = null
         var previous: TransactionCandidate? = null
-        return raws.map { raw ->
+        val items = raws.map { raw ->
             val date = raw.explicitDate ?: shared ?: carriedDate ?: context.today
             if (raw.explicitDate != null) carriedDate = raw.explicitDate
             val transfer = previous?.takeIf { it.type.isTransfer }
@@ -60,6 +70,7 @@ object BatchEntryParser {
             previous = candidate
             candidate
         }
+        return Message(items, leftOut = relevant.size - raws.size, inputCut = inputCut)
     }
 
     private val FEE = Regex("\\b(fee|fees|charge|charges|service charge)\\b")
