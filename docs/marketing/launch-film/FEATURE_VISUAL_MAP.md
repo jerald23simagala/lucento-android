@@ -1,6 +1,6 @@
 # Lucento launch film: feature-to-visual map
 
-How each feature becomes a picture. Screens are real Lucento 0.5.8 captures (`ASSET_INVENTORY.md` lists where each
+How each feature becomes a picture. Screens are real Lucento 0.5.14 captures (`ASSET_INVENTORY.md` lists where each
 came from). Animation means camera work on those captures, or a reveal of their own pixels. Nothing inside a screen
 is drawn. Status and plan come from `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md`.
 
@@ -8,7 +8,7 @@ is drawn. Status and plan come from `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md`.
 
 | Feature | App screen | Interaction | Demonstration scenario | Asset | Animation | Message | Priority |
 |---|---|---|---|---|---|---|---|
-| Dashboard | Home ("Dashboard") | Scroll | Net wallet balance ₱258,108.10, budget 89% "Ahead of pace", Safe to spend, Upcoming | `dash`, `dash-lower`, `dash-lowest` → stitched `dash-strip` | Phone rises from the dark; smooth pan with header and dock pinned | "Everything, in one clear view." | 1 |
+| Dashboard | Home ("Dashboard") | Scroll | Net wallet balance ₱258,108.10, budget 89% "Ahead of pace", Budget remaining beside Spendable wallets, Safe to spend | `dash`, `dash-lower`, `dash-lowest` → stitched `dash-strip` | Phone rises from the dark; smooth pan with header and dock pinned | "Everything, in one clear view." | 1 |
 | Voice entry | Composer → Listening sheet | Tap mic, speak | "Add 500 pesos for lunch using cash." → Lunch −₱500 · Restaurants · Cash | `composer-empty`, `listening`, `voice-rows` | Sheet rises (real pixels); mic ring pulses; spoken words appear beside the phone | "Say it. Speak naturally. Lucento fills in the details." | 1 |
 | Natural-language typing (on-device reading, not AI) | Composer | Type, send | "Paid 850 for groceries using my cash wallet" → Groceries −₱850 · Cash | `typed-field`, `typed-rows` | Push in on the field; real typed text revealed in order; reply slides up | "Type it. Write it the way you'd text it." | 1 |
 | Bulk entry | Composer | One message, one save | "Coffee 180, lunch 250, Grab 240, load 300" → 4 rows → "4 transactions saved" | `bulk-field`, `bulk-rows`, `bulk-rows-end`, `bulk-saved` | Rows lift out into a grid and return; Save tap; confirmation | "All at once. Four in one message. One tap to save." | 1 |
@@ -42,7 +42,7 @@ is drawn. Status and plan come from `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md`.
 | Safe to spend | Dashboard pan (S02) |
 | Offline-first, App lock, no bank login | Chips in S08 |
 | Awards, the payments bell, wallet adjustments | Captured (`awards`, `bell`), not used in the master; future videos |
-| FX rates, Scheduled transactions ("Never miss a bill"), Amortization tracking, Goals tracking, Transfers, Offline, Cloud | Scene 09 "And there's more": named in words, one line each (owner's list, 2026-11-14) |
+| FX rates, Transfers, Scheduled transactions ("Never miss a bill"), Goals tracking, Amortization tracking, Installments tracking, Statement scanning, Receipt scanning, Home-screen widgets, Offline, Cloud, Backups | Scene 09 "And there's more": all named together in words, one line each (owner's list, 2026-11-14, plus five added 2026-11-19) |
 
 ## Tier 4: future marketing content
 

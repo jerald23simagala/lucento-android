@@ -115,21 +115,22 @@ resolved items are kept at the bottom for traceability.
 | MC-13 | Console dependencies: `next` 16.4.3 has a moderate advisory (GHSA-mfr8-8qww-v76h: `'use cache'` called through `unstable_cache()`, which the console doesn't use; fixed in 16.4.6), and `zod` < 4.6.6 (high: memory with oversized collections) comes in through `@vercel/blob` → `@vercel/oidc`; `npm audit fix --force` would downgrade the Blob SDK. `next build` and `next dev` stop once to report it (running them again continues) | console `npm audit` (2026-11-17) | Next part fixed: 16.4.6, console PR #13 (fd3d231). Open: `zod` waits for the next `@vercel/blob` |
 | MC-14 | The console's idle sign-out ends every session of the admin, not only the idle device's: `proxy.ts` calls `signOut()`, whose default scope is global (seen by the design critic, who was signed out of a second browser mid-review) | console `src/proxy.ts` | `signOut({ scope: 'local' })`, with a check that the other device stays signed in |
 
-## Found while verifying the launch film (2026-11-14)
+## Found while verifying the launch film (2026-11-14, re-checked on 0.5.14 on 2026-11-19)
 
-All **Code-only** (read in source on `main` `0679ccf`); details in `docs/marketing/LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §6.
+All **Code-only** (first read on `main` `0679ccf`, re-read on `c4458d9`); details in
+`docs/marketing/LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §6.
 
-- **Free users can spend Ask Lucento allowance on Smarter reading.** In the local website repo the interpret proxy counts a request before rejecting non-Pro users (`src/pages/api/interpret.ts` ~154–166, `consume_ai_request`). Check what's deployed.
-- Home's info tooltip still says "Nothing is converted between currencies." (`feature/home/HomeScreen.kt:1409`).
-- The Ask Lucento hero types "What's my top 5 spending categories?"; the chip reads "What are my top 5…".
-- The AI counter says "N left today" although Free's allowance is per month.
+- **Free users could spend Ask Lucento allowance on Smarter reading.** In the local website repo the interpret proxy counts a request before rejecting non-Pro users (`src/pages/api/interpret.ts` ~154–166, `consume_ai_request`). **0.5.14: not reachable from the app** (Smarter reading is Pro-gated on the phone, `ProGates.smartReadingAllowed`); the server's order wasn't re-checked.
+- Home's info tooltip still says "Nothing is converted between currencies." (`feature/home/HomeScreen.kt:1428`). Open.
+- The Ask Lucento hero types "What's my top 5 spending categories?" (`feature/ask/AskLucentoHero.kt:51`, also on Insights); the chip reads "What are my top 5…". Open.
+- ~~The AI counter says "N left today" although Free's allowance is per month.~~ Fixed: "N left this month" on Free (`feature/ask/AskAiCopy.kt:21`).
 - Onboarding's "Never miss a bill" relies on in-app reminders only (no notifications). The owner accepts the wording
   (2026-11-14); the launch film uses it for Scheduled transactions.
-- Onboarding's "Sync with an account (Recommended)" and "Synced with your account" don't say sync is Pro.
-- The plan page says debts are free "with no limits"; Free tracks 2 cards or loans.
-- The editor allows "No category"; the composer requires one.
-- Rows beyond 30 in one composer message are dropped silently.
-- README and CHANGELOG are stale (the short first run was reverted on 2026-10-29; Shared is merged; Ask AI sends 60 days of transactions).
+- The onboarding summary's "Synced with your account" (`OnboardingScreen.kt:1571`) doesn't say sync is Pro. Open.
+- The plan page says debts are "free on every plan, with no limits" (`feature/pro/ProScreen.kt:187`); Free tracks 2 cards or loans. Open.
+- The editor allows "No category"; the composer requires one. Not re-checked.
+- Rows beyond 30 in one composer message are dropped silently (`BatchEntryParser.kt:37`). Open.
+- README and CHANGELOG are stale (the short first run was reverted on 2026-10-29; Shared is merged; Ask AI sends 60 days of transactions). Not re-checked.
 
 ## Sign out (2026-11-12, `feature/sign-out`)
 

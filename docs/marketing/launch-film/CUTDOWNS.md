@@ -43,14 +43,14 @@ same. What each scene does in portrait:
 |---|---|
 | Sky | Panoramas centre-cropped (the ridges stay in the bottom fifth); the night-to-sunrise timing is unchanged |
 | 01 | Fragments spread through the tall frame; horizontal lockup at 170 px; headline below at 60 px |
-| 02 | Headline at the top (two lines, 96 px); one large phone (width ~620) below; the scroll is unchanged |
+| 02 | Headline centred at the top (two lines, 96 px); one large phone (width ~620) below; the scroll is unchanged |
 | 03 | Headline phrases stacked as three lines at the top; cards fan above and below the phone instead of left and right |
-| 04 | Beat label and line at the top; a smaller phone higher up, so the composer's field stays clear of the caption area; a gentle zoom around the field while typing; lifted rows in a 2 × 2 grid over the phone |
-| 05 | "82 ready-made categories" above the presets phone; the trio stays in a row of three smaller phones with labels |
-| 06 | Headline and the question at the top; the Ask phone slides in over the Insights phone |
+| 04 | Beat label and line centred at the top, the voice bars leading the spoken quote inline; a smaller phone higher up, so the composer's field stays clear of the caption area; a gentle zoom around the field while typing; lifted rows in a 2 × 2 grid over the phone |
+| 05 | Headline and "82 ready-made categories" centred above the presets phone; the trio stays in a row of three smaller phones with labels |
+| 06 | Headline and the question centred at the top; the Ask phone slides in over the Insights phone |
 | 07 | Headline in two balanced lines; two phones side by side with "You" / "Your partner" chips above; the arc runs between the chips |
-| 08 | Theme arc rotated into a vertical stack that fans out; chips in a 2 × 2 grid under the phone |
-| 09 | The seven feature names, long ones on two lines |
+| 08 | Theme arc rotated into a vertical stack that fans out; headline and chips centred above it (the chips in two rows) |
+| 09 | The twelve features together, in two columns of six |
 | 10 | Stacked lockup (crest above the wordmark); headline in two lines; CTA, URL and the Pro note above the ridges |
 
 **Rules:**
