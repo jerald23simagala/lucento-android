@@ -387,6 +387,56 @@ try {
     );
   }
 
+  // MC7 (Tasks, OWNER_TASKS.md §2): the owner marks a task done while Claude moves it to Waiting, in both orders. The
+  // second waits for the tasks lock, then acts on what the first committed: after Claude's move the owner's row version
+  // is stale; after the owner's done Claude can't move a closed task. Never a lost update.
+  {
+    const key = (await setup.query(`select mc.rotate_ingest_secret('tasks') as s`)).rows[0].s;
+    const task = (code) => ({
+      code, title: `Race ${code}`, area: 'Database', priority: 'soon',
+      content: { why: 'A task the race test marks from both sides.', parts: [{ steps: [{ text: 'Do the one step.' }] }] },
+    });
+    const c = await asClaude();
+    const pushed = (await c.query(`select mc_api.ingest_tasks_push($1, $2::jsonb) as j`,
+      [key, JSON.stringify([task('RT-1'), task('RT-2')])])).rows[0].j;
+    await c.end();
+    const rv = async (code) => Number((await setup.query(`select row_version from mc.tasks where code = $1`, [code])).rows[0].row_version);
+    const act = (cl, code, version) =>
+      cl.query(`select mc_api.task_act($1, $2, 'done', null) as j`, [code, version]).then((r) => r.rows[0].j);
+    const wait = (cl, code) =>
+      cl.query(`select mc_api.ingest_tasks_update($1, $2, 'wait', null, 'Launch day') as j`, [key, code]).then((r) => r.rows[0].j);
+
+    // Claude first, the owner waiting.
+    const seen1 = await rv('RT-1');
+    const [a, b] = [await asClaude(), await asOwner()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const moved = await wait(a, 'RT-1');
+    const marking = act(b, 'RT-1', seen1);
+    const waited1 = await waitingForLock(bPid);
+    await a.query('commit');
+    const marked = await marking;
+    await Promise.all([a.end(), b.end()]);
+
+    // The owner first, Claude waiting.
+    const seen2 = await rv('RT-2');
+    const [o, cl] = [await asOwner(), await asClaude()];
+    const clPid = await pidOf(cl);
+    await o.query('begin');
+    const done = await act(o, 'RT-2', seen2);
+    const moving = wait(cl, 'RT-2');
+    const waited2 = await waitingForLock(clPid);
+    await o.query('commit');
+    const refused = await moving;
+    await Promise.all([o.end(), cl.end()]);
+    const { rows } = await setup.query(`select code, status from mc.tasks where code in ('RT-1', 'RT-2') order by code`);
+    check(
+      pushed.ok && moved.ok && waited1 >= 1 && marked.error === 'stale' && done.ok && waited2 >= 1 && refused.error === 'not_allowed'
+        && rows[0].status === 'waiting' && rows[1].status === 'done',
+      `MC7 the owner's done and Claude's move at once, both orders: the second waits (${waited1}, ${waited2}) and gets ${marked.error} / ${refused.error}; ${rows.map((x) => `${x.code} ${x.status}`).join(', ')}`,
+    );
+  }
+
   await setup.end();
 } catch (e) {
   check(false, `the run stopped: ${e.code ?? ''} ${e.message}`);

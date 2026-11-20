@@ -29,8 +29,9 @@ new account, two transactions for the last places under a row ceiling, twenty wr
 counts against the daily total. For Marketing approvals (MC1–MC5) it races an approval against Claude's new version in
 both orders, two approvals of one post, two pushes of one pack, and Claude's feedback against a request being written:
 each time the second session waits (for the marketing lock; two calls by the same admin already queue one step earlier,
-on the gate's hourly counter row), then acts on what the first committed. It creates and drops
-its own database. CI runs it against a Postgres 17 service container
+on the gate's hourly counter row), then acts on what the first committed. MC6 races two auto-posting claims; MC7 races
+the owner's done against Claude moving the same task to Waiting, in both orders (the second gets `stale` or
+`not_allowed`, never a lost update). It creates and drops its own database. CI runs it against a Postgres 17 service container
 (`.github/workflows/android.yml`, job `sql-verify`); locally any throwaway server works (the `embedded-postgres` npm
 package was used on Windows). Never point it at lucento-test or production.
 
