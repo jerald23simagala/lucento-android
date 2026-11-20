@@ -121,16 +121,16 @@ All **Code-only** (first read on `main` `0679ccf`, re-read on `c4458d9`); detail
 `docs/marketing/LAUNCH_VIDEO_FEATURE_DISCOVERY.md` §6.
 
 - **Free users could spend Ask Lucento allowance on Smarter reading.** In the local website repo the interpret proxy counts a request before rejecting non-Pro users (`src/pages/api/interpret.ts` ~154–166, `consume_ai_request`). **0.5.14: not reachable from the app** (Smarter reading is Pro-gated on the phone, `ProGates.smartReadingAllowed`); the server's order wasn't re-checked.
-- ~~Home's info tooltip still says "Nothing is converted between currencies."~~ Fixed on `fix/discovery-issues-0514` (2026-11-19, not merged yet): it explains foreign wallets' main-currency value; TalkBack also reads "Assets" now.
-- ~~The Ask Lucento hero types "What's my top 5 spending categories?"~~ Fixed on `fix/discovery-issues-0514`: "What are my top 5…", like the chip.
+- ~~Home's info tooltip still says "Nothing is converted between currencies."~~ Fixed in #116 (merged 2026-11-19 as `6949bd1`; not in a release build yet): it explains foreign wallets' main-currency value; TalkBack also reads "Assets" now.
+- ~~The Ask Lucento hero types "What's my top 5 spending categories?"~~ Fixed in #116: "What are my top 5…", like the chip.
 - ~~The AI counter says "N left today" although Free's allowance is per month.~~ Fixed: "N left this month" on Free (`feature/ask/AskAiCopy.kt:21`).
 - Onboarding's "Never miss a bill" relies on in-app reminders only (no notifications). The owner accepts the wording
   (2026-11-14); the launch film uses it for Scheduled transactions.
-- ~~The onboarding summary's "Synced with your account" doesn't say sync is Pro.~~ Fixed on `fix/discovery-issues-0514`: it says synced only when the plan includes sync (`StorageSummary`).
-- ~~The plan page says debts are "free on every plan, with no limits".~~ Fixed on `fix/discovery-issues-0514`: debts left out of that sentence.
-- ~~The editor allows "No category"; the composer requires one.~~ Confirmed on 0.5.14, fixed on `fix/discovery-issues-0514`: income and expenses need a category in the editor too.
-- ~~Rows beyond 30 in one composer message are dropped silently.~~ Fixed on `fix/discovery-issues-0514`: the reply says what was read (`CaptureLimits`), also past 2,000 characters and with Smarter reading.
-- ~~README and CHANGELOG are stale.~~ Fixed on `fix/discovery-issues-0514`: README "What works today" is 0.5.14; CHANGELOG marks the reverted first run and says it stopped on 2026-11-01.
+- ~~The onboarding summary's "Synced with your account" doesn't say sync is Pro.~~ Fixed in #116: it says synced only when the plan includes sync (`StorageSummary`).
+- ~~The plan page says debts are "free on every plan, with no limits".~~ Fixed in #116: debts left out of that sentence.
+- ~~The editor allows "No category"; the composer requires one.~~ Confirmed on 0.5.14, fixed in #116: income and expenses need a category in the editor too.
+- ~~Rows beyond 30 in one composer message are dropped silently.~~ Fixed in #116: the reply says what was read (`CaptureLimits`), also past 2,000 characters and with Smarter reading.
+- ~~README and CHANGELOG are stale.~~ Fixed in #116: README "What works today" is 0.5.14; CHANGELOG marks the reverted first run and says it stopped on 2026-11-01.
 
 ## Sign out (2026-11-12, `feature/sign-out`)
 
