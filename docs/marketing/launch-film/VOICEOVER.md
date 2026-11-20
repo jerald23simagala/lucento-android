@@ -23,7 +23,7 @@ Philippine English is welcome: the film is peso-first.
 | 0:43.5 – 0:52.5 | 1305–1575 | Insights, then Ask Lucento | "See where your money goes. Ask a question in plain words, and get an answer worked out from your own records." |
 | 0:54.0 – 1:03.0 | 1620–1890 | Lucento Shared | "Share it with your partner: each on your own phone, both looking at the same numbers. Better decisions start together." |
 | 1:04.5 – 1:11.0 | 1935–2130 | Themes, Hide amounts | "Make it yours, with themes, hidden amounts, and an app that works even offline." |
-| 1:12.5 – 1:21.5 | 2175–2445 | And there's more | "And there's so much more: exchange rates, bills on schedule, loans paid down, goals in sight — offline, or in the cloud." |
+| 1:12.5 – 1:21.5 | 2175–2445 | And there's more | "And so much more: exchange rates, scheduled bills, loans and installments, goals, scanning — offline, or in the cloud." |
 | 1:23.7 – 1:27.5 | 2510–2625 | The sun rises | *(silence: let the music build)* |
 | 1:28.7 – 1:31.7 | 2660–2750 | Logo and headline | "Lucento. See your money clearly." |
 

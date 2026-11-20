@@ -2,7 +2,7 @@
 
 Lucento's first official product film: **93.3 seconds, 1920 × 1080, 30 fps**, plus a **vertical 1080 × 1920**
 version. It is built in Remotion from real captures of Lucento 0.5.14 (refreshed 2026-11-19; the first cut used 0.5.8) and
-carries an original synthesized score.
+carries an original synthesized score. In the vertical version every caption is centred.
 30-second and 15-second cuts, in both shapes, come from the same source.
 
 | Deliverable | Where |

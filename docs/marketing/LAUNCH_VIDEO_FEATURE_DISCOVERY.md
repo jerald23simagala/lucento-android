@@ -271,8 +271,12 @@ Status re-checked on 0.5.14 (2026-11-19) after each item.
 
 ## 7. What changed for the film between 0.5.8 and 0.5.14
 
-The film was refreshed with 0.5.14 captures on 2026-11-19. Its words and timing are unchanged: every claim in
-`copy.ts` still holds. On screen:
+The film was refreshed with 0.5.14 captures on 2026-11-19. Its timing is unchanged and every claim in `copy.ts` still
+holds. The owner's notes the same day changed three things: captions are centred in the vertical version; "Every asset."
+became "Every asset and debt." (it left out what is owed); and "And there's more" shows all its features at once, now
+twelve (Installments tracking, Statement scanning, Receipt scanning, Home-screen widgets and Backups added; each checked
+in the code: installments are counted on loans and money owed to you, the Quick add widget opens the composer, backups
+are free JSON files). On screen:
 
 - **Home (S01, S02, S08):** the redesigned budget card (gauge, the two limits, Safe to spend, To watch) and the hero's
   "Assets" and "Debts & loans" labels. S02 now scrolls until the whole budget card shows.
