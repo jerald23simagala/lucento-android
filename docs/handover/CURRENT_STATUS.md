@@ -1084,7 +1084,7 @@ periods as a future task (NEXT_TASKS › "Custom budget periods").
   decisions, outline), ROADMAP M3, CLAUDE.md (who reads `BudgetPlan`; the `budgets` table rule), KNOWN_ISSUES BF-1/BF-2.
 - **Not checked:** a phone (logic only; the screen's layout is unchanged).
 
-## Mission Control › Tasks, the owner's to-do list — 2026-11-20 (branch `feature/mc-owner-tasks`; console `feature/tasks`; tool in `lucento-studio/mission-control`; database not applied yet: OT-42)
+## Mission Control › Tasks, the owner's to-do list — 2026-11-20 (android #118, console #14 and #15, merged; tool in `lucento-studio/mission-control`; lucento-test set up and the 18 tasks sent 2026-11-21: OT-42 done)
 
 Owner: "start streamlining my to do list to be part of the mission control. That will be our main interface for you and
 me to update status of." Contract: `docs/mission-control/v1/OWNER_TASKS.md`.
