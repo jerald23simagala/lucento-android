@@ -125,22 +125,45 @@ token into Mission Control: keys go straight from the clipboard into the tool th
 
 ## 5. Console
 
+Mission Control is used on a laptop (owner, 2026-11-20: it "need not be mobile friendly"). Pages are designed and
+reviewed for laptop windows, 1280–1920 px and a snapped half-screen window, at text sizes up to 200 %. A narrower
+window gets one column and must not break, but phones are not a target.
+
 - **Tasks** in the navigation, second, with the count to do (tasks that can wait are left out of it). The list is
-  navigation: one **Start here** card (overdue first, then due today, then priority `now`, then by due date), then
-  **To do**, **Asked Claude**, **Waiting**, **Can wait** (priority `later`) and **Closed** (done and not needed, 50
-  shown). Each row shows its code, due date, what it waits for, how far the owner ticked, and what is new.
-- One task opens beside the list (above it on phones), fetched alone with `task_get`: why, what to have ready, the
-  steps by part (numbered 6.3, each number a tick box kept in this browser only, Copy for text to paste, each link with
-  its host), done when, if stuck, links, then notes and history. A sticky bar under the console's header keeps the
-  progress ("23 of 94 ticked · Continue at step 6.3") and the actions in reach; the same buttons follow the last step.
+  navigation: one **Start here** card (overdue first, then due today, then priority `now`, then by due date; quiet
+  while another task is open), then **To do**, **Asked Claude**, **Waiting**, **Can wait** (priority `later`) and
+  **Closed** (done and not needed, 50 shown). Each row shows its code, due date, what it waits for, how far the owner
+  ticked, and what is new.
+- One task opens beside the list once the page is 56rem wide. The switch is a container query in rem, so at large text
+  the list moves below the task instead of crushing it. The task is fetched alone with `task_get` and shows:
+  - why, and what to have ready;
+  - the steps by part: numbered 6.3, each number a tick box kept in this browser only; Copy for text to paste; each
+    link with its host; other tasks' codes link to them;
+  - done when, if stuck, links, then notes and history.
+
+  Its first control, **All tasks**, takes the keyboard to the list. The open task's row is scrolled into view there.
+- A bar under the console's header keeps the progress and the next move in reach:
+  - "Start at step 1.1", then "Continue at step 6.3", then **Mark done** once every step is ticked;
+  - nothing filled while it's Claude's turn or the task waits;
+  - "Next: <task>" once it is closed.
+
+  The bar sticks only while it takes at most a fifth of the screen; otherwise it stays in its place. The page's scroll
+  padding follows what stays on screen, so a step reached by an address or the keyboard is never under the bar. After
+  the last step come **Add a note** and **Not needed**, or the whole set when the bar doesn't stick.
 - Every action opens one dialog: **Ask Claude** (filled with the step the owner is on; a question is required),
-  **Mark done**, **Add a note**, **Not needed**, **Reopen**. The note being written is kept in the tab (sessionStorage)
-  until it is saved, so a refusal, a stale task or a sign-in never loses it. A success comes back to the same step,
-  with a line in the bar saying what happened; a question's line offers the sentence to paste into Claude.
+  **Mark done**, **Add a note**, **Not needed**, **Reopen**.
+  - The note being written is kept in the tab (sessionStorage) until it is saved, so a refusal, a stale task, no
+    connection or a sign-in never loses it.
+  - A success comes back to where the owner was (the step, the end or the top), with a line saying what happened.
+  - A question's line offers the sentence to paste into Claude.
 - The page shows when Claude last read the list and offers that sentence ("Check my Mission Control tasks") with a
-  Copy button, the same way as Marketing (no scheduled checker, MC-11), and warns five minutes before the idle sign-out.
-- **Overview › Needs you now**: tasks overdue (red) or due within two days, then what Claude answered or added since the
-  owner last opened Tasks (three lines at most), then the count ("9 tasks to do (4 more can wait)").
+  Copy button, also inside an asked task's note. It works the same way as Marketing (no scheduled checker, MC-11), and
+  warns five minutes before the idle sign-out.
+- **Overview › Needs you now**:
+  - tasks on the owner's turn that are overdue (red) or due within two days;
+  - then what Claude answered or added since the owner last opened Tasks, three lines at most, each named by its code
+    ("Due tomorrow: OT-43 · Apply for production access");
+  - then the count ("9 tasks to do (4 more can wait)").
 
 ## 6. Claude's tool (`lucento-studio/mission-control/tasks.mjs`)
 

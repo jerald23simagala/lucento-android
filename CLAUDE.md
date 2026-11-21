@@ -201,6 +201,11 @@ file in `lucento-studio/mission-control/owner-tasks/` (complete click-by-click s
 sent with `tasks.mjs push`; answer the owner's questions there with `tasks.mjs set <code> answer --note "…"`. Mark an owner
 task done only with a note saying how you know.
 
+**Mission Control is used on a laptop** (owner, 2026-11-20: it "need not be mobile friendly"). Design and review its pages
+for laptop windows, 1280–1920 px and a snapped half-screen window, at text sizes up to 200 %. A narrower window gets one
+column and must not break, but phones are not a target: no phone-only work, and no phone sizes in a critic's brief. The
+Android app's rules are unchanged.
+
 
 ## UI/UX Creative Authority
 

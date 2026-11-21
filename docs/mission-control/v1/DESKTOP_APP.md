@@ -1,6 +1,8 @@
 # Mission Control as a desktop app: options (2026-11-20)
 
 Owner, 2026-11-20: "can you explore the possibility of migrating the web app to desktop app so we have better interface."
+Later the same day: "mission control need not be mobile friendly as I expect to handle them through my laptop." The
+laptop is the device; phones are not a target for any option below.
 
 Mission Control is a Next.js console on Vercel: every page is rendered on the server, every change is a server action,
 the database decides who may do what (`mc.gate`), and the keys for Resend, Play, Meta, Google and TikTok live only on
@@ -20,7 +22,6 @@ the server. Whatever the desktop shell, that server stays: a desktop app is a be
 | Starts with Windows | Yes (Edge › Apps › **Auto-start on device login**) | Yes | Yes | Yes |
 | Notifications when Claude adds or answers a task | Yes, with Web Push: a second step (a service worker, push keys, and the console sending a push) | Yes | Yes | Yes |
 | Tray icon, global shortcut | No | Yes | Yes | Yes |
-| On the phone | The same install (Add to Home screen) | Nothing | Nothing | Nothing |
 
 ## Recommendation: A, in two steps
 
@@ -38,6 +39,8 @@ B and C buy a tray icon and a global shortcut, at the price of a yearly certific
 updater, and auto-posting's account connections breaking inside the embedded browser. D rebuilds what already works.
 None of that is "better interface"; the interface itself is the same pages in every option. If the pages themselves
 feel cramped or slow, that is a design pass on the console (Tasks went through one), which every option would need.
+With the laptop as the only device, that pass can use the width a laptop has (Tasks: the list beside the open task)
+instead of designing every page down to a phone.
 
 ## Sources
 
