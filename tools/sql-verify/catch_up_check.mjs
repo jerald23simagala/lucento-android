@@ -8,7 +8,9 @@
 //      and APPLY_MARKETING.sql is current (python tools/supabase/build_marketing_apply.py --check);
 //   E. auto-posting on top of that: APPLY_AUTOPOST.sql twice (and APPLY_MARKETING.sql pasted again after it) →
 //      VERIFY_MISSION_CONTROL.sql, VERIFY_MARKETING.sql and VERIFY_AUTOPOST.sql all true (but the clock, which waits for
-//      the owner's setup and pg_cron, and pg_net, which PGlite lacks).
+//      the owner's setup and pg_cron, and pg_net, which PGlite lacks);
+//   F. Tasks on top of Marketing approvals: APPLY_TASKS.sql twice, its key made, then APPLY_AUTOPOST.sql pasted again (the
+//      owner may follow part J after part K) → every VERIFY file all true (but the clock, pg_net and later steps).
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -30,6 +32,8 @@ const applyMarketing = readFileSync(join(docs, 'APPLY_MARKETING.sql'), 'utf8');
 const verifyMarketing = readFileSync(join(docs, 'VERIFY_MARKETING.sql'), 'utf8');
 const applyAutopost = readFileSync(join(docs, 'APPLY_AUTOPOST.sql'), 'utf8');
 const verifyAutopost = readFileSync(join(docs, 'VERIFY_AUTOPOST.sql'), 'utf8');
+const applyTasks = readFileSync(join(docs, 'APPLY_TASKS.sql'), 'utf8');
+const verifyTasks = readFileSync(join(docs, 'VERIFY_TASKS.sql'), 'utf8');
 // VERIFY_MISSION_CONTROL.sql columns that wait for the owner's later steps (or for pg_cron, which PGlite lacks).
 const LATER_STEPS = ['cron_jobs_4', 'admin_added_step_a5', 'both_secrets_created_step_a6'];
 
@@ -211,6 +215,51 @@ const check = (ok, label, detail = '') => {
       JSON.stringify(a));
   } catch (e) {
     check(false, 'E4 VERIFY_AUTOPOST.sql runs', e.message);
+  }
+  await db.close();
+}
+
+// F. Tasks (docs/mission-control/APPLY_TASKS.sql: auto-posting's migration, then Tasks') on a project with Marketing
+{
+  const db = await project([]);
+  await db.exec(apply);
+  await db.exec(applyMarketing);
+  try {
+    await db.exec(applyTasks);
+    await db.exec(applyTasks);
+    check(true, 'F1 APPLY_TASKS.sql runs after APPLY_MARKETING.sql, and again (pasted twice)');
+  } catch (e) {
+    check(false, 'F1 APPLY_TASKS.sql runs after APPLY_MARKETING.sql, and again (pasted twice)', e.message);
+  }
+  try {
+    const k = (await db.query(`select mc.rotate_ingest_secret('tasks') ~ '^[0-9a-f]{64}$' as ok`)).rows[0];
+    await db.exec(applyAutopost);
+    const again = (await db.query(`select mc.rotate_ingest_secret('tasks') is not null as ok,
+      (select count(*) from mc.ingest_secret where purpose = 'tasks') = 1 as kept`)).rows[0];
+    check(k.ok && again.ok && again.kept, 'F2 the tasks key survives APPLY_AUTOPOST.sql pasted again after Tasks');
+  } catch (e) {
+    check(false, 'F2 the tasks key survives APPLY_AUTOPOST.sql pasted again after Tasks', e.message);
+  }
+  await db.exec(`create schema if not exists cron; create table if not exists cron.job (jobname text);`);
+  try {
+    const t = last(await db.exec(verifyTasks))[0];
+    const falses = Object.entries(t).filter(([, val]) => val !== true);
+    check(falses.length === 0 && Object.keys(t).length >= 13, 'F3 VERIFY_TASKS.sql: every column true', JSON.stringify(t));
+  } catch (e) {
+    check(false, 'F3 VERIFY_TASKS.sql runs', e.message);
+  }
+  try {
+    const v = last(await db.exec(verify))[0];
+    const m = last(await db.exec(verifyMarketing))[0];
+    const a = last(await db.exec(verifyAutopost))[0];
+    const falses = [
+      ...Object.entries(v).filter(([k, val]) => val === false && !LATER_STEPS.includes(k)),
+      ...Object.entries(m).filter(([, val]) => val !== true),
+      ...Object.entries(a).filter(([k, val]) => val !== true && !['clock_scheduled', 'pg_net_on'].includes(k)),
+    ];
+    check(falses.length === 0, 'F4 VERIFY_MISSION_CONTROL, VERIFY_MARKETING and VERIFY_AUTOPOST stay true with Tasks added', JSON.stringify(falses));
+  } catch (e) {
+    check(false, 'F4 the earlier VERIFY files run with Tasks added', e.message);
   }
   await db.close();
 }

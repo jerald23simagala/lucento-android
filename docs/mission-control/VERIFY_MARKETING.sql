@@ -16,11 +16,13 @@ select
               where n.nspname = 'mc_api' and (p.proname like 'marketing\_%' or p.proname = 'nav_badges')
                 and (not has_function_privilege('authenticated', p.oid, 'execute')
                      or has_function_privilege('anon', p.oid, 'execute')))                                         as page_functions_signed_in_only,
-  -- Besides Mission Control's five (and auto-posting's three), anon runs exactly the four ingest_marketing_* functions.
+  -- Besides Mission Control's five (and auto-posting's three, Tasks' four), anon runs exactly the four ingest_marketing_*
+  -- functions.
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'mc_api' and has_function_privilege('anon', p.oid, 'execute')
        and p.proname not in ('ingest_email_events', 'play_orders_wanted', 'ingest_play_orders', 'ingest_job_run', 'ingest_service_checks',
-                             'ingest_autopost_claim', 'ingest_autopost_result', 'ingest_autopost_token'))
+                             'ingest_autopost_claim', 'ingest_autopost_result', 'ingest_autopost_token',
+                             'ingest_tasks_push', 'ingest_tasks_feed', 'ingest_tasks_get', 'ingest_tasks_update'))
     = array['ingest_marketing_feedback', 'ingest_marketing_media_ready', 'ingest_marketing_pack', 'ingest_marketing_pending']
                                                                                                                    as anon_marketing_exactly_4,
   not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace

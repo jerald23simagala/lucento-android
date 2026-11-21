@@ -219,12 +219,13 @@ begin
 
   -- Privileges in the catalog, whatever the defaults: anon executes only the ingest functions; PUBLIC nothing. (The four
   -- ingest_marketing_* functions are Marketing approvals', 20261117090000; the three ingest_autopost_* auto-posting's,
-  -- 20261118090000.)
+  -- 20261118090000; the four ingest_tasks_* Tasks', 20261120090000.)
   select count(*) into v_n from pg_proc p join pg_namespace s on s.oid = p.pronamespace
     where s.nspname = 'mc_api' and has_function_privilege('anon', p.oid, 'execute')
       and p.proname not in ('ingest_email_events', 'play_orders_wanted', 'ingest_play_orders', 'ingest_job_run', 'ingest_service_checks',
                             'ingest_marketing_pack', 'ingest_marketing_pending', 'ingest_marketing_media_ready',
-                            'ingest_marketing_feedback', 'ingest_autopost_claim', 'ingest_autopost_result', 'ingest_autopost_token');
+                            'ingest_marketing_feedback', 'ingest_autopost_claim', 'ingest_autopost_result', 'ingest_autopost_token',
+                            'ingest_tasks_push', 'ingest_tasks_feed', 'ingest_tasks_get', 'ingest_tasks_update');
   select count(*) into v_m from pg_proc p join pg_namespace s on s.oid = p.pronamespace
     where s.nspname = 'mc_api' and p.proname like 'ingest%' and has_function_privilege('authenticated', p.oid, 'execute');
   r := r || case when v_n = 0 and v_m = 0 then 'ok  K14 anon runs only the ingest functions; signed-in callers never do'

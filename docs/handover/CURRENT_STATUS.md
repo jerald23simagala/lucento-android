@@ -1083,3 +1083,54 @@ periods as a future task (NEXT_TASKS › "Custom budget periods").
   budgeted spending only; a pointer to the periods rules), NEXT_TASKS "Custom budget periods" (future Pro: rules,
   decisions, outline), ROADMAP M3, CLAUDE.md (who reads `BudgetPlan`; the `budgets` table rule), KNOWN_ISSUES BF-1/BF-2.
 - **Not checked:** a phone (logic only; the screen's layout is unchanged).
+
+## Mission Control › Tasks, the owner's to-do list — 2026-11-20 (branch `feature/mc-owner-tasks`; console `feature/tasks`; tool in `lucento-studio/mission-control`; database not applied yet: OT-42)
+
+Owner: "start streamlining my to do list to be part of the mission control. That will be our main interface for you and
+me to update status of." Contract: `docs/mission-control/v1/OWNER_TASKS.md`.
+
+- **Database** (`supabase/migrations/20261120090000_mission_control_tasks.sql`; one paste `docs/mission-control/
+  APPLY_TASKS.sql` = auto-posting's migration, then Tasks', since both change the ingest-secret purposes; check
+  `VERIFY_TASKS.sql`): tasks with a structured write-up (checked field by field, no markup, https links only, nothing
+  key-like), immutable versions, append-only history, both read positions. A fifth secret purpose `tasks` (the
+  auto-posting migration now lists it too, so pasting that file again after Tasks keeps the key). Owner functions
+  behind `mc.gate` (board, one task, act: done / ask / note / not needed / reopen with the row version, 300 an hour,
+  audited; Overview's summary; `nav_badges` + `tasks`), four ingest functions for Claude's tool.
+- **Console** (laptop-first, owner 2026-11-20):
+  - Tasks is second in the menu, with the count to do. The list (To do with one "Start here", Asked Claude, Waiting,
+    Can wait, Closed) sits beside the open task once the page is 47rem wide.
+  - Each task opens to its steps (tick boxes kept in the browser, Copy for text to paste, link hosts shown, other tasks'
+    codes linked), notes and history.
+  - A bar keeps the next move in reach and sticks only while it fits.
+  - One dialog serves every action. Drafts are kept per action, and a stale task, no connection or a sign-in never
+    loses what was typed.
+  - Overview: tasks on the owner's turn overdue or due within two days, then Claude's answers and new tasks, each named
+    by its code, then the count.
+  - Four routes for the tool (`/api/tasks/*`, exempt from the session gate, bearer checked first). DEPLOYMENT.md part
+    K is the owner's setup.
+- **Design review**:
+  - Rounds 1–3 were REJECT (2.97, 3.2, 3.2; reports in lucento-studio `critic/reports/2026-11-20-tasks-*`). The owner
+    chose "a critic confirms the round-3 list, then merge".
+  - The confirming critic found every round-3 P0/P1 fixed and one new P1 in the session layer: MC-14, the global
+    idle sign-out with a "No connection" message. That is fixed, and the re-check said **CONFIRMED** (console da5dcdb).
+  - Leftovers: MC-19.
+- **Tool** (`lucento-studio/mission-control/tasks.mjs`): setup / check / status / show / push / set; settings outside
+  every repo; checks every write-up with the database's rules before sending. **18 task write-ups** in
+  `owner-tasks/` (OT-16, 25, 26, 28–32, 34, 37, 43–50; OT-34 became a laptop check and OT-37 is priority now on
+  2026-11-20; OT-50 installs the app), drafted from DEPLOYMENT.md, PLAY_STORE_SUBMISSION.md,
+  OWNER_ACTIONS_REQUIRED.md and the app's own strings, then reviewed: the page's real labels, OT-48 without the call
+  the owner already answered, OT-37 without a paste the Tasks setup already did, OT-28 with "tell Claude first" before
+  the switch (MC-15).
+- **Verified**: `tools/sql-verify` 12 suites, 550 checks, 0 failed under both default-privilege variants (new
+  `tasks_suite.sql`, 32); `catch_up_check.mjs` parts A–F all ok; console lint, types, 334 unit tests; the whole
+  console end-to-end suite on a fresh local stack, 33 passed and 1 skipped (the screenshot tour), Tasks' 7 among
+  them; all 18 write-ups accepted by the local database through the tool.
+- **Desktop app**: the owner chose the installable app (`docs/mission-control/v1/DESKTOP_APP.md`). It is built on
+  console `feature/installable-app`:
+  - a manifest with a jump list and one reused window;
+  - its own icon (Lucento's crest on the console's navy tile);
+  - a taskbar badge with the tasks to do;
+  - the manifest and icons public;
+  - DEPLOYMENT.md part L for installing; the owner's task is OT-50.
+
+  Notifications wait for the owner to ask.

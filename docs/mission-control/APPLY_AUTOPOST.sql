@@ -47,11 +47,14 @@ end;
 $$;
 
 -- ================================================================================================ secrets, settings, jobs
+-- The list names `tasks` too (20261120090000_mission_control_tasks.sql): pasting this file again after Tasks must not
+-- refuse that secret's row.
 alter table mc.ingest_secret drop constraint if exists ingest_secret_purpose_check;
 alter table mc.ingest_secret add constraint ingest_secret_purpose_check
-  check (purpose in ('app', 'backup', 'marketing', 'autopost'));
+  check (purpose in ('app', 'backup', 'marketing', 'autopost', 'tasks'));
 
--- The same function as before with the fourth purpose. Still not security definer: only the owner runs it.
+-- The same function as before with the fourth purpose (and Tasks' fifth). Still not security definer: only the owner
+-- runs it.
 create or replace function mc.rotate_ingest_secret(p_purpose text default 'app')
 returns text
 language plpgsql
@@ -62,8 +65,8 @@ declare
   -- Two version-4 UUIDs: 244 random bits from the server's strong random source, with no extension needed.
   v_secret text := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
 begin
-  if p_purpose is null or p_purpose not in ('app', 'backup', 'marketing', 'autopost') then
-    raise exception 'rotate_ingest_secret: purpose is app, backup, marketing or autopost' using errcode = '22023';
+  if p_purpose is null or p_purpose not in ('app', 'backup', 'marketing', 'autopost', 'tasks') then
+    raise exception 'rotate_ingest_secret: purpose is app, backup, marketing, autopost or tasks' using errcode = '22023';
   end if;
   insert into mc.ingest_secret (purpose, secret_hash, rotated_at)
     values (p_purpose, encode(sha256(convert_to(v_secret, 'UTF8')), 'hex'), now())
