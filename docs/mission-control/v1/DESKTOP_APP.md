@@ -23,6 +23,17 @@ the server. Whatever the desktop shell, that server stays: a desktop app is a be
 | Notifications when Claude adds or answers a task | Yes, with Web Push: a second step (a service worker, push keys, and the console sending a push) | Yes | Yes | Yes |
 | Tray icon, global shortcut | No | Yes | Yes | Yes |
 
+## Decision (owner, 2026-11-20): A, the installable app
+
+Built in lucento-mission-control (branch `feature/installable-app`). It has four parts:
+- `src/app/manifest.ts`: "Lucento Mission Control", standalone, one reused window, and a jump list with Tasks,
+  Marketing, Support and Overview.
+- Its own icon: Lucento's crest on the console's dark navy tile, in `public/icons`.
+- A taskbar badge with the tasks to do.
+- The manifest and icons served without a session.
+
+The owner's install steps are DEPLOYMENT.md part L. Notifications (step 2 below) wait for the owner to ask for them.
+
 ## Recommendation: A, in two steps
 
 1. **Installable app now** (about a day): a web app manifest (name "Mission Control", its own icon so it doesn't look
