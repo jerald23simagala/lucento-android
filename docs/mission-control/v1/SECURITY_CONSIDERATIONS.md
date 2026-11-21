@@ -102,8 +102,15 @@ disclosure over a consent step (FD-V3), so:
 ## 7. Web hardening
 
 - Next.js server components and server actions; data responses `Cache-Control: no-store`.
-- Strict Content-Security-Policy (self + Supabase + chart library), `frame-ancestors 'none'`, HSTS, Referrer-Policy
-  `no-referrer`.
+- Strict Content-Security-Policy (self + Supabase + chart library), `frame-ancestors 'none'`, HSTS.
+- Referrer-Policy `same-origin` (2026-11-20; was `no-referrer`): nothing goes to other sites, and same-site requests keep
+  their Origin. With `no-referrer`, a form posted before the page came alive sent `Origin: null`, which the server
+  actions' origin check refuses, so signing in on a slow load failed. The routes with secrets in their address keep
+  their own `no-referrer`: the sign-in returns from Meta, Google and TikTok, and the media links.
+- Session scope (2026-11-20): the console's automatic sign-outs end only that browser's session. These are idle and
+  12-hour expiry, a login that isn't an admin, and a cancelled sign-in. **Sign out** ends every session of the login.
+- The installed app (DESKTOP_APP.md) is the same pages in the browser's own profile, with no other access. Its
+  manifest and icons are public, since a browser fetches them without cookies.
 - CSRF: SameSite=Strict cookies + origin checks on actions. Webhooks verify Resend's signature and are idempotent.
 - No analytics or third-party scripts. Dependencies pinned; Dependabot alerts on.
 - Preview deployments point at lucento-test and sit behind Vercel's deployment protection.

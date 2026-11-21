@@ -25,7 +25,8 @@ the server. Whatever the desktop shell, that server stays: a desktop app is a be
 
 ## Decision (owner, 2026-11-20): A, the installable app
 
-Built in lucento-mission-control (branch `feature/installable-app`). It has four parts:
+Built in lucento-mission-control PR #15 (with the Referrer-Policy fix that lets a sign-in posted before the page comes
+alive go through). It has four parts:
 - `src/app/manifest.ts`: "Lucento Mission Control", standalone, one reused window, and a jump list with Tasks,
   Marketing, Support and Overview.
 - Its own icon: Lucento's crest on the console's dark navy tile, in `public/icons`.
