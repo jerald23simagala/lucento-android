@@ -458,7 +458,9 @@ On 2026-10-25 the live project reported the Google provider as **enabled**.
      `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75` (each machine's debug keystore differs — check
      with `./gradlew signingReport`).
    - **Android** client for `com.lucento.app` with the **release** keystore's SHA-1, and another with the Play App
-     Signing SHA-1 if the app is distributed through Google Play.
+     Signing SHA-1 if the app is distributed through Google Play. Play can change its app signing key (Play Console ›
+     App integrity › App signing lists the key in use and earlier ones): each key needs its own client, and the old
+     clients stay for phones that still get the old key. The current list and fingerprints: `docs/ACCOUNTS.md`.
    - Authorized domains / branding only matter for the consent screen and browser OAuth; the Lucento website domain
      and Search Console verification are unrelated to this flow.
 2. **Supabase dashboard** → Authentication → Sign In / Providers → **Google**: enabled; **Client IDs** contains the
