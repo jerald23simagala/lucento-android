@@ -26,7 +26,7 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
    | Product id | Type | Set up |
    |---|---|---|
    | `lucento_pro` | Subscription | Base plan `monthly`: auto-renewing, 1 month, ₱149. Base plan `annual`: auto-renewing, 1 year, ₱1,190, with an offer (id e.g. `trial`) of a **7-day free trial**, eligibility "new customer acquisition: never had this subscription" |
-   | `lucento_pro_lifetime` | One-time product | One purchase option, ₱3,490. No founder offer (the owner dropped it on 2026-11-21). The app shows the lowest offer Play lists |
+   | `lucento_pro_lifetime` | One-time product | One purchase option, ₱2,490 (lowered from ₱3,490 on 2026-11-21). No founder offer (the owner dropped it on 2026-11-21). The app shows the lowest offer Play lists |
    | `lucento_cloud` | Subscription | Base plans `monthly` (₱59) and `annual` (₱490). The app offers it only to Lifetime owners whose included year has ended |
 
    Prices for the other countries come from the four regional tiers in [REGIONAL_PRICING.md](REGIONAL_PRICING.md),
