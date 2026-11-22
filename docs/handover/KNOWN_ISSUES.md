@@ -15,6 +15,20 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Lucento Scan — document intelligence (2026-11-22, `feature/scan-document-intelligence`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| SC-1 | Accuracy is measured on OCR-like **text** (the independent corpus), not photos. Held-out set (39 documents, never tuned on): statement recall 99 %, direction 99 %, currency 97 %, receipt total 82 % (89 % with the one-tap choice), category 61 %, payment instrument 75 %, two receipts in one image 50 %. Real photos (glare, creases, fading, misreads) will score lower. | Verified (benchmark, `app/build/reports/scan-benchmark/holdout.md`) | Consented photo corpus (NEXT_TASKS SC-N1); phone test |
+| SC-2 | Japanese, Korean and Chinese **photos** lose their words: only ML Kit's Latin model is bundled. Amounts, `¥`/`₩` and dates still read; PDFs with a text layer read CJK fine. | Code-only (design) | Owner decision: bundle the script models (APK +~4 MB each) or download them through Play services (a new download to disclose) |
+| SC-3 | Locked PDFs can't be opened on Android 11 and older, nor on 12–14 without the platform PDF update (SDK extension 13); the person is told to save an unlocked copy. Text layers are read only on 15+ (and 12–14 with the update); elsewhere pages are OCR'd. | Code-only; device test on API 35 | Device check on an Android 12–14 phone |
+| SC-4 | The Document Scanner needs Google Play services and ≥ 1.7 GB RAM; it downloads its module on first use (the first scan can wait). Without it the camera opens and says so. | Code-only (ML Kit docs) | Phone test on a low-end Android (e.g. Transsion) |
+| SC-5 | ML Kit (text recognition, already shipped, and the scanner) sends Google technical diagnostics (device model, OS and app version, latency, error codes; never image or text content) — listed in the Privacy Policy from 2026-11-22. The website's /privacy page doesn't list it yet. | Verified (ML Kit data-disclosure page, 2026-11-22) | Website privacy update (NEXT_TASKS SC-N3); Play Data safety form |
+| SC-6 | Side-by-side and stacked receipts split only when each part has its own labelled total; bills and confirmations photographed together stay one document. | Verified (benchmark) | Photo corpus will show how often this matters |
+| SC-7 | A merchant no dictionary knows and no cue explains gets no category (the row asks, as before); a payee's habits need two saved transactions with the same name. | Verified (benchmark) | Grow the dictionaries (data only; docs/SCAN.md) |
+| SC-8 | The reconciler's balance check uses the wallet's opening balance; a wallet created after the statement period is skipped, and backfilled history before a wallet's creation can make the balance differ (explained, never adjusted). | Code-only | — |
+| SC-9 | Not yet run on a real phone: Document Scanner flow, PDF picker and password dialog, "Add anyway", the reconciliation panel's layout at 200 % font. | Unverified | Owner phone test (NEXT_TASKS SC-N2) |
+
 ## Pro experience: walls met again, previews (2026-11-19, `feature/pro-repeat-taps-previews`)
 
 | Id | Issue | Evidence | Next step |

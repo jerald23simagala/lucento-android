@@ -60,6 +60,17 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Lucento Scan — follow-ups (2026-11-22, `feature/scan-document-intelligence`)
+
+| # | Task | Why |
+|---|---|---|
+| SC-N1 | **Consented photo corpus**: the owner and testers photograph ≥ 40 real receipts, bills and statements (kept off the repository, ground truth written once); run the benchmark on it | The text corpus can't show glare, creases or OCR misreads; phase 1's gate |
+| SC-N2 | **Phone test** (owner): Scan pages on paper (one receipt, three receipts, a 2-page statement), Take a photo, Choose images, Import a PDF (an e-statement, a locked one); "Add anyway"; the reconciliation panel at 100 % and 200 % font; a phone without Google Play services or with < 2 GB RAM | SC-4, SC-9 |
+| SC-N3 | **Website privacy page** (lucento-website): add the "Scanning documents" lines (ML Kit diagnostics, the scanner's Play services download, PDFs and their passwords) to match `LegalDocuments.kt` 2026-11-22; Play Data safety: declare ML Kit's diagnostics if not already | CLAUDE.md: every send path listed wherever the policy is summarised |
+| SC-N4 | Owner decision: CJK photo OCR (bundle ML Kit's Japanese/Korean/Chinese models, or download via Play services) | SC-2 |
+| SC-N5 | Phase 4 decision (AI reading of hard photos through the Gemini proxy, paid tier, own consent; Pro or allowance) | Audit capability 4; not built |
+| SC-N6 | Grow the merchant dictionaries from the photo corpus and tester reports (data only, bump the file's `version`) | SC-7 |
+
 ## Regional prices — follow-ups (2026-11-21, `feature/regional-pricing`)
 
 | # | Task | Priority | Notes |

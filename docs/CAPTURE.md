@@ -84,42 +84,43 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
 - "Edit message" puts the text back in the input; sending it again re-reads it but keeps every field the user changed.
 - Leaving with unsaved rows asks before discarding.
 
-## Scanning: one receipt, or a statement's many lines
+## Scanning: receipts, bills, statements and PDFs
 
-Owner, 2026-11-04: a scan should tell a receipt (many lines, one payment) from a statement or a photo of a transaction
-list (many payments). Everything is read on this phone (`LocalTransactionInterpreter.interpretScan`), never presented as AI.
+Owner, 2026-11-04: a scan tells a receipt (many lines, one payment) from a statement or a photo of a transaction list
+(many payments). Owner, 2026-11-22: Lucento Scan reads any financial document, from the Philippines, the United States
+or anywhere, checks statements against the ledger and knows merchants. Everything is read on this phone
+(`LocalTransactionInterpreter.interpretDocument`), never presented as AI. The full rules are in **docs/SCAN.md**.
 
-1. **OCR rows.** ML Kit returns text lines with positions; `ReceiptParser.mergeRows` joins the pieces of each printed
-   line left to right (columns become one row). A photo taken at a slight tilt is straightened first by the median of
-   ML Kit's line angles, so a label stays with its own amount instead of the one beside the next line.
-2. **Receipt or statement?** `StatementParser.classify`: several lines that each carry a date and an amount, dates
-   heading or under groups of amounts (an e-wallet's history), or +/− marks on several lines make a statement; anything
-   else is a receipt.
-3. **A receipt** becomes one expense for its total. The total line is chosen by label: "Amount due" outranks "Total",
-   "Amount paid" is used only when nothing better is printed (less the change, when change is printed); "Subtotal",
-   VAT, cash tendered and "Minimum amount due" never count. Thermal-printer abbreviations ("AMT DUE", "TOTAL AMT",
-   "TTL", "AMT PAID") count, and "TOTAL (VAT INCLUSIVE)" is a total, not a tax line. With no total line, cash
-   tendered less change is the total when that amount is printed on the receipt; otherwise nothing is pre-filled and
-   the choices offered are amounts that could be the payment (cash less change first), never cash tendered, change,
-   VAT or VATable lines, discounts or points (tester report 2026-11-21).
-4. **A statement** becomes one row per transaction, each with its own date, description and amount, in the scanned
-   account (the active wallet). Money in or out comes from the running balance when one is printed, else CR/DR and
-   +/− marks, else the words; a card statement's lines are charges unless they say payment or credit. A payment into a
-   card or loan becomes a transfer whose source the user picks; a line naming another of the user's accounts becomes a
-   transfer between them. At most 60 lines per scan.
-5. **The reply says what it read**: "Read as one receipt: one payment for the “Amount due” line, not each item." or
+1. **Inputs** — the scan button's menu: **Scan pages** (ML Kit Document Scanner: several pages, flattened; the camera
+   opens instead where it can't run), **Take a photo**, **Choose images** (up to 10, read as one scan), **Import a PDF**
+   (its text layer, else OCR of each page; a locked PDF asks for its password once and never keeps it). The composer's
+   Scan widget opens Scan pages.
+2. **Pages → documents** (`DocumentAssembler`): receipts photographed together are split; a statement's pages join, with
+   lines repeated by overlapping photos read once; a long receipt over two photos is one payment; sideways photos are
+   turned upright and tilted ones straightened.
+3. **A receipt** becomes one row for its total (labels in 20 languages, tips, refunds as income), dated by its bill or
+   transaction date, in the document's currency, for the business paid — never the payment provider — in the account
+   that paid when the person has it (their GCash wallet, their Amex card), with the person's usual category for that
+   merchant when they have one.
+4. **A statement** becomes one row per transaction in the account it belongs to (the wallet at the bank named in its
+   heading, else the active one), direction from the running balance, columns, signs, sections or words; card refunds
+   are income, card payments transfers, ATM withdrawals transfers to cash; merchants named ("Starbucks").
+5. **Checked against the ledger**: lines already saved are held back and listed with **Add anyway**; near matches and
+   lines printed twice are marked; the reply shows the statement's balance next to Lucento's, fees, a card's minimum due
+   and limits, and saved transactions missing from the statement. Nothing saved is changed.
+6. **The reply says what it read**: "Read as one receipt: one payment for the “Amount due” line, not each item.",
    "Read as a statement: 7 transactions, Oct 3 – Oct 31, each its own row. Money in and out matches the running
-   balance." Rows whose direction or date the statement didn't settle carry a hint ("Money in or out? …", "Check the
-   date"); choosing the type answers it. Rows that look already recorded (same amount and type in the account within
-   three days) say so, without blocking.
+   balance.", "Read 2 receipts: each payment is its own row." Rows carry hints for what needs a look ("Check the
+   currency", "Pending at the bank", "Possibly saved already …").
 
-Definitions: docs/CALCULATIONS.md "Statement scans" and "Receipt amounts". Tests: `StatementScanTest` (JVM) and
-`ScanOcrTest` (device, real OCR on made-up images in `androidTest/assets/scans`).
+Definitions: docs/CALCULATIONS.md "Statement scans", "Receipt amounts" and "Statement check". Tests: the capture suites
+in `app/src/test/.../domain/capture` (incl. `ScanCorpusBenchmarkTest` on the independent corpus) and, on a device,
+`ScanOcrTest` and `DocumentIntelligenceDeviceTest` (real OCR on made-up images and a generated PDF).
 
 ## Speech and camera
 
 Speech asks for English in the phone's own English region (or `en-US`; `SpeechRequest.languageTag`). Lucento holds no
-camera permission (the camera is another app). Cancel, denial and "no recogniser" all leave a one-line note and the
+camera permission (the camera is another app, and the Document Scanner uses Google Play services' own). Cancel, denial and "no recogniser" all leave a one-line note and the
 keyboard.
 
 **Lucento listens itself (owner 2026-11-13).** Google's voice window stopped listening before people had started

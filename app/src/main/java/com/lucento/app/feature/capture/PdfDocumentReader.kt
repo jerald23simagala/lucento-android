@@ -130,8 +130,10 @@ object PdfDocumentReader {
     /**
      * A page's own text as rows. Pieces that come with one box per line are placed by position, so a table drawn column
      * by column still reads row by row; without boxes the text is taken in its own order. Null when the page has no
-     * real text (a scanned page): it is read by OCR instead.
+     * real text (a scanned page): it is read by OCR instead. Called only from [readWithText] (Android 15+) and
+     * [readWithTextPreV] (S extension 13), where these text objects exist.
      */
+    @SuppressLint("NewApi")
     private fun textPage(contents: List<PdfPageTextContent>): ScanPage? {
         val text = contents.joinToString("\n") { it.text }
         if (text.count { it.isLetterOrDigit() } < MIN_TEXT) return null

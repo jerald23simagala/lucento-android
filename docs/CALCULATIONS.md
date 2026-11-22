@@ -428,40 +428,70 @@ apostrophe).
 
 ## Receipt amounts
 **Which line is the total**, best first: "Grand total"; "Amount due" / "Total due" / "Balance due" / "Amount payable" /
-"Amount to pay"; "Total amount" / "Net total" / "Net amount" / "Total"; "Amount paid" / "Total paid" / "You paid". Never
-"Subtotal", tax lines, change, cash tendered or "Minimum amount due". When the only label is "Amount paid" and a change
-line is printed, the total is paid − change (`ReceiptParser.findTotal`). Abbreviations count ("Amt due", "Total amt",
-"TTL", "Amt paid"), and a "VAT inclusive" / "incl. VAT" qualifier doesn't make a total line a tax line. With no total
-line, cash tendered − change is the total only when that amount is also printed on the receipt; otherwise nothing is
-pre-filled, and the amounts offered to choose from leave out cash tendered, change, VAT/VATable/exempt/zero-rated lines,
-discounts, savings and points (cash − change, when printed, is offered first).
-Amounts are read with the minor-unit digits of the currency printed on the receipt (unambiguous symbols/ISO codes
-only; `$` and `¥` are ambiguous and ignored), else the default wallet's currency, else 2. A group of three after a
-single separator is thousands (`1,250`, `12.500`) except for 3-decimal currencies with a `.` (`12.500` KWD). Plain
-integers count only on a line labelled as the total. Dates, times, percentages, phone/TIN/reference numbers and
-quantities are masked first. The result is always a suggestion on an editable review screen; missing values stay
-missing.
+"Amount to pay" / "Amount sent" / "Refund amount"; "Total amount" / "Net total" / "Net amount" / "Total" / "Fuel sale";
+"Amount paid" / "Total paid" / "You paid" / "You sent" / a line starting "Amount" — and their equivalents in 20 languages
+(SUMME, ZU ZAHLEN, TOTAL TTC, NET À PAYER, TOTAL A PAGAR, TOTALE, TE BETALEN, TOTAL BAYAR, 合計, 합계 …;
+`ReceiptParser.totalLabels`). Never "Subtotal", tax lines, "GST included in total", the total row of a tax table,
+change, cash tendered, savings, points, suggested tips, item counts or "Minimum amount due". When the only label is
+"Amount paid" and a change line is printed, the total is paid − change (`ReceiptParser.findTotal`). A label alone on its
+line takes the next line's amount only when that line holds nothing else. Abbreviations count ("Amt due", "Total amt",
+"TTL", "Amt paid"), and a "VAT inclusive" / "incl. VAT" / "TTC" / "inkl. MwSt" qualifier doesn't make a total line a tax
+line. With no total line, cash tendered − change is the total only when that amount is also printed on the receipt;
+otherwise nothing is pre-filled, and the amounts offered leave out cash tendered, change, tax lines, discounts, savings
+and points (cash − change, when printed, is offered first). With a tip, items + tax + tip are checked against the total.
+A total printed negative, or refund words on its line or a title line, makes the receipt a refund (income).
+**Currency** (`DocumentCurrency`): the one printed (or clearly dominating); a shared symbol (`$`, `¥`, `kr`, `Rs`) settled
+by the document's country (`DocumentLocale`), else by the person's only account in such a currency (the row says "check
+the currency"); nothing printed and a firm country → that country's currency; otherwise unknown and the account's.
+Amounts are read with that currency's minor-unit digits, else the default wallet's, else 2. A group of three after a
+single separator is thousands (`1,250`, `12.500`) except for 3-decimal currencies with a `.` (`12.500` KWD); Indian
+`1,23,456.00` is one number. Plain integers count on a line labelled as the total, or with a currency beside them
+(`¥348`, `348円`). Dates, times, percentages, phone/TIN/reference/account numbers, quantities with units, meter readings
+and written dates are masked first. **Date**: a labelled bill/invoice/transaction date wins; due dates, periods and
+expiry dates are passed over; day/month order by another date on the receipt, else the country, else marked unclear.
+The result is always a suggestion on an editable review screen; missing values stay missing. More: docs/SCAN.md.
 
 ## Statement scans
-`domain/capture/StatementParser.kt` (pure, unit-tested; `ScanOcrTest` runs it on real on-device OCR). A scan is a
-**statement** (one transaction per line) when two or more lines each carry a date and an amount; or dates head (or sit
-under) groups of amounts, with +/− marks or statement words, and no more receipt words than statement words; or three or
-more lines carry +/− marks and nothing reads like a receipt. Otherwise it is a **receipt** (one payment, above).
-- **Lines**: opening/closing balances, totals, minimum due, limits and due dates are never transactions; an opening
-  balance anchors the balance check. A wrapped second line joins the dated line above it.
-- **Amount**: with a balance column (a header naming "balance", or most amount lines carrying two amounts) the first
-  amount is the transaction and the last the running balance; otherwise the last amount. Bare integers count only with
-  a currency or a sign beside them.
+`domain/capture/StatementParser.kt` (pure, unit-tested; `ScanOcrTest` and `DocumentIntelligenceDeviceTest` run it on
+real on-device OCR). A scan is a **statement** (one transaction per line) when two or more lines each carry a date and an
+amount; or dates head (or sit under) groups of at least two different amounts, with +/− marks or statement words, and no
+more receipt words than statement words; or three or more lines carry +/− marks and nothing reads like a receipt. A bill
+or receipt with at most three dated lines, no running balance and its own total to pay stays a **receipt**, unless it
+reads like a card statement.
+- **Lines**: opening/closing balances, totals, minimum due, limits, rewards, balance labels, daily-balance and APR tables,
+  fee summaries, prose and declined lines are never transactions; an opening balance anchors the balance check. A
+  wrapped second line joins the dated line above it. On a statement whose lines carry their own dates, an undated line
+  counts only with a running balance, under a date line, or as a card's interest or fee. At most 200 lines.
+- **Amount**: with columns known from positions, the amount under Debit/Credit (or Amount) and the Balance column's;
+  with a balance column (a header naming "balance", or most amount lines carrying two amounts) the first amount is the
+  transaction and the last the running balance; otherwise the last amount. Bare integers count only with a currency or
+  a sign beside them (or on a dated line in a currency without decimals); digits glued to letters are codes.
 - **Direction** (money in or out of the account), strongest first: the running balance (previous − amount = this
-  balance → out; previous + amount → in), checked oldest-first and newest-first and the better fit kept; a mark beside
-  the amount (−, +, ( ), CR, DR; a trailing minus is a credit on a card statement and a debit on a bank's); the words
-  (deposit, salary, received, cash in, refund → in; withdrawal, purchase, payment to, transfer to, fee → out); on a card
-  statement, a charge unless it says payment, credit or refund. Anything else is marked for the user to check.
+  balance → out; previous + amount → in, reversed on a page that plainly is a card statement, whose balance is owed),
+  checked oldest-first and newest-first and the better fit kept; the column; a mark beside the amount (−, +, ( ), CR,
+  DR, (Cr), (Dr); a trailing minus or a minus is a credit on a card statement and a debit on a bank's); a bank's
+  convention (debits printed with a minus: unsigned amounts are money in); the section heading; the words
+  (`FinancialTerms`, by account type); on a card statement, a charge unless it says payment, credit or refund. Anything
+  else is marked for the user to check.
 - **Dates**: a day above 12 settles day/month order for the whole statement; otherwise the order that keeps its dates
-  within about two months, then the phone's order, and the dates are marked as unclear. A year not printed is the latest
-  one that keeps the date on or before the statement's newest full date (or today). Future dates and dates more than
-  five years back are dropped (the row's date is then marked).
-- **Rows** (`StatementCandidates`): all in the scanned account; out → expense, in → income, except money into a card or
-  loan (a payment: a transfer whose source the user picks) and a line naming another of the user's same-currency
-  accounts (a transfer between them). "Already saved?" for a statement row matches the same amount and type in the
-  account within three days, whatever the description.
+  within about two months, then the document's country's order, then the phone's order, and the dates are marked as
+  unclear. A year not printed is the latest one that keeps the date on or before the statement's newest full date (or
+  today). Future dates and dates more than five years back are dropped (the row's date is then marked). European
+  `dd.mm` lines and month names in ten languages are read.
+- **Rows** (`StatementCandidates`): all in the statement's account (the person's wallet at the bank named in the heading,
+  else the account in its currency, else the active wallet); out → expense, in → income, except a refund (income, on a
+  card too), money into a card or loan (a payment: a transfer whose source the user picks), money added to an e-wallet
+  (a transfer in), a line naming another of the user's same-currency accounts (a transfer between them), and ATM
+  withdrawals and cash advances (a transfer to the one cash wallet).
+
+## Statement check
+`StatementReconciler` compares a statement's rows with the saved ledger of its account; nothing saved is changed.
+**Saved already**: same account, amount and type within 3 days (closest date, then closest words; one saved transaction
+per line) → held back, offered with "Add anyway". **Possibly saved**: the same amount in the account within 7 days or as
+another type, or in another account within 3 days → added, with a note. **Printed twice**: same day, amount, direction
+and (nearly) the same words → added, marked. A line repeating a row already waiting in the batch is held back. **Not on
+the statement**: saved in the account within the statement's period (whole statements only: a period, or both balances,
+printed). **Balance**: the statement's closing balance against `WalletBalanceCalculator.balanceOn` on its last day plus
+every row offered (a card's balance is what's owed); skipped for a wallet created after that day. **Adds up**: opening ±
+posted lines = closing. Refunds and reversals are paired with a charge of the same amount sharing a word, and a refund
+with a saved purchase of the same amount within 120 days; fees and interest are totalled.

@@ -145,7 +145,7 @@ class DocumentIntelligenceDeviceTest {
         assertEquals(1L, row.categoryId)
     }
 
-    @Test fun aPdfStatementIsReadPageByPage() = runBlocking {
+    @Test fun aPdfStatementIsReadPageByPage(): Unit = runBlocking {
         val file = File(app.cacheDir, "statement-test.pdf")
         val pdf = PdfDocument()
         val lines = listOf(

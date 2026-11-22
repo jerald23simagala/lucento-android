@@ -1,7 +1,5 @@
 package com.lucento.app.domain.capture.merchant
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.text.Normalizer
 import java.util.Locale
 
@@ -139,17 +137,38 @@ class MerchantDirectory(val entities: List<FinancialEntity>, val versions: Map<S
     companion object {
         val EMPTY = MerchantDirectory(emptyList())
 
-        private val json = Json { ignoreUnknownKeys = true }
-
         /** Reads the dictionary files in assets/merchants. A file or entity that can't be read is skipped, never fatal. */
         fun parse(files: List<String>): MerchantDirectory {
             val versions = LinkedHashMap<String, Int>()
             val entities = files.flatMap { text ->
-                val file = runCatching { json.decodeFromString(DictionaryFile.serializer(), text) }.getOrNull() ?: return@flatMap emptyList()
-                versions[file.region] = file.version
-                file.entities.mapNotNull { it.toEntity(file.region) }
+                val file = runCatching { MiniJson.parse(text) as Map<*, *> }.getOrNull() ?: return@flatMap emptyList()
+                val region = file["region"] as? String ?: return@flatMap emptyList()
+                versions[region] = (file["version"] as? Number)?.toInt() ?: 1
+                (file["entities"] as? List<*>).orEmpty().mapNotNull { (it as? Map<*, *>)?.let { e -> entityOf(e, region) } }
             }
             return MerchantDirectory(entities, versions)
+        }
+
+        private fun Map<*, *>.strings(key: String): List<String> = (this[key] as? List<*>).orEmpty().filterIsInstance<String>()
+
+        private fun entityOf(e: Map<*, *>, region: String): FinancialEntity? {
+            val name = (e["name"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            val kind = runCatching { EntityKind.valueOf(e["kind"] as? String ?: return null) }.getOrNull() ?: return null
+            val weakAliases = e.strings("weakAliases").map { it.trim() }.filter { it.isNotEmpty() }
+            val weak = weakAliases.map { normalize(it) }.toSet()
+            // The canonical name is an alias too ("Mercury Drug" matches "MERCURY DRUG"), unless it is a common word kept weak.
+            val own = name.takeIf { normalize(it) !in weak }
+            return FinancialEntity(
+                name = name,
+                kind = kind,
+                aliases = (e.strings("aliases") + listOfNotNull(own)).map { it.trim() }.filter { it.isNotEmpty() && normalize(it) !in weak }.distinct(),
+                weakAliases = weakAliases,
+                prefixes = e.strings("prefixes").filter { it.isNotBlank() },
+                category = (e["category"] as? String)?.takeIf { kind.isPayee },
+                countries = e.strings("countries").map { it.uppercase(Locale.ROOT) }.toSet(),
+                issuesCards = e["issuesCards"] == true,
+                region = region,
+            )
         }
 
         /**
@@ -175,36 +194,114 @@ class MerchantDirectory(val entities: List<FinancialEntity>, val versions: Map<S
     }
 }
 
-@Serializable
-private data class DictionaryFile(val region: String, val version: Int = 1, val entities: List<EntityJson> = emptyList())
+/**
+ * A small JSON reader for the dictionaries — objects, arrays, strings (with escapes), numbers, true, false, null — so
+ * the domain layer stays plain Kotlin with no library. Throws on malformed input (the caller skips that file).
+ */
+internal object MiniJson {
+    fun parse(text: String): Any? {
+        val reader = Reader(text)
+        val value = reader.value()
+        reader.space()
+        require(reader.at >= text.length) { "trailing data at ${reader.at}" }
+        return value
+    }
 
-@Serializable
-private data class EntityJson(
-    val name: String,
-    val kind: String,
-    val aliases: List<String> = emptyList(),
-    val weakAliases: List<String> = emptyList(),
-    val prefixes: List<String> = emptyList(),
-    val category: String? = null,
-    val countries: List<String> = emptyList(),
-    val issuesCards: Boolean = false,
-) {
-    fun toEntity(region: String): FinancialEntity? {
-        val kind = runCatching { EntityKind.valueOf(kind) }.getOrNull() ?: return null
-        if (name.isBlank()) return null
-        val weak = weakAliases.map { MerchantDirectory.normalize(it) }.toSet()
-        // The canonical name is an alias too ("Mercury Drug" matches "MERCURY DRUG"), unless it is a common word kept weak.
-        val own = name.takeIf { MerchantDirectory.normalize(it) !in weak }
-        return FinancialEntity(
-            name = name.trim(),
-            kind = kind,
-            aliases = (aliases + listOfNotNull(own)).map { it.trim() }.filter { it.isNotEmpty() && MerchantDirectory.normalize(it) !in weak }.distinct(),
-            weakAliases = weakAliases.map { it.trim() }.filter { it.isNotEmpty() },
-            prefixes = prefixes.filter { it.isNotBlank() },
-            category = category?.takeIf { kind.isPayee },
-            countries = countries.map { it.uppercase(Locale.ROOT) }.toSet(),
-            issuesCards = issuesCards,
-            region = region,
-        )
+    private class Reader(val s: String) {
+        var at = 0
+
+        fun space() {
+            while (at < s.length && s[at].isWhitespace()) at++
+        }
+
+        fun value(): Any? {
+            space()
+            require(at < s.length) { "unexpected end" }
+            return when (val c = s[at]) {
+                '{' -> obj()
+                '[' -> array()
+                '"' -> string()
+                't' -> word("true", true)
+                'f' -> word("false", false)
+                'n' -> word("null", null)
+                else -> if (c == '-' || c.isDigit()) number() else throw IllegalArgumentException("unexpected '$c' at $at")
+            }
+        }
+
+        private fun word(w: String, v: Any?): Any? {
+            require(s.startsWith(w, at)) { "expected $w at $at" }
+            at += w.length
+            return v
+        }
+
+        private fun obj(): Map<String, Any?> {
+            val out = LinkedHashMap<String, Any?>()
+            at++
+            space()
+            if (s[at] == '}') return out.also { at++ }
+            while (true) {
+                space()
+                val key = string()
+                space()
+                require(s[at] == ':') { "expected : at $at" }
+                at++
+                out[key] = value()
+                space()
+                when (s[at++]) {
+                    ',' -> continue
+                    '}' -> return out
+                    else -> throw IllegalArgumentException("expected , or } at ${at - 1}")
+                }
+            }
+        }
+
+        private fun array(): List<Any?> {
+            val out = ArrayList<Any?>()
+            at++
+            space()
+            if (s[at] == ']') return out.also { at++ }
+            while (true) {
+                out += value()
+                space()
+                when (s[at++]) {
+                    ',' -> continue
+                    ']' -> return out
+                    else -> throw IllegalArgumentException("expected , or ] at ${at - 1}")
+                }
+            }
+        }
+
+        private fun string(): String {
+            require(s[at] == '"') { "expected string at $at" }
+            at++
+            val out = StringBuilder()
+            while (true) {
+                val c = s[at++]
+                when {
+                    c == '"' -> return out.toString()
+                    c == '\\' -> when (val e = s[at++]) {
+                        '"', '\\', '/' -> out.append(e)
+                        'b' -> out.append('\b')
+                        'f' -> out.append('\u000C')
+                        'n' -> out.append('\n')
+                        'r' -> out.append('\r')
+                        't' -> out.append('\t')
+                        'u' -> {
+                            out.append(s.substring(at, at + 4).toInt(16).toChar())
+                            at += 4
+                        }
+                        else -> throw IllegalArgumentException("bad escape at ${at - 1}")
+                    }
+                    else -> out.append(c)
+                }
+            }
+        }
+
+        private fun number(): Number {
+            val start = at
+            while (at < s.length && (s[at].isDigit() || s[at] in "+-.eE")) at++
+            val text = s.substring(start, at)
+            return text.toLongOrNull() ?: text.toDouble()
+        }
     }
 }

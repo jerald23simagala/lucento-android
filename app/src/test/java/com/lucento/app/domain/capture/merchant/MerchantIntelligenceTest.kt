@@ -31,6 +31,20 @@ class MerchantIntelligenceTest {
         assertEquals(EntityKind.BILLER, directory.named("meralco")?.kind)
     }
 
+    @Test fun theDictionaryReaderHandlesEscapesAndSkipsBadFiles() {
+        val parsed = MiniJson.parse("""{"a": [1, -2.5, true, false, null], "b": "Café \"Q\" \\ \n", "c": {}}""") as Map<*, *>
+        assertEquals(listOf(1L, -2.5, true, false, null), parsed["a"])
+        assertEquals("Café \"Q\" \\ \n", parsed["b"])
+        val directory = MerchantDirectory.parse(
+            listOf(
+                """{"region": "X", "version": 2, "entities": [{"name": "Café Uno", "kind": "MERCHANT", "aliases": ["cafe uno"]}]}""",
+                """{"region": "Y", "entities": [""",
+            ),
+        )
+        assertEquals(mapOf("X" to 2), directory.versions)
+        assertEquals("Café Uno", directory.mentions("CAFE UNO MAKATI").single().entity.name)
+    }
+
     @Test fun namesMatchAsWholeWordsWithAccentsAndCaseIgnored() {
         assertEquals(listOf("Walmart"), directory.mentions("WAL-MART SUPERCENTER #2516").map { it.entity.name })
         assertEquals(listOf("Intermarché"), directory.mentions("INTERMARCHE SUPER").map { it.entity.name })
