@@ -1,0 +1,55 @@
+{
+  "id": "au-receipt-woolworths-01",
+  "country": "AU",
+  "type": "TAX_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-04",
+  "pages": [
+    [
+      "Woolworths",
+      "The fresh food people",
+      "Woolworths Town Hall",
+      "Shop 1, 492 George St",
+      "Sydney NSW 2000",
+      "ABN 88 000 014 675",
+      "TAX INVOICE",
+      "WW FULL CREAM MILK 3L  4.65",
+      "WW WHITE BREAD 700G  2.40",
+      "BANANA CAVENDISH  4.96",
+      "1.012 kg NET @ $4.90/kg",
+      "WW FREE RANGE EGGS 12PK  6.80",
+      "#COCA COLA 1.25L  3.60",
+      "#SMITHS CHIPS ORIGINAL 170G  4.50",
+      "#FINISH QUANTUM TABS 40PK  18.00",
+      "7 SUBTOTAL  44.91",
+      "TOTAL  $44.91",
+      "Mastercard  $44.91",
+      "************7720  CONTACTLESS",
+      "APPROVED 00",
+      "# GST INCLUDED IN TOTAL  $2.37",
+      "Everyday Rewards Card ********4410",
+      "Points this shop: 44",
+      "03/11/26 15:07  Store 1042  Lane 6  Trans 3317"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Woolworths",
+        "total": "44.91",
+        "currency": "AUD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-03",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "7720"
+      }
+    ]
+  },
+  "notes": "Australian TAX INVOICE: only '$' printed; NSW address and ABN make it AUD. 03/11/26 is 3 November (day first). GST (1/11 of taxable items) is included, not added."
+}

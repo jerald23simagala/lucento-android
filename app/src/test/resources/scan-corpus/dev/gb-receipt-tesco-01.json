@@ -1,0 +1,60 @@
+{
+  "id": "gb-receipt-tesco-01",
+  "country": "GB",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-04",
+  "pages": [
+    [
+      "TESCO",
+      "Kensington Superstore",
+      "West Cromwell Road",
+      "London W14 8PB",
+      "VAT Number: GB 220 4302 31",
+      "TESCO FINEST SOURDOUGH  £2.10",
+      "TESCO SEMI SKIMMED MILK 2.272L  £1.65",
+      "TESCO BRITISH BANANAS 5PK  £0.95",
+      "WALKERS CRISPS 6PK  £2.25",
+      "CLUBCARD PRICE SAVING  -£0.50",
+      "PG TIPS 80 TEA BAGS  £2.75",
+      "FAIRY LIQUID 433ML  £1.50",
+      "MCVITIES DIGESTIVES 400G  £1.80",
+      "TOTAL  £12.50",
+      "VISA CONTACTLESS  £12.50",
+      "CARD NUMBER  ************3307",
+      "AID A0000000031010",
+      "PAN SEQ NO 01",
+      "AUTH CODE 052841",
+      "CHANGE DUE  £0.00",
+      "VAT RATE  NET  VAT",
+      "A 20.00%  £2.71  £0.54",
+      "Z 0.00%  £9.25  £0.00",
+      "CLUBCARD STATEMENT",
+      "Clubcard Number  ************3318",
+      "Points this visit  12",
+      "Clubcard Prices saved you  £0.50",
+      "03/10/26  14:22  2133 012 1016 1234",
+      "Every little helps"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Tesco",
+        "total": "12.50",
+        "currency": "GBP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-03",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "3307"
+      }
+    ]
+  },
+  "notes": "UK receipt: 03/10/26 is 3 October 2026 (day first; London postcode and GB VAT number make the country evident). VAT-inclusive prices; zero-rated food."
+}

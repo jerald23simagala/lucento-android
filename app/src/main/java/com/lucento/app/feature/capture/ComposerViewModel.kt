@@ -23,7 +23,6 @@ import com.lucento.app.domain.capture.CaptureSource
 import com.lucento.app.domain.capture.Interpretation
 import com.lucento.app.domain.capture.InterpretationContext
 import com.lucento.app.domain.capture.LocalTransactionInterpreter
-import com.lucento.app.domain.capture.ReceiptParser
 import com.lucento.app.domain.capture.ReviewRow
 import com.lucento.app.domain.capture.ReviewSetup
 import com.lucento.app.domain.capture.TransactionCandidate
@@ -66,6 +65,10 @@ sealed interface MessageState {
         val engine: com.lucento.app.domain.capture.InterpreterEngine? = null,
         /** What kind of scan it was and what to check ("Read as a statement: 7 transactions…"); null for messages. */
         val note: String? = null,
+        /** Scanned lines saved already (or waiting among this batch's rows), not added; each can still be added. */
+        val held: List<com.lucento.app.domain.capture.HeldLine> = emptyList(),
+        /** Each statement in the scan, checked against the ledger. */
+        val statements: List<com.lucento.app.domain.capture.StatementReport> = emptyList(),
     ) : MessageState
     data class NothingFound(val message: String) : MessageState
 }
@@ -125,6 +128,10 @@ class ComposerViewModel(
     private val fxRates: com.lucento.app.data.fx.FxRateSource? = null,
     /** Whether Smarter reading can be used on this phone (signed in, with a proxy, in the plan); false in tests. */
     smartReadingAvailable: Flow<Boolean> = flowOf(false),
+    /** The bundled merchant dictionaries, for reading scans on this phone (none in tests unless given). */
+    private val merchants: com.lucento.app.data.capture.MerchantDictionary? = null,
+    /** The bundled bank registry: a wallet's bank's names, so a document naming the bank finds the wallet. */
+    private val institutions: com.lucento.app.core.banks.InstitutionRepository? = null,
 ) : ViewModel() {
 
     private data class Session(
@@ -344,22 +351,93 @@ class ComposerViewModel(
      * Reads a scanned image on this phone (ML Kit, bundled model): a receipt adds one row, a statement or transaction
      * history one row per line. [cleanup] is deleted afterwards.
      */
-    fun readReceipt(appContext: Context, uri: Uri, cleanup: File?) {
+    fun readReceipt(appContext: Context, uri: Uri, cleanup: File?) =
+        readImages(appContext, listOf(uri), com.lucento.app.domain.capture.PageOrigin.PHOTO, listOfNotNull(cleanup))
+
+    /**
+     * Reads images as the pages of one scan (Document Scanner pages, photos, picked images), on this phone: each page
+     * by on-device OCR, then pages joined into the documents they make up — several receipts are several rows, a
+     * statement's pages one statement checked against the ledger ([TransactionInterpreter.interpretDocument]). The
+     * [cleanup] files (Lucento's own copies) are deleted once read.
+     */
+    fun readImages(appContext: Context, uris: List<Uri>, origin: com.lucento.app.domain.capture.PageOrigin, cleanup: List<File> = emptyList()) {
+        if (uris.isEmpty()) return
         val id = nextMessageId++
-        session.update { s -> s.copy(messages = s.messages + ComposerMessage(id, CaptureSource.RECEIPT, SCAN_LABEL, MessageState.Reading), saveError = null) }
+        val label = if (uris.size == 1) SCAN_LABEL else "Scanned ${uris.size} pages"
+        session.update { s -> s.copy(messages = s.messages + ComposerMessage(id, CaptureSource.RECEIPT, label, MessageState.Reading), saveError = null) }
         viewModelScope.launch {
             val result = try {
-                val lines = ReceiptParser.mergeRows(ReceiptOcr.recognize(appContext, uri))
-                interpreter.interpretScan(lines, context())
+                val pages = uris.map { uri -> com.lucento.app.domain.capture.ScanPage.ofFragments(ReceiptOcr.recognize(appContext, uri), origin) }
+                interpreter.interpretDocument(com.lucento.app.domain.capture.ScanDocument(pages), context())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Interpretation.NothingFound("Lucento couldn’t read that image. Try another photo, or type the details instead.")
             } finally {
-                // The photo was only needed for reading; remove it so receipts don't pile up on the device.
-                cleanup?.delete()
+                // The photos were only needed for reading; remove them so scans don't pile up on the device.
+                cleanup.forEach { it.delete() }
             }
             receive(id, CaptureSource.RECEIPT, result, replacing = null)
+        }
+    }
+
+    /**
+     * Reads a PDF on this phone ([PdfDocumentReader]): its own text, or each page by OCR when it has none. A locked PDF
+     * calls [onPassword] (true when a password was tried and was wrong) so the screen can ask; the password is used for
+     * this read only and never kept.
+     */
+    fun readPdf(appContext: Context, uri: Uri, password: String? = null, onPassword: (wrong: Boolean) -> Unit) {
+        val id = nextMessageId++
+        session.update { s -> s.copy(messages = s.messages + ComposerMessage(id, CaptureSource.RECEIPT, PDF_LABEL, MessageState.Reading), saveError = null) }
+        viewModelScope.launch {
+            fun dropMessage() = session.update { s -> s.copy(messages = s.messages.filterNot { it.id == id }) }
+            val result = try {
+                when (val read = PdfDocumentReader.read(appContext, uri, password)) {
+                    is PdfDocumentReader.Result.Pages -> {
+                        val label = if (read.pages.size == 1) PDF_LABEL else "PDF, ${read.pages.size} pages"
+                        session.update { s -> s.copy(messages = s.messages.map { if (it.id == id) it.copy(text = label) else it }) }
+                        val interpreted = interpreter.interpretDocument(com.lucento.app.domain.capture.ScanDocument(read.pages), context())
+                        if (read.total > read.pages.size && interpreted is Interpretation.Candidates) {
+                            interpreted.copy(note = listOfNotNull(interpreted.note, "Only the first ${read.pages.size} of ${read.total} pages were read — import the rest as another file.").joinToString(" "))
+                        } else {
+                            interpreted
+                        }
+                    }
+                    PdfDocumentReader.Result.NeedsPassword, PdfDocumentReader.Result.WrongPassword -> {
+                        dropMessage()
+                        onPassword(read == PdfDocumentReader.Result.WrongPassword)
+                        return@launch
+                    }
+                    PdfDocumentReader.Result.LockedUnsupported -> Interpretation.NothingFound(
+                        "This PDF is locked with a password, and this phone’s Android version can’t open locked PDFs here. " +
+                            "Open it in your bank’s app or a PDF viewer, save or print an unlocked copy, and import that.",
+                    )
+                    PdfDocumentReader.Result.Unreadable -> Interpretation.NothingFound("Lucento couldn’t open that PDF. Try another file, or scan the paper copy instead.")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Interpretation.NothingFound("Lucento couldn’t read that PDF. Try another file, or scan the paper copy instead.")
+            }
+            receive(id, CaptureSource.RECEIPT, result, replacing = null)
+        }
+    }
+
+    /** Adds a held line (already saved, or already among the rows) as a row after all: the person decided it is new. */
+    fun addHeld(messageId: Long, index: Int) {
+        if (session.value.saving) return
+        session.update { s ->
+            val message = s.messages.firstOrNull { it.id == messageId } ?: return@update s
+            val read = message.state as? MessageState.Read ?: return@update s
+            val line = read.held.getOrNull(index) ?: return@update s
+            val row = ReviewRow.from(line.candidate, UUID.randomUUID().toString(), messageId, message.source, separator)
+            s.copy(
+                rows = s.rows + row,
+                messages = s.messages.map {
+                    if (it.id == messageId) it.copy(state = read.copy(found = read.found + 1, held = read.held.filterIndexed { i, _ -> i != index })) else it
+                },
+                saveError = null,
+            )
         }
     }
 
@@ -374,12 +452,20 @@ class ComposerViewModel(
         val default = s.chosenWalletId?.takeIf { id -> loaded.wallets.any { it.id == id } }
             ?: loaded.activeWalletId
             ?: lastUsedWallet(loaded.wallets)
+        val registry = institutions?.let { runCatching { it.registry() }.getOrNull() }
         return InterpretationContext(
             loaded.wallets, loaded.categories, today(), default, s.typeHint,
             decimalSeparator = separator,
             spaceGrouping = java.text.DecimalFormatSymbols.getInstance().groupingSeparator in setOf(' ', ' ', ' ', ' '),
             dayFirst = phoneDayFirst(),
             moneyWalletId = moneyWalletFor(loaded),
+            defaultWalletChosen = listOf(s.chosenWalletId, s.entryWalletId).any { id -> id != null && loaded.wallets.any { it.id == id } },
+            // Read on this phone only, by the scan reader; Smarter reading never receives these.
+            directory = merchants?.directory() ?: com.lucento.app.domain.capture.merchant.MerchantDirectory.EMPTY,
+            history = latestHistory,
+            walletLabels = loaded.wallets.associate { w ->
+                w.id to registry?.get(w.institutionId)?.let { listOf(it.name) + it.aliases }.orEmpty()
+            },
         )
     }
 
@@ -408,8 +494,13 @@ class ComposerViewModel(
         session.update { s ->
             val (messageState, newRows) = when (result) {
                 is Interpretation.Candidates -> {
-                    val rows = result.items.map { ReviewRow.from(it, UUID.randomUUID().toString(), id, source, separator) }
-                    MessageState.Read(rows.size, engine = result.engine, note = result.note) to rows
+                    // A scan never adds a row twice: lines repeating rows already waiting here are held, like saved ones.
+                    val waiting = if (replacing != null) s.rows.filterNot { it.messageId == replacing } else s.rows
+                    val repeats = if (source == CaptureSource.RECEIPT) BatchReview.repeatsInBatch(result.items, waiting, separator) else emptySet()
+                    val rows = result.items.filterIndexed { i, _ -> i !in repeats }.map { ReviewRow.from(it, UUID.randomUUID().toString(), id, source, separator) }
+                    val alsoHeld = result.items.filterIndexed { i, _ -> i in repeats }
+                        .map { com.lucento.app.domain.capture.HeldLine(it, null, "Already among the rows above, waiting to be saved") }
+                    MessageState.Read(rows.size, engine = result.engine, note = result.note, held = result.held + alsoHeld, statements = result.statements) to rows
                 }
                 is Interpretation.NothingFound -> MessageState.NothingFound(result.message) to emptyList()
             }
@@ -517,9 +608,14 @@ class ComposerViewModel(
         /** The user's side of the chat for a scanned image (a receipt, a statement or an app's history). */
         const val SCAN_LABEL = "Scanned image"
 
+        /** The user's side of the chat for an imported PDF. */
+        const val PDF_LABEL = "PDF"
+
         val Factory = containerFactory {
             ComposerViewModel(
                 it.transactions, it.wallets, it.categories, it.interpreter, it.preferences, fxRates = it.fxRates,
+                merchants = it.merchants,
+                institutions = it.institutions,
                 // Signed in, a proxy in this build, and a plan that includes it: the interpreter's own rule.
                 smartReadingAvailable = combine(it.auth.observeSignedInEmail(), it.entitlements.state) { email, plan ->
                     email != null && com.lucento.app.BuildConfig.AI_INTERPRET_URL.isNotBlank() &&

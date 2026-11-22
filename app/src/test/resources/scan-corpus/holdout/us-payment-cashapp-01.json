@@ -1,0 +1,43 @@
+{
+  "id": "us-payment-cashapp-01",
+  "country": "US",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-05",
+  "pages": [
+    [
+      "9:20",
+      "Cash App",
+      "Completed",
+      "$60.00",
+      "Marcus Bell",
+      "$marcusb88",
+      "For  Knicks tix",
+      "Paid with  Cash Balance",
+      "Date  Nov 4, 2026 at 9:17 PM",
+      "Identifier  #DXK7QZ3",
+      "Web Receipt",
+      "Need help with this payment?"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": null,
+        "total": "60.00",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-04",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "transfer",
+        "paymentInstrument": "Cash App",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Cash App person-to-person payment; '$marcusb88' is a cashtag, not an amount. Cash App is US-only (only '$' printed)."
+}

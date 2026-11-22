@@ -1,0 +1,54 @@
+{
+  "id": "ph-utility-pldt-01",
+  "country": "PH",
+  "type": "UTILITY_BILL",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-26",
+  "pages": [
+    [
+      "PLDT",
+      "Statement of Account",
+      "PLDT Home Fiber Plan 1699",
+      "Account Number  0298765432",
+      "Telephone Number  (02) 8634-1122",
+      "Statement Date  October 05, 2026",
+      "Bill Period  Sep 06 - Oct 05, 2026",
+      "Due Date  October 25, 2026",
+      "JOANNA DELA CRUZ",
+      "Unit 12B, The Grove Tower, C5 Road, Ugong, Pasig City 1604",
+      "SUMMARY OF ACCOUNT",
+      "Previous Balance  1,699.00",
+      "Payment - Thank You (Sep 22)  -1,699.00",
+      "Outstanding Balance  0.00",
+      "Current Charges  1,699.00",
+      "Total Amount Due  PHP 1,699.00",
+      "CURRENT CHARGES",
+      "Monthly Service Fee - Fiber Plan 1699  1,516.96",
+      "VAT (12%)  182.04",
+      "Total Current Charges  1,699.00",
+      "Pay through the PLDT Home app, GCash, Maya or any accredited bank.",
+      "PLDT Inc.  VAT REG TIN 000-488-793-000",
+      "Page 1 of 2"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "PLDT",
+        "total": "1699.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-05",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "internet",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "The plan name contains 1699 and the previous balance equals the current charge; the truth is the total amount due for this statement."
+}

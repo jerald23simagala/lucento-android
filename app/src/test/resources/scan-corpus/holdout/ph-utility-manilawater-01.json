@@ -1,0 +1,54 @@
+{
+  "id": "ph-utility-manilawater-01",
+  "country": "PH",
+  "type": "UTILITY_BILL",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-31",
+  "pages": [
+    [
+      "MANILA WATER",
+      "Manila Water Company, Inc.",
+      "MWC Bldg., 489 Katipunan Road, Balara, Quezon City",
+      "VAT REG TIN 005-038-428-000",
+      "STATEMENT OF ACCOUNT",
+      "Contract Account No.  60012345678",
+      "Bill Date  10/16/2026",
+      "Billing Period  09/14/2026 - 10/13/2026",
+      "ANGELICA P. MENDOZA",
+      "18 Malakas St., Brgy. Pinyahan, Quezon City",
+      "Meter No. MW-0098812",
+      "Present Reading  1,248  Previous Reading  1,224",
+      "Consumption  24 cu.m.",
+      "Basic Charge  562.40",
+      "Environmental Charge (20%)  112.48",
+      "Sewer Charge  0.00",
+      "Maintenance Service Charge  1.50",
+      "VAT (12%)  81.17",
+      "Total Current Charges  757.55",
+      "Previous Unpaid Amount  0.00",
+      "TOTAL AMOUNT DUE  ₱ 757.55",
+      "Due Date  10/30/2026",
+      "Pay at Bayad Center, GCash, Maya or online banking. Thank you for paying on time!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Manila Water",
+        "total": "757.55",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-16",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "water",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Water bill: basic + environmental + maintenance + VAT = amount due. Meter readings and cu.m. are not money."
+}

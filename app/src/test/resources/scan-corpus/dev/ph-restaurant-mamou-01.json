@@ -1,0 +1,55 @@
+{
+  "id": "ph-restaurant-mamou-01",
+  "country": "PH",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-08",
+  "pages": [
+    [
+      "MAMOU",
+      "Mamou Too! Inc.",
+      "R1 Level, Power Plant Mall, Rockwell Center, Makati City",
+      "VAT REG TIN: 008-112-447-00003",
+      "MIN: 19070512881  SN: TP0025711",
+      "Tbl: 12  Pax: 3  Svr: JUN",
+      "Check #: 58812",
+      "11/07/2026  8:41 PM",
+      "1 Mamou's Steak 500g  2,450.00",
+      "1 Truffle Cream Pasta  495.00",
+      "1 Caesar Salad  385.00",
+      "2 House Iced Tea  270.00",
+      "1 Chocolate Cake  295.00",
+      "SUBTOTAL  3,895.00",
+      "SERVICE CHARGE 10%  389.50",
+      "TOTAL AMOUNT DUE  4,284.50",
+      "VISA  ************2208  4,284.50",
+      "APPR# 307156",
+      "VATable Sales  3,477.68",
+      "VAT Amount  417.32",
+      "VAT-Exempt Sales  0.00",
+      "Zero-Rated Sales  0.00",
+      "Service charge is distributed in full to our staff.",
+      "THIS SERVES AS YOUR SALES INVOICE"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Mamou",
+        "total": "4284.50",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-07",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "2208"
+      }
+    ]
+  },
+  "notes": "10% service charge added to the subtotal; the VAT breakdown covers the food subtotal only. No tip line."
+}

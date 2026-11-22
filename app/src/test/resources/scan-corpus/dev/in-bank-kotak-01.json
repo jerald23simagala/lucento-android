@@ -1,0 +1,250 @@
+{
+  "id": "in-bank-kotak-01",
+  "country": "IN",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "kotak",
+      "Kotak Mahindra Bank",
+      "Statement of Account",
+      "Account No.  4512893307  Currency  INR",
+      "Period  01-10-2026 to 31-10-2026",
+      "MR ARJUN MEHTA",
+      "No. 42, 3rd Cross, 5th Block, Koramangala",
+      "Bengaluru - 560095, Karnataka",
+      "Branch  KORAMANGALA  IFSC  KKBK0000958",
+      "CRN  12XXXX789",
+      "Date  Narration  Chq/Ref No  Withdrawal (Dr)/Deposit (Cr)  Balance",
+      "01-10-2026  OPENING BALANCE  1,23,456.00(Cr)",
+      "01-10-2026  UPI/SWIGGY/627412345678/Payment from Ph  UPI-627412345678  412.00(Dr)  1,23,044.00(Cr)",
+      "01-10-2026  NEFT CR-KKBK0000958-INFOSYS LIMITED-SALARY SEP26  NEFTINW-0412873  1,48,250.00(Cr)  2,71,294.00(Cr)",
+      "02-10-2026  UPI/RAHUL SHARMA/627512398765/rent share  UPI-627512398765  18,000.00(Dr)  2,53,294.00(Cr)",
+      "03-10-2026  ACH D- BAJAJ FINANCE LTD-P400LPL1234567  ACH-DR-88123  12,450.00(Dr)  2,40,844.00(Cr)",
+      "04-10-2026  UPI/BESCOM/627612345111/electricity bill  UPI-627612345111  1,842.00(Dr)  2,39,002.00(Cr)",
+      "05-10-2026  ATM WDL/KORAMANGALA 5TH BLK/S1CN1234  ATM-001234  10,000.00(Dr)  2,29,002.00(Cr)",
+      "06-10-2026  PCD/4321/RELIANCE SMART/BANGALORE  POS-778812  3,456.75(Dr)  2,25,545.25(Cr)",
+      "08-10-2026  UPI/ZOMATO/627912345222/Payment  UPI-627912345222  689.00(Dr)  2,24,856.25(Cr)",
+      "10-10-2026  IMPS/P2A/628012345333/PRIYA M/gift  IMPS-628012345333  5,000.00(Cr)  2,29,856.25(Cr)",
+      "12-10-2026  UPI/AIRTEL/628212345444/recharge  UPI-628212345444  719.00(Dr)  2,29,137.25(Cr)",
+      "14-10-2026  BIL/BPAY/KOTAK CREDIT CARD/628412345555  BPAY-628412345555  25,000.00(Dr)  2,04,137.25(Cr)",
+      "Page 1 of 2"
+    ],
+    [
+      "kotak",
+      "Kotak Mahindra Bank",
+      "Statement of Account",
+      "Account No.  4512893307  Currency  INR",
+      "Period  01-10-2026 to 31-10-2026",
+      "Date  Narration  Chq/Ref No  Withdrawal (Dr)/Deposit (Cr)  Balance",
+      "15-10-2026  UPI/AMAZON PAY/628512345666/Amazon order  UPI-628512345666  2,399.00(Dr)  2,01,738.25(Cr)",
+      "17-10-2026  NACH DR-ICICI PRULIFE-POLICY 12345678  NACH-445120  4,500.00(Dr)  1,97,238.25(Cr)",
+      "19-10-2026  UPI/UBER INDIA/628912345777/Uber trip  UPI-628912345777  346.00(Dr)  1,96,892.25(Cr)",
+      "21-10-2026  RTGS CR-SBIN0001234-MEHTA RAJESH-FAMILY SUPPORT  SBINR52026102100123  2,50,000.00(Cr)  4,46,892.25(Cr)",
+      "22-10-2026  MF SIP-ZERODHA COIN-HDFC FLEXI CAP  NACH-551902  10,000.00(Dr)  4,36,892.25(Cr)",
+      "24-10-2026  UPI/BIGBASKET/629312345888/groceries  UPI-629312345888  2,876.40(Dr)  4,34,015.85(Cr)",
+      "26-10-2026  FD BOOKED 7.10% 1Y FD NO 6512340987  FD-6512340987  2,00,000.00(Dr)  2,34,015.85(Cr)",
+      "28-10-2026  UPI/PVR INOX/629712345999/movie  UPI-629712345999  980.00(Dr)  2,33,035.85(Cr)",
+      "30-10-2026  Int.Pd:01-07-2026 to 30-09-2026  INT-Q2  1,284.00(Cr)  2,34,319.85(Cr)",
+      "31-10-2026  SMS ALERT CHARGES QTR INCL GST  CHG-0931  17.70(Dr)  2,34,302.15(Cr)",
+      "31-10-2026  CLOSING BALANCE  2,34,302.15(Cr)",
+      "Statement Summary",
+      "Opening Balance  1,23,456.00  Total Withdrawal  2,93,687.85  Total Deposit  4,04,534.00  Closing Balance  2,34,302.15",
+      "Withdrawal Count  17  Deposit Count  4",
+      "This is a computer generated statement and does not require a signature.",
+      "Page 2 of 2"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "SAVINGS",
+        "institution": "Kotak Mahindra Bank",
+        "currency": "INR",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "123456.00",
+        "closingBalance": "234302.15",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "UPI/SWIGGY",
+            "amount": "412.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Swiggy"
+          },
+          {
+            "date": "2026-10-01",
+            "description": "INFOSYS LIMITED-SALARY",
+            "amount": "148250.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-02",
+            "description": "UPI/RAHUL SHARMA",
+            "amount": "18000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-03",
+            "description": "BAJAJ FINANCE LTD",
+            "amount": "12450.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Bajaj Finance"
+          },
+          {
+            "date": "2026-10-04",
+            "description": "UPI/BESCOM",
+            "amount": "1842.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "BESCOM"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "ATM WDL/KORAMANGALA",
+            "amount": "10000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-06",
+            "description": "RELIANCE SMART",
+            "amount": "3456.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Reliance Smart"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "UPI/ZOMATO",
+            "amount": "689.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Zomato"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "IMPS/P2A/628012345333/PRIYA M",
+            "amount": "5000.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-12",
+            "description": "UPI/AIRTEL",
+            "amount": "719.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Airtel"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "KOTAK CREDIT CARD",
+            "amount": "25000.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-15",
+            "description": "UPI/AMAZON PAY",
+            "amount": "2399.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-10-17",
+            "description": "ICICI PRULIFE",
+            "amount": "4500.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "ICICI Prudential Life"
+          },
+          {
+            "date": "2026-10-19",
+            "description": "UPI/UBER INDIA",
+            "amount": "346.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Uber"
+          },
+          {
+            "date": "2026-10-21",
+            "description": "MEHTA RAJESH",
+            "amount": "250000.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-22",
+            "description": "ZERODHA COIN",
+            "amount": "10000.00",
+            "direction": "OUT",
+            "kind": "OTHER",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-24",
+            "description": "UPI/BIGBASKET",
+            "amount": "2876.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "BigBasket"
+          },
+          {
+            "date": "2026-10-26",
+            "description": "FD BOOKED",
+            "amount": "200000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-28",
+            "description": "UPI/PVR INOX",
+            "amount": "980.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "PVR INOX"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "Int.Pd",
+            "amount": "1284.00",
+            "direction": "IN",
+            "kind": "INTEREST_EARNED",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "SMS ALERT CHARGES",
+            "amount": "17.70",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Indian statement: lakh grouping (1,23,456.00 / 2,50,000.00), each amount tagged (Dr)/(Cr), balance tagged (Cr); UPI/NEFT/IMPS/RTGS/NACH narrations. The interest line names a past quarter (Jul-Sep) but posts on 30-10-2026. Dates are day-first."
+}

@@ -1,0 +1,185 @@
+{
+  "id": "us-card-capitalone-01",
+  "country": "US",
+  "type": "CARD_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-19",
+  "pages": [
+    [
+      "Capital One",
+      "Quicksilver Visa Signature | Visa Signature ending in 0912",
+      "Sep 22, 2026 - Oct 21, 2026 | 30 days in Billing Cycle",
+      "Payment Information",
+      "New Balance  $525.90",
+      "Minimum Payment Due  $25.00",
+      "Payment Due Date  Nov 18, 2026",
+      "Late Payment Warning: If we do not receive your minimum payment by the date listed above, you may have to pay a late fee of up to $40.00.",
+      "Account Summary",
+      "Previous Balance  $812.40",
+      "Payments  - $812.40",
+      "Other Credits  - $0.00",
+      "Transactions  + $313.76",
+      "Cash Advances  + $200.00",
+      "Fees Charged  + $10.00",
+      "Interest Charged  + $2.14",
+      "New Balance  = $525.90",
+      "Credit Limit  $3,000.00",
+      "Available Credit (as of Oct 21, 2026)  $2,474.10",
+      "Cash Advance Credit Limit  $900.00",
+      "Available Credit for Cash Advances  $687.86",
+      "Rewards Summary",
+      "Previous balance  $14.62",
+      "Earned this period  $5.17",
+      "Total cash back  $19.79",
+      "ALEX MORGAN #0912: Payments, Credits and Adjustments",
+      "Trans Date  Post Date  Description  Amount",
+      "Oct 3  Oct 3  CAPITAL ONE MOBILE PYMT Authdate 10-03  - $812.40",
+      "ALEX MORGAN #0912: Transactions",
+      "Trans Date  Post Date  Description  Amount",
+      "Sep 23  Sep 24  SAFEWAY #1551 SEATTLEWA  $58.21",
+      "Sep 25  Sep 26  ARCO #42095 AMPM SEATTLEWA  $41.17",
+      "Sep 28  Sep 29  DOORDASH*PANDA EXPRESS SAN FRANCISCOCA  $27.84",
+      "Oct 1  Oct 2  STEAMGAMES.COM 4259522985 WA  $19.99",
+      "Oct 4  Oct 5  CVS/PHARMACY #08827 SEATTLEWA  $15.62",
+      "Oct 8  Oct 8  ATM CASH ADVANCE 1200 PINE ST SEATTLE WA  $200.00",
+      "Oct 11  Oct 12  TACO TIME #1234 SEATTLEWA  $11.48",
+      "Oct 15  Oct 16  AMAZON.COM*AB12C3D4E AMZN.COM/BILLWA  $73.40",
+      "Oct 18  Oct 19  QFC #5847 SEATTLEWA  $66.05",
+      "ALEX MORGAN #0912: Total Transactions  $513.76",
+      "Fees",
+      "Oct 8  Oct 8  CASH ADVANCE FEE  $10.00",
+      "Total Fees for This Period  $10.00",
+      "Interest Charge on Purchases  $0.00",
+      "Interest Charge on Cash Advances  $2.14",
+      "Interest Charge on Other Balances  $0.00",
+      "Total Interest for This Period  $2.14",
+      "Totals Year-to-Date",
+      "Total Fees charged in 2026  $10.00",
+      "Total Interest charged in 2026  $2.14",
+      "Interest Charge Calculation",
+      "Type of Balance  Annual Percentage Rate (APR)  Balance Subject to Interest Rate  Interest Charge",
+      "Purchases  28.24% V  $0.00  $0.00",
+      "Cash Advances  29.99% V  $200.26  $2.14",
+      "Page 2 of 3"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "Capital One",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "812.40",
+        "closingBalance": "525.90",
+        "statementBalance": "525.90",
+        "minimumPayment": "25.00",
+        "paymentDueDate": "2026-11-18",
+        "creditLimit": "3000.00",
+        "availableCredit": "2474.10",
+        "transactions": [
+          {
+            "date": "2026-10-03",
+            "description": "CAPITAL ONE MOBILE PYMT",
+            "amount": "812.40",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-23",
+            "description": "SAFEWAY #1551",
+            "amount": "58.21",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Safeway"
+          },
+          {
+            "date": "2026-09-25",
+            "description": "ARCO #42095 AMPM",
+            "amount": "41.17",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "ARCO"
+          },
+          {
+            "date": "2026-09-28",
+            "description": "DOORDASH*PANDA EXPRESS",
+            "amount": "27.84",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "DoorDash"
+          },
+          {
+            "date": "2026-10-01",
+            "description": "STEAMGAMES.COM",
+            "amount": "19.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Steam"
+          },
+          {
+            "date": "2026-10-04",
+            "description": "CVS/PHARMACY #08827",
+            "amount": "15.62",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "CVS Pharmacy"
+          },
+          {
+            "date": "2026-10-11",
+            "description": "TACO TIME #1234",
+            "amount": "11.48",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Taco Time"
+          },
+          {
+            "date": "2026-10-15",
+            "description": "AMAZON.COM*AB12C3D4E",
+            "amount": "73.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-10-18",
+            "description": "QFC #5847",
+            "amount": "66.05",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "QFC"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "ATM CASH ADVANCE",
+            "amount": "200.00",
+            "direction": "OUT",
+            "kind": "CASH_ADVANCE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-08",
+            "description": "CASH ADVANCE FEE",
+            "amount": "10.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-21",
+            "description": "Interest Charge on Cash Advances",
+            "amount": "2.14",
+            "direction": "OUT",
+            "kind": "INTEREST_CHARGE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Dates are the Trans Date column (Post Date follows). Includes an ATM cash advance, its fee and cash-advance interest; rewards and year-to-date totals are not transactions."
+}

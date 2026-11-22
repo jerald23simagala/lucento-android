@@ -1,0 +1,311 @@
+{
+  "id": "ph-ewallet-gcash-screens-long-01",
+  "country": "PH",
+  "type": "EWALLET_HISTORY",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-15",
+  "pages": [
+    [
+      "7:15",
+      "GCash",
+      "Transactions",
+      "All  Sent  Received  Payments",
+      "Express Send to MA**A L.",
+      "Nov 14, 2026 7:32 PM  -500.00",
+      "Payment to CHOWKING (QR)",
+      "Nov 13, 2026 12:15 PM  -245.00",
+      "Buy Load 09271231180",
+      "Nov 12, 2026 8:40 AM  -99.00",
+      "Received from PAOLO T.",
+      "Nov 11, 2026 6:02 PM  +1,500.00",
+      "Bills Payment MERALCO",
+      "Nov 10, 2026 9:30 AM  -1,876.45",
+      "Received via InstaPay from BPI",
+      "Nov 9, 2026 4:47 PM  +2,000.00",
+      "Payment to JOLLIBEE (QR)",
+      "Nov 8, 2026 1:20 PM  -318.00",
+      "GSave Deposit",
+      "Nov 7, 2026 7:55 PM  -1,000.00",
+      "Cash-in via BDO",
+      "Nov 6, 2026 10:10 AM  +5,000.00",
+      "Payment to GRAB",
+      "Nov 5, 2026 9:45 PM  -264.00",
+      "Bills Payment CONVERGE",
+      "Nov 4, 2026 3:33 PM  -1,500.00",
+      "Send Money via InstaPay to UnionBank",
+      "Nov 3, 2026 11:11 AM  -3,000.00",
+      "InstaPay Fee",
+      "Nov 3, 2026 11:11 AM  -15.00",
+      "Payment to 7-ELEVEN (QR)",
+      "Nov 2, 2026 6:45 PM  -149.50"
+    ],
+    [
+      "7:16",
+      "GCash",
+      "Transactions",
+      "All  Sent  Received  Payments",
+      "Send Money via InstaPay to UnionBank",
+      "Nov 3, 2026 11:11 AM  -3,000.00",
+      "InstaPay Fee",
+      "Nov 3, 2026 11:11 AM  -15.00",
+      "Payment to 7-ELEVEN (QR)",
+      "Nov 2, 2026 6:45 PM  -149.50",
+      "Cash-in via BPI",
+      "Nov 1, 2026 8:12 AM  +3,000.00",
+      "GInvest Subscription",
+      "Oct 31, 2026 9:00 PM  -1,000.00",
+      "Payment to MANG INASAL (QR)",
+      "Oct 30, 2026 12:30 PM  -289.00",
+      "Received from MA**A L.",
+      "Oct 29, 2026 5:05 PM  +750.00",
+      "Buy Load 09271231180",
+      "Oct 28, 2026 7:40 AM  -50.00",
+      "Payment to SM SUPERMARKET (QR)",
+      "Oct 27, 2026 2:22 PM  -1,432.75",
+      "Bills Payment MERALCO",
+      "Oct 26, 2026 9:15 AM  -2,846.35",
+      "Express Send to JUAN D.",
+      "Oct 25, 2026 6:10 PM  -1,000.00",
+      "GCredit Payment",
+      "Oct 24, 2026 1:00 PM  -1,200.00",
+      "Payment to FOODPANDA",
+      "Oct 23, 2026 8:30 PM  -385.00",
+      "Cash-in via UnionBank",
+      "Oct 22, 2026 10:00 AM  +2,500.00",
+      "Payment to MERCURY DRUG (QR)",
+      "Oct 21, 2026 4:15 PM  -512.25",
+      "End of list. Download your transaction history for older entries."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "EWALLET",
+        "institution": "GCash",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": null,
+        "closingBalance": null,
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-11-14",
+            "description": "Express Send to MA**A L.",
+            "amount": "500.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-13",
+            "description": "Payment to CHOWKING (QR)",
+            "amount": "245.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Chowking"
+          },
+          {
+            "date": "2026-11-12",
+            "description": "Buy Load 09271231180",
+            "amount": "99.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Globe"
+          },
+          {
+            "date": "2026-11-11",
+            "description": "Received from PAOLO T.",
+            "amount": "1500.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-10",
+            "description": "Bills Payment MERALCO",
+            "amount": "1876.45",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-11-09",
+            "description": "Received via InstaPay from BPI",
+            "amount": "2000.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-08",
+            "description": "Payment to JOLLIBEE (QR)",
+            "amount": "318.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Jollibee"
+          },
+          {
+            "date": "2026-11-07",
+            "description": "GSave Deposit",
+            "amount": "1000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-06",
+            "description": "Cash-in via BDO",
+            "amount": "5000.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-05",
+            "description": "Payment to GRAB",
+            "amount": "264.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Grab"
+          },
+          {
+            "date": "2026-11-04",
+            "description": "Bills Payment CONVERGE",
+            "amount": "1500.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Converge"
+          },
+          {
+            "date": "2026-11-03",
+            "description": "Send Money via InstaPay to UnionBank",
+            "amount": "3000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-03",
+            "description": "InstaPay Fee",
+            "amount": "15.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-02",
+            "description": "Payment to 7-ELEVEN (QR)",
+            "amount": "149.50",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "7-Eleven"
+          },
+          {
+            "date": "2026-11-01",
+            "description": "Cash-in via BPI",
+            "amount": "3000.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "GInvest Subscription",
+            "amount": "1000.00",
+            "direction": "OUT",
+            "kind": "OTHER",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-30",
+            "description": "Payment to MANG INASAL (QR)",
+            "amount": "289.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Mang Inasal"
+          },
+          {
+            "date": "2026-10-29",
+            "description": "Received from MA**A L.",
+            "amount": "750.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-28",
+            "description": "Buy Load 09271231180",
+            "amount": "50.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Globe"
+          },
+          {
+            "date": "2026-10-27",
+            "description": "Payment to SM SUPERMARKET (QR)",
+            "amount": "1432.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SM Supermarket"
+          },
+          {
+            "date": "2026-10-26",
+            "description": "Bills Payment MERALCO",
+            "amount": "2846.35",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "Express Send to JUAN D.",
+            "amount": "1000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-24",
+            "description": "GCredit Payment",
+            "amount": "1200.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-23",
+            "description": "Payment to FOODPANDA",
+            "amount": "385.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "foodpanda"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "Cash-in via UnionBank",
+            "amount": "2500.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-21",
+            "description": "Payment to MERCURY DRUG (QR)",
+            "amount": "512.25",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Mercury Drug"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "26 entries from two scrolled screenshots; screenshot 2 repeats the last three entries of screenshot 1 (InstaPay 3,000.00, InstaPay fee 15.00, 7-Eleven 149.50). Two entries share the same minute (transfer and its fee). No peso sign or balance; GCash is Philippine-only. GCredit payment repays GCash's credit line (PAYMENT_TO_CARD)."
+}

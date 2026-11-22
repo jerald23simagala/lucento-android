@@ -1,0 +1,51 @@
+{
+  "id": "jp-restaurant-izakaya-01",
+  "country": "JP",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "CJK",
+  "noise": false,
+  "today": "2026-11-07",
+  "pages": [
+    [
+      "鳥貴族 新宿東口店",
+      "東京都新宿区新宿3-26-11 新宿高野ビル7F",
+      "TEL 03-5363-1234",
+      "登録番号 T5120001148823",
+      "2026年11月06日(金) 21:48",
+      "卓番 12  人数 3名  担当 佐藤",
+      "生ビール  3  1,170円",
+      "もも貴族焼 たれ  2  780円",
+      "つくね 塩  2  780円",
+      "キャベツ盛  1  390円",
+      "ポテトフライ  1  390円",
+      "釜飯  1  690円",
+      "レモンサワー  3  1,170円",
+      "小計  5,370円",
+      "(10%対象  5,370円  内消費税  488円)",
+      "合計  5,370円",
+      "クレジット  5,370円",
+      "VISA  ************2207",
+      "承認番号 550127",
+      "ありがとうございました またお越しくださいませ"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "鳥貴族",
+        "total": "5370",
+        "currency": "JPY",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-06",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "2207"
+      }
+    ]
+  },
+  "notes": "Izakaya bill in yen written with 円 (unique to JPY); prices include 10% consumption tax (dine-in). No tip in Japan. Merchant kept in Japanese (鳥貴族 = Torikizoku)."
+}

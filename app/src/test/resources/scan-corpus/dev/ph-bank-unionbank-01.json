@@ -1,0 +1,176 @@
+{
+  "id": "ph-bank-unionbank-01",
+  "country": "PH",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-02",
+  "pages": [
+    [
+      "UnionBank",
+      "UNION BANK OF THE PHILIPPINES",
+      "Statement of Account",
+      "Account Name  ANGELICA P. MENDOZA",
+      "Account Number  1094 2233 7734",
+      "Product  Regular Savings Account",
+      "Statement Period  October 01, 2026 - October 31, 2026",
+      "Opening Balance  PHP 12,840.55",
+      "Total Credits  PHP 62,008.40",
+      "Total Debits  PHP 24,099.13",
+      "Closing Balance  PHP 50,749.82",
+      "Date  Transaction Description  Reference No.  Debit  Credit  Balance",
+      "Oct 01, 2026  Salary Credit - SHOPEE PHILIPPINES INC  UB2026100148213  28,500.00  41,340.55",
+      "Oct 02, 2026  InstaPay Transfer to MAYA 09281234567  UB2026100256132  3,000.00  38,340.55",
+      "Oct 04, 2026  Bill Payment - MERALCO  UB2026100464051  1,987.45  36,353.10",
+      "Oct 06, 2026  Debit Card Purchase - SHOPEE PH  UB2026100671970  1,249.00  35,104.10",
+      "Oct 09, 2026  PESONet Transfer from BPI - ANGELICA MENDOZA  UB2026100979889  5,000.00  40,104.10",
+      "Oct 11, 2026  ATM Withdrawal - UB TIMOG  UB2026101187808  4,000.00  36,104.10",
+      "Oct 15, 2026  Salary Credit - SHOPEE PHILIPPINES INC  UB2026101595727  28,500.00  64,604.10",
+      "Oct 16, 2026  Bill Payment - PLDT HOME  UB2026101603646  1,699.00  62,905.10",
+      "Oct 18, 2026  Debit Card Purchase - SM STORE NORTH EDSA  UB2026101811565  2,350.00  60,555.10",
+      "Oct 21, 2026  InstaPay Transfer to BDO - CARLO M REYES  UB2026102119484  8,000.00  52,555.10",
+      "Oct 25, 2026  Debit Card Purchase - GRAB PH  UB2026102527403  312.00  52,243.10",
+      "Oct 28, 2026  Bill Payment - CONVERGE ICT  UB2026102835322  1,500.00  50,743.10",
+      "Oct 31, 2026  Interest Credit  UB2026103143241  8.40  50,751.50",
+      "Oct 31, 2026  Withholding Tax  UB2026103151160  1.68  50,749.82",
+      "Nothing follows.",
+      "UnionBank is regulated by the Bangko Sentral ng Pilipinas. https://www.bsp.gov.ph",
+      "Deposits are insured by PDIC up to P1 Million per depositor.",
+      "Page 1 of 1"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "SAVINGS",
+        "institution": "UnionBank",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "12840.55",
+        "closingBalance": "50749.82",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "Salary Credit - SHOPEE",
+            "amount": "28500.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-02",
+            "description": "InstaPay Transfer to MAYA",
+            "amount": "3000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-04",
+            "description": "Bill Payment - MERALCO",
+            "amount": "1987.45",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-10-06",
+            "description": "Debit Card Purchase - SHOPEE PH",
+            "amount": "1249.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shopee"
+          },
+          {
+            "date": "2026-10-09",
+            "description": "PESONet Transfer from BPI",
+            "amount": "5000.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-11",
+            "description": "ATM Withdrawal - UB TIMOG",
+            "amount": "4000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Salary Credit - SHOPEE",
+            "amount": "28500.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-16",
+            "description": "Bill Payment - PLDT HOME",
+            "amount": "1699.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "PLDT"
+          },
+          {
+            "date": "2026-10-18",
+            "description": "SM STORE NORTH EDSA",
+            "amount": "2350.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SM Store"
+          },
+          {
+            "date": "2026-10-21",
+            "description": "InstaPay Transfer to BDO - CARLO M REYES",
+            "amount": "8000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-25",
+            "description": "Debit Card Purchase - GRAB PH",
+            "amount": "312.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Grab"
+          },
+          {
+            "date": "2026-10-28",
+            "description": "Bill Payment - CONVERGE ICT",
+            "amount": "1500.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Converge"
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Interest Credit",
+            "amount": "8.40",
+            "direction": "IN",
+            "kind": "INTEREST_EARNED",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Withholding Tax",
+            "amount": "1.68",
+            "direction": "OUT",
+            "kind": "OTHER",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Each row carries a reference number that embeds the date digits; amounts are the Debit/Credit cell, followed by the running balance."
+}

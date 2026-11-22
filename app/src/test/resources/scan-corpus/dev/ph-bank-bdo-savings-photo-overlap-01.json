@@ -1,0 +1,309 @@
+{
+  "id": "ph-bank-bdo-savings-photo-overlap-01",
+  "country": "PH",
+  "type": "BANK_STATEMENT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-10-03",
+  "pages": [
+    [
+      "BDO",
+      "BDO Unibank, Inc.",
+      "STATEMENT OF ACCOUNT",
+      "SAVINGS ACCOUNT",
+      "ACCOUNT NAME: MARIA CRISTINA L. VILLANUEVA",
+      "ACCOUNT NUMBER: 001230456789",
+      "BRANCH: SM CITY NORTH EDSA",
+      "STATEMENT PERIOD: SEPTEMBER 01, 2026 TO SEPTEMBER 30, 2026",
+      "CURRENCY: PHP",
+      "POSTING DATE  TRANSACTION DESCRIPTION  DEBIT  CREDIT  RUNNING BALANCE",
+      "09/01/26  BALANCE FORWARD  25,431.18",
+      "09/01/26  POS PURCHASE - SM SUPERMARKET NORTH EDSA  2,345.60  23,085.58",
+      "09/02/26  ATM WITHDRAWAL - BDO SM NORTH EDSA  5,000.00  18,085.58",
+      "09/03/26  BILLS PAYMENT - MERALCO  2,604.18  15,481.40",
+      "09/05/26  FUND TRANSFER FROM 0098-7654-3210  3,000.00  18,481.40",
+      "09/05/26  INTERBANK FUND TRANSFER INSTAPAY - GCASH 0917***4821  1,000.00  17,481.40",
+      "09/05/26  INSTAPAY SERVICE FEE  25.00  17,456.40",
+      "09/08/26  POS PURCHASE - MERCURY DRUG KATIPUNAN  486.75  16,969.65",
+      "09/10/26  BILLS PAYMENT - PLDT  1,699.00  15,270.65",
+      "09/12/26  POS PURCHASE - SHELL C5 LIBIS  2,000.00  13,270.65",
+      "09/15/26  PAYROLL CREDIT - ACCENTURE INC  32,415.50  45,686.15",
+      "09/15/26  INTERBANK FUND TRANSFER PESONET - BPI 3459XXXX12  10,000.00  35,686.15",
+      "09/16/26  ATM WITHDRAWAL - BPI KATIPUNAN  3,000.00  32,686.15",
+      "09/16/26  ATM SERVICE FEE - OTHER BANK  18.00  32,668.15",
+      "09/18/26  BILLS PAYMENT - MANILA WATER  612.40  32,055.75",
+      "09/19/26  POS PURCHASE - PUREGOLD CUBAO  3,218.25  28,837.50",
+      "09/20/26  FUND TRANSFER TO 0098-7654-3210  5,000.00  23,837.50"
+    ],
+    [
+      "09/18/26  BILLS PAYMENT - MANILA WATER  612.40  32,055.75",
+      "09/19/26  POS PURCHASE - PUREGOLD CUBAO  3,218.25  28,837.50",
+      "09/20/26  FUND TRANSFER TO 0098-7654-3210  5,000.00  23,837.50",
+      "09/22/26  POS PURCHASE - JOLLIBEE SM MEGAMALL  412.00  23,425.50",
+      "09/23/26  INSTAPAY RECEIVED FROM JUAN DELA CRUZ - UNIONBANK  1,500.00  24,925.50",
+      "09/24/26  POS PURCHASE - NATIONAL BOOK STORE  845.50  24,080.00",
+      "09/25/26  BILLS PAYMENT - GLOBE TELECOM  1,299.00  22,781.00",
+      "09/26/26  ATMWITHDRAWAL - BDO GATEWAY MALL  4,000.00  18,781.00",
+      "09/27/26  P0S PURCHASE - ROBINSONS SUPERMARKET  1,876.30  16,904.70",
+      "09/28/26  CREDIT CARD PAYMENT - BDO MASTERCARD  8,500.00  8,404.70",
+      "09/29/26  POS PURCHASE - ACE HARDWARE SM NORTH  1,245.00  7,159.70",
+      "09/30/26  PAYROLL CREDIT - ACCENTURE INC  32,415.50  39,575.20",
+      "09/30/26  INTEREST EARNED  15.42  39,590.62",
+      "09/30/26  WITHHOLDING TAX  3.08  39,587.54",
+      "09/30/26  FUND TRANSFER TO 0098-7654-3210  20,000.00  19,587.54",
+      "TOTAL DEBITS  75,190.06",
+      "TOTAL CREDITS  69,346.42",
+      "ENDING BALANCE  19,587.54",
+      "*** END OF STATEMENT ***",
+      "Please examine your statement immediately. If no error is reported within 30 days,",
+      "the account will be considered correct. BDO is regulated by the Bangko Sentral ng Pilipinas.",
+      "Deposits are insured by PDIC up to P1 Million per depositor."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "SAVINGS",
+        "institution": "BDO",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "25431.18",
+        "closingBalance": "19587.54",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-09-01",
+            "description": "SM SUPERMARKET NORTH EDSA",
+            "amount": "2345.60",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SM Supermarket"
+          },
+          {
+            "date": "2026-09-02",
+            "description": "BDO SM NORTH EDSA",
+            "amount": "5000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-03",
+            "description": "BILLS PAYMENT - MERALCO",
+            "amount": "2604.18",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-09-05",
+            "description": "FUND TRANSFER FROM 0098-7654-3210",
+            "amount": "3000.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-05",
+            "description": "INSTAPAY - GCASH",
+            "amount": "1000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-05",
+            "description": "INSTAPAY SERVICE FEE",
+            "amount": "25.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-08",
+            "description": "MERCURY DRUG KATIPUNAN",
+            "amount": "486.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Mercury Drug"
+          },
+          {
+            "date": "2026-09-10",
+            "description": "BILLS PAYMENT - PLDT",
+            "amount": "1699.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "PLDT"
+          },
+          {
+            "date": "2026-09-12",
+            "description": "SHELL C5 LIBIS",
+            "amount": "2000.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shell"
+          },
+          {
+            "date": "2026-09-15",
+            "description": "PAYROLL CREDIT - ACCENTURE",
+            "amount": "32415.50",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-15",
+            "description": "PESONET - BPI",
+            "amount": "10000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-16",
+            "description": "BPI KATIPUNAN",
+            "amount": "3000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-16",
+            "description": "ATM SERVICE FEE",
+            "amount": "18.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-18",
+            "description": "MANILA WATER",
+            "amount": "612.40",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Manila Water"
+          },
+          {
+            "date": "2026-09-19",
+            "description": "PUREGOLD CUBAO",
+            "amount": "3218.25",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Puregold"
+          },
+          {
+            "date": "2026-09-20",
+            "description": "FUND TRANSFER TO 0098-7654-3210",
+            "amount": "5000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-22",
+            "description": "JOLLIBEE SM MEGAMALL",
+            "amount": "412.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Jollibee"
+          },
+          {
+            "date": "2026-09-23",
+            "description": "INSTAPAY RECEIVED FROM JUAN DELA CRUZ",
+            "amount": "1500.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-24",
+            "description": "NATIONAL BOOK STORE",
+            "amount": "845.50",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "National Book Store"
+          },
+          {
+            "date": "2026-09-25",
+            "description": "GLOBE TELECOM",
+            "amount": "1299.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Globe"
+          },
+          {
+            "date": "2026-09-26",
+            "description": "BDO GATEWAY MALL",
+            "amount": "4000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-27",
+            "description": "ROBINSONS SUPERMARKET",
+            "amount": "1876.30",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Robinsons Supermarket"
+          },
+          {
+            "date": "2026-09-28",
+            "description": "CREDIT CARD PAYMENT - BDO MASTERCARD",
+            "amount": "8500.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-29",
+            "description": "ACE HARDWARE",
+            "amount": "1245.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "ACE Hardware"
+          },
+          {
+            "date": "2026-09-30",
+            "description": "PAYROLL CREDIT - ACCENTURE",
+            "amount": "32415.50",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-30",
+            "description": "INTEREST EARNED",
+            "amount": "15.42",
+            "direction": "IN",
+            "kind": "INTEREST_EARNED",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-30",
+            "description": "WITHHOLDING TAX",
+            "amount": "3.08",
+            "direction": "OUT",
+            "kind": "OTHER",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-30",
+            "description": "FUND TRANSFER TO 0098-7654-3210",
+            "amount": "20000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "28 transactions photographed in two shots; shot 2 repeats the last three lines of shot 1 (Manila Water, Puregold, fund transfer 5,000.00 on 09/20). BALANCE FORWARD is the opening balance. Debit/credit columns collapse into one amount followed by the running balance. Withholding tax on interest is kind OTHER. OCR noise: 'ATMWITHDRAWAL', 'P0S PURCHASE'."
+}

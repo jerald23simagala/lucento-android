@@ -1,0 +1,469 @@
+{
+  "id": "us-bank-chase-checking-sections-01",
+  "country": "US",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-05",
+  "pages": [
+    [
+      "JPMorgan Chase Bank, N.A.",
+      "P O Box 182051",
+      "Columbus, OH 43218 - 2051",
+      "October 01, 2026 through October 31, 2026",
+      "Account Number: 000000538221967",
+      "CUSTOMER SERVICE INFORMATION",
+      "Web site:  Chase.com",
+      "Service Center:  1-800-935-9935",
+      "Deaf and Hard of Hearing:  1-800-242-7383",
+      "Para Espanol:  1-877-312-4273",
+      "International Calls:  1-713-262-1679",
+      "00012418 DRE 703 141 30526 NNNNNNNNNNN 1 000000000 64 0000",
+      "DANIEL REYES",
+      "4417 FREMONT AVE N APT 3",
+      "SEATTLE WA 98103-7742",
+      "*start*summary",
+      "Chase Total Checking",
+      "CHECKING SUMMARY",
+      "INSTANCES  AMOUNT",
+      "Beginning Balance  $1,520.11",
+      "Deposits and Additions  6  6,242.39",
+      "Checks Paid  2  -1,450.00",
+      "ATM & Debit Card Withdrawals  19  -853.87",
+      "Electronic Withdrawals  7  -2,482.56",
+      "Fees  3  -43.00",
+      "Ending Balance  37  $2,933.07",
+      "*end*summary",
+      "Your monthly service fee was not waived this period. To avoid it, keep a balance of $1,500.00",
+      "at the beginning of each day or have electronic deposits of $500.00 or more each period.",
+      "*start*deposits and additions",
+      "DEPOSITS AND ADDITIONS",
+      "DATE  DESCRIPTION  AMOUNT",
+      "10/01  Acme Logistics Payroll PPD ID: 9111111101  $2,256.20",
+      "10/09  Zelle Payment From Maria Lopez Bacmjk2Xq9Yz  120.00",
+      "10/15  Acme Logistics Payroll PPD ID: 9111111101  2,256.20",
+      "10/15  Fedwire Credit Via: Bank of America, N.A./026009593 B/O: Robert Kim  1,500.00",
+      "Seattle WA 98109-4410 Ref: Chase Nyc/Ctr/Bnf=Daniel Reyes Seattle WA 98103-7742",
+      "US/Ac-000000001234 Rfb=Ow00004417 Obi=Loan Repay Imad: 1015B1Qgc07C001234 Trn:",
+      "3141592653Ff Ysf Ref: 3141592653",
+      "10/22  Card Purchase Return 10/21 Target T-1234 Seattle WA Card 4421  24.99",
+      "10/27  Venmo Cashout PPD ID: 5264681992  85.00",
+      "Total Deposits and Additions  $6,242.39",
+      "*end*deposits and additions",
+      "*start*checks paid section3",
+      "CHECKS PAID",
+      "DATE",
+      "CHECK NO.  DESCRIPTION  PAID  AMOUNT",
+      "1043 ^  10/06  $1,200.00",
+      "1044 ^  10/19  250.00",
+      "Total Checks Paid  $1,450.00",
+      "If you see a description in the Checks Paid section, it means that we received only electronic information about the check,",
+      "not the original or an image of the check. As a result, we're not able to return the check to you or show you an image.",
+      "^ An image of this check may be available for you to view on Chase.com.",
+      "*end*checks paid section3",
+      "Page 1 of 3"
+    ],
+    [
+      "October 01, 2026 through October 31, 2026",
+      "Account Number: 000000538221967",
+      "*start*atm debit withdrawal",
+      "ATM & DEBIT CARD WITHDRAWALS",
+      "DATE  DESCRIPTION  AMOUNT",
+      "10/02  Card Purchase 10/01 Starbucks Store 12345 Seattle WA Card 4421  $6.45",
+      "10/03  Card Purchase With Pin 10/03 Safeway #1551 Seattle WA Card 4421  87.34",
+      "10/04  Card Purchase 10/03 Sq *Blue Bottle Coffee Seattle WA Card 4421  5.75",
+      "10/06  Recurring Card Purchase 10/06 Netflix.Com Netflix.Com CA Card 4421  15.49",
+      "10/07  Card Purchase 10/06 Tst* The Habit - Bellevue Bellevue WA Card 4421  18.72",
+      "10/08  Card Purchase 10/07 Amzn Mktp US*2K4L71Z30 Amzn.Com/Bill WA Card 4421  42.17",
+      "10/09  ATM Withdrawal 10/09 0123 Main St Seattle WA Card 4421  200.00",
+      "10/10  Card Purchase 10/09 Shell Oil 57442381 Seattle WA Card 4421  48.60",
+      "10/12  Card Purchase 10/11 Uber *Trip Help.Uber.Com CA Card 4421  23.18",
+      "10/13  Card Purchase 10/12 Trader Joe's #131 Seattle WA Card 4421  64.21",
+      "10/14  Card Purchase 10/13 Apple.Com/Bill 866-712-7753 CA Card 4421  2.99",
+      "10/16  Card Purchase 10/15 Paypal *Spotify 402-935-7733 CA Card 4421  11.99",
+      "10/18  Non-Chase ATM Withdrawal 10/18 1200 Pine St Seattle WA Card 4421  60.00",
+      "10/20  Card Purchase 10/19 Target T-1234 Seattle WA Card 4421  56.83",
+      "10/21  Card Purchase 10/20 Walgreens #4502 Seattle WA Card 4421  19.47",
+      "10/23  Card Purchase 10/22 Chipotle 1842 Seattle WA Card 4421  13.65",
+      "10/25  Card Purchase 10/24 Costco Whse #0001 Seattle WA Card 4421  152.38",
+      "10/28  Card Purchase 10/27 Starbucks Store 12345 Seattle WA Card 4421  7.25",
+      "10/30  Card Purchase 10/29 Lyft *Ride Thu 8pm Lyft.Com CA Card 4421  17.40",
+      "Total ATM & Debit Card Withdrawals  $853.87",
+      "*end*atm debit withdrawal",
+      "*start*atm and debit card summary",
+      "ATM & DEBIT CARD SUMMARY",
+      "Daniel Reyes Card 4421",
+      "Total ATM Withdrawals & Debits  $260.00",
+      "Total Card Purchases  $593.87",
+      "Total Card Deposits & Credits  $24.99",
+      "ATM & Debit Card Totals",
+      "Total ATM Withdrawals & Debits  $260.00",
+      "Total Card Purchases  $593.87",
+      "Total Card Deposits & Credits  $24.99",
+      "*end*atm and debit card summary",
+      "Page 2 of 3"
+    ],
+    [
+      "October 01, 2026 through October 31, 2026",
+      "Account Number: 000000538221967",
+      "*start*electronic withdrawal",
+      "ELECTRONIC WITHDRAWALS",
+      "DATE  DESCRIPTION  AMOUNT",
+      "10/05  10/05 Online Payment 18734562 To Seattle City Light  $84.12",
+      "10/08  Chase Credit Crd Autopay PPD ID: 4760039224  500.00",
+      "10/11  10/11 Online Zelle Payment To Jordan Lee Rent Share Jpm99Ah4K2B1  650.00",
+      "10/17  Comcast Xfinity Cable Pmt PPD ID: 0000213490  79.99",
+      "10/20  10/20 Online Domestic Wire Transfer Via: Wells Fargo NA/121000248 A/C: Ana Torres  1,000.00",
+      "Seattle WA 98118 US Ref: Deposit Imad: 1020Mmqfmp2N012345 Trn: 3261090293Es",
+      "10/26  Geico Auto Pay PPD ID: 5250574902  128.45",
+      "10/29  Venmo Payment 1029384756 Web ID: 3264681992  40.00",
+      "Total Electronic Withdrawals  $2,482.56",
+      "*end*electronic withdrawal",
+      "*start*fees section",
+      "FEES",
+      "DATE  DESCRIPTION  AMOUNT",
+      "10/18  Non-Chase ATM Fee-With  $3.00",
+      "10/20  Online Domestic Wire Fee  25.00",
+      "10/31  Monthly Service Fee  15.00",
+      "Total Fees  $43.00",
+      "*end*fees section",
+      "*start*daily ending balance2",
+      "DAILY ENDING BALANCE",
+      "DATE  AMOUNT  DATE  AMOUNT  DATE  AMOUNT",
+      "10/01  $3,776.31  10/02  3,769.86  10/03  3,682.52",
+      "10/04  3,676.77  10/05  3,592.65  10/06  2,377.16",
+      "10/07  2,358.44  10/08  1,816.27  10/09  1,736.27",
+      "10/10  1,687.67  10/11  1,037.67  10/12  1,014.49",
+      "10/13  950.28  10/14  947.29  10/15  4,703.49",
+      "10/16  4,691.50  10/17  4,611.51  10/18  4,548.51",
+      "10/19  4,298.51  10/20  3,216.68  10/21  3,197.21",
+      "10/22  3,222.20  10/23  3,208.55  10/25  3,056.17",
+      "10/26  2,927.72  10/27  3,012.72  10/28  3,005.47",
+      "10/29  2,965.47  10/30  2,948.07  10/31  2,933.07",
+      "*end*daily ending balance2",
+      "IN CASE OF ERRORS OR QUESTIONS ABOUT YOUR ELECTRONIC FUNDS TRANSFERS:",
+      "Call us at 1-866-564-2262 or write us at the address on the front of this statement immediately if you think your statement or",
+      "receipt is incorrect or if you need more information about a transfer listed on the statement or receipt.",
+      "JPMorgan Chase Bank, N.A. Member FDIC",
+      "Page 3 of 3"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "Chase",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "1520.11",
+        "closingBalance": "2933.07",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "Acme Logistics Payroll",
+            "amount": "2256.20",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-09",
+            "description": "Zelle Payment From Maria Lopez",
+            "amount": "120.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Acme Logistics Payroll",
+            "amount": "2256.20",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Fedwire Credit",
+            "amount": "1500.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-22",
+            "description": "Card Purchase Return",
+            "amount": "24.99",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-10-27",
+            "description": "Venmo Cashout",
+            "amount": "85.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-06",
+            "description": "1043",
+            "amount": "1200.00",
+            "direction": "OUT",
+            "kind": "CHECK",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-19",
+            "description": "1044",
+            "amount": "250.00",
+            "direction": "OUT",
+            "kind": "CHECK",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-02",
+            "description": "Starbucks Store 12345",
+            "amount": "6.45",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Starbucks"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "Safeway #1551",
+            "amount": "87.34",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Safeway"
+          },
+          {
+            "date": "2026-10-04",
+            "description": "Sq *Blue Bottle Coffee",
+            "amount": "5.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Blue Bottle Coffee"
+          },
+          {
+            "date": "2026-10-06",
+            "description": "Netflix.Com",
+            "amount": "15.49",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Netflix"
+          },
+          {
+            "date": "2026-10-07",
+            "description": "Tst* The Habit",
+            "amount": "18.72",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "The Habit"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "Amzn Mktp US*2K4L71Z30",
+            "amount": "42.17",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-10-09",
+            "description": "ATM Withdrawal 10/09",
+            "amount": "200.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-10",
+            "description": "Shell Oil 57442381",
+            "amount": "48.60",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shell"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "Uber *Trip",
+            "amount": "23.18",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Uber"
+          },
+          {
+            "date": "2026-10-13",
+            "description": "Trader Joe's #131",
+            "amount": "64.21",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Trader Joe's"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "Apple.Com/Bill",
+            "amount": "2.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Apple"
+          },
+          {
+            "date": "2026-10-16",
+            "description": "Paypal *Spotify",
+            "amount": "11.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Spotify"
+          },
+          {
+            "date": "2026-10-18",
+            "description": "Non-Chase ATM Withdrawal",
+            "amount": "60.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "10/19 Target T-1234",
+            "amount": "56.83",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-10-21",
+            "description": "Walgreens #4502",
+            "amount": "19.47",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Walgreens"
+          },
+          {
+            "date": "2026-10-23",
+            "description": "Chipotle 1842",
+            "amount": "13.65",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Chipotle"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "Costco Whse #0001",
+            "amount": "152.38",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Costco"
+          },
+          {
+            "date": "2026-10-28",
+            "description": "Starbucks Store 12345",
+            "amount": "7.25",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Starbucks"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "Lyft *Ride",
+            "amount": "17.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Lyft"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "Seattle City Light",
+            "amount": "84.12",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Seattle City Light"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "Chase Credit Crd Autopay",
+            "amount": "500.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-11",
+            "description": "Zelle Payment To Jordan Lee",
+            "amount": "650.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-17",
+            "description": "Comcast Xfinity",
+            "amount": "79.99",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Xfinity"
+          },
+          {
+            "date": "2026-10-20",
+            "description": "Online Domestic Wire Transfer",
+            "amount": "1000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-26",
+            "description": "Geico",
+            "amount": "128.45",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "GEICO"
+          },
+          {
+            "date": "2026-10-29",
+            "description": "Venmo Payment",
+            "amount": "40.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-18",
+            "description": "Non-Chase ATM Fee",
+            "amount": "3.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "Online Domestic Wire Fee",
+            "amount": "25.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Monthly Service Fee",
+            "amount": "15.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Sectioned Chase layout, 37 transactions over 3 pages, with summary, section totals, ATM & debit card summary and daily ending balances that are not transactions. Dates are the DATE column (posting date); card lines also print the purchase date one or two days earlier. Checks are keyed by check number."
+}

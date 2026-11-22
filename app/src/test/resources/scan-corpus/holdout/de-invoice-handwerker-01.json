@@ -1,0 +1,57 @@
+{
+  "id": "de-invoice-handwerker-01",
+  "country": "DE",
+  "type": "INVOICE",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-06",
+  "pages": [
+    [
+      "Elektro Becker GmbH",
+      "Meisterbetrieb seit 1998",
+      "Lindenstrasse 14 - 50674 Koeln",
+      "Tel. 0221 123456 - info@elektro-becker.example",
+      "USt-IdNr.: DE298765432",
+      "Herrn",
+      "Lukas Schneider",
+      "Venloer Str. 211",
+      "50823 Koeln",
+      "Rechnung",
+      "Rechnungsnummer: RE-2026-0871",
+      "Rechnungsdatum: 22.10.2026",
+      "Leistungsdatum: 20.10.2026",
+      "Kundennummer: 10442",
+      "Pos.  Beschreibung  Menge  Einzelpreis  Gesamt",
+      "1  Austausch Unterverteilung (Sicherungskasten)  1  680,00 €  680,00 €",
+      "2  FI-Schutzschalter 40A  2  89,50 €  179,00 €",
+      "3  Arbeitszeit Elektromeister (Std.)  2,5  58,00 €  145,00 €",
+      "4  Anfahrtspauschale  1  33,40 €  33,40 €",
+      "Nettobetrag  € 1.037,40",
+      "zzgl. 19% MwSt.  € 197,11",
+      "Gesamtbetrag  € 1.234,51",
+      "Zahlbar innerhalb von 14 Tagen ohne Abzug bis 05.11.2026.",
+      "Bankverbindung: Sparkasse KoelnBonn  IBAN DE45 3705 0198 0012 3456 78  BIC COLSDE33XXX",
+      "Geschaeftsfuehrer: Thomas Becker  Amtsgericht Koeln HRB 12345",
+      "Seite 1 von 1"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Elektro Becker",
+        "total": "1234.51",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-22",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "housing",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "German tradesman invoice: euro sign before amounts ('€ 1.234,51'), net + 19% MwSt = Gesamtbetrag. Date is the Rechnungsdatum (22.10.2026), not the service date or the payment deadline."
+}

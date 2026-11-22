@@ -1,0 +1,51 @@
+{
+  "id": "us-refund-bestbuy-01",
+  "country": "US",
+  "type": "REFUND",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-31",
+  "pages": [
+    [
+      "BEST BUY",
+      "Store 498  Northgate",
+      "401 NE Northgate Way",
+      "Seattle, WA 98125",
+      "(206) 440-1000",
+      "10/30/26 14:22  0498 04 3317 1002",
+      "RETURN",
+      "6505432  JBL TUNE 760NC  -129.99",
+      "Orig Trans: 0498 02 2281 0927 10/12/26",
+      "Reason: Defective",
+      "SUBTOTAL  -129.99",
+      "TAX 10.25%  -13.32",
+      "TOTAL  -143.31",
+      "REFUND TO VISA  ************4421  -143.31",
+      "AUTH 042913",
+      "Refunds to credit cards may take 3-5 business days to post.",
+      "My Best Buy Member ID: 3170448812",
+      "Points reversed this return: 130",
+      "Thank you for shopping at Best Buy",
+      "0498 04 3317 1002"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Best Buy",
+        "total": "143.31",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-30",
+        "dateAmbiguous": false,
+        "direction": "IN",
+        "category": "refund",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "4421"
+      }
+    ]
+  },
+  "notes": "Return printed with leading minus signs; refund amount is positive with direction IN. The original purchase date (10/12/26) is not the refund date."
+}

@@ -1,0 +1,57 @@
+{
+  "id": "us-receipt-cvs-noise-01",
+  "country": "US",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-10-30",
+  "pages": [
+    [
+      "CVS/pharrnacy",
+      "STORE 8827",
+      "1201 3RD AVE",
+      "SEATTLE, WA 98101",
+      "(206) 555-0198",
+      "REG#02 TRN#4412 CSHR#0016321 STR#8827",
+      "ExtraCareCard #: ************5318",
+      "1 ADVIL TAB 100CT  12.49T",
+      "1 CVS VIT D3 2000IU  8.79T",
+      "1 C0LGATE TTL TP 2PK  7.99T",
+      "ExtraBucks Rewards  2.00-",
+      "1 KLEENEX 3PK  5.49T",
+      "4 ITEMS",
+      "SUBT0TAL  32.76",
+      "WA 10.25% TAX  3.36",
+      "TOTAL  S36.12",
+      "VISA  36.12",
+      "CARD#: ************7102",
+      "APPROVAL#: 01984C",
+      "REF#: 8827-02-4412",
+      "CHANGE  .00",
+      "YOU SAVED $2.00 TODAY",
+      "ExtraBucks earned this trip: $0.65",
+      "10/29/2026 5:18 PM",
+      "Get the CVS Pharmacy app",
+      "1 8827 02 4412 10/29/2026"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "CVS Pharmacy",
+        "total": "36.12",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-29",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "pharmacy",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "7102"
+      }
+    ]
+  },
+  "notes": "OCR noise: 'pharrnacy', 'C0LGATE', 'SUBT0TAL', 'S36.12' for $36.12, dropped space in ExtraCareCard. ExtraBucks coupon printed as trailing-minus 2.00-."
+}

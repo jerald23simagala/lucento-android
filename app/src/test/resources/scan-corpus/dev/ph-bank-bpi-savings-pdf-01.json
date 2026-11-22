@@ -1,0 +1,232 @@
+{
+  "id": "ph-bank-bpi-savings-pdf-01",
+  "country": "PH",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-04",
+  "pages": [
+    [
+      "BPI",
+      "BANK OF THE PHILIPPINE ISLANDS",
+      "STATEMENT OF ACCOUNT",
+      "JOSE MIGUEL R. TAN",
+      "Unit 8A Avida Towers, Sucat Rd., Muntinlupa City 1770",
+      "Account Type: SAVINGS (REGULAR)",
+      "Account Number: 3459-1234-56",
+      "Period Covered: OCT 01, 2026 - OCT 31, 2026",
+      "Branch of Account: BPI ALABANG TOWN CENTER",
+      "DATE  DESCRIPTION  DEBIT  CREDIT  BALANCE",
+      "BEGINNING BALANCE  48,215.40",
+      "OCT 01  Payroll Credit - Globe Telecom Inc  38,250.00  86,465.40",
+      "OCT 02  Bills Payment MERALCO Ref 102937  3,114.82  83,350.58",
+      "OCT 03  ATM Withdrawal BPI ATC 2  10,000.00  73,350.58",
+      "OCT 05  InstaPay Transfer to GCASH 09171234567  2,000.00  71,350.58",
+      "OCT 05  InstaPay Transfer Fee  15.00  71,335.58",
+      "OCT 07  Fund Transfer to 3459-8888-01  5,000.00  66,335.58",
+      "OCT 09  Check Deposit - Clearing  15,000.00  81,335.58",
+      "OCT 12  POS Debit - LANDERS SUPERSTORE ALABANG  4,512.35  76,823.23",
+      "OCT 14  Bills Payment CONVERGE ICT Ref 559102  1,500.00  75,323.23",
+      "OCT 15  Payroll Credit - Globe Telecom Inc  38,250.00  113,573.23",
+      "OCT 16  Credit Card Payment - BPI Card 4889  12,000.00  101,573.23",
+      "Page 1 of 2"
+    ],
+    [
+      "BPI",
+      "BANK OF THE PHILIPPINE ISLANDS",
+      "STATEMENT OF ACCOUNT",
+      "Account Number: 3459-1234-56",
+      "Period Covered: OCT 01, 2026 - OCT 31, 2026",
+      "DATE  DESCRIPTION  DEBIT  CREDIT  BALANCE",
+      "BALANCE FORWARDED  101,573.23",
+      "OCT 18  PESONet Transfer to BDO 001230456789  20,000.00  81,573.23",
+      "OCT 20  ATM Withdrawal BDO ALABANG  5,000.00  76,573.23",
+      "OCT 20  ATM Fee - Other Bank  18.00  76,555.23",
+      "OCT 22  Bills Payment MAYNILAD Ref 771204  845.20  75,710.03",
+      "OCT 25  InstaPay Transfer from PAOLO S TAN - UnionBank  2,500.00  78,210.03",
+      "OCT 28  Debit Memo - BPI AIA Premium Policy 80012345  2,850.00  75,360.03",
+      "OCT 31  Interest Earned  12.85  75,372.88",
+      "OCT 31  Tax Withheld  2.57  75,370.31",
+      "ENDING BALANCE  75,370.31",
+      "TOTAL DEBITS  66,857.94",
+      "TOTAL CREDITS  94,012.85",
+      "For inquiries, call our 24-hour Contact Center at (+632) 889-10000.",
+      "BPI is regulated by the Bangko Sentral ng Pilipinas. Deposits are insured by PDIC up to P1,000,000 per depositor.",
+      "Page 2 of 2"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "SAVINGS",
+        "institution": "BPI",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "48215.40",
+        "closingBalance": "75370.31",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "Payroll Credit - Globe Telecom",
+            "amount": "38250.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-02",
+            "description": "Bills Payment MERALCO",
+            "amount": "3114.82",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "ATM Withdrawal BPI ATC",
+            "amount": "10000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-05",
+            "description": "InstaPay Transfer to GCASH",
+            "amount": "2000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-05",
+            "description": "InstaPay Transfer Fee",
+            "amount": "15.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-07",
+            "description": "Fund Transfer to 3459-8888-01",
+            "amount": "5000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-09",
+            "description": "Check Deposit",
+            "amount": "15000.00",
+            "direction": "IN",
+            "kind": "DEPOSIT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-12",
+            "description": "LANDERS SUPERSTORE",
+            "amount": "4512.35",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Landers Superstore"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "CONVERGE ICT",
+            "amount": "1500.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Converge"
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Payroll Credit - Globe Telecom",
+            "amount": "38250.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-16",
+            "description": "Credit Card Payment - BPI Card 4889",
+            "amount": "12000.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-18",
+            "description": "PESONet Transfer to BDO",
+            "amount": "20000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "ATM Withdrawal BDO ALABANG",
+            "amount": "5000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "ATM Fee - Other Bank",
+            "amount": "18.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-22",
+            "description": "Bills Payment MAYNILAD",
+            "amount": "845.20",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Maynilad"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "InstaPay Transfer from PAOLO S TAN",
+            "amount": "2500.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-28",
+            "description": "BPI AIA Premium",
+            "amount": "2850.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "BPI AIA"
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Interest Earned",
+            "amount": "12.85",
+            "direction": "IN",
+            "kind": "INTEREST_EARNED",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Tax Withheld",
+            "amount": "2.57",
+            "direction": "OUT",
+            "kind": "OTHER",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Two pages; page 2 opens with BALANCE FORWARDED (not a transaction). Dates have no year (OCT 01). No currency symbol or code; PDIC/Bangko Sentral and Philippine address give the country."
+}

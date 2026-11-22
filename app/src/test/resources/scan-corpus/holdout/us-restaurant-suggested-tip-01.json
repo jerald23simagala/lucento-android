@@ -1,0 +1,55 @@
+{
+  "id": "us-restaurant-suggested-tip-01",
+  "country": "US",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-06",
+  "pages": [
+    [
+      "FOUNDING FARMERS",
+      "1924 Pennsylvania Ave NW",
+      "Washington, DC 20006",
+      "(202) 822-8783",
+      "Server: Tasha  Table 31  Guests 2",
+      "Check #88213",
+      "11/05/2026 7:41 PM",
+      "1 Chicken Pot Pie  24.00",
+      "1 Yankee Pot Roast  29.00",
+      "1 Devilled Eggs  9.00",
+      "2 Lemonade @ 5.50  11.00",
+      "Subtotal  73.00",
+      "DC Tax 10%  7.30",
+      "Total  80.30",
+      "Suggested Gratuity:",
+      "18%  $13.14  Total $93.44",
+      "20%  $14.60  Total $94.90",
+      "22%  $16.06  Total $96.36",
+      "Tip: ____________",
+      "Total: ____________",
+      "VISA  XXXXXXXXXXXX0271",
+      "Auth: 619043",
+      "Customer Copy",
+      "Thank you! Tips are appreciated by our team."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Founding Farmers",
+        "total": "80.30",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-05",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "0271"
+      }
+    ]
+  },
+  "notes": "Suggested-gratuity table prints three possible totals, but the tip line is blank: truth is the printed total before tip (80.30)."
+}

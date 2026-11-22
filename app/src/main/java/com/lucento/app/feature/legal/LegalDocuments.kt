@@ -9,8 +9,8 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-17"
-    const val UPDATED = "17 November 2026"
+    const val VERSION = "2026-11-22"
+    const val UPDATED = "22 November 2026"
 
     /**
      * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit
@@ -153,8 +153,8 @@ object LegalDocuments {
                 listOf(
                     "Your wallets, transactions, budgets, goals, debts, scheduled payments and settings are stored in a " +
                         "database on your phone. Every core feature works offline.",
-                    "Receipt scanning reads the photo on your phone; the photo isn’t uploaded. A profile photo stays on " +
-                        "your phone too.",
+                    "Scanned receipts, bills and statements, and PDFs you import, are read on your phone and aren’t " +
+                        "uploaded (see “Scanning documents”). A profile photo stays on your phone too.",
                     "Lucento doesn’t use Android’s automatic cloud backup, so nothing is copied to a backup you didn’t " +
                         "choose.",
                 ),
@@ -171,6 +171,24 @@ object LegalDocuments {
                     "Some phones can’t do that offline. If you turn on online voice (Lucento asks first, and you can turn " +
                         "it off in Settings › Privacy), the speech service may send your recording to Google to turn it " +
                         "into text, under Google’s own privacy policy.",
+                ),
+            ),
+            Section(
+                "Scanning documents",
+                listOf(
+                    "Photos and scans of receipts, bills and statements are read on your phone by Google’s ML Kit, which " +
+                        "is built into Lucento. Lucento deletes its own copy of a photo once it has been read.",
+                    "A PDF you import is read where it is on your phone; it isn’t copied or uploaded. If it is locked, " +
+                        "its password is used once to open it and isn’t kept.",
+                    "“Scan pages” uses Google’s document scanner, part of Google Play services: the first time you use " +
+                        "it, Play services downloads it from Google. Scanning happens on your phone and the pages come " +
+                        "straight back to Lucento.",
+                    "ML Kit and the document scanner may send Google technical diagnostics — such as your phone’s model, " +
+                        "Android and app version, how long a scan took, and error codes — never the images or the text " +
+                        "read from them.",
+                    "To suggest a category and an account, Lucento compares a scan with your own saved transactions and " +
+                        "the merchant lists built into the app, on your phone. Nothing is learned or kept beyond the " +
+                        "transactions you save, and none of it is sent anywhere.",
                 ),
             ),
             Section(

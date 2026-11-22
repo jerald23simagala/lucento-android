@@ -1,0 +1,132 @@
+{
+  "id": "us-ewallet-paypal-activity-01",
+  "country": "US",
+  "type": "EWALLET_HISTORY",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-02",
+  "pages": [
+    [
+      "PayPal",
+      "Activity",
+      "Statement period: Oct 1, 2026 - Oct 31, 2026",
+      "Samantha Ortiz  samantha.ortiz@example.com",
+      "Date  Description  Amount",
+      "Oct 31  Spotify USA Inc · Automatic payment  -$11.99 USD",
+      "Oct 28  Transfer to BANK OF AMERICA, N.A. x-1964 · Standard transfer  -$200.00 USD",
+      "Oct 25  eBay · Payment  -$64.99 USD",
+      "Oct 22  Received from Jordan Kim · Friends and Family  +$45.00 USD",
+      "Oct 19  Uber Eats · Payment  -$28.76 USD",
+      "Oct 15  Valve Corporation (Steam) · Payment  -$19.99 USD",
+      "Oct 12  Refund from Target.com · Refund  +$24.99 USD",
+      "Oct 8  Added money from BANK OF AMERICA, N.A. x-1964 · Add money  +$150.00 USD",
+      "Oct 5  DoorDash · Payment  -$31.20 USD",
+      "Oct 1  Netflix.com · Automatic payment  -$15.49 USD",
+      "Pending and declined transactions are not shown.",
+      "PayPal, Inc. 2211 North First Street, San Jose, CA 95131",
+      "Page 1 of 1"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "EWALLET",
+        "institution": "PayPal",
+        "currency": "USD",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": null,
+        "closingBalance": null,
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-31",
+            "description": "Spotify USA Inc",
+            "amount": "11.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Spotify"
+          },
+          {
+            "date": "2026-10-28",
+            "description": "Transfer to BANK OF AMERICA, N.A. x-1964",
+            "amount": "200.00",
+            "direction": "OUT",
+            "kind": "CASH_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-25",
+            "description": "eBay",
+            "amount": "64.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "eBay"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "Received from Jordan Kim",
+            "amount": "45.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-19",
+            "description": "Uber Eats",
+            "amount": "28.76",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Uber Eats"
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Valve Corporation (Steam)",
+            "amount": "19.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Steam"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "Refund from Target.com",
+            "amount": "24.99",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "Added money from BANK OF AMERICA, N.A. x-1964",
+            "amount": "150.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-05",
+            "description": "DoorDash",
+            "amount": "31.20",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "DoorDash"
+          },
+          {
+            "date": "2026-10-01",
+            "description": "Netflix.com",
+            "amount": "15.49",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Netflix"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "PayPal activity printout: signed amounts with USD, the counterparty before the middle dot and the transaction type after it. Bank transfers in/out are CASH_IN/CASH_OUT. No balances printed."
+}

@@ -254,6 +254,8 @@ dependencies {
 
     // On-device receipt OCR (bundled model; works offline).
     implementation(libs.mlkit.text.recognition)
+    // Paper documents: flattened, straightened, several pages per scan; the app needs no camera permission (docs/SCAN.md).
+    implementation(libs.mlkit.document.scanner)
 
     // Optional cloud sync (see docs/SYNC.md). Nothing here is reachable unless the user explicitly opts in —
     // the app otherwise never calls any of it and the manifest's INTERNET permission stays unused.

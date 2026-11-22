@@ -316,6 +316,13 @@ class AppContainer(application: Application) {
     val institutions: com.lucento.app.core.banks.InstitutionRepository by lazy {
         com.lucento.app.core.banks.InstitutionRepository { application.assets.open("banks/institutions.json").bufferedReader().use { it.readText() } }
     }
+    /** The bundled merchant and payment-provider dictionaries (assets/merchants), for reading scans on this phone. */
+    val merchants: com.lucento.app.data.capture.MerchantDictionary by lazy {
+        com.lucento.app.data.capture.MerchantDictionary {
+            application.assets.list("merchants").orEmpty().filter { it.endsWith(".json") }.sorted()
+                .map { name -> application.assets.open("merchants/$name").bufferedReader().use { it.readText() } }
+        }
+    }
     val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao(), runner = runner, access = structureAccess) }
     val transactions: TransactionRepository by lazy {
         TransactionRepository(

@@ -1,0 +1,41 @@
+{
+  "id": "au-receipt-parking-01",
+  "country": "AU",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-10-10",
+  "pages": [
+    [
+      "PARKING RECEIPT",
+      "Zone 4521  Bay 17",
+      "Start  09/10/2026 08:12",
+      "Exp1ry  09/10/2026 10:12",
+      "Durati0n  2 h 00 min",
+      "Rate  4.60 / h",
+      "Amount Paid  9.20",
+      "VISA ****1123",
+      "Txn 004417  Machine 0921",
+      "Display on dashboard"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": null,
+        "total": "9.20",
+        "currency": "AUD",
+        "currencyEvidence": "NONE",
+        "date": "2026-10-09",
+        "dateAmbiguous": true,
+        "direction": "OUT",
+        "category": "parking",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "1123"
+      }
+    ]
+  },
+  "notes": "Parking-machine ticket with no operator, address or currency. 09/10/2026 is 9 October (truth, Sydney) or September 10; nothing on the ticket settles it. Rate 4.60/h is not the total. OCR noise: 'Exp1ry', 'Durati0n'."
+}

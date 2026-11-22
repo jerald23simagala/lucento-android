@@ -1,0 +1,59 @@
+{
+  "id": "us-restaurant-tip-blank-01",
+  "country": "US",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-04",
+  "pages": [
+    [
+      "OLIVE GARDEN",
+      "ITALIAN KITCHEN",
+      "#1643 Orlando Int'l Dr",
+      "8984 International Dr",
+      "Orlando, FL 32819",
+      "(407) 351-1082",
+      "Server: Mike R  Tbl 22/1",
+      "Chk 7721  Gst 3",
+      "10/03/2026  7:14 PM",
+      "1 Tour of Italy  23.49",
+      "1 Chicken Alfredo  19.99",
+      "1 Kids Mac & Cheese  6.99",
+      "3 Soft Drink @ 3.79  11.37",
+      "Subtotal  61.84",
+      "Tax  4.02",
+      "Total  65.86",
+      "Balance Due  65.86",
+      "VISA  XXXXXXXXXXXX9930",
+      "AUTH 085521",
+      "Entry: Chip",
+      "Amount:  65.86",
+      "TIP: ______________",
+      "TOTAL: ______________",
+      "X______________________",
+      "I agree to pay the above total amount",
+      "according to card issuer agreement",
+      "MERCHANT COPY",
+      "Thank you for visiting Olive Garden!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Olive Garden",
+        "total": "65.86",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-03",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "9930"
+      }
+    ]
+  },
+  "notes": "Tip and final total lines are blank; truth is the printed amount before tip."
+}

@@ -1,0 +1,61 @@
+{
+  "id": "us-other-brokerage-01",
+  "country": "US",
+  "type": "OTHER_FINANCIAL",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-06",
+  "pages": [
+    [
+      "Fidelity",
+      "INVESTMENT REPORT",
+      "October 1, 2026 - October 31, 2026",
+      "Envelope # BCKLMNPQRBBZT",
+      "SAMANTHA ORTIZ - INDIVIDUAL",
+      "Account Number: Z12-345678",
+      "Your Account Value:  $48,212.37",
+      "Change from Last Period:  $1,084.55",
+      "This Period  Year-to-Date",
+      "Beginning Account Value  $47,127.82  $41,906.15",
+      "Additions  0.00  2,400.00",
+      "Subtractions  0.00  -500.00",
+      "Transaction Costs, Fees & Charges  0.00  0.00",
+      "Change in Investment Value *  1,084.55  4,406.22",
+      "Ending Account Value **  $48,212.37  $48,212.37",
+      "Accrued Interest (AI)  0.00",
+      "Ending Account Value Incl. AI  $48,212.37",
+      "* Appreciation or depreciation of your holdings due to price changes,",
+      "plus any distribution and income earned during the statement period.",
+      "Income Summary",
+      "Taxable  This Period  Year-to-Date",
+      "Dividends  38.14  301.88",
+      "Interest  1.07  9.12",
+      "Total  $39.21  $311.00",
+      "Page 1 of 4",
+      "Fidelity Brokerage Services LLC, Member NYSE, SIPC  900 Salem Street, Smithfield, RI 02917"
+    ],
+    [
+      "INDIVIDUAL Z12-345678  October 1, 2026 - October 31, 2026",
+      "Holdings",
+      "Description  Quantity  Price Per Unit  Total Market Value",
+      "FIDELITY 500 INDEX FUND (FXAIX)  162.408  $233.98  $38,000.22",
+      "FIDELITY TOTAL INTL INDEX (FTIHX)  612.115  $16.03  $9,812.20",
+      "FIDELITY GOVERNMENT MONEY MARKET (SPAXX)  399.950  $1.00  $399.95",
+      "Total Holdings  $48,212.37",
+      "Activity",
+      "Dividends, Interest & Other Income",
+      "Settlement Date  Security Name  Symbol/CUSIP  Description  Quantity  Price  Amount",
+      "10/31  FIDELITY 500 INDEX FUND  FXAIX  Dividend Received  -  -  $38.14",
+      "10/31  FIDELITY 500 INDEX FUND  FXAIX  Reinvestment  0.163  $233.98  -$38.14",
+      "10/31  FIDELITY GOVERNMENT MONEY MARKET  SPAXX  Dividend Received  -  -  $1.07",
+      "10/31  FIDELITY GOVERNMENT MONEY MARKET  SPAXX  Reinvestment  1.070  $1.00  -$1.07",
+      "Total Dividends, Interest & Other Income  $39.21",
+      "Page 2 of 4"
+    ]
+  ],
+  "expected": {
+    "documents": []
+  },
+  "notes": "Brokerage report: dividends were reinvested inside the account and nothing moved in or out this period, so a person records nothing. Expected documents is empty."
+}

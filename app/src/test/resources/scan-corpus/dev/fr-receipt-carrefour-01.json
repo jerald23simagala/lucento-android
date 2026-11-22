@@ -1,0 +1,59 @@
+{
+  "id": "fr-receipt-carrefour-01",
+  "country": "FR",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-16",
+  "pages": [
+    [
+      "CARREFOUR MARKET",
+      "PARIS BATIGNOLLES",
+      "32 RUE DES BATIGNOLLES 75017 PARIS",
+      "TEL 01 44 69 12 34",
+      "SIRET 451 321 335 00041",
+      "BAGUETTE TRADITION  1,30 €  1",
+      "LAIT DEMI-ECREME 1L  1,15 €  1",
+      "COMTE AOP 200G  4,59 €  1",
+      "POMMES GALA 1KG  2,99 €  1",
+      "VIN COTES DU RHONE 75CL  6,95 €  2",
+      "PAPIER TOILETTE X6  3,49 €  2",
+      "YAOURT NATURE X4  1,89 €  1",
+      "7 ARTICLES",
+      "TOTAL A PAYER  22,36 €",
+      "CB  22,36 €",
+      "CODE TVA  HT  TVA  TTC",
+      "1  5,50%  11,30  0,62  11,92",
+      "2  20,00%  8,70  1,74  10,44",
+      "Le 15/10/2026 a 19:04  Caisse 004  Ticket 1187",
+      "CARTE BANCAIRE SANS CONTACT",
+      "VISA",
+      "A0000000031010",
+      "************4207",
+      "MONTANT REEL",
+      "22,36 EUR",
+      "DEBIT",
+      "TICKET CLIENT A CONSERVER",
+      "Merci de votre visite"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Carrefour",
+        "total": "22.36",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-15",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "4207"
+      }
+    ]
+  },
+  "notes": "French layout with TVA 5,5% and 20% breakdown; the card slip repeats the amount as 'MONTANT REEL'."
+}

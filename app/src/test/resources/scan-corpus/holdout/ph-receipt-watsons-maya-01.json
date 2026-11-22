@@ -1,0 +1,51 @@
+{
+  "id": "ph-receipt-watsons-maya-01",
+  "country": "PH",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-12",
+  "pages": [
+    [
+      "WATSONS",
+      "Watsons Personal Care Stores (Phils.), Inc.",
+      "Ayala Malls Manila Bay, Aseana Ave., Parañaque City",
+      "VAT REG TIN: 006-833-517-00087",
+      "MIN: 21051234567  SN: WTS0087X12",
+      "SALES INVOICE No. 0087-00412233",
+      "11/11/2026 06:12 PM  POS 3  Cashier: KRIS",
+      "CETAPHIL MOIST LOTION 250ML  1 @ 799.00  799.00",
+      "WATSONS COTTON BUDS 200S  2 @ 59.75  119.50",
+      "COLGATE TOTAL 150G  1 @ 189.00  189.00",
+      "BIOFLU TAB 10S  1 @ 87.50  87.50",
+      "TOTAL  1,195.00",
+      "MAYA  1,195.00",
+      "Ref: MY2026111145521",
+      "VATable Sales  1,066.96",
+      "VAT Amount  128.04",
+      "VAT-Exempt Sales  0.00",
+      "Zero-Rated Sales  0.00",
+      "Watsons Club Points earned: 11.95",
+      "THIS SERVES AS YOUR SALES INVOICE"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Watsons",
+        "total": "1195.00",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-11",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "personal",
+        "paymentInstrument": "Maya",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Paid with Maya; points earned (11.95) is not money. No peso sign; Philippine TIN and address give the country."
+}

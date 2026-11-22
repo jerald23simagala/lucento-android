@@ -1,0 +1,163 @@
+{
+  "id": "jp-bank-statement-01",
+  "country": "JP",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "CJK",
+  "noise": false,
+  "today": "2026-11-02",
+  "pages": [
+    [
+      "三菱UFJ銀行",
+      "入出金明細",
+      "普通預金  店番 123  口座番号 4567890",
+      "山田 太郎 様",
+      "照会期間  2026/10/01 ～ 2026/10/31",
+      "通貨  円",
+      "日付  摘要  お支払金額  お預り金額  差引残高",
+      "2026/09/30  前月繰越  285,430",
+      "2026/10/01  口座振替 トウキヨウガス  4,812  280,618",
+      "2026/10/02  カード セブンギンコウ  20,000  260,618",
+      "2026/10/02  ATM手数料  110  260,508",
+      "2026/10/05  口座振替 トウキヨウデンリヨク  7,356  253,152",
+      "2026/10/10  振込 ヤマダ ハナコ  30,000  223,152",
+      "2026/10/10  振込手数料  145  223,007",
+      "2026/10/12  デビット アマゾン  3,980  219,027",
+      "2026/10/20  口座振替 NTTドコモ  6,578  212,449",
+      "2026/10/24  デビット ユニクロ  5,990  206,459",
+      "2026/10/25  給与 カ)サクラテツク  312,450  518,909",
+      "2026/10/27  口座振替 ミツイフドウサン ヤチン  98,000  420,909",
+      "2026/10/28  振込 スズキ イチロウ  12,000  432,909",
+      "2026/10/31  カード 三菱UFJ  10,000  422,909",
+      "お支払金額合計  186,971",
+      "お預り金額合計  324,450",
+      "現在残高  422,909",
+      "1 / 1 ページ"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "SAVINGS",
+        "institution": "MUFG Bank",
+        "currency": "JPY",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "285430",
+        "closingBalance": "422909",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "トウキヨウガス",
+            "amount": "4812",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "東京ガス"
+          },
+          {
+            "date": "2026-10-02",
+            "description": "カード セブンギンコウ",
+            "amount": "20000",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-02",
+            "description": "ATM手数料",
+            "amount": "110",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-05",
+            "description": "トウキヨウデンリヨク",
+            "amount": "7356",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "東京電力"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "振込 ヤマダ ハナコ",
+            "amount": "30000",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-10",
+            "description": "振込手数料",
+            "amount": "145",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-12",
+            "description": "デビット アマゾン",
+            "amount": "3980",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "アマゾン"
+          },
+          {
+            "date": "2026-10-20",
+            "description": "NTTドコモ",
+            "amount": "6578",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "NTTドコモ"
+          },
+          {
+            "date": "2026-10-24",
+            "description": "デビット ユニクロ",
+            "amount": "5990",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "ユニクロ"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "給与",
+            "amount": "312450",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-27",
+            "description": "ミツイフドウサン",
+            "amount": "98000",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "三井不動産"
+          },
+          {
+            "date": "2026-10-28",
+            "description": "振込 スズキ イチロウ",
+            "amount": "12000",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "カード 三菱UFJ",
+            "amount": "10000",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Japanese web statement: year-first dates, zero-decimal yen with comma grouping, katakana payee names; payment and deposit columns collapse into one amount followed by the balance. Currency printed as 円. Merchant names are kept in Japanese as a Japanese account holder would write them."
+}

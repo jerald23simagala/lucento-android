@@ -1,0 +1,55 @@
+{
+  "id": "us-utility-verizon-01",
+  "country": "US",
+  "type": "UTILITY_BILL",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-16",
+  "pages": [
+    [
+      "verizon",
+      "Bill date  October 21, 2026",
+      "Account number  482117395-00001",
+      "Invoice number  8823140771",
+      "Pay from the My Verizon app or verizon.com/mybill",
+      "Quick bill summary  Sep 22 - Oct 21",
+      "Previous balance (see back for details)  $95.42",
+      "Payment - thank you  -$95.42",
+      "Balance forward  $0.00",
+      "Monthly charges  $90.00",
+      "Usage and purchase charges  $0.00",
+      "Equipment charges  $0.00",
+      "Surcharges and other charges and credits  $5.06",
+      "Taxes and governmental surcharges  $2.94",
+      "Total current charges due by November 15, 2026  $98.00",
+      "Total amount due  $98.00",
+      "Auto Pay  Your payment of $98.00 will be charged to your account on file on 11/15/26.",
+      "Unlimited Welcome  (917) 555-0144  $65.00",
+      "Unlimited Welcome  (917) 555-0187  $25.00",
+      "Auto Pay & paper-free billing discount applied",
+      "MARCUS BELL",
+      "1180 GRAND CONCOURSE APT 6D",
+      "BRONX NY 10456-1234",
+      "Verizon Wireless  PO Box 16810  Newark, NJ 07101-6810"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Verizon",
+        "total": "98.00",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-21",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "phone",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Per-line plan prices ($65 + $25 = monthly charges) are part of the total, not separate payments."
+}
