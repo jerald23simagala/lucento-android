@@ -725,8 +725,9 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      - "While you subscribe" for a subscription;
      - "With Lucento Cloud" for the add-on.
    - **The AI card** says "50 a day until Nov 12, 2027, then 10 a month": the allowance falls back to the free plan's;
-     it doesn't stop. It shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan, and
-     until then it says "Included until …" like the other services.
+     it doesn't stop. It shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan. Until
+     then it says "Pro allowance until …", because only the Pro allowance ends on that date (owner, 2026-11-22, OT-48
+     call 4 B). The other services keep "Included until …".
    - **What runs on the phone** never carries a term: it's owned.
    - **Back:** the system Back key goes to the collection.
    - **No side effects:** nothing in the deck changes data or consents, and it never moves through the app's screens.
