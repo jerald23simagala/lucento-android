@@ -30,6 +30,8 @@ object BackupCodec {
         "onboardingComplete", "themeMode", "primaryCurrency", "enabledFeatures",
         "acknowledgedBudgetMonth", "displayName", "categorySetupDone", "defaultWalletId",
         "guideStep", "smartReading",
+        // Backup v6: customisations that follow the account (BackupSettings); older files get them as null (Migrate5To6).
+        "themeId", "showCents", "walletsView", "moduleOffersHidden", "fxRatesOnline",
     )
 
     fun encode(document: BackupDocument): String {
@@ -365,6 +367,12 @@ object BackupCodec {
             defaultWalletId = row.idOrNull("defaultWalletId"),
             guideStep = guide,
             smartReading = row.bool("smartReading"),
+            // Keys a newer build may know more values of: well formed is enough here; the app uses the ones it knows.
+            themeId = row.keyOrNull("themeId"),
+            showCents = row.boolOrNull("showCents"),
+            walletsView = row.keyOrNull("walletsView"),
+            moduleOffersHidden = row.boolOrNull("moduleOffersHidden"),
+            fxRatesOnline = row.boolOrNull("fxRatesOnline"),
         )
     }
 
@@ -605,6 +613,11 @@ object BackupCodec {
         "defaultWalletId" to jsonNullable(row.defaultWalletId),
         "guideStep" to jsonNullable(row.guideStep),
         "smartReading" to JsonValue.Bool(row.smartReading),
+        "themeId" to jsonNullable(row.themeId),
+        "showCents" to jsonNullableBool(row.showCents),
+        "walletsView" to jsonNullable(row.walletsView),
+        "moduleOffersHidden" to jsonNullableBool(row.moduleOffersHidden),
+        "fxRatesOnline" to jsonNullableBool(row.fxRatesOnline),
     )
 }
 
@@ -635,6 +648,8 @@ private fun jsonInstant(millis: Long): JsonValue.Str = try {
 }
 
 private fun jsonNullable(value: String?): JsonValue = if (value == null) JsonValue.Null else JsonValue.Str(value)
+
+private fun jsonNullableBool(value: Boolean?): JsonValue = if (value == null) JsonValue.Null else JsonValue.Bool(value)
 
 private fun jsonNullableLong(value: Long?): JsonValue = if (value == null) JsonValue.Null else jsonLong(value)
 
@@ -696,6 +711,19 @@ private fun JsonValue.Obj.intOrNull(key: String): Int? {
 }
 
 private fun JsonValue.Obj.bool(key: String): Boolean = (fields[key] as? JsonValue.Bool)?.value ?: invalid()
+
+private fun JsonValue.Obj.boolOrNull(key: String): Boolean? = when (val value = fields[key]) {
+    JsonValue.Null -> null
+    is JsonValue.Bool -> value.value
+    else -> invalid()
+}
+
+/** A lowercase snake_case key (a theme, a view), or null. */
+private fun JsonValue.Obj.keyOrNull(key: String): String? {
+    val value = textOrNull(key, 1..32) ?: return null
+    if (!value.matches(Regex("^[a-z0-9_]{1,32}$"))) invalid()
+    return value
+}
 
 private fun JsonValue.Obj.text(key: String, length: IntRange): String {
     val value = (fields[key] as? JsonValue.Str)?.value ?: invalid()

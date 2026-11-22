@@ -8,6 +8,7 @@ import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * Everything [SyncRepository] needs from the server, as an interface so the engine runs against an in-memory
@@ -60,6 +61,22 @@ interface SyncRemote {
 
     /** Multicurrency: sets it, once. The server keeps the first value (there is no way to change it). */
     suspend fun setMainCurrency(ledgerUserId: String, code: String) = Unit
+
+    /**
+     * Settings that follow the account (docs/SYNC.md "Settings"): the signed-in account's own document and its revision,
+     * or null when it has none yet. Throws on any network or server error, including a project without the table.
+     */
+    suspend fun accountSettings(userId: String): AccountSettingsRow? = throw UnsupportedOperationException("No settings on this server")
+
+    /**
+     * Saves [document] as the account's settings on top of [baseRevision], the revision it was merged with (null: the
+     * account had none). False when another phone saved first: nothing changed, and the caller reads that version and
+     * merges again. The database refuses any other base, so no phone overwrites a version it hasn't seen.
+     */
+    suspend fun saveAccountSettings(userId: String, document: JsonObject, baseRevision: Long?): Boolean =
+        throw UnsupportedOperationException("No settings on this server")
+
+    data class AccountSettingsRow(val document: JsonObject, val revision: Long?)
 }
 
 class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
@@ -175,6 +192,35 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
         }
     }
 
+    override suspend fun accountSettings(userId: String): SyncRemote.AccountSettingsRow? =
+        // RLS shows an account only its own row (supabase/migrations/20261122090000_user_settings.sql).
+        client.from(USER_SETTINGS).select(columns = Columns.list(SETTINGS, REVISION)) {
+            filter { eq("user_id", userId) }
+            limit(1)
+        }.decodeList<JsonObject>().firstOrNull()?.let { row ->
+            SyncRemote.AccountSettingsRow(
+                document = row[SETTINGS] as? JsonObject ?: JsonObject(emptyMap()),
+                revision = (row[REVISION] as? kotlinx.serialization.json.JsonPrimitive)?.longOrNull,
+            )
+        }
+
+    override suspend fun saveAccountSettings(userId: String, document: JsonObject, baseRevision: Long?): Boolean = refusalsTyped {
+        // base_revision always goes, null included: the database keeps a write only on top of the revision it was merged
+        // with (lucento_user_settings_write), and answers with no row when another phone saved first.
+        client.from(USER_SETTINGS).upsert(
+            listOf(
+                kotlinx.serialization.json.buildJsonObject {
+                    put("user_id", kotlinx.serialization.json.JsonPrimitive(userId))
+                    put(SETTINGS, document)
+                    put("base_revision", baseRevision?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+                },
+            ),
+        ) {
+            onConflict = "user_id"
+            select(Columns.list("user_id", REVISION))
+        }.decodeList<JsonObject>().isNotEmpty()
+    }
+
     /**
      * Security audit F-01: the database's write gate answers 42501 (the plan doesn't include cloud sync) and its row ceiling
      * LU001. Both are typed here, so [SyncRepository] pauses uploads instead of treating them as a network failure.
@@ -196,6 +242,8 @@ class SupabaseSyncRemote(private val client: SupabaseClient) : SyncRemote {
         /** SQLSTATE of a write past the account's row ceiling (same migration). */
         const val ROW_CEILING = "LU001"
         const val LEDGER_SETTINGS = "ledger_settings"
+        const val USER_SETTINGS = "user_settings"
+        const val SETTINGS = "settings"
         const val SERVER_UPDATED_AT = "server_updated_at"
         const val REVISION = "revision"
     }

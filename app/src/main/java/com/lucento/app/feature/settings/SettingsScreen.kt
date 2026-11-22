@@ -276,6 +276,9 @@ fun SettingsScreen(
                         "the most recently changed amount is kept — check your budgets afterwards.\n\n" +
                         "Anything you recorded in both places will appear twice and be counted twice in your totals " +
                         "until you delete the extra copy.\n\n" +
+                        // docs/SYNC.md "Settings": a phone joining an account takes the account's settings.
+                        "Settings your account already has, like your theme and the features you use, replace this " +
+                        "phone’s. Any it doesn’t have yet come from this phone.\n\n" +
                         "Choose Don’t connect to leave this phone as it is, not signed in.",
                     confirmLabel = "Add to account",
                     onConfirm = viewModel::confirmAccountPrompt,
@@ -334,9 +337,12 @@ fun SettingsScreen(
         )
     }
     if (confirmReplace) {
+        // With sync on, what Replace writes goes up like any change: the account and the other phones end up like the file.
+        val syncing = state?.cloudSync?.let { it.signedInEmail != null && it.status.enabled } == true
         ConfirmDialog(
             title = "Replace everything on this device?",
-            text = "This erases the wallets, transactions, budgets, goals and schedules on this phone, then imports the file. It can’t be undone.",
+            text = "This erases the wallets, transactions, budgets, goals and schedules on this phone, then imports the file. It can’t be undone." +
+                if (syncing) " Cloud sync is on, so your account and your other phones will match the file too." else "",
             confirmLabel = "Replace",
             destructive = true,
             onConfirm = {
@@ -701,7 +707,7 @@ internal fun CloudSyncSection(
             }
             state.signedInEmail == null -> {
                 Text(
-                    "Back up your wallets, transactions, budgets and goals and keep them in sync across your " +
+                    "Back up your wallets, transactions, budgets, goals and settings and keep them in sync across your " +
                         "devices. Lucento stays fully usable without this — your data stays on this phone until you " +
                         "connect an account and keep sync on.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1087,7 +1093,8 @@ private fun RestorePreviewDialog(
                 Spacer(Modifier.height(Spacing.sm))
                 Text(
                     "Merge keeps records already on this phone and updates one only when the file is newer. " +
-                        "Replace erases this phone’s records and uses the file. Theme and currency change only when you replace.",
+                        "Replace erases this phone’s records and uses the file. Your settings, like theme and currency, " +
+                        "change only when you replace.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

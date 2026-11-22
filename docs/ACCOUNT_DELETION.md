@@ -36,6 +36,8 @@ web page that works without the app. Lucento offers both, built on 2026-11-07 on
 - **What it does.** It runs `delete from auth.users where id = auth.uid()`.
 - **What goes with it.** Every user-owned table already cascades from `auth.users`. On lucento-test, 2026-11-07:
   - wallets, categories, transactions, budgets, goals, goal_contributions, recurring and ledger_settings;
+  - user_settings, the settings that follow the account (added 2026-11-22, also `on delete cascade`;
+    `tools/sql-verify/user_settings_suite.sql` U23 checks it goes);
   - entitlements, purchase_links and ai_usage;
   - shared_spaces (with space_members and space_invites) and space_members;
   - Supabase Auth's own identities, sessions and factors.

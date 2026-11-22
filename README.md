@@ -17,7 +17,8 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation. On a new phone,
   **I already have an account** (when sync is available) reminds you to sync the old phone first, signs in, downloads
-  the account and goes straight to Home — no story, no guided setup; an empty account continues with the normal setup.
+  the account — records and settings — and goes straight to Home: no story, no guided setup; an empty account continues
+  with the normal setup.
 - **Home**: a working header (sync status, month selector, profile); the **Budget pace** card — % of budget used,
   budget used vs month elapsed, a verdict in words and Lucento, the mascot, whose look follows it; **net worth** as
   assets − liabilities with shortcuts to goals, scheduled transactions, debts and categories; the savings goal closest
@@ -85,8 +86,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   reduced-motion aware.
 - Exact money math in minor units; more than 1,500 JVM unit tests; an emulator screenshot tour in CI.
 - **Optional cloud sync** (Google Sign-In + Supabase, row-level security): off until you connect an account; every
-  core feature works offline without it, and signing out keeps local data. See [docs/SYNC.md](docs/SYNC.md) —
-  sign-in needs the Google OAuth setup listed there.
+  core feature works offline without it, and signing out keeps local data. Your settings and customisations (theme,
+  features, name, default wallet…) follow the account too; consents and the app lock stay on each phone. See
+  [docs/SYNC.md](docs/SYNC.md) — sign-in needs the Google OAuth setup listed there.
 - **Lucento Shared**: one person's finances shared with a Partner who signs in with their own account. Both see everything and add, edit or delete transactions; the Owner
   manages wallets, budgets, goals, categories and schedules. Built on cloud sync; needs its Supabase migrations on the
   project. See [docs/shared/](docs/shared/).

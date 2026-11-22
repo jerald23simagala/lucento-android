@@ -18,8 +18,8 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm run concur
 ```
 
 Exit code 0 means every check passed. Each suite runs on a fresh database; the output lists every check, for example
-`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (12 suites, 550 checks on
-2026-11-20). Run both variants: a migration must be safe whichever default privileges the project has.
+`ok  C9 partner updates/deletes of wallets … affect 0 rows`, and ends with the total (13 suites, 573 checks on
+2026-11-22, both variants). Run both variants: a migration must be safe whichever default privileges the project has.
 
 `node run.mjs <migrations dir> <suite.sql> [skip …]` runs one suite. By default it skips `usage_events_purge_schedule`,
 because PGlite has no `pg_cron`.
@@ -131,6 +131,11 @@ checks that all four VERIFY files stay true.
   write: transactions yes, the financial structure no, including upserts refused as a whole statement. It also checks
   server-stamped `created_by`/`updated_by`, stale-edit and replayed-push handling, immediate revocation on removal and
   leaving, strangers and `anon` seeing nothing, and that a solo account behaves exactly as before.
+- `user_settings_suite.sql` — settings that follow the account (docs/SYNC.md "Settings"), 23 checks: each account reads
+  and writes only its own row (a Partner and the Owner never see each other's); the compare-and-set rule on the
+  PostgREST upsert path (kept on top of the revision read, skipped on an older one or none, whatever the times; a
+  revision the phone sends is ignored); the CLOUD gate on insert and update, reading left open; a JSON object of at most
+  16 KB; no deletes; `anon` sees nothing; account deletion removes the row.
 
 ## What this is not
 

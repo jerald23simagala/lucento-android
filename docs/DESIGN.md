@@ -106,9 +106,10 @@ palette cross-fades for 250 ms (instant under reduced motion), nothing restarts.
   checks ink and muted ink at both ends and the middle of every face, and the trend text and bars where they sit.
   Sunrise's start moved from `#2768ED` and its muted ink from `#C9D7FF`: the small labels were 3.4:1 in the bright
   corner (AA needs 4.5).
-- Persistence: DataStore `theme_id` beside `theme_mode`; unknown values fall back to Sunrise. A device choice (like the
-  wallets view): kept across sign-outs, not in backups or sync (the backup settings format is strict; adding it would
-  need a backup schema bump). Owner-confirmed 2026-11-05.
+- Persistence: DataStore `theme_id` beside `theme_mode`; unknown values fall back to Sunrise. Kept across sign-outs. Since
+  2026-11-22 the theme (like the wallets view) follows the account and is in backups (backup v6; docs/SYNC.md
+  "Settings"), after tester feedback that a restore meant setting up again. Until then it was a device choice
+  (owner-confirmed 2026-11-05).
 - Adding a theme: one `ThemeSpec` (two `ThemeColors` built from `BrandColors`, a `BalanceCardFace`), a landscape, then
   `ThemeContrastTest` and `DataSeriesTest` must pass. No screen changes.
 
