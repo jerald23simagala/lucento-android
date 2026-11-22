@@ -35,7 +35,7 @@ Postgres (production)
 | MFA | TOTP required: Mission Control refuses to load data at `aal1`, and every `mc_api` function rejects tokens without `aal2` |
 | Allowlist | `mc.admins` (database) **and** `MC_ADMIN_EMAILS` (server env). Both must match |
 | No public registration | Mission Control has no sign-up page. Production Auth must stay open for the app, which is why the allowlist, not sign-up, is the gate |
-| Session expiry | Mission Control signs you out after 30 minutes idle or 12 hours, whichever comes first (a signed, HttpOnly cookie records both times) |
+| Session expiry | Mission Control signs you out after a stretch without activity or 12 hours after signing in, whichever comes first. The idle limit is 30 minutes unless the owner chooses a longer one for that browser in Settings › You: 1, 2, 4 or 8 hours (owner decision 2026-11-22, console #16). Activity is any request, including the session check each page sends at most once a minute while the owner clicks, types, scrolls or moves the pointer over it, so a tab nobody touches still goes idle. A signed, HttpOnly cookie records both times and the chosen limit (an HttpOnly preference cookie, `mc_idle`, only seeds new sessions on that browser). Trade-off: a longer limit keeps an unattended, unlocked laptop signed in longer; it is per browser, capped at 8 hours, and the 12 hours still apply |
 | Step-up | Lifetime grants, deletion, suspension and record viewing ask for a fresh TOTP code (a Supabase MFA challenge) if the last one is older than 10 minutes |
 
 **Trade-off (FD-V2).** Keeping the admin login in the production project is simpler (one project, one migration
