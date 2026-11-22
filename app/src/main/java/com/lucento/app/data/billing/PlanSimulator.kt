@@ -134,7 +134,7 @@ class DebugPlanSimulator(
 val TEST_PRICES: List<ProductPrice> = listOf(
     ProductPrice(PlayProducts.PRO_SUBSCRIPTION, "annual", "test-pro-annual", "₱1,190.00 (test)", "P1Y", freeTrialPeriodIso = "P7D", priceMicros = 1_190_000_000, currencyCode = "PHP"),
     ProductPrice(PlayProducts.PRO_SUBSCRIPTION, "monthly", "test-pro-monthly", "₱149.00 (test)", "P1M", priceMicros = 149_000_000, currencyCode = "PHP"),
-    ProductPrice(PlayProducts.PRO_LIFETIME, null, "test-lifetime", "₱3,490.00 (test)", null, priceMicros = 3_490_000_000, currencyCode = "PHP"),
+    ProductPrice(PlayProducts.PRO_LIFETIME, null, "test-lifetime", "₱2,490.00 (test)", null, priceMicros = 2_490_000_000, currencyCode = "PHP"),
     ProductPrice(PlayProducts.CLOUD_ADDON, "annual", "test-cloud-annual", "₱490.00 (test)", "P1Y", priceMicros = 490_000_000, currencyCode = "PHP"),
     ProductPrice(PlayProducts.CLOUD_ADDON, "monthly", "test-cloud-monthly", "₱59.00 (test)", "P1M", priceMicros = 59_000_000, currencyCode = "PHP"),
 )

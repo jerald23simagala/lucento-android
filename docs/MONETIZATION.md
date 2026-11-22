@@ -24,7 +24,7 @@ long as the phone runs the app.
 |---|---|---|
 | **Free** | A complete offline budgeting app with a small number of count limits | ₱0 |
 | **Pro Subscription** | Everything Lucento does, including the online services (cloud sync, cloud restore, AI adviser, Lucento Shared), while subscribed | ₱149 / month · ₱1,190 / year (7-day trial on annual) |
-| **Pro Lifetime** | Permanent ownership of every **local** Pro feature, plus 12 months of the online services; after that the online services are an optional add-on | **₱3,490 once** (recommended; see §4.3) + optional **Lucento Cloud** add-on ₱59 / month or ₱490 / year |
+| **Pro Lifetime** | Permanent ownership of every **local** Pro feature, plus 12 months of the online services; after that the online services are an optional add-on | **₱2,490 once** (lowered from ₱3,490 on 2026-11-21; see §4.3) + optional **Lucento Cloud** add-on ₱59 / month or ₱490 / year |
 
 **The one idea that makes Lifetime honest**: entitlements are split into four groups, and Lifetime buys group A
 outright.
@@ -301,7 +301,12 @@ section are tier 1, the Philippine prices are tier 3, and Play converts each tie
 the country lists and the tool are in [monetization/REGIONAL_PRICING.md](monetization/REGIONAL_PRICING.md). The
 per-region table Play holds is [monetization/REGIONAL_PRICES.md](monetization/REGIONAL_PRICES.md).
 
-### 4.3 Lifetime price — recommended ₱3,490 (USD $79.99)
+### 4.3 Lifetime price — ₱2,490 (USD $59.99), lowered from ₱3,490 (USD $79.99) on 2026-11-21
+
+**2026-11-21 (owner):** lowered to stay competitive with the apps closest to Lucento by features. Their one-time
+prices are ₱1,290–₱1,790 and $19.99–$29.99, and Spendee's is ₱2,990 / $119.99 (monetization/COMPETITOR_PRICING_2026-11.md).
+Lifetime is now 2.1 × yearly in the Philippines and 2.0 × in the US. Every tier moved in proportion
+(monetization/REGIONAL_PRICING.md). The reasoning below is the original case for ₱3,490.
 
 Commercial reasoning:
 
@@ -776,7 +781,7 @@ instead of turning, and the badge appears without movement.
 | D-7 | Custom-category cap for Free | "standard categories" | **No cap** | budgets are built from categories; the cost is zero |
 | D-8 | Scheduled-payment cap for Free | "basic recurring" | **No cap** | "never miss a bill" focus; cost zero |
 | D-9 | CSV export in Free | evaluate | **Yes** | portability is never sold; it is also the trust signal behind "your data" |
-| D-10 | Lifetime price | — | **₱3,490** (USD 79.99); founder offer ₱2,990 for 60 days, **dropped 2026-11-21** (never created in Play) | §4.3 |
+| D-10 | Lifetime price | — | **₱3,490** (USD 79.99), **lowered to ₱2,490 (USD 59.99) on 2026-11-21**; founder offer ₱2,990 for 60 days, **dropped 2026-11-21** (never created in Play) | §4.3 |
 | D-11 | Subscriber buys Lifetime | — | allowed; the person cancels the subscription in Play; no automatic credit (Play has none). Offer a support-granted Cloud extension equal to the unused months, manually, on request | avoids building proration logic Play does not support |
 | D-12 | Lucento Cloud add-on | — | **₱59 / ₱490**, offered to Lifetime owners only at launch | §4.4; a Free-tier Cloud SKU would undercut Pro |
 | D-13 | Lifetime included services | evaluate | **12 months of B/C/D from the purchase**, then Free AI allowance; Cloud add-on optional | the person experiences sync and the adviser; the promise stays bounded |
@@ -797,7 +802,7 @@ Lifetime = permanent ownership of local features; AI enforced server-side; never
 |---|---|---|
 | The matrix (what each plan can do) | `PlanCatalog` (Kotlin, tested so the table and the gates agree) ← this document §3 | `lucento-website/src/data/pricing.ts` (new), Play listing text, in-app comparison table, `CUSTOMER_COPY.md` A |
 | Numeric limits | `PlanCatalog` for client counts; `plan_limits` for server-enforced AI / partners | website copy quotes them; a website unit test pins the numbers |
-| Prices | Google Play Console | app via `ProductDetails`; website "from ₱149 / month · ₱3,490 once" marked *indicative, final price in Google Play* |
+| Prices | Google Play Console | app via `ProductDetails`; website "from ₱149 / month · ₱2,490 once" marked *indicative, final price in Google Play* |
 | The Lifetime promise and FAQ | `CUSTOMER_COPY.md` B and E | website `/pricing` and `/faq`; in-app Pro page "What Lifetime means" link |
 | Legal | website `/terms` (new), `/privacy` | upgrade screen footer |
 

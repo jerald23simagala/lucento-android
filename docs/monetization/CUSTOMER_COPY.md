@@ -80,7 +80,7 @@ billed differently; the table shows them as one column with a note where they di
 
 | | Free | Pro Monthly | Pro Annual | Pro Lifetime |
 |---|---|---|---|---|
-| Price (Philippines, indicative — final price in Google Play) | ₱0 | ₱149 / month | ₱1,190 / year (≈ ₱99 / month) | **₱3,490 once** |
+| Price (Philippines, indicative — final price in Google Play) | ₱0 | ₱149 / month | ₱1,190 / year (≈ ₱99 / month) | **₱2,490 once** |
 | Free trial | — | — | 7 days (once per Google account) | — |
 | Renews | — | Monthly, until cancelled in Google Play | Yearly, until cancelled in Google Play | **Never** |
 | Online services (sync, cloud restore, AI adviser, Shared) | — | While subscribed | While subscribed | **12 months included**, then optional Lucento Cloud: ₱59 / month or ₱490 / year |
@@ -215,7 +215,7 @@ Smarter reading. Afterwards, optional with Lucento Cloud (₱59 a month or ₱49
 *Limits:* 20 active goals. Online services are a service, not part of the one-time purchase, and are included for the
 first 12 months.
 
-*Price:* **₱3,490, once.** No renewal, ever.
+*Price:* **₱2,490, once.** No renewal, ever.
 
 *CTA:* **Buy Lifetime**
 
@@ -381,7 +381,7 @@ Pro, monthly ceiling (rare):
 > [ OK ]
 
 **D-6 Lifetime purchase option (plan selector card)**
-> **Pro Lifetime · ₱3,490 once**
+> **Pro Lifetime · ₱2,490 once**
 > Own every Pro feature that runs on your phone, for life, offline, with no renewal. Includes 12 months of cloud sync,
 > Shared and the AI adviser; keep them afterwards with Lucento Cloud, or not.
 > [ Buy Lifetime ]   · What Lifetime means ›
