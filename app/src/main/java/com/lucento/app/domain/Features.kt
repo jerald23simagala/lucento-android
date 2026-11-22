@@ -29,7 +29,7 @@ enum class Feature(
     ),
     RECURRING("recurring", "Recurring payments", "Bills, subscriptions and salary you confirm when they happen."),
     INSIGHTS("insights", "Insights & reports", "Spending breakdowns, monthly comparisons and net flow."),
-    RECEIPT_SCANNING("receipt_scanning", "Receipt scanning", "Read totals from receipt photos on this device."),
+    RECEIPT_SCANNING("receipt_scanning", "Receipt scanning", "Read receipts, bills and statements from photos, scans and PDFs, on this device."),
     VOICE_ENTRY("voice_entry", "Voice entry", "Speak transactions, or questions for Ask Lucento; your phone’s speech service turns them into text.");
 
     companion object {
