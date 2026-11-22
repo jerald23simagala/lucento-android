@@ -598,6 +598,24 @@ with kinds, and shortcut palette B.
   (`artifacts/tester-round-2026-11-17/`; rounds 1 and 2 in `r1/` and `r2/`) are local only, not committed.
 - **Not checked:** a real phone (OT-39), sync against a project with the migration (OT-38), and TalkBack.
 
+## Release 0.5.15 (version code 20) — 2026-11-22 (`release/0.5.15`)
+
+The owner said "Lets push it to a new build and I will test" after the scan roadmap was built. The branch is stacked on
+#125 (Lucento Scan), which is stacked on #124 (the tester fixes); none of them is merged yet, so the build comes from the
+`release/0.5.15` push run. App changes since 0.5.14:
+- #124: tilted receipts are read straight and the paid total is found (AMT DUE, TTL, VAT inclusive, cash less change);
+  Google-only accounts get no Update password form.
+- #125: Lucento Scan. The document scanner, several images, PDF import (locked ones too), pages joined or split into
+  documents, each document's own currency and dates, the statement check against saved transactions, and regional
+  merchant dictionaries (docs/SCAN.md). Privacy Policy version 2026-11-22 ("Scanning documents").
+- #116, already on main: the launch film's product fixes. These cover the Home net-balance tooltip, the Insights Ask
+  hero question, the onboarding storage summary by plan, the Plan page's debts line, the composer's 30-transaction
+  notice, and a required category in the editor.
+
+Room stays at v14, backups at format v5, and sync is untouched, so no Supabase change is needed. One new dependency,
+`play-services-mlkit-document-scanner` 16.0.0, adds no permission. Before production, the website /privacy page needs
+the "Scanning documents" lines. Owner: upload to Internal testing, then Mission Control OT-53 (the phone test, SC-N2).
+
 ## Release 0.5.14 (version code 19) — 2026-11-19 (`release/0.5.14`)
 
 The owner chose "Yes, build 0.5.14" for OT-41. The app changes since 0.5.13 are #106–#110 and #112:
