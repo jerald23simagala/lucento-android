@@ -1136,3 +1136,24 @@ me to update status of." Contract: `docs/mission-control/v1/OWNER_TASKS.md`.
   - DEPLOYMENT.md part L for installing; the owner's task is OT-50.
 
   Notifications wait for the owner to ask.
+
+## Mission Control on production, and the owner's setup day — 2026-11-21/22
+
+- **OT-28 done (2026-11-21, about 20:45 Manila):** the console runs on production at `mission.lucentoapp.com` (CNAME at
+  GoDaddy). Preview deployments keep lucento-test. Blob stores: `lucento-marketing-production` (Production),
+  `lucento-marketing-test` (Preview). Claude's tasks and marketing tools now default to PRODUCTION.
+- **The task list moved:** a copy of TEST first (`%USERPROFILE%\.lucento\mc-tasks-copy-TEST-2026-11-21.json`), then 19
+  tasks pushed to production with their states and TEST history as notes (KNOWN_ISSUES MC-15). Other sessions have
+  added OT-52 and OT-53 there since.
+- **OT-16 done:** the new Play signing key's Android client (AC-1), Purchase history also lists Fraud prevention, and
+  the reviewer account has a 90-day GRANT (checked read-only on production).
+- **OT-29 done:** the weekly encrypted backup ran green (2026-11-21 19:27 Manila); `MC_BACKUP_SECRET` is in the GitHub
+  environment, so later runs report to the production console.
+- **OT-37, parts 1–8 done on TEST:** the Meta, Google and TikTok apps (`docs/ACCOUNTS.md`), and all five accounts said
+  Works. **Marketing is on hold until Lucento is on Google Play** (owner, OT-34): parts 9–10 wait, and auto-posting on
+  production will need its own short setup. Setup-doc lessons (Meta's login configuration, Google's Branding step, the TikTok sandbox and DNS check, Supabase's
+  new Connect window) are in console `DEPLOYMENT.md` B3 and J4–J6 (console PR #17).
+- **Session timeout (console #16, merged 2026-11-22, `1e7e310`):** using a page counts as activity (a session check at
+  most once a minute while the owner clicks, types or scrolls), and Settings › You chooses the idle limit per browser,
+  30 minutes to 8 hours (12 hours absolute). Unit tests 344/344; full chromium e2e on a fresh local stack 37 passed,
+  1 skipped (the screenshot tour). SECURITY_CONSIDERATIONS.md §2 updated.

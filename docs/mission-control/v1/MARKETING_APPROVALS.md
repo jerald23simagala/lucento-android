@@ -396,9 +396,12 @@ scroll):
 - Numbers (Sunday): followers per channel (TikTok, Instagram, YouTube, Facebook Page, Community group), views per short
   per platform (TikTok, FB Reels, IG Reels, YouTube), installs and listing visitors (after launch) → Save.
 - History disclosure per card: the log, newest first, with [Remove this note] on owner notes (redact, fresh code).
-- Session: `?next=` survives /login and /mfa (same-origin only); a client timer from the last server round trip shows at
-  25 minutes "You'll be signed out in 5 minutes. [Stay signed in]"; a decision after expiry says "You were signed out
-  after 30 minutes without activity. Sign in, then tap again: this choice wasn't saved."
+- Session: `?next=` survives /login and /mfa (same-origin only); a client timer from the last server round trip shows,
+  on every console page, 5 minutes before the session's idle limit (30 minutes unless that browser chose longer in
+  Settings › You) "You'll be signed out in 5 minutes. [Stay signed in]"; using the page counts as activity (the page
+  tells the server at most once a minute); a decision after expiry says "You were signed out after 30 minutes without
+  activity. Sign in, then tap again: this choice wasn't saved." with the browser's limit in place of 30 minutes
+  (console #16, 2026-11-22).
 - Overview "Needs you now" (through `call()`: a missing function shows no marketing items; NavLinks treats a missing key
   as 0), sorted by slot: "Mon 19:30 post has no approved version yet" (warn < 36 h, bad < 12 h) · "5 posts wait for your
   yes · first goes out Mon 19:30" · "Tue 12:15 is approved but not scheduled" · "The apps still have an old or skipped

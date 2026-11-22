@@ -23,7 +23,7 @@ client in the same project as the web client (project **Lucento**). Fingerprints
 
 | Certificate | SHA-1 | Android client in project Lucento |
 |---|---|---|
-| Play app signing key **in use** (Play Console marks it "Quantum-ready (beta)") | `3F:DC:90:EE:BB:AE:DC:FD:2E:9C:64:07:13:44:80:82:3D:0A:86:66` | **Missing on 2026-11-21**: OT-16 adds it |
+| Play app signing key **in use** (Play Console marks it "Quantum-ready (beta)") | `3F:DC:90:EE:BB:AE:DC:FD:2E:9C:64:07:13:44:80:82:3D:0A:86:66` | "Lucento release (Play signing, new key)", added by the owner on 2026-11-21 (OT-16). Not yet proven by a Google sign-in on a copy installed from Play |
 | Play app signing key, previous (first used 2026-11-07) | `37:CE:29:A8:6A:61:97:37:DC:4C:82:73:AA:93:F8:A8:3C:41:9E:CC` | "Lucento release (Play app signing)", 2026-11-10 |
 | Upload key (CI signs the AAB with it) | `65:17:37:2B:3F:26:AC:68:D8:01:87:C9:EB:F4:72:4B:FF:F6:25:C1` | "Lucento upload key", 2026-11-09 |
 | Debug keystore (this PC) | `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75` | "Lucento Android Debug" (`com.lucento.app.debug`), and "Lucento Android" (`com.lucento.app`, a leftover: AC-2) |
@@ -46,4 +46,30 @@ Console's Cloud-project link needs the signing keys.
 - Data safety marks purchase history **optional**: correct, since nobody has to buy anything to use Lucento.
 - `lucento_cloud` in Play's products: the app's entitlement code still recognises it (`Entitlement.kt`).
 
-Follow-ups are in `docs/handover/KNOWN_ISSUES.md` (AC-1 to AC-4).
+## Mission Control's own apps (auto-posting, OT-37)
+
+Set up on 2026-11-21 for the TEST console's address (`lucento-mission-control.vercel.app`). Mission Control moved to
+production (`mission.lucentoapp.com`, OT-28) the same evening, so auto-posting on production needs the production
+return addresses added to all three and the accounts connected again (OT-37 waits for Marketing to restart). App ids
+and client keys are public identifiers; the secrets live only in Vercel.
+
+| App | Account | Where | Setup |
+|---|---|---|---|
+| Meta app **Lucento Mission Control** (App ID `1142971521993000`) | The Facebook account that manages the Lucento and KlaroPH Pages | developers.facebook.com | **Live**, no icon yet. Facebook Login for Business configuration "Mission Control" (user access token, the six permissions of `META_SCOPES`), so `META_LOGIN_CONFIG_ID` is required. Instagram through "API setup with Facebook login", which Meta now calls legacy (KNOWN_ISSUES MC-20) |
+| Google Cloud project **Lucento Mission Control** | The Google account that owns Lucento's YouTube channel | console.cloud.google.com | YouTube Data API v3. Consent screen External, In production, unverified (no logo): Branding has lucentoapp.com links and the authorized domains `lucentoapp.com` and `lucento-mission-control.vercel.app` (vercel.app is a public suffix). Web client "Mission Control" |
+| TikTok developer app **Lucento Mission Control** | Lucento's TikTok account (`lucentoapp`) | developers.tiktok.com | Individual, category Business. The main app is unsaved: TikTok demands a demo video, which belongs to its review. Sandbox **Mission Control** (saved with Apply changes): Login Kit with the callback, Content Posting API with Direct Post off, `user.info.basic` and `video.upload`, target user `lucentoapp`; its client key and secret are in Vercel |
+
+## DNS records on lucentoapp.com (GoDaddy)
+
+| Name | Type | What it is for |
+|---|---|---|
+| `lucentoapp.com` | TXT `google-site-verification=…` | Google Search Console |
+| `lucentoapp.com` | TXT `tiktok-developers-site-verification=…` | TikTok's URL properties for the developer app's terms, privacy and web addresses (added 2026-11-21) |
+| `_dmarc` | TXT | DMARC, reports to GoDaddy's address |
+| `send.lucentoapp.com` | DKIM (`resend._domainkey.send`), SPF and MX (`send.send`) | Account emails through Resend (docs/EMAILS.md) |
+| `mission` | CNAME to Vercel | Mission Control on production (OT-28, 2026-11-21) |
+
+Checked from outside on 2026-11-21 after the TikTok record went in: the Google verification, DMARC and the Resend
+records were unchanged.
+
+Follow-ups are in `docs/handover/KNOWN_ISSUES.md` (AC-1 to AC-4, MC-20 to MC-22).
