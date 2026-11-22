@@ -90,13 +90,18 @@ Owner, 2026-11-04: a scan should tell a receipt (many lines, one payment) from a
 list (many payments). Everything is read on this phone (`LocalTransactionInterpreter.interpretScan`), never presented as AI.
 
 1. **OCR rows.** ML Kit returns text lines with positions; `ReceiptParser.mergeRows` joins the pieces of each printed
-   line left to right (columns become one row).
+   line left to right (columns become one row). A photo taken at a slight tilt is straightened first by the median of
+   ML Kit's line angles, so a label stays with its own amount instead of the one beside the next line.
 2. **Receipt or statement?** `StatementParser.classify`: several lines that each carry a date and an amount, dates
    heading or under groups of amounts (an e-wallet's history), or +/− marks on several lines make a statement; anything
    else is a receipt.
 3. **A receipt** becomes one expense for its total. The total line is chosen by label: "Amount due" outranks "Total",
    "Amount paid" is used only when nothing better is printed (less the change, when change is printed); "Subtotal",
-   VAT, cash tendered and "Minimum amount due" never count.
+   VAT, cash tendered and "Minimum amount due" never count. Thermal-printer abbreviations ("AMT DUE", "TOTAL AMT",
+   "TTL", "AMT PAID") count, and "TOTAL (VAT INCLUSIVE)" is a total, not a tax line. With no total line, cash
+   tendered less change is the total when that amount is printed on the receipt; otherwise nothing is pre-filled and
+   the choices offered are amounts that could be the payment (cash less change first), never cash tendered, change,
+   VAT or VATable lines, discounts or points (tester report 2026-11-21).
 4. **A statement** becomes one row per transaction, each with its own date, description and amount, in the scanned
    account (the active wallet). Money in or out comes from the running balance when one is printed, else CR/DR and
    +/− marks, else the words; a card statement's lines are charges unless they say payment or credit. A payment into a

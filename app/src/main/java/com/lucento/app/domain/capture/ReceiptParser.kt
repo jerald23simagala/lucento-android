@@ -15,8 +15,12 @@ enum class TotalConfidence {
     NONE,
 }
 
-/** A piece of recognised text and where it sits on the image (pixels). */
-data class TextFragment(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int) {
+/**
+ * A piece of recognised text and where it sits on the image (pixels). [angle] is the line's tilt in degrees, clockwise
+ * positive (ML Kit's `Text.Line.angle`); 0 when unknown.
+ */
+data class TextFragment(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int, val angle: Float = 0f) {
+    val centerX: Int get() = (left + right) / 2
     val centerY: Int get() = (top + bottom) / 2
     val height: Int get() = (bottom - top).coerceAtLeast(1)
 }
@@ -29,7 +33,11 @@ data class ReceiptSuggestion(
     val date: LocalDate?,
     /** True when the date's day/month order could not be determined and the reading may be wrong. */
     val dateAmbiguous: Boolean,
-    /** Every money amount seen, largest first, so the user can pick another one quickly. */
+    /**
+     * Amounts that could be what was paid, so the user can pick another one quickly: the suggested total first, then
+     * the rest largest first. Cash handed over, change, VAT breakdowns, discounts and points are left out (tester report
+     * 2026-11-21: they crowded out the real total), unless nothing else is printed.
+     */
     val amounts: List<BigDecimal>,
     /** Currency named on the receipt (symbol or ISO code), or null when none or an ambiguous one (`$`, `¥`). */
     val currencyCode: String? = null,
@@ -49,16 +57,32 @@ object ReceiptParser {
      * Receipts are laid out in columns ("TOTAL" on the left, "274.40" on the right) and OCR returns them
      * as separate fragments. This rebuilds visual rows: fragments whose vertical centres fall within
      * half a line of each other are joined left-to-right, rows ordered top-to-bottom.
+     *
+     * A receipt photographed at a slight tilt makes the right-hand column drift up or down a line (at 3° across a
+     * 600 px slip, about 30 px), which joined "AMOUNT DUE" to the price beside the line above (tester report
+     * 2026-11-21). So the centres are first straightened by the page's tilt: the median of the lines' angles.
      */
     fun mergeRows(fragments: List<TextFragment>): List<String> {
-        val rows = ArrayList<MutableList<TextFragment>>()
-        fragments.filter { it.text.isNotBlank() }.sortedBy { it.centerY }.forEach { f ->
+        val visible = fragments.filter { it.text.isNotBlank() }
+        val tilt = pageTilt(visible)
+        fun level(f: TextFragment): Double = f.centerY - f.centerX * tilt
+        val rows = ArrayList<MutableList<Pair<TextFragment, Double>>>()
+        visible.map { it to level(it) }.sortedBy { it.second }.forEach { (f, y) ->
             val row = rows.lastOrNull()
-            val anchor = row?.let { r -> r.sumOf { it.centerY } / r.size }
-            val tolerance = row?.let { r -> (r.maxOf { it.height }.coerceAtLeast(f.height)) / 2 } ?: 0
-            if (row != null && anchor != null && kotlin.math.abs(f.centerY - anchor) <= tolerance) row.add(f) else rows.add(mutableListOf(f))
+            val anchor = row?.let { r -> r.sumOf { it.second } / r.size }
+            val tolerance = row?.let { r -> (r.maxOf { it.first.height }.coerceAtLeast(f.height)) / 2.0 } ?: 0.0
+            if (row != null && anchor != null && kotlin.math.abs(y - anchor) <= tolerance) row.add(f to y) else rows.add(mutableListOf(f to y))
         }
-        return rows.map { r -> r.sortedBy { it.left }.joinToString("  ") { it.text.trim() } }
+        return rows.map { r -> r.map { it.first }.sortedBy { it.left }.joinToString("  ") { it.text.trim() } }
+    }
+
+    /** The slope (tan of the median line angle) to straighten by; 0 when nearly level, unknown, or implausibly steep. */
+    internal fun pageTilt(fragments: List<TextFragment>): Double {
+        val angles = fragments.map { it.angle }.filter { it.isFinite() }.sorted()
+        if (angles.isEmpty()) return 0.0
+        val median = angles[angles.size / 2].toDouble()
+        if (kotlin.math.abs(median) < 0.3 || kotlin.math.abs(median) > 30) return 0.0
+        return kotlin.math.tan(Math.toRadians(median))
     }
 
     /**
@@ -70,8 +94,14 @@ object ReceiptParser {
         val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
         val detected = detectCurrency(clean)
         val digits = CurrencyRules.fractionDigits(detected ?: expectedCurrency ?: "XXX").let { if (it > 3) 2 else it }
-        val amounts = clean.flatMap { amountsIn(it, digits, allowIntegers = false) }.distinct().sortedDescending()
+        val every = clean.flatMap { amountsIn(it, digits, allowIntegers = false) }.distinct().sortedDescending()
+        val payable = clean.filterNot { notPayment.containsMatchIn(withoutTaxQualifier(it.lowercase(Locale.ROOT))) }
+            .flatMap { amountsIn(it, digits, allowIntegers = false) }.distinct().sortedDescending()
+        val derived = cashLessChange(clean, digits)
         val labelled = findTotal(clean, digits)
+            // No total line, but the cash handed over less the change matches an amount printed on the receipt.
+            ?: derived?.takeIf { d -> every.any { it.compareTo(d) == 0 } }?.let { LabelledTotal(it, "Cash less change") }
+        val amounts = (listOfNotNull(derived) + payable).distinct().ifEmpty { every }
         val (total, confidence) = labelled?.let { it.amount to TotalConfidence.LABELLED }
             ?: amounts.firstOrNull()?.let { it to TotalConfidence.LARGEST_AMOUNT }
             ?: (null to TotalConfidence.NONE)
@@ -82,7 +112,7 @@ object ReceiptParser {
             totalConfidence = confidence,
             date = date,
             dateAmbiguous = ambiguous,
-            amounts = (listOfNotNull(total) + amounts).distinct().sortedDescending().take(8),
+            amounts = (listOfNotNull(total) + amounts).distinct().take(8),
             currencyCode = detected,
             fractionDigits = digits,
             totalLabel = labelled?.label,
@@ -207,15 +237,49 @@ object ReceiptParser {
      */
     private val totalLabels = listOf(
         Regex("grand\\s*total") to 0,
-        Regex("total\\s*(amount\\s*)?due|amount\\s*due|balance\\s*due|amount\\s*payable|total\\s*payable|amount\\s*to\\s*pay") to 1,
-        Regex("total\\s*amount|net\\s*total|total\\s*sales|net\\s*amount|\\btotal\\b") to 2,
-        Regex("amount\\s*paid|total\\s*paid|you\\s*paid|paid\\s*amount|payment\\s*amount") to 3,
+        // Thermal printers abbreviate: "AMT DUE", "TOTAL AMT", "TTL", "AMT PAID".
+        Regex(
+            "total\\s*(amount\\s*|amt\\.?\\s*)?due|(amount|amt\\.?)\\s*due|balance\\s*due|(amount|amt\\.?)\\s*payable|" +
+                "(total|net)\\s*payable|amount\\s*to\\s*pay",
+        ) to 1,
+        Regex("total\\s*(amount|amt)|net\\s*total|total\\s*sales?\\b|net\\s*amount|\\btotal\\b|\\bttl\\b") to 2,
+        Regex("(amount|amt\\.?)\\s*paid|total\\s*paid|you\\s*paid|paid\\s*amount|payment\\s*amount") to 3,
     )
     private val notTotal = Regex(
         "sub\\s*-?\\s*total|total\\s*(items?|qty|quantity|savings|discount|vat|tax)|\\bvat\\b|\\btax\\b|change|tender|cash\\s*paid|discount|points|" +
             "min(imum)?\\.?\\s*(amount\\s*)?due",
     )
     private val changeLine = Regex("\\bchange\\b")
+
+    /**
+     * "TOTAL (VAT INCLUSIVE)", "Amount due incl. VAT": the tax words qualify the total; they don't make it a tax line.
+     * Removed before a line is tested against [notTotal].
+     */
+    private val taxQualifier = Regex(
+        "\\(?\\s*(vat|tax)[\\s-]*(incl(usive|\\.|uded)?|inc\\.?)\\s*\\)?|\\(?\\s*incl(usive|\\.|uding)?\\s*(of\\s*)?(vat|tax(es)?)\\s*\\)?",
+    )
+
+    internal fun withoutTaxQualifier(lower: String): String = taxQualifier.replace(lower, " ")
+
+    /** Lines whose amounts are never what was paid: money handed over, change, tax breakdowns, savings, counts. */
+    private val notPayment = Regex(
+        "\\bchange\\b|tender|\\bcash\\b(?!\\s*back)|\\bvat|\\btax\\b|exempt|zero[-\\s]*rated|discount|savings|points|rewards?|" +
+            "total\\s*(items?|qty|quantity)|min(imum)?\\.?\\s*(amount\\s*)?due",
+    )
+
+    /** Money handed over: "CASH 1,000.00", "AMOUNT TENDERED 500.00". */
+    private val tenderedLine = Regex("\\bcash\\b(?!\\s*back)|tender")
+
+    /** The cash handed over less the change given back, when both are printed; null otherwise. */
+    internal fun cashLessChange(lines: List<String>, fractionDigits: Int): BigDecimal? {
+        // The first such line that carries an amount: "PAYMENT TYPE: CASH" alone names the method, not the money.
+        fun firstAmount(matches: (String) -> Boolean): BigDecimal? = lines.firstNotNullOfOrNull { line ->
+            line.takeIf { matches(it.lowercase(Locale.ROOT)) }?.let { amountsIn(it, fractionDigits, allowIntegers = true).lastOrNull() }
+        }
+        val tendered = firstAmount { tenderedLine.containsMatchIn(it) && !changeLine.containsMatchIn(it) } ?: return null
+        val change = firstAmount { changeLine.containsMatchIn(it) } ?: return null
+        return (tendered - change).takeIf { it.signum() > 0 }
+    }
 
     /** A labelled total and the words that labelled it. */
     private data class LabelledTotal(val amount: BigDecimal, val label: String)
@@ -228,7 +292,7 @@ object ReceiptParser {
         var best: Triple<Int, Int, BigDecimal>? = null // rank, line index, amount
         var bestLabel = ""
         lines.forEachIndexed { index, line ->
-            val lower = line.lowercase(Locale.ROOT)
+            val lower = withoutTaxQualifier(line.lowercase(Locale.ROOT))
             if (notTotal.containsMatchIn(lower)) return@forEachIndexed
             val (re, rank) = totalLabels.firstOrNull { (re, _) -> re.containsMatchIn(lower) } ?: return@forEachIndexed
             // On a line labelled as the total, a plain integer ("TOTAL 250") is a legitimate amount.
@@ -272,7 +336,7 @@ object ReceiptParser {
         if (total == null) return ItemsCheck.UNKNOWN
         val clean = lines.map { it.trim() }.filter { it.isNotEmpty() }
         val totalIndex = clean.indexOfFirst { line ->
-            val lower = line.lowercase(Locale.ROOT)
+            val lower = withoutTaxQualifier(line.lowercase(Locale.ROOT))
             !notTotal.containsMatchIn(lower) && totalLabels.any { (re, _) -> re.containsMatchIn(lower) }
         }
         if (totalIndex <= 0) return ItemsCheck.UNKNOWN

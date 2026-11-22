@@ -7,8 +7,9 @@ import java.util.Locale
  * Receipt text (from on-device OCR) → one expense candidate: the shop as the description, the total paid, the printed
  * date. A receipt is one payment, so its line items are never split into separate transactions.
  *
- * A total printed next to "Total" is pre-filled. Without one, the largest amounts are offered as choices and nothing is
- * pre-filled, because a guessed total must never be saved silently. Items that don't add up to the total, a missing
+ * A total printed next to "Total" is pre-filled. Without one, the amounts that could be the payment are offered as
+ * choices (never cash tendered, change or VAT lines) and nothing is pre-filled, because a guessed total must never be
+ * saved silently. Items that don't add up to the total, a missing
  * date and an unclear day/month order are flagged on the row.
  */
 object ReceiptCandidates {

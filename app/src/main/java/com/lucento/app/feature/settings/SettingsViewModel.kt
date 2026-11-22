@@ -95,6 +95,11 @@ data class CloudSyncUiState(
      * for good: the sign-in panel says so first (owner decision 2026-11-14).
      */
     val purchaseWithoutAccount: Boolean = false,
+    /**
+     * The account signs in with an email and password. False for a Google-only account, which hides the Password
+     * section (it has no password to update); null when unknown, which keeps it.
+     */
+    val usesPassword: Boolean? = null,
 )
 
 class SettingsViewModel(
@@ -150,6 +155,7 @@ class SettingsViewModel(
             partnerOfSpace,
             deletion,
             purchaseWithoutAccount,
+            auth.observeUsesPassword(),
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
@@ -164,6 +170,7 @@ class SettingsViewModel(
             val partner = values[10] as Boolean
             val deleting = values[11] as com.lucento.app.feature.account.DeleteAccountPrompt?
             val heldWithoutAccount = values[12] as Boolean
+            val usesPassword = values[13] as Boolean?
             val lockedByPlan = plan != null && !com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, partner, System.currentTimeMillis())
             SettingsUiState(
                 preferences = prefs,
@@ -185,6 +192,7 @@ class SettingsViewModel(
                     lockedByPlan = lockedByPlan,
                     deletion = deleting,
                     purchaseWithoutAccount = heldWithoutAccount,
+                    usesPassword = usesPassword,
                 ),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

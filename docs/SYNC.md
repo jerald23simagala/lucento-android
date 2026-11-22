@@ -67,6 +67,9 @@ to the server and every sync fails safely, keeping all local data and dirty flag
   sends nothing) tries the same password: the person's own account just signs in; otherwise they're told to sign in.
 - A new email account records the Terms of Use / Privacy Policy version it agreed to (`terms_version`,
   `terms_accepted_at` in user metadata; docs/LEGAL.md). Google sign-in shows "By continuing with Google, you agree…".
+- Settings › Account & sync shows **Password › Update password** only when the account's sign-in methods (the session's
+  `app_metadata.providers` and identities, `AuthRepository.observeUsesPassword`) include `email`. A Google-only account
+  has no password, so the section is hidden (tester report 2026-11-21); when the session doesn't say, it stays.
 - Onboarding asks first, right after Get started (owner, 2026-11-06): **Keep your money safe** — Sync with an account
   (Google, or "Use email instead" → a create-only page) or Keep it on this phone only. "I already have Lucento" signs in
   only; "I was invited to share" can sign in or create. Connecting turns sync on, but the **first sync runs only when

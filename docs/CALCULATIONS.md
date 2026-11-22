@@ -430,7 +430,11 @@ apostrophe).
 **Which line is the total**, best first: "Grand total"; "Amount due" / "Total due" / "Balance due" / "Amount payable" /
 "Amount to pay"; "Total amount" / "Net total" / "Net amount" / "Total"; "Amount paid" / "Total paid" / "You paid". Never
 "Subtotal", tax lines, change, cash tendered or "Minimum amount due". When the only label is "Amount paid" and a change
-line is printed, the total is paid − change (`ReceiptParser.findTotal`).
+line is printed, the total is paid − change (`ReceiptParser.findTotal`). Abbreviations count ("Amt due", "Total amt",
+"TTL", "Amt paid"), and a "VAT inclusive" / "incl. VAT" qualifier doesn't make a total line a tax line. With no total
+line, cash tendered − change is the total only when that amount is also printed on the receipt; otherwise nothing is
+pre-filled, and the amounts offered to choose from leave out cash tendered, change, VAT/VATable/exempt/zero-rated lines,
+discounts, savings and points (cash − change, when printed, is offered first).
 Amounts are read with the minor-unit digits of the currency printed on the receipt (unambiguous symbols/ISO codes
 only; `$` and `¥` are ambiguous and ignored), else the default wallet's currency, else 2. A group of three after a
 single separator is thousands (`1,250`, `12.500`) except for 3-decimal currencies with a `.` (`12.500` KWD). Plain

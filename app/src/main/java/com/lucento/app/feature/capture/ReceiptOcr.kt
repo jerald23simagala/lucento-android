@@ -37,6 +37,7 @@ object ReceiptOcr {
                                     top = box?.top ?: 0,
                                     right = box?.right ?: 0,
                                     bottom = box?.bottom ?: 0,
+                                    angle = line.angle,
                                 )
                             }
                         }

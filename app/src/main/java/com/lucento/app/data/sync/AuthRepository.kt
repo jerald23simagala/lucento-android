@@ -136,6 +136,23 @@ class AuthRepository(
     }
 
     /**
+     * Whether the signed-in account has an email-and-password sign-in, read from the session's sign-in methods. False
+     * for an account that only signs in with Google, which has no password to update (tester report 2026-11-21);
+     * null when signed out or when the session doesn't say.
+     */
+    fun observeUsesPassword(): Flow<Boolean?> {
+        val auth = client?.auth ?: return flowOf(null)
+        return auth.sessionStatus.map { status ->
+            val user = when (status) {
+                is SessionStatus.Authenticated -> status.session.user
+                is SessionStatus.RefreshFailure -> auth.currentUserOrNull()
+                else -> null
+            }
+            user?.let { usesPasswordSignIn(it.appMetadata, it.identities?.map { identity -> identity.provider }) }
+        }.distinctUntilChanged()
+    }
+
+    /**
      * Shows Google's account picker and exchanges the chosen account's ID token for a Supabase session (a new
      * Supabase user is created on first sign-in). [activity] must be an Activity: Credential Manager launches its
      * account sheet from it. It is used only for this call and not retained.
@@ -586,6 +603,19 @@ internal fun accountPhotoUrl(metadata: kotlinx.serialization.json.JsonObject?): 
     listOf("avatar_url", "picture")
         .firstNotNullOfOrNull { key -> (metadata?.get(key) as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content }
         ?.takeIf { com.lucento.app.data.media.ProfilePhotos.isGooglePhotoUrl(it) }
+
+/**
+ * True when the account's sign-in methods include Supabase's "email" provider (a password), false when they are known
+ * and don't (Google only), null when neither the app metadata ("providers", "provider") nor the identities say.
+ */
+internal fun usesPasswordSignIn(appMetadata: kotlinx.serialization.json.JsonObject?, identityProviders: List<String>?): Boolean? {
+    fun text(element: kotlinx.serialization.json.JsonElement?): String? =
+        (element as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
+    val fromMetadata = (appMetadata?.get("providers") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { text(it) }.orEmpty() +
+        listOfNotNull(text(appMetadata?.get("provider")))
+    val providers = (fromMetadata + identityProviders.orEmpty()).map { it.trim().lowercase(java.util.Locale.ROOT) }.filter { it.isNotEmpty() }
+    return if (providers.isEmpty()) null else "email" in providers
+}
 
 internal fun signInFailureMessage(e: Throwable, debug: Boolean): String {
     val message = when {
