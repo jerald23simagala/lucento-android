@@ -296,6 +296,11 @@ cannot do automatically).
 ₱149 / month, ₱1,190 / year (≈ ₱99 / month, 33% off), 7-day trial on annual. Reasoning as v1 §4.2; unchanged. USD
 template $3.99 / $29.99.
 
+**Regional prices (owner decision 2026-11-21).** Every price comes in four income tiers. The USD figures in this
+section are tier 1, the Philippine prices are tier 3, and Play converts each tier's base for its regions. The method,
+the country lists and the tool are in [monetization/REGIONAL_PRICING.md](monetization/REGIONAL_PRICING.md). The
+per-region table Play holds is [monetization/REGIONAL_PRICES.md](monetization/REGIONAL_PRICES.md).
+
 ### 4.3 Lifetime price — recommended ₱3,490 (USD $79.99)
 
 Commercial reasoning:
@@ -315,7 +320,8 @@ Commercial reasoning:
 Alternatives considered: ₱2,990 (too close to 2.5 × annual: at a 7-day trial on annual, a sizeable share of annual
 buyers would switch, and the included services year makes it a near-giveaway); ₱4,490 (3.8 ×; converts fewer and
 needs a launch promo to move at all). A **launch "founder" price** (₱2,990 for the first 60 days, then ₱3,490) is a
-Play Console action, not an app change, and is recommended as the launch tactic (D-10).
+Play Console action, not an app change, and is recommended as the launch tactic (D-10). **Dropped by the owner on
+2026-11-21:** Lifetime launches at its full price, with no founder offer in Play.
 
 ### 4.4 Lucento Cloud add-on — ₱59 / month, ₱490 / year (USD $1.49 / $12.99)
 
@@ -344,7 +350,8 @@ adviser discoverable.
 
 ### 4.6 Promotions and future tiers
 
-Play promo codes, introductory prices and the founder price are Play Console offers; no app change. Server `GRANT`
+Play promo codes, introductory prices and launch offers are Play Console offers; no app change (the founder price was
+dropped on 2026-11-21). Server `GRANT`
 rows (with expiry) cover founders, testers, giveaways and goodwill. A future Pro Plus / Family is a new `Plan` and a
 `max_partners` change (PRODUCT_SPEC §7); the matrix is data (`PlanCatalog`), not code paths.
 
@@ -769,7 +776,7 @@ instead of turning, and the badge appears without movement.
 | D-7 | Custom-category cap for Free | "standard categories" | **No cap** | budgets are built from categories; the cost is zero |
 | D-8 | Scheduled-payment cap for Free | "basic recurring" | **No cap** | "never miss a bill" focus; cost zero |
 | D-9 | CSV export in Free | evaluate | **Yes** | portability is never sold; it is also the trust signal behind "your data" |
-| D-10 | Lifetime price | — | **₱3,490** (USD 79.99); founder offer ₱2,990 for 60 days | §4.3 |
+| D-10 | Lifetime price | — | **₱3,490** (USD 79.99); founder offer ₱2,990 for 60 days, **dropped 2026-11-21** (never created in Play) | §4.3 |
 | D-11 | Subscriber buys Lifetime | — | allowed; the person cancels the subscription in Play; no automatic credit (Play has none). Offer a support-granted Cloud extension equal to the unused months, manually, on request | avoids building proration logic Play does not support |
 | D-12 | Lucento Cloud add-on | — | **₱59 / ₱490**, offered to Lifetime owners only at launch | §4.4; a Free-tier Cloud SKU would undercut Pro |
 | D-13 | Lifetime included services | evaluate | **12 months of B/C/D from the purchase**, then Free AI allowance; Cloud add-on optional | the person experiences sync and the adviser; the promise stays bounded |
@@ -957,7 +964,7 @@ What landed:
     whole reading a *failure*, so a forged purchase neither adds a plan nor hides a real one.
   - `onPurchasesUpdated` re-reads the whole list, because the merge treats a missing purchase as ended.
   - Offers are chosen in `PlayPriceSelection`: the trial when Play lists it, the base plan otherwise, never an offer with
-    a paid intro phase, and the cheapest Lifetime option (the founder price).
+    a paid intro phase, and the cheapest Lifetime option (there's only one, since the founder price was dropped on 2026-11-21).
   - `obfuscatedAccountId` is sha256 of the Lucento user id.
   - Release builds use Play only with `LUCENTO_PLAY_LICENSE_KEY`. Without it they use `UnavailablePurchaseSource`, which
     never removes a plan. Debug builds keep the fake store.
@@ -1000,7 +1007,7 @@ What landed:
 
 Original scope:
 `billing-ktx` 9.x, `PlayPurchaseSource` (SUBS + INAPP, pending, acknowledge, restore, `obfuscatedAccountId`);
-Vercel `verify.ts`, `rtdn.ts`, `voided.ts`; Play Console products, base plans, offers (trial, founder price), RTDN
+Vercel `verify.ts`, `rtdn.ts`, `voided.ts`; Play Console products, base plans, offers (trial; the founder price was dropped later), RTDN
 topic, license testers; release signing (CS-20) and `targetSdk` check first.
 
 ### Phase 5 — QA, website, launch

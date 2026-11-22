@@ -60,6 +60,15 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Regional prices — follow-ups (2026-11-21, `feature/regional-pricing`)
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| RP-1 | Owner: untick **Manage store presence** on `lucento-play-billing` (Mission Control › Tasks **OT-52**); then confirm `pricing.mjs plan` gets 403 and purchase checks still read | P1 | The key also lives in Vercel for purchase checks, so it shouldn't keep price and listing powers |
+| RP-2 | lucento-website: say that the prices shown are the Philippine ones and that Google Play shows the price for each country (`src/data/plans.ts`, `Pricing.astro`) | P2 | A US visitor now pays $3.99, not the peso equivalent |
+| RP-3 | Re-run `node tools/play-pricing/pricing.mjs plan` every six months (next by May 2027), and whenever a currency moves more than about 10 % (TRY, ARS, EGP, NGN). Apply after the owner approves, then commit the new `REGIONAL_PRICES.md` and history | P3 | Needs RP-1's permission again for the run |
+| RP-4 | Watch Lifetime after launch: at $79.99 / ₱3,490 it's 2–4 × the lifetime price of Cashew, Money Lover and Wallet (`COMPETITOR_PRICING_2026-11.md`). The owner dropped the founder price on 2026-11-21; any change is the owner's call | P3 | Subscriptions compare well |
+
 ## Pro experience — follow-ups (2026-11-19, `feature/pro-repeat-taps-previews`)
 
 - On a phone, Free plan: a wall met twice (the dialog, then the message with Unlock) on Wallets, in the wallet editor,
