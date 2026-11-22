@@ -1,0 +1,4163 @@
+{
+  "kind": "plan",
+  "madeAt": "2026-11-22T01:36:56.535Z",
+  "regionsVersion": "2026/01",
+  "prices": {
+    "pro.monthly": {
+      "AE": {
+        "currencyCode": "AED",
+        "units": "14",
+        "nanos": 990000000
+      },
+      "AG": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "AL": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 790000000
+      },
+      "AM": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "AO": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "AR": {
+        "currencyCode": "ARS",
+        "units": "3700"
+      },
+      "AT": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "AU": {
+        "currencyCode": "AUD",
+        "units": "6",
+        "nanos": 490000000
+      },
+      "AW": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "AZ": {
+        "currencyCode": "AZN",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "BA": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "BD": {
+        "currencyCode": "BDT",
+        "units": "220"
+      },
+      "BE": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "BF": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "BG": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 590000000
+      },
+      "BH": {
+        "currencyCode": "USD",
+        "units": "3",
+        "nanos": 290000000
+      },
+      "BJ": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "BM": {
+        "currencyCode": "USD",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "BO": {
+        "currencyCode": "BOB",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "BR": {
+        "currencyCode": "BRL",
+        "units": "13",
+        "nanos": 990000000
+      },
+      "BS": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "BW": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "BY": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 790000000
+      },
+      "BZ": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "CA": {
+        "currencyCode": "CAD",
+        "units": "5",
+        "nanos": 490000000
+      },
+      "CD": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "CF": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "CG": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "CH": {
+        "currencyCode": "CHF",
+        "units": "3",
+        "nanos": 300000000
+      },
+      "CI": {
+        "currencyCode": "XOF",
+        "units": "1100"
+      },
+      "CL": {
+        "currencyCode": "CLP",
+        "units": "3600"
+      },
+      "CM": {
+        "currencyCode": "XAF",
+        "units": "1100"
+      },
+      "CO": {
+        "currencyCode": "COP",
+        "units": "8000"
+      },
+      "CR": {
+        "currencyCode": "CRC",
+        "units": "1000"
+      },
+      "CV": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "CY": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "CZ": {
+        "currencyCode": "CZK",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "DE": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "DJ": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "DK": {
+        "currencyCode": "DKK",
+        "units": "34"
+      },
+      "DM": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "DO": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "DZ": {
+        "currencyCode": "DZD",
+        "units": "325"
+      },
+      "EC": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "EE": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "EG": {
+        "currencyCode": "EGP",
+        "units": "97",
+        "nanos": 990000000
+      },
+      "ER": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "ES": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "ET": {
+        "currencyCode": "ETB",
+        "units": "250"
+      },
+      "FI": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "FJ": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "FM": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "FR": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "GA": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 90000000
+      },
+      "GB": {
+        "currencyCode": "GBP",
+        "units": "3",
+        "nanos": 690000000
+      },
+      "GD": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "GE": {
+        "currencyCode": "GEL",
+        "units": "7"
+      },
+      "GH": {
+        "currencyCode": "GHS",
+        "units": "25"
+      },
+      "GI": {
+        "currencyCode": "GBP",
+        "units": "3",
+        "nanos": 90000000
+      },
+      "GM": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "GN": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "GR": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "GT": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "GW": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "HK": {
+        "currencyCode": "HKD",
+        "units": "29",
+        "nanos": 900000000
+      },
+      "HN": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "HR": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "HT": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "HU": {
+        "currencyCode": "HUF",
+        "units": "1290"
+      },
+      "ID": {
+        "currencyCode": "IDR",
+        "units": "43000"
+      },
+      "IE": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "IL": {
+        "currencyCode": "ILS",
+        "units": "13"
+      },
+      "IN": {
+        "currencyCode": "INR",
+        "units": "170"
+      },
+      "IQ": {
+        "currencyCode": "IQD",
+        "units": "3500"
+      },
+      "IS": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "IT": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "JM": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "JO": {
+        "currencyCode": "JOD",
+        "units": "1",
+        "nanos": 650000000
+      },
+      "JP": {
+        "currencyCode": "JPY",
+        "units": "700"
+      },
+      "KE": {
+        "currencyCode": "KES",
+        "units": "250"
+      },
+      "KG": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "KH": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "KM": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "KN": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "KR": {
+        "currencyCode": "KRW",
+        "units": "5900"
+      },
+      "KW": {
+        "currencyCode": "USD",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "KY": {
+        "currencyCode": "USD",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "KZ": {
+        "currencyCode": "KZT",
+        "units": "1190"
+      },
+      "LA": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "LB": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "LC": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "LI": {
+        "currencyCode": "CHF",
+        "units": "3",
+        "nanos": 600000000
+      },
+      "LK": {
+        "currencyCode": "LKR",
+        "units": "525"
+      },
+      "LR": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "LT": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "LU": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "LV": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "LY": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "MA": {
+        "currencyCode": "MAD",
+        "units": "27",
+        "nanos": 990000000
+      },
+      "MC": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "MD": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 790000000
+      },
+      "MK": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 790000000
+      },
+      "ML": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "MM": {
+        "currencyCode": "MMK",
+        "units": "3000"
+      },
+      "MN": {
+        "currencyCode": "MNT",
+        "units": "8410"
+      },
+      "MO": {
+        "currencyCode": "MOP",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "MT": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "MU": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "MV": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "MX": {
+        "currencyCode": "MXN",
+        "units": "49"
+      },
+      "MY": {
+        "currencyCode": "MYR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "MZ": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "NA": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "NE": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "NG": {
+        "currencyCode": "NGN",
+        "units": "2380"
+      },
+      "NI": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "NL": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "NO": {
+        "currencyCode": "NOK",
+        "units": "49"
+      },
+      "NP": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 790000000
+      },
+      "NZ": {
+        "currencyCode": "NZD",
+        "units": "8",
+        "nanos": 490000000
+      },
+      "OM": {
+        "currencyCode": "USD",
+        "units": "3",
+        "nanos": 90000000
+      },
+      "PA": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "PE": {
+        "currencyCode": "PEN",
+        "units": "7",
+        "nanos": 990000000
+      },
+      "PG": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "PH": {
+        "currencyCode": "PHP",
+        "units": "149",
+        "nanos": 0
+      },
+      "PK": {
+        "currencyCode": "PKR",
+        "units": "440"
+      },
+      "PL": {
+        "currencyCode": "PLN",
+        "units": "14",
+        "nanos": 990000000
+      },
+      "PT": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "PY": {
+        "currencyCode": "PYG",
+        "units": "15000"
+      },
+      "QA": {
+        "currencyCode": "QAR",
+        "units": "15"
+      },
+      "RO": {
+        "currencyCode": "RON",
+        "units": "17",
+        "nanos": 990000000
+      },
+      "RS": {
+        "currencyCode": "RSD",
+        "units": "299"
+      },
+      "RU": {
+        "currencyCode": "RUB",
+        "units": "189"
+      },
+      "RW": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "SA": {
+        "currencyCode": "SAR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "SB": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "SC": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "SE": {
+        "currencyCode": "SEK",
+        "units": "49"
+      },
+      "SG": {
+        "currencyCode": "SGD",
+        "units": "5",
+        "nanos": 490000000
+      },
+      "SI": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "SK": {
+        "currencyCode": "EUR",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "SL": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "SM": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "SN": {
+        "currencyCode": "XOF",
+        "units": "1100"
+      },
+      "SO": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "SR": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "SV": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "TC": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "TD": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "TG": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "TH": {
+        "currencyCode": "THB",
+        "units": "85"
+      },
+      "TJ": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "TM": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "TN": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 290000000
+      },
+      "TO": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "TR": {
+        "currencyCode": "TRY",
+        "units": "139",
+        "nanos": 990000000
+      },
+      "TT": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "TW": {
+        "currencyCode": "TWD",
+        "units": "100"
+      },
+      "TZ": {
+        "currencyCode": "TZS",
+        "units": "4200"
+      },
+      "UA": {
+        "currencyCode": "UAH",
+        "units": "84",
+        "nanos": 990000000
+      },
+      "UG": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 890000000
+      },
+      "US": {
+        "currencyCode": "USD",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "UY": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "UZ": {
+        "currencyCode": "UZS",
+        "units": "21400"
+      },
+      "VA": {
+        "currencyCode": "EUR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "VE": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "VG": {
+        "currencyCode": "USD",
+        "units": "2",
+        "nanos": 990000000
+      },
+      "VN": {
+        "currencyCode": "VND",
+        "units": "60000"
+      },
+      "VU": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "WS": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "YE": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "ZA": {
+        "currencyCode": "ZAR",
+        "units": "46",
+        "nanos": 990000000
+      },
+      "ZM": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "ZW": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 590000000
+      }
+    },
+    "pro.annual": {
+      "AE": {
+        "currencyCode": "AED",
+        "units": "114",
+        "nanos": 990000000
+      },
+      "AG": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "AL": {
+        "currencyCode": "USD",
+        "units": "21",
+        "nanos": 990000000
+      },
+      "AM": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "AO": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "AR": {
+        "currencyCode": "ARS",
+        "units": "29500"
+      },
+      "AT": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "AU": {
+        "currencyCode": "AUD",
+        "units": "49",
+        "nanos": 990000000
+      },
+      "AW": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "AZ": {
+        "currencyCode": "AZN",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "BA": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "BD": {
+        "currencyCode": "BDT",
+        "units": "1700"
+      },
+      "BE": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "BF": {
+        "currencyCode": "EUR",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "BG": {
+        "currencyCode": "EUR",
+        "units": "19",
+        "nanos": 990000000
+      },
+      "BH": {
+        "currencyCode": "USD",
+        "units": "24",
+        "nanos": 990000000
+      },
+      "BJ": {
+        "currencyCode": "EUR",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "BM": {
+        "currencyCode": "USD",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "BO": {
+        "currencyCode": "BOB",
+        "units": "139",
+        "nanos": 990000000
+      },
+      "BR": {
+        "currencyCode": "BRL",
+        "units": "109",
+        "nanos": 990000000
+      },
+      "BS": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "BW": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "BY": {
+        "currencyCode": "USD",
+        "units": "21",
+        "nanos": 990000000
+      },
+      "BZ": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "CA": {
+        "currencyCode": "CAD",
+        "units": "42",
+        "nanos": 990000000
+      },
+      "CD": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "CF": {
+        "currencyCode": "EUR",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "CG": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "CH": {
+        "currencyCode": "CHF",
+        "units": "25"
+      },
+      "CI": {
+        "currencyCode": "XOF",
+        "units": "8500"
+      },
+      "CL": {
+        "currencyCode": "CLP",
+        "units": "28000"
+      },
+      "CM": {
+        "currencyCode": "XAF",
+        "units": "8600"
+      },
+      "CO": {
+        "currencyCode": "COP",
+        "units": "65000"
+      },
+      "CR": {
+        "currencyCode": "CRC",
+        "units": "8300"
+      },
+      "CV": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "CY": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "CZ": {
+        "currencyCode": "CZK",
+        "units": "599",
+        "nanos": 990000000
+      },
+      "DE": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "DJ": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "DK": {
+        "currencyCode": "DKK",
+        "units": "255"
+      },
+      "DM": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "DO": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "DZ": {
+        "currencyCode": "DZD",
+        "units": "2550"
+      },
+      "EC": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "EE": {
+        "currencyCode": "EUR",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "EG": {
+        "currencyCode": "EGP",
+        "units": "739",
+        "nanos": 990000000
+      },
+      "ER": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "ES": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "ET": {
+        "currencyCode": "ETB",
+        "units": "1950"
+      },
+      "FI": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "FJ": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "FM": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "FR": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "GA": {
+        "currencyCode": "EUR",
+        "units": "16",
+        "nanos": 990000000
+      },
+      "GB": {
+        "currencyCode": "GBP",
+        "units": "27",
+        "nanos": 490000000
+      },
+      "GD": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "GE": {
+        "currencyCode": "GEL",
+        "units": "59"
+      },
+      "GH": {
+        "currencyCode": "GHS",
+        "units": "170"
+      },
+      "GI": {
+        "currencyCode": "GBP",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "GM": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "GN": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "GR": {
+        "currencyCode": "EUR",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "GT": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "GW": {
+        "currencyCode": "EUR",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "HK": {
+        "currencyCode": "HKD",
+        "units": "238"
+      },
+      "HN": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "HR": {
+        "currencyCode": "EUR",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "HT": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "HU": {
+        "currencyCode": "HUF",
+        "units": "9899"
+      },
+      "ID": {
+        "currencyCode": "IDR",
+        "units": "339000"
+      },
+      "IE": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "IL": {
+        "currencyCode": "ILS",
+        "units": "99",
+        "nanos": 900000000
+      },
+      "IN": {
+        "currencyCode": "INR",
+        "units": "1300"
+      },
+      "IQ": {
+        "currencyCode": "IQD",
+        "units": "28150"
+      },
+      "IS": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "IT": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "JM": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "JO": {
+        "currencyCode": "JOD",
+        "units": "13",
+        "nanos": 250000000
+      },
+      "JP": {
+        "currencyCode": "JPY",
+        "units": "5200"
+      },
+      "KE": {
+        "currencyCode": "KES",
+        "units": "1800"
+      },
+      "KG": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "KH": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "KM": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "KN": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "KR": {
+        "currencyCode": "KRW",
+        "units": "44000"
+      },
+      "KW": {
+        "currencyCode": "USD",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "KY": {
+        "currencyCode": "USD",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "KZ": {
+        "currencyCode": "KZT",
+        "units": "9890"
+      },
+      "LA": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "LB": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "LC": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "LI": {
+        "currencyCode": "CHF",
+        "units": "27"
+      },
+      "LK": {
+        "currencyCode": "LKR",
+        "units": "3975"
+      },
+      "LR": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "LT": {
+        "currencyCode": "EUR",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "LU": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "LV": {
+        "currencyCode": "EUR",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "LY": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "MA": {
+        "currencyCode": "MAD",
+        "units": "224",
+        "nanos": 990000000
+      },
+      "MC": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "MD": {
+        "currencyCode": "USD",
+        "units": "21",
+        "nanos": 990000000
+      },
+      "MK": {
+        "currencyCode": "USD",
+        "units": "21",
+        "nanos": 990000000
+      },
+      "ML": {
+        "currencyCode": "EUR",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "MM": {
+        "currencyCode": "MMK",
+        "units": "25000"
+      },
+      "MN": {
+        "currencyCode": "MNT",
+        "units": "67200"
+      },
+      "MO": {
+        "currencyCode": "MOP",
+        "units": "239"
+      },
+      "MT": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "MU": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "MV": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "MX": {
+        "currencyCode": "MXN",
+        "units": "415"
+      },
+      "MY": {
+        "currencyCode": "MYR",
+        "units": "82",
+        "nanos": 990000000
+      },
+      "MZ": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "NA": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "NE": {
+        "currencyCode": "EUR",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "NG": {
+        "currencyCode": "NGN",
+        "units": "18000"
+      },
+      "NI": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "NL": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "NO": {
+        "currencyCode": "NOK",
+        "units": "365"
+      },
+      "NP": {
+        "currencyCode": "USD",
+        "units": "13",
+        "nanos": 990000000
+      },
+      "NZ": {
+        "currencyCode": "NZD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "OM": {
+        "currencyCode": "USD",
+        "units": "23",
+        "nanos": 990000000
+      },
+      "PA": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "PE": {
+        "currencyCode": "PEN",
+        "units": "63",
+        "nanos": 990000000
+      },
+      "PG": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "PH": {
+        "currencyCode": "PHP",
+        "units": "1190",
+        "nanos": 0
+      },
+      "PK": {
+        "currencyCode": "PKR",
+        "units": "3300"
+      },
+      "PL": {
+        "currencyCode": "PLN",
+        "units": "114",
+        "nanos": 990000000
+      },
+      "PT": {
+        "currencyCode": "EUR",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "PY": {
+        "currencyCode": "PYG",
+        "units": "125000"
+      },
+      "QA": {
+        "currencyCode": "QAR",
+        "units": "110"
+      },
+      "RO": {
+        "currencyCode": "RON",
+        "units": "134",
+        "nanos": 990000000
+      },
+      "RS": {
+        "currencyCode": "RSD",
+        "units": "2399"
+      },
+      "RU": {
+        "currencyCode": "RUB",
+        "units": "1499"
+      },
+      "RW": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "SA": {
+        "currencyCode": "SAR",
+        "units": "98",
+        "nanos": 990000000
+      },
+      "SB": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "SC": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "SE": {
+        "currencyCode": "SEK",
+        "units": "385"
+      },
+      "SG": {
+        "currencyCode": "SGD",
+        "units": "41",
+        "nanos": 990000000
+      },
+      "SI": {
+        "currencyCode": "EUR",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "SK": {
+        "currencyCode": "EUR",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "SL": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "SM": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "SN": {
+        "currencyCode": "XOF",
+        "units": "8500"
+      },
+      "SO": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "SR": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "SV": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "TC": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "TD": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "TG": {
+        "currencyCode": "EUR",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "TH": {
+        "currencyCode": "THB",
+        "units": "675"
+      },
+      "TJ": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "TM": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "TN": {
+        "currencyCode": "USD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "TO": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "TR": {
+        "currencyCode": "TRY",
+        "units": "1129",
+        "nanos": 990000000
+      },
+      "TT": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "TW": {
+        "currencyCode": "TWD",
+        "units": "800"
+      },
+      "TZ": {
+        "currencyCode": "TZS",
+        "units": "32000"
+      },
+      "UA": {
+        "currencyCode": "UAH",
+        "units": "649",
+        "nanos": 990000000
+      },
+      "UG": {
+        "currencyCode": "USD",
+        "units": "13",
+        "nanos": 990000000
+      },
+      "US": {
+        "currencyCode": "USD",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "UY": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "UZ": {
+        "currencyCode": "UZS",
+        "units": "161400"
+      },
+      "VA": {
+        "currencyCode": "EUR",
+        "units": "29",
+        "nanos": 990000000
+      },
+      "VE": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "VG": {
+        "currencyCode": "USD",
+        "units": "22",
+        "nanos": 990000000
+      },
+      "VN": {
+        "currencyCode": "VND",
+        "units": "481000"
+      },
+      "VU": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "WS": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "YE": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "ZA": {
+        "currencyCode": "ZAR",
+        "units": "374",
+        "nanos": 990000000
+      },
+      "ZM": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "ZW": {
+        "currencyCode": "USD",
+        "units": "11",
+        "nanos": 990000000
+      }
+    },
+    "lifetime": {
+      "AE": {
+        "currencyCode": "AED",
+        "units": "309",
+        "nanos": 990000000
+      },
+      "AG": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "AL": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "AM": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "AO": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "AR": {
+        "currencyCode": "ARS",
+        "units": "86400"
+      },
+      "AT": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "AU": {
+        "currencyCode": "AUD",
+        "units": "134",
+        "nanos": 990000000
+      },
+      "AW": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "AZ": {
+        "currencyCode": "AZN",
+        "units": "94",
+        "nanos": 990000000
+      },
+      "BA": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "BD": {
+        "currencyCode": "BDT",
+        "units": "4600"
+      },
+      "BE": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "BF": {
+        "currencyCode": "EUR",
+        "units": "28",
+        "nanos": 990000000
+      },
+      "BG": {
+        "currencyCode": "EUR",
+        "units": "59",
+        "nanos": 990000000
+      },
+      "BH": {
+        "currencyCode": "USD",
+        "units": "69",
+        "nanos": 990000000
+      },
+      "BJ": {
+        "currencyCode": "EUR",
+        "units": "28",
+        "nanos": 990000000
+      },
+      "BM": {
+        "currencyCode": "USD",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "BO": {
+        "currencyCode": "BOB",
+        "units": "374",
+        "nanos": 990000000
+      },
+      "BR": {
+        "currencyCode": "BRL",
+        "units": "324",
+        "nanos": 990000000
+      },
+      "BS": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "BW": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "BY": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "BZ": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "CA": {
+        "currencyCode": "CAD",
+        "units": "114",
+        "nanos": 990000000
+      },
+      "CD": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "CF": {
+        "currencyCode": "EUR",
+        "units": "28",
+        "nanos": 990000000
+      },
+      "CG": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "CH": {
+        "currencyCode": "CHF",
+        "units": "65"
+      },
+      "CI": {
+        "currencyCode": "XOF",
+        "units": "22600"
+      },
+      "CL": {
+        "currencyCode": "CLP",
+        "units": "79000"
+      },
+      "CM": {
+        "currencyCode": "XAF",
+        "units": "22800"
+      },
+      "CO": {
+        "currencyCode": "COP",
+        "units": "192000"
+      },
+      "CR": {
+        "currencyCode": "CRC",
+        "units": "24300"
+      },
+      "CV": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "CY": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "CZ": {
+        "currencyCode": "CZK",
+        "units": "1799",
+        "nanos": 990000000
+      },
+      "DE": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "DJ": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "DK": {
+        "currencyCode": "DKK",
+        "units": "679"
+      },
+      "DM": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "DO": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "DZ": {
+        "currencyCode": "DZD",
+        "units": "7500"
+      },
+      "EC": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "EE": {
+        "currencyCode": "EUR",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "EG": {
+        "currencyCode": "EGP",
+        "units": "1949",
+        "nanos": 990000000
+      },
+      "ER": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "ES": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "ET": {
+        "currencyCode": "ETB",
+        "units": "5200"
+      },
+      "FI": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "FJ": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "FM": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "FR": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "GA": {
+        "currencyCode": "EUR",
+        "units": "49",
+        "nanos": 990000000
+      },
+      "GB": {
+        "currencyCode": "GBP",
+        "units": "72",
+        "nanos": 990000000
+      },
+      "GD": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "GE": {
+        "currencyCode": "GEL",
+        "units": "174"
+      },
+      "GH": {
+        "currencyCode": "GHS",
+        "units": "450"
+      },
+      "GI": {
+        "currencyCode": "GBP",
+        "units": "60",
+        "nanos": 990000000
+      },
+      "GM": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "GN": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "GR": {
+        "currencyCode": "EUR",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "GT": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "GW": {
+        "currencyCode": "EUR",
+        "units": "28",
+        "nanos": 990000000
+      },
+      "HK": {
+        "currencyCode": "HKD",
+        "units": "628"
+      },
+      "HN": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "HR": {
+        "currencyCode": "EUR",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "HT": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "HU": {
+        "currencyCode": "HUF",
+        "units": "27999"
+      },
+      "ID": {
+        "currencyCode": "IDR",
+        "units": "990000"
+      },
+      "IE": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "IL": {
+        "currencyCode": "ILS",
+        "units": "275"
+      },
+      "IN": {
+        "currencyCode": "INR",
+        "units": "3500"
+      },
+      "IQ": {
+        "currencyCode": "IQD",
+        "units": "82600"
+      },
+      "IS": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "IT": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "JM": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "JO": {
+        "currencyCode": "JOD",
+        "units": "38",
+        "nanos": 800000000
+      },
+      "JP": {
+        "currencyCode": "JPY",
+        "units": "14000"
+      },
+      "KE": {
+        "currencyCode": "KES",
+        "units": "4800"
+      },
+      "KG": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "KH": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "KM": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "KN": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "KR": {
+        "currencyCode": "KRW",
+        "units": "120000"
+      },
+      "KW": {
+        "currencyCode": "USD",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "KY": {
+        "currencyCode": "USD",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "KZ": {
+        "currencyCode": "KZT",
+        "units": "28990"
+      },
+      "LA": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "LB": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "LC": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "LI": {
+        "currencyCode": "CHF",
+        "units": "75"
+      },
+      "LK": {
+        "currencyCode": "LKR",
+        "units": "10750"
+      },
+      "LR": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "LT": {
+        "currencyCode": "EUR",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "LU": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "LV": {
+        "currencyCode": "EUR",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "LY": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "MA": {
+        "currencyCode": "MAD",
+        "units": "659",
+        "nanos": 990000000
+      },
+      "MC": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "MD": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "MK": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "ML": {
+        "currencyCode": "EUR",
+        "units": "28",
+        "nanos": 990000000
+      },
+      "MM": {
+        "currencyCode": "MMK",
+        "units": "67000"
+      },
+      "MN": {
+        "currencyCode": "MNT",
+        "units": "197100"
+      },
+      "MO": {
+        "currencyCode": "MOP",
+        "units": "648"
+      },
+      "MT": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "MU": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "MV": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "MX": {
+        "currencyCode": "MXN",
+        "units": "1199"
+      },
+      "MY": {
+        "currencyCode": "MYR",
+        "units": "244",
+        "nanos": 990000000
+      },
+      "MZ": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "NA": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "NE": {
+        "currencyCode": "EUR",
+        "units": "28",
+        "nanos": 990000000
+      },
+      "NG": {
+        "currencyCode": "NGN",
+        "units": "48000"
+      },
+      "NI": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "NL": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "NO": {
+        "currencyCode": "NOK",
+        "units": "979"
+      },
+      "NP": {
+        "currencyCode": "USD",
+        "units": "35",
+        "nanos": 990000000
+      },
+      "NZ": {
+        "currencyCode": "NZD",
+        "units": "169",
+        "nanos": 990000000
+      },
+      "OM": {
+        "currencyCode": "USD",
+        "units": "69",
+        "nanos": 990000000
+      },
+      "PA": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "PE": {
+        "currencyCode": "PEN",
+        "units": "189",
+        "nanos": 990000000
+      },
+      "PG": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "PH": {
+        "currencyCode": "PHP",
+        "units": "3490",
+        "nanos": 0
+      },
+      "PK": {
+        "currencyCode": "PKR",
+        "units": "8800"
+      },
+      "PL": {
+        "currencyCode": "PLN",
+        "units": "324",
+        "nanos": 990000000
+      },
+      "PT": {
+        "currencyCode": "EUR",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "PY": {
+        "currencyCode": "PYG",
+        "units": "350000"
+      },
+      "QA": {
+        "currencyCode": "QAR",
+        "units": "290"
+      },
+      "RO": {
+        "currencyCode": "RON",
+        "units": "384",
+        "nanos": 990000000
+      },
+      "RS": {
+        "currencyCode": "RSD",
+        "units": "6999"
+      },
+      "RU": {
+        "currencyCode": "RUB",
+        "units": "4490"
+      },
+      "RW": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "SA": {
+        "currencyCode": "SAR",
+        "units": "279",
+        "nanos": 990000000
+      },
+      "SB": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "SC": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "SE": {
+        "currencyCode": "SEK",
+        "units": "999"
+      },
+      "SG": {
+        "currencyCode": "SGD",
+        "units": "109",
+        "nanos": 990000000
+      },
+      "SI": {
+        "currencyCode": "EUR",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "SK": {
+        "currencyCode": "EUR",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "SL": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "SM": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "SN": {
+        "currencyCode": "XOF",
+        "units": "22600"
+      },
+      "SO": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "SR": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "SV": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "TC": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "TD": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "TG": {
+        "currencyCode": "EUR",
+        "units": "28",
+        "nanos": 990000000
+      },
+      "TH": {
+        "currencyCode": "THB",
+        "units": "1975"
+      },
+      "TJ": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "TM": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "TN": {
+        "currencyCode": "USD",
+        "units": "54",
+        "nanos": 990000000
+      },
+      "TO": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "TR": {
+        "currencyCode": "TRY",
+        "units": "3319",
+        "nanos": 990000000
+      },
+      "TT": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "TW": {
+        "currencyCode": "TWD",
+        "units": "2250"
+      },
+      "TZ": {
+        "currencyCode": "TZS",
+        "units": "85000"
+      },
+      "UA": {
+        "currencyCode": "UAH",
+        "units": "1749",
+        "nanos": 990000000
+      },
+      "UG": {
+        "currencyCode": "USD",
+        "units": "37",
+        "nanos": 990000000
+      },
+      "US": {
+        "currencyCode": "USD",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "UY": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "UZ": {
+        "currencyCode": "UZS",
+        "units": "430600"
+      },
+      "VA": {
+        "currencyCode": "EUR",
+        "units": "79",
+        "nanos": 990000000
+      },
+      "VE": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "VG": {
+        "currencyCode": "USD",
+        "units": "64",
+        "nanos": 990000000
+      },
+      "VN": {
+        "currencyCode": "VND",
+        "units": "1400000"
+      },
+      "VU": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "WS": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "YE": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "ZA": {
+        "currencyCode": "ZAR",
+        "units": "1099",
+        "nanos": 990000000
+      },
+      "ZM": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "ZW": {
+        "currencyCode": "USD",
+        "units": "31",
+        "nanos": 990000000
+      }
+    },
+    "cloud.monthly": {
+      "AE": {
+        "currencyCode": "AED",
+        "units": "5",
+        "nanos": 690000000
+      },
+      "AG": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "AL": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 90000000
+      },
+      "AM": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "AO": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "AR": {
+        "currencyCode": "ARS",
+        "units": "1450"
+      },
+      "AT": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "AU": {
+        "currencyCode": "AUD",
+        "units": "2",
+        "nanos": 490000000
+      },
+      "AW": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "AZ": {
+        "currencyCode": "AZN",
+        "units": "1",
+        "nanos": 590000000
+      },
+      "BA": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "BD": {
+        "currencyCode": "BDT",
+        "units": "80"
+      },
+      "BE": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "BF": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 490000000
+      },
+      "BG": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 990000000
+      },
+      "BH": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 290000000
+      },
+      "BJ": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 490000000
+      },
+      "BM": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "BO": {
+        "currencyCode": "BOB",
+        "units": "6",
+        "nanos": 990000000
+      },
+      "BR": {
+        "currencyCode": "BRL",
+        "units": "5",
+        "nanos": 490000000
+      },
+      "BS": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "BW": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "BY": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 90000000
+      },
+      "BZ": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "CA": {
+        "currencyCode": "CAD",
+        "units": "2",
+        "nanos": 90000000
+      },
+      "CD": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "CF": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 490000000
+      },
+      "CG": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "CH": {
+        "currencyCode": "CHF",
+        "units": "1",
+        "nanos": 200000000
+      },
+      "CI": {
+        "currencyCode": "XOF",
+        "units": "400"
+      },
+      "CL": {
+        "currencyCode": "CLP",
+        "units": "1400"
+      },
+      "CM": {
+        "currencyCode": "XAF",
+        "units": "400"
+      },
+      "CO": {
+        "currencyCode": "COP",
+        "units": "3000"
+      },
+      "CR": {
+        "currencyCode": "CRC",
+        "units": "410"
+      },
+      "CV": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "CY": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "CZ": {
+        "currencyCode": "CZK",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "DE": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "DJ": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "DK": {
+        "currencyCode": "DKK",
+        "units": "13"
+      },
+      "DM": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "DO": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "DZ": {
+        "currencyCode": "DZD",
+        "units": "125"
+      },
+      "EC": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "EE": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "EG": {
+        "currencyCode": "EGP",
+        "units": "35",
+        "nanos": 990000000
+      },
+      "ER": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "ES": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "ET": {
+        "currencyCode": "ETB",
+        "units": "95"
+      },
+      "FI": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "FJ": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "FM": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "FR": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "GA": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 790000000
+      },
+      "GB": {
+        "currencyCode": "GBP",
+        "units": "1",
+        "nanos": 390000000
+      },
+      "GD": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "GE": {
+        "currencyCode": "GEL",
+        "units": "3"
+      },
+      "GH": {
+        "currencyCode": "GHS",
+        "units": "8"
+      },
+      "GI": {
+        "currencyCode": "GBP",
+        "units": "1",
+        "nanos": 90000000
+      },
+      "GM": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "GN": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "GR": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "GT": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "GW": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 490000000
+      },
+      "HK": {
+        "currencyCode": "HKD",
+        "units": "13"
+      },
+      "HN": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "HR": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "HT": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "HU": {
+        "currencyCode": "HUF",
+        "units": "499"
+      },
+      "ID": {
+        "currencyCode": "IDR",
+        "units": "17000"
+      },
+      "IE": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "IL": {
+        "currencyCode": "ILS",
+        "units": "5"
+      },
+      "IN": {
+        "currencyCode": "INR",
+        "units": "65"
+      },
+      "IQ": {
+        "currencyCode": "IQD",
+        "units": "1400"
+      },
+      "IS": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "IT": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "JM": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "JO": {
+        "currencyCode": "JOD",
+        "units": "0",
+        "nanos": 650000000
+      },
+      "JP": {
+        "currencyCode": "JPY",
+        "units": "260"
+      },
+      "KE": {
+        "currencyCode": "KES",
+        "units": "99"
+      },
+      "KG": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "KH": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "KM": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "KN": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "KR": {
+        "currencyCode": "KRW",
+        "units": "2200"
+      },
+      "KW": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "KY": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "KZ": {
+        "currencyCode": "KZT",
+        "units": "490"
+      },
+      "LA": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "LB": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "LC": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "LI": {
+        "currencyCode": "CHF",
+        "units": "1",
+        "nanos": 300000000
+      },
+      "LK": {
+        "currencyCode": "LKR",
+        "units": "200"
+      },
+      "LR": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "LT": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "LU": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "LV": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "LY": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "MA": {
+        "currencyCode": "MAD",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "MC": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "MD": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 90000000
+      },
+      "MK": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 90000000
+      },
+      "ML": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 490000000
+      },
+      "MM": {
+        "currencyCode": "MMK",
+        "units": "1000"
+      },
+      "MN": {
+        "currencyCode": "MNT",
+        "units": "3330"
+      },
+      "MO": {
+        "currencyCode": "MOP",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "MT": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "MU": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "MV": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "MX": {
+        "currencyCode": "MXN",
+        "units": "21"
+      },
+      "MY": {
+        "currencyCode": "MYR",
+        "units": "3",
+        "nanos": 990000000
+      },
+      "MZ": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "NA": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "NE": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 490000000
+      },
+      "NG": {
+        "currencyCode": "NGN",
+        "units": "880"
+      },
+      "NI": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "NL": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "NO": {
+        "currencyCode": "NOK",
+        "units": "18"
+      },
+      "NP": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 690000000
+      },
+      "NZ": {
+        "currencyCode": "NZD",
+        "units": "3",
+        "nanos": 90000000
+      },
+      "OM": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 290000000
+      },
+      "PA": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "PE": {
+        "currencyCode": "PEN",
+        "units": "3",
+        "nanos": 190000000
+      },
+      "PG": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "PH": {
+        "currencyCode": "PHP",
+        "units": "59",
+        "nanos": 0
+      },
+      "PK": {
+        "currencyCode": "PKR",
+        "units": "160"
+      },
+      "PL": {
+        "currencyCode": "PLN",
+        "units": "5",
+        "nanos": 990000000
+      },
+      "PT": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "PY": {
+        "currencyCode": "PYG",
+        "units": "6000"
+      },
+      "QA": {
+        "currencyCode": "QAR",
+        "units": "5",
+        "nanos": 500000000
+      },
+      "RO": {
+        "currencyCode": "RON",
+        "units": "6",
+        "nanos": 990000000
+      },
+      "RS": {
+        "currencyCode": "RSD",
+        "units": "99"
+      },
+      "RU": {
+        "currencyCode": "RUB",
+        "units": "75"
+      },
+      "RW": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "SA": {
+        "currencyCode": "SAR",
+        "units": "5",
+        "nanos": 90000000
+      },
+      "SB": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "SC": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "SE": {
+        "currencyCode": "SEK",
+        "units": "19"
+      },
+      "SG": {
+        "currencyCode": "SGD",
+        "units": "1",
+        "nanos": 990000000
+      },
+      "SI": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "SK": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "SL": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "SM": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "SN": {
+        "currencyCode": "XOF",
+        "units": "400"
+      },
+      "SO": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "SR": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "SV": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "TC": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "TD": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "TG": {
+        "currencyCode": "EUR",
+        "units": "0",
+        "nanos": 490000000
+      },
+      "TH": {
+        "currencyCode": "THB",
+        "units": "34"
+      },
+      "TJ": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "TM": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "TN": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 890000000
+      },
+      "TO": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "TR": {
+        "currencyCode": "TRY",
+        "units": "55",
+        "nanos": 990000000
+      },
+      "TT": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "TW": {
+        "currencyCode": "TWD",
+        "units": "41"
+      },
+      "TZ": {
+        "currencyCode": "TZS",
+        "units": "1600"
+      },
+      "UA": {
+        "currencyCode": "UAH",
+        "units": "31",
+        "nanos": 990000000
+      },
+      "UG": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 690000000
+      },
+      "US": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "UY": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "UZ": {
+        "currencyCode": "UZS",
+        "units": "7940"
+      },
+      "VA": {
+        "currencyCode": "EUR",
+        "units": "1",
+        "nanos": 490000000
+      },
+      "VE": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "VG": {
+        "currencyCode": "USD",
+        "units": "1",
+        "nanos": 190000000
+      },
+      "VN": {
+        "currencyCode": "VND",
+        "units": "24000"
+      },
+      "VU": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "WS": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "YE": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "ZA": {
+        "currencyCode": "ZAR",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "ZM": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      },
+      "ZW": {
+        "currencyCode": "USD",
+        "units": "0",
+        "nanos": 590000000
+      }
+    },
+    "cloud.annual": {
+      "AE": {
+        "currencyCode": "AED",
+        "units": "49",
+        "nanos": 990000000
+      },
+      "AG": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "AL": {
+        "currencyCode": "USD",
+        "units": "8",
+        "nanos": 990000000
+      },
+      "AM": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "AO": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "AR": {
+        "currencyCode": "ARS",
+        "units": "12100"
+      },
+      "AT": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "AU": {
+        "currencyCode": "AUD",
+        "units": "21",
+        "nanos": 990000000
+      },
+      "AW": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "AZ": {
+        "currencyCode": "AZN",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "BA": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "BD": {
+        "currencyCode": "BDT",
+        "units": "700"
+      },
+      "BE": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "BF": {
+        "currencyCode": "EUR",
+        "units": "4",
+        "nanos": 590000000
+      },
+      "BG": {
+        "currencyCode": "EUR",
+        "units": "8",
+        "nanos": 490000000
+      },
+      "BH": {
+        "currencyCode": "USD",
+        "units": "10",
+        "nanos": 990000000
+      },
+      "BJ": {
+        "currencyCode": "EUR",
+        "units": "4",
+        "nanos": 590000000
+      },
+      "BM": {
+        "currencyCode": "USD",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "BO": {
+        "currencyCode": "BOB",
+        "units": "58",
+        "nanos": 990000000
+      },
+      "BR": {
+        "currencyCode": "BRL",
+        "units": "45",
+        "nanos": 990000000
+      },
+      "BS": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "BW": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "BY": {
+        "currencyCode": "USD",
+        "units": "8",
+        "nanos": 990000000
+      },
+      "BZ": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "CA": {
+        "currencyCode": "CAD",
+        "units": "18",
+        "nanos": 990000000
+      },
+      "CD": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "CF": {
+        "currencyCode": "EUR",
+        "units": "4",
+        "nanos": 590000000
+      },
+      "CG": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "CH": {
+        "currencyCode": "CHF",
+        "units": "11"
+      },
+      "CI": {
+        "currencyCode": "XOF",
+        "units": "3500"
+      },
+      "CL": {
+        "currencyCode": "CLP",
+        "units": "12200"
+      },
+      "CM": {
+        "currencyCode": "XAF",
+        "units": "3600"
+      },
+      "CO": {
+        "currencyCode": "COP",
+        "units": "27000"
+      },
+      "CR": {
+        "currencyCode": "CRC",
+        "units": "3400"
+      },
+      "CV": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "CY": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "CZ": {
+        "currencyCode": "CZK",
+        "units": "269",
+        "nanos": 990000000
+      },
+      "DE": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "DJ": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "DK": {
+        "currencyCode": "DKK",
+        "units": "109"
+      },
+      "DM": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "DO": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "DZ": {
+        "currencyCode": "DZD",
+        "units": "1050"
+      },
+      "EC": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "EE": {
+        "currencyCode": "EUR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "EG": {
+        "currencyCode": "EGP",
+        "units": "309",
+        "nanos": 990000000
+      },
+      "ER": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "ES": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "ET": {
+        "currencyCode": "ETB",
+        "units": "800"
+      },
+      "FI": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "FJ": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "FM": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "FR": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "GA": {
+        "currencyCode": "EUR",
+        "units": "6",
+        "nanos": 990000000
+      },
+      "GB": {
+        "currencyCode": "GBP",
+        "units": "11",
+        "nanos": 990000000
+      },
+      "GD": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "GE": {
+        "currencyCode": "GEL",
+        "units": "24"
+      },
+      "GH": {
+        "currencyCode": "GHS",
+        "units": "70"
+      },
+      "GI": {
+        "currencyCode": "GBP",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "GM": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "GN": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "GR": {
+        "currencyCode": "EUR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "GT": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "GW": {
+        "currencyCode": "EUR",
+        "units": "4",
+        "nanos": 590000000
+      },
+      "HK": {
+        "currencyCode": "HKD",
+        "units": "99",
+        "nanos": 900000000
+      },
+      "HN": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "HR": {
+        "currencyCode": "EUR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "HT": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "HU": {
+        "currencyCode": "HUF",
+        "units": "4299"
+      },
+      "ID": {
+        "currencyCode": "IDR",
+        "units": "139000"
+      },
+      "IE": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "IL": {
+        "currencyCode": "ILS",
+        "units": "43",
+        "nanos": 900000000
+      },
+      "IN": {
+        "currencyCode": "INR",
+        "units": "550"
+      },
+      "IQ": {
+        "currencyCode": "IQD",
+        "units": "11600"
+      },
+      "IS": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "IT": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "JM": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "JO": {
+        "currencyCode": "JOD",
+        "units": "5",
+        "nanos": 450000000
+      },
+      "JP": {
+        "currencyCode": "JPY",
+        "units": "2260"
+      },
+      "KE": {
+        "currencyCode": "KES",
+        "units": "800"
+      },
+      "KG": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "KH": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "KM": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "KN": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "KR": {
+        "currencyCode": "KRW",
+        "units": "19000"
+      },
+      "KW": {
+        "currencyCode": "USD",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "KY": {
+        "currencyCode": "USD",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "KZ": {
+        "currencyCode": "KZT",
+        "units": "4090"
+      },
+      "LA": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "LB": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "LC": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "LI": {
+        "currencyCode": "CHF",
+        "units": "12"
+      },
+      "LK": {
+        "currencyCode": "LKR",
+        "units": "1650"
+      },
+      "LR": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "LT": {
+        "currencyCode": "EUR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "LU": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "LV": {
+        "currencyCode": "EUR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "LY": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "MA": {
+        "currencyCode": "MAD",
+        "units": "91",
+        "nanos": 990000000
+      },
+      "MC": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "MD": {
+        "currencyCode": "USD",
+        "units": "8",
+        "nanos": 990000000
+      },
+      "MK": {
+        "currencyCode": "USD",
+        "units": "8",
+        "nanos": 990000000
+      },
+      "ML": {
+        "currencyCode": "EUR",
+        "units": "4",
+        "nanos": 590000000
+      },
+      "MM": {
+        "currencyCode": "MMK",
+        "units": "10000"
+      },
+      "MN": {
+        "currencyCode": "MNT",
+        "units": "27700"
+      },
+      "MO": {
+        "currencyCode": "MOP",
+        "units": "108"
+      },
+      "MT": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "MU": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "MV": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "MX": {
+        "currencyCode": "MXN",
+        "units": "169"
+      },
+      "MY": {
+        "currencyCode": "MYR",
+        "units": "33",
+        "nanos": 990000000
+      },
+      "MZ": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "NA": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "NE": {
+        "currencyCode": "EUR",
+        "units": "4",
+        "nanos": 590000000
+      },
+      "NG": {
+        "currencyCode": "NGN",
+        "units": "7470"
+      },
+      "NI": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "NL": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "NO": {
+        "currencyCode": "NOK",
+        "units": "159"
+      },
+      "NP": {
+        "currencyCode": "USD",
+        "units": "5",
+        "nanos": 490000000
+      },
+      "NZ": {
+        "currencyCode": "NZD",
+        "units": "26",
+        "nanos": 990000000
+      },
+      "OM": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "PA": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "PE": {
+        "currencyCode": "PEN",
+        "units": "26",
+        "nanos": 990000000
+      },
+      "PG": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "PH": {
+        "currencyCode": "PHP",
+        "units": "490",
+        "nanos": 0
+      },
+      "PK": {
+        "currencyCode": "PKR",
+        "units": "1400"
+      },
+      "PL": {
+        "currencyCode": "PLN",
+        "units": "49",
+        "nanos": 990000000
+      },
+      "PT": {
+        "currencyCode": "EUR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "PY": {
+        "currencyCode": "PYG",
+        "units": "50000"
+      },
+      "QA": {
+        "currencyCode": "QAR",
+        "units": "47"
+      },
+      "RO": {
+        "currencyCode": "RON",
+        "units": "59",
+        "nanos": 990000000
+      },
+      "RS": {
+        "currencyCode": "RSD",
+        "units": "999"
+      },
+      "RU": {
+        "currencyCode": "RUB",
+        "units": "599"
+      },
+      "RW": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "SA": {
+        "currencyCode": "SAR",
+        "units": "42",
+        "nanos": 990000000
+      },
+      "SB": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "SC": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "SE": {
+        "currencyCode": "SEK",
+        "units": "165"
+      },
+      "SG": {
+        "currencyCode": "SGD",
+        "units": "17",
+        "nanos": 990000000
+      },
+      "SI": {
+        "currencyCode": "EUR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "SK": {
+        "currencyCode": "EUR",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "SL": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "SM": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "SN": {
+        "currencyCode": "XOF",
+        "units": "3500"
+      },
+      "SO": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "SR": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "SV": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "TC": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "TD": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "TG": {
+        "currencyCode": "EUR",
+        "units": "4",
+        "nanos": 590000000
+      },
+      "TH": {
+        "currencyCode": "THB",
+        "units": "275"
+      },
+      "TJ": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "TM": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "TN": {
+        "currencyCode": "USD",
+        "units": "7",
+        "nanos": 490000000
+      },
+      "TO": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "TR": {
+        "currencyCode": "TRY",
+        "units": "464",
+        "nanos": 990000000
+      },
+      "TT": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "TW": {
+        "currencyCode": "TWD",
+        "units": "350"
+      },
+      "TZ": {
+        "currencyCode": "TZS",
+        "units": "13000"
+      },
+      "UA": {
+        "currencyCode": "UAH",
+        "units": "269",
+        "nanos": 990000000
+      },
+      "UG": {
+        "currencyCode": "USD",
+        "units": "5",
+        "nanos": 990000000
+      },
+      "US": {
+        "currencyCode": "USD",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "UY": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "UZ": {
+        "currencyCode": "UZS",
+        "units": "67170"
+      },
+      "VA": {
+        "currencyCode": "EUR",
+        "units": "12",
+        "nanos": 990000000
+      },
+      "VE": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "VG": {
+        "currencyCode": "USD",
+        "units": "9",
+        "nanos": 990000000
+      },
+      "VN": {
+        "currencyCode": "VND",
+        "units": "198000"
+      },
+      "VU": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "WS": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "YE": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "ZA": {
+        "currencyCode": "ZAR",
+        "units": "154",
+        "nanos": 990000000
+      },
+      "ZM": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      },
+      "ZW": {
+        "currencyCode": "USD",
+        "units": "4",
+        "nanos": 990000000
+      }
+    }
+  }
+}
