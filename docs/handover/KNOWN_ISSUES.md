@@ -28,6 +28,7 @@ resolved items are kept at the bottom for traceability.
 | SC-7 | A merchant no dictionary knows and no cue explains gets no category (the row asks, as before); a payee's habits need two saved transactions with the same name. | Verified (benchmark) | Grow the dictionaries (data only; docs/SCAN.md) |
 | SC-8 | The reconciler's balance check uses the wallet's opening balance; a wallet created after the statement period is skipped, and backfilled history before a wallet's creation can make the balance differ (explained, never adjusted). | Code-only | — |
 | SC-9 | Not yet run on a real phone: Document Scanner flow, PDF picker and password dialog, "Add anyway", the reconciliation panel's layout at 200 % font. | Unverified | Owner phone test (NEXT_TASKS SC-N2) |
+| SC-10 | 0.5.15 (vc 20) requires a portrait screen: the document scanner's activity is locked to portrait, which Play reads as required hardware, so Play Console warned that 23 devices supported by the previous release (landscape-only, mostly Chromebooks) lose the app. The owner chose to publish it anyway and fix it in the next build (2026-11-22). | Fixed for the next build | `uses-feature android.hardware.screen.portrait required="false"` plus a CI check that fails on any required feature but faketouch (`fix/scanner-portrait-not-required`) |
 
 ## Pro experience: walls met again, previews (2026-11-19, `feature/pro-repeat-taps-previews`)
 
