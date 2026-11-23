@@ -116,8 +116,8 @@ android {
         applicationId = "com.lucento.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 21
-        versionName = "0.5.16"
+        versionCode = 22
+        versionName = "0.5.17"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
