@@ -67,6 +67,7 @@
   - "paid 7000 to my credit card from payroll" / "binayaran ko … sa credit card" read as a card payment (a transfer);
   - a closing "paid with BPI card" / "bayad gamit …" applying to every row of the message, not only the last.
 - Each is a deterministic rule with JVM tests, in `QuickEntryParser` / `BatchEntryParser`.
+
 ## AI allowance per month — follow-ups (2026-11-23, `feature/ai-allowance-monthly`)
 
 - **Done 2026-11-23 (owner: "Switch now"):** Vercel production `GEMINI_MODEL=gemini-3.5-flash-lite`, redeployed
