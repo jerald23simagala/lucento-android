@@ -129,15 +129,22 @@ class HomeViewModel(
             cloudStatus = cloudStatus,
             visitedInsights = prefs.insightsVisited,
             secured = prefs.appLockUsed,
+            checkInAllowed = prefs.onboardingComplete && prefs.guideStep == null,
+            checkInPlanned = prefs.budgetMonthPlanned,
+            checkInRecapSeen = prefs.recapMonthSeen,
         ).let { built ->
+            // Awards an update added wait until what they already earn is recorded quietly (no ceremony for the past).
+            val newHere = if (prefs.achievementsSeen == null) emptySet()
+            else com.lucento.app.domain.Achievements.newToThisPhone(prefs.achievementsKnown)
             built.copy(
                 showLocalDataNotice = showLocalDataNotice(prefs.onboardingComplete, prefs.localDataNoticeSeen),
                 syncDetails = syncDetails,
                 moduleOffersHidden = prefs.moduleOffersHidden,
                 hideAmounts = prefs.hideAmounts,
-                milestoneToShow = com.lucento.app.domain.Achievements.toAcknowledge(built.earned, prefs.achievementsSeen),
-                milestonesAlsoNew = com.lucento.app.domain.Achievements.toAcknowledgeAll(built.earned, prefs.achievementsSeen).drop(1),
+                milestoneToShow = com.lucento.app.domain.Achievements.toAcknowledge(built.earned, prefs.achievementsSeen, newHere),
+                milestonesAlsoNew = com.lucento.app.domain.Achievements.toAcknowledgeAll(built.earned, prefs.achievementsSeen, newHere).drop(1),
                 needsMilestoneBaseline = prefs.achievementsSeen == null,
+                awardsNewHere = newHere,
                 proMemberSince = prefs.proMemberSince,
                 showAddSpotlight = showAddSpotlight(prefs.addSpotlightSeen, prefs.guideStep != null, built.recordedCount),
             )
@@ -193,7 +200,28 @@ class HomeViewModel(
 
     /** Part D: first run with milestones — what's already earned is recorded silently. */
     fun baselineMilestones(earned: Set<com.lucento.app.domain.Achievement>) {
-        viewModelScope.launch { preferences.acknowledgeAchievements(earned) }
+        viewModelScope.launch { preferences.recordAwardsQuietly(earned) }
+    }
+
+    /** Awards an update added: what they already earn ([earned] among them) is recorded silently, like the first run. */
+    fun recordNewAwardsQuietly(earned: Set<com.lucento.app.domain.Achievement>) {
+        viewModelScope.launch { preferences.recordAwardsQuietly(earned) }
+    }
+
+    /**
+     * "Not this month" on the check-in card: neither what it offered is asked about again. [onDismissed] gets the Undo,
+     * which puts the months back as they were.
+     */
+    fun dismissCheckIn(card: com.lucento.app.domain.MonthCheckIn.Card, onDismissed: (undo: () -> Unit) -> Unit = {}) {
+        viewModelScope.launch {
+            val before = preferences.dismissMonthCheckIn(card.plan, card.recap)
+            onDismissed { viewModelScope.launch { preferences.restoreMonthCheckIn(before) } }
+        }
+    }
+
+    /** The check-in's recap of [month] was opened. */
+    fun markRecapSeen(month: YearMonth) {
+        viewModelScope.launch { preferences.setRecapMonthSeen(month) }
     }
 
     /** Part D: the "+" spotlight was dismissed, or + was used. */

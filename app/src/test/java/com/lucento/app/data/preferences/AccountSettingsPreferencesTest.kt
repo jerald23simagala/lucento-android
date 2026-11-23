@@ -38,6 +38,8 @@ class AccountSettingsPreferencesTest {
     private val aiConfirmed = booleanPreferencesKey("ask_lucento_ai_v2")
     private val defaultWallet = longPreferencesKey("default_wallet_id")
     private val budgetMonth = stringPreferencesKey("acknowledged_budget_month")
+    private val plannedMonth = stringPreferencesKey("budget_month_planned")
+    private val recapSeen = stringPreferencesKey("recap_month_seen")
     private val smart = booleanPreferencesKey("smart_reading")
     private val onlineVoice = booleanPreferencesKey("online_voice")
     private val crash = booleanPreferencesKey("crash_reports")
@@ -230,6 +232,48 @@ class AccountSettingsPreferencesTest {
         val result = merge(p, document = null)
         assertNull(result.upload)
         assertEquals(setOf("default_wallet"), p[dirty])
+    }
+
+    @Test
+    fun `the check-in's months follow the account and never go back`() {
+        val p = mutablePreferencesOf(plannedMonth to "2026-12", recapSeen to "2026-11")
+        merge(
+            p,
+            doc(
+                AccountSetting.BUDGET_MONTH_PLANNED to (JsonPrimitive("2026-11") to 500L),
+                AccountSetting.RECAP_MONTH_SEEN to (JsonPrimitive("2026-10") to 500L),
+            ),
+        )
+        assertEquals("2026-12", p[plannedMonth])
+        assertEquals("2026-11", p[recapSeen])
+        // A later month planned on another phone reaches this one: the card stops asking here too.
+        val q = mutablePreferencesOf()
+        claim(q)
+        merge(q, doc(AccountSetting.BUDGET_MONTH_PLANNED to (JsonPrimitive("2027-01") to 600L)))
+        assertEquals("2027-01", q[plannedMonth])
+    }
+
+    @Test
+    fun `marking a month planned or seen only ever moves forward`() {
+        val p = mutablePreferencesOf(plannedMonth to "2026-12")
+        UserPreferencesRepository.laterMonth(p, plannedMonth, java.time.YearMonth.of(2026, 11))
+        assertEquals("2026-12", p[plannedMonth])
+        UserPreferencesRepository.laterMonth(p, plannedMonth, java.time.YearMonth.of(2027, 1))
+        assertEquals("2027-01", p[plannedMonth])
+        UserPreferencesRepository.laterMonth(p, recapSeen, java.time.YearMonth.of(2026, 11))
+        assertEquals("2026-11", p[recapSeen])
+    }
+
+    @Test
+    fun `the check-in's months belong to the ledger, so a sign-out and joining a Shared Space clear them`() {
+        val p = mutablePreferencesOf(plannedMonth to "2026-12", recapSeen to "2026-11")
+        UserPreferencesRepository.resetAccountSetup(p)
+        assertNull(p[plannedMonth])
+        assertNull(p[recapSeen])
+        val q = mutablePreferencesOf(plannedMonth to "2026-12", recapSeen to "2026-11")
+        UserPreferencesRepository.resetForSharedSpaceLedger(q)
+        assertNull(q[plannedMonth])
+        assertNull(q[recapSeen])
     }
 
     @Test

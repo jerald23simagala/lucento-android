@@ -237,7 +237,7 @@ private fun CategoryManageRow(
 }
 
 @Composable
-private fun NameDialog(
+internal fun NameDialog(
     title: String,
     initial: String,
     confirmLabel: String,

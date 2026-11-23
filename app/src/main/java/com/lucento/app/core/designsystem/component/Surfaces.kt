@@ -325,10 +325,13 @@ fun HeroStatTile(
     value: @Composable () -> Unit,
 ) {
     val ext = LucentoTheme.extendedColors
+    // By day a white tint lifted the tile to about #4C6EEB, where the muted caps label read at 3.3:1 (design review
+    // 2026-11-23); a deeper tint keeps it above 5:1. By night the navy hero already gives 5:1.
+    val fill = if (LucentoTheme.isDark) ext.onHero.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.12f)
     Column(
         modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(ext.onHero.copy(alpha = 0.14f))
+            .background(fill)
             .clearAndSetSemantics { contentDescription = description }
             .padding(Spacing.md),
     ) {
@@ -361,6 +364,20 @@ fun ListSectionHeader(
     subtotal: String? = null,
     action: @Composable (RowScope.() -> Unit)? = null,
 ) {
+    // From 130 % text a caption has no room beside the title: it goes under it, whole (design review 2026-11-23).
+    if (caption != null && action == null && LocalDensity.current.fontScale >= 1.3f) {
+        Column(modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.xs, start = Spacing.xxs)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = Hierarchy.sectionTitle, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f).semantics { heading() })
+                if (subtotal != null) {
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text(subtotal, style = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+            }
+            Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
     Row(
         modifier.fillMaxWidth().heightIn(min = 40.dp).padding(top = Spacing.lg, bottom = Spacing.xs, start = Spacing.xxs),
         verticalAlignment = Alignment.CenterVertically,

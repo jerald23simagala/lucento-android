@@ -12,8 +12,8 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 
 ## What works today (0.5.14)
 - **Navigation**: a persistent dock — **Home · Transactions · (+) · Budget · Wallets** — whose central **+** opens the
-  **transaction composer**; Insights, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
-  links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
+  **transaction composer**; Insights, Savings goals, Progress, Scheduled transactions and Debts & loans open from
+  Home's Quick links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation. On a new phone,
   **I already have an account** (when sync is available) reminds you to sync the old phone first, signs in, downloads
@@ -32,8 +32,14 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   a card's credit if you choose), less bills, loan and card payments and transfers out due this month. An (i) shows
   both figures line by line. See [docs/CALCULATIONS.md](docs/CALCULATIONS.md).
 - **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
-  the budget shown transparently; amounts per month and currency; manage categories (add, rename, reorder,
-  deactivate, restore). Existing users keep their categories and can personalise them from presets.
+  the budget shown transparently; amounts per month and currency, planned up to a year ahead; manage categories (add,
+  rename, reorder, deactivate, restore). Existing users keep their categories and can personalise them from presets.
+- **Monthly check-in**: from a month's last 3 days to the 7th of the next, a card on Home asks to plan the coming month
+  (a birthday, an event, a yearly bill): the plan page shows that month's budget, hints from your own records (yearly
+  costs due, the same month last year, last month's overspending) and sets one-off amounts for that month only.
+- **Progress** (from Home's Quick links): each month's recap — what was kept, the budget, where the money went, the
+  biggest change, net worth, goals, debts and days recorded — the year at a glance (Pro, previewed on Free) and the
+  awards, including Steady Month, Goal Reached and Loan Cleared.
 - **Insights**: the Ask Lucento card and the Reports list, then income and expenses over 3/6/12 months (transfers
   excluded, with the change against the period before; 6 and 12 months are Pro, previewed with the figures hidden on
   Free), where your money went, and net worth over time.

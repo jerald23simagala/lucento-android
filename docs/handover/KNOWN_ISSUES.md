@@ -15,6 +15,19 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Monthly check-in, Progress, Follow Lucento (2026-11-23, `feature/month-close`)
+
+| ID | Issue | Evidence | Next |
+|---|---|---|---|
+| MC-K1 | The check-in shows only while Lucento is open: nothing reminds anyone on the 1st (by design for now; a reminder would be the app's first notification permission) | Code (`MonthCheckIn`) | NEXT_TASKS MC-N2 |
+| MC-K2 | No switch turns the card off: a new setting would need backup schema 7 (unknown fields make a file invalid, and older builds refuse newer files), so "Not this month" is the only way to hide it | Code; docs/BACKUP.md | NEXT_TASKS MC-N3 |
+| MC-K3 | The check-in's months aren't in the JSON backup: a restore during the card's days can bring the card back (one tap); with sync on they return from the account | `AccountSettingsPreferencesTest` | — |
+| MC-K4 | Progress reads the main currency only, as Home does; a budget in another currency is on the Budget tab, not in the recap | Code (`MonthRecaps`) | Owner call if multicurrency testers need per-currency recaps |
+| MC-K5 | A one-off amount has no label of its own: it is a category's amount for that month only | Code | NEXT_TASKS MC-N4 |
+| MC-K6 | The year view's lock covers the 12-month overview only: every month's recap is free, as every month's report is free beside Insights' Pro trends | docs/MONETIZATION.md §3.4 | — |
+| MC-K7 | Steady Month looks back 24 months: a kept month older than that doesn't earn it | `ProgressAwardsTest` | — |
+| MC-K8 | Not yet run at a real turn of the month on a phone; checked on an emulator with its clock set | `MonthCloseCaptureTest` | NEXT_TASKS MC-N1 |
+
 ## Security and anti-tampering audit (2026-11-23)
 
 The findings are kept in the private `lucento-studio` repository (`docs/security/2026-11-23/`), not here: this

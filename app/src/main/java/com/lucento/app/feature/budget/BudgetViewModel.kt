@@ -159,6 +159,14 @@ class BudgetViewModel(
         viewModelScope.launch { runCatching { preferences.setAcknowledgedBudgetMonth(month) } }
     }
 
+    /** The plan page's Done: [month] is planned, so the monthly check-in doesn't ask about it again. */
+    fun markPlanned(month: YearMonth, onDone: () -> Unit) {
+        viewModelScope.launch {
+            runCatching { preferences.setBudgetMonthPlanned(month) }
+            onDone()
+        }
+    }
+
     companion object {
         val Factory = containerFactory {
             BudgetViewModel(it.transactions, it.categories, it.budgets, it.preferences, it.wallets, it.recurring)

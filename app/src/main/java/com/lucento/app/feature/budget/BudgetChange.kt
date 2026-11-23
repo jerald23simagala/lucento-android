@@ -33,12 +33,17 @@ data class BudgetChangeContext(
     val laterOwnAmounts: Int,
     /** [month]'s own amount is 0: the category was removed for that month only. */
     val removedThisMonth: Boolean = false,
+    /**
+     * Opened from the monthly check-in's plan page: every change starts as that month's only, because planning a month is
+     * about what is different in it (a birthday, an event). "Onward" is still one tap away.
+     */
+    val planning: Boolean = false,
 ) {
     val scopes: List<BudgetScope> get() = if (isPastMonth) listOf(BudgetScope.THIS_MONTH) else BudgetScope.entries
 
     /** A category with no amount at all starts as a monthly amount; any adjustment of an existing one is month-only. */
     val defaultScope: BudgetScope
-        get() = if (!isPastMonth && usual == null && !hasOwnAmount) BudgetScope.ONWARD else BudgetScope.THIS_MONTH
+        get() = if (!planning && !isPastMonth && usual == null && !hasOwnAmount) BudgetScope.ONWARD else BudgetScope.THIS_MONTH
 
     private val name get() = monthName(month)
 
@@ -105,6 +110,7 @@ data class BudgetChangeContext(
             currencyCode: String,
             month: YearMonth,
             currentMonth: YearMonth,
+            planning: Boolean = false,
         ): BudgetChangeContext {
             val rows = budgets.filter { it.categoryId == categoryId && it.limit.currencyCode == currencyCode }
             return BudgetChangeContext(
@@ -115,6 +121,7 @@ data class BudgetChangeContext(
                 hasOwnAmount = rows.any { it.month == month },
                 laterOwnAmounts = rows.mapNotNull { it.month }.filter { it > month }.distinct().size,
                 removedThisMonth = rows.any { it.month == month && it.limit.amountMinor == 0L },
+                planning = planning,
             )
         }
 

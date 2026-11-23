@@ -305,6 +305,14 @@ class ScreenshotTourTest {
         // A new award is presented in a modal ceremony, and the seeded month earns several at once: mark them all as seen
         // first so no ceremony covers a capture or blocks a tap (the tour captures the cabinet and a ceremony on purpose).
         runBlocking { container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet()) }
+        // The monthly check-in card shows only in a month's last days and first week: settled here, so every run's
+        // dashboard is the same whatever the date (the card and the plan page are captured separately, on a set clock).
+        runBlocking {
+            container.preferences.dismissMonthCheckIn(
+                plan = java.time.YearMonth.from(today).plusMonths(1),
+                recap = java.time.YearMonth.from(today).minusMonths(1),
+            )
+        }
         runBlocking { DemoMonth.seed(container, currency, demoScale, today) }
         applyDemoDark()
 
@@ -333,17 +341,25 @@ class ScreenshotTourTest {
         compose.waitForIdle()
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
-        // Awards: the cabinet (earned medals in gold, the rest as outlines with how to earn them and a count where it takes
-        // several steps), then an earned medal replays its ceremony — Lucento presenting the medal.
-        compose.onNodeWithContentDescription("Awards").performScrollTo().performClick()
-        waitForText("earned · from your own records")
-        shot("07a-awards-cabinet")
+        // Progress (owner, 2026-11-23): the month's recap, the year, then the award cabinet (earned medals in gold, the
+        // rest as outlines with how to earn them and a count where it takes several steps); an earned medal replays its
+        // ceremony — Lucento presenting the medal.
+        compose.onNodeWithContentDescription("Progress").performScrollTo().performClick()
+        waitForText("How your months are going", substring = true)
+        waitForText("Where it went")
+        shot("07a-progress-recap")
+        compose.onNodeWithText("Your year").performScrollTo()
+        compose.waitForIdle()
+        shot("07a2-progress-year")
+        compose.onNodeWithText("earned · from your own records", substring = true).performScrollTo()
+        compose.waitForIdle()
+        shot("07a3-awards-cabinet")
         click("Money Keeper")
         waitForText("Thanks, Lucento")
         Thread.sleep(2_600) // the medal lands, the confetti settles and the shine passes
         shot("07b-award-ceremony")
         click("Thanks, Lucento")
-        backUntilGone("earned · from your own records")
+        backUntilGone("How your months are going")
 
         // ---------------------------------------------------------------- the composer: several transactions in one message
         compose.onNodeWithContentDescription("Add transaction").performClick()

@@ -173,6 +173,13 @@ import androidx.compose.ui.focus.focusProperties
 @Serializable data class TransactionViewRoute(val transactionId: Long)
 /** Dashboard "top spending" tile: Transactions filtered to one category in one month ("yyyy-MM"). */
 @Serializable data class CategoryTransactionsRoute(val categoryId: Long, val month: String)
+/**
+ * Progress (owner, 2026-11-23): a month's recap ("yyyy-MM"; empty: the page's default month), the year and the awards;
+ * [awards] brings the awards into view (an award ceremony's "See all").
+ */
+@Serializable data class ProgressRoute(val month: String = "", val awards: Boolean = false)
+/** The monthly check-in's plan page for [month] ("yyyy-MM"). */
+@Serializable data class MonthPlanRoute(val month: String)
 /** The transaction composer: [start] is a [ComposerStart] name; [typeHint] a TransactionType name or empty. */
 @Serializable data class ComposerRoute(val start: String = "TYPE", val walletId: Long = NO_WALLET, val typeHint: String = "")
 
@@ -311,6 +318,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
     var showProfile by rememberSaveable { mutableStateOf(false) }
+    // Follow Lucento, opened from the profile menu once it has closed.
+    var showFollow by rememberSaveable { mutableStateOf(false) }
     // A Pro theme tried on lasts while the profile sheet is open (owner, 2026-11-19).
     val themeTrial = com.lucento.app.feature.profile.LocalThemeTrial.current
     LaunchedEffect(showProfile) { if (!showProfile) themeTrial.end() }
@@ -584,6 +593,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         onTransfer = { openTransfer() },
                                         onScanReceipt = { openComposer(ComposerStart.SCAN) },
                                         onOpenCategory = { id, month -> push(CategoryTransactionsRoute(id, month.toString())) },
+                                        onOpenProgress = { month, awards -> push(ProgressRoute(month?.toString().orEmpty(), awards)) },
+                                        onPlanMonth = { month -> push(MonthPlanRoute(month.toString())) },
                                     ),
                                 )
                             }
@@ -632,7 +643,35 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         onChooseCategories = { push(CategorySetupRoute) },
                                         onManageCategories = { push(CategoriesRoute) },
                                         onOpenScheduled = { push(RecurringRoute()) },
+                                        onPlanMonth = { month -> push(MonthPlanRoute(month.toString())) },
                                     )
+                                }
+                            }
+                            pushed<ProgressRoute>(reducedMotion) { entry ->
+                                val route = entry.toRoute<ProgressRoute>()
+                                com.lucento.app.feature.progress.ProgressScreen(
+                                    onBack = back,
+                                    initialMonth = route.month.takeIf { it.isNotEmpty() }?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
+                                    showAwards = route.awards,
+                                    onOpenInsights = if (features.isEnabled(Feature.INSIGHTS)) ({ push(InsightsRoute) }) else null,
+                                )
+                            }
+                            pushed<MonthPlanRoute>(reducedMotion) { entry ->
+                                val route = entry.toRoute<MonthPlanRoute>()
+                                val month = runCatching { java.time.YearMonth.parse(route.month) }.getOrNull()
+                                Gated(Feature.BUDGETS, features, enableFeature, back) {
+                                    if (month == null) {
+                                        LaunchedEffect(Unit) { back() }
+                                    } else {
+                                        com.lucento.app.feature.budget.MonthPlanScreen(
+                                            month = month,
+                                            onBack = back,
+                                            onDone = {
+                                                back()
+                                                notify("${com.lucento.app.feature.home.monthLabel(month)} is planned")
+                                            },
+                                        )
+                                    }
                                 }
                             }
                             pushed<InsightsRoute>(reducedMotion) {
@@ -940,11 +979,16 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         ProfileDestination.PRO -> push(ProRoute())
                         ProfileDestination.SWITCH_ACCOUNT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, switchAccount = true))
                         ProfileDestination.SIGN_OUT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, signOut = true))
+                        ProfileDestination.FOLLOW -> showFollow = true
                     }
                 },
                 onDismiss = { showProfile = false },
             )
         }
+    }
+
+    if (showFollow) {
+        com.lucento.app.feature.profile.FollowSheet(onDismiss = { showFollow = false })
     }
 
     // Lucento Pro: once, after a plan ends — what changed, and that nothing was removed.

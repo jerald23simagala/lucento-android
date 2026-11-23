@@ -124,6 +124,28 @@ object BudgetMilestones {
     ): BudgetPlan? {
         val month = YearMonth.from(today).minusMonths(1)
         if (lastAcknowledged != null && !lastAcknowledged.isBefore(month)) return null
+        return keptPlan(categories, budgets, ledger, currencyCode, month)
+    }
+
+    /**
+     * Whether [month] stayed within its budget by [monthToAcknowledge]'s rules (allocations that covered the whole month,
+     * real spending, Spent at or under the total). Steady Month uses it for any finished month.
+     */
+    fun keptWithin(
+        categories: List<Category>,
+        budgets: List<Budget>,
+        ledger: TranslatedLedger,
+        currencyCode: String,
+        month: YearMonth,
+    ): Boolean = keptPlan(categories, budgets, ledger, currencyCode, month) != null
+
+    private fun keptPlan(
+        categories: List<Category>,
+        budgets: List<Budget>,
+        ledger: TranslatedLedger,
+        currencyCode: String,
+        month: YearMonth,
+    ): BudgetPlan? {
         val wholeMonth = budgets.filter { b -> b.createdOn != null && !b.createdOn.isAfter(month.atDay(1)) }
         val plan = BudgetPlanner.plan(categories, wholeMonth, ledger.transactions, currencyCode, month)
         if (!plan.hasBudget || plan.spent.isZero || plan.spent > plan.total) return null

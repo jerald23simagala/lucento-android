@@ -129,7 +129,10 @@ What each action writes (`BudgetRepository`):
 | First amount (onboarding, guide, a category with no amount) | `setAllocation` = recurring from the current month |
 
 Months changed on their own after M keep their amounts when "onward" is used, and the confirmation says so. Past months
-can only be corrected for themselves. Spending is counted by each transaction's calendar date, so a month starts on the
+can only be corrected for themselves. The Budget tab reaches up to 12 months ahead (`MONTHS_AHEAD`, owner 2026-11-23): a
+month that hasn't started shows its planned total (the same sum), how it compares with the month before, and each
+category's amount with where it comes from ("Only December · usually ₱2,000", or "Every month"). Nothing is spent in it
+yet, so it shows no pace, no Safe to spend and no per-day figure. Spending is counted by each transaction's calendar date, so a month starts on the
 1st in the user's local calendar. Budget periods other than calendar months (payday, weekly, biweekly) are planned for
 Pro after launch and not built; any implementation must follow the rules in `docs/handover/NEXT_TASKS.md` › "Custom
 budget periods" (new tables only, never new scope columns on `budgets`).
@@ -150,11 +153,78 @@ budget periods" (new tables only, never new scope columns on `budgets`).
 Worked out from stored records (`Achievements.earned`), never from counters: Money Keeper (an asset wallet), Budget
 Builder (a category with an amount this month, lifecycle rules), First Step (an expense or income recorded), Getting
 Consistent (expenses or income on 7 different days, any order — no streak), Financial Explorer (Insights opened; a
-local flag), Goal Setter (a savings goal, archived ones included). Each is acknowledged once, after the write that earned it; the first run with
-milestones records what is already earned without showing anything. Progress (`Achievements.progress`) comes from the
+local flag), Goal Setter (a savings goal, archived ones included), Secured (app lock turned on at some point; a local
+flag). The progress awards (owner, 2026-11-23) recognise results rather than setup:
+- **Steady Month**: a finished month, at most 24 back, that stayed within its budget by the budget moment's rules
+  (`BudgetMilestones.keptWithin`: allocations that covered the whole month, real spending, Spent at or under the total,
+  in the main currency on the translated ledger).
+- **Goal Reached**: a goal (archived ones too) whose contributions, added up in date order, reached its target at some
+  point (`Achievements.everReached`); taking money back later doesn't undo it.
+- **Loan Cleared**: a loan (`WalletType.LOAN`, not a card: paying a card in full is routine) owing nothing, with at
+  least one payment (a transfer in) recorded on it.
+
+Each is acknowledged once, after the write that earned it; the first run with milestones records what is already earned
+without showing anything. Awards an update adds are recorded the same quiet way (`Achievements.newToThisPhone`, from the
+`achievements_known` record; a phone without one knew the first seven), so an update never brings ceremonies for the
+past. The cabinet shows what the records earn plus every award already presented (`shownEarned`): none is taken away. Progress (`Achievements.progress`) comes from the
 same facts, so it never disagrees with what is earned: `current` of `target`, capped at the target; only Getting
 Consistent has a target above 1 and shows a count ("3 of 7 days"). Awards earned together (`toAcknowledgeAll`: a
 restored backup, a first sync, one write that earns two) are acknowledged together and presented in one ceremony.
+
+### Monthly check-in (owner, 2026-11-23)
+A card on Home asks to plan a month: budgets differ from month to month (a birthday, an event, a yearly bill). Pure rules
+in `MonthCheckIn`:
+- **When**: from the last 3 days of a month (planning next month) to the 7th of the next (planning that month, and
+  offering last month's recap). Outside those days there is no card. It shows only while Lucento is open: it is never a
+  notification, and it never opens over the composer or a widget.
+- **Plan part**: Budgets on, the phone may change the budget (not a Partner's), and the budget is settled: it has an
+  amount this month and its first amount is at least 14 days old (`budgetSettled`; rows without a creation date count
+  as settled). It goes once the month is planned ("Done planning" on the plan page) or dismissed.
+- **Recap part**: the 1st to the 7th, when last month has income or expenses recorded; it goes once the recap is opened
+  (from the card or on the Progress page) or dismissed.
+- **Markers**: `budget_month_planned` and `recap_month_seen` ("yyyy-MM", the latest month done or dismissed) follow the
+  account like the budget moment (docs/SYNC.md "Settings": ledger settings, never moving back to an earlier month). They
+  aren't in the JSON backup (docs/BACKUP.md), like the one-time notices.
+- **The plan page** (`MonthPlanScreen`) is the Budget tab's own plan for that month: every change starts as that month's
+  only (`BudgetChangeContext.planning`; "onward" is one tap away), and "Add something" sets a month-only amount on any
+  category or a new one. From the 1st, the card says how the recap month's budget ended: "₱18,200 of ₱20,000 spent",
+  or "₱1,200 over budget" (in a month's last days this month's figures are on the budget card below it).
+- **Hints** (`MonthPlanHints`, facts only, at most 4, at most 2 of each kind, in this order): scheduled expenses that don't
+  come every month (yearly, every few months; not weekly, monthly, linked or paused ones) with an occurrence in the
+  month; the same month last year where a category's spending was at least 10 % above this month's plan for it, or it
+  had no plan; last month's budgeted categories that went over (so far, in a month's last days). A hint opens its
+  category's amount with a suggestion, said where it comes from (`hintSuggestion`): a bill due adds its amount to the
+  usual one; last year's month proposes what it cost then; last month's overspending proposes what was spent. Nothing
+  is saved until the person saves it.
+- **Reaching the plan page**: from the card, and from the Budget tab on any month ahead ("Plan <month>").
+- **Closing the card** ("Not this month") hides both parts and offers Undo, which puts the two months back as they were
+  (the one time they move back).
+
+### Progress recap (owner, 2026-11-23)
+The Progress page (from Home's Quick links; it replaced the awards sheet) tells a month's story and the year's, from the
+same calculators as the rest of the app (`MonthRecaps`), in the main currency on the translated ledger (FX results left
+out, as on Home and Budget):
+- **Kept** = income − expenses (`CashflowCalculator.netFlow`), signed. Transfers, adjustments and goal contributions
+  never count.
+- **Budget**: the Budget tab's plan for the month (`BudgetPlanner.plan`): spent of the total, categories within, and the
+  ones that went over, by how much. Null when Budgets is off or the month had no budget.
+- **Where it went**: the 3 largest expense categories, with their share of the month's expenses.
+- **Biggest change**: the category whose spending moved most since the month before (by size, either way; ties to the
+  larger amount, then category id), only when the month before has records. A month still running is compared with the
+  same days of the month before ("at this point in October", up to its last day if shorter), never with all of it.
+- **Net worth**: at the month's end (today's for the current month), and its change since the month before ended
+  (`BalanceHistory`), when wallets existed then.
+- **Goals**: contributions less withdrawals in the month for goals in this currency (archived included), and goals whose
+  savings crossed the target in it. **Debts**: payments (transfers in) to cards and loans in the month. Both only when
+  their module is on.
+- **Days recorded**: days with income or expenses (any currency) of the month's days so far.
+- **The year**: the 12 months to this one, each with what was kept and, for a finished month with records and a budget,
+  whether it stayed within it (the Budget tab's verdict); totals of income, expenses and kept, and net worth's change
+  from the end of the month before the first. When records start later than the window, the year is shown and told from
+  the first month with records ("kept since September"); only months with records open their recap. The year view is Lucento Pro, gated like Insights' 12 months
+  (`ProGates.insightsPeriodAllowed(12)`, docs/MONETIZATION.md §3.4); each month's recap is free.
+- Last month kept within budget is celebrated once, on the Progress page or the Budget tab, whichever comes first (the
+  same `acknowledged_budget_month`).
 
 ### Spendable now (Home, P2-1)
 The summed balances of cash, bank and e-wallet accounts in the dashboard currency (`NetWorthComposition.available`).
