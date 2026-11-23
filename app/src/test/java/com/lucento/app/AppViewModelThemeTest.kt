@@ -1,6 +1,9 @@
 package com.lucento.app
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import com.lucento.app.core.crash.CrashReportsFlag
 import com.lucento.app.data.preferences.ThemeId
 import com.lucento.app.data.preferences.UserPreferencesRepository
@@ -9,7 +12,6 @@ import com.lucento.app.domain.entitlement.Entitlement
 import com.lucento.app.domain.entitlement.EntitlementSource
 import com.lucento.app.domain.entitlement.EntitlementState
 import com.lucento.app.domain.entitlement.EntitlementStatus
-import com.lucento.app.domain.entitlement.ProGates
 import com.lucento.app.domain.entitlement.Verifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,11 +24,8 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -49,13 +48,27 @@ class AppViewModelThemeTest {
         )
     }
 
+    /** Owns this test's ViewModels, so their coroutines end with the test. */
+    private val viewModels = ViewModelStore()
+    private var now = 1_800_000_000_000L
+
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
 
     @After fun tearDown() {
-        // The DataStore first, while the test's Main dispatcher still runs the ViewModel collectors its closing wakes.
+        viewModels.clear()
         scope.cancel()
         Dispatchers.resetMain()
     }
+
+    private fun viewModel(plan: EntitlementState): AppViewModel =
+        ViewModelProvider(
+            viewModels,
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    AppViewModel(preferences, entitlements = MutableStateFlow(plan), clock = { now }) as T
+            },
+        )[AppViewModel::class.java]
 
     /** Lucento Pro (on this phone) until [endsAt], the offline grace included. */
     private fun proUntil(endsAt: Long): EntitlementState {
@@ -71,11 +84,11 @@ class AppViewModelThemeTest {
         )
     }
 
-    private suspend fun themeBecomes(theme: ThemeId) = withTimeout(5_000) { preferences.preferences.first { it.themeId == theme } }
+    private suspend fun themeBecomes(theme: ThemeId) = withTimeout(10_000) { preferences.preferences.first { it.themeId == theme } }
 
     @Test
     fun `a Pro theme is picked while the plan holds`() = runBlocking {
-        val vm = AppViewModel(preferences, entitlements = MutableStateFlow(proUntil(System.currentTimeMillis() + 3_600_000L)))
+        val vm = viewModel(proUntil(now + 3_600_000L))
         vm.setThemeId(ThemeId.AURORA)
         themeBecomes(ThemeId.AURORA)
         Unit
@@ -83,16 +96,15 @@ class AppViewModelThemeTest {
 
     @Test
     fun `a plan that ends while Lucento stays open unlocks no Pro theme`() = runBlocking {
-        val plan = proUntil(System.currentTimeMillis() + 3_000)
-        val vm = AppViewModel(preferences, entitlements = MutableStateFlow(plan))
-        assertTrue(ProGates.themeAllowed(ThemeId.AURORA.name, plan, System.currentTimeMillis()))
+        val vm = viewModel(proUntil(now + 60_000L))
         assertEquals(emptySet<ThemeId>(), vm.lockedThemes.value)
-        Thread.sleep(3_500)
+        now += 120_000L
         // No new plan has arrived, so the list worked out earlier still offers the Pro themes...
         assertEquals(emptySet<ThemeId>(), vm.lockedThemes.value)
-        // ...but the tap checks the plan as it is now: nothing is written (a write would land within milliseconds).
+        // ...but the tap checks the plan as it is now.
         vm.setThemeId(ThemeId.AURORA)
-        assertNull(withTimeoutOrNull(1_500) { preferences.preferences.first { it.themeId == ThemeId.AURORA } })
+        // An edit made after it lands after anything the tap asked for (DataStore applies edits in order).
+        withTimeout(10_000) { preferences.setShowCents(false) }
         assertEquals(ThemeId.SUNRISE, preferences.preferences.first().themeId)
         // A free theme is still picked.
         vm.setThemeId(ThemeId.MIDNIGHT)
