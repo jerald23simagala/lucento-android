@@ -686,8 +686,7 @@ class ScreenshotTourTest {
         buildList {
             add("Add every account you use" to "25a-pro-card-wallets")
             add("Count everything you have" to "25b-pro-card-net-worth")
-            // Gemini and Lucento Shared need a Lucento account: only in a build with cloud sync (CI's test build has none).
-            if (com.lucento.app.data.sync.SupabaseModule.isConfigured) add("Smarter reading, with Gemini" to "25b2-pro-card-smart-reading")
+            // No Smarter reading card since 2026-11-23 (owner: Gemini is for Ask Lucento).
             add("Save for more at once" to "25c-pro-card-goals")
             add("Look further back" to "25d-pro-card-insights")
             add("Keep your statements" to "25e-pro-card-statements")

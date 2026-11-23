@@ -67,7 +67,6 @@ object ProCopy {
             Limit.None -> "Not included"
             is Limit.Count -> "${limit.max}"
             is Limit.PerMonth -> "${limit.max} a month"
-            is Limit.PerDay -> "${limit.max} a day"
         }
     }
 
@@ -91,7 +90,7 @@ object ProCopy {
         data class Value(val text: String) : TableCell
     }
 
-    /** The table's short form of [cell]: "3", "No limit", "10/mo", "50/day", a tick or a dash. */
+    /** The table's short form of [cell]: "3", "No limit", "5/mo", a tick or a dash. */
     fun tableCell(feature: ProFeature, limit: Limit): TableCell = when (feature) {
         ProFeature.EXTRA_THEMES -> TableCell.Value(if (limit == Limit.None) "2" else "All 5")
         ProFeature.SHARED_SPACE -> when (limit) {
@@ -104,7 +103,6 @@ object ProCopy {
             Limit.None -> TableCell.NotIncluded
             is Limit.Count -> TableCell.Value("${limit.max}")
             is Limit.PerMonth -> TableCell.Value("${limit.max}/mo")
-            is Limit.PerDay -> TableCell.Value("${limit.max}/day")
         }
     }
 
@@ -141,7 +139,7 @@ object ProCopy {
             listOf(
                 "Cloud sync between your phones",
                 "Lucento Shared with a Partner",
-                "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} AI adviser questions a day",
+                "${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH} AI adviser questions a month",
                 "Unlimited wallets, cards and loans",
                 "12-month Insights, PDF statements and all five themes",
             ),
@@ -159,7 +157,7 @@ object ProCopy {
             listOf(
                 "Cloud sync and restoring from your account",
                 "Lucento Shared with a Partner",
-                "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} AI adviser questions a day",
+                "${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH} AI adviser questions a month",
             ),
         )
     }
@@ -185,7 +183,7 @@ object ProCopy {
         ProFeature.CLOUD_RESTORE -> "Restoring from your account is part of Lucento Pro. Restoring a backup file is always free."
         ProFeature.AI_ADVISER ->
             "The free plan includes ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} AI adviser questions a month. Lucento Pro gives you " +
-                "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day."
+                "${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH} a month."
         ProFeature.SMART_READING -> "Smarter reading is part of Lucento Pro. Reading on this phone is always free."
         ProFeature.SHARED_SPACE -> "Inviting a Partner is part of Lucento Pro. Being someone’s Partner is always free."
     }
@@ -267,7 +265,7 @@ object ProCopy {
     fun wallBody(wall: ProWall, plan: DisplayPlan = DisplayPlan.FREE): String {
         if (cloudWall(wall, plan)) {
             return if (wall.feature == ProFeature.AI_ADVISER) {
-                "Lucento Cloud gives you ${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day. Until your questions return, Lucento " +
+                "Lucento Cloud gives you ${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH} a month. Until your questions return, Lucento " +
                     "answers what it can on this phone."
             } else {
                 "Everything on this phone stays yours with Pro Lifetime. Lucento Cloud adds cloud sync, Lucento Shared, " +
@@ -293,7 +291,7 @@ object ProCopy {
                 "${have}Lucento Pro and Pro Lifetime allow ${PlanCatalog.PRO_ACTIVE_GOALS}. When a goal is reached, archiving it " +
                     "frees a slot. Nothing happens to the goals you have."
             ProFeature.AI_ADVISER ->
-                "Lucento Pro gives you ${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} a day. Until your questions return, Lucento " +
+                "Lucento Pro gives you ${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH} a month. Until your questions return, Lucento " +
                     "answers what it can on this phone."
             ProFeature.RECEIVABLES ->
                 "Track what someone owes you and each instalment they pay back. You can always record what they pay as income."

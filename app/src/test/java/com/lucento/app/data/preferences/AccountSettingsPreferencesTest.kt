@@ -40,7 +40,7 @@ class AccountSettingsPreferencesTest {
     private val budgetMonth = stringPreferencesKey("acknowledged_budget_month")
     private val plannedMonth = stringPreferencesKey("budget_month_planned")
     private val recapSeen = stringPreferencesKey("recap_month_seen")
-    private val smart = booleanPreferencesKey("smart_reading")
+    private val smart = booleanPreferencesKey("smart_reading_v2")
     private val onlineVoice = booleanPreferencesKey("online_voice")
     private val crash = booleanPreferencesKey("crash_reports")
     private val usage = booleanPreferencesKey("usage_counts")

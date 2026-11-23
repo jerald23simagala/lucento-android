@@ -41,8 +41,6 @@ sealed interface Limit {
     data class Count(val max: Int) : Limit
     /** At most [max] uses per calendar month (server-counted). */
     data class PerMonth(val max: Int) : Limit
-    /** At most [max] uses per day (server-counted). */
-    data class PerDay(val max: Int) : Limit
 
     /** Whether one more is allowed when [used] are already in use (active items, or uses in the period). */
     fun allows(used: Int): Boolean = when (this) {
@@ -50,7 +48,6 @@ sealed interface Limit {
         None -> false
         is Count -> used < max
         is PerMonth -> used < max
-        is PerDay -> used < max
     }
 
     /** The bare number, for copy ("the most on the free plan is 3"); null for [Unlimited] and [None]. */
@@ -59,6 +56,5 @@ sealed interface Limit {
             Unlimited, None -> null
             is Count -> max
             is PerMonth -> max
-            is PerDay -> max
         }
 }

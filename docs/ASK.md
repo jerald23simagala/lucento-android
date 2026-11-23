@@ -12,7 +12,7 @@ stale, and the proxy skips Gemini models that were just busy. **Round 10 (2026-1
 user's own amounts and with rates the model knows or assumes (e.g. Pag-IBIG MP2 dividends), low and high cases when
 unsure, never "it depends"; specific programmes and funds compared and a choice given. The phone's calculator learned
 amounts with a currency code, percentages and powers; requests carry `version: 3`. **On by default (owner,
-2026-11-17):** AI answers are on for every signed-in account, Free included (10 questions a month; Pro 50 a day), and
+2026-11-17):** AI answers are on for every signed-in account, Free included (5 questions a month; Pro 45 a month since 2026-11-23), and
 the person confirms once, at their first question, before anything is sent (see "Consent (v3)").
 
 ## Two ways an answer is made
@@ -156,7 +156,7 @@ sign-in details, the Gemini key.
   from a backup, and a sign-out or account reset returns both to the default (on, not confirmed), so the next account
   confirms for itself. Settings' Privacy summary counts AI answers as sharing only once confirmed.
 - **Limits.** The server counts each account's requests (`public.consume_ai_request`, `plan_limits`): the free plan
-  10 a calendar month, Lucento Pro 50 a day under a 400 monthly ceiling, shared with Smarter reading (Pro only). The reply
+  5 a calendar month, Lucento Pro 45 a calendar month (owner, 2026-11-23; was 50 a day under a 400 monthly ceiling), shared with Smarter reading (Pro only). The reply
   carries `remaining` and `plan`, so Ask says "N left this month" on Free and "N left today" with Pro. There is one
   request at a time (an in-flight guard), with a 30-second timeout.
 - **Sign-in token (round 9).** Ask Lucento and Smarter reading send the session's access token (`AuthRepository.accessToken`):
@@ -187,8 +187,8 @@ sign-in details, the Gemini key.
 ## Setting it up (owner)
 
 1. The proxy uses the same environment as `/api/interpret` (`GEMINI_API_KEY`, `SUPABASE_URL` or
-   `LUCENTO_SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` or `LUCENTO_SUPABASE_PUBLISHABLE_KEY`, optional `AI_DAILY_LIMIT` /
-   `GEMINI_MODEL`); see `CAPTURE.md` "Setting it up". There is nothing new to configure (Vercel production already has
+   `LUCENTO_SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` or `LUCENTO_SUPABASE_PUBLISHABLE_KEY`, optional
+   `GEMINI_MODEL`, production `gemini-3.5-flash-lite` since 2026-11-23); see `CAPTURE.md` "Setting it up". There is nothing new to configure (Vercel production already has
    `GEMINI_API_KEY` and the `LUCENTO_`-prefixed Supabase names, checked 2026-11-03).
 2. Merge `lucento-website` branch `feature/ask-lucento` and deploy. Check it with
    `curl -i -X POST -H "Content-Type: application/json" -d "{}" https://www.lucentoapp.com/api/ask`, which should answer

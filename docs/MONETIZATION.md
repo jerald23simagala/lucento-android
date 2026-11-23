@@ -256,7 +256,7 @@ bait-and-switch in onboarding.
 
 | Feature | Status | F | S | L | L+C | Offline | Gate |
 |---|---|---|---|---|---|---|---|
-| AI adviser (Gemini): plans, recommendations, projections over the person's own figures | Shipped | **10 questions / calendar month** (signed in, consent) | **50 / day**, soft monthly ceiling 400 (abuse guard, remote-configured) | first 12 months as S; then **10 / month** | as S | No | proxy reads plan from `entitlements`; app displays `remaining` |
+| AI adviser (Gemini): plans, recommendations, projections over the person's own figures | Shipped | **5 questions / calendar month** (signed in, consent) | **45 / calendar month**, shared with Smarter reading (owner, 2026-11-23; was 50 / day under a 400 monthly ceiling) | first 12 months as S; then **5 / month** | as S | No | proxy reads plan from `entitlements`; app displays `remaining` |
 | Smarter reading (Gemini reads the composer message) | Shipped | — (on-phone reading) | ✔ | first 12 months; then — | ✔ | No | proxy answers `403 pro_required`; consent switch shows the lock |
 | On-phone reading, scanning (ML Kit), voice entry | Shipped | ✔ | ✔ | ✔ | ✔ | Yes | none |
 
@@ -341,20 +341,24 @@ withheld.
 
 ### 4.5 Cost model behind the AI and cloud numbers (verify against current price lists before launch)
 
+Measured 2026-11-23 on Gemini 3.5 Flash-Lite ($0.30 / M input, $2.50 / M output), the production model since that day
+(`GEMINI_MODEL` on Vercel), with the app's own summary of a made-up household:
+
 | Item | Assumption | Per unit |
 |---|---|---|
-| Gemini Flash-class request (adviser): ~8k input tokens (figures, 60 days of transactions, system prompt) + ~600 output | $0.30 / M input, $2.50 / M output (verify) | ≈ **$0.004** (₱0.23) |
-| Smarter reading request: ~1.5k in + 200 out | same | ≈ $0.001 |
-| Free: 10 adviser questions / month | | ≤ $0.04 / user / month |
-| Pro: 50 / day, soft ceiling 400 / month | worst case 400 | ≤ $1.60 / user / month (≈ ₱90 — survivable against ₱149; the realistic median is far lower) |
-| Pro without a monthly ceiling | 1,500 / month | $6 / user / month — **more than the subscription**; hence the ceiling |
+| Ask Lucento question: ~11.5k input tokens (figures, 60 days of transactions, system prompt) + ~670 output (thinking included) | measured | ≈ **$0.005** (₱0.30) |
+| Smarter reading message: ~1k in + ~100 out | measured | ≈ $0.0005 |
+| Free: 5 adviser questions / month | | ≤ $0.03 / user / month |
+| Pro: 45 / calendar month, shared with Smarter reading | worst case 45 Ask questions | ≤ $0.23 / user / month (≈ ₱13 against ₱149 a month or ₱1,190 a year) |
+| The same 45 on Gemini Flash (3.6 / 3.8) | $0.75 / $3.75 per M, doubling on 1 Jan 2027 | ≈ $0.50, ≈ $1.00 from January |
 | Supabase sync storage and egress per user | tens of KB to a few MB | < $0.01 / user / month at current plan pricing; the fixed Supabase plan is the real cost |
 | Vercel function invocations | per request | negligible at launch scale |
 
-So: 50 / day is fine as the *daily* promise; the *monthly* soft ceiling (remote-configured, default 400, shown only
-when hit: "You've used this month's adviser allowance") is what keeps a single heavy user from costing more than they
-pay. Lifetime without Cloud gets the Free allowance (10 / month), which costs nothing meaningful and keeps the
-adviser discoverable.
+Owner, 2026-11-23: $2 a month (the earlier 400-question ceiling) was too much against the subscription, so every plan
+now runs per calendar month — Free 5, Pro 45 — and Gemini is for Ask Lucento, not for adding transactions (Smarter
+reading stays a Pro opt-in in Settings and uses the same allowance). Lifetime without Cloud gets the Free allowance
+(5 / month), which costs nothing meaningful and keeps the adviser discoverable. Production AI use before the change
+(aggregate): November to the 23rd, 7 accounts, 70 requests, median 7, most 34 in the month.
 
 ### 4.6 Promotions and future tiers
 
@@ -498,7 +502,7 @@ public.purchase_links (          -- one Play purchase ↔ one Lucento account, e
   purchase_token_hash text pk, order_id text, product_id text, user_id uuid references auth.users,
   obfuscated_account_id text null, linked_at timestamptz, relinked_count int default 0)
 lucento_private.plan_limits (    -- remote configuration; read by security-definer functions and the proxy
-  key text pk, value_int int, updated_at)   -- 'ai_free_monthly'=10, 'ai_pro_daily'=50, 'ai_pro_monthly_ceiling'=400, 'max_partners_pro'=1
+  key text pk, value_int int, updated_at)   -- 'ai_free_monthly'=5, 'ai_pro_monthly'=45 (20261123120000), 'max_partners_pro'=1
 ```
 
 Functions: `lucento_private.max_partners(owner)` → `1` when the owner has an active entitlement granting `SHARED`,
@@ -543,8 +547,8 @@ remembered first, so no "your plan has ended" notice follows.
 
 ### 5.5 Plan-aware AI on the proxy
 
-`ask.ts` / `interpret.ts`: after auth, call `ai_allowance()`; Free → monthly limit; Pro / Cloud → daily limit plus
-the monthly ceiling; Smarter reading → `403 pro_required` without `AI_PRO`. Limits come from `plan_limits` with env
+`ask.ts` / `interpret.ts`: after auth, call `ai_allowance()`; every plan → a calendar-month limit (owner, 2026-11-23;
+Pro / Cloud had a daily limit under a monthly ceiling until then); Smarter reading → `403 pro_required` without `AI_PRO`. Limits come from `plan_limits` with env
 vars as fallback, so quotas change with one SQL update, no deploy. Responses keep `remaining` and add `period`
 (`day` | `month`) and `resetsAt` so the app's copy is a display of the server's decision.
 
@@ -678,7 +682,7 @@ only after a committed write: never for a pending payment, a renewal, or a trial
 `domain/entitlement/ProWelcome.kt` (JVM-tested); screens: `feature/pro/welcome/`.
 
 1. **The deck.** The owner chose "Deck, unwrapped" on 2026-11-12, after the spotlight tour's buttons failed on real
-   phones (KNOWN_ISSUES PW-1). It shows up to ten cards in five chapters, one per thing Pro opened, held in a gold band
+   phones (KNOWN_ISSUES PW-1). It shows up to nine cards in five chapters (ten until 2026-11-23, when the owner dropped Smarter reading's card: Gemini is for Ask Lucento), one per thing Pro opened, held in a gold band
    with the Lucento symbol.
    - "Open your Pro deck" slides the band off and turns the first card, with the welcome's only burst. After that it's
      one card at a time:
@@ -730,8 +734,8 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      - "Included until Nov 12, 2027" for a Lifetime's included year, with the date read from its entitlement;
      - "While you subscribe" for a subscription;
      - "With Lucento Cloud" for the add-on.
-   - **The AI card** says "50 a day until Nov 12, 2027, then 10 a month": the allowance falls back to the free plan's;
-     it doesn't stop. It shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan. Until
+   - **The AI card** says "45 a month until Nov 12, 2027, then 5 a month": the allowance falls back to the free plan's;
+     it doesn't stop. It shows the allowance (5 a month → 45 a month) only once the server has confirmed the plan. Until
      then it says "Pro allowance until …", because only the Pro allowance ends on that date (owner, 2026-11-22, OT-48
      call 4 B). The other services keep "Included until …".
    - **What runs on the phone** never carries a term: it's owned.
@@ -743,7 +747,7 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      live region, so nothing is heard twice.
    - **The stage** is the same for every moment, and solid, so nothing beneath shows. While it is up, the status and
      navigation bars draw light icons.
-   - **Words:** the brand's name, counts ("10 perks", "50 a day") and menu paths ("Settings › Account & sync") never
+   - **Words:** the brand's name, counts ("10 perks", "45 a month") and menu paths ("Settings › Account & sync") never
      break inside; stage headlines never hyphenate.
 2. **The collection.**
    - **Title:** "Congratulations, you're Pro" ("You're Pro" from 130 % text, so no word breaks); "Welcome back to Pro"
@@ -754,7 +758,7 @@ only after a committed write: never for a pending payment, a renewal, or a trial
        services are included;
      - while the server hasn't confirmed the plan, where the online services stand;
      - every card as one line: its prop as a small square, its name, and its gain ("No limit", "20 goals",
-       "12 months", "50 a day") or its end date. When the name and its gain don't fit on one line (a date on a narrow
+       "12 months", "45 a month") or its end date. When the name and its gain don't fit on one line (a date on a narrow
        phone, large text), the gain moves under the name.
    - **Back** leaves the welcome: the award is still given and the badge appears.
 3. **Award**: the Lucento Pro medal on the award ceremony's stage. It is membership, not progress, so it stands on its
@@ -792,7 +796,7 @@ instead of turning, and the badge appears without movement.
 | D-11 | Subscriber buys Lifetime | — | allowed; the person cancels the subscription in Play; no automatic credit (Play has none). Offer a support-granted Cloud extension equal to the unused months, manually, on request | avoids building proration logic Play does not support |
 | D-12 | Lucento Cloud add-on | — | **₱59 / ₱490**, offered to Lifetime owners only at launch | §4.4; a Free-tier Cloud SKU would undercut Pro |
 | D-13 | Lifetime included services | evaluate | **12 months of B/C/D from the purchase**, then Free AI allowance; Cloud add-on optional | the person experiences sync and the adviser; the promise stays bounded |
-| D-14 | AI monthly soft ceiling for Pro | 50 / day | **400 / month**, remote-configured, shown only when hit | §4.5 cost model |
+| D-14 | AI allowance for Pro | 50 / day | **400 / month** ceiling (2026-11) → **45 / calendar month, no daily limit; Free 5 / month** (owner, 2026-11-23: Gemini is for Ask Lucento; at most ≈ $0.23 / Pro account on 3.5 Flash-Lite) | §4.5 cost model |
 | D-15 | Role names | Manager / Companion | **Owner / Partner** (as approved and built) | PRODUCT_SPEC §2; a rename is a separate decision |
 | D-16 | Shared lapse policy | "do not interrupt companion" | **Lenient** (no new invites; existing Partner stays) | §6.4 |
 | D-17 | Where verification runs | — | Vercel + Play Developer API; Supabase stores | v1 D-10, unchanged |

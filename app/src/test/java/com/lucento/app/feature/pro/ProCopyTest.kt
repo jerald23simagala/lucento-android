@@ -55,7 +55,7 @@ class ProCopyTest {
         assertEquals("Included", ProCopy.cell(ProFeature.RECEIVABLES, Limit.Unlimited))
         assertEquals("Not included", ProCopy.cell(ProFeature.CLOUD_SYNC, Limit.None))
         assertEquals("10 a month", ProCopy.cell(ProFeature.AI_ADVISER, Limit.PerMonth(10)))
-        assertEquals("50 a day", ProCopy.cell(ProFeature.AI_ADVISER, Limit.PerDay(50)))
+        assertEquals("45 a month", ProCopy.cell(ProFeature.AI_ADVISER, Limit.PerMonth(45)))
         assertEquals("Last 3 months", ProCopy.cell(ProFeature.INSIGHTS_LONG_PERIODS, Limit.None))
         assertEquals("Sunrise and Midnight", ProCopy.cell(ProFeature.EXTRA_THEMES, Limit.None))
         assertEquals("1 Partner", ProCopy.cell(ProFeature.SHARED_SPACE, Limit.Count(1)))
@@ -67,7 +67,7 @@ class ProCopyTest {
         assertEquals("20", ProCopy.lifetimeCell(rows.getValue(ProFeature.SAVINGS_GOALS)))
         assertEquals("First year, then with Lucento Cloud", ProCopy.lifetimeCell(rows.getValue(ProFeature.CLOUD_SYNC)))
         assertEquals("First year, then with Lucento Cloud", ProCopy.lifetimeCell(rows.getValue(ProFeature.SHARED_SPACE)))
-        assertEquals("50 a day the first year, then 10 a month", ProCopy.lifetimeCell(rows.getValue(ProFeature.AI_ADVISER)))
+        assertEquals("45 a month the first year, then 5 a month", ProCopy.lifetimeCell(rows.getValue(ProFeature.AI_ADVISER)))
         for (row in rows.values) {
             if (row.feature.requires != Capability.LOCAL_PRO) assertFalse("${row.feature}", ProCopy.lifetimeCell(row).contains("forever"))
         }
@@ -228,7 +228,7 @@ class ProCopyTest {
         }
         assertEquals(Limit.Unlimited, pro(ProFeature.MONEY_WALLETS))
         assertTrue((pro(ProFeature.SAVINGS_GOALS) as Limit.Count).max > (free(ProFeature.SAVINGS_GOALS) as Limit.Count).max)
-        assertTrue(free(ProFeature.AI_ADVISER) is Limit.PerMonth && pro(ProFeature.AI_ADVISER) is Limit.PerDay)
+        assertTrue((pro(ProFeature.AI_ADVISER) as Limit.PerMonth).max > (free(ProFeature.AI_ADVISER) as Limit.PerMonth).max)
         assertEquals(4, ProCopy.inviteLines.size)
     }
 }

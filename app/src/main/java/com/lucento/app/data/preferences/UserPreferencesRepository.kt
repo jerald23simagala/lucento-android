@@ -103,7 +103,8 @@ data class UserPreferences(
     val defaultWalletId: Long? = null,
     /**
      * Smarter reading: typed messages are read by Gemini through Lucento's proxy. Off by default, turned on only by the
-     * user after the consent dialog in Settings; nothing is sent to a model while it is off.
+     * user after the consent dialog in Settings; nothing is sent to a model while it is off. Since 2026-11-23 each message
+     * uses one of the AI questions Ask Lucento uses, so a consent given before that no longer counts (see [Keys.smartReading]).
      */
     val smartReading: Boolean = false,
     /**
@@ -301,7 +302,13 @@ class UserPreferencesRepository internal constructor(
         val categorySetupDone = booleanPreferencesKey("category_setup_done")
         val defaultWalletId = longPreferencesKey("default_wallet_id")
         val guideStep = stringPreferencesKey("guide_step")
-        val smartReading = booleanPreferencesKey("smart_reading")
+        /**
+         * Version 2 (owner, 2026-11-23: "We turn off Smarter Reading"): its messages now use the AI questions Ask Lucento
+         * uses, so everyone who had it on is asked again with the new consent. The first consent's key is ignored and
+         * removed on the next change ([smartReadingV1]).
+         */
+        val smartReading = booleanPreferencesKey("smart_reading_v2")
+        val smartReadingV1 = booleanPreferencesKey("smart_reading")
         val fxRatesOnline = booleanPreferencesKey("fx_rates_online")
         val onlineVoice = booleanPreferencesKey("online_voice")
         /**
@@ -393,7 +400,7 @@ class UserPreferencesRepository internal constructor(
                 categorySetupDone = p[Keys.categorySetupDone] ?: false,
                 defaultWalletId = p[Keys.defaultWalletId],
                 guideStep = com.lucento.app.domain.GuideStep.fromKey(p[Keys.guideStep]),
-                smartReading = p[Keys.smartReading] ?: false,
+                smartReading = smartReadingOn(p),
                 askLucentoAi = askAiOn(p),
                 askAiConfirmed = askAiConfirmed(p),
                 crashReports = p[Keys.crashReports] ?: false,
@@ -504,7 +511,10 @@ class UserPreferencesRepository internal constructor(
     }
 
     suspend fun setSmartReading(enabled: Boolean) {
-        trackedEdit { it[Keys.smartReading] = enabled }
+        trackedEdit {
+            it.remove(Keys.smartReadingV1)
+            it[Keys.smartReading] = enabled
+        }
     }
 
     /** Multicurrency: "Exchange rates online" (see [UserPreferences.fxRatesOnline]). A device choice, kept across sign-outs. */
@@ -873,6 +883,9 @@ class UserPreferencesRepository internal constructor(
         }
 
         /** Ask Lucento's AI answers are on unless the person turned them off (owner, 2026-11-17). */
+        /** Smarter reading's consent: only the one given since it uses Ask Lucento's AI questions counts ([Keys.smartReading]). */
+        internal fun smartReadingOn(p: Preferences): Boolean = p[Keys.smartReading] ?: false
+
         internal fun askAiOn(p: Preferences): Boolean = p[Keys.askAiOff] != true
 
         /** The person confirmed what AI answers send ([UserPreferences.askAiConfirmed]). */

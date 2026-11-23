@@ -163,17 +163,23 @@ is auto-sent; the user can fix the wording with "Edit message" or fix rows direc
 ## Smarter reading (Gemini) — opt-in
 
 Off by default, and turned on in one place only: **Settings › Privacy & security › Smarter reading** (shown when signed
-in, in a build with the proxy). Its consent dialog says first that adding transactions gets slower — each message waits
-a few seconds for Gemini's answer — then what is sent and where (`feature/capture/SmartReadingCopy.kt`); the switch's
-row says the same under it. Then typed and spoken messages go to Gemini through Lucento's own proxy; everything else —
-and everything while it is off — is read on this phone by `LocalTransactionInterpreter` (deterministic rules; never
-presented as AI).
+in, in a build with the proxy). Its consent dialog says first that each message uses one of the plan's AI questions —
+the same monthly allowance Ask Lucento uses — and that adding transactions gets slower (each message waits a few
+seconds for Gemini's answer), then what is sent and where (`feature/capture/SmartReadingCopy.kt`); the switch's row says
+both under it (`SmartReadingCopy.NOTE`). Then typed and spoken messages go to Gemini through Lucento's own proxy;
+everything else — and everything while it is off — is read on this phone by `LocalTransactionInterpreter`
+(deterministic rules; never presented as AI).
+
+**Gemini is for Ask Lucento (owner, 2026-11-23).** "Our direction is that Gemini is generally for Ask use and not for
+simple add transaction work." So the composer no longer mentions Smarter reading (the note under its examples is gone,
+on or off), Settings carries the caveat above, and everyone who had it on was asked again: the consent's key moved to
+`smart_reading_v2` (`UserPreferencesRepository.Keys.smartReading`; the first consent's `smart_reading` is ignored and
+removed on the next change). For someone who turns it on, the composer still says who read each message: "Gemini is
+reading…" while waiting, then "Read by Gemini · 12 AI questions left this month" (the server's count,
+`HybridTransactionInterpreter.gemini`) or "Read on this phone — this month’s AI questions are used up".
 
 **No switch in the composer (owner, 2026-11-15).** On-device reading answers at once; Gemini made every message wait,
-which new users read as the app being slow. The composer's own switch (added in owner test 2026-11-09) is gone. While
-Smarter reading is on, the composer says so: the note under its examples ("Smarter reading is on: Gemini reads each
-message, which takes a few seconds. You can turn it off in Settings › Privacy & security."; off: "Your messages are read
-on this phone, so their rows appear straight away.") and the reply while waiting ("Gemini is reading…").
+which new users read as the app being slow. The composer's own switch (added in owner test 2026-11-09) is gone.
 
 **Plan (owner, 2026-11-15).** Smarter reading is part of Lucento Pro (`Capability.AI_PRO`: Pro, or Lifetime's included
 year; docs/MONETIZATION.md). Without it the proxy refuses every message (`403 pro_required`), so the app doesn't ask:
@@ -186,26 +192,28 @@ off, and it works again when the plan includes it, as cloud sync does.
 | Piece | Where |
 |---|---|
 | Opt-in flag | `UserPreferences.smartReading` (DataStore), set only from the consent dialog |
-| Composer reader | `data/ai/HybridTransactionInterpreter`: Gemini when on and in the plan, else local; falls back to local per request (offline, signed out, daily limit used, error, nothing found) and labels the reply "Read by Gemini" / "Read on this phone — <reason>" |
+| Composer reader | `data/ai/HybridTransactionInterpreter`: Gemini when on and in the plan, else local; falls back to local per request (offline, signed out, this month's AI questions used, error, nothing found) and labels the reply "Read by Gemini · N AI questions left this month" / "Read on this phone — <reason>" |
 | Client | `data/ai/RemoteTransactionInterpreter` → `BuildConfig.AI_INTERPRET_URL` (release: default `https://www.lucentoapp.com/api/interpret`, override with `LUCENTO_AI_INTERPRET_URL`; debug: only `LUCENTO_DEBUG_AI_INTERPRET_URL`, otherwise Smarter reading is hidden — debug never calls the production proxy) with the user's Supabase access token |
 | Validation | `RemoteCandidates`: ids must be the user's own, amounts positive decimals, kinds must fit; doubts become review flags. Rows still go through `BatchReview` and the user's review |
-| Proxy | `lucento-website/api/interpret.ts` (Vercel). Holds `GEMINI_API_KEY`; checks the token with Supabase Auth; counts the request with `public.consume_ai_quota()`; returns structured rows |
-| Daily limit | `supabase/migrations/20261027090000_ai_usage_quota.sql` (`public.ai_usage`, RLS read-own, no write grants) + `AI_DAILY_LIMIT` on Vercel (default 50/user/UTC day) |
+| Proxy | `lucento-website/api/interpret.ts` (Vercel). Holds `GEMINI_API_KEY`; checks the token with Supabase Auth; counts the request with `public.consume_ai_request()`; returns structured rows and `remaining` |
+| Allowance | `public.consume_ai_request()` over `public.ai_usage` (RLS read-own, no write grants): per calendar month, shared with Ask Lucento — Pro 45, Free 5 (Free can't use Smarter reading) — from `lucento_private.plan_limits` (`ai_pro_monthly`, `ai_free_monthly`; `supabase/migrations/20261123120000_ai_allowance_monthly.sql`) |
 
 **Sent:** the message text, today's date, the main currency, category names/kinds and wallet names/types with their
 local ids. **Never sent:** balances, history, scans (receipts and statements are always read on this phone), the Gemini
 key (only on Vercel).
-A sync account is required: it identifies the user for the daily allowance.
+A sync account is required: it identifies the user for the AI allowance.
 
 ### Setting it up
 
 1. **Gemini key.** Open https://aistudio.google.com/apikey, sign in, *Create API key* (pick or create a Google Cloud
    project). For real users, turn on billing for that project (paid tier): on the free tier Google may use prompts to
    improve its products, and free-tier rate limits are low. Optionally set a budget alert in Google Cloud Billing.
-2. **Database.** Apply `supabase/migrations/20261027090000_ai_usage_quota.sql` to the Supabase project.
+2. **Database.** Apply `supabase/migrations/20261027090000_ai_usage_quota.sql`, the entitlements migration and
+   `20261123120000_ai_allowance_monthly.sql` to the Supabase project.
 3. **Vercel.** In the `lucento-website` project → Settings → Environment Variables (Production), add
-   `GEMINI_API_KEY` (mark *Sensitive*), `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and optionally `AI_DAILY_LIMIT`
-   and `GEMINI_MODEL` (see `lucento-website/.env.example`). Redeploy so the function picks them up.
+   `GEMINI_API_KEY` (mark *Sensitive*), `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and optionally `GEMINI_MODEL`
+   (production: `gemini-3.5-flash-lite` since 2026-11-23; see `lucento-website/.env.example`). Redeploy so the function
+   picks them up.
 4. **Check.** `curl -i -X POST -H "Content-Type: application/json" -d "{}" https://www.lucentoapp.com/api/interpret`
    (in PowerShell: `curl.exe`) answers `401 sign_in_required` once deployed; `503 not_configured` means a variable is
    missing. Without the JSON content type Astro's form protection answers `403` instead.
