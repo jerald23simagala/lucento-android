@@ -25,8 +25,9 @@ app/src/main/java/com/lucento/app/
   domain/              Pure Kotlin models and calculators (unit-tested, no Android deps)
   feature/<name>/      Screen + ViewModel per feature
   navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · (+) · Budget · Wallets; the centre +
-                       opens the transaction composer in feature/capture; Insights, goals, Progress (feature/progress:
-                       month recaps, the year, awards), scheduled and debts open from Home's Quick links, categories
+                       opens the transaction composer in feature/capture; Insights, goals, Milestones (feature/progress:
+                       month recaps, the budget year; its Awards button opens feature/awards), scheduled and debts
+                       open from Home's Quick links, categories
                        from Budget; the monthly check-in card opens the plan page), profile menu (Settings and Follow
                        Lucento live there); a new user's
                        guided setup (feature/guide) follows onboarding; Lucento Pro's welcome (feature/pro/welcome:

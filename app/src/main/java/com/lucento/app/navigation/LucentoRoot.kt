@@ -174,10 +174,12 @@ import androidx.compose.ui.focus.focusProperties
 /** Dashboard "top spending" tile: Transactions filtered to one category in one month ("yyyy-MM"). */
 @Serializable data class CategoryTransactionsRoute(val categoryId: Long, val month: String)
 /**
- * Progress (owner, 2026-11-23): a month's recap ("yyyy-MM"; empty: the page's default month), the year and the awards;
- * [awards] brings the awards into view (an award ceremony's "See all").
+ * Milestones ("Progress" until 2026-11-23): the Awards button, a month's recap ("yyyy-MM"; empty: the page's default
+ * month) and the budget year.
  */
-@Serializable data class ProgressRoute(val month: String = "", val awards: Boolean = false)
+@Serializable data class ProgressRoute(val month: String = "")
+/** The awards on their own page (owner, 2026-11-23): from Milestones' Awards button and a ceremony's "See all awards". */
+@Serializable data object AwardsRoute
 /** The monthly check-in's plan page for [month] ("yyyy-MM"). */
 @Serializable data class MonthPlanRoute(val month: String)
 /** The transaction composer: [start] is a [ComposerStart] name; [typeHint] a TransactionType name or empty. */
@@ -593,7 +595,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         onTransfer = { openTransfer() },
                                         onScanReceipt = { openComposer(ComposerStart.SCAN) },
                                         onOpenCategory = { id, month -> push(CategoryTransactionsRoute(id, month.toString())) },
-                                        onOpenProgress = { month, awards -> push(ProgressRoute(month?.toString().orEmpty(), awards)) },
+                                        onOpenProgress = { month -> push(ProgressRoute(month?.toString().orEmpty())) },
+                                        onOpenAwards = { push(AwardsRoute) },
                                         onPlanMonth = { month -> push(MonthPlanRoute(month.toString())) },
                                     ),
                                 )
@@ -652,9 +655,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 com.lucento.app.feature.progress.ProgressScreen(
                                     onBack = back,
                                     initialMonth = route.month.takeIf { it.isNotEmpty() }?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
-                                    showAwards = route.awards,
+                                    onOpenAwards = { push(AwardsRoute) },
                                     onOpenInsights = if (features.isEnabled(Feature.INSIGHTS)) ({ push(InsightsRoute) }) else null,
                                 )
+                            }
+                            pushed<AwardsRoute>(reducedMotion) {
+                                com.lucento.app.feature.awards.AwardsScreen(onBack = back)
                             }
                             pushed<MonthPlanRoute>(reducedMotion) { entry ->
                                 val route = entry.toRoute<MonthPlanRoute>()

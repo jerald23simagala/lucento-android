@@ -361,7 +361,7 @@ needs `20261122090000_user_settings.sql` on each project).
   Steady Month, Goal Reached and Loan Cleared (past progress recorded quietly on update).
 - **Follow Lucento** in the profile menu: Facebook, Instagram, TikTok and YouTube, opened by a tap; the Community group
   stays for questions and ideas.
-- docs/CALCULATIONS.md "Monthly check-in" and "Progress recap"; no Room or Supabase change (two ledger settings in the
+- docs/CALCULATIONS.md "Monthly check-in" and "Progress recap" (now "Milestones recap"); no Room or Supabase change (two ledger settings in the
   account document).
 
 ## Built — AI allowance per month; Gemini is for Ask Lucento (owner, 2026-11-23, `feature/ai-allowance-monthly`)
@@ -374,6 +374,14 @@ needs `20261122090000_user_settings.sql` on each project).
   Gemini read says how many AI questions are left; Ask says "N left this month" on every plan.
 - Server: `supabase/migrations/20261123120000_ai_allowance_monthly.sql`; website wording in lucento-website
   `copy/ai-allowance-monthly`.
+
+## Built — Milestones: the budget year, Awards on their own page (owner, 2026-11-23, `feature/milestones-budget-year`)
+- Progress is now **Milestones**. Its year is the **budget year**: January to December as 12 flat colour squares in the
+  Budget tab's levels (on track, getting close, over, no budget), each with its month and the share of the budget used
+  ("so far" for the running month, an outline for months to come); earlier years with a year switcher. Tapping a month
+  shows its recap above. Pro, previewed on Free with the person's own months in grey.
+- **Awards** has its own page, from a button at the top of Milestones and from an award ceremony's "See all awards".
+- docs/CALCULATIONS.md "Milestones recap"; no Room or Supabase change.
 
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).

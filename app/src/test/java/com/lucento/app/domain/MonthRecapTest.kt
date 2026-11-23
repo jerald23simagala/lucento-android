@@ -11,7 +11,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneOffset
 
-/** The Progress page's month and year recaps (docs/CALCULATIONS.md "Progress recap"). */
+/** The Milestones page's month recaps and budget year (docs/CALCULATIONS.md "Milestones recap"). */
 class MonthRecapTest {
     private val today = LocalDate.parse("2026-11-15")
     private fun php(minor: Long) = Money(minor, "PHP")
@@ -167,15 +167,17 @@ class MonthRecapTest {
         assertNull(MonthRecaps.biggestChange(now, now, "PHP"))
     }
 
-    @Test fun `the year is twelve months to this one, with its totals`() {
-        val year = MonthRecaps.year(inputs(), "PHP", YearMonth.of(2026, 11))
+    @Test fun `the year is January to December, with its totals to this month`() {
+        // Owner, 2026-11-23: the Milestones page shows the calendar year.
+        val year = MonthRecaps.calendarYear(inputs(), "PHP", 2026)
         assertEquals(12, year.months.size)
-        assertEquals(YearMonth.of(2025, 12), year.months.first().month)
-        assertEquals(YearMonth.of(2026, 11), year.months.last().month)
+        assertEquals(YearMonth.of(2026, 1), year.months.first().month)
+        assertEquals(YearMonth.of(2026, 12), year.months.last().month)
+        assertEquals(YearMonth.of(2026, 11), year.endMonth)
         assertEquals(php(50_000), year.income)
         assertEquals(php(27_000), year.spent)
         assertEquals(php(23_000), year.net)
-        // The end of November 2025 (₱900) to today (₱1,180 − ₱50 owed): +₱230, the year's net flow; transfers move nothing.
+        // The end of December 2025 (₱900) to today (₱1,180 − ₱50 owed): +₱230, the year's net flow; transfers move nothing.
         assertEquals(php(23_000), year.netWorthChange)
         assertEquals(3, year.recordedMonths)
         assertEquals(1, year.keptMonths)
@@ -189,9 +191,44 @@ class MonthRecapTest {
         assertEquals(1, year.withinBudgetMonths)
     }
 
-    @Test fun `the year never runs past this month`() {
-        val year = MonthRecaps.year(inputs(), "PHP", YearMonth.of(2027, 3))
-        assertEquals(YearMonth.of(2026, 11), year.endMonth)
-        assertEquals(YearMonth.of(2026, 11), year.months.last().month)
+    @Test fun `each month's square carries its budget's share and level`() {
+        val byMonth = MonthRecaps.calendarYear(inputs(), "PHP", 2026).months.associateBy { it.month }
+        // ₱110 of ₱140: 79 % (half-up, as the Budget tab rounds), on track.
+        val september = byMonth.getValue(YearMonth.of(2026, 9)).budget!!
+        assertEquals(79, september.percentUsed)
+        assertEquals(BudgetHealth.ON_TRACK, september.health)
+        // ₱150 of ₱140: 107 %, over.
+        val october = byMonth.getValue(YearMonth.of(2026, 10)).budget!!
+        assertEquals(107, october.percentUsed)
+        assertEquals(BudgetHealth.EXCEEDED, october.health)
+        assertEquals(php(-1_000), october.remaining)
+        // November so far: ₱10 of ₱140, 7 %; its verdict waits for the month's end, its square doesn't.
+        val november = byMonth.getValue(YearMonth.of(2026, 11))
+        assertEquals(7, november.budget!!.percentUsed)
+        assertFalse(november.finished)
+        // A month without records shows no result, even with a budget (it would read as 0 % used).
+        assertNull(byMonth.getValue(YearMonth.of(2026, 8)).budget)
+        // December hasn't come: an empty square.
+        val december = byMonth.getValue(YearMonth.of(2026, 12))
+        assertTrue(december.upcoming)
+        assertNull(december.budget)
+        assertFalse(december.hasRecords)
+    }
+
+    @Test fun `with Budgets off no month has a budget result`() {
+        val year = MonthRecaps.calendarYear(inputs(features = FeatureSet.ALL.with(Feature.BUDGETS, false)), "PHP", 2026)
+        assertTrue(year.months.all { it.budget == null && it.budgetKept == null })
+        assertEquals(3, year.recordedMonths)
+    }
+
+    @Test fun `a past year runs to December, and a year to come is all ahead`() {
+        val last = MonthRecaps.calendarYear(inputs(), "PHP", 2025)
+        assertEquals(YearMonth.of(2025, 12), last.endMonth)
+        assertTrue(last.months.none { it.upcoming })
+        assertEquals(0, last.recordedMonths)
+        val next = MonthRecaps.calendarYear(inputs(), "PHP", 2027)
+        assertTrue(next.months.all { it.upcoming })
+        assertEquals(php(0), next.income)
+        assertNull(next.netWorthChange)
     }
 }

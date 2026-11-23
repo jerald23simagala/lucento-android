@@ -4,17 +4,17 @@ import com.lucento.app.core.designsystem.component.AmountFormat
 import com.lucento.app.core.money.Money
 import com.lucento.app.domain.CategoryAmount
 import com.lucento.app.domain.CategoryChange
+import com.lucento.app.domain.MonthBudgetResult
 import com.lucento.app.domain.MonthRecap
 import com.lucento.app.domain.RecapBudget
 import com.lucento.app.domain.RecapMonthResult
 import com.lucento.app.domain.YearRecap
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.YearMonth
 import java.util.Locale
 
-/** The Progress page's words, from the recap's figures only. */
+/** The Milestones page's words, from the recap's figures only. */
 class RecapCopyTest {
     private val oct = YearMonth.of(2026, 10)
     private fun usd(minor: Long) = Money(minor, "USD")
@@ -89,39 +89,84 @@ class RecapCopyTest {
         assertEquals("Your budget began on October\u00A010", line.details.last())
     }
 
-    @Test fun `a month tile is one sentence for screen readers`() = english {
-        val kept = RecapMonthResult(oct, usd(35_000), hasRecords = true, finished = true, budgetKept = false)
-        assertEquals("October 2026: kept \$350.00, over budget", RecapCopy.tileDescription(kept, AmountFormat.Shown))
-        val short = RecapMonthResult(YearMonth.of(2026, 11), usd(-1_000), hasRecords = true, finished = false, budgetKept = null)
-        assertEquals("November 2026, so far: \$10.00 more went out than came in", RecapCopy.tileDescription(short, AmountFormat.Shown))
+    @Test fun `a month square is one sentence for screen readers`() = english {
+        val over = RecapMonthResult(oct, usd(35_000), true, true, budgetKept = false, budget = MonthBudgetResult(usd(15_000), usd(16_000)))
+        assertEquals("October 2026: 107% of the budget used, over budget", RecapCopy.squareDescription(over))
+        val running = RecapMonthResult(YearMonth.of(2026, 11), usd(-1_000), true, false, null, budget = MonthBudgetResult(usd(15_000), usd(1_000)))
+        assertEquals("November 2026, so far: 7% of the budget used, on track", RecapCopy.squareDescription(running))
+        val unbudgeted = RecapMonthResult(YearMonth.of(2026, 8), usd(500), hasRecords = true, finished = true, budgetKept = null)
+        assertEquals("August 2026: no budget", RecapCopy.squareDescription(unbudgeted))
         val empty = RecapMonthResult(YearMonth.of(2026, 7), usd(0), hasRecords = false, finished = true, budgetKept = null)
-        assertEquals("July 2026: nothing recorded", RecapCopy.tileDescription(empty, AmountFormat.Shown))
+        assertEquals("July 2026: nothing recorded", RecapCopy.squareDescription(empty))
+        val toCome = RecapMonthResult(YearMonth.of(2026, 12), usd(0), hasRecords = false, finished = false, budgetKept = null, upcoming = true)
+        assertEquals("December 2026: still to come", RecapCopy.squareDescription(toCome))
+        // The plan preview names the month only, never its result.
+        assertEquals("October 2026", RecapCopy.squareDescription(over, hidden = true))
     }
 
-    @Test fun `the year's totals lead with what was kept`() = english {
-        // Twelve months to November; nothing recorded before September.
-        val empty = (0L until 9L).map { RecapMonthResult(YearMonth.of(2025, 12).plusMonths(it), usd(0), false, true, null) }
-        val months = empty + listOf(
+    @Test fun `a square's level uses the Budget tab's words`() {
+        assertEquals("on track", RecapCopy.levelWords(MonthBudgetResult(usd(10_000), usd(7_999))))
+        assertEquals("getting close", RecapCopy.levelWords(MonthBudgetResult(usd(10_000), usd(8_000))))
+        assertEquals("getting close", RecapCopy.levelWords(MonthBudgetResult(usd(10_000), usd(9_950))))
+        // Spent to the cent is used up, not over.
+        assertEquals("fully used", RecapCopy.levelWords(MonthBudgetResult(usd(10_000), usd(10_000))))
+        assertEquals("over budget", RecapCopy.levelWords(MonthBudgetResult(usd(10_000), usd(10_001))))
+    }
+
+    @Test fun `the year's totals lead with the budget, and a year still running says so far`() = english {
+        // 2026 to November: nothing recorded before September, December still to come.
+        val before = (1..8).map { RecapMonthResult(YearMonth.of(2026, it), usd(0), hasRecords = false, finished = true, budgetKept = null) }
+        val months = before + listOf(
             RecapMonthResult(YearMonth.of(2026, 9), usd(-11_000), true, true, budgetKept = true),
             RecapMonthResult(oct, usd(35_000), true, true, budgetKept = false),
             RecapMonthResult(YearMonth.of(2026, 11), usd(-1_000), true, false, budgetKept = null),
+            RecapMonthResult(YearMonth.of(2026, 12), usd(0), false, false, null, upcoming = true),
         )
         val year = YearRecap(YearMonth.of(2026, 11), "USD", months, income = usd(50_000), spent = usd(27_000), netWorthChange = usd(23_000))
         assertEquals(
             listOf(
-                // The first month with records is September: the year is told from there.
-                "\$230.00 kept since September",
+                "Within budget in 1 of 2 budgeted months so far",
+                // The first month with records is September: the year is told from there, never called a whole year.
+                "\$230.00 kept since September.",
                 "\$500.00 came in and \$270.00 went out.",
                 "More came in than went out in 1 of 3 months with records.",
-                "Within budget in 1 of 2 budgeted months.",
-                "Net worth +\$230.00 over the year.",
+                "Net worth +\$230.00 in 2026 so far.",
             ),
             RecapCopy.yearLines(year, AmountFormat.Shown),
         )
-        assertTrue(RecapCopy.yearLines(YearRecap(oct, "USD", emptyList(), usd(0), usd(0), null), AmountFormat.Shown).single().startsWith("Nothing recorded"))
-        // Records from the window's first month on: then it is the year.
-        val full = (0L until 12L).map { RecapMonthResult(YearMonth.of(2025, 12).plusMonths(it), usd(1_000), true, true, null) }
-        assertEquals("\$120.00 kept over 12 months", RecapCopy.yearLines(YearRecap(YearMonth.of(2026, 11), "USD", full, usd(12_000), usd(0), null), AmountFormat.Shown).first())
+        // More out than in says so, in words.
+        val spentMore = year.copy(income = usd(10_000))
+        assertEquals("\$170.00 more went out than came in since September.", RecapCopy.yearLines(spentMore, AmountFormat.Shown)[1])
+    }
+
+    @Test fun `a finished year is told as that year`() = english {
+        // Records all year, no budget: the kept line leads.
+        val full = (1..12).map { RecapMonthResult(YearMonth.of(2025, it), usd(1_000), true, true, null) }
+        assertEquals(
+            listOf(
+                "\$120.00 kept in 2025",
+                "\$120.00 came in and \$0.00 went out.",
+                "More came in than went out in 12 of 12 months with records.",
+            ),
+            RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", full, usd(12_000), usd(0), null), AmountFormat.Shown),
+        )
+        // Records from September on: told from September of that year.
+        val late = (1..12).map { m ->
+            RecapMonthResult(YearMonth.of(2025, m), usd(if (m >= 9) 1_000 else 0), hasRecords = m >= 9, finished = true, budgetKept = if (m >= 9) true else null)
+        }
+        val lines = RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", late, usd(4_000), usd(0), usd(4_000)), AmountFormat.Shown)
+        assertEquals("Within budget in 4 of 4 budgeted months", lines[0])
+        assertEquals("\$40.00 kept since September 2025.", lines[1])
+        assertEquals("Net worth +\$40.00 in 2025.", lines.last())
+    }
+
+    @Test fun `a year without records says so`() = english {
+        val running = (1..12).map { m ->
+            RecapMonthResult(YearMonth.of(2026, m), usd(0), hasRecords = false, finished = m < 11, budgetKept = null, upcoming = m > 11)
+        }
+        assertEquals(listOf("Nothing recorded in 2026 yet."), RecapCopy.yearLines(YearRecap(YearMonth.of(2026, 11), "USD", running, usd(0), usd(0), null), AmountFormat.Shown))
+        val past = (1..12).map { RecapMonthResult(YearMonth.of(2025, it), usd(0), false, true, null) }
+        assertEquals(listOf("Nothing recorded in 2025."), RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", past, usd(0), usd(0), null), AmountFormat.Shown))
     }
 
     @Test fun `a month still running is compared with the same days of the month before`() = english {

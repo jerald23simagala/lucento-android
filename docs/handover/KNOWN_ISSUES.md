@@ -15,6 +15,14 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Milestones and the budget year (2026-11-23, `feature/milestones-budget-year`)
+
+| ID | Issue | Evidence | Next |
+|---|---|---|---|
+| ML-K1 | A month spent exactly to its budget is red like an over month, as the Budget tab colours "Fully used": its square says 100 % and TalkBack says "fully used", but the legend's red reads "Over budget" | Code (`squareTone`, `healthTone`) | Owner call if testers ask |
+| ML-K2 | The squares read the main currency's budget only, as the recap does (MCI-K4) | Code (`MonthRecaps.calendarYear`) | — |
+| ML-K3 | A month with a budget but nothing recorded is an outline with a dash ("nothing recorded"), never 0 % used, so a quiet month doesn't read as a perfect one | Code; `MonthRecapTest` | By design |
+
 ## Monthly check-in, Progress, Follow Lucento (2026-11-23, `feature/month-close`)
 
 | ID | Issue | Evidence | Next |

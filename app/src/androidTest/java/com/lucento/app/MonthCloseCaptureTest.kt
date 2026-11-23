@@ -41,14 +41,14 @@ import java.time.YearMonth
 import java.util.UUID
 
 /**
- * Captures the monthly check-in, the plan page, Progress, a future month on Budget and Follow Lucento for design review
+ * Captures the monthly check-in, the plan page, Milestones and Awards, a future month on Budget and Follow Lucento for design review
  * (CI doesn't run it). The card waits until a budget is two weeks old, so it runs in two steps with the device clock set
  * by the person running it (`settings put global auto_time 0; cmd alarm set-time <ms>`):
  * 1. [seed] on a fresh install, on a day at least two weeks before the one to capture (e.g. 10 November): onboarding,
  *    the demo month, a yearly bill due next month, one category over its budget, the trip goal topped up to its target and a
  *    small loan paid off (so two of the new awards show their earned art).
  * 2. [capture] on a day inside the check-in's window (e.g. 29 November, then 2 December). `-e captureDark true` takes the
- *    dark theme, `-e capturePro true` a Pro plan (the year view unlocked). Shots land in /data/local/tmp/lucento-monthclose.
+ *    dark theme, `-e capturePro true` a Pro plan (the budget year unlocked). Shots land in /data/local/tmp/lucento-monthclose.
  */
 @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -257,20 +257,20 @@ class MonthCloseCaptureTest {
         if (recap != null && compose.onAllNodesWithText("See ${name(recap)}’s recap").fetchSemanticsNodes().isNotEmpty()) {
             click("See ${name(recap)}’s recap")
         } else {
-            compose.onNodeWithContentDescription("Progress").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("Milestones").performScrollTo().performClick()
         }
         waitForText("How your months are going")
         shot("$tag-07-progress-recap")
-        // Most of a screen at a time to the page's end (Pro's Membership shelf comes after the awards).
+        // Most of a screen at a time to the page's end: the year's totals on Pro, the plan preview on Free.
         for (step in 'a'..'p') {
-            if (isShown(if (pro) "Yours to keep" else "Paid a loan down to zero")) break
+            if (isShown(if (pro) "months with records" else "always free")) break
             scrollOn()
             shot("$tag-08$step-progress-scroll")
         }
         if (pro) {
             // A month picked in the year: its recap comes into view above (and is announced).
             runCatching {
-                compose.onNodeWithText("Your year").performScrollTo()
+                compose.onNodeWithText("Your budget year").performScrollTo()
                 compose.onNode(androidx.compose.ui.test.hasContentDescription("October 2026", substring = true) and hasClickAction())
                     .performScrollTo()
                     .performClick()
@@ -278,6 +278,17 @@ class MonthCloseCaptureTest {
                 shot("$tag-09-year-tap")
             }
         }
+        // The awards on their own page, from the button at the top of Milestones (Pro's Membership shelf comes last).
+        scrollOn(-20f)
+        click("Awards")
+        waitForText("From your own records")
+        shot("$tag-10a-awards")
+        for (step in 'b'..'h') {
+            if (isShown(if (pro) "Yours to keep" else "Paid a loan down to zero")) break
+            scrollOn()
+            shot("$tag-10$step-awards-scroll")
+        }
+        back()
         back()
 
         // Budget, one month ahead: what is planned, nothing spent yet.

@@ -341,24 +341,26 @@ class ScreenshotTourTest {
         compose.waitForIdle()
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
-        // Progress (owner, 2026-11-23): the month's recap, the year, then the award cabinet (earned medals in gold, the
-        // rest as outlines with how to earn them and a count where it takes several steps); an earned medal replays its
-        // ceremony — Lucento presenting the medal.
-        compose.onNodeWithContentDescription("Progress").performScrollTo().performClick()
+        // Milestones (owner, 2026-11-23; "Progress" until then): the Awards button, the month's recap, the budget year as
+        // squares; then the awards on their own page (earned medals in gold, the rest as outlines with how to earn them
+        // and a count where it takes several steps); an earned medal replays its ceremony — Lucento presenting the medal.
+        compose.onNodeWithContentDescription("Milestones").performScrollTo().performClick()
         waitForText("How your months are going", substring = true)
         waitForText("Where it went")
         shot("07a-progress-recap")
-        compose.onNodeWithText("Your year").performScrollTo()
+        compose.onNodeWithText("Your budget year").performScrollTo()
         compose.waitForIdle()
         shot("07a2-progress-year")
-        compose.onNodeWithText("earned · from your own records", substring = true).performScrollTo()
-        compose.waitForIdle()
+        compose.onNodeWithText("Awards").performScrollTo().performClick()
+        waitForText("From your own records", substring = true)
         shot("07a3-awards-cabinet")
         click("Money Keeper")
         waitForText("Thanks, Lucento")
         Thread.sleep(2_600) // the medal lands, the confetti settles and the shine passes
         shot("07b-award-ceremony")
         click("Thanks, Lucento")
+        // Awards, then Milestones under it.
+        backUntilGone("From your own records")
         backUntilGone("How your months are going")
 
         // ---------------------------------------------------------------- the composer: several transactions in one message
