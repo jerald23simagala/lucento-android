@@ -15,11 +15,17 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Security and anti-tampering audit (2026-11-23)
+
+The findings are kept in the private `lucento-studio` repository (`docs/security/2026-11-23/`), not here: this
+repository is public, and the audit describes problems that are still open. Owner steps are in Mission Control ›
+Tasks.
+
 ## Settings that follow the account (2026-11-22, PR #130 merged as `96e6287` on 2026-11-23)
 
 | Id | Issue | Evidence | Next step |
 |---|---|---|---|
-| SS-K1 | Not on production yet (lucento-test has it since 2026-11-23, OT-54): until `20261122090000_user_settings.sql` is applied there, release builds skip the settings step every cycle (records sync as before; settings wait on the phone, nothing lost) | `AccountSettingsSyncTest` ("a project without the settings table…"); `user_settings_suite.sql` 23/23 on PGlite; production read-only check 2026-11-23: no table, no function | NEXT_TASKS SS-1 (owner task OT-55) |
+| SS-K1 | **Applied on production**: the security audit's read-only check on 2026-11-23 found the table's three policies and the history row `20261122090000`. Was: not on production yet (lucento-test had it since 2026-11-23, OT-54), so release builds skipped the settings step every cycle (records synced as before; settings waited on the phone, nothing lost) | `AccountSettingsSyncTest` ("a project without the settings table…"); `user_settings_suite.sql` 23/23 on PGlite; production read-only, 2026-11-23: policies and history row present | — (OT-55 done) |
 | SS-K2 | Not run on a phone or emulator, and never against a real Supabase project: the PostgREST upsert path (`on_conflict=user_id`, the skipped update returning no row) is only checked as the equivalent SQL on PGlite | JVM tests and SQL suites only | NEXT_TASKS SS-3, SS-6 |
 | SS-K3 | After the update, phones of one account that were set up differently stay different until a setting is changed on one (by design: updating restyles no phone); a restore or a new phone gets the first updated phone's values for settings nobody changed since | `AccountSettingsSyncTest` ("updating Lucento changes nothing…") | — (documented, docs/SYNC.md "Known limitations") |
 | SS-K4 | The sign-out dialog counts only records: a settings change made offline and not yet uploaded doesn't make it say "unsynced". It isn't lost: the same account signing back in gets it and uploads it; another account never receives it | `AccountSettingsSyncTest` ("the same account signing back in…"), `AccountSettingsPreferencesTest` | — |
