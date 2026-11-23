@@ -185,7 +185,10 @@ select to_regclass('public.user_settings') is not null as table_exists,
   verdict side by side). Since 2026-11-23 (tester: the sentence dropped under the amount and left the right side empty;
   owner chose "Sentence beside the amount") phones put it beside the amount too, whenever it fits there in 4 lines at
   normal text; checked on API 35 at 360, 393 and 411 dp and at 130 % (stacked), screenshots in the main checkout's
-  `artifacts/safe-to-spend-2026-11-23/`. Still to do: TalkBack on the phone layout (the semantics are unchanged).
+  `artifacts/safe-to-spend-2026-11-23/`. Owner review of the screenshots (2026-11-23): the amount about 10 % smaller (`AmountStyles.hero`, 32 sp), both sides
+  top-aligned, and an information icon instead of the check while there is something to spend (it invites the tap for
+  the details; a warning icon at zero), on every layout; re-checked on API 35 at 360 and 411 dp, light and dark. Still to
+  do: TalkBack on the phone layout (the semantics are unchanged).
 - `DailyFigure.SafePerDay` / `NothingLeft` now only feed `BudgetDailyFigureTest`: fold those checks into
   `budgetSafeToSpend` and keep `DailyFigure` for a finished month's average.
 

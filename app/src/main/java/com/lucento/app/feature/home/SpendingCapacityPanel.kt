@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -601,8 +601,10 @@ private fun PartRow(part: Part, label: TextStyle, amount: TextStyle, oneLine: Bo
 
 /**
  * Section C, the card's conclusion: Safe to spend, the lower of the two limits, with the sentence that says which one set
- * it (or, at zero, what took it). Green while there is something to spend, red at zero; the icon and the words say the
- * same, so colour is never the only cue. The whole panel opens how it is worked out.
+ * it (or, at zero, what took it). Green while there is something to spend, red at zero; the icon (an information "i",
+ * which invites a tap for the details, owner 2026-11-23; a warning at zero) and the words say it too, so colour is never
+ * the only cue. The amount uses [AmountStyles.hero] (owner, 2026-11-23: about 10 % smaller than the old headline size).
+ * The whole panel opens how it is worked out.
  */
 @Composable
 private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay: Boolean) {
@@ -634,12 +636,12 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
                     .background(ink.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(if (nothing) Icons.Outlined.ErrorOutline else Icons.Filled.Check, contentDescription = null, tint = ink, modifier = Modifier.size(24.dp))
+                Icon(if (nothing) Icons.Outlined.ErrorOutline else Icons.Outlined.Info, contentDescription = null, tint = ink, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(Spacing.md))
             Column(Modifier.weight(1f)) {
                 Text("SAFE TO SPEND", style = OverlineStyle, color = ink)
-                MoneyText(money = capacity.shown, style = AmountStyles.headline, color = ink, fractionScale = 1f, minScale = 0.5f)
+                MoneyText(money = capacity.shown, style = AmountStyles.hero, color = ink, fractionScale = 1f, minScale = 0.5f)
                 if (perDay != null) {
                     Text("${fmt.format(perDay)} a day for $days", style = MaterialTheme.typography.bodySmall, color = ink)
                 }
@@ -653,11 +655,11 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (nothing) Icons.Outlined.ErrorOutline else Icons.Filled.Check, contentDescription = null, tint = ink, modifier = Modifier.size(16.dp))
+                    Icon(if (nothing) Icons.Outlined.ErrorOutline else Icons.Outlined.Info, contentDescription = null, tint = ink, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(Spacing.xs))
                     Text("SAFE TO SPEND", style = OverlineStyle, color = ink)
                 }
-                MoneyText(money = capacity.shown, style = AmountStyles.headline, color = ink, fractionScale = 1f, minScale = 0.5f)
+                MoneyText(money = capacity.shown, style = AmountStyles.hero, color = ink, fractionScale = 1f, minScale = 0.5f)
                 if (perDay != null) {
                     Text("${fmt.format(perDay)} a day for $days", style = MaterialTheme.typography.bodySmall, color = ink)
                 }
@@ -699,7 +701,8 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
             }
             .padding(Spacing.md),
     ) {
-        // Figure and words side by side, [split] of the width for the figure, with a hairline between them.
+        // Figure and words side by side, [split] of the width for the figure, with a hairline between them. Both start at
+        // the top (owner, 2026-11-23): the label and the sentence's first line on one line.
         val divided: @Composable (Float, Dp, @Composable () -> Unit) -> Unit = { split, gap, left ->
             val line = ink.copy(alpha = 0.25f)
             Row(
@@ -710,7 +713,7 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
                         val x = size.width * split
                         drawLine(line, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
                     },
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
             ) {
                 Box(Modifier.weight(split).padding(end = gap)) { left() }
                 words(Modifier.weight(1f - split).padding(start = gap))
