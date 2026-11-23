@@ -1,13 +1,15 @@
 package com.lucento.app.feature.progress
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,39 +18,32 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.TrendingDown
-import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.EditCalendar
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.PieChart
-import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material.icons.outlined.TrackChanges
+import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.WorkspacePremium
-import androidx.compose.material.icons.automirrored.outlined.CallMade
-import androidx.compose.material.icons.automirrored.outlined.CallReceived
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -56,362 +51,233 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.AmountFormat
 import com.lucento.app.core.designsystem.component.CardOverline
-import com.lucento.app.core.designsystem.component.Confirmation
-import com.lucento.app.core.designsystem.component.ConfirmationHost
-import com.lucento.app.core.designsystem.component.Hairline
-import com.lucento.app.core.designsystem.component.HeroCard
-import com.lucento.app.core.designsystem.component.HeroStatTile
 import com.lucento.app.core.designsystem.component.IconTile
-import com.lucento.app.core.designsystem.component.LocalAmountsHidden
+import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.LucentoCard
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
-import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.LucentoTopBar
-import com.lucento.app.core.designsystem.component.MoneyText
+import com.lucento.app.core.designsystem.component.NavRow
 import com.lucento.app.core.designsystem.component.ProfileButton
+import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.component.amountFormat
-import com.lucento.app.core.designsystem.theme.AmountStyles
-import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.designsystem.theme.TonePair
 import com.lucento.app.domain.Achievement
-import com.lucento.app.domain.BudgetMilestones
-import com.lucento.app.domain.Category
-import com.lucento.app.domain.MonthCheckIn
+import com.lucento.app.domain.BudgetHealth
+import com.lucento.app.domain.Feature
+import com.lucento.app.domain.MonthBudgetResult
 import com.lucento.app.domain.MonthRecap
 import com.lucento.app.domain.MonthRecaps
 import com.lucento.app.domain.RecapMonthResult
 import com.lucento.app.domain.YearRecap
-import com.lucento.app.feature.budget.MonthSwitcher
+import com.lucento.app.feature.budget.YearSwitcher
+import com.lucento.app.feature.budget.healthTone
 import com.lucento.app.feature.home.monthLabel
 import java.time.YearMonth
-import kotlinx.coroutines.launch
 import java.time.format.TextStyle
 import java.util.Locale
 
 /**
- * Progress (owner, 2026-11-23, after a tester called the old awards page an outlier): how a month went, how the year is
- * going, and the awards earned along the way — all from the person's own records. A month's recap is free; the 12-month
- * year view is Lucento Pro, like Insights' 12 months, with the same preview of the person's own months on Free. Figures
- * come from [MonthRecaps], which reuses the calculators Home, Budget, Wallets and Goals use, so they always agree.
+ * Milestones (owner, 2026-11-23; "Progress" until then): the awards one tap away, then the year on top — how each month
+ * did against its budget, as squares, and the year's totals. A month's own recap opens from its square
+ * ([MonthRecapScreen]; also from Home's check-in card) and is free; the budget year is Lucento Pro, like Insights'
+ * 12 months, with the person's own months as a preview on Free (whose squares still open each month's free recap).
+ * Figures come from [MonthRecaps], which reuses the calculators Home, Budget, Wallets and Goals use, so they agree.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProgressScreen(
     onBack: () -> Unit,
-    /** The month to open on; null: last month in the first days of a new one, otherwise this month so far. */
-    initialMonth: YearMonth? = null,
-    /** Opened from an award ceremony's "See all": the awards are brought into view. */
-    showAwards: Boolean = false,
-    /** Insights, when that module is on. */
-    onOpenInsights: (() -> Unit)? = null,
+    /** A month's recap, from its square. */
+    onOpenMonth: (YearMonth) -> Unit = {},
+    /** The awards page, from the card at the top (owner, 2026-11-23). */
+    onOpenAwards: () -> Unit = {},
     viewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val today = state.today
     val current = YearMonth.from(today)
-    var chosen by rememberSaveable { mutableStateOf(initialMonth?.toString()) }
-    val month = chosen?.let { runCatching { YearMonth.parse(it) }.getOrNull() }
-        ?.coerceIn(state.earliestMonth, current)
-        ?: MonthCheckIn.recapMonth(today)?.takeIf { it >= state.earliestMonth } ?: current
+    // The budget year shown: this calendar year, earlier ones with its switcher (owner, 2026-11-23).
+    var shownYear by rememberSaveable { mutableIntStateOf(current.year) }
+    val earliestYear = state.earliestMonth.year
     val inputs = state.inputs
-    val recap = remember(inputs, state.currency, month) { inputs?.let { MonthRecaps.month(it, state.currency, month) } }
-    val year = remember(inputs, state.currency, current) { inputs?.let { MonthRecaps.year(it, state.currency, current) } }
+    val year = remember(inputs, state.currency, shownYear, today) { inputs?.let { MonthRecaps.calendarYear(it, state.currency, shownYear) } }
+    val budgetsOn = state.features.isEnabled(Feature.BUDGETS)
 
-    var replaying by remember { mutableStateOf<Achievement?>(null) }
-    var replayingPro by remember { mutableStateOf(false) }
-    var celebration by remember { mutableStateOf<Confirmation?>(null) }
-    var celebrated by remember { mutableStateOf(false) }
-
-    // The check-in's recap, looked at: Home stops offering it.
-    LaunchedEffect(state.loading, month) {
-        if (!state.loading && month == MonthCheckIn.recapMonth(today)) viewModel.markRecapSeen(month)
-    }
-    // Last month kept within budget is celebrated once, here or on the Budget tab, whichever comes first (the same flag).
-    LaunchedEffect(state.loading, month, state.acknowledgedBudgetMonth) {
-        val ledger = state.ledger
-        if (state.loading || celebrated || ledger == null || inputs == null || month != current.minusMonths(1)) return@LaunchedEffect
-        val kept = BudgetMilestones.monthToAcknowledge(
-            categories = inputs.categories,
-            budgets = inputs.budgets,
-            ledger = ledger,
-            currencyCode = state.primaryCurrency,
-            today = today,
-            lastAcknowledged = state.acknowledgedBudgetMonth,
-        ) ?: return@LaunchedEffect
-        celebrated = true
-        viewModel.acknowledgeBudgetMonth(kept.month)
-        celebration = Confirmation("You stayed within ${monthLabel(kept.month)}’s budget", kind = Confirmation.Kind.Milestone)
-    }
-
-    val awardsRequester = remember { BringIntoViewRequester() }
-    // A month picked in the year changes the recap above it: the recap comes into view (critic r3, P2).
-    val recapRequester = remember { BringIntoViewRequester() }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    LaunchedEffect(showAwards, state.loading) {
-        if (showAwards && !state.loading) awardsRequester.bringIntoView()
-    }
-
-    Box(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = com.lucento.app.core.designsystem.component.screenGutter()),
-        ) {
-            LucentoTopBar(title = "Progress", onBack = onBack, actions = { ProfileButton() })
-            Text(
-                "How your months are going, from your own records.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (state.loading || recap == null || year == null) return@Column
-
-            Spacer(Modifier.height(Spacing.sm))
-            Box(Modifier.bringIntoViewRequester(recapRequester)) {
-                MonthSwitcher(
-                    month = month,
-                    canGoForward = month < current,
-                    canGoBack = month > state.earliestMonth,
-                    onPrevious = { if (month > state.earliestMonth) chosen = month.minusMonths(1).toString() },
-                    onNext = { if (month < current) chosen = month.plusMonths(1).toString() },
-                )
-            }
-            Spacer(Modifier.height(Spacing.sm))
-            RecapHero(recap)
-            Spacer(Modifier.height(Spacing.md))
-            RecapDetails(recap, state.categoriesById)
-            if (onOpenInsights != null) {
-                LucentoTextButton(
-                    text = "See trends in Insights",
-                    onClick = onOpenInsights,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
-            }
-
-            Spacer(Modifier.height(Spacing.section))
-            // The grid starts at the first month with records, so a newer person doesn't see a wall of empty months.
-            val firstRecorded = year.firstRecordedMonth
-            val shownMonths = year.months.dropWhile { !it.hasRecords }.ifEmpty { year.months }
-            SectionTitle(
-                "Your year",
-                if (firstRecorded != null && firstRecorded > year.months.first().month) "Since ${monthLabel(firstRecorded)} ${firstRecorded.year}"
-                else "The 12 months to ${monthLabel(current)} ${current.year}",
-            )
-            Spacer(Modifier.height(Spacing.sm))
-            if (state.yearLocked) {
-                YearPreview(year, shownMonths)
-            } else {
-                YearGrid(shownMonths, selected = month, onSelect = {
-                    chosen = it.toString()
-                    scope.launch { recapRequester.bringIntoView() }
-                })
-                Spacer(Modifier.height(Spacing.md))
-                YearTotals(year)
-            }
-
-            Spacer(Modifier.height(Spacing.section))
-            SectionTitle(
-                "Awards",
-                "${state.earned.size} of ${Achievement.entries.size} earned · from your own records. No streaks, nothing to lose.",
-                modifier = Modifier.bringIntoViewRequester(awardsRequester),
-            )
-            Spacer(Modifier.height(Spacing.md))
-            // Steady Month counts whole months only: say which month can be the first (critic r2, P1-3).
-            val firstWhole = remember(inputs, state.primaryCurrency) {
-                inputs?.let { com.lucento.app.domain.BudgetMilestones.firstWholeMonth(it.budgets, state.primaryCurrency) }
-            }
-            com.lucento.app.feature.awards.AwardCabinet(
-                earned = state.earned,
-                facts = state.facts,
-                onReplay = { replaying = it },
-                proMemberSince = state.proMemberSince,
-                onReplayPro = { replayingPro = true },
-                notes = buildMap {
-                    if (firstWhole != null && firstWhole >= current) put(Achievement.STEADY_MONTH, "Your first whole month is ${monthLabel(firstWhole)}.")
-                },
-            )
-            Spacer(Modifier.height(Spacing.fabClearance))
-        }
-        ConfirmationHost(confirmation = celebration, onDismissed = { celebration = null })
-    }
-
-    replaying?.let { award ->
-        com.lucento.app.feature.awards.AwardCeremony(award, earnedCount = state.earned.size, onDismiss = { replaying = null })
-    }
-    if (replayingPro) {
-        com.lucento.app.feature.awards.ProMedalCeremony(
-            onDismiss = { replayingPro = false },
-            replay = true,
-            memberSince = state.proMemberSince?.let { com.lucento.app.feature.awards.memberSinceLabel(it) },
-        )
-    }
-}
-
-@Composable
-private fun SectionTitle(title: String, subtitle: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = com.lucento.app.core.designsystem.component.screenGutter()),
+    ) {
+        LucentoTopBar(title = "Milestones", onBack = onBack, actions = { ProfileButton() })
         Text(
-            title,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-            modifier = Modifier.semantics { heading() },
+            "How your months are going, from your own records.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
+        if (state.loading || year == null) return@Column
 
-/**
- * The month as one statement on brand blue: what was kept (signed: less is minus), the sentence that says what it means,
- * then money in and money out. A month still running says "so far".
- */
-@Composable
-private fun RecapHero(recap: MonthRecap) {
-    val fmt = amountFormat()
-    val ext = LucentoTheme.extendedColors
-    HeroCard {
-        Spacer(Modifier.height(Spacing.xs))
-        // A polite live region: a month picked in the year (or with the arrows) is announced as it appears.
-        CardOverline(
-            "${monthLabel(recap.month)} ${recap.month.year}" + if (recap.finished) "" else " · so far",
-            color = ext.onHeroMuted,
-            modifier = Modifier.semantics {
-                liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite
-                contentDescription = "Showing ${monthLabel(recap.month)} ${recap.month.year}" + if (recap.finished) "" else ", so far"
+        // The awards have their own page, one tap from the top, with a few of the medals as a cue (owner, 2026-11-23).
+        Spacer(Modifier.height(Spacing.md))
+        AwardsCard(earned = state.earned, onClick = onOpenAwards)
+
+        Spacer(Modifier.height(Spacing.section))
+        // The title on the left and the year on the right, on one line while they fit (owner, 2026-11-23).
+        YearHeader(
+            switcher = if (state.yearLocked) null else {
+                {
+                    YearSwitcher(
+                        year = shownYear,
+                        canGoBack = shownYear > earliestYear,
+                        canGoForward = shownYear < current.year,
+                        onPrevious = { if (shownYear > earliestYear) shownYear -= 1 },
+                        onNext = { if (shownYear < current.year) shownYear += 1 },
+                    )
+                }
             },
         )
-        Spacer(Modifier.height(6.dp))
-        if (!recap.hasRecords) {
-            Text(
-                "Nothing recorded in ${monthLabel(recap.month)}" + if (recap.finished) "." else " yet.",
-                style = MaterialTheme.typography.titleMedium,
-                color = ext.onHero,
-            )
-            Text(
-                "Add what came in and went out, and this is where its story appears.",
-                style = MaterialTheme.typography.bodySmall,
-                color = ext.onHeroMuted,
-            )
-            Spacer(Modifier.height(Spacing.xs))
-            return@HeroCard
-        }
-        MoneyText(money = recap.net, style = AmountStyles.headline, color = ext.onHero, showPlus = true, fractionScale = 1f, minScale = 0.5f)
-        Text(RecapCopy.headline(recap), style = MaterialTheme.typography.bodyMedium, color = ext.onHeroMuted)
-        Spacer(Modifier.height(14.dp))
-        val inTile: @Composable (Modifier) -> Unit = { m ->
-            HeroStatTile("Money in", Icons.AutoMirrored.Outlined.CallReceived, description = "Money in ${fmt.spoken(recap.income)}", modifier = m) {
-                MoneyText(money = recap.income, style = HeroFigure, color = ext.onHero, fractionScale = 1f)
-            }
-        }
-        val outTile: @Composable (Modifier) -> Unit = { m ->
-            HeroStatTile("Money out", Icons.AutoMirrored.Outlined.CallMade, description = "Money out ${fmt.spoken(recap.spent)}", modifier = m) {
-                MoneyText(money = recap.spent, style = HeroFigure, color = ext.onHero, fractionScale = 1f)
-            }
-        }
-        if (LocalDensity.current.fontScale >= 1.3f) {
-            // Large text: each tile takes the full width, so its label and figure are never cut off.
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                inTile(Modifier.fillMaxWidth())
-                outTile(Modifier.fillMaxWidth())
-            }
+        Spacer(Modifier.height(Spacing.sm))
+        if (state.yearLocked) {
+            YearPreview(year, onOpenMonth)
         } else {
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                inTile(Modifier.weight(1f).fillMaxHeight())
-                outTile(Modifier.weight(1f).fillMaxHeight())
+            // With Budgets off the months are still there to open, without colours (there is no budget to show).
+            BudgetSquares(year.months, current = current, onSelect = onOpenMonth, hidden = !budgetsOn)
+            Spacer(Modifier.height(Spacing.sm))
+            if (budgetsOn) {
+                SquaresLegend()
+            } else {
+                InfoNote("Each month’s budget result shows here when Budgets is on (profile menu › Enabled features).")
             }
+            Spacer(Modifier.height(Spacing.md))
+            YearTotals(year)
         }
-        Spacer(Modifier.height(Spacing.xs))
+        Spacer(Modifier.height(Spacing.fabClearance))
     }
-}
-
-private val HeroFigure = AmountStyles.medium.copy(fontWeight = FontWeight.Bold)
-
-/** The month in a few lines: only those with something to say, each an icon, a statement and what it rests on. */
-@Composable
-private fun RecapDetails(recap: MonthRecap, categories: Map<Long, Category>) {
-    val fmt = amountFormat()
-    val lines = remember(recap, categories, fmt) { RecapCopy.lines(recap, { id -> id?.let { categories[it]?.name } }, fmt) }
-    if (lines.isEmpty()) return
-    LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
-        lines.forEachIndexed { index, line ->
-            RecapRow(line)
-            if (index < lines.lastIndex) Hairline(inset = Spacing.md + 34.dp + Spacing.sm + Spacing.xxs)
-        }
-    }
-}
-
-@Composable
-private fun RecapRow(line: RecapLine) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .semantics(mergeDescendants = true) {}
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm + Spacing.xxs),
-        verticalAlignment = if (line.details.isEmpty()) Alignment.CenterVertically else Alignment.Top,
-    ) {
-        IconTile(
-            icon = line.kind.icon(),
-            size = 34.dp,
-            container = MaterialTheme.colorScheme.surfaceContainerHigh,
-            content = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.width(Spacing.sm + Spacing.xxs))
-        Column(Modifier.weight(1f)) {
-            Text(line.title, style = Hierarchy.cardTitle.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading))
-            line.details.forEach { detail ->
-                Text(
-                    detail,
-                    style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-private fun RecapLine.Kind.icon(): ImageVector = when (this) {
-    RecapLine.Kind.BUDGET -> Icons.Outlined.PieChart
-    RecapLine.Kind.TOP -> Icons.Outlined.ShoppingBag
-    RecapLine.Kind.MORE -> Icons.AutoMirrored.Outlined.TrendingUp
-    RecapLine.Kind.LESS -> Icons.AutoMirrored.Outlined.TrendingDown
-    RecapLine.Kind.NET_WORTH -> Icons.Outlined.AccountBalance
-    RecapLine.Kind.GOALS -> Icons.Outlined.TrackChanges
-    RecapLine.Kind.DEBTS -> Icons.Outlined.CreditCard
-    RecapLine.Kind.DAYS -> Icons.Outlined.CalendarMonth
 }
 
 /**
- * The year as 12 months: each month's short name, what was kept (signed) and, once a budgeted month has ended, whether it
- * stayed within. A tap shows that month's recap above. Three across (two at large text sizes, four on wide windows).
+ * The budget year's header: its title, then [switcher] on the right of the same line while both fit, below it when
+ * they don't (a narrow phone or large text), and what the squares are under them.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun YearHeader(switcher: (@Composable () -> Unit)?) {
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Text(
+            "Your budget year",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .padding(end = Spacing.sm)
+                .semantics { heading() },
+        )
+        if (switcher != null) Box(Modifier.align(Alignment.CenterVertically)) { switcher() }
+    }
+    Text(
+        "How each month did against its budget. Tap a month for its recap.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** The way to the awards: how many are earned, with a few of the medals lined up on the right as a cue. */
+@Composable
+private fun AwardsCard(earned: Set<Achievement>, onClick: () -> Unit) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.xs) {
+        NavRow(
+            icon = Icons.Outlined.EmojiEvents,
+            title = "Awards",
+            summary = "${earned.size} of ${Achievement.entries.size} earned",
+            onClick = onClick,
+            tone = LucentoTheme.extendedColors.shortcuts.awards,
+            trailing = { MedalLineup(earned) },
+            wrapTitle = true,
+            onClickLabel = "Open your awards",
+        )
+    }
+}
+
+/**
+ * Three small medals on the Awards card (owner, 2026-11-23: "a subtle medal lined up on right sides"): the latest
+ * earned in gold, then outlines of those still to come, each a little behind the one before. Decorative: the card's
+ * summary says how many are earned.
  */
 @Composable
-private fun YearGrid(months: List<RecapMonthResult>, selected: YearMonth?, onSelect: ((YearMonth) -> Unit)?) {
+private fun MedalLineup(earned: Set<Achievement>) {
+    val gold = Achievement.entries.filter { it in earned }.takeLast(MEDALS_SHOWN)
+    val shown = (gold + Achievement.entries.filter { it !in earned }).take(MEDALS_SHOWN)
+    val size = 24.dp
+    val step = 17.dp
+    Box(Modifier.width(size + step * (shown.size - 1)).height(size * com.lucento.app.feature.awards.MedalAspect)) {
+        shown.forEachIndexed { index, award ->
+            com.lucento.app.feature.awards.AwardMedal(
+                award,
+                earned = award in earned,
+                size = size,
+                modifier = Modifier
+                    .offset(x = step * index)
+                    // The first medal in front: the gold ones lead.
+                    .zIndex((shown.size - index).toFloat()),
+            )
+        }
+    }
+}
+
+private const val MEDALS_SHOWN = 3
+
+/**
+ * The calendar year as 12 squares, one flat colour each for how its budget went (owner, 2026-11-23: "Flat colour
+ * squares"), in the Budget tab's own levels: green on track, amber getting close (80 %+), red over, grey recorded without
+ * a budget. A month with nothing recorded is an outline with a dash, one still to come an empty outline, and today's
+ * month says "so far" (and is outlined: today's month). Each square names its month and the share of its budget used, so
+ * colour is never the only cue; a tap opens that month's recap. Four across (six on wide windows, three with large text;
+ * two at the largest, only as tall as their words need), and a row grows taller rather than cut its words off. [hidden]:
+ * the plan preview, or Budgets off, every square without its figure or colour (months with records still open).
+ */
+@Composable
+private fun BudgetSquares(
+    months: List<RecapMonthResult>,
+    /** Today's month, outlined. */
+    current: YearMonth?,
+    onSelect: ((YearMonth) -> Unit)?,
+    hidden: Boolean = false,
+) {
     val textScale = LocalDensity.current.fontScale
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val perRow = when {
-            textScale >= 1.5f -> 2
-            maxWidth >= 520.dp -> 4
-            else -> 3
-        }
+        fun side(perRow: Int) = (maxWidth - Spacing.sm * (perRow - 1)) / perRow
+        // The most squares across that still hold the running month's three lines (month, share, "so far") at this
+        // text size: four on a phone, six on a wide window, three or two with large text.
+        val needed = (SQUARE_TEXT_LINES_SP * textScale + SQUARE_PADDING_DP).dp
+        val perRow = listOf(6, 4, 3).filter { it != 6 || maxWidth >= 520.dp }.firstOrNull { side(it) >= needed } ?: 2
+        // Two across (the largest text): only as tall as the words need, so the year isn't three screens long.
+        val square = if (perRow == 2) minOf(side(perRow), needed) else side(perRow)
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             months.chunked(perRow).forEach { row ->
+                // Square when the words fit; taller (a whole row together) rather than ever cutting them off.
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     row.forEach { result ->
-                        MonthTile(
+                        MonthSquare(
                             result,
-                            selected = result.month == selected,
-                            // A month without records has no story to show, so only months with one open their recap.
+                            isCurrent = !hidden && result.month == current,
+                            // A month without records has no recap to show, so only months with one open it.
                             onClick = onSelect?.takeIf { result.hasRecords }?.let { pick -> { pick(result.month) } },
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            hidden = hidden,
+                            modifier = Modifier.weight(1f).heightIn(min = square).fillMaxHeight(),
                         )
                     }
                     repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
@@ -421,98 +287,175 @@ private fun YearGrid(months: List<RecapMonthResult>, selected: YearMonth?, onSel
     }
 }
 
+/** A square's three lines of text (labelMedium 16 + titleMedium 24 + labelSmall 16 line heights), in sp. */
+private const val SQUARE_TEXT_LINES_SP = 56f
+
+/** A square's inner padding, top and bottom, with a little to spare. */
+private const val SQUARE_PADDING_DP = 18f
+
+/**
+ * A month's square colours ([BudgetSquares]); null for a month with nothing to show, which is only an outline: one still
+ * to come, or one with nothing recorded (it has a dash), so grey always means a month recorded without a budget.
+ */
 @Composable
-private fun MonthTile(result: RecapMonthResult, selected: Boolean, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
-    val fmt = amountFormat()
+private fun squareTone(result: RecapMonthResult, hidden: Boolean): TonePair? = when {
+    result.upcoming || !result.hasRecords -> null
+    hidden -> StatusTones.neutral
+    else -> result.budget?.let { healthTone(it.health) } ?: StatusTones.neutral
+}
+
+@Composable
+private fun MonthSquare(result: RecapMonthResult, isCurrent: Boolean, onClick: (() -> Unit)?, hidden: Boolean, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    val ext = LucentoTheme.extendedColors
+    val tone = squareTone(result, hidden)
+    val ink = tone?.content ?: colors.onSurfaceVariant
     val name = result.month.month.getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault())
-    val spoken = RecapCopy.tileDescription(result, fmt)
+    val spoken = RecapCopy.squareDescription(result, hidden)
+    val budget = result.budget?.takeUnless { hidden }
+    val edge = when {
+        isCurrent -> colors.onSurface
+        tone == null -> LucentoTheme.extendedColors.borderDefault
+        else -> tone.content.copy(alpha = 0.25f)
+    }
     Column(
         modifier
             .clip(MaterialTheme.shapes.medium)
-            .border(
-                BorderStroke(if (selected) 2.dp else 1.dp, if (selected) colors.primary else ext.borderDefault),
-                MaterialTheme.shapes.medium,
-            )
+            .background(tone?.container ?: androidx.compose.ui.graphics.Color.Transparent)
+            .border(BorderStroke(if (isCurrent) 2.dp else 1.dp, edge), MaterialTheme.shapes.medium)
             .let { m ->
                 if (onClick != null) m.clickable(role = Role.Button, onClickLabel = "See this month’s recap", onClick = onClick) else m
             }
-            .clearAndSetSemantics {
-                contentDescription = spoken
-                this.selected = selected
-            }
-            .heightIn(min = 72.dp)
-            .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+            .clearAndSetSemantics { contentDescription = spoken }
+            .padding(Spacing.sm),
     ) {
-        Text(
-            name + if (result.finished) "" else " · now",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) colors.primary else colors.onSurfaceVariant,
-            maxLines = 1,
-        )
-        Spacer(Modifier.height(Spacing.xxs))
-        if (result.hasRecords) {
-            MoneyText(money = result.net, style = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold), showPlus = true, fractionScale = 1f, minScale = 0.6f)
-        } else {
-            Text("—", style = AmountStyles.small, color = colors.onSurfaceVariant)
-        }
-        result.budgetKept?.let { kept ->
-            Spacer(Modifier.height(Spacing.xxs))
-            Text(
-                if (kept) "Within budget" else "Over budget",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (kept) ext.positive else ext.negative,
-                maxLines = 2,
-            )
+        Text(name, style = MaterialTheme.typography.labelMedium, color = ink, maxLines = 1)
+        Spacer(Modifier.weight(1f))
+        when {
+            budget != null -> {
+                Text(
+                    "${budget.percentUsed}%",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ink,
+                    maxLines = 1,
+                )
+                if (!result.finished) Text("so far", style = MaterialTheme.typography.labelSmall, color = ink, maxLines = 1)
+            }
+            result.upcoming || hidden -> Unit
+            else -> Text("—", style = MaterialTheme.typography.titleMedium, color = ink)
         }
     }
 }
 
-/** The year's totals in words: what was kept, how many budgeted months stayed within, how net worth moved. */
+/** What the squares' colours mean, in the Budget tab's own words. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun YearTotals(year: YearRecap) {
-    val fmt = amountFormat()
-    val lines = remember(year, fmt) { RecapCopy.yearLines(year, fmt) }
-    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
-        lines.forEachIndexed { index, line ->
-            Text(line, style = if (index == 0) Hierarchy.cardTitle else MaterialTheme.typography.bodyMedium)
-            if (index < lines.lastIndex) Spacer(Modifier.height(Spacing.xs))
-        }
+private fun SquaresLegend() {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        LegendKey(StatusTones.positive, "On track")
+        LegendKey(StatusTones.warning, "Getting close")
+        LegendKey(StatusTones.negative, "Over budget")
+        LegendKey(StatusTones.neutral, "No budget")
+        LegendKey(null, "Nothing recorded")
+    }
+}
+
+/** A legend swatch, drawn like a small square ([MonthSquare]'s corners in proportion); null tone: an outline. */
+@Composable
+private fun LegendKey(tone: TonePair?, label: String) {
+    val swatch = androidx.compose.foundation.shape.RoundedCornerShape(percent = 20)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(14.dp)
+                .clip(swatch)
+                .background(tone?.container ?: androidx.compose.ui.graphics.Color.Transparent)
+                .border(BorderStroke(1.dp, tone?.content?.copy(alpha = 0.4f) ?: LucentoTheme.extendedColors.borderDefault), swatch),
+        )
+        Spacer(Modifier.width(Spacing.xs))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 /**
- * The year view on a plan without it: the person's own 12 months, softened and with every figure hidden, under the plan
- * fact and the way to the plan page — as Insights previews its 12 months (owner, 2026-11-19). Never made-up numbers.
+ * The year's totals as a bulleted outline (owner, 2026-11-23: "emphasizing the bulleted outlines"): the year and "so far"
+ * as its overline, then one line per fact, each with its own mark and its figures in bold — the budgeted months within
+ * budget, what was kept, what came in and went out, the months that kept something, and how net worth moved.
  */
 @Composable
-private fun YearPreview(year: YearRecap, months: List<RecapMonthResult>) {
+private fun YearTotals(year: YearRecap) {
+    val fmt = amountFormat()
+    val lines = remember(year, fmt) { RecapCopy.yearLines(year, fmt) }
+    val label = year.months.firstOrNull()?.month?.year ?: year.endMonth.year
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+        CardOverline(if (year.months.any { !it.finished }) "$label · so far" else "$label")
+        Spacer(Modifier.height(Spacing.sm))
+        lines.forEachIndexed { index, line ->
+            YearBullet(line)
+            if (index < lines.lastIndex) Spacer(Modifier.height(Spacing.sm + Spacing.xxs))
+        }
+    }
+}
+
+@Composable
+private fun YearBullet(line: YearLine) {
+    val strong = MaterialTheme.colorScheme.onSurface
+    val text = remember(line, strong) {
+        buildAnnotatedString {
+            append(line.text)
+            line.figures.forEach { figure ->
+                val start = line.text.indexOf(figure)
+                if (start >= 0) addStyle(SpanStyle(fontWeight = FontWeight.Bold, color = strong), start, start + figure.length)
+            }
+        }
+    }
+    Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.Top) {
+        IconTile(
+            icon = line.kind.icon(),
+            size = 30.dp,
+            container = MaterialTheme.colorScheme.primaryContainer,
+            content = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        Spacer(Modifier.width(Spacing.sm + Spacing.xxs))
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f).padding(top = Spacing.xxs),
+        )
+    }
+}
+
+private fun YearLine.Kind.icon(): ImageVector = when (this) {
+    YearLine.Kind.BUDGET -> Icons.Outlined.PieChart
+    YearLine.Kind.KEPT -> Icons.Outlined.Savings
+    YearLine.Kind.FLOW -> Icons.Outlined.SwapVert
+    YearLine.Kind.MONTHS -> Icons.Outlined.CalendarMonth
+    YearLine.Kind.NET_WORTH -> Icons.Outlined.AccountBalance
+    YearLine.Kind.NOTHING -> Icons.Outlined.EditCalendar
+}
+
+/**
+ * The budget year on a plan without it: the person's own months as grey squares, every figure and colour hidden, under
+ * the plan fact and the way to the plan page, as Insights previews its 12 months (owner, 2026-11-19). Never made-up
+ * numbers, and no colour gives a month's result away; a month's square still opens its recap, which is free.
+ */
+@Composable
+private fun YearPreview(year: YearRecap, onOpenMonth: (YearMonth) -> Unit) {
     val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
-    val plan = com.lucento.app.feature.pro.LocalEntitlements.current.displayPlan(System.currentTimeMillis())
-    val wall = com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS)
     LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
         if (year.recordedMonths > 0) {
-            // Says what it shows: the months since the first one with records, not always twelve (critic r3, P3).
-            val since = months.firstOrNull()?.month
-            val described = if (since == null || months.size >= 12) "Your last 12 months, with the figures hidden."
-            else "Your months since ${monthLabel(since)} ${since.year}, with the figures hidden."
-            Box(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = described }) {
-                CompositionLocalProvider(LocalAmountsHidden provides true) {
-                    Box(Modifier.alpha(0.45f)) { YearGrid(months, selected = null, onSelect = null) }
-                }
-            }
+            BudgetSquares(year.months, current = null, onSelect = onOpenMonth, hidden = true)
             Spacer(Modifier.height(Spacing.md))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.WorkspacePremium, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(Spacing.sm))
-            Text("Your year is part of Lucento Pro", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text("Your budget year is part of Lucento Pro", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         }
         Spacer(Modifier.height(Spacing.xs))
         Text(
-            "See every month’s result and the year’s totals at a glance. " +
-                "Each month’s recap above is always free.",
+            "See how each month did against its budget, in colour, and the year’s totals. " +
+                "Each month’s recap is free: tap a month.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -528,6 +471,11 @@ private fun YearPreview(year: YearRecap, months: List<RecapMonthResult>) {
 /** One line of the month's recap: what it is about, its statement, and the facts under it. */
 internal data class RecapLine(val kind: Kind, val title: String, val details: List<String> = emptyList()) {
     enum class Kind { BUDGET, TOP, MORE, LESS, NET_WORTH, GOALS, DEBTS, DAYS }
+}
+
+/** One line of the year's totals: what it is about, its sentence, and the [figures] in it shown in bold. */
+internal data class YearLine(val kind: Kind, val text: String, val figures: List<String> = emptyList()) {
+    enum class Kind { BUDGET, KEPT, FLOW, MONTHS, NET_WORTH, NOTHING }
 }
 
 /** The recap's words, from its figures only (pure apart from month names), so every case is pinned in tests. */
@@ -611,37 +559,60 @@ internal object RecapCopy {
         }
     }
 
-    /** A month tile's one description for screen readers. */
-    fun tileDescription(result: RecapMonthResult, fmt: AmountFormat): String {
-        val name = "${monthLabel(result.month)} ${result.month.year}" + if (result.finished) "" else ", so far"
-        val kept = if (!result.hasRecords) "nothing recorded" else when {
-            result.net.isNegative -> "${fmt.spoken(-result.net)} more went out than came in"
-            else -> "kept ${fmt.spoken(result.net)}"
+    /** A month square's one description for screen readers: the month, the share of its budget used and its level. */
+    fun squareDescription(result: RecapMonthResult, hidden: Boolean = false): String {
+        val name = "${monthLabel(result.month)} ${result.month.year}"
+        if (result.upcoming) return "$name: still to come"
+        if (hidden) return name
+        val budget = result.budget
+        val soFar = if (result.finished) "" else ", so far"
+        return when {
+            budget != null -> "$name$soFar: ${budget.percentUsed}% of the budget used, ${levelWords(budget)}"
+            !result.hasRecords -> "$name: nothing recorded"
+            else -> "$name$soFar: no budget"
         }
-        val budget = when (result.budgetKept) {
-            true -> ", within budget"
-            false -> ", over budget"
-            null -> ""
-        }
-        return "$name: $kept$budget"
     }
 
-    /** The year's totals, the first being its headline. */
-    fun yearLines(year: YearRecap, fmt: AmountFormat): List<String> = buildList {
+    /** A budget's level in the Budget tab's words; spent to the cent is used up, not over. */
+    fun levelWords(budget: MonthBudgetResult): String = when (budget.health) {
+        BudgetHealth.NOT_SET -> "no budget"
+        BudgetHealth.ON_TRACK -> "on track"
+        BudgetHealth.APPROACHING, BudgetHealth.LOW -> "getting close"
+        BudgetHealth.EXCEEDED -> if (budget.remaining.isZero) "fully used" else "over budget"
+    }
+
+    /**
+     * The calendar year's totals as bullet lines, the budget first: how many budgeted months stayed within, what was kept,
+     * what came in and went out, the months that kept something, and how net worth moved, each with its figures (shown
+     * in bold). A year still running says "so far"; a year whose records began after January is told from that month, so
+     * a few months are never called a year (design review 2026-11-23).
+     */
+    fun yearLines(year: YearRecap, fmt: AmountFormat): List<YearLine> = buildList {
+        val label = year.months.firstOrNull()?.month?.year ?: year.endMonth.year
+        val running = year.months.any { !it.finished }
+        val soFar = if (running) " so far" else ""
         if (year.recordedMonths == 0) {
-            add("Nothing recorded in these 12 months yet.")
+            add(YearLine(YearLine.Kind.NOTHING, "Nothing recorded in $label" + if (running) " yet" else ""))
             return@buildList
         }
-        // Told from the first month with records, so a few months are never called a year (design review 2026-11-23).
+        if (year.budgetedMonths > 0) {
+            val within = "${year.withinBudgetMonths} of ${year.budgetedMonths}"
+            add(YearLine(YearLine.Kind.BUDGET, "Within budget in $within budgeted months$soFar", listOf(within)))
+        }
         val first = year.firstRecordedMonth
-        val span = if (first != null && first > year.months.first().month) "since ${monthLabel(first)}" else "over 12 months"
-        add(
-            if (year.net.isNegative) "${fmt.format(-year.net)} more went out than came in $span"
-            else "${fmt.format(year.net)} kept $span",
-        )
-        add("${fmt.format(year.income)} came in and ${fmt.format(year.spent)} went out.")
-        add("More came in than went out in ${year.keptMonths} of ${year.recordedMonths} months with records.")
-        if (year.budgetedMonths > 0) add("Within budget in ${year.withinBudgetMonths} of ${year.budgetedMonths} budgeted months.")
-        year.netWorthChange?.let { add("Net worth ${fmt.signed(it)} over the year.") }
+        val span = if (first != null && first.monthValue > 1) "since ${monthLabel(first)}" + if (running) "" else " $label"
+        else "in $label$soFar"
+        val net = fmt.format(if (year.net.isNegative) -year.net else year.net)
+        val kept = if (year.net.isNegative) "$net more went out than came in $span" else "$net kept $span"
+        add(YearLine(YearLine.Kind.KEPT, kept, listOf(net)))
+        val income = fmt.format(year.income)
+        val spent = fmt.format(year.spent)
+        add(YearLine(YearLine.Kind.FLOW, "$income came in and $spent went out", listOf(income, spent)))
+        val keptMonths = "${year.keptMonths} of ${year.recordedMonths}"
+        add(YearLine(YearLine.Kind.MONTHS, "More came in than went out in $keptMonths months with records", listOf(keptMonths)))
+        year.netWorthChange?.let {
+            val change = fmt.signed(it)
+            add(YearLine(YearLine.Kind.NET_WORTH, "Net worth $change in $label$soFar", listOf(change)))
+        }
     }
 }

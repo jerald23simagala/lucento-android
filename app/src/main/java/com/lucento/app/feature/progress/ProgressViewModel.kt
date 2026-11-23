@@ -44,7 +44,7 @@ data class ProgressUiState(
     val earned: Set<Achievement> = emptySet(),
     val facts: ProgressFacts? = null,
     val proMemberSince: Long? = null,
-    /** Lucento Pro (docs/MONETIZATION.md §3.4): the 12-month year view, like Insights' 12 months. */
+    /** Lucento Pro (docs/MONETIZATION.md §3.4): the budget year, like Insights' 12 months. */
     val yearLocked: Boolean = false,
     val acknowledgedBudgetMonth: YearMonth? = null,
 )

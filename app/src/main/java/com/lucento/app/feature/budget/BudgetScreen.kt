@@ -470,6 +470,45 @@ internal fun MonthSwitcher(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     canGoBack: Boolean = true,
+) = PeriodSwitcher(
+    label = "${monthLabel(month)} ${month.year}",
+    previous = "Previous month",
+    next = "Next month",
+    canGoBack = canGoBack,
+    canGoForward = canGoForward,
+    onPrevious = onPrevious,
+    onNext = onNext,
+)
+
+/** The same pill for a calendar year: Milestones' budget squares (owner, 2026-11-23). */
+@Composable
+internal fun YearSwitcher(
+    year: Int,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) = PeriodSwitcher(
+    label = year.toString(),
+    previous = "Previous year",
+    next = "Next year",
+    canGoBack = canGoBack,
+    canGoForward = canGoForward,
+    onPrevious = onPrevious,
+    onNext = onNext,
+    minLabelWidth = 72.dp,
+)
+
+@Composable
+private fun PeriodSwitcher(
+    label: String,
+    previous: String,
+    next: String,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    minLabelWidth: androidx.compose.ui.unit.Dp = 112.dp,
 ) {
     val fill = MaterialTheme.colorScheme.surfaceContainerLowest
     val edge = LucentoTheme.extendedColors.borderDefault
@@ -486,17 +525,17 @@ internal fun MonthSwitcher(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onPrevious, enabled = canGoBack) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = previous)
         }
         Text(
-            "${monthLabel(month)} ${month.year}",
+            label,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
             textAlign = TextAlign.Center,
             maxLines = 1,
-            modifier = Modifier.widthIn(min = 112.dp),
+            modifier = Modifier.widthIn(min = minLabelWidth),
         )
         IconButton(onClick = onNext, enabled = canGoForward) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = next)
         }
     }
 }

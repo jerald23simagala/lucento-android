@@ -257,11 +257,12 @@ data class HomeActions(
     val onSetSpendable: (Long, Boolean) -> Unit = { _, _ -> },
     /** Opens a wallet's editor on the dashboard (a card's counted credit, from the spending money sheet). */
     val onEditWallet: (com.lucento.app.domain.Wallet) -> Unit = {},
-    /**
-     * The Progress page (owner, 2026-11-23): a month's recap (null: the page's own default month), and with true, scrolled
-     * to the awards.
-     */
-    val onOpenProgress: (YearMonth?, Boolean) -> Unit = { _, _ -> },
+    /** The Milestones page ("Progress" until 2026-11-23): the Awards card and the budget year. */
+    val onOpenMilestones: () -> Unit = {},
+    /** A month's recap on its own page: the monthly check-in card's "See <month>'s recap". */
+    val onOpenMonthRecap: (YearMonth) -> Unit = {},
+    /** The awards on their own page (owner, 2026-11-23): an award ceremony's "See all awards". */
+    val onOpenAwards: () -> Unit = {},
     /** The monthly check-in: plan this month's budget (or next month's, in the last days of this one). */
     val onPlanMonth: (YearMonth) -> Unit = {},
 )
@@ -418,7 +419,7 @@ private fun HomeDashboard(
                     onTurnOn = viewModel::turnOn,
                     onHideOffers = viewModel::hideModuleOffers,
                     onAddWallet = addWallet,
-                    onOpenMilestones = { actions.onOpenProgress(null, false) },
+                    onOpenMilestones = actions.onOpenMilestones,
                     onDismissSpotlight = viewModel::dismissAddSpotlight,
                     onDismissCheckIn = { card ->
                         // A quiet close with a way back (design review 2026-11-23): the card returns with Undo. The
@@ -427,7 +428,7 @@ private fun HomeDashboard(
                     },
                     onSeeRecap = { month ->
                         viewModel.markRecapSeen(month)
-                        actions.onOpenProgress(month, false)
+                        actions.onOpenMonthRecap(month)
                     },
                 )
             }
@@ -469,7 +470,7 @@ private fun HomeDashboard(
             onDismiss = { ceremony = null },
             onSeeAll = {
                 ceremony = null
-                actions.onOpenProgress(null, true)
+                actions.onOpenAwards()
             },
         )
     }
@@ -1846,8 +1847,8 @@ private fun ShortcutRow(
     val items = listOfNotNull(
         module(Feature.SAVINGS_GOALS, tones.goals, actions.onOpenGoals),
         module(Feature.INSIGHTS, tones.insights, actions.onOpenInsights),
-        // The awards live on Progress now, with each month's recap and the year (owner, 2026-11-23).
-        Shortcut("Progress", "Progress", Icons.Outlined.EmojiEvents, tones.awards, onOpenMilestones),
+        // Milestones (owner, 2026-11-23; "Progress" until then): the Awards card and the budget year, each month's recap a tap away.
+        Shortcut("Milestones", "Milestones", Icons.Outlined.EmojiEvents, tones.awards, onOpenMilestones),
         module(Feature.DEBTS_LOANS, tones.debts, actions.onOpenDebts),
         module(Feature.RECURRING, tones.scheduled) { actions.onOpenRecurring(null) },
     )

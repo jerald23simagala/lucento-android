@@ -231,8 +231,8 @@ Pro-sized life.
 | Ask Lucento: on-phone answers, four statements on screen (net worth, cash flow, budget vs actual, debts), top categories | Shipped | ✔ | ✔ | ✔ | Yes | none |
 | Ask Lucento: **statements as PDF** (save / share) | Shipped | — | ✔ | ✔ | Yes | `AskLucentoViewModel` PDF actions → `ProRequired` |
 | Category breakdown on Budget / Home | Shipped | ✔ | ✔ | ✔ | Yes | none |
-| Progress: a month's recap (kept, budget, where it went, the biggest change, net worth, goals, debts, days recorded) and the awards | Shipped (owner, 2026-11-23) | ✔ any month | ✔ | ✔ | Yes | none |
-| Progress: **the year view** (12 months' results, which stayed within budget, the year's totals) | Shipped (owner, 2026-11-23) | Preview: the person's own months, figures hidden | ✔ | ✔ | Yes | `ProGates.insightsPeriodAllowed(12)`, the same gate and wall as Insights' 12 months (`ProFeature.INSIGHTS_LONG_PERIODS`) |
+| Milestones ("Progress" until 2026-11-23): each month's recap on its own page (kept, budget, where it went, the biggest change, net worth, goals, debts, days recorded), opened from the month's square on every plan or from the check-in card, and the Awards page | Shipped (owner, 2026-11-23) | ✔ any month | ✔ | ✔ | Yes | none |
+| Milestones: **the budget year** (the calendar year as 12 squares coloured by how each month's budget went, the share used, the year's totals) | Shipped (owner, 2026-11-23) | Preview: the person's own months as grey squares, every result hidden | ✔ | ✔ | Yes | `ProGates.insightsPeriodAllowed(12)`, the same gate and wall as Insights' 12 months (`ProFeature.INSIGHTS_LONG_PERIODS`) |
 | Monthly check-in: the Home card, the plan page, planning months ahead | Shipped (owner, 2026-11-23) | ✔ | ✔ | ✔ | Yes | none |
 
 Why this split and not "all Insights free" (v1): the owner wants analytics as a Pro reason, and the period selector is

@@ -36,7 +36,7 @@ data class RecapBudget(
 }
 
 /**
- * One month's story for the Progress page (docs/CALCULATIONS.md "Progress recap"). Every figure comes from a calculator
+ * One month's story for the Milestones page (docs/CALCULATIONS.md "Milestones recap"). Every figure comes from a calculator
  * the rest of the app already uses for it, so the recap always agrees with Home, Budget, Wallets and Goals. One currency,
  * the main one; nothing is converted here.
  */
@@ -86,9 +86,31 @@ data class RecapMonthResult(
     val finished: Boolean,
     /** Null for the current month, a month without records, or one without a budget. */
     val budgetKept: Boolean?,
+    /**
+     * The month's budget against what was spent (so far, for the current month): the colour and the percentage of its
+     * square on the Milestones page (owner, 2026-11-23). Null with Budgets off, without a budget that month, without
+     * records, or for a month still to come.
+     */
+    val budget: MonthBudgetResult? = null,
+    /** After today's month: nothing to tell yet (an empty square). */
+    val upcoming: Boolean = false,
 )
 
-/** The 12 months up to [endMonth], oldest first, with their totals (docs/CALCULATIONS.md "Progress recap"). */
+/**
+ * A month's budget result for the year's squares, from the Budget tab's own plan ([BudgetPlanner.plan]): the share used
+ * the way the Budget tab rounds it ([Insights.percentOf], half-up) and its level ([BudgetPlanner.health]: on track,
+ * getting close from 80 %, over from 100 %), so a square always says what the Budget tab says about that month.
+ */
+data class MonthBudgetResult(val total: Money, val spent: Money) {
+    val remaining: Money get() = total - spent
+    val percentUsed: Int get() = Insights.percentOf(spent, total) ?: 0
+    val health: BudgetHealth get() = BudgetPlanner.health(total, spent)
+}
+
+/**
+ * A calendar year's 12 months, January first, with their totals up to [endMonth] (December, or today's month for this
+ * year); months after today's are [RecapMonthResult.upcoming] (docs/CALCULATIONS.md "Milestones: the budget year").
+ */
 data class YearRecap(
     val endMonth: YearMonth,
     val currencyCode: String,
@@ -209,26 +231,37 @@ object MonthRecaps {
     }
 
     /** The [YEAR] months up to [endMonth] (never past today's month), oldest first. */
-    fun year(inputs: RecapInputs, currency: String, endMonth: YearMonth): YearRecap {
+    /**
+     * The calendar [year] for the Milestones page's budget squares (owner, 2026-11-23: "This calendar year"): January to
+     * December, each month with what was kept and its budget result ([MonthBudgetResult], so far for today's month);
+     * months after today's are [RecapMonthResult.upcoming] and add nothing. Totals and net worth's change run from January
+     * to December, or to today's month in this year. A year after today's is all upcoming.
+     */
+    fun calendarYear(inputs: RecapInputs, currency: String, year: Int): YearRecap {
         val current = YearMonth.from(inputs.today)
-        val end = if (endMonth > current) current else endMonth
         val budgetsOn = inputs.features.isEnabled(Feature.BUDGETS)
-        val flows = (YEAR - 1 downTo 0).map { back -> CashflowCalculator.netFlow(currency, end.minusMonths(back.toLong()), inputs.transactions) }
-        val months = flows.map { flow ->
-            val month = flow.month
+        val january = YearMonth.of(year, 1)
+        val end = minOf(YearMonth.of(year, 12), current)
+        val flows = (1..YEAR).map { YearMonth.of(year, it) }.filter { it <= current }
+            .associateWith { CashflowCalculator.netFlow(currency, it, inputs.transactions) }
+        val months = (1..YEAR).map { number ->
+            val month = YearMonth.of(year, number)
+            val flow = flows[month]
+                ?: return@map RecapMonthResult(month, Money.zero(currency), hasRecords = false, finished = false, budgetKept = null, upcoming = true)
             val records = MonthCheckIn.hasRecords(inputs.transactions, month)
             val finished = month < current
-            val kept = if (!budgetsOn || !finished || !records) null else {
+            // A month without records has no result to show: a budget nobody recorded against would read as 0 % used.
+            val budget = if (!budgetsOn || !records) null else {
                 val plan = BudgetPlanner.plan(inputs.categories, inputs.budgets, inputs.transactions, currency, month)
-                if (plan.hasBudget) !plan.remaining.isNegative else null
+                if (plan.hasBudget) MonthBudgetResult(plan.total, plan.spent) else null
             }
-            RecapMonthResult(month, flow.net, records, finished, kept)
+            val kept = budget?.takeIf { finished }?.let { !it.remaining.isNegative }
+            RecapMonthResult(month, flow.net, records, finished, kept, budget)
         }
-        val income = Money.sum(currency, flows.map { it.income })
-        val spent = Money.sum(currency, flows.map { it.expense })
-        val first = end.minusMonths((YEAR - 1).toLong())
-        val netWorthChange = if (inputs.wallets.none { it.currencyCode == currency }) null else {
-            val before = BalanceHistory.lastMonths(inputs.wallets, inputs.withFxResults, currency, first.minusMonths(1), inputs.today, count = 1, zone = inputs.zone)
+        val income = Money.sum(currency, flows.values.map { it.income })
+        val spent = Money.sum(currency, flows.values.map { it.expense })
+        val netWorthChange = if (end < january || inputs.wallets.none { it.currencyCode == currency }) null else {
+            val before = BalanceHistory.lastMonths(inputs.wallets, inputs.withFxResults, currency, january.minusMonths(1), inputs.today, count = 1, zone = inputs.zone)
             val after = BalanceHistory.lastMonths(inputs.wallets, inputs.withFxResults, currency, end, inputs.today, count = 1, zone = inputs.zone)
             if (before.isEmpty() || after.isEmpty()) null else after.first().netWorth - before.first().netWorth
         }
