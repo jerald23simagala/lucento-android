@@ -84,8 +84,12 @@ class LucentoApplication : Application() {
             }
         }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now".
-            uploadRequests(container.syncRepository.observePendingChanges()).collect {
+            // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now", and so is a
+            // changed setting that follows the account (docs/SYNC.md "Settings").
+            kotlinx.coroutines.flow.merge(
+                uploadRequests(container.syncRepository.observePendingChanges()),
+                uploadRequests(container.preferences.accountSettingChanges),
+            ).collect {
                 if (backgroundSyncAllowed(container.syncPreferences.isEnabled(), container.onboardingComplete(), container.planAllowsSync())) {
                     // Open: send it now. In the background (or if the app is closed before it runs): WorkManager.
                     if (container.inForeground.get()) container.foregroundSync.request(forced = true)
@@ -170,7 +174,17 @@ class AppContainer(application: Application) {
     /** Background and launch sync wait for this (P0-2); onboarding's own restore syncs directly. */
     suspend fun onboardingComplete(): Boolean = preferences.preferences.first().onboardingComplete
     val backup: BackupEngine by lazy {
-        BackupEngine(RoomBackupStore(database, runner, preferences, GoalPhotos(application)))
+        BackupEngine(
+            RoomBackupStore(
+                database, runner, preferences, GoalPhotos(application),
+                // Lucento Pro: a backup file restores a Pro theme only where the plan allows it (docs/MONETIZATION.md §3.8).
+                themeAllowed = { theme ->
+                    // The plan read from its sealed copy first: on a cold start the state is still the free default.
+                    entitlements.loadCached()
+                    com.lucento.app.domain.entitlement.ProGates.themeAllowed(theme.name, entitlements.state.value, System.currentTimeMillis())
+                },
+            ),
+        )
     }
     /**
      * Lucento Shared: a Partner's phone (bound to an Owner's Shared Space) doesn't change the financial structure. Read
@@ -431,6 +445,21 @@ class AppContainer(application: Application) {
                 com.lucento.app.domain.entitlement.ProGates.cloudPlanFingerprint(entitlements.state.value)
             },
             onUploadsRefused = { refreshEntitlements() },
+            // Settings that follow the account (docs/SYNC.md "Settings"). The row is the person's own, so it is saved on
+            // their own plan, even on a Partner's phone (which syncs the records on the Owner's).
+            accountSettings = preferences,
+            accountSettingsUploadAllowed = {
+                entitlements.loadCached()
+                com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(
+                    entitlements.state.value, partnerOfSpace = false, now = System.currentTimeMillis(),
+                )
+            },
+            // MONETIZATION §3.8: an account's Pro theme isn't applied on a phone whose plan can't pick it.
+            lockedThemes = {
+                entitlements.loadCached()
+                val locked = com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(entitlements.state.value, System.currentTimeMillis())
+                com.lucento.app.data.preferences.ThemeId.entries.filter { it.name in locked }.map { it.key }.toSet()
+            },
         )
     }
 
@@ -445,7 +474,7 @@ class AppContainer(application: Application) {
             upToDate = {
                 val last = syncPreferences.lastSyncedAtMillis()
                 last != null && System.currentTimeMillis() - last < com.lucento.app.data.sync.ForegroundSync.FRESH_MILLIS &&
-                    syncRepository.pendingChangeCount() == 0
+                    syncRepository.pendingChangeCount() == 0 && !preferences.accountSettingsWaiting()
             },
             sync = { syncRepository.sync() },
         )

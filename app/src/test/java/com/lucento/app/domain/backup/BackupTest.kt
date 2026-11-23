@@ -25,7 +25,7 @@ class BackupTest {
         val store = MemoryBackupStore(original)
         val engine = engine(store)
         val json = engine.export("0.5.0")
-        assertTrue(json.contains("\"schemaVersion\": 5"))
+        assertTrue(json.contains("\"schemaVersion\": 6"))
         assertTrue(json.contains("\"appVersion\": \"0.5.0\""))
         assertTrue(json.contains("\"exportedAt\": \"2026-03-01T00:00:00Z\""))
         assertTrue(json.contains("\"amountMinor\": 450"))
@@ -82,7 +82,7 @@ class BackupTest {
         assertNull(decoded.getValue("bud-1").month)
 
         // A file written before the lifecycle has no month/effectiveFrom keys at all: every budget is "every month".
-        val legacy = encode(sample()).replace(Regex(""",\s*"(month|effectiveFrom)"\s*:\s*null"""), "").replace("\"schemaVersion\": 5", "\"schemaVersion\": 1")
+        val legacy = encode(sample()).replace(Regex(""",\s*"(month|effectiveFrom)"\s*:\s*null"""), "").let { asVersion(it, 1) }
         assertTrue(!legacy.contains("effectiveFrom"))
         val restored = BackupCodec.decode(legacy).snapshot.budgets.single()
         assertNull(restored.month)
@@ -103,7 +103,7 @@ class BackupTest {
         val legacy = encode(sample())
             .replace(Regex(""",\s*"(institutionId|fxBasisRate|kind|iconKey|spendable|spendableCreditMinor)"\s*:\s*null"""), "")
             .replace(Regex(""",\s*"fxRevalue"\s*:\s*false"""), "")
-            .replace("\"schemaVersion\": 5", "\"schemaVersion\": 1")
+            .let { asVersion(it, 1) }
         assertTrue(!legacy.contains("institutionId"))
         assertTrue(BackupCodec.decode(legacy).snapshot.wallets.all { it.institutionId == null })
         val store = MemoryBackupStore(BackupSnapshot())
@@ -134,7 +134,7 @@ class BackupTest {
         val legacy = encode(sample())
             .replace(Regex(""",\s*"(fxBasisRate|baseAmountMinor|baseCurrency|fxSource|kind|iconKey|spendable|spendableCreditMinor)"\s*:\s*null"""), "")
             .replace(Regex(""",\s*"fxRevalue"\s*:\s*false"""), "")
-            .replace("\"schemaVersion\": 5", "\"schemaVersion\": 3")
+            .let { asVersion(it, 3) }
         assertTrue(!legacy.contains("fxSource") && !legacy.contains("fxRevalue"))
         val restored = BackupCodec.decode(legacy).snapshot
         assertTrue(restored.wallets.all { it.fxBasisRate == null && !it.fxRevalue })
@@ -157,7 +157,7 @@ class BackupTest {
         assertEquals(5, decoded.dueDay)
         // A version 2 file has no billing keys on its debt rows: no limit, no cycle.
         val legacy = encode(sample()).replace(Regex(""",\s*"(creditLimitMinor|statementDay|dueDay)"\s*:\s*null"""), "")
-            .replace("\"schemaVersion\": 5", "\"schemaVersion\": 2")
+            .let { asVersion(it, 2) }
         assertTrue(!legacy.contains("statementDay"))
         val restored = BackupCodec.decode(legacy).snapshot.debtTerms.single()
         assertNull(restored.creditLimitMinor)
@@ -166,6 +166,39 @@ class BackupTest {
         val store = MemoryBackupStore(BackupSnapshot())
         assertEquals(BackupFailure.INVALID, failure(engine(store), store, encode(billed).replace("\"statementDay\": 15", "\"statementDay\": 32")))
         assertEquals(BackupFailure.INVALID, failure(engine(store), store, encode(billed).replace("\"creditLimitMinor\": 500000", "\"creditLimitMinor\": 0")))
+        assertEquals(0, store.writes)
+    }
+
+    @Test fun customisationsRoundTripAndOlderFilesKeepThePhonesOwn() = runTest {
+        // Backup v6 (tester feedback 2026-11-22): the colour theme and the other customisations that follow the account.
+        val customised = sample().let { s ->
+            s.copy(
+                settings = s.settings.copy(
+                    themeId = "grove", showCents = false, walletsView = "rows", moduleOffersHidden = true,
+                    fxRatesOnline = false,
+                ),
+            )
+        }
+        val json = encode(customised)
+        assertTrue(json.contains("\"themeId\": \"grove\""))
+        assertEquals(customised.settings, BackupCodec.decode(json).snapshot.settings)
+
+        // A version 5 file has none of them: they read as null, which a restore takes as "keep this phone's own".
+        val legacy = asVersion(json, 5)
+        assertFalse(legacy.contains("themeId"))
+        val restored = BackupCodec.decode(legacy).snapshot.settings
+        assertNull(restored.themeId)
+        assertNull(restored.showCents)
+        assertNull(restored.walletsView)
+        assertNull(restored.fxRatesOnline)
+        assertEquals("DARK", restored.themeMode)
+        assertEquals("Ada", restored.displayName)
+
+        // Malformed values, or a version 5 file that carries a version 6 key, change nothing.
+        val store = MemoryBackupStore(BackupSnapshot())
+        assertEquals(BackupFailure.INVALID, failure(engine(store), store, json.replace("\"grove\"", "\"Grove Theme\"")))
+        assertEquals(BackupFailure.INVALID, failure(engine(store), store, json.replace("\"showCents\": false", "\"showCents\": \"no\"")))
+        assertEquals(BackupFailure.INVALID, failure(engine(store), store, json.replace("\"schemaVersion\": 6", "\"schemaVersion\": 5")))
         assertEquals(0, store.writes)
     }
 
@@ -401,9 +434,9 @@ class BackupTest {
 
         assertEquals(BackupFailure.MALFORMED, failure(engine, store, "{"))
         assertEquals(BackupFailure.MALFORMED, failure(engine, store, valid.replace("\"amountMinor\": 450", "\"amountMinor\": 4.50")))
-        assertEquals(BackupFailure.UNSUPPORTED_VERSION, failure(engine, store, valid.replace("\"schemaVersion\": 5", "\"schemaVersion\": 99")))
+        assertEquals(BackupFailure.UNSUPPORTED_VERSION, failure(engine, store, valid.replace("\"schemaVersion\": 6", "\"schemaVersion\": 99")))
         assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replaceFirst("{", "{\"accessToken\":\"secret\",")))
-        assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replace("\"schemaVersion\": 5", "\"schemaVersion\": \"3\"")))
+        assertEquals(BackupFailure.INVALID, failure(engine, store, valid.replace("\"schemaVersion\": 6", "\"schemaVersion\": \"3\"")))
         assertEquals(sample(), store.snapshot)
         assertEquals(0, store.writes)
     }
@@ -490,6 +523,11 @@ class BackupTest {
 
     private fun encode(snapshot: BackupSnapshot): String =
         BackupCodec.encode(BackupDocument(1, "0.5.0", exportedAt, snapshot))
+
+    /** [json] as an older version wrote it: without the backup v6 settings keys, and with that version number. */
+    private fun asVersion(json: String, version: Int): String =
+        json.replace(Regex(""",\s*"(themeId|showCents|walletsView|moduleOffersHidden|fxRatesOnline|aiAnswers)"\s*:\s*(null|true|false|"[a-z0-9_]*")"""), "")
+            .replace("\"schemaVersion\": ${BackupCodec.SCHEMA_VERSION}", "\"schemaVersion\": $version")
 
     private inner class MemoryBackupStore(initial: BackupSnapshot) : BackupStore {
         var snapshot: BackupSnapshot = initial

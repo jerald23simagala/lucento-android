@@ -866,10 +866,10 @@ class OnboardingViewModel(
         savedState[KEY_CURRENCY] = code
     }
 
-    /** Applied immediately so the user sees the theme they pick. */
+    /** Applied immediately so the user sees the theme they pick (a setup choice, see previewThemeMode). */
     fun selectTheme(mode: ThemeMode) {
         savedState[KEY_THEME] = mode.name
-        viewModelScope.launch { preferences.setThemeMode(mode) }
+        viewModelScope.launch { preferences.previewThemeMode(mode) }
     }
 
     fun finish() {

@@ -165,8 +165,14 @@ data class BackupDeletion(
 )
 
 /**
- * Device preferences that belong in a backup. Crash reports, the one-time local-data notice, sync
- * cursors, account ids and sessions are not here.
+ * Preferences that belong in a backup. Crash reports, the one-time local-data notice, sync
+ * cursors, account ids and sessions are not here. Neither are online voice, Ask Lucento's AI answers, app lock, hiding
+ * Lucento in recent apps or hidden amounts: each phone decides those for itself. [smartReading] is carried, but a restore
+ * only ever turns it off (turning it on needs that phone's own consent).
+ *
+ * Backup version 6 (2026-11-22, with the settings that follow the account, docs/SYNC.md "Settings") adds the
+ * customisations from [themeId] on. Each is null when the phone had no value of its own (the default), and in every file
+ * from version 5 or older: a restore then leaves this phone's own.
  */
 data class BackupSettings(
     val onboardingComplete: Boolean = false,
@@ -179,6 +185,16 @@ data class BackupSettings(
     val defaultWalletId: String? = null,
     val guideStep: String? = null,
     val smartReading: Boolean = false,
+    /** The colour theme's key ("sunrise", "grove", …). */
+    val themeId: String? = null,
+    /** Settings › Money › Show cents. */
+    val showCents: Boolean? = null,
+    /** How the Wallets screen lists accounts: "rows" or "cards". */
+    val walletsView: String? = null,
+    /** Home's offers to turn on modules that are off were hidden. */
+    val moduleOffersHidden: Boolean? = null,
+    /** Exchange rates online (Settings › Money). */
+    val fxRatesOnline: Boolean? = null,
 )
 
 enum class RestoreMode { MERGE, REPLACE }

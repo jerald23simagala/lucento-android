@@ -333,7 +333,7 @@ class AppViewModel(
         viewModelScope.launch { preferences.setFeatureEnabled(feature, enabled) }
     }
 
-    /** Profile menu: the optional name shown on the avatar (stored only on this device). */
+    /** Profile menu: the optional name shown on the avatar (follows the account with cloud sync, docs/SYNC.md "Settings"). */
     fun setDisplayName(name: String) {
         viewModelScope.launch { preferences.setDisplayName(name) }
     }

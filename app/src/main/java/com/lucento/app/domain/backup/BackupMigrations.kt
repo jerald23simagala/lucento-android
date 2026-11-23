@@ -14,7 +14,7 @@ fun interface BackupMigrationStep {
 }
 
 object BackupMigrations {
-    const val CURRENT = 5
+    const val CURRENT = 6
 
     private val steps: Map<Int, BackupMigrationStep> = mapOf(
         0 to Migrate0To1,
@@ -22,6 +22,7 @@ object BackupMigrations {
         2 to Migrate2To3,
         3 to Migrate3To4,
         4 to Migrate4To5,
+        5 to Migrate5To6,
     )
 
     fun toCurrent(document: JsonValue.Obj): JsonValue.Obj {
@@ -44,6 +45,29 @@ object BackupMigrations {
             version = next
         }
         return current
+    }
+}
+
+/**
+ * Version 6 (2026-11-22, tester feedback: "restoring means setting up again") adds the customisations that follow the
+ * account to `settings`: `themeId`, `showCents`, `walletsView`, `moduleOffersHidden` and `fxRatesOnline`
+ * (docs/SYNC.md "Settings"). A version 5 file has none of them: they become null, which a restore reads as "keep this
+ * phone's own". The bump makes an older app refuse a version 6 file as "from a newer Lucento" instead of calling it invalid.
+ */
+private object Migrate5To6 : BackupMigrationStep {
+    private val added = listOf("themeId", "showCents", "walletsView", "moduleOffersHidden", "fxRatesOnline")
+
+    override fun migrate(document: JsonValue.Obj): JsonValue.Obj {
+        val fields = LinkedHashMap(document.fields)
+        val settings = fields["settings"] as? JsonValue.Obj
+            ?: throw BackupFormatException(BackupFailure.INVALID, "This file isn’t a valid Lucento backup. Nothing was changed.")
+        // A real version 5 file can't hold these keys.
+        if (added.any { it in settings.fields }) {
+            throw BackupFormatException(BackupFailure.INVALID, "This file isn’t a valid Lucento backup. Nothing was changed.")
+        }
+        fields["settings"] = JsonValue.Obj(LinkedHashMap(settings.fields).apply { added.forEach { put(it, JsonValue.Null) } })
+        fields["schemaVersion"] = JsonValue.Num("6")
+        return JsonValue.Obj(fields)
     }
 }
 

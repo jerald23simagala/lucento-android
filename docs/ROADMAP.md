@@ -89,7 +89,8 @@ Next: on-device learning from corrections (M5), optional opt-in remote interpret
 Done: Room v6 sync bookkeeping (emulator-tested migration), push/pull/merge engine with tombstones and
 last-write-wins, WorkManager scheduling, Settings → Cloud sync, Supabase schema + RLS applied and verified.
 Remaining: Google OAuth clients + Supabase Google provider (blocks real sign-in), an end-to-end two-device test,
-recurring-schedule sync, syncing preferences.
+recurring-schedule sync. Syncing preferences: built 2026-11-22 (settings follow the account, docs/SYNC.md "Settings";
+needs `20261122090000_user_settings.sql` on each project).
 
 ## In progress — dashboard refresh (`feature/dashboard-refresh`)
 - Home: working header (brand, sync status, disabled notifications placeholder, profile, month selector); Budget pace

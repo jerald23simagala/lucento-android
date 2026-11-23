@@ -31,6 +31,10 @@ Google accounts get no metadata, because their consent is given by continuing.
   anything is sent (owner decision; docs/ASK.md "Consent (v3)"); Read messages with Gemini stays off until turned on
   (Lucento Pro). The Terms say "Gemini for the AI features you use". The website's `legal.ts`, homepage privacy table
   and FAQ change in the same release (lucento-website PR #36).
+- Version 2026-11-22: cloud sync keeps the person's settings too (theme, features, name, default wallet and similar
+  choices; docs/SYNC.md "Settings"), and the policy says what stays on each phone (the consents and the app lock). Not a
+  new network path: the same opted-in sync. The website's `legal.ts` is regenerated and deployed with the release that
+  carries settings sync (NEXT_TASKS).
 
 ## Keeping the website in step
 

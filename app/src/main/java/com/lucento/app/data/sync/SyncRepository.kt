@@ -32,6 +32,7 @@ import kotlinx.serialization.json.longOrNull
 import java.util.UUID
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The whole optional cloud sync engine (see docs/SYNC.md). Room is always the local source of truth — nothing
@@ -52,6 +53,7 @@ import kotlinx.coroutines.withTimeout
  *    as a conflict instead of failing the sync.
  * 5. Save the new cursor only after all of that succeeded. Any failure leaves the cursor, every dirty flag and
  *    every local row exactly as they were, so the next cycle simply repeats the work.
+ * 6. Merge the person's settings with the account's ([settleAccountSettings]); this step never fails the cycle.
  *
  * Conflicts: [localEditWins] / [pullDecision]; the server applies the same rule on every write.
  */
@@ -95,6 +97,18 @@ class SyncRepository(
     private val planFingerprint: suspend () -> String = { "" },
     /** Called once when the server starts refusing uploads (the app re-reads the plan, so its own gate catches up). */
     private val onUploadsRefused: suspend () -> Unit = {},
+    /**
+     * Settings that follow the account (docs/SYNC.md "Settings"), merged after the records in every cycle. Null in tests
+     * that don't exercise them.
+     */
+    private val accountSettings: com.lucento.app.data.preferences.AccountSettingsStore? = null,
+    /**
+     * Whether the signed-in person's own plan lets their settings be saved. Their settings row is theirs, so a Partner, who
+     * syncs the Owner's records on the Owner's plan, needs their own (security audit F-01 gate on `user_settings`).
+     */
+    private val accountSettingsUploadAllowed: suspend () -> Boolean = { true },
+    /** Lucento Pro: theme keys this phone's plan may not pick; an account's choice of one isn't applied here. */
+    private val lockedThemes: suspend () -> Set<String> = { emptySet() },
 ) {
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
@@ -177,6 +191,17 @@ class SyncRepository(
             // that pull has finished, so a first sync that fails half-way pulls first again on the retry (P0-2).
             val initialPullDone = initialPullDone(owner, userId, env)
             val firstIntoExisting = !initialPullDone && remoteHasData(r, env)
+            // The settings here belong to this account from now on; a phone's first sync with it joins it (docs/SYNC.md
+            // "Settings"). Before anything is read, so no merge ever runs for the wrong account. Never fails the cycle.
+            accountSettings?.let { store ->
+                try {
+                    store.bindAccountSettings(userId, claiming = owner == null)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // The merge binds again before it runs.
+                }
+            }
             // Claimed before anything is pulled or pushed, and never moved later: a half-finished pull must still mark
             // this phone as the account's, so a different account signing in next is wiped first (AccountBoundary).
             if (owner == null) preferences.setSyncedUserId(userId)
@@ -232,6 +257,10 @@ class SyncRepository(
                 val again = Rejected()
                 report += upload { pushTombstones(r, env, again) + pushBudgets(r, env, again) }
             }
+            // The person's settings, after the records, so a default wallet that just arrived can be matched. Always the
+            // signed-in account's own row (a Partner's too), and it never fails the cycle.
+            // A full ledger (the row ceiling) doesn't hold settings back: user_settings has no ceiling.
+            report += settleAccountSettings(r, userId, partner, uploadsHeld = refusal == UploadRefusal.PLAN)
             preferences.setLastSyncedAtMillis(clock())
             preferences.addOverriddenChanges(report.overridden)
             val refused = refusal
@@ -297,6 +326,50 @@ class SyncRepository(
         } catch (e: Exception) {
             // Kept as before: values already on this phone stay in the currency they say they're in (base_currency).
         }
+    }
+
+    /**
+     * Settings that follow the account (docs/SYNC.md "Settings"): read the account's document, merge it into this phone's
+     * one setting at a time ([com.lucento.app.domain.settings.AccountSettingsMerge]), and save the result back on top of
+     * the revision that was read. When another phone saved in between, the database keeps its version and this one reads
+     * and merges again (up to [SETTINGS_ATTEMPTS] times, then the next cycle). A Partner's phone in someone else's Shared
+     * Space keeps to the person's own settings: the default wallet and the budget moment belong to the records it holds.
+     *
+     * Never fails the cycle: a project without the table (an older server), a refusal or a lost connection leaves the
+     * records synced and the settings waiting here. Each merge is one edit, so nothing is ever half-applied.
+     */
+    private suspend fun settleAccountSettings(r: SyncRemote, userId: String, partner: Boolean, uploadsHeld: Boolean): SyncReport {
+        val store = accountSettings ?: return SyncReport()
+        val allowed = if (partner) com.lucento.app.domain.settings.AccountSetting.PERSONAL else com.lucento.app.domain.settings.AccountSetting.entries.toSet()
+        var report = SyncReport()
+        try {
+            // Its own limit, well inside the cycle's, so a slow settings request never makes a finished sync look failed.
+            withTimeoutOrNull(SETTINGS_STEP_TIMEOUT_MILLIS) {
+                val locked = lockedThemes()
+                repeat(SETTINGS_ATTEMPTS) {
+                    val row = r.accountSettings(userId)
+                    val all = wallets.getAll()
+                    val uuidOf = all.associate { it.id to it.clientUuid }
+                    val idOf = all.mapNotNull { w -> w.clientUuid?.let { it to w.id } }.toMap()
+                    val merged = store.mergeAccountSettings(userId, row?.document, allowed, { uuidOf[it] }, { idOf[it] }, locked)
+                    report += SyncReport(overridden = merged.replaced, settingsTaken = merged.taken)
+                    val upload = merged.upload ?: return@withTimeoutOrNull
+                    // Uploads the plan refused this cycle wait, as the records' do; so does a person whose own plan has no cloud.
+                    if (uploadsHeld || !accountSettingsUploadAllowed()) return@withTimeoutOrNull
+                    if (r.saveAccountSettings(userId, upload.document, row?.revision)) {
+                        store.markAccountSettingsSent(upload)
+                        report += SyncReport(settingsSent = upload.sent.size + upload.seeded.size)
+                        return@withTimeoutOrNull
+                    }
+                    // Another phone saved first: read its version and merge again.
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Kept as it is: what changed here goes up in a later cycle.
+        }
+        return report
     }
 
     /**
@@ -1246,6 +1319,12 @@ class SyncRepository(
 
         /** How long refused uploads wait under an unchanged plan before one more attempt (security audit F-01). */
         const val UPLOAD_REFUSAL_COOLDOWN_MILLIS = 30 * 60_000L
+
+        /** Reads and merges of the settings document per cycle when other phones keep saving first. */
+        const val SETTINGS_ATTEMPTS = 3
+
+        /** The settings step's own limit (a few small requests; each one already times out after 30 s). */
+        const val SETTINGS_STEP_TIMEOUT_MILLIS = 60_000L
 
         /** What Settings and the sync sheet show while uploads are paused; never a technical code. */
         fun refusalMessage(reason: UploadRefusal): String = when (reason) {

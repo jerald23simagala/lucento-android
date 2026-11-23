@@ -60,6 +60,34 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Settings that follow the account — follow-ups (2026-11-22, `feature/sync-settings`)
+
+Tester feedback: sync restored the records but not the settings and customisations, "so restoring means setting up
+again". Built: settings sync (`public.user_settings`, docs/SYNC.md "Settings") and backup v6 (docs/BACKUP.md), which adds
+the colour theme and the other customisations the file lacked.
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| SS-1 | Apply `supabase/migrations/20261122090000_user_settings.sql` to **lucento-test** (owner: Mission Control › Tasks **OT-54**, created 2026-11-22) and **production** before the release that carries settings sync. The owner chose (2026-11-22) to have Claude apply production through the Supabase connector; that call was declined at the permission prompt, so production still lacks it (checked read-only: no table, no function). Either way: SQL editor, paste `begin;`, the whole file, `commit;`, Run, then the check below (every column `true`) | P0 for that release | Until then the settings step is skipped every cycle: records sync as before and settings wait on the phone; nothing is lost. Re-running the file is safe |
+| SS-2 | Regenerate the website's privacy text (`python tools/legal/export_legal.py ../lucento-website/src/data/legal.ts`) and deploy it with that release | P0 for that release | Policy version 2026-11-22: sync also keeps settings; consents and the app lock stay per phone (docs/LEGAL.md) |
+| SS-3 | Phone test on lucento-test after SS-1: customise phone A (theme, mode, modules, name, Show cents, Wallets view, default wallet) and sync; restore the account on phone B (all of them come back); change a setting on B and see it on A | P1 | JVM- and SQL-tested only (see CURRENT_STATUS) |
+| SS-4 | Release notes: "Your theme, features and other settings now come back when you restore, and stay the same on all your phones" | P2 | With the release. Also say backup files made by this version can't be restored on older versions |
+| SS-5 | Owner, Play Console › Policy › App content › Data safety: add **App functionality** to Personal info › Name (the display name now syncs with the settings), as `docs/play/PLAY_STORE_SUBMISSION.md` §3.2 now reads | P0 for that release | The policy text says it (version 2026-11-22); the form must too |
+| SS-6 | Device QA, beyond SS-3: two phones that already synced, set up differently, both updated (neither restyles the other; a change made since reaches both); sign out and sign in as a different account (nothing of the first account arrives); sign out and back in to the same account with a change waiting (it goes up); Replace restore with sync on (the other phone matches the file); a Partner's phone (personal settings only) | P1 | The QA and architecture reviews' regression list (2026-11-22) |
+
+SS-1 check (read-only):
+
+```sql
+select to_regclass('public.user_settings') is not null as table_exists,
+  (select relrowsecurity from pg_class where oid = to_regclass('public.user_settings')) as rls_on,
+  (select count(*) = 3 from pg_policies where schemaname = 'public' and tablename = 'user_settings') as three_policies,
+  has_table_privilege('authenticated', 'public.user_settings', 'select, insert, update') as signed_in_can_sync,
+  not has_table_privilege('authenticated', 'public.user_settings', 'delete') as no_deletes,
+  not has_table_privilege('anon', 'public.user_settings', 'select') as anon_none,
+  exists (select 1 from pg_trigger where tgname = 'trg_user_settings_write') as write_rule_on;
+```
+
+
 ## Regional prices — follow-ups (2026-11-21, `feature/regional-pricing`)
 
 | # | Task | Priority | Notes |

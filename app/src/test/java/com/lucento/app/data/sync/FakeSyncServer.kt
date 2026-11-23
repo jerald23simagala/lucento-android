@@ -48,6 +48,21 @@ class FakeSyncServer(var serverNow: Long = 1_000_000_000_000L) {
     /** Rows one account may store per table (the LU001 ceiling); null: no ceiling. */
     var rowCeiling: Int? = null
 
+    /**
+     * Settings that follow the account (20261122090000_user_settings.sql): account -> (document, revision). Only the
+     * account itself reads or writes its row (a Partner's are their own); a save is kept only on top of the stored
+     * revision, or as the first one (compare-and-set); a save needs the account's own CLOUD under [cloud].
+     * [noUserSettings]: a project without the migration, where every request fails.
+     */
+    val settingsRows = mutableMapOf<String, Pair<JsonObject, Long>>()
+    var noUserSettings = false
+
+    /** Every settings document saved (accepted or not), for tests that check what a phone sent. */
+    val settingsSaves = mutableListOf<JsonObject>()
+
+    /** Runs once before the next settings save, e.g. so another phone saves first. */
+    var beforeSettingsSave: (() -> Unit)? = null
+
     private fun gate(table: String, account: String, env: String, newRows: Int) {
         val holders = cloud
         if (holders != null) {
@@ -187,6 +202,32 @@ class FakeSyncServer(var serverNow: Long = 1_000_000_000_000L) {
             if (noLedgerSettings) error("relation \"public.ledger_settings\" does not exist")
             require(ledgerUserId == userId) { "new row violates row-level security policy" }
             mainCurrencies.putIfAbsent(ledgerUserId, code)
+        }
+
+        override suspend fun accountSettings(userId: String): SyncRemote.AccountSettingsRow? {
+            if (noUserSettings) error("Could not find the table 'public.user_settings' in the schema cache")
+            // Row-level security: an account sees only its own row.
+            if (userId != currentAccount()) return null
+            return settingsRows[userId]?.let { (document, revision) -> SyncRemote.AccountSettingsRow(document, revision) }
+        }
+
+        override suspend fun saveAccountSettings(userId: String, document: JsonObject, baseRevision: Long?): Boolean {
+            if (noUserSettings) error("Could not find the table 'public.user_settings' in the schema cache")
+            val account = currentAccount()
+            require(userId == account) { "new row violates row-level security policy for table \"user_settings\"" }
+            cloud?.let { holders -> if (account !in holders) throw UploadRefusedException(UploadRefusal.PLAN) }
+            beforeSettingsSave?.let {
+                beforeSettingsSave = null
+                it()
+            }
+            settingsSaves += document
+            val stored = settingsRows[userId]
+            return when {
+                stored == null -> true.also { settingsRows[userId] = document to 1L }
+                baseRevision == stored.second -> true.also { settingsRows[userId] = document to stored.second + 1 }
+                // lucento_user_settings_write: not on top of the stored revision, so skipped (no row back).
+                else -> false
+            }
         }
 
         private fun currentAccount(): String = userId!!

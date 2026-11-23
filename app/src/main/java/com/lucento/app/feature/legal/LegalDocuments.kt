@@ -9,8 +9,8 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-17"
-    const val UPDATED = "17 November 2026"
+    const val VERSION = "2026-11-22"
+    const val UPDATED = "22 November 2026"
 
     /**
      * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit
@@ -192,6 +192,10 @@ object LegalDocuments {
                 listOf(
                     "With sync on, a copy of your records is kept in Lucento’s cloud database (Supabase), so they’re backed " +
                         "up and the same on every phone you sign in to.",
+                    "Your settings are kept there too — your theme, the features you use, your name, your default wallet " +
+                        "and similar choices — so a new phone starts the way you left the old one. What you allowed on a " +
+                        "phone, like crash reports, online voice, AI answers or reading messages with Gemini, and your app " +
+                        "lock stay on that phone.",
                     "Database rules let only your signed-in account — and people you share with through Lucento Shared — " +
                         "read or change your records.",
                     "Signing out removes your account’s data from that phone; the cloud copy stays for when you sign in " +
