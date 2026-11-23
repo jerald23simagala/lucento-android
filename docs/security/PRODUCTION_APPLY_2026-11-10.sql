@@ -3,7 +3,7 @@
 -- All four migrations run in ONE transaction: if any statement fails, nothing changes. Then tell Claude "applied" and it
 -- runs the read-only checks of §14.
 -- Already done before this file (2026-11-10, owner decision): 12-month GRANT rows for jerald23simagala@gmail.com and
--- rachelretas20@gmail.com, so both keep syncing under the Cloud write gate.
+-- a tester's account, so both keep syncing under the Cloud write gate.
 begin;
 
 -- ==================================================================================== 20261111090000_cloud_write_gate_and_quotas.sql

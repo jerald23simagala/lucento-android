@@ -139,5 +139,7 @@ JDK 17, compileSdk and targetSdk 36, minSdk 26 (Android 8.0+). Application ID `c
 See [CLAUDE.md](CLAUDE.md) for architecture, money rules and engineering standards.
 
 ## Licenses
+Lucento's own code, designs and animations: © 2026 Jerald Simagala, all rights reserved; see [LICENSE](LICENSE).
+
 Plus Jakarta Sans © The Plus Jakarta Sans Project Authors, SIL Open Font License 1.1 — see `docs/licenses/PlusJakartaSans-OFL.txt`.
 Airbnb Lottie, Apache License 2.0. All animation files are original to Lucento (`docs/design/ANIMATION_ASSETS.md`).
