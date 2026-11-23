@@ -32,7 +32,7 @@ same way. Smarter reading (Gemini) never reads scans.
 
 | Input | How | Notes |
 |---|---|---|
-| **Scan pages** | ML Kit Document Scanner (`play-services-mlkit-document-scanner`), up to 10 pages, gallery import allowed | Flattens, straightens and cleans paper. Runs in Google Play services, on the device; downloaded once by Play services. Needs ≥ 1.7 GB RAM and Play services; otherwise the camera opens instead. No camera permission. Its JPEGs land in Lucento's cache and are deleted once read. |
+| **Scan pages** | ML Kit Document Scanner (`play-services-mlkit-document-scanner`), up to 10 pages, gallery import allowed | Flattens, straightens and cleans paper. Runs in Google Play services, on the device; downloaded once by Play services. Needs ≥ 1.7 GB RAM and Play services; otherwise the camera opens instead. No camera permission. Its JPEGs land in Lucento's cache and are deleted once read. Its screen is locked to portrait, so the manifest declares `android.hardware.screen.portrait` not required (without it Play drops landscape-only devices; KNOWN_ISSUES SC-10). |
 | **Take a photo** | System camera (`TakePicture`) | The fallback; the photo is deleted once read. |
 | **Choose images** | Photo picker, up to 10 | Read as pages of one scan. Picked images are the person's own files and are not deleted. |
 | **Import a PDF** | `OpenDocument("application/pdf")`, up to 20 pages | Read where it is, never copied. Android 15+ (and 12–14 with SDK extension 13): each page's text layer with positions; locked PDFs ask for the password, used once, never stored. Older phones and scanned PDFs: each page drawn at ~2,400 px and read by OCR; locked PDFs can't be opened and the person is told how to save an unlocked copy. |
