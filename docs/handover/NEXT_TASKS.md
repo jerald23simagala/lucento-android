@@ -68,7 +68,7 @@ Control › Tasks.
 
 ## Monthly check-in, Progress, Follow Lucento — follow-ups (2026-11-23, `feature/month-close`)
 
-- **MCI-N1 Phone test at a real turn of the month** (from the 28th to the 7th), with a budget at least two weeks old:
+- **MCI-N1 Phone test at a real turn of the month** (owner, on 0.5.17: Mission Control **OT-59**, 28 Nov – 7 Dec) (from the 28th to the 7th), with a budget at least two weeks old:
   the card appears; Plan December → the plan page → Done hides it and says "December is planned"; See November opens
   Progress on November; Not this month hides it, and on a second phone after a sync; a Partner's phone gets only the
   recap; the Budget tab steps into next month and back.
@@ -78,7 +78,7 @@ Control › Tasks.
   step; older builds refuse newer files). Until then "Not this month" is the way.
 - **MCI-N4 Labels for one-off amounts** ("Mia's birthday"): a new table, never new columns on `budgets` (the same rule as
   custom budget periods below).
-- **MCI-N5 Owner: the Facebook Page's username** `lucentoapp`; then update `LucentoLinks.FOLLOW` and lucento-website
+- **MCI-N5 Owner: the Facebook Page's username** `lucentoapp` (Mission Control **OT-60**); then update `LucentoLinks.FOLLOW` and lucento-website
   `src/data/site.ts` together (both use `profile.php?id=61596187720039` until then, which keeps working).
 - **MCI-N6 Custom budget periods** (below): the check-in then follows the period's start rather than the 1st.
 
