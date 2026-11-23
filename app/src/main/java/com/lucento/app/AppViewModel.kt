@@ -344,6 +344,10 @@ class AppViewModel(
 
     fun setThemeId(theme: ThemeId) {
         if (theme in lockedThemes.value) return // the picker shows why; nothing is persisted
+        // [lockedThemes] is worked out when the plan changes: a plan that ends while Lucento stays open is caught here,
+        // at the tap (Pro-gate review 2026-11-23, PE-3).
+        val plan = entitlements?.value
+        if (plan != null && !com.lucento.app.domain.entitlement.ProGates.themeAllowed(theme.name, plan, System.currentTimeMillis())) return
         viewModelScope.launch { preferences.setThemeId(theme) }
     }
 

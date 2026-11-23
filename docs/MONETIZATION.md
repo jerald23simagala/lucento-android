@@ -242,7 +242,7 @@ bait-and-switch in onboarding.
 | Feature | Status | F | S | L | L+C | Offline | Gate |
 |---|---|---|---|---|---|---|---|
 | Everything stored on the phone (Room), no account needed | Shipped | ✔ | ✔ | ✔ | ✔ | Yes | none |
-| JSON backup file and restore (merge or replace) | Shipped | ✔ | ✔ | ✔ | ✔ | Yes | none — portability is never sold |
+| JSON backup file and restore (merge or replace) | Shipped | ✔ | ✔ | ✔ | ✔ | Yes | none — portability is never sold. A file's records aren't counted against the Free limits, hand-edited files included (owner decision 2026-11-23, KNOWN_ISSUES LP-K16) |
 | CSV export | Shipped | ✔ (D-9: recommended **yes**) | ✔ | ✔ | ✔ | Yes | none |
 | Sign in (Google or email) | Shipped | ✔ | ✔ | ✔ | ✔ | Needs internet once | none — identity for the free AI allowance, Shared invitations, entitlement recovery |
 | **Cloud sync** across phones, upload after every write | Shipped | — | ✔ | **first 12 months**, then — | ✔ | No (service) | `SyncPreferences.setEnabled(true)` and `backgroundSyncAllowed(enabled, onboarded, entitled)` |
@@ -643,7 +643,10 @@ Cloud until 6 Nov 2027" · "Pro Lifetime · Cloud ended" · "Courtesy access unt
 2. Only **creation** (and un-archive, and type/currency changes into a gated kind) is refused, with the count and the
    way out shown.
 3. Insights 6 / 12 months and composition become locked previews; the 3-month view keeps working.
-4. Themes: a locked theme already selected stays until the person changes it; the picker shows it as Pro.
+4. Themes: a locked theme already selected stays until the person changes it; the picker shows it as Pro. The rule is
+   per phone: when a different account signs in, a Pro theme the phone already shows stays too (owner decision
+   2026-11-23, KNOWN_ISSUES LP-K18). The picker checks the plan at the tap, so a plan that ends while Lucento is open
+   unlocks nothing, and settings sync and a Replace restore apply a Pro theme only where this phone's plan allows it.
 5. PDF: the on-screen statement stays; Save / Share show the lock.
 6. Data paths stay alive: foreign wallets keep quoting and translating, FX results keep showing, AI consent stays stored.
 7. The person is told **once**, on the first start after the change, which things are now restricted — one sheet,

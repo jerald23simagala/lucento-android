@@ -96,6 +96,7 @@ class UserPreferencesRepositoryTest {
         repository.applyBackupSettings(
             BackupSettings(onboardingComplete = true, themeMode = "SYSTEM", primaryCurrency = "USD", enabledFeatures = Feature.entries.map { it.key }),
             defaultWalletLocalId = null,
+            themeAllowed = { true },
         )
         assertFalse(waiting())
         repository.clearDefaultWalletAfterMerge(defaultWalletLocalId = null)
@@ -146,6 +147,7 @@ class UserPreferencesRepositoryTest {
             com.lucento.app.domain.settings.AccountSetting.entries.toSet(),
             walletUuid = { null },
             walletId = { null },
+            lockedThemes = emptySet(),
         )
         repository.completeRestore("PHP", ThemeMode.SYSTEM, Feature.entries.toSet(), categoriesChosen = true)
         val p = repository.preferences.first()

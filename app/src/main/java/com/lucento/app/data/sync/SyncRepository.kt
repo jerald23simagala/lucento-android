@@ -105,10 +105,16 @@ class SyncRepository(
     /**
      * Whether the signed-in person's own plan lets their settings be saved. Their settings row is theirs, so a Partner, who
      * syncs the Owner's records on the Owner's plan, needs their own (security audit F-01 gate on `user_settings`).
+     * Left out, nothing is saved: the plan checks deny unless given (Pro-gate review 2026-11-23, F1).
      */
-    private val accountSettingsUploadAllowed: suspend () -> Boolean = { true },
-    /** Lucento Pro: theme keys this phone's plan may not pick; an account's choice of one isn't applied here. */
-    private val lockedThemes: suspend () -> Set<String> = { emptySet() },
+    private val accountSettingsUploadAllowed: suspend () -> Boolean = { false },
+    /**
+     * Lucento Pro: theme keys this phone's plan may not pick; an account's choice of one isn't applied here. Left out,
+     * every Pro theme is locked.
+     */
+    private val lockedThemes: suspend () -> Set<String> = {
+        com.lucento.app.data.preferences.ThemeId.keysOf(com.lucento.app.domain.entitlement.ProGates.PRO_THEME_IDS)
+    },
 ) {
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()

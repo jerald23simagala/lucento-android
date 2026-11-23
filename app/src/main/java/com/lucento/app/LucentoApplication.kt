@@ -448,18 +448,22 @@ class AppContainer(application: Application) {
             // Settings that follow the account (docs/SYNC.md "Settings"). The row is the person's own, so it is saved on
             // their own plan, even on a Partner's phone (which syncs the records on the Owner's).
             accountSettings = preferences,
-            accountSettingsUploadAllowed = {
-                entitlements.loadCached()
-                com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(
-                    entitlements.state.value, partnerOfSpace = false, now = System.currentTimeMillis(),
-                )
-            },
+            accountSettingsUploadAllowed = { accountSettingsUploadAllowed() },
             // MONETIZATION §3.8: an account's Pro theme isn't applied on a phone whose plan can't pick it.
             lockedThemes = {
                 entitlements.loadCached()
-                val locked = com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(entitlements.state.value, System.currentTimeMillis())
-                com.lucento.app.data.preferences.ThemeId.entries.filter { it.name in locked }.map { it.key }.toSet()
+                com.lucento.app.data.preferences.ThemeId.keysOf(
+                    com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(entitlements.state.value, System.currentTimeMillis()),
+                )
             },
+        )
+    }
+
+    /** Whether the signed-in person's own plan lets their settings be saved: a Partner's phone too needs their own cloud. */
+    private suspend fun accountSettingsUploadAllowed(): Boolean {
+        entitlements.loadCached()
+        return com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(
+            entitlements.state.value, partnerOfSpace = false, now = System.currentTimeMillis(),
         )
     }
 
@@ -472,9 +476,14 @@ class AppContainer(application: Application) {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             allowed = { backgroundSyncAllowed(syncPreferences.isEnabled(), onboardingComplete(), planAllowsSync()) },
             upToDate = {
-                val last = syncPreferences.lastSyncedAtMillis()
-                last != null && System.currentTimeMillis() - last < com.lucento.app.data.sync.ForegroundSync.FRESH_MILLIS &&
-                    syncRepository.pendingChangeCount() == 0 && !preferences.accountSettingsWaiting()
+                val settingsWaiting = preferences.accountSettingsWaiting()
+                com.lucento.app.data.sync.ForegroundSync.isUpToDate(
+                    lastSyncedAt = syncPreferences.lastSyncedAtMillis(),
+                    now = System.currentTimeMillis(),
+                    pendingChanges = syncRepository.pendingChangeCount(),
+                    settingsWaiting = settingsWaiting,
+                    settingsCanUpload = settingsWaiting && accountSettingsUploadAllowed(),
+                )
             },
             sync = { syncRepository.sync() },
         )

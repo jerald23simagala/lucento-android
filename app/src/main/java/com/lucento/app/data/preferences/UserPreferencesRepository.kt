@@ -56,6 +56,9 @@ enum class ThemeId(val key: String) {
     companion object {
         /** Unknown or missing values (a newer build's theme, a damaged file) fall back to Sunrise, the brand theme. */
         fun fromKey(key: String?): ThemeId = entries.firstOrNull { it.key == key } ?: SUNRISE
+
+        /** The stored keys of the themes named in [ids] (ProGates names themes by their enum name). */
+        fun keysOf(ids: Set<String>): Set<String> = entries.filter { it.name in ids }.mapTo(mutableSetOf()) { it.key }
     }
 }
 
@@ -734,11 +737,12 @@ class UserPreferencesRepository internal constructor(
      * local-data notice and this phone's consents stay as they are. A Lucento Pro theme is applied only where the plan
      * allows it ([themeAllowed], asked first), so a file can't unlock one. A restore is the person's change: what it
      * changes on this phone follows the account (docs/SYNC.md "Settings"); what it leaves as it was doesn't.
+     * [themeAllowed] has no default, so no caller can leave the plan out (Pro-gate review 2026-11-23, F1).
      */
     suspend fun applyBackupSettings(
         settings: BackupSettings,
         defaultWalletLocalId: Long?,
-        themeAllowed: suspend (ThemeId) -> Boolean = { true },
+        themeAllowed: suspend (ThemeId) -> Boolean,
     ) {
         require(CurrencyRules.isSupported(settings.primaryCurrency))
         val theme = settings.themeId?.let { key -> ThemeId.entries.firstOrNull { it.key == key } }?.takeIf { themeAllowed(it) }
@@ -908,7 +912,7 @@ class UserPreferencesRepository internal constructor(
             setting: AccountSetting,
             value: JsonElement,
             walletId: (String) -> Long?,
-            lockedThemes: Set<String> = emptySet(),
+            lockedThemes: Set<String>,
         ): Boolean {
             if (!setting.accepts(value)) return false
             val text = (value as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -990,7 +994,10 @@ class UserPreferencesRepository internal constructor(
             forgetSettingsSync(p, AccountSetting.entries.filter { it.ledger })
         }
 
-        /** [UserPreferencesRepository.mergeAccountSettings] on [p], so the merge can be tested without a DataStore. */
+        /**
+         * [UserPreferencesRepository.mergeAccountSettings] on [p], so the merge can be tested without a DataStore.
+         * [lockedThemes] has no default, so no caller can leave the plan out (Pro-gate review 2026-11-23, F1).
+         */
         internal fun mergeAccountSettingsInto(
             p: MutablePreferences,
             account: String,
@@ -998,7 +1005,7 @@ class UserPreferencesRepository internal constructor(
             settings: Set<AccountSetting>,
             walletUuid: (Long) -> String?,
             walletId: (String) -> Long?,
-            lockedThemes: Set<String> = emptySet(),
+            lockedThemes: Set<String>,
         ): AccountSettingsMerge.Result {
             // Normally bound at the start of the cycle; settings set aside at a sign-out are never merged unbound.
             if (p[Keys.accountSettingsAccount] != account) bindAccountSettingsInto(p, account, claiming = false)
@@ -1022,11 +1029,15 @@ class UserPreferencesRepository internal constructor(
                     if (decision !is AccountSettingsMerge.Decision.Take) continue
                     val before = rawAccountSettingValue(p, setting) { id -> JsonPrimitive(id) }
                     applyAccountSetting(p, setting, entry.value, walletId, lockedThemes)
-                    if (rawAccountSettingValue(p, setting) { id -> JsonPrimitive(id) } != before) taken++
+                    val changed = rawAccountSettingValue(p, setting) { id -> JsonPrimitive(id) } != before
+                    if (changed) taken++
+                    // The account's entry counts as seen even when this phone can't use it (a Pro theme its plan doesn't
+                    // allow): an older change here never goes up over it, and a later purchase applies it.
                     p[Keys.settingAt(setting)] = entry.at
                     dirty -= setting.key
                     inherited -= setting.key
-                    if (decision.replacesLocalChange) replaced++
+                    // "Changed on another device" only when this phone's change really gave way (Pro-gate review F2).
+                    if (decision.replacesLocalChange && changed) replaced++
                 }
             }
             if (dirty.isEmpty()) p.remove(Keys.accountSettingsDirty) else p[Keys.accountSettingsDirty] = dirty
@@ -1093,7 +1104,8 @@ class UserPreferencesRepository internal constructor(
             p[Keys.primaryCurrency] = primaryCurrency
             val inherited = p[Keys.accountSettingsInherited].orEmpty()
             AccountSetting.entries.filter { it.key in inherited }.forEach { setting ->
-                applyAccountSetting(p, setting, JsonNull, walletId = { null })
+                // Back to the default, which is never a Pro theme.
+                applyAccountSetting(p, setting, JsonNull, walletId = { null }, lockedThemes = emptySet())
                 p.remove(Keys.settingAt(setting))
             }
             forgetSettingsSync(p, AccountSetting.entries.filter { it.key in inherited })

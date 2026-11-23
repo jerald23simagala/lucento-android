@@ -484,8 +484,7 @@ class SettingsViewModel(
     private suspend fun enableSyncAndRun() {
         // Lucento Pro: the account stays connected (free AI allowance, Shared invitations); only the upload waits for a plan.
         if (!planAllowsSyncNow()) {
-            val plan = entitlements?.value?.displayPlan(System.currentTimeMillis()) ?: com.lucento.app.domain.entitlement.DisplayPlan.FREE
-            syncMessage.value = com.lucento.app.feature.pro.ProCopy.syncLockedNote(paused = false, plan = plan)
+            syncMessage.value = syncLockedNote(paused = false)
             return
         }
         syncPreferences.setEnabled(true)
@@ -496,6 +495,11 @@ class SettingsViewModel(
     private suspend fun planAllowsSyncNow(): Boolean {
         val plan = entitlements?.value ?: return true
         return com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, partnerOfSpace.first(), System.currentTimeMillis())
+    }
+
+    private fun syncLockedNote(paused: Boolean): String {
+        val plan = entitlements?.value?.displayPlan(System.currentTimeMillis()) ?: com.lucento.app.domain.entitlement.DisplayPlan.FREE
+        return com.lucento.app.feature.pro.ProCopy.syncLockedNote(paused = paused, plan = plan)
     }
 
     /** Email accounts only. Length and the breach check run before the password is sent. */
@@ -519,7 +523,11 @@ class SettingsViewModel(
             syncing.value = true
             // Never synced from this phone (for example, the merge question was left unanswered): ask the same first-sync
             // question as at sign-in, so "Sync now" can't upload this phone's records into an account without consent.
-            if (syncPreferences.syncedUserId() == null && auth.currentUserId() != null) firstSyncCheck() else runSyncNow()
+            when (syncNowStep(planAllowsSyncNow(), syncPreferences.syncedUserId() == null, auth.currentUserId() != null)) {
+                SyncNowStep.PLAN_LOCKED -> syncMessage.value = syncLockedNote(paused = syncPreferences.isEnabled())
+                SyncNowStep.FIRST_SYNC_CHECK -> firstSyncCheck()
+                SyncNowStep.SYNC -> runSyncNow()
+            }
             syncing.value = false
         }
     }
