@@ -9,7 +9,7 @@ These steps need your consoles, your production projects or a real payment, so t
 > tier at launch, disclosed in the policy and every AI consent (accepted risk; paid tier once there is a user base) ·
 > §2 Confirm email is ON (owner, and the catalog shows every account confirmed after sign-up, none auto-confirmed) ·
 > §6 production stays on Supabase Free for now · §8 test purchases allowed during internal testing · §13 approved: grants
-> added for jerald23simagala@gmail.com and rachelretas20@gmail.com (12 months, done 2026-11-10); the migrations are
+> added for jerald23simagala@gmail.com and a tester's account (12 months, done 2026-11-10); the migrations are
 > applied by pasting `docs/security/PRODUCTION_APPLY_2026-11-10.sql` (the MCP calls were declined twice).
 >
 > **Update 2026-11-15 (owner):** §1 moves from "once there is a user base" to **one of the last steps before the
