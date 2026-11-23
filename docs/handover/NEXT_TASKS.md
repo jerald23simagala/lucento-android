@@ -65,14 +65,15 @@
 - **Done 2026-11-23 (owner: "Switch now"):** Vercel production `GEMINI_MODEL=gemini-3.5-flash-lite`, redeployed
   (`dpl_4Z9YaRLsUJ9j9q3CcKePrz49Ujd2`, serving www.lucentoapp.com); `/api/ask` and `/api/interpret` answer
   `401 sign_in_required` without a token, as before.
-- **Owner:** apply `supabase/migrations/20261123120000_ai_allowance_monthly.sql` to production and `lucento-test`
-  together with merging the website wording (lucento-website `copy/ai-allowance-monthly`), then release the app build
-  that carries this branch (KNOWN_ISSUES AI-5).
-- **Proposed, not built:** on-device categories for typed and spoken messages from the merchant dictionaries and the
+- **Owner (OT-61 in Mission Control, owner chose "Now"):** paste `supabase/migrations/20261123120000_ai_allowance_monthly.sql`
+  into production and `lucento-test`. Claude's Supabase connection reads but can't write (`execute_sql` was declined).
+  The website wording is live: lucento-website #43 merged as `e5b7441` and deployed 2026-11-23. Then release the app
+  build that carries this branch (0.5.18; KNOWN_ISSUES AI-5).
+- **Next (owner: "Yes, build it next"):** on-device categories for typed and spoken messages from the merchant dictionaries and the
   person's own habits (today only scans use `MerchantDirectory` / `MerchantMemory`). Measured on the Gemini test's notes:
   the on-device reader got 31/45 on Taglish and 35/45 in English with every amount right; 7 of the 14 Taglish misses
   were categories left to choose. Gemini 3.5 Flash-Lite got 42/45.
-- **Owner call:** keep or drop the Pro welcome deck's Smarter reading card (KNOWN_ISSUES AI-6).
+- **Decided:** the Pro welcome deck no longer deals the Smarter reading card (owner, 2026-11-23; KNOWN_ISSUES AI-6).
 
 ## Security and anti-tampering plan (2026-11-23)
 

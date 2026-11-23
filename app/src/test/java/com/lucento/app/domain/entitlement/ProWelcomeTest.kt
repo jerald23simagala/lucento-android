@@ -113,16 +113,17 @@ class ProWelcomeTest {
         manages: Boolean = true,
     ) = ProTourContext(capabilities, wallets, goals, insights, manages)
 
-    @Test fun the_full_deck_has_ten_cards_in_five_chapters() {
+    @Test fun the_full_deck_has_nine_cards_in_five_chapters() {
+        // Owner, 2026-11-23: Gemini is for Ask Lucento, so the deck no longer deals the Smarter reading card.
         val stops = ProWelcome.stops(context())
-        assertEquals(ProTourStop.entries.toList(), stops)
+        assertEquals(ProTourStop.entries.filter { it != ProTourStop.SMART_READING }, stops)
         assertEquals(ProTourChapter.entries.toList(), stops.map { it.chapter }.distinct())
     }
 
     @Test fun stops_follow_the_modules_switched_on() {
         val stops = ProWelcome.stops(context(goals = false, insights = false))
         assertEquals(
-            listOf(ProTourStop.WALLETS, ProTourStop.NET_WORTH, ProTourStop.SMART_READING, ProTourStop.SYNC, ProTourStop.SHARED, ProTourStop.THEMES),
+            listOf(ProTourStop.WALLETS, ProTourStop.NET_WORTH, ProTourStop.SYNC, ProTourStop.SHARED, ProTourStop.THEMES),
             stops,
         )
     }
@@ -132,7 +133,7 @@ class ProWelcomeTest {
         val stops = ProWelcome.stops(context().copy(hasWallets = false))
         assertTrue(ProTourStop.WALLETS in stops)
         assertTrue(ProTourStop.NET_WORTH in stops)
-        assertTrue(ProTourStop.SMART_READING in stops)
+        assertTrue(ProTourStop.SMART_READING !in stops)
     }
 
     @Test fun a_partner_is_not_shown_adding_wallets() {

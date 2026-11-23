@@ -140,7 +140,7 @@ Tasks.
 | Id | Issue | Evidence | Next step |
 |---|---|---|---|
 | AI-5 | Builds before this change (0.5.17 and older) still say "50 AI questions a day" and call Pro's count "N left today" until they are updated; the server's monthly limit (Free 5, Pro 45) applies to them as soon as `20261123120000_ai_allowance_monthly.sql` runs | Code-only | Release the next build soon after the migration (testers only before launch) |
-| AI-6 | The Pro welcome deck still has its Smarter reading card (now saying each message uses one of your AI questions). With Gemini for Ask only, the owner may prefer to drop the card | Code-only | Owner call |
+| AI-6 | **Decided 2026-11-23** (owner: "Remove the card"): the Pro welcome deck no longer deals the Smarter reading card. `ProWelcome.stops` leaves it out; the enum value, copy and art stay, so progress saved on phones still reads and the card can come back | Verified: `ProWelcomeTest` | — |
 | AI-7 | Smarter reading is turned off for everyone without a message (the consent's key moved to `smart_reading_v2`); someone who used it finds messages read on the phone until they turn it on again in Settings | Verified: `SmartReadingConsentTest` (by design, owner: "We turn off Smarter Reading") | Say so in the release notes |
 
 ## Play Console edge-to-edge warnings on 0.5.10 (2026-11-16, `fix/edge-to-edge-deprecated-apis`)

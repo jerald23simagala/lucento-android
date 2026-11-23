@@ -64,8 +64,8 @@ object ProWelcome {
                 add(ProTourStop.WALLETS)
                 add(ProTourStop.NET_WORTH)
             }
-            // Gemini reads what is typed or said in the composer: it needs a Lucento account (a build with sync).
-            if (Capability.AI_PRO in context.capabilities && context.syncAvailable) add(ProTourStop.SMART_READING)
+            // No Smarter reading card (owner, 2026-11-23: "Gemini is generally for Ask use and not for simple add
+            // transaction work"). It stays a Pro opt-in in Settings, with its caveat; the AI answers card stays.
             if (local && context.goalsEnabled) add(ProTourStop.GOALS)
             if (local && context.insightsEnabled) {
                 add(ProTourStop.INSIGHTS_PERIODS)
@@ -150,7 +150,11 @@ enum class ProTourStop(val chapter: ProTourChapter) {
     /** Wallets › net worth: money owed to you, things you own, other currencies. */
     NET_WORTH(ProTourChapter.YOUR_MONEY),
 
-    /** The composer (the + button): Smarter reading, Gemini reading what is typed or said (still the person's choice). */
+    /**
+     * The composer (the + button): Smarter reading, Gemini reading what is typed or said (still the person's choice).
+     * Not dealt since 2026-11-23 ([ProWelcome.stops]; owner: Gemini is for Ask Lucento). Kept, with its copy and art, so
+     * progress saved on phones stays readable and the card can come back.
+     */
     SMART_READING(ProTourChapter.YOUR_MONEY),
 
     /** Goals › Add: up to 20 active goals. */

@@ -682,7 +682,7 @@ only after a committed write: never for a pending payment, a renewal, or a trial
 `domain/entitlement/ProWelcome.kt` (JVM-tested); screens: `feature/pro/welcome/`.
 
 1. **The deck.** The owner chose "Deck, unwrapped" on 2026-11-12, after the spotlight tour's buttons failed on real
-   phones (KNOWN_ISSUES PW-1). It shows up to ten cards in five chapters, one per thing Pro opened, held in a gold band
+   phones (KNOWN_ISSUES PW-1). It shows up to nine cards in five chapters (ten until 2026-11-23, when the owner dropped Smarter reading's card: Gemini is for Ask Lucento), one per thing Pro opened, held in a gold band
    with the Lucento symbol.
    - "Open your Pro deck" slides the band off and turns the first card, with the welcome's only burst. After that it's
      one card at a time:
