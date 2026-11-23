@@ -1,0 +1,204 @@
+{
+  "id": "ph-card-bdo-mastercard-01",
+  "country": "PH",
+  "type": "CARD_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-08",
+  "pages": [
+    [
+      "BDO",
+      "BDO Unibank, Inc.",
+      "STATEMENT OF ACCOUNT",
+      "BDO Standard Mastercard",
+      "MARIA CRISTINA L VILLANUEVA",
+      "Blk 7 Lot 12 Camella Homes Springville",
+      "Molino 3, Bacoor, Cavite 4102",
+      "Card Number  5241 **** **** 1187",
+      "Statement Date  OCTOBER 18, 2026",
+      "Payment Due Date  NOVEMBER 07, 2026",
+      "Credit Limit  80,000.00",
+      "Available Credit Limit  49,231.88",
+      "Total Amount Due  PHP 30,768.12",
+      "Minimum Amount Due  PHP 923.04",
+      "SUMMARY OF ACCOUNT",
+      "Previous Statement Balance  14,215.60",
+      "Less: Payments/Credits  -9,145.00",
+      "Add: Purchases/Advances  25,526.05",
+      "Add: Finance Charges  171.47",
+      "Add: Late Payment Charge  0.00",
+      "Total Amount Due  30,768.12",
+      "SALE DATE  POST DATE  TRANSACTION DESCRIPTION  AMOUNT",
+      "09/28  09/28  PAYMENT RECEIVED - THANK YOU  -8,500.00",
+      "09/19  09/20  SM SUPERMARKET MEGAMALL  MANDALUYONG PH  3,456.75",
+      "09/21  09/22  SHOPEE PHILIPPINES  MANDALUYONG PH  1,899.00",
+      "09/22  09/23  NETFLIX.COM  AMSTERDAM NL  549.00",
+      "09/24  09/25  AIRBNB * HM4K2X9PQZ  SAN FRANCISCO US  10,813.06",
+      "US$ 186.40  @ 58.0100",
+      "09/26  09/26  SM APPLIANCE CTR-INST 02/12  QUEZON CITY PH  2,499.92",
+      "09/29  09/30  CHOWKING SM NORTH EDSA  QUEZON CITY PH  285.00",
+      "10/01  10/02  CALTEX STA ROSA  STA ROSA PH  1,800.00",
+      "Page 1 of 2"
+    ],
+    [
+      "BDO Standard Mastercard  5241 **** **** 1187  Statement Date OCTOBER 18, 2026  Page 2 of 2",
+      "SALE DATE  POST DATE  TRANSACTION DESCRIPTION  AMOUNT",
+      "10/03  10/04  AMAZON WEB SERVICES  AWS.AMAZON.CO US  719.32",
+      "US$ 12.40  @ 58.0100",
+      "10/05  10/06  LAZADA PHILIPPINES  TAGUIG PH  2,145.00",
+      "10/08  10/09  GRAB* A-8ZKLQ3XHCB4F  SINGAPORE SG  286.00",
+      "10/10  10/11  MERCURY DRUG KATIPUNAN 2  QUEZON CITY PH  924.00",
+      "10/12  10/13  SPOTIFY P1A2B3C4D5  STOCKHOLM SE  149.00",
+      "10/14  10/15  LAZADA PHILIPPINES - REFUND  TAGUIG PH  -645.00",
+      "10/18  10/18  FINANCE CHARGE  171.47",
+      "BALANCE END  30,768.12",
+      "*** END OF STATEMENT ***",
+      "Foreign currency transactions are converted to Philippine pesos at the rate shown, which includes",
+      "Mastercard's assessment and BDO's service fee.",
+      "For inquiries call (02) 8631-8000.",
+      "BDO Unibank is regulated by the Bangko Sentral ng Pilipinas."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "BDO",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "14215.60",
+        "closingBalance": "30768.12",
+        "statementBalance": "30768.12",
+        "minimumPayment": "923.04",
+        "paymentDueDate": "2026-11-07",
+        "creditLimit": "80000.00",
+        "availableCredit": "49231.88",
+        "transactions": [
+          {
+            "date": "2026-09-28",
+            "description": "PAYMENT RECEIVED - THANK YOU",
+            "amount": "8500.00",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-19",
+            "description": "SM SUPERMARKET MEGAMALL",
+            "amount": "3456.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SM Supermarket"
+          },
+          {
+            "date": "2026-09-21",
+            "description": "SHOPEE PHILIPPINES",
+            "amount": "1899.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shopee"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "NETFLIX.COM",
+            "amount": "549.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Netflix"
+          },
+          {
+            "date": "2026-09-24",
+            "description": "AIRBNB * HM4K2X9PQZ",
+            "amount": "10813.06",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Airbnb"
+          },
+          {
+            "date": "2026-09-26",
+            "description": "SM APPLIANCE CTR-INST 02/12",
+            "amount": "2499.92",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SM Appliance Center"
+          },
+          {
+            "date": "2026-09-29",
+            "description": "CHOWKING SM NORTH",
+            "amount": "285.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Chowking"
+          },
+          {
+            "date": "2026-10-01",
+            "description": "CALTEX STA ROSA",
+            "amount": "1800.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Caltex"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "AMAZON WEB SERVICES",
+            "amount": "719.32",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon Web Services"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "LAZADA PHILIPPINES",
+            "amount": "2145.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Lazada"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "GRAB* A-8ZKLQ3XHCB4F",
+            "amount": "286.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Grab"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "MERCURY DRUG KATIPUNAN",
+            "amount": "924.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Mercury Drug"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "SPOTIFY",
+            "amount": "149.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Spotify"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "LAZADA PHILIPPINES - REFUND",
+            "amount": "645.00",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "Lazada"
+          },
+          {
+            "date": "2026-10-18",
+            "description": "FINANCE CHARGE",
+            "amount": "171.47",
+            "direction": "OUT",
+            "kind": "INTEREST_CHARGE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Two US$ charges show the dollar amount and rate on a continuation line; the peso amount on the first line is the transaction amount. Installment line 02/12 is this month's charge. Dates are SALE DATE. Finance charge is 3% of the unpaid previous balance."
+}

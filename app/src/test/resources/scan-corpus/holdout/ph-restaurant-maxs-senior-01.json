@@ -1,0 +1,56 @@
+{
+  "id": "ph-restaurant-maxs-senior-01",
+  "country": "PH",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-11-09",
+  "pages": [
+    [
+      "MAX'S RESTAURANT",
+      "The House That Fried Chicken Built",
+      "Max's Group, Inc.",
+      "Robinsons Galleria, EDSA cor. Ortigas Ave., Quezon City",
+      "VAT REG TIN: 000-292-711-00063",
+      "SI No.: 0063-0120334",
+      "Table 9  Pax 2  Server: Liza",
+      "11/08/2026  12:58 PM",
+      "1 Max's Fried Chicken Whole  658.00",
+      "1 Kare-Kare Regu1ar  398.00",
+      "1 Pancit Cant0n Solo  176.00",
+      "SUBTOTAL  1,232.00",
+      "Less: VAT on SC share (12%)  66.00",
+      "Less: SC Discount 20% (1 of 2 pax)  110.00",
+      "TOTAL AMOUNT DUE  1,056.00",
+      "CASH  1,100.00",
+      "CHANGE  44.00",
+      "VATable Sales  550.00",
+      "VAT Amount  66.00",
+      "VAT-Exempt Sales  440.00",
+      "Zero-Rated Sales  0.00",
+      "SC/PWD Name: ROSARIO T. SANTOS",
+      "OSCA ID No.: 1376-0042",
+      "Signature: ______________",
+      "THIS SERVES AS YOUR SALES INVOICE"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Max's Restaurant",
+        "total": "1056.00",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-08",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Cash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Senior-citizen discount on one of two diners: that share is VAT-exempt (66.00 removed) and gets 20% off (110.00), so the amount due is 1,056.00, not the 1,232.00 subtotal. OCR noise: 'Regu1ar', 'Cant0n'."
+}

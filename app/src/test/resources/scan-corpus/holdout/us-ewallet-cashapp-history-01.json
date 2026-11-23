@@ -1,0 +1,143 @@
+{
+  "id": "us-ewallet-cashapp-history-01",
+  "country": "US",
+  "type": "EWALLET_HISTORY",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-05",
+  "pages": [
+    [
+      "9:41",
+      "Cash App",
+      "Money",
+      "Cash balance",
+      "$84.35",
+      "Add Cash  Cash Out",
+      "Activity",
+      "Marcus Bell  -$60.00",
+      "Knicks tix · Nov 4",
+      "Chipotle Mexican Grill  -$12.85",
+      "Cash Card · Nov 3",
+      "Cash Out  -$100.00",
+      "Chase ...4421 · Nov 2",
+      "Direct Deposit  +$212.40",
+      "GIGWORK LLC · Oct 31",
+      "Bitcoin  -$25.00",
+      "Bought Bitcoin · Oct 30",
+      "Priya Shah  +$32.00",
+      "dinner · Oct 29",
+      "Shell Oil 57442381  -$41.10",
+      "Cash Card · Oct 27",
+      "Walgreens  -$9.37",
+      "Cash Card · Oct 26",
+      "Add Cash  +$100.00",
+      "Chase ...4421 · Oct 25",
+      "Spotify  -$11.99",
+      "Cash Card · Oct 24",
+      "Boost active: 10% off at Chipotle",
+      "Home  Card  Pay  Activity"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "EWALLET",
+        "institution": "Cash App",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": null,
+        "closingBalance": "84.35",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-11-04",
+            "description": "Marcus Bell",
+            "amount": "60.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-03",
+            "description": "Chipotle Mexican Grill",
+            "amount": "12.85",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Chipotle"
+          },
+          {
+            "date": "2026-11-02",
+            "description": "Cash Out",
+            "amount": "100.00",
+            "direction": "OUT",
+            "kind": "CASH_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Direct Deposit",
+            "amount": "212.40",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-30",
+            "description": "Bitcoin",
+            "amount": "25.00",
+            "direction": "OUT",
+            "kind": "OTHER",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-29",
+            "description": "Priya Shah",
+            "amount": "32.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-27",
+            "description": "Shell Oil 57442381",
+            "amount": "41.10",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shell"
+          },
+          {
+            "date": "2026-10-26",
+            "description": "Walgreens",
+            "amount": "9.37",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Walgreens"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "Add Cash",
+            "amount": "100.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-24",
+            "description": "Spotify",
+            "amount": "11.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Spotify"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Cash App activity screenshot: title line with signed amount, then memo or funding source and date (no year; 2026 from today). The Boost line is an offer, not money. Cash balance at the top is the current balance."
+}

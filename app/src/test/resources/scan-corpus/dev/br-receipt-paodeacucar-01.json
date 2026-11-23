@@ -1,0 +1,55 @@
+{
+  "id": "br-receipt-paodeacucar-01",
+  "country": "BR",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-26",
+  "pages": [
+    [
+      "Pão de Açúcar",
+      "COMPANHIA BRASILEIRA DE DISTRIBUICAO",
+      "CNPJ: 47.508.411/0001-56",
+      "Av. Brigadeiro Luís Antônio, 3126 - Jardim Paulista, São Paulo - SP",
+      "Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica",
+      "#  Código  Descrição  Qtde  Un  Vl Unit  Vl Total",
+      "001  7891000100103  LEITE NINHO INTEGRAL 1L  2  UN  6,49  12,98",
+      "002  7896006716112  ARROZ TIO JOAO 5KG  1  UN  27,90  27,90",
+      "003  7896006744115  FEIJAO CARIOCA CAMIL 1KG  1  UN  8,99  8,99",
+      "004  7896089012345  CAFE PILAO 500G  1  UN  19,90  19,90",
+      "005  2000123000005  BANANA PRATA KG  1,235  KG  7,98  9,86",
+      "006  2000456000008  PAO FRANCES KG  0,412  KG  19,90  8,20",
+      "Qtd. total de itens  6",
+      "Valor total R$  87,83",
+      "Descontos R$  0,00",
+      "Valor a Pagar R$  87,83",
+      "FORMA PAGAMENTO  VALOR PAGO",
+      "Pix  87,83",
+      "Troco R$  0,00",
+      "Tributos Totais Incidentes (Lei Federal 12.741/2012)  R$ 14,93",
+      "Consumidor não identificado",
+      "NFC-e nº 004521  Série 1  Emissão 25/10/2026 18:44:12",
+      "Chave de acesso: 3526 1047 5084 1100 0156 6500 1000 0045 2110 0004 5217",
+      "Protocolo de autorização: 135261234567890"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Pão de Açúcar",
+        "total": "87.83",
+        "currency": "BRL",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-25",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Pix",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Brazilian NFC-e with comma decimals and weighed items (kg quantities with comma decimals). 'Tributos Totais Incidentes' is an informational tax estimate inside the total, not an extra charge. Paid by Pix."
+}

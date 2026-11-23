@@ -1,0 +1,46 @@
+{
+  "id": "ph-refund-lazada-01",
+  "country": "PH",
+  "type": "REFUND",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-15",
+  "pages": [
+    [
+      "10:31",
+      "Lazada",
+      "Refund Details",
+      "Refund successful",
+      "₱645.00",
+      "Order No. 1029384756123456",
+      "Request ID: RF2026101400172",
+      "Baseus 20W PD Fast Charger - White  x1",
+      "Reason: Item not as described",
+      "Refund amount  ₱645.00",
+      "Refund method  Mastercard ****1187",
+      "Refund initiated  14 Oct 2026 10:22",
+      "Refund completed  14 Oct 2026 10:25",
+      "Refunds to cards may take 7-15 banking days to appear on your statement.",
+      "Back to My Orders"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Lazada",
+        "total": "645.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-14",
+        "dateAmbiguous": false,
+        "direction": "IN",
+        "category": "refund",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "1187"
+      }
+    ]
+  },
+  "notes": "Partial refund for one item of an order, back to a Mastercard ending 1187."
+}

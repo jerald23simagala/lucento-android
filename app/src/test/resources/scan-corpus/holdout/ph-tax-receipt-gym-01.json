@@ -1,0 +1,49 @@
+{
+  "id": "ph-tax-receipt-gym-01",
+  "country": "PH",
+  "type": "TAX_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-09-16",
+  "pages": [
+    [
+      "FITLIFE HEALTH CLUB INC.",
+      "Unit G-12, Uptown Parade, 9th Ave., Bonifacio Global City, Taguig City",
+      "VAT REG TIN: 009-441-276-00002",
+      "SALES INVOICE  No. 0001844",
+      "Date: September 15, 2026",
+      "Sold to: PAOLO S. TAN",
+      "Address: Taguig City  TIN: ______________",
+      "Description  Amount",
+      "Monthly Membership Dues - September 2026  2,500.00",
+      "Access Key Fob Replacement  300.00",
+      "Total Sales (VAT Inclusive)  2,800.00",
+      "Less: VAT  300.00",
+      "Amount: Net of VAT  2,500.00",
+      "Add: VAT  300.00",
+      "TOTAL AMOUNT DUE  2,800.00",
+      "Payment: Credit Card  VISA ****6620",
+      "BIR Authority to Print No. OCN 116AU20260000004412",
+      "Received by: ______________"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Fitlife Health Club",
+        "total": "2800.00",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-09-15",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "fitness",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "6620"
+      }
+    ]
+  },
+  "notes": "BIR VAT sales invoice for gym dues (net + VAT = total)."
+}

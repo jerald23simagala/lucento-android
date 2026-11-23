@@ -1,0 +1,253 @@
+{
+  "id": "gb-bank-hsbc-statement-01",
+  "country": "GB",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "HSBC UK",
+      "Your Statement",
+      "HSBC Advance",
+      "Account Name  MR OLIVER J BENNETT",
+      "Sortcode 40-11-62  Account Number 51837720",
+      "1 October to 31 October 2026",
+      "MR OLIVER J BENNETT",
+      "FLAT 3",
+      "27 ELMORE STREET",
+      "LONDON",
+      "N1 3AQ",
+      "Your HSBC Advance details",
+      "Opening Balance  £1,248.36",
+      "Payments In  £2,642.00",
+      "Payments Out  £1,758.03",
+      "Closing Balance  £2,132.33",
+      "International Bank Account Number GB29HBUK40116251837720",
+      "Branch Identifier Code HBUKGB4106P",
+      "Your Bank Account details",
+      "Date  Payment type and details  Paid out  Paid in  Balance",
+      "01 Oct 2026  BALANCE BROUGHT FORWARD  1,248.36",
+      "01 Oct 2026  DD  THAMES WATER  42.50",
+      "SO  K PATEL RENT OCT  950.00  255.86",
+      "02 Oct 2026  )))  PRET A MANGER LONDON  6.85  249.01",
+      "03 Oct 2026  VIS  TESCO STORES 3021 LONDON  12.50  236.51",
+      "05 Oct 2026  DD  EE LIMITED  25.00  211.51",
+      "06 Oct 2026  ATM  LINK ISLINGTON 13:02  60.00  151.51",
+      "08 Oct 2026  VIS  TFL TRAVEL CH TFL.GOV.UK/CP  18.20  133.31",
+      "10 Oct 2026  CR  J WRIGHT DINNER SPLIT  32.00  165.31",
+      "12 Oct 2026  VIS  AMAZON.CO.UK*2K4L7 AMAZON.CO.UK  24.99  140.32",
+      "15 Oct 2026  CR  ACME DIGITAL LTD SALARY  2,410.00",
+      "DD  BRITISH GAS  68.00  2,482.32",
+      "BALANCE CARRIED FORWARD  2,482.32",
+      "Page 1 of 2"
+    ],
+    [
+      "HSBC UK",
+      "Your Statement",
+      "HSBC Advance",
+      "Account Name  MR OLIVER J BENNETT",
+      "Sortcode 40-11-62  Account Number 51837720",
+      "1 October to 31 October 2026",
+      "Date  Payment type and details  Paid out  Paid in  Balance",
+      "16 Oct 2026  BALANCE BROUGHT FORWARD  2,482.32",
+      "16 Oct 2026  DD  LB ISLINGTON CTAX  142.00  2,340.32",
+      "18 Oct 2026  )))  SAINSBURYS S/MKTS  34.67  2,305.65",
+      "20 Oct 2026  VIS  NETFLIX.COM  10.99  2,294.66",
+      "22 Oct 2026  BP  BARCLAYCARD 4929 ****  6612  300.00  1,994.66",
+      "24 Oct 2026  VIS  DELIVEROO  23.45  1,971.21",
+      "26 Oct 2026  CR  FROM SAVINGS 40-11-62 91827364  200.00  2,171.21",
+      "28 Oct 2026  VIS  BOOTS 1146 ISLINGTON  9.79  2,161.42",
+      "30 Oct 2026  DD  PUREGYM LTD  24.99  2,136.43",
+      "31 Oct 2026  )))  COSTA COFFEE  4.10  2,132.33",
+      "31 Oct 2026  BALANCE CARRIED FORWARD  2,132.33",
+      "Payment types:  ATM Cash Machine  BP Bill Payment  CR Credit",
+      "DD Direct Debit  SO Standing Order  VIS Visa  ))) Contactless",
+      "Arranged overdraft limit  £500.00",
+      "HSBC UK Bank plc. Registered in England No 9928412.",
+      "Page 2 of 2"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "HSBC",
+        "currency": "GBP",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "1248.36",
+        "closingBalance": "2132.33",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "THAMES WATER",
+            "amount": "42.50",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Thames Water"
+          },
+          {
+            "date": "2026-10-01",
+            "description": "K PATEL RENT",
+            "amount": "950.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-02",
+            "description": "PRET A MANGER",
+            "amount": "6.85",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Pret A Manger"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "TESCO STORES 3021",
+            "amount": "12.50",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Tesco"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "EE LIMITED",
+            "amount": "25.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "EE"
+          },
+          {
+            "date": "2026-10-06",
+            "description": "LINK ISLINGTON",
+            "amount": "60.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-08",
+            "description": "TFL TRAVEL CH",
+            "amount": "18.20",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "TfL"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "J WRIGHT DINNER SPLIT",
+            "amount": "32.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-12",
+            "description": "AMAZON.CO.UK*2K4L7",
+            "amount": "24.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-10-15",
+            "description": "ACME DIGITAL LTD SALARY",
+            "amount": "2410.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-15",
+            "description": "BRITISH GAS",
+            "amount": "68.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "British Gas"
+          },
+          {
+            "date": "2026-10-16",
+            "description": "LB ISLINGTON CTAX",
+            "amount": "142.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Islington Council"
+          },
+          {
+            "date": "2026-10-18",
+            "description": "SAINSBURYS S/MKTS",
+            "amount": "34.67",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Sainsbury's"
+          },
+          {
+            "date": "2026-10-20",
+            "description": "NETFLIX.COM",
+            "amount": "10.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Netflix"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "BARCLAYCARD",
+            "amount": "300.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-24",
+            "description": "DELIVEROO",
+            "amount": "23.45",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Deliveroo"
+          },
+          {
+            "date": "2026-10-26",
+            "description": "FROM SAVINGS",
+            "amount": "200.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-28",
+            "description": "BOOTS 1146",
+            "amount": "9.79",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Boots"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "PUREGYM",
+            "amount": "24.99",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "PureGym"
+          },
+          {
+            "date": "2026-10-31",
+            "description": "COSTA COFFEE",
+            "amount": "4.10",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Costa Coffee"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "UK current account: dates like '03 Oct 2026', the date printed only on the first line of each day and the balance only on the last. BALANCE BROUGHT/CARRIED FORWARD lines are not transactions. The arranged overdraft limit is not a balance."
+}

@@ -1,0 +1,53 @@
+{
+  "id": "mx-restaurant-propina-01",
+  "country": "MX",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-10-19",
+  "pages": [
+    [
+      "EL CARDENAL",
+      "Restaurante El Cardenal S.A. de C.V.",
+      "Palma 23, Centro Hist0rico, Cuauhtemoc, 06000 CDMX",
+      "RFC: RCA850312AB1",
+      "Tel. 55 5521 8815",
+      "Mesa 14  Personas 4  Mesero:Arturo",
+      "Fecha: 18/10/2026 15:32",
+      "2  CHILAQUILES VERDES  MX$ 145.00  290.00",
+      "1  ENCHILADAS SUIZAS  168.00",
+      "1  MOLE POBLANO  215.00",
+      "2  AGUA DE JAMAICA  MX$ 45.00  90.00",
+      "1  CAFE DE OLLA  42.00",
+      "1  CESTA DE PAN DULCE  85.00",
+      "SUBT0TAL  MX$ 767.24",
+      "IVA 16%  MX$ 122.76",
+      "TOTAL  MX$ 890.00",
+      "PROPINA 15%  MX$ 133.50",
+      "TOTAL CON PROPINA  MX$ 1,023.50",
+      "VISA  ****4415",
+      "AUT 228193",
+      "Gracias por su preferencia",
+      "Este no es un comprobante fiscal. Solicite su factura en 72 h."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "El Cardenal",
+        "total": "1023.50",
+        "currency": "MXN",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-18",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "4415"
+      }
+    ]
+  },
+  "notes": "Tip (propina 15%) already filled in; the person paid TOTAL CON PROPINA. Prices include IVA (subtotal + IVA = TOTAL). OCR noise: 'Hist0rico', 'SUBT0TAL', 'Mesero:Arturo'."
+}

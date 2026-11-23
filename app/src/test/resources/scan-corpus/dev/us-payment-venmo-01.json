@@ -1,0 +1,44 @@
+{
+  "id": "us-payment-venmo-01",
+  "country": "US",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-09",
+  "pages": [
+    [
+      "9:47",
+      "Paid",
+      "- $42.50",
+      "Alex Chen",
+      "@alex-chen-17",
+      "pizza + drinks fri",
+      "Nov 8, 2026, 9:41 PM",
+      "Transaction details",
+      "Paid with  Venmo balance",
+      "Payment to  Alex Chen",
+      "Transaction ID  4173829105562781934",
+      "Visibility  Friends",
+      "Like  Comment"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": null,
+        "total": "42.50",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-08",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "transfer",
+        "paymentInstrument": "Venmo",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Venmo is US-only; only '$' printed. Friend payment, so merchant null and category transfer."
+}

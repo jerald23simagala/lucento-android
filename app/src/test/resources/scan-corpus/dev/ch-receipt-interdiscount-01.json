@@ -1,0 +1,48 @@
+{
+  "id": "ch-receipt-interdiscount-01",
+  "country": "CH",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-20",
+  "pages": [
+    [
+      "Interdiscount",
+      "Interdiscount Zuerich HB",
+      "Bahnhofplatz 15, 8001 Zuerich",
+      "CHE-109.338.123 MWST",
+      "Quittung Nr. 2214-0098812",
+      "Datum: 19.10.2026  14:05  Kasse 3",
+      "Apple AirPods Pro (2. Gen)  CHF 249.00",
+      "Sony WH-1000XM6 Kopfhoerer  CHF 429.00",
+      "Samsung Galaxy Tab S10 128GB  CHF 549.00",
+      "vRG Recyclinggebuehr 3 x 2.50  CHF 7.50",
+      "Total  CHF 1'234.50",
+      "MWST 8.1% inkl.  CHF 92.50",
+      "Bezahlt mit Mastercard  CHF 1'234.50",
+      "Karte  XXXX XXXX XXXX 8806",
+      "Trx-Nr. 004417  Auth 0R81Q2",
+      "SUPERCARD Punkte: 1234",
+      "Garantie: Bitte Quittung aufbewahren"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Interdiscount",
+        "total": "1234.50",
+        "currency": "CHF",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-19",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "shopping",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "8806"
+      }
+    ]
+  },
+  "notes": "Swiss apostrophe thousands separator (CHF 1'234.50). MWST is included. The loyalty points figure is not money."
+}

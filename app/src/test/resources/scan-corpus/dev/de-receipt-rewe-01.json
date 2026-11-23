@@ -1,0 +1,62 @@
+{
+  "id": "de-receipt-rewe-01",
+  "country": "DE",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-10-29",
+  "pages": [
+    [
+      "REWE",
+      "REWE Markt GmbH",
+      "Sch0nhauser Allee 80",
+      "10439 Berlin",
+      "UID Nr.: DE812706034",
+      "EUR",
+      "BIOBANANEN  1,99 B",
+      "ALPRO HAFERDRINK  2,29 A",
+      "REWE BESTE WAHL GOUDA  2,49 B",
+      "VOLLKORNBROT  1,79 B",
+      "COCA-COLA 1,5L  1,49 A",
+      "PFAND 0,25  0,25 A",
+      "SPULMITTEL  1,15 A",
+      "TOMATEN RISPEN  2,38 B",
+      "0,870 kg x  2,74 EUR/kg",
+      "--------------------------------------",
+      "SUMME  EUR  13,83",
+      "Geg. Girocard  EUR  13,83",
+      "Steuer  %  Netto  Steuer  Brutto",
+      "A=  19,0%  4,35  0,83  5,18",
+      "B=  7,0%  8,08  0,57  8,65",
+      "Gesamtbetrag  12,43  1,40  13,83",
+      "TSE-Signatur: KqC7xL9mV2pR4sT8wY1zB3nD6fH0jM5a",
+      "TSE-Start: 2026-10-28T18:42:03",
+      "Datum: 28.10.2026  Uhrzeit: 18:42:11 Uhr",
+      "Beleg-Nr. 4417  Trace-Nr. 112233",
+      "Bezahlung  Kontaktlos  girocard",
+      "Nr. ############4471 0000",
+      "VU-Nr. 4556677889",
+      "Genehmigungs-Nr. 774412",
+      "Vielen Dank fur Ihren Einkauf"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "REWE",
+        "total": "13.83",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-28",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Girocard",
+        "instrumentLast4": "4471"
+      }
+    ]
+  },
+  "notes": "OCR noise: 'Sch0nhauser', 'BIOBANANEN' (dropped space), umlauts lost ('SPULMITTEL', 'fur'). Comma decimals. The TSE start timestamp is a fiscal-signature field, same day."
+}

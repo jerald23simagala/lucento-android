@@ -1,0 +1,49 @@
+{
+  "id": "kw-receipt-sultan-01",
+  "country": "KW",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-13",
+  "pages": [
+    [
+      "The Sultan Center",
+      "TSC Salmiya",
+      "Salem Al Mubarak Street, Salmiya, Kuwait",
+      "Tel: +965 2575 0000",
+      "Receipt No: 0045-118273",
+      "Date: 12/10/2026  19:22  Cashier: 31",
+      "KDD FULL CREAM MILK 1L  2 x 0.550  1.100",
+      "ARABIC BREAD 6PCS  0.150",
+      "CHICKEN BREAST 1KG  2.950",
+      "BASMATI RICE 5KG  3.750",
+      "NIDO MILK POWDER 900G  3.200",
+      "PEPSI 6X330ML  1.350",
+      "Items: 6",
+      "TOTAL KWD  12.500",
+      "KNET  12.500",
+      "Card: ************3392",
+      "Auth: 551177",
+      "Thank you for shopping at TSC"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "The Sultan Center",
+        "total": "12.500",
+        "currency": "KWD",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-12",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "KNET",
+        "instrumentLast4": "3392"
+      }
+    ]
+  },
+  "notes": "Three-decimal currency (KWD 12.500). 12/10/2026 is 12 October (Kuwait writes day first). KNET is Kuwait's debit network."
+}

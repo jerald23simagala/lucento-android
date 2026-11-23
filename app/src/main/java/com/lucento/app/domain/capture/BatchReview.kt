@@ -39,6 +39,8 @@ data class ReviewRow(
     val edited: Set<RowField> = emptySet(),
     /** The words named [walletId]; otherwise it follows the composer's active wallet (see [BatchReview.retarget]). */
     val walletFromText: Boolean = false,
+    /** What the reader found that the person should know ("Possibly saved already…", "Refund of your 2 Nov purchase"). */
+    val hint: String? = null,
 ) {
     companion object {
         fun from(candidate: TransactionCandidate, key: String, messageId: Long, source: CaptureSource, separator: Char) = ReviewRow(
@@ -57,6 +59,7 @@ data class ReviewRow(
             sourceText = candidate.sourceText,
             flags = candidate.flags,
             walletFromText = candidate.walletFromText,
+            hint = candidate.hint,
         )
 
         /**
@@ -285,7 +288,19 @@ object BatchReview {
         if (CandidateFlag.ITEMS_DONT_ADD_UP in row.flags && RowField.AMOUNT !in row.edited) {
             issues += RowIssue(RowField.AMOUNT, "The items don’t add up to this total — check it", blocking = false)
         }
-        if (money != null && wallet != null && looksSaved(row, money, setup.history)) {
+        if (CandidateFlag.CURRENCY_ASSUMED in row.flags && RowField.WALLET !in row.edited && RowField.AMOUNT !in row.edited && wallet != null) {
+            issues += RowIssue(
+                RowField.WALLET,
+                "Check the currency — the document shows only a symbol several currencies use; Lucento chose ${wallet.name} (${wallet.currencyCode}).",
+                blocking = false,
+            )
+        }
+        if (CandidateFlag.PENDING in row.flags) {
+            issues += RowIssue(RowField.AMOUNT, "Pending at the bank — the amount may still change", blocking = false)
+        }
+        row.hint?.let { issues += RowIssue(RowField.DESCRIPTION, it, blocking = false) }
+        // A statement checked line by line against the ledger already said what it found (in the hint).
+        if (CandidateFlag.RECONCILED !in row.flags && money != null && wallet != null && looksSaved(row, money, setup.history)) {
             issues += RowIssue(
                 RowField.DESCRIPTION,
                 if (CandidateFlag.FROM_STATEMENT in row.flags) "Looks already recorded: the same amount is saved within a few days — remove it if it’s the same one"
@@ -355,6 +370,29 @@ object BatchReview {
 
     /** How far apart a statement line and a saved transaction can be dated and still look like the same one. */
     private const val STATEMENT_DAYS = 3L
+
+    /**
+     * Which of a new scan's [candidates] repeat a scanned row already waiting in this batch (the same document scanned
+     * twice, or overlapping pages scanned one by one): the same accounts, type and amount, on the same day — or within
+     * a few days for statement lines. Each waiting row answers for one candidate at most. The repeats are held back
+     * rather than added, so nothing is saved twice; the person can still add them.
+     */
+    fun repeatsInBatch(candidates: List<TransactionCandidate>, rows: List<ReviewRow>, separator: Char): Set<Int> {
+        val waiting = rows.filter { it.source == CaptureSource.RECEIPT }.toMutableList()
+        val repeats = HashSet<Int>()
+        candidates.forEachIndexed { i, c ->
+            val amount = c.amount ?: return@forEachIndexed
+            val twin = waiting.firstOrNull { r ->
+                val value = r.amountText.replace(separator, '.').toBigDecimalOrNull() ?: return@firstOrNull false
+                val window = if (CandidateFlag.FROM_STATEMENT in c.flags || CandidateFlag.FROM_STATEMENT in r.flags) STATEMENT_DAYS else 0L
+                r.walletId == c.walletId && r.toWalletId == c.toWalletId && r.type == c.type && value.compareTo(amount) == 0 &&
+                    kotlin.math.abs(r.date.toEpochDay() - c.date.toEpochDay()) <= window
+            } ?: return@forEachIndexed
+            waiting.remove(twin)
+            repeats += i
+        }
+        return repeats
+    }
 
     fun summarize(rows: List<ReviewRow>, statuses: Map<String, RowStatus>): BatchSummary {
         val ready = rows.filter { statuses[it.key]?.ready == true }

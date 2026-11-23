@@ -90,6 +90,16 @@ select to_regclass('public.user_settings') is not null as table_exists,
   -- exists (select 1 from supabase_migrations.schema_migrations where version = '20261122090000') as recorded;
 ```
 
+## Lucento Scan — follow-ups (2026-11-22, `feature/scan-document-intelligence`)
+
+| # | Task | Why |
+|---|---|---|
+| SC-N1 | **Consented photo corpus**: the owner and testers photograph ≥ 40 real receipts, bills and statements (kept off the repository, ground truth written once); run the benchmark on it | The text corpus can't show glare, creases or OCR misreads; phase 1's gate |
+| SC-N2 | **Phone test** (owner, Mission Control OT-53 on 0.5.15 vc 20): Scan pages on paper (one receipt, three receipts, a 2-page statement), Take a photo, Choose images, Import a PDF (an e-statement, a locked one); "Add anyway"; the reconciliation panel at 100 % and 200 % font; a phone without Google Play services or with < 2 GB RAM | SC-4, SC-9 |
+| SC-N3 | **Website privacy page** (lucento-website): add the "Scanning documents" lines (ML Kit diagnostics, the scanner's Play services download, PDFs and their passwords) to match `LegalDocuments.kt` 2026-11-22; Play Data safety: declare ML Kit's diagnostics if not already | CLAUDE.md: every send path listed wherever the policy is summarised |
+| SC-N4 | Owner decision: CJK photo OCR (bundle ML Kit's Japanese/Korean/Chinese models, or download via Play services) | SC-2 |
+| SC-N5 | Phase 4 decision (AI reading of hard photos through the Gemini proxy, paid tier, own consent; Pro or allowance) | Audit capability 4; not built |
+| SC-N6 | Grow the merchant dictionaries from the photo corpus and tester reports (data only, bump the file's `version`) | SC-7 |
 
 ## Regional prices — follow-ups (2026-11-21, `feature/regional-pricing`)
 

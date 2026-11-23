@@ -1,0 +1,213 @@
+{
+  "id": "us-bank-usbank-trailing-minus-01",
+  "country": "US",
+  "type": "BANK_STATEMENT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "U.S. BANK",
+      "Easy Checking",
+      "Member FDIC",
+      "Account Number 1-534-0001-2345",
+      "Statement Period: Oct 1, 2026 through Oct 31, 2026",
+      "Page 1 of 1",
+      "JASMINE TORRES",
+      "1204 E 7TH ST",
+      "SAINT PAUL MN 55106-5512",
+      "To Contact U.S. Bank  24-Hour Business Solutions: 1-800-673-3555",
+      "ACCOUNT SUMMARY",
+      "Beginning Balance on Oct 1  $ 1,206.74",
+      "Customer Deposits  0.00",
+      "Other Deposits  4,215.88",
+      "Card Withdrawals  362.40-",
+      "Other Withdrawals  2,240.75-",
+      "Ending Balance on Oct 31, 2026  $ 2,819.47",
+      "Other Deposits",
+      "Date  Description of Transaction  Ref Number  Amount",
+      "Oct 1  ACH CREDIT  2,107.94",
+      "ORIG CO NAME:TWIN CITIES HOSP ORIG ID:9410012345",
+      "CO ENTRY DESCR:PAYROLL SEC:PPD TRACE#:091000015234123",
+      "IND NAME:JASMINE TORRES",
+      "Oct 15  ACH CREDIT  2,107.94",
+      "ORIG CO NAME:TWIN CITIES HOSP ORIG ID:9410012345",
+      "CO ENTRY DESCR:PAYROLL SEC:PPD TRACE#:091000015887401",
+      "IND NAME:JASMINE TORRES",
+      "Total Other Deposits  $ 4,215.88",
+      "Card Withdrawals",
+      "Card Number: xxxx-xxxx-xxxx-6127",
+      "Date  Description of Transaction  Ref Number  Amount",
+      "Oct 3  Debit Purchase - VISA On 100226 CUB FOODS #1621 SAINT PAUL MN  84.12-",
+      "Oct 7  Debit Purchase - VISA On 100626 HOLIDAY STNSTORE 0281 ST PAUL MN  45.60-",
+      "Oct 10  Debit Purchase - VISA On 100926 TARGET T-1764 SAINT PAUL MN  63.47-",
+      "Oct 14  ATM Withdrawal U.S. BANK 1204 E 7TH ST SAINT PAUL MN  100.00-",
+      "Oct 18  Debit Purchase - VISA On 101726 CARIBOU COFFEE 0142 SAINT PAUL MN  6.89-",
+      "Oct 22  Debit Purchase - VISA On 102126 SQ *ST PAUL BAGELRY SAINT PAUL MN  12.40-",
+      "Oct 26  Debit Purchase - VISA On 102526 WALGREENS #07341 SAINT PAUL MN  18.92-",
+      "Oct 29  Debit Purchase - VISA On 102826 AMAZON MKTPL*ZQ1AB2CD3 AMZN.COM/BILL WA  31.00-",
+      "Total Card Withdrawals  $ 362.40-",
+      "Other Withdrawals",
+      "Date  Description of Transaction  Ref Number  Amount",
+      "Oct 2  Electronic Withdrawal To XCEL ENERGY  REF=262750021144870  92.15-",
+      "Oct 5  Mobile Banking Transfer To Account 104755551234  500.00-",
+      "Oct 20  Electronic Withdrawal To CENTERPOINT ENERGY  REF=262930045512870  48.60-",
+      "Oct 28  Zelle Instant Pmt To MARIA TORRES Conf# 7Hq2Xk  150.00-",
+      "Oct 31  Electronic Withdrawal To BLUESTONE PROPERTIES RENT  REF=263040077123590  1,450.00-",
+      "Total Other Withdrawals  $ 2,240.75-",
+      "BALANCE SUMMARY",
+      "Date  Ending Balance  Date  Ending Balance",
+      "Oct 1  3,314.68  Oct 2  3,222.53",
+      "Oct 3  3,138.41  Oct 5  2,638.41",
+      "Oct 7  2,592.81  Oct 10  2,529.34",
+      "Oct 14  2,429.34  Oct 15  4,537.28",
+      "Oct 18  4,530.39  Oct 20  4,481.79",
+      "Oct 22  4,469.39  Oct 26  4,450.47",
+      "Oct 28  4,300.47  Oct 29  4,269.47",
+      "Oct 31  2,819.47",
+      "Balances only appear for days reflecting change."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "U.S. Bank",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "1206.74",
+        "closingBalance": "2819.47",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "ORIG CO NAME:TWIN CITIES HOSP",
+            "amount": "2107.94",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-15",
+            "description": "ORIG CO NAME:TWIN CITIES HOSP",
+            "amount": "2107.94",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-03",
+            "description": "CUB FOODS #1621",
+            "amount": "84.12",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Cub Foods"
+          },
+          {
+            "date": "2026-10-07",
+            "description": "HOLIDAY STNSTORE",
+            "amount": "45.60",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Holiday"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "TARGET T-1764",
+            "amount": "63.47",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "ATM Withdrawal U.S. BANK",
+            "amount": "100.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-18",
+            "description": "CARIBOU COFFEE",
+            "amount": "6.89",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Caribou Coffee"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "SQ *ST PAUL BAGELRY",
+            "amount": "12.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "St Paul Bagelry"
+          },
+          {
+            "date": "2026-10-26",
+            "description": "WALGREENS #07341",
+            "amount": "18.92",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Walgreens"
+          },
+          {
+            "date": "2026-10-29",
+            "description": "AMAZON MKTPL*ZQ1AB2CD3",
+            "amount": "31.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-10-02",
+            "description": "XCEL ENERGY",
+            "amount": "92.15",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Xcel Energy"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "Mobile Banking Transfer To Account",
+            "amount": "500.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "CENTERPOINT ENERGY",
+            "amount": "48.60",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "CenterPoint Energy"
+          },
+          {
+            "date": "2026-10-28",
+            "description": "Zelle Instant Pmt To MARIA TORRES",
+            "amount": "150.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "BLUESTONE PROPERTIES",
+            "amount": "1450.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Bluestone Properties"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "U.S. Bank layout: withdrawals printed with a trailing minus ('84.12-'), ACH CREDIT payroll with ORIG CO NAME / CO ENTRY DESCR / IND NAME continuation lines, and a two-column daily balance summary that is not transactions. Card lines carry the purchase date as MMDDYY after 'On'."
+}

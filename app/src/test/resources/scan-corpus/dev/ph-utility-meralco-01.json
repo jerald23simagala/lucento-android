@@ -1,0 +1,64 @@
+{
+  "id": "ph-utility-meralco-01",
+  "country": "PH",
+  "type": "UTILITY_BILL",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-25",
+  "pages": [
+    [
+      "MERALCO",
+      "Manila Electric Company",
+      "Lopez Bldg., Ortigas Ave., Brgy. Ugong, Pasig City",
+      "VAT Reg. TIN 000-101-528-000",
+      "Customer Account Number  0123456789",
+      "Bill Date  Oct 12, 2026",
+      "Billing Period  Sep 10, 2026 to Oct 9, 2026",
+      "Name  RICARDO SANTOS",
+      "Service Address  45 Kamias Rd., Brgy. Pinyahan, Quezon City",
+      "Rate Type  Residential",
+      "Meter No.  ME 0478812",
+      "Present Reading  Oct 9  12,456",
+      "Previous Reading  Sep 10  12,224",
+      "kWh Used  232",
+      "Your Bill Summary",
+      "Generation Charge  1,243.58",
+      "Transmission Charge  198.20",
+      "System Loss Charge  112.06",
+      "Distribution Charge  272.37",
+      "Supply Charge  127.45",
+      "Metering Charge  119.94",
+      "Other Charges (Lifeline/Subsidies)  2.32",
+      "Government Taxes  299.73",
+      "Universal Charges  64.90",
+      "FIT-All (Renew. Energy)  19.95",
+      "Total Current Bill  2,460.50",
+      "Previous Balance  2,604.18",
+      "Payment Received Sep 21  -2,604.18",
+      "Total Amount Due  ₱ 2,460.50",
+      "Please pay on or before  Oct 24, 2026",
+      "Pay via the Meralco Mobile App, GCash, Maya, banks and Bayad Centers.",
+      "Avoid disconnection. Bills unpaid after the due date may be subject to disconnection.",
+      "Meralco Hotline 16211"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Meralco",
+        "total": "2460.50",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-12",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "utilities",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Amount due equals the current bill (previous balance was paid). Meter readings and kWh are not money."
+}

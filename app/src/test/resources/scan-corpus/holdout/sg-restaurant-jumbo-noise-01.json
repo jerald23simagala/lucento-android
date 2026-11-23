@@ -1,0 +1,54 @@
+{
+  "id": "sg-restaurant-jumbo-noise-01",
+  "country": "SG",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-11-07",
+  "pages": [
+    [
+      "JUMBO SEAFOOD",
+      "Riverside Point, 30 Merchant Road #01-01/02",
+      "Singapore 058282",
+      "GST Reg No: M2-0045512-7",
+      "Tel: 6532 3435",
+      "Table: 21  Pax: 4  Server: Wei Ling",
+      "Bill No: 30-118842",
+      "Date: 06/11/2026 20:15",
+      "Chilli Crab 1.2kg @ 98.00/kg  117.60",
+      "Fried Mant0u x10  12.00",
+      "Cereal Prawns (M)  38.00",
+      "Sambal Kangkong (M)  16.00",
+      "Yang Chow Fried Rice (M)  22.00",
+      "Tiger Pint x4 @ 14.00  56.00",
+      "Chinese Tea x4 @ 2.00  8.00",
+      "Wet Towel x4 @ 0.30  1.20",
+      "Subtotal  S$270.80",
+      "10% Servlce Charge  27.08",
+      "GST 9%  26.81",
+      "Total  S$324.69",
+      "AMEX  ************1004  S$324.69",
+      "Approval 771204",
+      "Thank you and see you again!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Jumbo Seafood",
+        "total": "324.69",
+        "currency": "SGD",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-06",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "American Express",
+        "instrumentLast4": "1004"
+      }
+    ]
+  },
+  "notes": "Singapore bill: 10% service charge then 9% GST on subtotal + service charge. 06/11/2026 is 6 November (day first). Per-kg price and per-item prices are not totals. OCR noise: 'Mant0u', 'Servlce'."
+}

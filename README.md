@@ -67,6 +67,13 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,
   idempotent). Interpretation runs on the phone, with no network; Smarter reading (Pro, switched on in Settings)
   sends the message to Gemini through Lucento's proxy instead. See [docs/CAPTURE.md](docs/CAPTURE.md).
+- **Lucento Scan** (2026-11-22): scan paper with the Document Scanner (several pages, flattened), take a photo, pick
+  images or import a PDF (its text, or OCR; locked PDFs ask for the password once). Receipts, bills, invoices,
+  payment confirmations, refunds and bank, card and e-wallet statements from the Philippines, the United States and
+  20 other countries become rows: the business paid (never the payment app), the document's own currency and dates,
+  the account that paid, the person's usual category. Statements are checked against the ledger — lines already
+  saved are held back, near matches marked, the balance compared — and nothing saved is ever changed. All on the
+  phone. See [docs/SCAN.md](docs/SCAN.md).
 - **Home-screen widgets**: **Quick add** (the composer's own scan · mic · field bar — one tap into Type, Speak or Scan)
   and **Safe to spend** (Home's Monthly budget card in brief, with Add). Same figures as Home, in its words; they follow
   Hide amounts, App lock and the chosen theme; home screen only; no permission, no network. Add them from Settings ›

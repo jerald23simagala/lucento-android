@@ -1,0 +1,42 @@
+{
+  "id": "us-payment-applepay-ubereats-01",
+  "country": "US",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-13",
+  "pages": [
+    [
+      "9:05",
+      "Uber Eats",
+      "San Francisco, CA",
+      "$34.27",
+      "Approved",
+      "Thursday, November 12, 2026 at 8:58 PM",
+      "Paid with Apple Pay",
+      "Card  Chase Freedom Unlimited  .... 3920",
+      "Device Account Number  .... 6621",
+      "Merchant Website  ubereats.com",
+      "Report an Issue"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Uber Eats",
+        "total": "34.27",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-12",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "takeout",
+        "paymentInstrument": "Apple Pay",
+        "instrumentLast4": "3920"
+      }
+    ]
+  },
+  "notes": "Apple Wallet transaction detail. The card ends 3920; 6621 is the device account number. Merchant city/state gives the US."
+}

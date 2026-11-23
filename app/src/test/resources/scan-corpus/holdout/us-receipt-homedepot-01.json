@@ -1,0 +1,54 @@
+{
+  "id": "us-receipt-homedepot-01",
+  "country": "US",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "THE HOME DEPOT",
+      "1201 W BEN WHITE BLVD",
+      "AUSTIN, TX 78704  (512) 443-9888",
+      "6512 00051 87112  11/02/26 03:14 PM",
+      "SALE  SELF CHECKOUT",
+      "012345678901 2X4X8 PREM KD  <A>",
+      "6@4.18  25.08",
+      "049206123457 DECK SCREWS 5LB  34.97",
+      "019785014522 K1LZ PRIMER 1G  27.98",
+      "070490062513 PURDY BRUSH 2.5IN  14.97",
+      "075353077121 BLUE PAINTERS TAPE 3PK  18.97",
+      "SUBTTL  121.97",
+      "SALES TAX  10.06",
+      "TOTAL  $132.03 *",
+      "XXXXXXXXXXXX8814 MASTERCARD  USD$132.03",
+      "AUTH CODE 038214/5512071  TA",
+      "Chip Read",
+      "AID A0000000041010  MASTERCARD",
+      "RETURN POLICY: 90 DAYS WITH RECEIPT",
+      "6512 51 87112 11/02/2026 5361",
+      "DID WE NAIL IT?",
+      "Take a short survey for a chance TO WIN A $5,000 HOME DEPOT GIFT CARD",
+      "www.homedepot.com/survey  User ID: H81 70831 21945  PASSWORD: 21944 21921"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "The Home Depot",
+        "total": "132.03",
+        "currency": "USD",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-02",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "home_supplies",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "8814"
+      }
+    ]
+  },
+  "notes": "SUBTTL abbreviation; Texas sales tax 8.25%. The survey line offers a $5,000 prize, not a charge. OCR noise: 'K1LZ', stray '*' after TOTAL."
+}

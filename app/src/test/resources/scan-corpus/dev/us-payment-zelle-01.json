@@ -1,0 +1,46 @@
+{
+  "id": "us-payment-zelle-01",
+  "country": "US",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-06",
+  "pages": [
+    [
+      "9:12",
+      "CHASE",
+      "You're all set",
+      "You sent $85.00 to Priya Shah",
+      "We'll let Priya know.",
+      "To  Priya Shah",
+      "p*****@gmail.com",
+      "From  TOTAL CHECKING (...4421)",
+      "Amount  $85.00",
+      "Memo  Concert tickets",
+      "Send on  Nov 6, 2026",
+      "Transaction number  5928371604",
+      "Zelle",
+      "Go to accounts",
+      "Send more money"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": null,
+        "total": "85.00",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-06",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "transfer",
+        "paymentInstrument": "Chase",
+        "instrumentLast4": "4421"
+      }
+    ]
+  },
+  "notes": "Person-to-person Zelle from a Chase checking account. Only '$' is printed; Zelle/Chase are US-only, so evidence is CONTEXT."
+}

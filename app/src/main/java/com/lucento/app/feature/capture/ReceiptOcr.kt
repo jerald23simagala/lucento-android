@@ -21,8 +21,13 @@ import kotlin.coroutines.resumeWithException
 object ReceiptOcr {
 
     /** Recognised lines with their positions, for [com.lucento.app.domain.capture.ReceiptParser.mergeRows]. */
-    suspend fun recognize(context: Context, uri: Uri): List<TextFragment> {
-        val image = withContext(Dispatchers.IO) { InputImage.fromFilePath(context, uri) }
+    suspend fun recognize(context: Context, uri: Uri): List<TextFragment> =
+        recognize(withContext(Dispatchers.IO) { InputImage.fromFilePath(context, uri) })
+
+    /** The same for a page drawn on the phone (a PDF page with no text of its own). */
+    suspend fun recognize(bitmap: Bitmap): List<TextFragment> = recognize(InputImage.fromBitmap(bitmap, 0))
+
+    private suspend fun recognize(image: InputImage): List<TextFragment> {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         return try {
             suspendCancellableCoroutine { cont ->
@@ -37,6 +42,7 @@ object ReceiptOcr {
                                     top = box?.top ?: 0,
                                     right = box?.right ?: 0,
                                     bottom = box?.bottom ?: 0,
+                                    angle = line.angle,
                                 )
                             }
                         }

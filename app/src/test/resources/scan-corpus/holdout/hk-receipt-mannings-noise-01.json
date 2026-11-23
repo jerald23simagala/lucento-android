@@ -1,0 +1,49 @@
+{
+  "id": "hk-receipt-mannings-noise-01",
+  "country": "HK",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-11-04",
+  "pages": [
+    [
+      "mannings",
+      "Shop G12, Times Square, 1 Matheson Street",
+      "Causeway Bay, Hong Kong",
+      "Tel: 2506 0886",
+      "Receipt No: 0412-2026-118237",
+      "03/11/2026 13:48  Till 02  Staff 3381",
+      "PANADOL EXTRA 20S  42.90",
+      "CERAVE M0ISTURISING CREAM 340G  169.00",
+      "MANNINGS C0TTON PADS 120S  19.90",
+      "SENSODYNE REPAIR & PROTECT 100G  54.90",
+      "Subtotal  HK$286.70",
+      "MoneyBack member discount  -10.00",
+      "Total  HK$276.70",
+      "Octopus  HK$276.70",
+      "Octopus No. ****5678(9)",
+      "Rernaining Value  HK$123.40",
+      "MoneyBack points earned: 276",
+      "Thank you for shopping at Mannings"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Mannings",
+        "total": "276.70",
+        "currency": "HKD",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-03",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "pharmacy",
+        "paymentInstrument": "Octopus",
+        "instrumentLast4": "5678"
+      }
+    ]
+  },
+  "notes": "Paid by Octopus card; 'Remaining Value' (OCR 'Rernaining') is the card's balance after payment, not the total. 03/11/2026 is 3 November (Hong Kong writes day first). OCR noise: 'M0ISTURISING', 'C0TTON', 'Rernaining'."
+}

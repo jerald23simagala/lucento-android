@@ -1,0 +1,52 @@
+{
+  "id": "ph-other-sunlife-premium-01",
+  "country": "PH",
+  "type": "OTHER_FINANCIAL",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-11",
+  "pages": [
+    [
+      "Sun Life",
+      "Sun Life of Canada (Philippines), Inc.",
+      "Sun Life Centre, 5th Ave. cor. Rizal Drive, Bonifacio Global City, Taguig City",
+      "PREMIUM DUE NOTICE",
+      "Notice Date: October 20, 2026",
+      "Policy Owner: JOSE MIGUEL R. TAN",
+      "Insured: JOSE MIGUEL R. TAN",
+      "Policy No.: 08-1234567-8",
+      "Plan: SUN MAXILINK ONE (Variable Universal Life)",
+      "Mode of Payment: Quarterly",
+      "Premium Due Date: November 10, 2026",
+      "Modal Premium  PHP 12,450.00",
+      "Unpaid Premium Loan / APL  PHP 0.00",
+      "Total Amount Due  PHP 12,450.00",
+      "Policy Values",
+      "Sum Assured  PHP 2,000,000.00",
+      "Fund Value as of October 15, 2026  PHP 486,212.55",
+      "Premiums paid to date  PHP 298,800.00",
+      "Please pay within the 31-day grace period to keep your policy in force.",
+      "Pay via Sun Life Online, BPI, BDO, Metrobank, GCash or Maya (Biller: SUN LIFE).",
+      "This is a system-generated notice."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Sun Life",
+        "total": "12450.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-20",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "insurance",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Insurance premium notice treated like a bill: the quarterly premium due (12,450.00) is what a person records. Sum assured, fund value and premiums paid to date are policy values, not transactions. Date is the notice date."
+}

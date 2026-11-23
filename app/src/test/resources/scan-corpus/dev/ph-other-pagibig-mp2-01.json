@@ -1,0 +1,48 @@
+{
+  "id": "ph-other-pagibig-mp2-01",
+  "country": "PH",
+  "type": "OTHER_FINANCIAL",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-02",
+  "pages": [
+    [
+      "PAG-IBIG FUND",
+      "Home Development Mutual Fund",
+      "MODIFIED PAG-IBIG 2 (MP2) SAVINGS",
+      "STATEMENT OF ACCOUNT",
+      "MP2 Account No.: 1234-5678-9012",
+      "Member: MARIA CRISTINA L. VILLANUEVA",
+      "Pag-IBIG MID No.: 1211-2233-4455",
+      "As of: OCTOBER 31, 2026",
+      "Date Opened: 03/15/2024",
+      "Term: 5 years",
+      "Contribution History (2026)",
+      "Period  Date Paid  Reference No.  Amount",
+      "2026-01  01/10/2026  MP220260107731  1,000.00",
+      "2026-02  02/10/2026  MP220260207768  1,000.00",
+      "2026-03  03/10/2026  MP220260307805  1,000.00",
+      "2026-04  04/10/2026  MP220260407842  1,000.00",
+      "2026-05  05/10/2026  MP220260507879  1,000.00",
+      "2026-06  06/10/2026  MP220260607916  1,000.00",
+      "2026-07  07/10/2026  MP220260707953  1,000.00",
+      "2026-08  08/10/2026  MP220260807990  1,000.00",
+      "2026-09  09/10/2026  MP220260908027  1,000.00",
+      "2026-10  10/10/2026  MP220261008064  1,000.00",
+      "Contributions 2024-2025  22,000.00",
+      "Total Contributions  32,000.00",
+      "Dividends Earned (credited annually)",
+      "2024  1,086.40",
+      "2025  1,554.18",
+      "Total Dividends  2,640.58",
+      "TOTAL ACCOUNT BALANCE  PHP 34,640.58",
+      "Dividend rate for 2025: 6.6% p.a.",
+      "This is a system-generated statement. No signature required."
+    ]
+  ],
+  "expected": {
+    "documents": []
+  },
+  "notes": "MP2 savings statement: contributions were paid earlier from the member's bank or wallet (and recorded there) and dividends are credited inside the fund, so nothing new to record. Expected documents is empty."
+}

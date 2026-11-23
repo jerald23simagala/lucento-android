@@ -250,6 +250,14 @@ needs `20261122090000_user_settings.sql` on each project).
 - CameraX + ML Kit Text Recognition (bundled model, works offline). Extract total, date, merchant with heuristics;
   editable result screen; images never leave the device and are discarded after save unless the user keeps them.
 
+## Done — Lucento Scan, financial document intelligence (2026-11-22, `feature/scan-document-intelligence`)
+- Audit and roadmap phases 0–3 (owner-approved 2026-11-22): Document Scanner, PDF import (text layer, password,
+  OCR fallback), several pages and several receipts per scan, global currency/date/terminology, US and PH
+  statement layouts, reconciliation against the ledger, merchant dictionaries (~1,950 entities, 7 regions) and
+  learning from the person's own ledger. Independent 112-document benchmark in CI. docs/SCAN.md.
+- Next: consented photo corpus and phone test; phase 4 (optional AI reading) and phase 5 (line items) await owner
+  decisions (NEXT_TASKS SC-N1…N6).
+
 ## M8 — Recurring transactions
 - Rules (daily/weekly/monthly/yearly, end date/count); WorkManager materializes due items idempotently
   (unique key per occurrence) so reboots or double runs never duplicate.

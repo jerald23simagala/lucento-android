@@ -1,0 +1,66 @@
+{
+  "id": "us-receipt-walmart-01",
+  "country": "US",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-19",
+  "pages": [
+    [
+      "Walmart",
+      "Save money. Live better.",
+      "( 425 ) 255 - 0142",
+      "MANAGER JESSICA PARK",
+      "743 RAINIER AVE S",
+      "RENTON WA 98057",
+      "ST# 02351 OP# 009044 TE# 44 TR# 01827",
+      "GV 2% MILK  007874235186 F  3.48 N",
+      "BANANAS  000000004011 KF  1.36 N",
+      "2.13 lb @ 1 lb /0.64",
+      "GV LG EGGS 18CT  007874211631 F  4.97 N",
+      "BOUNTY SAS 6DR  003700074787  21.97 X",
+      "TIDE PODS 42CT  003700087141  13.97 X",
+      "GV WHT BREAD  007874213032 F  1.42 N",
+      "CHKN BRST BNLS  025317671400 F  9.84 N",
+      "DORITOS NACHO  002840009089 F  4.48 N",
+      "COKE 12PK  004900000634  7.98 X",
+      "SUBTOTAL  69.47",
+      "TAX 1  10.100 %  4.44",
+      "TOTAL  73.91",
+      "VISA TEND  73.91",
+      "VISA  **** **** **** 4421 I 0",
+      "APPROVAL # 08142B",
+      "REF # 629100658812",
+      "TRANS ID - 162941086154821",
+      "VALIDATION - 2HDB",
+      "PAYMENT SERVICE - E",
+      "AID A0000000031010",
+      "TERMINAL # SC010422",
+      "*Signature Verified",
+      "10/18/26  14:32:07",
+      "CHANGE DUE  0.00",
+      "# ITEMS SOLD 9",
+      "TC# 8241 5519 0263 7781 2956",
+      "Low Prices You Can Trust. Every Day.",
+      "10/18/26  14:32:07"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Walmart",
+        "total": "73.91",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-18",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "4421"
+      }
+    ]
+  }
+}

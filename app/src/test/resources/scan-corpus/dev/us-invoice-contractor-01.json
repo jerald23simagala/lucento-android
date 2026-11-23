@@ -1,0 +1,55 @@
+{
+  "id": "us-invoice-contractor-01",
+  "country": "US",
+  "type": "INVOICE",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-23",
+  "pages": [
+    [
+      "Rainier Plumbing & Drain LLC",
+      "5512 Rainier Ave S, Seattle, WA 98118",
+      "(206) 555-0187  |  billing@rainierplumbing.example",
+      "WA Contractor Lic# RAINIPD812QK",
+      "INVOICE",
+      "Invoice #: 2026-1187",
+      "Invoice Date: 10/08/2026",
+      "Due Date: 10/22/2026",
+      "Bill To:",
+      "Daniel Reyes",
+      "4417 Fremont Ave N Apt 3",
+      "Seattle, WA 98103",
+      "Description  Qty  Rate  Amount",
+      "Service call - diagnostic  1  $89.00  $89.00",
+      "Replace kitchen faucet cartridge (Moen 1225)  1  $42.50  $42.50",
+      "Labor (hours)  1.5  $125.00  $187.50",
+      "Subtotal  $319.00",
+      "Sales Tax (10.25%)  $32.70",
+      "Total  $351.70",
+      "Amount Paid  $0.00",
+      "Balance Due  $351.70",
+      "Terms: Net 14. Please make checks payable to Rainier Plumbing & Drain LLC.",
+      "Pay online: pay.rainierplumbing.example/2026-1187",
+      "Thank you for your business!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Rainier Plumbing & Drain",
+        "total": "351.70",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-08",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "housing",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Unpaid service invoice; total is the balance due. Date is the invoice date."
+}

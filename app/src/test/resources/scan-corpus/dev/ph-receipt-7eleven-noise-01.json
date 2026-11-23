@@ -1,0 +1,53 @@
+{
+  "id": "ph-receipt-7eleven-noise-01",
+  "country": "PH",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-10-31",
+  "pages": [
+    [
+      "7-ELEVEN",
+      "Phi1ippine Seven Corporation",
+      "7th Flr The Columbia Tower, Ortigas Ave., Mandaluyong City",
+      "Store #3021 Katipunan-Aurora QC",
+      "VAT REG TIN: 000-390-189-00118",
+      "MIN: 12111801374  SN: 7E30210018",
+      "10/30/2026 21:47  POS01  TXN 0045791",
+      "BIGBITE HOTDOG  1 @ 49.00  49.00 V",
+      "GATORADE BLUE 500ML  1 @ 45.00  45.00 V",
+      "PIATTOS CHEESE 85G  1 @ 35.50  35.50 V",
+      "NESCAFE 3lN1 TWIN  2 @ 10.00  20.00 V",
+      "SUBTOTAL :  149.50",
+      "TOTAL  149.50",
+      "GCASH  149.50",
+      "Ref No. 7012 345 678901",
+      "CHANGE  0.00",
+      "VATab1e Sales  133.48",
+      "VAT Amount  16.02",
+      "VAT-Exempt Sales  0.00",
+      "Zero-Rated Sales  0.00",
+      "CLiQQ: earn points on every purchase",
+      "THIS SERVES AS YOUR SALES INVOICE"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "7-Eleven",
+        "total": "149.50",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-30",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "convenience",
+        "paymentInstrument": "GCash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "OCR noise: 'Phi1ippine', 'BIGBITE' (dropped space), '3lN1', 'VATab1e', stray colon after SUBTOTAL. Paid with GCash."
+}

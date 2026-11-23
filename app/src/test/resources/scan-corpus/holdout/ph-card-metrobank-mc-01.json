@@ -1,0 +1,161 @@
+{
+  "id": "ph-card-metrobank-mc-01",
+  "country": "PH",
+  "type": "CARD_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-26",
+  "pages": [
+    [
+      "METROBANK CARD CORPORATION",
+      "Metrobank Titanium Mastercard",
+      "RICARDO M SANTOS",
+      "45 Kamias Rd., Brgy. Pinyahan, Quezon City 1102",
+      "Card Number  5407 **** **** 2291",
+      "Statement Date  OCT 05, 2026",
+      "Payment Due Date  OCT 25, 2026",
+      "Credit Limit  100,000.00",
+      "Available Credit  81,198.04",
+      "Previous Balance  12,480.75",
+      "Total Amount Due  18,801.96",
+      "Minimum Amount Due  850.00",
+      "Trans Date  Post Date  Description  Amount (PHP)",
+      "09/06  09/07  S&R MEMBERSHIP SHOPPING CONGRESSIONAL QC  4,528.30",
+      "09/08  09/09  0% INST 03/06 ABENSON SM NORTH EDSA  4,166.67",
+      "09/11  09/12  STEAMGAMES.COM 4259522985 WA US  1,166.82",
+      "USD 19.99  CONV RATE 58.37",
+      "09/14  09/15  SHELL KAMIAS QUEZON CITY  2,500.00",
+      "09/19  09/20  CABALEN SM MEGAMALL MANDALUYONG  1,845.00",
+      "09/19  09/20  CABALEN SM MEGAMALL MANDALUYONG  1,845.00",
+      "09/22  09/22  PAYMENT - THANK YOU  -9,000.00",
+      "09/25  09/26  APPLE.COM/BILL ITUNES.COM  149.00",
+      "09/28  09/29  NETFLIX.COM AMSTERDAM NL  549.00",
+      "09/30  09/30  REVERSAL - DUPLICATE CHARGE CABALEN SM MEGAMALL  -1,845.00",
+      "10/02  10/03  GRAB* A-9QWRT2YZ MANILA  312.00",
+      "10/05  10/05  FINANCE CHARGE  104.42",
+      "10/05  10/05  LATE PAYMENT CHARGE  0.00",
+      "STATEMENT BALANCE  18,801.96",
+      "Installment balance remaining: 3 of 6 (ABENSON)  12,500.01",
+      "For inquiries call (02) 88-700-700",
+      "Metrobank Card Corporation is regulated by the Bangko Sentral ng Pilipinas."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "Metrobank",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "12480.75",
+        "closingBalance": "18801.96",
+        "statementBalance": "18801.96",
+        "minimumPayment": "850.00",
+        "paymentDueDate": "2026-10-25",
+        "creditLimit": "100000.00",
+        "availableCredit": "81198.04",
+        "transactions": [
+          {
+            "date": "2026-09-06",
+            "description": "S&R MEMBERSHIP SHOPPING",
+            "amount": "4528.30",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "S&R"
+          },
+          {
+            "date": "2026-09-08",
+            "description": "ABENSON SM NORTH",
+            "amount": "4166.67",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Abenson"
+          },
+          {
+            "date": "2026-09-11",
+            "description": "STEAMGAMES.COM",
+            "amount": "1166.82",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Steam"
+          },
+          {
+            "date": "2026-09-14",
+            "description": "SHELL KAMIAS",
+            "amount": "2500.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shell"
+          },
+          {
+            "date": "2026-09-19",
+            "description": "CABALEN SM MEGAMALL",
+            "amount": "1845.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Cabalen"
+          },
+          {
+            "date": "2026-09-19",
+            "description": "CABALEN SM MEGAMALL",
+            "amount": "1845.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Cabalen"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "PAYMENT - THANK YOU",
+            "amount": "9000.00",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-25",
+            "description": "APPLE.COM/BILL",
+            "amount": "149.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Apple"
+          },
+          {
+            "date": "2026-09-28",
+            "description": "NETFLIX.COM",
+            "amount": "549.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Netflix"
+          },
+          {
+            "date": "2026-09-30",
+            "description": "REVERSAL - DUPLICATE CHARGE",
+            "amount": "1845.00",
+            "direction": "IN",
+            "kind": "REVERSAL",
+            "merchant": "Cabalen"
+          },
+          {
+            "date": "2026-10-02",
+            "description": "GRAB* A-9QWRT2YZ",
+            "amount": "312.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Grab"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "FINANCE CHARGE",
+            "amount": "104.42",
+            "direction": "OUT",
+            "kind": "INTEREST_CHARGE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "A restaurant charge posted twice and was reversed (both charges and the reversal are listed). USD charge converted at the printed rate. The remaining installment balance (12,500.01) is not a charge this month; the 0.00 late charge is not a transaction. Finance charge 3% of unpaid previous balance."
+}

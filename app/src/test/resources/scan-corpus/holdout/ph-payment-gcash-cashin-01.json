@@ -1,0 +1,43 @@
+{
+  "id": "ph-payment-gcash-cashin-01",
+  "country": "PH",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-01",
+  "pages": [
+    [
+      "8:13",
+      "Cash In",
+      "via BPI",
+      "You have successfully cashed in!",
+      "Amount  ₱3,000.00",
+      "Fee  ₱0.00",
+      "Total  ₱3,000.00",
+      "From  BPI Savings ****3456",
+      "To  GCash  0927 *** 1180",
+      "Ref No. 4016 731 905512",
+      "Nov 1, 2026 8:12 AM",
+      "Done"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": null,
+        "total": "3000.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-01",
+        "dateAmbiguous": false,
+        "direction": "IN",
+        "category": "transfer",
+        "paymentInstrument": "BPI",
+        "instrumentLast4": "3456"
+      }
+    ]
+  },
+  "notes": "Cash-in from the person's own BPI savings to their GCash wallet: a transfer between own accounts. Direction IN is from the GCash wallet's side; the funding bank is BPI (account ending 3456)."
+}
