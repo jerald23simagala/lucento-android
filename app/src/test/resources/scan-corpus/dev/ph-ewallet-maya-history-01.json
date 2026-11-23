@@ -1,0 +1,140 @@
+{
+  "id": "ph-ewallet-maya-history-01",
+  "country": "PH",
+  "type": "EWALLET_HISTORY",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-10",
+  "pages": [
+    [
+      "8:30",
+      "Transactions",
+      "All  Money in  Money out",
+      "November 2026",
+      "Bought load for 0928 123 4567  -₱99.00",
+      "Nov 10, 2026, 8:05 AM",
+      "Sent money to JUAN D.  -₱1,000.00",
+      "Nov 9, 2026, 6:20 PM",
+      "Received money from ANGELICA M.  +₱2,500.00",
+      "Nov 7, 2026, 1:15 PM",
+      "Paid PUREGOLD - CUBAO  -₱1,264.50",
+      "Nov 5, 2026, 7:48 PM",
+      "Paid bill: MERALCO  -₱2,105.30",
+      "Nov 3, 2026, 9:12 AM",
+      "Paid MANG INASAL - SM NORTH EDSA  -₱385.00",
+      "Nov 2, 2026, 12:41 PM",
+      "October 2026",
+      "Transferred to Maya Savings  -₱2,000.00",
+      "Oct 30, 2026, 4:40 PM",
+      "Cash in via 7-Eleven  +₱1,000.00",
+      "Oct 28, 2026, 11:21 AM",
+      "Paid FOODPANDA  -₱468.00",
+      "Oct 25, 2026, 8:30 PM",
+      "Cash in from UnionBank via InstaPay  +₱3,000.00",
+      "Oct 22, 2026, 2:02 PM",
+      "Wallet  Savings  Credit  Cards  More"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "EWALLET",
+        "institution": "Maya",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": null,
+        "closingBalance": null,
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-11-10",
+            "description": "Bought load",
+            "amount": "99.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Smart"
+          },
+          {
+            "date": "2026-11-09",
+            "description": "Sent money to JUAN D.",
+            "amount": "1000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-07",
+            "description": "Received money from ANGELICA M.",
+            "amount": "2500.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-05",
+            "description": "Paid PUREGOLD",
+            "amount": "1264.50",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Puregold"
+          },
+          {
+            "date": "2026-11-03",
+            "description": "MERALCO",
+            "amount": "2105.30",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-11-02",
+            "description": "Paid MANG INASAL",
+            "amount": "385.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Mang Inasal"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "Transferred to Maya Savings",
+            "amount": "2000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-28",
+            "description": "Cash in via 7-Eleven",
+            "amount": "1000.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-25",
+            "description": "Paid FOODPANDA",
+            "amount": "468.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "foodpanda"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "Cash in from UnionBank",
+            "amount": "3000.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Maya app list, newest first, title line with a signed peso amount then a date line. No balances shown."
+}

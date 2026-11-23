@@ -70,7 +70,7 @@ the colour theme and the other customisations the file lacked.
 |---|---|---|---|
 | SS-1 | Apply `supabase/migrations/20261122090000_user_settings.sql` to **lucento-test** and **production** before the release that carries settings sync. **lucento-test: done 2026-11-23** (owner, OT-54; Claude checked it over REST: the table answers anon with 42501 "permission denied", a missing table answers 404 PGRST205). **Production: owner task OT-55** (created 2026-11-23). The owner asked Claude to apply it (2026-11-22, and again 2026-11-23), but the Supabase connector declined `apply_migration` both times: it wants a confirmation that doesn't reach the owner here. OT-55 is the same paste as OT-54 plus a history row under the repository's version (`20261122090000`, `created_by 'owner-sql-editor'`, as the v14 paste did). The paste and its eight-column check ran on PGlite on top of every earlier migration: all true, and pasting twice changes nothing. Once OT-55 is done, Claude runs the check below read-only through MCP and records it | P0 for that release | Until then the settings step is skipped every cycle on production: records sync as before and settings wait on the phone; nothing is lost. Re-running the file is safe |
 | SS-2 | Regenerate the website's privacy text (`python tools/legal/export_legal.py ../lucento-website/src/data/legal.ts`) | **Done 2026-11-23** (owner: "Proceed"): lucento-website #38, merged `d44a281`, live (checked on www.lucentoapp.com: /privacy, / and /delete-account) | The policy of 2026-11-22 (sync also keeps settings; consents and the app lock stay per phone, docs/LEGAL.md). #38 also updates the home page's privacy row, the cloud sync FAQ and the deletion list, which say settings are only ever visible to their own account. Published early on purpose: the policy should be live before a build with settings sync reaches testers |
-| SS-3 | Phone test on lucento-test after SS-1: customise phone A (theme, mode, modules, name, Show cents, Wallets view, default wallet) and sync; restore the account on phone B (all of them come back); change a setting on B and see it on A | P1 | JVM- and SQL-tested only (see CURRENT_STATUS). **Owner 2026-11-23: tests it on the next build**: that build's test task in Mission Control carries SS-3 and SS-6 step by step |
+| SS-3 | Phone test on lucento-test after SS-1: customise phone A (theme, mode, modules, name, Show cents, Wallets view, default wallet) and sync; restore the account on phone B (all of them come back); change a setting on B and see it on A | P1 | JVM- and SQL-tested only (see CURRENT_STATUS). **Owner 2026-11-23: tests it on the next build**: 0.5.16, Mission Control **OT-57**, with SS-3 and SS-6 step by step. A Play build is a release build, so it syncs with production, which has the table since 2026-11-23 (OT-55, checked) |
 | SS-4 | Release notes: "Your theme, features and other settings now come back when you restore, and stay the same on all your phones" | P2 | With the release. Also say backup files made by this version can't be restored on older versions |
 | SS-5 | Owner, Play Console › Policy › App content › Data safety: add **App functionality** to Personal info › Name (the display name now syncs with the settings), as `docs/play/PLAY_STORE_SUBMISSION.md` §3.2 now reads | P0 for that release; **owner task OT-56** (created 2026-11-23, priority soon) | The policy text says it (version 2026-11-22); the form must too |
 | SS-6 | Device QA, beyond SS-3: two phones that already synced, set up differently, both updated (neither restyles the other; a change made since reaches both); sign out and sign in as a different account (nothing of the first account arrives); sign out and back in to the same account with a change waiting (it goes up); Replace restore with sync on (the other phone matches the file); a Partner's phone (personal settings only) | P1 | The QA and architecture reviews' regression list (2026-11-22) |
@@ -90,6 +90,16 @@ select to_regclass('public.user_settings') is not null as table_exists,
   -- exists (select 1 from supabase_migrations.schema_migrations where version = '20261122090000') as recorded;
 ```
 
+## Lucento Scan — follow-ups (2026-11-22, `feature/scan-document-intelligence`)
+
+| # | Task | Why |
+|---|---|---|
+| SC-N1 | **Consented photo corpus**: the owner and testers photograph ≥ 40 real receipts, bills and statements (kept off the repository, ground truth written once); run the benchmark on it | The text corpus can't show glare, creases or OCR misreads; phase 1's gate |
+| SC-N2 | **Phone test** (owner, Mission Control OT-53 on 0.5.15 vc 20): Scan pages on paper (one receipt, three receipts, a 2-page statement), Take a photo, Choose images, Import a PDF (an e-statement, a locked one); "Add anyway"; the reconciliation panel at 100 % and 200 % font; a phone without Google Play services or with < 2 GB RAM | SC-4, SC-9. **Done by the owner 2026-11-23** (OT-53 marked done, no problems noted); a phone without Play services or with < 2 GB RAM is still untried |
+| SC-N3 | **Website privacy page** (lucento-website): add the "Scanning documents" lines (ML Kit diagnostics, the scanner's Play services download, PDFs and their passwords) to match `LegalDocuments.kt`; Play Data safety: declare ML Kit's diagnostics if not already | CLAUDE.md: every send path listed wherever the policy is summarised. **Website: lucento-website #39** (2026-11-23, with 0.5.16: `legal.ts` version 2026-11-23, a Scanning row in the homepage privacy sheet, the offline FAQs). **Still open before production:** Play Data safety for ML Kit's diagnostics |
+| SC-N4 | Owner decision: CJK photo OCR (bundle ML Kit's Japanese/Korean/Chinese models, or download via Play services) | SC-2 |
+| SC-N5 | Phase 4 decision (AI reading of hard photos through the Gemini proxy, paid tier, own consent; Pro or allowance) | Audit capability 4; not built |
+| SC-N6 | Grow the merchant dictionaries from the photo corpus and tester reports (data only, bump the file's `version`) | SC-7 |
 
 ## Regional prices — follow-ups (2026-11-21, `feature/regional-pricing`)
 
@@ -341,11 +351,11 @@ microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
   (vc 12, PR #64). Its fixes: the next card is in place under a leaving card at once and a swiped card leaves from
   where it was let go; each card's own scroll position; balanced last lines. Large text
   re-captured (130 % light/dark, 150 %, 200 %) after the emulator's System UI froze on text-size changes (capture
-  with a settle step: studio scratch `capture_lt.sh` logic). Open for the owner (three polish rounds done): doodle
-  spacing refinements (bare patches beside the pair), one art window for the deck with copy trims, centring wide pairs
-  versus keeping the torch glow inside, the AI feature's name and card 7's chip wording; a phone recording of leaving,
-  swiping and going back;
-- (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
+  with a settle step: studio scratch `capture_lt.sh` logic). The owner's calls (OT-48, 2026-11-22: "1 A, 2 B, 3 A,
+  4 B"; on the phone the hop, swipe, doodles and props were fine): doodles stay as they are; wide pairs are centred and
+  the glow's faint outer edge may be cut; "AI answers" and "AI adviser" both stay; card 7's chip says "Pro allowance
+  until" (both built on `feature/pro-cards-owner-calls`). The one art window for the deck was passed on earlier;
+- (b) on a phone: done by the owner in OT-48 (the hop, the doodles in a dim room, the props' sharpness);
 - (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner

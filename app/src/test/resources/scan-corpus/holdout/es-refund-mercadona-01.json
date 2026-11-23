@@ -1,0 +1,48 @@
+{
+  "id": "es-refund-mercadona-01",
+  "country": "ES",
+  "type": "REFUND",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-06",
+  "pages": [
+    [
+      "MERCADONA, S.A.  A-46103834",
+      "C/ ALCALA, 160 - 28028 MADRID",
+      "TELEFONO: 914 01 23 45",
+      "05/10/2026 19:12  OP: 1185471",
+      "FACTURA SIMPLIFICADA: 2641-012-583921",
+      "DEVOLUCION",
+      "Descripcion  Importe",
+      "1 ACEITE OLIVA VIRGEN EXTRA 1L  -8,95",
+      "1 QUESO CURADO MANCHEGO  -6,40",
+      "TOTAL (€)  -15,35",
+      "TARJETA BANCARIA  -15,35",
+      "MASTERCARD  **** **** **** 5531",
+      "IVA  BASE IMPONIBLE (€)  CUOTA (€)",
+      "4%  -14,76  -0,59",
+      "TOTAL  -14,76  -0,59",
+      "Ticket original: 2641-012-581177 de 03/10/2026",
+      "SE ADMITEN DEVOLUCIONES CON TICKET"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Mercadona",
+        "total": "15.35",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-05",
+        "dateAmbiguous": false,
+        "direction": "IN",
+        "category": "refund",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "5531"
+      }
+    ]
+  },
+  "notes": "Spanish return ticket with leading minus signs; 05/10/2026 is 5 October (Spanish day-first, Madrid address). The original ticket date (03/10/2026) is not the refund date."
+}

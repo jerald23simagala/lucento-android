@@ -1,0 +1,52 @@
+{
+  "id": "us-payment-paypal-netflix-01",
+  "country": "US",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-02",
+  "pages": [
+    [
+      "PayPal",
+      "Receipt for Your Payment to Netflix.com",
+      "Nov 1, 2026 08:14:22 PDT",
+      "Transaction ID: 8KJ29384PL5517203",
+      "Hello Samantha Ortiz,",
+      "You sent a payment of $15.49 USD to Netflix.com (info@account.netflix.com)",
+      "It may take a few moments for this transaction to appear in your account.",
+      "Merchant  Instructions to merchant",
+      "Netflix.com  You haven't entered any instructions.",
+      "info@account.netflix.com",
+      "Description  Unit price  Qty  Amount",
+      "Netflix Monthly Plan - Standard  $15.49 USD  1  $15.49 USD",
+      "Subtotal  $15.49 USD",
+      "Total  $15.49 USD",
+      "Payment  $15.49 USD",
+      "Paid with  Visa Credit Card x-4108  $15.49 USD",
+      "Charge will appear on your credit card statement as \"PAYPAL *NETFLIX.COM\"",
+      "Issues with this transaction?",
+      "You have 180 days from the date of the transaction to open a dispute in the Resolution Center.",
+      "Copyright 1999-2026 PayPal, Inc. All rights reserved.",
+      "PayPal, Inc. 2211 North First Street, San Jose, CA 95131"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Netflix",
+        "total": "15.49",
+        "currency": "USD",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-01",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "streaming",
+        "paymentInstrument": "PayPal",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Merchant is Netflix, instrument PayPal (the Visa x-4108 is PayPal's funding card, so instrumentLast4 is left null)."
+}

@@ -1,0 +1,128 @@
+{
+  "id": "us-bank-activity-pending-01",
+  "country": "US",
+  "type": "BANK_STATEMENT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-14",
+  "pages": [
+    [
+      "9:12",
+      "Capital One",
+      "360 Checking...4417",
+      "$1,798.46",
+      "Available balance",
+      "Current balance  $1,911.06",
+      "Transfer  Deposit  Pay bills",
+      "Pending",
+      "Lou Malnati's Pizzeria  -$45.20",
+      "Nov 14",
+      "Whole Foods Market  -$67.40",
+      "Nov 14",
+      "Posted",
+      "Zelle money received from KIM J  +$45.00",
+      "Nov 13",
+      "Starbucks  -$6.85",
+      "Nov 12",
+      "Comcast Xfinity  -$79.99",
+      "Nov 12",
+      "ATM Withdrawal - 1200 Pine St  -$60.00",
+      "Nov 11",
+      "Target  -$34.18",
+      "Nov 10",
+      "Direct Deposit - NORTHWIND STUDIO PAYROLL  +$1,842.65",
+      "Nov 10",
+      "Amazon.com  -$23.47",
+      "Nov 9",
+      "Trader Joe's  -$58.04",
+      "Nov 8",
+      "View more transactions"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "Capital One",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": null,
+        "closingBalance": "1911.06",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-11-13",
+            "description": "Zelle money received from KIM J",
+            "amount": "45.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-12",
+            "description": "Starbucks",
+            "amount": "6.85",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Starbucks"
+          },
+          {
+            "date": "2026-11-12",
+            "description": "Comcast Xfinity",
+            "amount": "79.99",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Xfinity"
+          },
+          {
+            "date": "2026-11-11",
+            "description": "ATM Withdrawal - 1200 Pine St",
+            "amount": "60.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-10",
+            "description": "Target",
+            "amount": "34.18",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-11-10",
+            "description": "Direct Deposit - NORTHWIND STUDIO PAYROLL",
+            "amount": "1842.65",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-09",
+            "description": "Amazon.com",
+            "amount": "23.47",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-11-08",
+            "description": "Trader Joe's",
+            "amount": "58.04",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Trader Joe's"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Bank app activity screenshot. The two Pending lines are excluded from truth (not posted; the restaurant hold will change when the tip posts). Current balance (posted) is the closing balance; Available balance = current minus pending. No opening balance shown."
+}

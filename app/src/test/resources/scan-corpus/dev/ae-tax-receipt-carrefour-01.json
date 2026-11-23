@@ -1,0 +1,54 @@
+{
+  "id": "ae-tax-receipt-carrefour-01",
+  "country": "AE",
+  "type": "TAX_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-10",
+  "pages": [
+    [
+      "Carrefour",
+      "Majid Al Futtaim Hypermarkets LLC",
+      "Carrefour Mall of the Emirates",
+      "Al Barsha, Dubai, United Arab Emirates",
+      "TRN: 100012345600003",
+      "TAX INVOICE",
+      "Invoice No: 0123-0456-118827",
+      "Date: 09/11/2026 20:41",
+      "ITEM  QTY  PRICE  VAT%  AMOUNT",
+      "AL AIN WATER 1.5L X6  1  9.50  5%  9.50",
+      "ALMARAI LABAN 2L  1  10.25  5%  10.25",
+      "AMERICANA NUGGETS 750G  1  24.95  5%  24.95",
+      "INDIA GATE BASMATI 5KG  1  54.00  5%  54.00",
+      "FAIRY LEMON 1L  1  12.75  5%  12.75",
+      "BANANA PHILIPPINES 1KG  1  6.95  5%  6.95",
+      "Total excl. VAT  AED 112.76",
+      "VAT 5%  AED 5.64",
+      "Total incl. VAT  AED 118.40",
+      "Paid by VISA  AED 118.40",
+      "Card ************6634",
+      "Auth 728812",
+      "SHARE ID: ****5521  Points earned 118",
+      "Thank you for shopping at Carrefour"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Carrefour",
+        "total": "118.40",
+        "currency": "AED",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-09",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "6634"
+      }
+    ]
+  },
+  "notes": "UAE tax invoice with TRN; 09/11/2026 is 9 November (day first, Dubai). Total incl. VAT is what was paid."
+}

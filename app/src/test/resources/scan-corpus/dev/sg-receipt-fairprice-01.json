@@ -1,0 +1,55 @@
+{
+  "id": "sg-receipt-fairprice-01",
+  "country": "SG",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-05",
+  "pages": [
+    [
+      "FairPrice",
+      "NTUC FairPrice Co-operative Ltd",
+      "FairPrice Finest Bukit Timah Plaza",
+      "1 Jalan Anak Bukit #B1-01",
+      "Singapore 588996",
+      "GST Reg No: M2-0001234-5",
+      "Tel: 6466 1234",
+      "04/11/26 18:22  Str:0123 Pos:05 Cshr:118",
+      "MEIJI FRESH MILK 2L  6.95",
+      "GARDENIA WHOLEMEAL 400G  2.85",
+      "SONGHE JASMINE RICE 5KG  13.90",
+      "PASAR BROCCOLI  2.10",
+      "FAIRPRICE EGGS 10S  3.45",
+      "MILO 3IN1 18S  8.95",
+      "DYNAMO DETERGENT 2.4KG  16.90",
+      "SUBTOTAL  55.10",
+      "TOTAL  $55.10",
+      "VISA  $55.10",
+      "************1149  CONTACTLESS",
+      "APPR CODE 603317",
+      "GST 9% INCLUDED IN TOTAL  4.55",
+      "7 ITEMS",
+      "LinkPoints earned: 3",
+      "Thank you for shopping at FairPrice"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "FairPrice",
+        "total": "55.10",
+        "currency": "SGD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-04",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "1149"
+      }
+    ]
+  },
+  "notes": "Only '$' is printed; the Singapore postcode and GST Reg No make it SGD. 04/11/26 is 4 November (Singapore writes day first). GST is included in the prices."
+}

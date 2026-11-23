@@ -1,0 +1,67 @@
+{
+  "id": "ph-receipt-sm-supermarket-01",
+  "country": "PH",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-25",
+  "pages": [
+    [
+      "SM SUPERMARKET",
+      "SUPERVALUE INC.",
+      "SM City North EDSA, North Ave. cor. EDSA",
+      "Brgy. Sto. Cristo, Quezon City 1105",
+      "VAT REG TIN: 000-163-715-00012",
+      "MIN: 18082310221456712",
+      "SN: 4CE0391XYZ  POS 017",
+      "SALES INVOICE",
+      "SI No.: 017-00027154",
+      "10/25/2026  11:42:18 AM",
+      "Cashier: 2210 MARICEL",
+      "NESTLE FRESH MILK 1L  98.75  V",
+      "SKYFLAKES CRACKERS 250G  45.50  V",
+      "CDO JUMBO HOTDOG 1KG  239.00  V",
+      "DINORADO RICE 5KG  365.00  E",
+      "BANANA LAKATAN  115.00  E",
+      "1.250 KG @ 92.00",
+      "EGGS LARGE 12S  108.00  E",
+      "SURF POWDER 1.4KG  162.25  V",
+      "COKE 1.5L  78.00  V",
+      "** 8 ITEM(S) **",
+      "TOTAL  Php 1,211.50",
+      "CASH  1,500.00",
+      "CHANGE  288.50",
+      "VATable Sales  556.70",
+      "VAT Amount (12%)  66.80",
+      "VAT-Exempt Sales  588.00",
+      "Zero-Rated Sales  0.00",
+      "SM Advantage Card: 8880 **** **** 4127",
+      "Points earned: 6.06",
+      "Customer Name: ______________",
+      "Address: ______________",
+      "TIN: ______________",
+      "Accreditation No. 036-2019-04-000123",
+      "PTU No. FP012026-074-0123456-00017",
+      "THIS SERVES AS YOUR SALES INVOICE"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "SM Supermarket",
+        "total": "1211.50",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-25",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Cash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "VAT-inclusive prices; VATable Sales + VAT + VAT-Exempt = TOTAL. Cash 1,500.00 with change 288.50."
+}

@@ -1,0 +1,160 @@
+{
+  "id": "ph-card-bpi-01",
+  "country": "PH",
+  "type": "CARD_STATEMENT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-11-12",
+  "pages": [
+    [
+      "BPI",
+      "BPI Amore Cashback Card",
+      "Statement 0f Account",
+      "Customer Number  02-1234567-8",
+      "JOSE MIGUEL R TAN",
+      "Card Number  4569 **** **** 4889",
+      "Statement Date  OCT 22, 2026",
+      "Payment Due Date  NOV 11, 2026",
+      "Total Amount Due  17,165.81",
+      "Minimum Amount Due  514.97",
+      "Credit Limit  60,000.00",
+      "Available Credit  42,834.19",
+      "Previous Balance  15,880.25",
+      "Transaction Date  Post Date  Transaction Details  Amount",
+      "SEP 24  SEP 25  LANDERS SUPERSTORE ALABANG  3,210.60",
+      "SEP 27  SEP 28  PETRON SUCAT  1,500.00",
+      "SEP 30  OCT 01  MAX'S RESTAURANT ATC  1,846.00",
+      "OCT 02  OCT 03  FESTIVAL MALL CINEMA  640.00",
+      "OCT 05  OCT 06  SHOPEE PH  799.00",
+      "OCT 08  OCT 09  WATSONS ATC  1,124.75",
+      "OCT 11  OCT 12  GLOBE TELECOM ONLINE  1,299.00",
+      "OCT 14  OCT 15  SM STORE SOUTHMALL  2,480.00",
+      "OCT 16  OCT 16  PAYMENT - THANK Y0U  -12,000.00",
+      "OCT 19  OCT 20  STARBUCKS ATC  315.00",
+      "OCT 20  OCT 20  CASHBACK REBATE  -45.20",
+      "OCT 22  OCT 22  FINANCE CHARGE  116.41",
+      "Statement Balance  17,165.81",
+      "Cashback earned this cycle: 45.20",
+      "Pay your BPI card bill via BPI Online or the BPI app.",
+      "BPI is regulated by the Bangko Sentral ng Pilipinas."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "BPI",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "15880.25",
+        "closingBalance": "17165.81",
+        "statementBalance": "17165.81",
+        "minimumPayment": "514.97",
+        "paymentDueDate": "2026-11-11",
+        "creditLimit": "60000.00",
+        "availableCredit": "42834.19",
+        "transactions": [
+          {
+            "date": "2026-09-24",
+            "description": "LANDERS SUPERSTORE ALABANG",
+            "amount": "3210.60",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Landers Superstore"
+          },
+          {
+            "date": "2026-09-27",
+            "description": "PETRON SUCAT",
+            "amount": "1500.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Petron"
+          },
+          {
+            "date": "2026-09-30",
+            "description": "MAX'S RESTAURANT ATC",
+            "amount": "1846.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Max's Restaurant"
+          },
+          {
+            "date": "2026-10-02",
+            "description": "FESTIVAL MALL CINEMA",
+            "amount": "640.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Festival Mall Cinema"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "SHOPEE PH",
+            "amount": "799.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shopee"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "WATSONS ATC",
+            "amount": "1124.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Watsons"
+          },
+          {
+            "date": "2026-10-11",
+            "description": "GLOBE TELECOM ONLINE",
+            "amount": "1299.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Globe"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "SM STORE SOUTHMALL",
+            "amount": "2480.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SM Store"
+          },
+          {
+            "date": "2026-10-19",
+            "description": "STARBUCKS ATC",
+            "amount": "315.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Starbucks"
+          },
+          {
+            "date": "2026-10-16",
+            "description": "PAYMENT - THANK",
+            "amount": "12000.00",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "CASHBACK REBATE",
+            "amount": "45.20",
+            "direction": "IN",
+            "kind": "OTHER",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-22",
+            "description": "FINANCE CHARGE",
+            "amount": "116.41",
+            "direction": "OUT",
+            "kind": "INTEREST_CHARGE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "OCR noise: 'Statement 0f Account', 'THANK Y0U'. No currency symbol; BPI/Bangko Sentral give the country. Cashback rebate is a statement credit (kind OTHER, IN). Finance charge 3% of the unpaid previous balance. Dates are the Transaction Date column."
+}

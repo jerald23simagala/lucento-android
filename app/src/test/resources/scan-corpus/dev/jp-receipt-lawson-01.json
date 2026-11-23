@@ -1,0 +1,51 @@
+{
+  "id": "jp-receipt-lawson-01",
+  "country": "JP",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "CJK",
+  "noise": false,
+  "today": "2026-10-15",
+  "pages": [
+    [
+      "LAWSON",
+      "ローソン 渋谷道玄坂店",
+      "東京都渋谷区道玄坂2-6-17",
+      "電話:03-3461-0123",
+      "登録番号 T1234567890123",
+      "2026年10月15日(木) 08:12",
+      "レジ01  責No.012",
+      "おにぎり 鮭  ¥160軽",
+      "からあげクン レギュラー  ¥238軽",
+      "サントリー 天然水 550ml  ¥108軽",
+      "ボールペン 黒 0.5  ¥165",
+      "小計  ¥671",
+      "(8%対象  ¥506  内消費税  ¥37)",
+      "(10%対象  ¥165  内消費税  ¥15)",
+      "合計  ¥671",
+      "お預り現金  ¥1,000",
+      "お釣り  ¥329",
+      "「軽」は軽減税率対象商品です",
+      "Pontaカード  1234********5678",
+      "ご利用ありがとうございました"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Lawson",
+        "total": "671",
+        "currency": "JPY",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-15",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "convenience",
+        "paymentInstrument": "Cash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Japanese convenience-store receipt; prices include consumption tax (8% reduced rate marked 軽). ¥ is shared by JPY and CNY; the Tokyo address and 消費税 make it JPY. Zero-decimal amounts."
+}

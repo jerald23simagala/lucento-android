@@ -1,0 +1,56 @@
+{
+  "id": "it-receipt-esselunga-01",
+  "country": "IT",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "esselunga",
+      "ESSELUNGA S.p.A.",
+      "Via Giambologna 1, 20096 Limito di Pioltello (MI)",
+      "P.IVA 01255720169",
+      "Punto vendita: MILANO - VIALE PIAVE",
+      "DOCUMENTO COMMERCIALE",
+      "di vendita o prestazione",
+      "DESCRIZIONE  IVA  Prezzo(€)",
+      "PASTA DE CECCO 500G  4%  1,49",
+      "PARMIGIANO REGG. 300G  4%  6,90",
+      "LATTE PARZ. SCREM. 1L  4%  1,25",
+      "CAFFE LAVAZZA ORO 250G  22%  3,99",
+      "ACQUA S.PELLEGRINO 6X1L  22%  3,30",
+      "PROSCIUTTO COTTO 120G  10%  2,79",
+      "POMODORI DATTERINI 500G  4%  2,40",
+      "TOTALE COMPLESSIVO  22,12",
+      "DI CUI IVA  2,02",
+      "Pagamento elettronico  22,12",
+      "Pagamento contante  0,00",
+      "Importo pagato  22,12",
+      "Carta: MASTERCARD ************6650",
+      "02-11-2026 10:41",
+      "DOCUMENTO N. 0417-0093",
+      "RT 99MEX012345",
+      "Fidaty: 2 punti"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Esselunga",
+        "total": "22.12",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-02",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "6650"
+      }
+    ]
+  },
+  "notes": "02-11-2026 is 2 November (Italian day-first; Milan address and P.IVA make the country evident). 'DI CUI IVA' is the VAT included, not an extra charge."
+}

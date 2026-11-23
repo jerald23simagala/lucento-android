@@ -1,0 +1,267 @@
+{
+  "id": "us-bank-bofa-photo-overlap-01",
+  "country": "US",
+  "type": "BANK_STATEMENT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-09-10",
+  "pages": [
+    [
+      "BANK OF AMERICA",
+      "P.O. Box 15284",
+      "Wilmington, DE 19850",
+      "MICHELLE T NGUYEN",
+      "2210 E MADISON ST",
+      "SEATTLE WA 98112-5502",
+      "Customer service information",
+      "1.800.432.1000",
+      "Your Adv Relationship Banking",
+      "for August 1, 2026 to August 31, 2026",
+      "Account number: 4381 2207 1964",
+      "Account summary",
+      "Beginning balance on August 1, 2026  $1,912.40",
+      "Deposits and other additions  3,360.03",
+      "Withdrawals and other subtractions  -2,641.08",
+      "Checks  -325.00",
+      "Service fees  -10.00",
+      "Ending balance on August 31, 2026  $2,296.35",
+      "# of deposits/credits: 5",
+      "# of withdrawals/debits: 15",
+      "# of days in cycle: 31",
+      "Deposits and other additions",
+      "Date  Description  Amount",
+      "08/14/26  BRIGHTLINE MEDICA DES:PAYROLL ID:XXXXX45521 INDN:NGUYEN,MICHELLE CO ID:XXXXX12345 PPD  1,575.00",
+      "08/15/26  REVERSAL OF OVERDRAFT ITEM FEE FOR ACTIVITY OF 08-10  10.00",
+      "08/20/26  Zelle payment from KEVIN NGUYEN Conf# k3j8xq0tz  200.00",
+      "08/28/26  BRIGHTLINE MEDICA DES:PAYROLL ID:XXXXX45521 INDN:NGUYEN,MICHELLE CO ID:XXXXX12345 PPD  1,575.00",
+      "08/31/26  Interest Earned  0.03",
+      "Total deposits and other additions  $3,360.03",
+      "Withdrawals and other subtractions",
+      "Date  Description  Amount",
+      "08/01/26  SUNSET RIDGE APTS DES:WEB PMTS ID:XXXXX88231 INDN:MICHELLE NGUYEN CO ID:XXXXX44001 WEB  -1,450.00",
+      "08/10/26  PUGET SOUND ENER DES:UTIL PMT ID:XXXXX22011 INDN:MICHELLE NGUYEN CO ID:XXXXX52500 WEB  -88.36",
+      "08/25/26  VERIZON WIRELESS DES:PAYMENTS ID:XXXXX61145 INDN:MICHELLE NGUYEN CO ID:XXXXX12390 PPD  -75.00",
+      "08/29/26  Online Banking payment to CRD 7711 Confirmation# 1638294057  -600.00",
+      "Card account # XXXX XXXX XXXX 3058",
+      "08/03/26  CHECKCARD 0801 TRADER JOE S #131 SEATTLE WA 24431066213100000000000  -54.12",
+      "08/04/26  CHECKCARD 0803 SQ *BLUE BOTTLE COFFEE SEATTLE WA 24692166215100000000000  -6.25",
+      "08/05/26  CHECKCARD 0804 ORCA WA STATE DEPT TRANSP SEATTLE WA 24755426216100000000000  -50.00",
+      "08/07/26  CHECKCARD 0806 STARBUCKS STORE 03391 SEATTLE WA 24431066218100000000000  -5.45",
+      "08/17/26  CHECKCARD 0815 AMAZON MKTPL*ZY12AB3C4 Amzn.com/bill WA 24692166228100000000000  -63.48",
+      "08/18/26  BKOFAMERICA ATM 08/18 #000004521 WITHDRWL SEATTLE MAIN SEATTLE WA  -120.00"
+    ],
+    [
+      "08/17/26  CHECKCARD 0815 AMAZON MKTPL*ZY12AB3C4 Amzn.com/bill WA 24692166228100000000000  -63.48",
+      "08/18/26  BKOFAMERICA ATM 08/18 #000004521 WITHDRWL SEATTLE MAIN SEATTLE WA  -120.00",
+      "08/21/26  CHECKCARD 0820 SAFEWAY #1551 SEATTLE WA 24431066233100000000000  -91.07",
+      "08/24/26  CHECKCARD 0822 TST* THE HABIT - SEATTL SEATTLE WA 24692166235100000000000  -14.89",
+      "08/27/26  CHECKCARD 0826 CVS/PHARMACY #08827 SEATTLE WA 24431066239100000000000  -22.46",
+      "Subtotal for card account # XXXX XXXX XXXX 3058  -$427.72",
+      "Total withdrawals and other subtractions  -$2,641.08",
+      "Checks",
+      "Date  Check #  Amount",
+      "08/06/26  2051  -325.00",
+      "Total checks  -$325.00",
+      "Total # of checks  1",
+      "Service fees",
+      "Date  Transaction description  Amount",
+      "08/10/26  OVERDRAFT ITEM FEE FOR ACTIVITY OF 08-10 ELECTRONIC TRANSACTION POSTING SEQ 00002  -10.00",
+      "Total service fees  -$10.00",
+      "Note your Ending Balance already reflects the subtraction of Service Fees.",
+      "Daily ledger balances",
+      "Date  Balance ($)  Date  Balance($)",
+      "08/01  462.40  08/03  408.28",
+      "08/04  402.03  08/05  352.03",
+      "08/06  27.03  08/07  21.58",
+      "08/10  -76.78  08/14  1,498.22",
+      "08/15  1,508.22  08/17  1,444.74",
+      "08/18  1,324.74  08/20  1,524.74",
+      "08/21  1,433.67  08/24  1,418.78",
+      "08/25  1,343.78  08/27  1,321.32",
+      "08/28  2,896.32  08/29  2,296.32",
+      "08/31  2,296.35"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "Bank of America",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "1912.40",
+        "closingBalance": "2296.35",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-08-01",
+            "description": "SUNSET RIDGE APTS",
+            "amount": "1450.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Sunset Ridge Apartments"
+          },
+          {
+            "date": "2026-08-03",
+            "description": "TRADER JOE S #131",
+            "amount": "54.12",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Trader Joe's"
+          },
+          {
+            "date": "2026-08-04",
+            "description": "SQ *BLUE BOTTLE COFFEE",
+            "amount": "6.25",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Blue Bottle Coffee"
+          },
+          {
+            "date": "2026-08-05",
+            "description": "ORCA WA STATE DEPT TRANSP",
+            "amount": "50.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "ORCA"
+          },
+          {
+            "date": "2026-08-06",
+            "description": "2051",
+            "amount": "325.00",
+            "direction": "OUT",
+            "kind": "CHECK",
+            "merchant": null
+          },
+          {
+            "date": "2026-08-07",
+            "description": "STARBUCKS STORE 03391",
+            "amount": "5.45",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Starbucks"
+          },
+          {
+            "date": "2026-08-10",
+            "description": "PUGET SOUND ENER",
+            "amount": "88.36",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Puget Sound Energy"
+          },
+          {
+            "date": "2026-08-10",
+            "description": "OVERDRAFT ITEM FEE",
+            "amount": "10.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-08-14",
+            "description": "BRIGHTLINE MEDICA DES:PAYROLL",
+            "amount": "1575.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-08-15",
+            "description": "REVERSAL OF OVERDRAFT ITEM FEE",
+            "amount": "10.00",
+            "direction": "IN",
+            "kind": "REVERSAL",
+            "merchant": null
+          },
+          {
+            "date": "2026-08-17",
+            "description": "AMAZON MKTPL*ZY12AB3C4",
+            "amount": "63.48",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-08-18",
+            "description": "BKOFAMERICA ATM",
+            "amount": "120.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-08-20",
+            "description": "Zelle payment from KEVIN NGUYEN",
+            "amount": "200.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-08-21",
+            "description": "SAFEWAY #1551",
+            "amount": "91.07",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Safeway"
+          },
+          {
+            "date": "2026-08-24",
+            "description": "TST* THE HABIT",
+            "amount": "14.89",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "The Habit"
+          },
+          {
+            "date": "2026-08-25",
+            "description": "VERIZON WIRELESS",
+            "amount": "75.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Verizon"
+          },
+          {
+            "date": "2026-08-27",
+            "description": "CVS/PHARMACY #08827",
+            "amount": "22.46",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "CVS Pharmacy"
+          },
+          {
+            "date": "2026-08-28",
+            "description": "BRIGHTLINE MEDICA DES:PAYROLL",
+            "amount": "1575.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-08-29",
+            "description": "Online Banking payment to CRD 7711",
+            "amount": "600.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-08-31",
+            "description": "Interest Earned",
+            "amount": "0.03",
+            "direction": "IN",
+            "kind": "INTEREST_EARNED",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Statement photographed in two overlapping shots: shot 2 starts by repeating the last two card lines of shot 1 (Amazon 63.48 and ATM 120.00); each real transaction is listed once. Includes an overdraft item fee and its reversal, a check, interest earned, a card-account subtotal and daily ledger balances (not transactions). Dates are the posting-date column."
+}

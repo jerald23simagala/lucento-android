@@ -1,0 +1,41 @@
+{
+  "id": "ph-payment-maya-qr-01",
+  "country": "PH",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-02",
+  "pages": [
+    [
+      "12:42",
+      "Payment successful",
+      "You paid",
+      "₱385.00",
+      "to MANG INASAL - SM NORTH EDSA",
+      "Payment method  Maya Wallet",
+      "Date and time  Nov 2, 2026, 12:41 PM",
+      "Reference ID  9F3A2C71B804",
+      "Transaction fee  ₱0.00",
+      "Total amount  ₱385.00",
+      "Download receipt  Share"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Mang Inasal",
+        "total": "385.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-02",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Maya",
+        "instrumentLast4": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "id": "ph-restaurant-jollibee-01",
+  "country": "PH",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-01",
+  "pages": [
+    [
+      "JOLLIBEE",
+      "Jollibee Foods Corporation",
+      "10/F Jollibee Plaza Bldg., Emerald Ave., Ortigas Center, Pasig City",
+      "JFC-SM MEGAMALL 2",
+      "Lower Ground Flr, SM Megamall Bldg. B, Mandaluyong City",
+      "VAT REG TIN: 000-388-551-00342",
+      "MIN: 160822045  SN: JB2X41107",
+      "SALES INVOICE #0342-0118847",
+      "ORDER #: 142  DINE IN",
+      "11/01/2026  12:24 PM",
+      "1 C1 1pc Chickenjoy w/ Rice  108.00",
+      "1 Jolly Spaghetti Solo  70.00",
+      "1 Yumburger  45.00",
+      "2 Coke Float Reg @ 40.00  80.00",
+      "TOTAL  303.00",
+      "CASH  500.00",
+      "CHANGE  197.00",
+      "VATable Sales  270.54",
+      "VAT Amount  32.46",
+      "VAT-Exempt Sales  0.00",
+      "Zero Rated Sales  0.00",
+      "SC/PWD Discount  0.00",
+      "Thank you! Please come again."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Jollibee",
+        "total": "303.00",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-01",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Cash",
+        "instrumentLast4": null
+      }
+    ]
+  }
+}

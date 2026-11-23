@@ -1,0 +1,200 @@
+{
+  "id": "ph-ewallet-gcash-history-01",
+  "country": "PH",
+  "type": "EWALLET_HISTORY",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "GCash",
+      "Transaction History",
+      "Name: RACHEL ANN T. SORIANO",
+      "Mobile Number: 0927 *** 1180",
+      "Date Covered: 2026-10-01 to 2026-10-31",
+      "All amounts are in PHP.",
+      "Date and Time  Description  Reference No.  Debit  Credit  Balance",
+      "STARTING BALANCE  412.35",
+      "2026-10-01 08:12 AM  Cash In from BPI  1003581274511  5,000.00  5,412.35",
+      "2026-10-01 12:30 PM  Payment to JOLLIBEE (QR)  1003686003694  289.00  5,123.35",
+      "2026-10-03 07:02 PM  Buy Load Transaction for 639271231180  1003790732877  99.00  5,024.35",
+      "2026-10-05 09:41 AM  Received GCash from JUAN D.  1003895462060  750.00  5,774.35",
+      "2026-10-06 06:20 PM  Express Send to MA**A L.  1004000191243  500.00  5,274.35",
+      "2026-10-08 07:55 AM  Bills Payment to MERALCO  1004104920426  1,932.80  3,341.55",
+      "2026-10-10 01:15 PM  Payment to SM SUPERMARKET (QR)  1004209649609  1,245.60  2,095.95",
+      "2026-10-12 10:02 AM  GSave Deposit (CIMB)  1004314378792  1,000.00  1,095.95",
+      "2026-10-15 08:30 AM  Cash In from BDO  1004419107975  3,000.00  4,095.95",
+      "2026-10-16 09:44 PM  Payment to GRAB  1004523837158  286.00  3,809.95",
+      "2026-10-18 11:10 AM  GInvest Subscription - ATRAM Global Tech Feeder Fund  1004628566341  500.00  3,309.95",
+      "2026-10-20 03:25 PM  Send Money via InstaPay to BDO 001230456789  1004733295524  1,500.00  1,809.95",
+      "2026-10-20 03:25 PM  InstaPay Transfer Fee  1004838024707  15.00  1,794.95",
+      "2026-10-23 12:48 PM  Payment to MANG INASAL (QR)  1004942753890  385.00  1,409.95",
+      "2026-10-25 05:09 PM  Received GCash from PAOLO T.  1005047483073  1,200.00  2,609.95",
+      "2026-10-28 08:31 PM  Bills Payment to CONVERGE ICT  1005152212256  1,500.00  1,109.95",
+      "2026-10-30 09:00 AM  Buy Load Transaction for 639271231180  1005256941439  50.00  1,059.95",
+      "ENDING BALANCE  1,059.95",
+      "Total Debit  9,302.40",
+      "Total Credit  9,950.00",
+      "G-Xchange, Inc. is regulated by the Bangko Sentral ng Pilipinas.",
+      "Page 1 of 1"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "EWALLET",
+        "institution": "GCash",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "412.35",
+        "closingBalance": "1059.95",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "Cash In from BPI",
+            "amount": "5000.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-01",
+            "description": "Payment to JOLLIBEE (QR)",
+            "amount": "289.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Jollibee"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "Buy Load Transaction for 639271231180",
+            "amount": "99.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Globe"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "Received GCash from JUAN D.",
+            "amount": "750.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-06",
+            "description": "Express Send to MA**A L.",
+            "amount": "500.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-08",
+            "description": "Bills Payment to MERALCO",
+            "amount": "1932.80",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "Payment to SM SUPERMARKET (QR)",
+            "amount": "1245.60",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SM Supermarket"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "GSave Deposit (CIMB)",
+            "amount": "1000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Cash In from BDO",
+            "amount": "3000.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-16",
+            "description": "Payment to GRAB",
+            "amount": "286.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Grab"
+          },
+          {
+            "date": "2026-10-18",
+            "description": "GInvest Subscription - ATRAM Global Tech Feeder Fund",
+            "amount": "500.00",
+            "direction": "OUT",
+            "kind": "OTHER",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "Send Money via InstaPay to BDO 001230456789",
+            "amount": "1500.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "InstaPay Transfer Fee",
+            "amount": "15.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-23",
+            "description": "Payment to MANG INASAL (QR)",
+            "amount": "385.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Mang Inasal"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "Received GCash from PAOLO T.",
+            "amount": "1200.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-28",
+            "description": "Bills Payment to CONVERGE ICT",
+            "amount": "1500.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Converge"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "Buy Load Transaction for 639271231180",
+            "amount": "50.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Globe"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "GCash emailed history: ISO dates with times, 13-digit reference numbers, one amount cell then the running balance. Buy Load is a prepaid-load purchase (Globe). GInvest subscription is an investment (kind OTHER); GSave deposit moves money to savings."
+}

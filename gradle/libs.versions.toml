@@ -29,6 +29,8 @@ androidxTestRunner = "1.6.2"
 androidxEspresso = "3.7.0"
 # Bundled on-device text recognition (Latin). The model ships inside the APK; no download, no network.
 mlkitTextRecognition = "16.0.1"
+# ML Kit Document Scanner (GA): edge detection, perspective fix, multi-page; runs in Google Play services, on the device.
+mlkitDocumentScanner = "16.0.0"
 # Optional cloud sync (see docs/SYNC.md) — the only reason this app ever talks to the network, and only once
 # the user explicitly opts in. supabase-kt needs one Ktor HTTP engine and kotlinx-datetime; WorkManager runs
 # the background push/pull; Credential Manager + the Google ID library drive Google Sign-In.
@@ -84,6 +86,7 @@ androidx-biometric = { group = "androidx.biometric", name = "biometric", version
 androidx-fragment-ktx = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "fragment" }
 play-billing = { group = "com.android.billingclient", name = "billing", version.ref = "billing" }
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+mlkit-document-scanner = { group = "com.google.android.gms", name = "play-services-mlkit-document-scanner", version.ref = "mlkitDocumentScanner" }
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }

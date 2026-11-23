@@ -1,0 +1,46 @@
+{
+  "id": "us-refund-amazon-01",
+  "country": "US",
+  "type": "REFUND",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-11",
+  "pages": [
+    [
+      "amazon",
+      "Your refund for order #112-4419283-5521906",
+      "Hello Samantha,",
+      "We've issued your refund of $34.97 for 1 item from order #112-4419283-5521906.",
+      "Refund date: November 10, 2026",
+      "Refund summary",
+      "Item refund  Anker Nano Charger 30W  $31.72",
+      "Tax refund  $3.25",
+      "Shipping refund  $0.00",
+      "Total refund  $34.97",
+      "Refunded to  Visa ending in 4108",
+      "Your refund will appear on your statement within 3-5 business days.",
+      "Order placed October 28, 2026",
+      "Ship to: Samantha Ortiz, 8216 Greenwood Ave N, Seattle, WA 98103",
+      "Amazon.com, 410 Terry Ave N, Seattle, WA 98109"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Amazon",
+        "total": "34.97",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-10",
+        "dateAmbiguous": false,
+        "direction": "IN",
+        "category": "refund",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "4108"
+      }
+    ]
+  },
+  "notes": "Refund email: item + tax = total refund. The order date (Oct 28) is not the refund date."
+}

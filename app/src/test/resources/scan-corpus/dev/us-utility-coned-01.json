@@ -1,0 +1,58 @@
+{
+  "id": "us-utility-coned-01",
+  "country": "US",
+  "type": "UTILITY_BILL",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-04",
+  "pages": [
+    [
+      "conEdison",
+      "Your billing summary",
+      "Account number: 46-1234-5678-0012-3",
+      "Bill date: October 14, 2026",
+      "Billing period: Sep 12, 2026 to Oct 13, 2026 (31 days)",
+      "Service for:",
+      "OLIVIA CHEN",
+      "245 E 82ND ST APT 4C",
+      "NEW YORK NY 10028",
+      "Total amount due by Nov 3, 2026  $131.88",
+      "Your previous bill  $118.20",
+      "Payment received Sep 29, 2026 - Thank you  -$118.20",
+      "Your balance  $0.00",
+      "Your current charges",
+      "Electricity (Rate EL1 Residential)  $131.88",
+      "Delivery charges  $71.12",
+      "Supply charges  $55.08",
+      "Sales tax  $5.68",
+      "Total current charges  $131.88",
+      "Total amount due  $131.88",
+      "Your electricity use",
+      "Meter # 000123456  Actual reading Oct 13  42118  Previous Sep 12  41706",
+      "Total usage  412 kWh  Avg daily use 13.3 kWh",
+      "Pay online at conEd.com/billpay or call 1-800-752-6633",
+      "Please return this portion with your payment",
+      "Account number 46-1234-5678-0012-3  Amount due $131.88  Due by Nov 3, 2026",
+      "Con Edison  JAF Station  P.O. Box 1702  New York, NY 10116-1702"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Con Edison",
+        "total": "131.88",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-14",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "utilities",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Amount due is the current charges; the previous bill and its payment are history. Date is the bill date, not the due date."
+}

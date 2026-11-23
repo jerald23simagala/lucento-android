@@ -1,0 +1,68 @@
+{
+  "id": "us-receipt-costco-01",
+  "country": "US",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-25",
+  "pages": [
+    [
+      "COSTCO",
+      "WHOLESALE",
+      "Kirkland #1",
+      "8629 120th Ave NE",
+      "Kirkland, WA 98033",
+      "Member 111812345678",
+      "E  1234567  KS PAPER TOWEL  23.99 A",
+      "345678 / 1234567  5.00-A",
+      "E  512515  ORG BANANAS  1.99",
+      "E  1069829  KS ORG EGGS 24CT  8.49",
+      "E  1117045  ROTISSERIE CHKN  4.99",
+      "E  1580393  KS ALMONDS 3LB  15.99",
+      "E  1298332  TIDE PODS 156CT  32.99 A",
+      "E  964120  KS WATER 40PK  4.49",
+      "SUBTOTAL  87.93",
+      "TAX  5.35",
+      "****  TOTAL  93.28",
+      "XXXXXXXXXXXX8834  CHIP Read",
+      "AID: A0000000031010",
+      "Seq# 18624  App#: 07211D",
+      "Visa  Resp: APPROVED",
+      "Tran ID#: 629700018624....",
+      "APPROVED - Purchase",
+      "AMOUNT: $93.28",
+      "10/24/2026 15:48 1 18 624 133",
+      "Visa  93.28",
+      "CHANGE  0.00",
+      "A 10.3% TAX  5.35",
+      "TOTAL TAX  5.35",
+      "TOTAL NUMBER OF ITEMS SOLD = 7",
+      "INSTANT SAVINGS  $5.00",
+      "10/24/2026 15:48 1 18 624 133",
+      "OP#: 133 Name: Eric R.",
+      "Thank You!",
+      "Please Come Again",
+      "Whse: 1 Trm: 18 Trn: 624 OP: 133",
+      "Items Sold: 7"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Costco",
+        "total": "93.28",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-24",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "8834"
+      }
+    ]
+  },
+  "notes": "Instant savings printed with a trailing minus (5.00-A)."
+}

@@ -1,0 +1,51 @@
+{
+  "id": "ph-invoice-aircon-service-01",
+  "country": "PH",
+  "type": "INVOICE",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-20",
+  "pages": [
+    [
+      "COOLBREEZE AIRCON SERVICES",
+      "Blk 3 Lot 9 Mabuhay St., Brgy. San Isidro, Parañaque City",
+      "Mobile: 0917 555 0148 | coolbreeze.ph@gmail.com",
+      "VAT REG TIN: 456-789-012-00000",
+      "SALES INVOICE  No. 2026-0412",
+      "Date: 10/19/2026",
+      "Customer: JOANNA DELA CRUZ",
+      "Address: Unit 12B The Grove Tower, C5 Road, Ugong, Pasig City",
+      "QTY  DESCRIPTION  UNIT PRICE  AMOUNT",
+      "2  General cleaning - window type aircon  800.00  1,600.00",
+      "1  General cleaning - split type 1.5HP  1,500.00  1,500.00",
+      "1  Freon recharge (R32) - split type  2,200.00  2,200.00",
+      "Total Sales (VAT Inclusive)  5,300.00",
+      "Less: VAT  567.86",
+      "Amount: Net of VAT  4,732.14",
+      "Add: VAT  567.86",
+      "TOTAL AMOUNT DUE  5,300.00",
+      "Terms: Payable upon completion. GCash 0917 555 0148 / BDO 0045-6789-0123",
+      "Received the above services in good condition.",
+      "Customer signature: ______________"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "CoolBreeze Aircon Services",
+        "total": "5300.00",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-19",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "housing",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "VAT-inclusive service invoice; net + VAT = total. 10/19/2026 is unambiguous (19 cannot be a month). Payment method not yet chosen."
+}

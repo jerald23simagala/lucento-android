@@ -1,0 +1,249 @@
+{
+  "id": "us-card-citi-01",
+  "country": "US",
+  "type": "CARD_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-21",
+  "pages": [
+    [
+      "citi",
+      "Citi Double Cash(R) Card",
+      "PRIYA SHAH",
+      "Member Since 2019",
+      "Billing Period: 09/27/26-10/26/26",
+      "Account number ending in: 5521",
+      "Customer Service 1-888-766-2484",
+      "Minimum payment due: $41.00",
+      "New balance: $1,132.93",
+      "Payment due date: 11/20/26",
+      "Late Payment Warning: If we do not receive your minimum payment by the date listed above, you may have to pay",
+      "a late fee of up to $41 and your APRs may be increased up to the Penalty APR of 29.99%.",
+      "Account Summary",
+      "Previous balance  $904.33",
+      "Payments  -$904.33",
+      "Credits  -$24.99",
+      "Purchases  +$1,144.88",
+      "Cash advances  +$0.00",
+      "Fees  +$13.04",
+      "Interest  +$0.00",
+      "New balance  $1,132.93",
+      "Credit limit  $9,500.00",
+      "Available credit  $8,367.07",
+      "Cash advance limit  $2,850.00",
+      "Available credit for cash advance  $2,850.00",
+      "Rewards: 2% cash back balance $54.18",
+      "PRIYA SHAH",
+      "88 LEXINGTON AVE APT 9F",
+      "NEW YORK NY 10016-8114",
+      "Page 1 of 3"
+    ],
+    [
+      "PRIYA SHAH  Account number ending in: 5521  Billing Period: 09/27/26-10/26/26  Page 2 of 3",
+      "Payments, Credits and Adjustments",
+      "Sale Date  Post Date  Description  Amount",
+      "10/15  10/15  AUTOPAY PAYMENT - THANK YOU  -$904.33",
+      "10/03  10/04  NORDSTROM RACK #0560 NEW YORK NY  -$24.99",
+      "Standard Purchases",
+      "Sale Date  Post Date  Description  Amount",
+      "09/28  09/29  WHOLE FOODS MKT #10341 NEW YORK NY  $52.18",
+      "09/30  10/01  MTA*NYCT PAYGO NEW YORK NY  $34.00",
+      "10/01  10/02  SWEETGREEN NOHO NEW YORK NY  $16.45",
+      "10/02  10/03  NORDSTROM RACK #0560 NEW YORK NY  $74.97",
+      "10/05  10/06  SPOTIFY USA 877-7781161 NY  $11.99",
+      "10/07  10/08  DELTA AIR LINES ATLANTA GA  $318.40",
+      "10/09  10/10  TIM HORTONS #4412 TORONTO ON  $6.21",
+      "8.45 CANADIAN DOLLAR",
+      "10/10  10/11  FAIRMONT ROYAL YORK TORONTO ON  $412.88",
+      "561.80 CANADIAN DOLLAR",
+      "10/11  10/12  TTC PRESTO TORONTO ON  $15.43",
+      "21.00 CANADIAN DOLLAR",
+      "10/14  10/15  UBER *TRIP HELP.UBER.COM CA  $27.60",
+      "10/18  10/19  TRADER JOE'S #540 NEW YORK NY  $61.29",
+      "10/22  10/23  CON ED OF NY 800-752-6633 NY  $95.12",
+      "10/25  10/26  CVS/PHARMACY #10012 NEW YORK NY  $18.36",
+      "Fees Charged",
+      "Date  Description  Amount",
+      "10/10  FOREIGN TRANSACTION FEE  $0.19",
+      "10/11  FOREIGN TRANSACTION FEE  $12.39",
+      "10/12  FOREIGN TRANSACTION FEE  $0.46",
+      "TOTAL FEES FOR THIS PERIOD  $13.04",
+      "Interest Charged",
+      "INTEREST CHARGED TO STANDARD PURCH  $0.00",
+      "TOTAL INTEREST FOR THIS PERIOD  $0.00",
+      "2026 totals year-to-date",
+      "Total fees charged in 2026  $15.08",
+      "Total interest charged in 2026  $0.00",
+      "Interest charge calculation  Days in billing cycle: 30",
+      "Balance type  Annual percentage rate (APR)  Balance subject to interest rate  Interest charge",
+      "Standard Purch  19.24% (V)  $0.00  $0.00",
+      "Standard Adv  29.99% (V)  $0.00  $0.00"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "Citi",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "904.33",
+        "closingBalance": "1132.93",
+        "statementBalance": "1132.93",
+        "minimumPayment": "41.00",
+        "paymentDueDate": "2026-11-20",
+        "creditLimit": "9500.00",
+        "availableCredit": "8367.07",
+        "transactions": [
+          {
+            "date": "2026-10-15",
+            "description": "AUTOPAY PAYMENT - THANK YOU",
+            "amount": "904.33",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-03",
+            "description": "NORDSTROM RACK #0560",
+            "amount": "24.99",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "Nordstrom Rack"
+          },
+          {
+            "date": "2026-09-28",
+            "description": "WHOLE FOODS MKT #10341",
+            "amount": "52.18",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Whole Foods"
+          },
+          {
+            "date": "2026-09-30",
+            "description": "MTA*NYCT PAYGO",
+            "amount": "34.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "MTA"
+          },
+          {
+            "date": "2026-10-01",
+            "description": "SWEETGREEN NOHO",
+            "amount": "16.45",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Sweetgreen"
+          },
+          {
+            "date": "2026-10-02",
+            "description": "NORDSTROM RACK #0560",
+            "amount": "74.97",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Nordstrom Rack"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "SPOTIFY USA",
+            "amount": "11.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Spotify"
+          },
+          {
+            "date": "2026-10-07",
+            "description": "DELTA AIR LINES",
+            "amount": "318.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Delta Air Lines"
+          },
+          {
+            "date": "2026-10-09",
+            "description": "TIM HORTONS #4412",
+            "amount": "6.21",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Tim Hortons"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "FAIRMONT ROYAL YORK",
+            "amount": "412.88",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Fairmont Royal York"
+          },
+          {
+            "date": "2026-10-11",
+            "description": "TTC PRESTO",
+            "amount": "15.43",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "TTC"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "UBER *TRIP",
+            "amount": "27.60",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Uber"
+          },
+          {
+            "date": "2026-10-18",
+            "description": "TRADER JOE'S #540",
+            "amount": "61.29",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Trader Joe's"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "CON ED OF NY",
+            "amount": "95.12",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Con Edison"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "CVS/PHARMACY #10012",
+            "amount": "18.36",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "CVS Pharmacy"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "FOREIGN TRANSACTION FEE",
+            "amount": "0.19",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-11",
+            "description": "FOREIGN TRANSACTION FEE",
+            "amount": "12.39",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-12",
+            "description": "FOREIGN TRANSACTION FEE",
+            "amount": "0.46",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Three charges in Canadian dollars show the C$ amount on a continuation line ('8.45 CANADIAN DOLLAR'); the USD amount is the charge. 3% foreign transaction fees are dated by post date. Dates are Sale Date. Cash-back rewards and YTD totals are not transactions."
+}

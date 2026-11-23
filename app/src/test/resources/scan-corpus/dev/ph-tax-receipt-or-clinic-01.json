@@ -1,0 +1,53 @@
+{
+  "id": "ph-tax-receipt-or-clinic-01",
+  "country": "PH",
+  "type": "TAX_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-06",
+  "pages": [
+    [
+      "SMILECRAFT DENTAL CLINIC",
+      "DRA. PATRICIA G. LIM, DMD - Prop.",
+      "Unit 305, Medical Plaza Ortigas, San Miguel Ave., Pasig City",
+      "NON-VAT REG TIN: 234-567-891-00000",
+      "SERVICE INVOICE  No. 0001287",
+      "Date: November 05, 2026",
+      "Sold to: ANGELICA P. MENDOZA",
+      "TIN: ______________  Address: Quezon City",
+      "Particulars  Amount",
+      "Oral prophylaxis  1,500.00",
+      "Composite filling (1 surface) x2  3,000.00",
+      "Periapical x-ray  500.00",
+      "TOTAL AMOUNT DUE  5,000.00",
+      "Less: Discount (SC/PWD)  0.00",
+      "Total Sales  5,000.00",
+      "Form of payment:  [x] Cash  [ ] Check  [ ] GCash/Maya",
+      "Cash  5,000.00",
+      "THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX",
+      "BIR Authority to Print No. OCN 049AU20260000012345",
+      "Date of ATP: 01/15/2026",
+      "Printer: ABC Printing Press  TIN 123-456-789-000",
+      "By: ______________ Authorized Signature"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "SmileCraft Dental Clinic",
+        "total": "5000.00",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-05",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dental",
+        "paymentInstrument": "Cash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Non-VAT BIR service invoice from a dental clinic. The ATP date (01/15/2026) is the printer's permit date, not the transaction date."
+}

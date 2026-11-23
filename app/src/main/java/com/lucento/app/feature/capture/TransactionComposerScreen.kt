@@ -4,11 +4,7 @@ import com.lucento.app.feature.fx.FxOfflineChoice
 import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import com.lucento.app.core.designsystem.component.SheetHeader
-import android.content.ActivityNotFoundException
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,6 +41,7 @@ import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -74,7 +71,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.ConfirmDialog
@@ -97,7 +93,6 @@ import com.lucento.app.domain.capture.CaptureSource
 import com.lucento.app.domain.capture.ReviewRow
 import com.lucento.app.domain.capture.RowEdit
 import com.lucento.app.feature.wallets.WalletRow
-import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
 import com.lucento.app.core.designsystem.component.ChatDayDivider
@@ -157,7 +152,6 @@ fun TransactionComposerScreen(
     var pickingDateFor by remember { mutableStateOf<String?>(null) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var started by rememberSaveable { mutableStateOf(false) }
-    var pendingPhoto by remember { mutableStateOf<File?>(null) }
     var scanMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
@@ -191,44 +185,18 @@ fun TransactionComposerScreen(
         onLeft = { heard -> input = SpeechRequest.intoField(input, heard, MESSAGE_LIMIT) },
     )
 
-    // ---------------------------------------------------------------- receipts (system camera or photo picker; read on this phone)
-    val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
-        val file = pendingPhoto
-        pendingPhoto = null
-        if (saved && file != null) {
-            viewModel.readReceipt(context.applicationContext, FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file), cleanup = file)
-        } else {
-            file?.delete()
-        }
-    }
-    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) viewModel.readReceipt(context.applicationContext, uri, cleanup = null)
-    }
-
-    fun launchCamera() {
-        val dir = File(context.cacheDir, "receipts").apply { mkdirs() }
-        val file = File(dir, "receipt-${System.currentTimeMillis()}.jpg")
-        pendingPhoto = file
-        try {
-            takePicture.launch(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
-        } catch (e: ActivityNotFoundException) {
-            pendingPhoto = null
-            file.delete()
-            viewModel.receiptUnavailable("No camera app is available. Choose an image instead.")
-        }
-    }
-
-    fun launchPicker() {
-        try {
-            pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-        } catch (e: ActivityNotFoundException) {
-            viewModel.receiptUnavailable("No photo picker is available on this phone.")
-        }
-    }
+    // ---------------------------------------------------------------- documents (Document Scanner, camera, images, PDF; read on this phone)
+    // A locked PDF waits here for its password: the file, and whether a password was already tried and refused.
+    var lockedPdf by remember { mutableStateOf<Pair<android.net.Uri, Boolean>?>(null) }
+    val scan = rememberScanLaunchers(
+        viewModel,
+        onPdfLocked = { uri, wrong -> lockedPdf = uri to wrong },
+        onNotice = { notice = it },
+    )
 
     fun begin(mode: ComposerStart) = when (mode) {
         ComposerStart.SPEAK -> if (voiceEnabled) voice.listen() else Unit
-        ComposerStart.SCAN -> if (scanEnabled) launchCamera() else Unit
+        ComposerStart.SCAN -> if (scanEnabled) scan.scanDocument() else Unit
         ComposerStart.TYPE -> Unit
     }
 
@@ -355,6 +323,10 @@ fun TransactionComposerScreen(
                                 fx = state.fx[row.key],
                             )
                         }
+                        // A scan checked against the ledger: what was held back, the balance, fees, a card's figures.
+                        (message.state as? MessageState.Read)?.takeIf { it.held.isNotEmpty() || it.statements.isNotEmpty() }?.let { read ->
+                            StatementCheck(read, state.wallets, onAddHeld = { index -> viewModel.addHeld(message.id, index) })
+                        }
                     }
                 }
             }
@@ -430,22 +402,40 @@ fun TransactionComposerScreen(
         ) {
             if (scanEnabled) {
                 Box {
-                    ChatToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt or statement", onClick = { scanMenu = true })
+                    ChatToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt, bill or statement", onClick = { scanMenu = true })
                     DropdownMenu(expanded = scanMenu, onDismissRequest = { scanMenu = false }) {
+                        // The Document Scanner flattens paper and takes several pages; the plain camera stays for phones
+                        // where it can't run, and for a quick single photo.
+                        DropdownMenuItem(
+                            text = { Text("Scan pages") },
+                            leadingIcon = { Icon(Icons.Outlined.DocumentScanner, contentDescription = null) },
+                            onClick = {
+                                scanMenu = false
+                                scan.scanDocument()
+                            },
+                        )
                         DropdownMenuItem(
                             text = { Text("Take a photo") },
                             leadingIcon = { Icon(Icons.Outlined.CameraAlt, contentDescription = null) },
                             onClick = {
                                 scanMenu = false
-                                launchCamera()
+                                scan.takePhoto()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Choose an image") },
+                            text = { Text("Choose images") },
                             leadingIcon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null) },
                             onClick = {
                                 scanMenu = false
-                                launchPicker()
+                                scan.chooseImages()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Import a PDF") },
+                            leadingIcon = { Icon(Icons.Outlined.PictureAsPdf, contentDescription = null) },
+                            onClick = {
+                                scanMenu = false
+                                scan.importPdf()
                             },
                         )
                     }
@@ -511,6 +501,17 @@ fun TransactionComposerScreen(
     }
 
     VoiceInputSheets(voice)
+
+    lockedPdf?.let { (uri, wrong) ->
+        PdfPasswordDialog(
+            wrong = wrong,
+            onUnlock = { password ->
+                lockedPdf = null
+                viewModel.readPdf(context.applicationContext, uri, password) { again -> lockedPdf = uri to again }
+            },
+            onDismiss = { lockedPdf = null },
+        )
+    }
 
     if (confirmDiscard) {
         val n = state.rows.size
@@ -793,6 +794,8 @@ private fun Response(
             is MessageState.Read -> {
                 val text = when {
                     rows.isEmpty() && s.saved > 0 -> if (s.saved == 1) "Saved." else "Saved all ${s.saved}."
+                    // Every line of the scan is saved already (or waiting above): nothing new to add.
+                    rows.isEmpty() && s.found == 0 && s.held.isNotEmpty() -> "Everything here is already in Lucento — nothing new to add."
                     rows.isEmpty() -> "Removed."
                     needsAttention == 0 -> if (rows.size == 1) "Got it! Here’s the transaction I’ll add:" else "Got it! Here are ${rows.size} transactions I’ll add:"
                     needsAttention == 1 -> if (rows.size == 1) "Here’s what I read — it needs a look:" else "Here are ${rows.size} transactions — 1 needs a look:"
@@ -800,7 +803,7 @@ private fun Response(
                 }
                 Text(text, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), modifier = live)
                 // A scan says what it was read as (one receipt, or a statement's lines) and what to check.
-                if (rows.isNotEmpty()) {
+                if (rows.isNotEmpty() || s.held.isNotEmpty()) {
                     s.note?.let { note ->
                         Text(
                             note,

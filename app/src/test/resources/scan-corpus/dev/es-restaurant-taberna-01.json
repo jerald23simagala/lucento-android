@@ -1,0 +1,52 @@
+{
+  "id": "es-restaurant-taberna-01",
+  "country": "ES",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-25",
+  "pages": [
+    [
+      "TABERNA EL SUR",
+      "C/ de la Torrecilla del Leal, 12",
+      "28012 Madrid",
+      "NIF: B87654321",
+      "Tel. 914 27 89 33",
+      "FACTURA SIMPLIFICADA N.º T1-004417",
+      "Fecha: 24/10/2026  Hora: 22:15",
+      "Mesa: 7  Comensales: 2  Camarero: Luis",
+      "2  CAÑA MAHOU  2,80  5,60",
+      "1  TORTILLA DE PATATAS  9,50",
+      "1  CROQUETAS JAMÓN (6)  8,40",
+      "1  PULPO A LA GALLEGA  18,90",
+      "2  PAN  1,00  2,00",
+      "1  FLAN CASERO  4,50",
+      "BASE IMPONIBLE  44,45",
+      "IVA 10%  4,45",
+      "TOTAL  48,90 €",
+      "TARJETA  48,90",
+      "MASTERCARD  ************2290",
+      "IVA INCLUIDO",
+      "Gracias por su visita"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Taberna El Sur",
+        "total": "48.90",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-24",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "2290"
+      }
+    ]
+  },
+  "notes": "Spanish simplified invoice; prices include IVA 10%, base + IVA = total. No tip line."
+}

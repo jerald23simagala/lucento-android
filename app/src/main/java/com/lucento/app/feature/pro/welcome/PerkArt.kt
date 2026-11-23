@@ -49,8 +49,7 @@ import kotlin.math.hypot
  * sprites, never redrawn), so it hops in as the card turns, floats a little and rests, in a pose that suits the card
  * ([mascot]), over a soft shadow that shrinks as it rises. The props are soft-3D cut-outs trimmed to what is visible
  * (docs/design/illustrations/perks, tools/illustrations/export_perk_art.py), so the pair is sized and placed by what
- * really shows ([pairLayout]): as large as the band allows, centred a little below the middle, the torch's glow kept
- * inside the band. Like the medal, a card is an object: its art looks the same in every theme. Decorative: the card's
+ * really shows ([pairLayout]): as large as the band allows, centred, a little below the middle. Like the medal, a card is an object: its art looks the same in every theme. Decorative: the card's
  * words say everything it shows, so TalkBack skips it.
  */
 @Composable
@@ -141,7 +140,9 @@ private val CharacterShapes = listOf(
  * picture's width: a baked shadow runs further) to where the pose's character starts ([poseLeft] of its box), so a hair
  * tip or an elbow never grazes it and no card leaves a wide stripe between them. The pair stays together
  * at every band shape (critic, app round 2: spreading them apart on wide bands split the picture), centred on what
- * shows, a little below the middle, with the glow inside the band. The mascot is at most 0.88 of the band's height, so
+ * shows, a little below the middle. The size leaves room for the glow, but the centring doesn't move for it: on the
+ * widest pairs its faint outer edge is cut at the band's edge (owner, OT-48 call 2 B). The mascot is at most 0.88 of
+ * the band's height, so
  * its arrival hop (it rises about 9 % of its size) never takes the hair past the band's top.
  */
 internal fun pairLayout(
@@ -168,10 +169,9 @@ internal fun pairLayout(
     val mascotY = top - groupTop
     val propY = mascotY + feet - propHeight
     val shows = propWidth * solid - reach + (CharacterRight - start) * m
-    val left = (width - shows) / 2f
-    // Keep the torch's glow inside the band: move the pair left if it would spill over the right edge.
-    val spill = (left + propWidth * solid - reach - start * m + (CharacterRight + GlowBeyond) * m) - (width - 2f)
-    val propX = (left - spill.coerceAtLeast(0f)).coerceAtLeast(SideRoom / 2f)
+    // Centred on what shows, on every card (owner, 2026-11-22, OT-48 call 2 B): on the widest pairs the faint outer edge
+    // of the torch's glow runs past the band's edge and is cut there, rather than those pairs sitting left of centre.
+    val propX = ((width - shows) / 2f).coerceAtLeast(SideRoom / 2f)
     val mascotX = propX + propWidth * solid - reach - start * m
     return PairLayout(m, mascotX, mascotY, propWidth, propHeight, propX, propY)
 }

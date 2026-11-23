@@ -1,0 +1,51 @@
+{
+  "id": "in-restaurant-gst-01",
+  "country": "IN",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-08",
+  "pages": [
+    [
+      "TRUFFLES",
+      "93, 4th B Cross, Koramangala 5th Block, Bengaluru 560095",
+      "GSTIN: 29AABCT1234F1Z5",
+      "FSSAI Lic No. 11218331000123",
+      "TAX INVOICE",
+      "Bill No: KOR/2026/18842",
+      "Date: 07/10/2026  Time: 21:02",
+      "Table: 7  Covers: 2  Steward: Ravi",
+      "1 All American Cheese Burger  ₹395.00",
+      "1 Peri Peri Chicken Pasta  ₹425.00",
+      "2 Fresh Lime Soda @ 120.00  ₹240.00",
+      "1 Chocolate Brownie with Ice Cream  ₹245.00",
+      "Sub Total  ₹1,305.00",
+      "CGST @ 2.5%  ₹32.63",
+      "SGST @ 2.5%  ₹32.63",
+      "Round Off  -0.26",
+      "Grand Total  ₹1,370.00",
+      "Paid via UPI - Google Pay  ₹1,370.00",
+      "UPI Ref No. 629841127733",
+      "Service charge not levied. Thank you, visit again!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Truffles",
+        "total": "1370.00",
+        "currency": "INR",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-07",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Google Pay",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Indian tax invoice: CGST 2.5% + SGST 2.5% then a round-off of -0.26 to a whole-rupee grand total. 07/10/2026 is 7 October (Indian day-first; Bengaluru address and GSTIN)."
+}

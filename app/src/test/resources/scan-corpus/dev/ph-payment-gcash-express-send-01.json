@@ -1,0 +1,44 @@
+{
+  "id": "ph-payment-gcash-express-send-01",
+  "country": "PH",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-14",
+  "pages": [
+    [
+      "9:41",
+      "GCash",
+      "Express Send",
+      "Sent via GCash",
+      "MA**A L.",
+      "+63 917 *** 4821",
+      "Amount  500.00",
+      "Total Amount Sent  ₱500.00",
+      "Message",
+      "for kuryente share",
+      "Ref No. 1012 593 287461",
+      "Nov 14, 2026 7:32 PM",
+      "Done"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": null,
+        "total": "500.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-14",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "transfer",
+        "paymentInstrument": "GCash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Person-to-person Express Send; the message mentions electricity but the money went to a person, so category transfer and merchant null."
+}

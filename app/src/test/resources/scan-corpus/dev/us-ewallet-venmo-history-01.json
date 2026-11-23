@@ -1,0 +1,142 @@
+{
+  "id": "us-ewallet-venmo-history-01",
+  "country": "US",
+  "type": "EWALLET_HISTORY",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-09",
+  "pages": [
+    [
+      "9:58",
+      "Me",
+      "Venmo balance",
+      "$137.25",
+      "Transfer  Add money",
+      "Transactions",
+      "Completed",
+      "You paid Alex Chen  - $42.50",
+      "pizza + drinks fri  Nov 8",
+      "Priya Shah paid you  + $25.00",
+      "uber split  Nov 7",
+      "You paid Blue Bottle Coffee  - $6.75",
+      "Purchase  Nov 5",
+      "Transfer to Chase ...4421  - $120.00",
+      "Standard transfer  Nov 4",
+      "Marcus Bell paid you  + $85.00",
+      "concert tix  Nov 2",
+      "You paid Sofia Ramirez  - $18.20",
+      "halloween party supplies  Oct 31",
+      "Daniel Reyes paid you  + $40.00",
+      "gas money  Oct 29",
+      "You paid Philz Coffee  - $5.95",
+      "Purchase  Oct 27",
+      "Added money from Chase ...4421  + $100.00",
+      "Add to balance  Oct 25",
+      "You paid Kevin Nguyen  - $64.30",
+      "october utilities  Oct 23",
+      "Home  Cards  Pay/Request  Crypto  Me"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "EWALLET",
+        "institution": "Venmo",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": null,
+        "closingBalance": "137.25",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-11-08",
+            "description": "You paid Alex Chen",
+            "amount": "42.50",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-07",
+            "description": "Priya Shah paid you",
+            "amount": "25.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-05",
+            "description": "You paid Blue Bottle Coffee",
+            "amount": "6.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Blue Bottle Coffee"
+          },
+          {
+            "date": "2026-11-04",
+            "description": "Transfer to Chase",
+            "amount": "120.00",
+            "direction": "OUT",
+            "kind": "CASH_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-11-02",
+            "description": "Marcus Bell paid you",
+            "amount": "85.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "You paid Sofia Ramirez",
+            "amount": "18.20",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-29",
+            "description": "Daniel Reyes paid you",
+            "amount": "40.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-27",
+            "description": "You paid Philz Coffee",
+            "amount": "5.95",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Philz Coffee"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "Added money from Chase",
+            "amount": "100.00",
+            "direction": "IN",
+            "kind": "CASH_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-23",
+            "description": "You paid Kevin Nguyen",
+            "amount": "64.30",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "App list screenshot: each entry is a title line with a signed amount and a note line with the date (no year; 2026 from today). The balance at the top is the current balance (closingBalance); no opening balance is shown. Venmo is US-only."
+}

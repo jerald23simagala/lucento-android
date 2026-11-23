@@ -1,0 +1,43 @@
+{
+  "id": "gb-invoice-tutor-01",
+  "country": "GB",
+  "type": "INVOICE",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-12",
+  "pages": [
+    [
+      "INVOICE",
+      "Invoice No: 0042",
+      "Date: 05/11/2026",
+      "From: Eleanor Hughes - Math & Physics Tutoring",
+      "eleanor.hughes.tutor@example.com",
+      "To: Mr & Mrs Okafor",
+      "Description  Qty  Rate  Amount",
+      "Math tutoring (1 hr)  4  45.00  180.00",
+      "Practice paper pack  1  12.50  12.50",
+      "Total due  192.50",
+      "Payment by bank transfer within 14 days.",
+      "Thank you!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Eleanor Hughes",
+        "total": "192.50",
+        "currency": "GBP",
+        "currencyEvidence": "NONE",
+        "date": "2026-11-05",
+        "dateAmbiguous": true,
+        "direction": "OUT",
+        "category": "education",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Freelance invoice with no address, currency, tax number or phone. 05/11/2026 is 5 November (truth, UK tutor) or May 11; nothing on the page settles it. Currency is GBP for scoring only."
+}

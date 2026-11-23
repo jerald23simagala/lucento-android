@@ -1,0 +1,55 @@
+{
+  "id": "us-restaurant-tip-filled-01",
+  "country": "US",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-17",
+  "pages": [
+    [
+      "THE PINK DOOR",
+      "1919 Post Alley",
+      "Seattle, WA 98101",
+      "(206) 443-3241",
+      "Server: Alyssa",
+      "Table 14  Guests: 2",
+      "Check #4417",
+      "Ordered: 10/16/2026 8:52 PM",
+      "1 Linguine alle Vongole  $29.00",
+      "1 Rigatoni Bolognese  $26.00",
+      "1 Burrata  $18.00",
+      "2 Glass Chianti  $28.00",
+      "2 @ $14.00",
+      "Subtotal  $101.00",
+      "Tax  $10.45",
+      "Total  $111.45",
+      "Mastercard (Contactless)",
+      "xxxxxxxxxxxx6214",
+      "Approval: 051922",
+      "Tip  $20.00",
+      "Total  $131.45",
+      "Thank you for dining with us!",
+      "Powered by Toast",
+      "Order #4417  10/16/2026 10:31 PM"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "The Pink Door",
+        "total": "131.45",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-16",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "dining",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "6214"
+      }
+    ]
+  },
+  "notes": "Two Total lines: pre-tip 111.45 and final 131.45 after the $20 tip. Truth is the final total."
+}

@@ -778,26 +778,29 @@ internal fun CloudSyncSection(
                     )
                 }
                 // Tester round 3: the password and the account's deletion each get their own clearly marked section, so
-                // nobody mistakes one for the other.
-                SectionHeader(
-                    "Password",
-                    Modifier.padding(top = Spacing.section),
-                    supporting = "For signing in with your email. Signing in with Google doesn’t use it.",
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                com.lucento.app.core.designsystem.component.LucentoCard(Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconTile(
-                            icon = Icons.Outlined.Lock,
-                            container = MaterialTheme.colorScheme.primaryContainer,
-                            content = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Spacer(Modifier.width(Spacing.md))
-                        Text("Update password", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    }
-                    Spacer(Modifier.height(Spacing.sm))
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
+                // nobody mistakes one for the other. An account that only signs in with Google has no password, so it
+                // gets no Password section (tester report 2026-11-21).
+                if (state.usesPassword != false) {
+                    SectionHeader(
+                        "Password",
+                        Modifier.padding(top = Spacing.section),
+                        supporting = "For signing in with your email. Signing in with Google doesn’t use it.",
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    com.lucento.app.core.designsystem.component.LucentoCard(Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconTile(
+                                icon = Icons.Outlined.Lock,
+                                container = MaterialTheme.colorScheme.primaryContainer,
+                                content = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Spacer(Modifier.width(Spacing.md))
+                            Text("Update password", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(Spacing.sm))
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
+                        }
                     }
                 }
                 // Owner decision 2026-11-12: one name, "Sign out", everywhere (it was "Disconnect" here). Its dialog

@@ -56,6 +56,9 @@ class HybridTransactionInterpreter(
     override suspend fun interpretScan(lines: List<String>, context: InterpretationContext): Interpretation =
         local.interpretScan(lines, context)
 
+    override suspend fun interpretDocument(document: com.lucento.app.domain.capture.ScanDocument, context: InterpretationContext): Interpretation =
+        local.interpretDocument(document, context)
+
     companion object {
         val GEMINI = InterpreterEngine(label = "Gemini", onDevice = false)
         private const val REMOTE_TIMEOUT_MS = 20_000L

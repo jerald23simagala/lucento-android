@@ -1,0 +1,61 @@
+{
+  "id": "us-receipt-traderjoes-noise-01",
+  "country": "US",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-11-08",
+  "pages": [
+    [
+      "TRADER JOE'S",
+      "130 Court St",
+      "Brooklyn NY 11201",
+      "STORE #546 - (718) 246-8460",
+      "OPEN 8:00AM TO 9:00PM DAILY",
+      "BANANAS 6 @ 0.25  $1.50",
+      "0RGANIC BABY SPINACH  $2.99",
+      "MANDARIN ORANGE CHICKEN  $5.49",
+      "CAULIFLOWER GNOCCHI 2 @ 2.99  $5.98",
+      "EVERYTHING BAGEL SEASONING  $2.49",
+      "GREEKY0GURT 32OZ  $4.99",
+      "COLD BREW COFFEE CONC  $6.99",
+      "WILD SOCKEYE SALMON  $12.99",
+      "CHICKEN THIGHS BNLS  $8.47",
+      "AGED WHITE CHEDDAR  $4.79",
+      "SOURDOUGH BOULE  $4.49",
+      "EGGS LARGE BROWN 1DZ  $3.49",
+      "SPANISH OLIVE OIL  $9.99",
+      "DK CHOC PB CUPS  $4.49 T",
+      "SPARKLING WATER 12PK  $4.99 T",
+      "SUBTOTAL  $84.13",
+      "TAX @ 8.875% on $9.48  $0.84",
+      "TOTAL  $84.97",
+      "CASH  $100.00",
+      "CHANGE  $15.03",
+      "ITEMS 21",
+      "11-08-2026 05:42PM 0546 04 1297 2271",
+      "THANK YOU FOR SHOPPING AT",
+      "TRADER JOE'S",
+      "www.traderjoes.com"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Trader Joe's",
+        "total": "84.97",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-11-08",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Cash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Cash sale with change. Only candy and soda are taxed (T). OCR noise: '0RGANIC', 'GREEKY0GURT' (dropped space and O read as 0). Date printed 11-08-2026 (US month-first)."
+}

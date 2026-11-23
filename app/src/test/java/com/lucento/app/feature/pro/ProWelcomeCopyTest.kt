@@ -93,6 +93,17 @@ class ProWelcomeCopyTest {
         assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day", confirmed.gain)
     }
 
+    @Test fun before_the_server_confirms_card_7_says_when_the_pro_allowance_ends() {
+        // Owner, OT-48 call 4 B: AI answers carry on after the date at the free allowance; only the Pro allowance ends.
+        for (status in listOf(OnlineStatus.SIGN_IN_NEEDED, OnlineStatus.CONFIRMING)) {
+            val ai = { term: ProCopy.ServiceTerm -> ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, signedIn = false, aiAnswersOn = false, online = status, term = term).term }
+            assertEquals(status.name, "Pro allowance until ${year.date}", ai(year))
+            assertEquals(status.name, "While you subscribe", ai(ProCopy.ServiceTerm.Subscription))
+            // The other online cards keep their own words.
+            assertEquals(status.name, "Included until ${year.date}", ProWelcomeCopy.stop(ProTourStop.SYNC, all, false, false, online = status, term = year).term)
+        }
+    }
+
     @Test fun online_services_say_how_long_they_are_included() {
         for (stop in listOf(ProTourStop.SMART_READING, ProTourStop.SYNC, ProTourStop.SHARED)) {
             assertEquals(stop.name, "Included until Nov 12, 2027", ProWelcomeCopy.stop(stop, all, true, false, term = year).term)
@@ -233,7 +244,9 @@ class ProWelcomeCopyTest {
     @Test fun the_ai_card_states_the_allowance_only_once_the_server_has_confirmed_it() {
         for (online in listOf(OnlineStatus.SIGN_IN_NEEDED, OnlineStatus.CONFIRMING)) {
             val term = ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, signedIn = false, aiAnswersOn = false, online = online, term = year).term
-            assertEquals(online.name, ProWelcomeCopy.serviceTermText(year), term)
+            // No allowance figure before the server confirms, only when the Pro allowance ends (OT-48 call 4 B).
+            assertEquals(online.name, ProWelcomeCopy.aiPendingTermText(year), term)
+            assertFalse(online.name, term.orEmpty().contains("a day"))
         }
     }
 

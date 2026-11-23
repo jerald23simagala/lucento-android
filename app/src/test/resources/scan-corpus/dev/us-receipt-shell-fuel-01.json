@@ -1,0 +1,52 @@
+{
+  "id": "us-receipt-shell-fuel-01",
+  "country": "US",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-11",
+  "pages": [
+    [
+      "SHELL",
+      "STATION 57442381",
+      "2120 RAINIER AVE S",
+      "SEATTLE WA 98144",
+      "(206) 555-0171",
+      "10/10/2026  08:17:44",
+      "INVOICE 0042177",
+      "AUTH # 112935",
+      "PUMP# 06",
+      "REGULAR  CR",
+      "GALLONS  11.462",
+      "PRICE/GAL  $4.239",
+      "FUEL SALE  $48.59",
+      "CREDIT  $48.59",
+      "MASTERCARD",
+      "XXXXXXXXXXXX5512",
+      "ENTRY METHOD: CHIP",
+      "SHELL FUEL REWARDS",
+      "SAVED $0.00",
+      "THANK YOU",
+      "PLEASE COME AGAIN"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Shell",
+        "total": "48.59",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-10",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "fuel",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "5512"
+      }
+    ]
+  },
+  "notes": "11.462 gal x $4.239 = $48.59. Price per gallon has three decimals and must not be taken as the total."
+}

@@ -1,0 +1,166 @@
+{
+  "id": "fr-bank-bnp-01",
+  "country": "FR",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-04",
+  "pages": [
+    [
+      "BNP PARIBAS",
+      "RELEVE DE COMPTE CHEQUES",
+      "Montants en euros",
+      "M. THOMAS DUBOIS",
+      "12 RUE DE LA ROQUETTE",
+      "75011 PARIS",
+      "Compte de cheques n° 00012 34567 89  RIB : 30004 00123 00012345678 89",
+      "du 1 octobre 2026 au 31 octobre 2026",
+      "Date  Libelle  Valeur  Debit  Credit",
+      "SOLDE CREDITEUR AU 30.09.2026  2 145,80",
+      "02.10  PRLV SEPA FREE MOBILE ECH/021026 ID EMETTEUR/FR12ZZZ123456  02.10  19,99",
+      "03.10  CARTE X4207 02/10 MONOPRIX PARIS 11  03.10  34,18",
+      "05.10  PRLV SEPA EDF CLIENTS PARTICULIERS  05.10  87,00",
+      "07.10  RETRAIT DAB 06/10 PARIS BASTILLE  07.10  80,00",
+      "09.10  CARTE X4207 08/10 SNCF INTERNET  09.10  64,00",
+      "12.10  PRLV SEPA COMUTITRES NAVIGO ANNUEL  12.10  88,80",
+      "14.10  VIR SEPA EMIS /MOTIF LOYER OCTOBRE /BEN M. LEFEVRE  14.10  1 150,00",
+      "16.10  CARTE X4207 15/10 CARREFOUR MARKET  16.10  22,36",
+      "20.10  VIR INST RECU /DE MLLE CLAIRE MARTIN /MOTIF RESTO  20.10  25,00",
+      "22.10  CARTE X4207 21/10 UBER EATS  22.10  27,40",
+      "25.10  COMMISSIONS COTISATION ESPRIT LIBRE  25.10  7,50",
+      "28.10  CARTE X4207 27/10 FNAC PARIS  28.10  49,99",
+      "30.10  VIR SEPA RECU /DE ACME CONSEIL SAS /MOTIF SALAIRE OCTOBRE 2026  30.10  2 850,00",
+      "TOTAL DES OPERATIONS  1 631,22  2 875,00",
+      "SOLDE CREDITEUR AU 31.10.2026  3 389,58",
+      "BNP Paribas SA au capital de 2 294 954 818 euros - Siege social : 16 bd des Italiens 75009 Paris",
+      "Mediateur : en cas de litige vous pouvez saisir le mediateur",
+      "P. 1/1"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "BNP Paribas",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "2145.80",
+        "closingBalance": "3389.58",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-02",
+            "description": "PRLV SEPA FREE MOBILE",
+            "amount": "19.99",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Free Mobile"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "MONOPRIX PARIS 11",
+            "amount": "34.18",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Monoprix"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "EDF CLIENTS PARTICULIERS",
+            "amount": "87.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "EDF"
+          },
+          {
+            "date": "2026-10-07",
+            "description": "RETRAIT DAB",
+            "amount": "80.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-09",
+            "description": "SNCF INTERNET",
+            "amount": "64.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SNCF"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "COMUTITRES NAVIGO",
+            "amount": "88.80",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Navigo"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "LOYER OCTOBRE",
+            "amount": "1150.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-16",
+            "description": "CARREFOUR MARKET",
+            "amount": "22.36",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Carrefour"
+          },
+          {
+            "date": "2026-10-20",
+            "description": "CLAIRE MARTIN",
+            "amount": "25.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-22",
+            "description": "UBER EATS",
+            "amount": "27.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Uber Eats"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "COTISATION ESPRIT LIBRE",
+            "amount": "7.50",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-28",
+            "description": "FNAC PARIS",
+            "amount": "49.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Fnac"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "SALAIRE OCTOBRE",
+            "amount": "2850.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "French statement with space thousands separators ('2 850,00'), no running balance, debit and credit columns collapsed; card lines also carry the card date (02/10) after X4207. 'Montants en euros' gives the currency. The share capital in the footer is not a transaction."
+}

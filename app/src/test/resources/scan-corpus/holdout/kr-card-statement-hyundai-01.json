@@ -1,0 +1,151 @@
+{
+  "id": "kr-card-statement-hyundai-01",
+  "country": "KR",
+  "type": "CARD_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "CJK",
+  "noise": false,
+  "today": "2026-11-15",
+  "pages": [
+    [
+      "현대카드",
+      "2026년 11월 이용대금 명세서",
+      "김민지 님",
+      "결제일  2026년 11월 14일",
+      "결제하실 금액  ₩262,140",
+      "결제계좌  국민은행 ***-**-***4521",
+      "이용기간  2026.10.01 ~ 2026.10.31",
+      "이용한도  5,000,000원",
+      "잔여한도  4,737,860원",
+      "1 / 2"
+    ],
+    [
+      "현대카드  2026년 11월 이용대금 명세서  2 / 2",
+      "이용일자  이용하신 곳  이용금액  결제하실 금액",
+      "2026.10.02  스타벅스 강남역점  6,500  6,500",
+      "2026.10.05  쿠팡  45,800  45,800",
+      "2026.10.08  GS25 역삼점  8,700  8,700",
+      "2026.10.11  CGV 강남  30,000  30,000",
+      "2026.10.12  쿠팡 (취소)  -45,800  -45,800",
+      "2026.10.14  이마트 역삼점  52,340  52,340",
+      "2026.10.17  배달의민족  28,500  28,500",
+      "2026.10.20  SK에너지 역삼주유소  70,000  70,000",
+      "2026.10.22  올리브영 강남본점  34,900  34,900",
+      "2026.10.28  넷플릭스  17,000  17,000",
+      "2026.10.30  카카오T 택시  14,200  14,200",
+      "합계  262,140  262,140",
+      "포인트 적립  M포인트 1,450",
+      "리볼빙/할부 잔액  0",
+      "문의 1577-6000"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "Hyundai Card",
+        "currency": "KRW",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": null,
+        "closingBalance": "262140",
+        "statementBalance": "262140",
+        "minimumPayment": null,
+        "paymentDueDate": "2026-11-14",
+        "creditLimit": "5000000",
+        "availableCredit": "4737860",
+        "transactions": [
+          {
+            "date": "2026-10-02",
+            "description": "스타벅스 강남역점",
+            "amount": "6500",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "스타벅스"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "쿠팡",
+            "amount": "45800",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "쿠팡"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "GS25 역삼점",
+            "amount": "8700",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "GS25"
+          },
+          {
+            "date": "2026-10-11",
+            "description": "CGV 강남",
+            "amount": "30000",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "CGV"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "쿠팡 (취소)",
+            "amount": "45800",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "쿠팡"
+          },
+          {
+            "date": "2026-10-14",
+            "description": "이마트 역삼점",
+            "amount": "52340",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "이마트"
+          },
+          {
+            "date": "2026-10-17",
+            "description": "배달의민족",
+            "amount": "28500",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "배달의민족"
+          },
+          {
+            "date": "2026-10-20",
+            "description": "SK에너지 역삼주유소",
+            "amount": "70000",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SK에너지"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "올리브영 강남본점",
+            "amount": "34900",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "올리브영"
+          },
+          {
+            "date": "2026-10-28",
+            "description": "넷플릭스",
+            "amount": "17000",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "넷플릭스"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "카카오T 택시",
+            "amount": "14200",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "카카오T"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Korean card statement in Hangul: zero-decimal won, year-first dates, one cancelled Coupang order (negative). Korean statements show the amount payable for the month rather than previous balance/payments, so openingBalance and minimumPayment are null. Merchant names are kept in Korean."
+}

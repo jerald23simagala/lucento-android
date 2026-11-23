@@ -1,0 +1,317 @@
+{
+  "id": "us-bank-chase-sections-02",
+  "country": "US",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-04",
+  "pages": [
+    [
+      "JPMorgan Chase Bank, N.A.",
+      "P O Box 182051",
+      "Columbus, OH 43218 - 2051",
+      "September 01, 2026 through September 30, 2026",
+      "Account Number: 000000917264410",
+      "CUSTOMER SERVICE INFORMATION",
+      "Web site:  Chase.com",
+      "Service Center:  1-800-935-9935",
+      "AALIYAH JOHNSON",
+      "1541 W FARRAGUT AVE APT 2",
+      "CHICAGO IL 60640-1922",
+      "*start*summary",
+      "Chase Total Checking",
+      "CHECKING SUMMARY",
+      "INSTANCES  AMOUNT",
+      "Beginning Balance  $642.18",
+      "Deposits and Additions  4  3,901.84",
+      "ATM & Debit Card Withdrawals  11  -363.58",
+      "Electronic Withdrawals  6  -1,276.15",
+      "Other Withdrawals  1  -450.00",
+      "Fees  2  -46.00",
+      "Ending Balance  24  $2,408.29",
+      "*end*summary",
+      "OVERDRAFT AND RETURNED ITEM FEE SUMMARY  Total for This Period  Total Year-to-date",
+      "Total Overdraft Fees  $34.00  $68.00",
+      "Total Returned Item Fees  $12.00  $12.00",
+      "*start*deposits and additions",
+      "DEPOSITS AND ADDITIONS",
+      "DATE  DESCRIPTION  AMOUNT",
+      "09/02  Remote Online Deposit  1  $450.00",
+      "09/12  Lakeshore Health Payroll PPD ID: 1363000141  1,688.42",
+      "09/19  Zelle Payment From Darnell Brooks 21Abc9X7Qk  75.00",
+      "09/26  Orig CO Name:Lakeshore Health Orig ID:1363000141 Desc Date:260926 CO Entry Descr:Payroll Sec:PPD Trace#:071000013455821 Ind Name:Aaliyah Johnson  1,688.42",
+      "Total Deposits and Additions  $3,901.84",
+      "*end*deposits and additions",
+      "*start*atm debit withdrawal",
+      "ATM & DEBIT CARD WITHDRAWALS",
+      "DATE  DESCRIPTION  AMOUNT",
+      "09/03  Card Purchase 09/02 Jewel-Osco #3443 Chicago IL Card 7781  $64.18",
+      "09/04  Card Purchase 09/03 Ventra Vending Chicago IL Card 7781  20.00",
+      "09/05  Card Purchase 09/04 Mariano's #8512 Chicago IL Card 7781  41.27",
+      "09/06  ATM Withdrawal 09/06 2 N Lasalle St Chicago IL Card 7781  20.00",
+      "09/09  Card Purchase 09/08 Portillo's #43 Chicago IL Card 7781  17.86",
+      "09/13  Card Purchase 09/12 Walgreens #9801 Chicago IL Card 7781  23.40",
+      "Page 1 of 2"
+    ],
+    [
+      "September 01, 2026 through September 30, 2026",
+      "Account Number: 000000917264410",
+      "ATM & DEBIT CARD WITHDRAWALS (continued)",
+      "DATE  DESCRIPTION  AMOUNT",
+      "09/15  Card Purchase 09/14 Target T-2387 Chicago IL Card 7781  58.91",
+      "09/17  Card Purchase 09/16 Sq *Dark Matter Coffee Chicago IL Card 7781  5.25",
+      "09/20  Card Purchase 09/19 Amzn Mktp US*Rt4Kd71Q2 Amzn.Com/Bill WA Card 7781  29.99",
+      "09/23  Card Purchase 09/22 Shell Oil 57543210 Chicago IL Card 7781  44.10",
+      "09/27  Card Purchase 09/26 Lou Malnati's Pizzeria Chicago IL Card 7781  38.62",
+      "Total ATM & Debit Card Withdrawals  $363.58",
+      "*end*atm debit withdrawal",
+      "*start*electronic withdrawal",
+      "ELECTRONIC WITHDRAWALS",
+      "DATE  DESCRIPTION  AMOUNT",
+      "09/01  Comed Utility Pymt PPD ID: 1360938600  $88.40",
+      "09/03  09/03 Zelle Payment To Rogers Park Rentals Sept Rent Jpm88Xy71  850.00",
+      "09/15  Peoples Gas Utility Pmt PPD ID: 1361172500  32.75",
+      "09/18  Capital One Mobile Pmt PPD ID: 9279744991  200.00",
+      "09/22  T-Mobile Pcs Svc Web ID: 0000450304  65.00",
+      "09/28  Cash App*Darnell Brooks Oakland CA Web ID: 9876543210  40.00",
+      "Total Electronic Withdrawals  $1,276.15",
+      "*end*electronic withdrawal",
+      "OTHER WITHDRAWALS",
+      "DATE  DESCRIPTION  AMOUNT",
+      "09/08  Deposited Item Returned Nsf Ck # 2201  $450.00",
+      "Total Other Withdrawals  $450.00",
+      "FEES",
+      "DATE  DESCRIPTION  AMOUNT",
+      "09/08  Deposited Item Returned Fee  $12.00",
+      "09/09  Insufficient Funds Fee For A $17.86 Item - Details: 0908 Card Purchase Portillo's #43  34.00",
+      "Total Fees  $46.00",
+      "DAILY ENDING BALANCE",
+      "DATE  AMOUNT  DATE  AMOUNT  DATE  AMOUNT",
+      "09/01  553.78  09/02  1,003.78  09/03  89.60",
+      "09/04  69.60  09/05  28.33  09/06  8.33",
+      "09/08  -453.67  09/09  -505.53  09/12  1,182.89",
+      "09/13  1,159.49  09/15  1,067.83  09/17  1,062.58",
+      "09/18  862.58  09/19  937.58  09/20  907.59",
+      "09/22  842.59  09/23  798.49  09/26  2,486.91",
+      "09/27  2,448.29  09/28  2,408.29",
+      "Your account was overdrawn during this period. Chase Overdraft Assist: no fee if you're overdrawn by $50 or less",
+      "at the end of the business day.",
+      "JPMorgan Chase Bank, N.A. Member FDIC",
+      "Page 2 of 2"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "Chase",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "642.18",
+        "closingBalance": "2408.29",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-09-02",
+            "description": "Remote Online Deposit",
+            "amount": "450.00",
+            "direction": "IN",
+            "kind": "DEPOSIT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-12",
+            "description": "Lakeshore Health Payroll",
+            "amount": "1688.42",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-19",
+            "description": "Zelle Payment From Darnell Brooks",
+            "amount": "75.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-26",
+            "description": "Orig CO Name:Lakeshore Health",
+            "amount": "1688.42",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-03",
+            "description": "Jewel-Osco #3443",
+            "amount": "64.18",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Jewel-Osco"
+          },
+          {
+            "date": "2026-09-04",
+            "description": "Ventra Vending",
+            "amount": "20.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Ventra"
+          },
+          {
+            "date": "2026-09-05",
+            "description": "Mariano's #8512",
+            "amount": "41.27",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Mariano's"
+          },
+          {
+            "date": "2026-09-06",
+            "description": "ATM Withdrawal 09/06",
+            "amount": "20.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-09",
+            "description": "Portillo's #43",
+            "amount": "17.86",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Portillo's"
+          },
+          {
+            "date": "2026-09-13",
+            "description": "Walgreens #9801",
+            "amount": "23.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Walgreens"
+          },
+          {
+            "date": "2026-09-15",
+            "description": "Target T-2387",
+            "amount": "58.91",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-09-17",
+            "description": "Sq *Dark Matter Coffee",
+            "amount": "5.25",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Dark Matter Coffee"
+          },
+          {
+            "date": "2026-09-20",
+            "description": "Amzn Mktp US*Rt4Kd71Q2",
+            "amount": "29.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-09-23",
+            "description": "Shell Oil 57543210",
+            "amount": "44.10",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shell"
+          },
+          {
+            "date": "2026-09-27",
+            "description": "Lou Malnati's",
+            "amount": "38.62",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Lou Malnati's"
+          },
+          {
+            "date": "2026-09-01",
+            "description": "Comed Utility Pymt",
+            "amount": "88.40",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "ComEd"
+          },
+          {
+            "date": "2026-09-03",
+            "description": "Zelle Payment To Rogers Park Rentals",
+            "amount": "850.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-15",
+            "description": "Peoples Gas",
+            "amount": "32.75",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Peoples Gas"
+          },
+          {
+            "date": "2026-09-18",
+            "description": "Capital One Mobile Pmt",
+            "amount": "200.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-22",
+            "description": "T-Mobile",
+            "amount": "65.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "T-Mobile"
+          },
+          {
+            "date": "2026-09-28",
+            "description": "Cash App*Darnell Brooks",
+            "amount": "40.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-08",
+            "description": "Deposited Item Returned",
+            "amount": "450.00",
+            "direction": "OUT",
+            "kind": "REVERSAL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-08",
+            "description": "Deposited Item Returned Fee",
+            "amount": "12.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-09",
+            "description": "Insufficient Funds Fee",
+            "amount": "34.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "The second payroll prints in Orig CO Name / CO Entry Descr ACH format. A mobile check deposit is returned unpaid (Deposited Item Returned, kind REVERSAL) and the account goes negative (daily ending balances below zero, an insufficient-funds fee whose description itself contains $17.86). The fee summary table and the Overdraft Assist text are not transactions. Dates are the posting-date column."
+}

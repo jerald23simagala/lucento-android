@@ -1,0 +1,226 @@
+{
+  "id": "ph-bank-metrobank-pdf-01",
+  "country": "PH",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-05",
+  "pages": [
+    [
+      "METROBANK",
+      "Metropolitan Bank & Trust Company",
+      "STATEMENT OF ACCOUNT - CURRENT ACCOUNT",
+      "RICARDO M. SANTOS",
+      "45 Kamias Rd., Brgy. Pinyahan, Quezon City 1102",
+      "Account No.  123-3-12345678-9",
+      "Branch  KAMIAS",
+      "Period  SEPTEMBER 01 - SEPTEMBER 30, 2026",
+      "DATE  PARTICULARS  CHECK NO.  DEBIT  CREDIT  BALANCE",
+      "SEP 01  BALANCE FORWARD  38,214.60",
+      "SEP 01  PAYROLL - JOLLIBEE FOODS CORP  45,800.00  84,014.60",
+      "SEP 02  CHECK PAID  000412  12,000.00  72,014.60",
+      "SEP 03  BILLS PAYMENT MERALCO VIA METROBANK ONLINE  3,412.66  68,601.94",
+      "SEP 05  ATM WITHDRAWAL MB KAMIAS  10,000.00  58,601.94",
+      "SEP 08  CHECK DEPOSIT - LOCAL CLEARING  8,500.00  67,101.94",
+      "SEP 09  RETURNED CHECK DEPOSIT - DAIF  8,500.00  58,601.94",
+      "SEP 09  RETURNED CHECK CHARGE  600.00  58,001.94",
+      "SEP 12  CHECK PAID  000413  4,750.00  53,251.94",
+      "SEP 15  PAYROLL - JOLLIBEE FOODS CORP  45,800.00  99,051.94",
+      "SEP 15  FUND TRANSFER TO 007-3-98765432-1  20,000.00  79,051.94",
+      "*** CONTINUED ON NEXT PAGE ***",
+      "Page 1 of 2"
+    ],
+    [
+      "METROBANK",
+      "Metropolitan Bank & Trust Company",
+      "STATEMENT OF ACCOUNT - CURRENT ACCOUNT",
+      "RICARDO M. SANTOS",
+      "45 Kamias Rd., Brgy. Pinyahan, Quezon City 1102",
+      "Account No.  123-3-12345678-9",
+      "Branch  KAMIAS",
+      "Period  SEPTEMBER 01 - SEPTEMBER 30, 2026",
+      "DATE  PARTICULARS  CHECK NO.  DEBIT  CREDIT  BALANCE",
+      "BALANCE FORWARDED  79,051.94",
+      "SEP 17  INSTAPAY TRANSFER TO GCASH 0917***8890  3,000.00  76,051.94",
+      "SEP 17  INSTAPAY FEE  15.00  76,036.94",
+      "SEP 20  POS PURCHASE S&R MEMBERSHIP SHOPPING QC  6,284.50  69,752.44",
+      "SEP 22  CREDIT CARD PAYMENT - METROBANK MC  9,000.00  60,752.44",
+      "SEP 24  BILLS PAYMENT PLDT  2,899.00  57,853.44",
+      "SEP 26  BILLS PAYMENT MANILA WATER  688.20  57,165.24",
+      "SEP 28  PESONET CREDIT FROM BPI - SANTOS ROSARIO  5,000.00  62,165.24",
+      "SEP 30  CHECKBOOK CHARGE (50 LEAVES)  250.00  61,915.24",
+      "ENDING BALANCE  61,915.24",
+      "TOTAL DEBITS  81,399.36  TOTAL CREDITS  105,100.00",
+      "No. of Debits: 14  No. of Credits: 4",
+      "Checks issued are subject to clearing. DAIF - Drawn Against Insufficient Funds.",
+      "Metrobank is regulated by the Bangko Sentral ng Pilipinas. Deposits are insured by PDIC up to P1,000,000 per depositor.",
+      "Page 2 of 2"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "Metrobank",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "38214.60",
+        "closingBalance": "61915.24",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-09-01",
+            "description": "PAYROLL - JOLLIBEE FOODS",
+            "amount": "45800.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-02",
+            "description": "000412",
+            "amount": "12000.00",
+            "direction": "OUT",
+            "kind": "CHECK",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-03",
+            "description": "BILLS PAYMENT MERALCO",
+            "amount": "3412.66",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-09-05",
+            "description": "ATM WITHDRAWAL MB KAMIAS",
+            "amount": "10000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-08",
+            "description": "CHECK DEPOSIT - LOCAL CLEARING",
+            "amount": "8500.00",
+            "direction": "IN",
+            "kind": "DEPOSIT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-09",
+            "description": "RETURNED CHECK DEPOSIT",
+            "amount": "8500.00",
+            "direction": "OUT",
+            "kind": "REVERSAL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-09",
+            "description": "RETURNED CHECK CHARGE",
+            "amount": "600.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-12",
+            "description": "000413",
+            "amount": "4750.00",
+            "direction": "OUT",
+            "kind": "CHECK",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-15",
+            "description": "PAYROLL - JOLLIBEE FOODS",
+            "amount": "45800.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-15",
+            "description": "FUND TRANSFER TO 007-3-98765432-1",
+            "amount": "20000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-17",
+            "description": "INSTAPAY TRANSFER TO GCASH",
+            "amount": "3000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-17",
+            "description": "INSTAPAY FEE",
+            "amount": "15.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-20",
+            "description": "S&R MEMBERSHIP SHOPPING",
+            "amount": "6284.50",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "S&R"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "CREDIT CARD PAYMENT - METROBANK MC",
+            "amount": "9000.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-24",
+            "description": "BILLS PAYMENT PLDT",
+            "amount": "2899.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "PLDT"
+          },
+          {
+            "date": "2026-09-26",
+            "description": "BILLS PAYMENT MANILA WATER",
+            "amount": "688.20",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Manila Water"
+          },
+          {
+            "date": "2026-09-28",
+            "description": "PESONET CREDIT FROM BPI",
+            "amount": "5000.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-30",
+            "description": "CHECKBOOK CHARGE",
+            "amount": "250.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Current (checking) account over 2 pages with a check-number column; a deposited check is returned (DAIF, kind REVERSAL) with a returned-check charge. Page 2 opens with BALANCE FORWARDED. Checks are keyed by check number. No currency symbol."
+}
