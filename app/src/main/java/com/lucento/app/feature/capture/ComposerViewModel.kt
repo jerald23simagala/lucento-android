@@ -460,7 +460,7 @@ class ComposerViewModel(
             dayFirst = phoneDayFirst(),
             moneyWalletId = moneyWalletFor(loaded),
             defaultWalletChosen = listOf(s.chosenWalletId, s.entryWalletId).any { id -> id != null && loaded.wallets.any { it.id == id } },
-            // Read on this phone only, by the scan reader; Smarter reading never receives these.
+            // Read on this phone only (the scan reader, and a typed row's category); Smarter reading never receives these.
             directory = merchants?.directory() ?: com.lucento.app.domain.capture.merchant.MerchantDirectory.EMPTY,
             history = latestHistory,
             walletLabels = loaded.wallets.associate { w ->
