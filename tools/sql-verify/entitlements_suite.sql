@@ -164,53 +164,55 @@ begin
   execute 'reset role';
 
   -- ======================================================================== AI allowance
+  -- Per calendar month on every plan (owner, 2026-11-23; 20261123120000_ai_allowance_monthly.sql): Free 5, Pro 45.
   perform pg_temp.as_user(v_free, 'free@lucento-test.invalid');
-  for v_i in 1..10 loop
+  for v_i in 1..5 loop
     select public.consume_ai_request() into v_j;
   end loop;
   r := r || (case when (v_j ->> 'allowed')::boolean and (v_j ->> 'remaining')::int = 0 and v_j ->> 'plan' = 'FREE'
-             then 'ok  A1 free: the 10th question of the month is allowed, 0 remaining' else 'FAIL A1 ' || v_j::text end);
+             then 'ok  A1 free: the 5th question of the month is allowed, 0 remaining' else 'FAIL A1 ' || v_j::text end);
   select public.consume_ai_request() into v_j;
   r := r || (case when not (v_j ->> 'allowed')::boolean and v_j ->> 'limited_by' = 'month'
-             then 'ok  A2 free: the 11th is refused by the month' else 'FAIL A2 ' || v_j::text end);
+             then 'ok  A2 free: the 6th is refused by the month' else 'FAIL A2 ' || v_j::text end);
   execute 'reset role';
 
   perform pg_temp.as_user(v_life, 'lifetime@lucento-test.invalid');
   select public.consume_ai_request() into v_j;
-  r := r || (case when v_j ->> 'plan' = 'PRO' and (v_j ->> 'daily_limit')::int = 50 and (v_j ->> 'monthly_limit')::int = 400
-             then 'ok  A3 a Lifetime owner with services active has the Pro allowance' else 'FAIL A3 ' || v_j::text end);
+  r := r || (case when v_j ->> 'plan' = 'PRO' and v_j ->> 'daily_limit' is null and (v_j ->> 'monthly_limit')::int = 45
+             then 'ok  A3 a Lifetime owner with services active has the Pro allowance (45 a month, no daily limit)' else 'FAIL A3 ' || v_j::text end);
   execute 'reset role';
   update public.entitlements set status = 'EXPIRED', expires_at = now() - interval '1 day' where user_id = v_life and source = 'PLAY_LIFETIME_SERVICES';
   perform pg_temp.as_user(v_life, 'lifetime@lucento-test.invalid');
   select public.consume_ai_request() into v_j;
-  r := r || (case when v_j ->> 'plan' = 'FREE' and (v_j ->> 'monthly_limit')::int = 10
+  r := r || (case when v_j ->> 'plan' = 'FREE' and (v_j ->> 'monthly_limit')::int = 5
              then 'ok  A4 after the included year the same owner has the free allowance' else 'FAIL A4 ' || v_j::text end);
   execute 'reset role';
 
-  -- Pro: the daily limit, then the monthly ceiling (lowered through plan_limits to keep the loop short).
+  -- Pro: the month's allowance in one day (no daily limit), then the month across days with a limit raised through
+  -- plan_limits (remote configuration).
   perform pg_temp.as_user(v_pro, 'pro@lucento-test.invalid');
-  for v_i in 1..50 loop
+  for v_i in 1..45 loop
     select public.consume_ai_request() into v_j;
   end loop;
-  r := r || (case when (v_j ->> 'allowed')::boolean and (v_j ->> 'remaining')::int = 0
-             then 'ok  A5 pro: the 50th question of the day is allowed' else 'FAIL A5 ' || v_j::text end);
-  select public.consume_ai_request() into v_j;
-  r := r || (case when not (v_j ->> 'allowed')::boolean and v_j ->> 'limited_by' = 'day'
-             then 'ok  A6 pro: the 51st is refused by the day' else 'FAIL A6 ' || v_j::text end);
-  execute 'reset role';
-  update lucento_private.plan_limits set value_int = 60 where key = 'ai_pro_monthly_ceiling';
-  update public.ai_usage set day = day - 1 where user_id = v_pro;   -- yesterday's 51 count toward the month, not today
-  perform pg_temp.as_user(v_pro, 'pro@lucento-test.invalid');
-  for v_i in 1..9 loop
-    select public.consume_ai_request() into v_j;
-  end loop;
-  r := r || (case when (v_j ->> 'allowed')::boolean and (v_j ->> 'used_month')::int = 60
-             then 'ok  A7 pro: the month''s 60th is allowed under a 60 ceiling' else 'FAIL A7 ' || v_j::text end);
+  r := r || (case when (v_j ->> 'allowed')::boolean and (v_j ->> 'remaining')::int = 0 and v_j ->> 'daily_limit' is null
+             then 'ok  A5 pro: the 45th question of the month is allowed, even all on one day' else 'FAIL A5 ' || v_j::text end);
   select public.consume_ai_request() into v_j;
   r := r || (case when not (v_j ->> 'allowed')::boolean and v_j ->> 'limited_by' = 'month'
-             then 'ok  A8 pro: the month''s 61st is refused by the ceiling' else 'FAIL A8 ' || v_j::text end);
+             then 'ok  A6 pro: the 46th is refused by the month' else 'FAIL A6 ' || v_j::text end);
   execute 'reset role';
-  update lucento_private.plan_limits set value_int = 400 where key = 'ai_pro_monthly_ceiling';
+  update lucento_private.plan_limits set value_int = 60 where key = 'ai_pro_monthly';
+  update public.ai_usage set day = day - 1 where user_id = v_pro;   -- yesterday's 46 count toward the month, not today
+  perform pg_temp.as_user(v_pro, 'pro@lucento-test.invalid');
+  for v_i in 1..14 loop
+    select public.consume_ai_request() into v_j;
+  end loop;
+  r := r || (case when (v_j ->> 'allowed')::boolean and (v_j ->> 'used_month')::int = 60 and (v_j ->> 'used_today')::int = 14
+             then 'ok  A7 pro: the month''s 60th is allowed under a raised 60 (yesterday''s count toward the month)' else 'FAIL A7 ' || v_j::text end);
+  select public.consume_ai_request() into v_j;
+  r := r || (case when not (v_j ->> 'allowed')::boolean and v_j ->> 'limited_by' = 'month'
+             then 'ok  A8 pro: the month''s 61st is refused' else 'FAIL A8 ' || v_j::text end);
+  execute 'reset role';
+  update lucento_private.plan_limits set value_int = 45 where key = 'ai_pro_monthly';
 
   set role anon;
   begin
