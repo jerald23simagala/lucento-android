@@ -406,7 +406,8 @@ owner decides next (NEXT_TASKS). Fixed since, all on `feature/pro-reveal`:
 - **The brand name:** the first headline broke it at 360 dp ("Lu- / cento Pro"). Stage headlines no longer hyphenate,
   and "Lucento Pro" never breaks.
 - **The online-service cards:** each says where it stands under its title ("Off · needs your Lucento account" …
-  "On"). The AI card states its allowance only once the server has confirmed it ("Included until …" before then).
+  "On"). The AI card states its allowance only once the server has confirmed it ("Pro allowance until …" before then,
+  since 2026-11-22, OT-48 call 4 B).
 - **The top band:** 64 dp once the deck is open, so the cards get the height.
 - **Line breaks:** no-break spaces in counts, "side by side", menu paths (which break only between steps) and "Pro
   Lifetime ·"; card titles and chips break evenly.

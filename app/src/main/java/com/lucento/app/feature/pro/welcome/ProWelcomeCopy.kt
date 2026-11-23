@@ -204,8 +204,8 @@ object ProWelcomeCopy {
                 },
                 short = "AI answers",
                 gain = if (confirmed) allowance else null,
-                // Until the server confirms, the same term as the other services: the allowance is the server's to give.
-                term = term?.let { if (confirmed) aiTermText(it) else serviceTermText(it) },
+                // Until the server confirms, no allowance figure (it is the server's to give), only when the Pro allowance ends.
+                term = term?.let { if (confirmed) aiTermText(it) else aiPendingTermText(it) },
                 status = serviceState(online, aiAnswersOn),
             )
         }
@@ -258,6 +258,16 @@ object ProWelcomeCopy {
     fun aiTermText(term: ProCopy.ServiceTerm): String = when (term) {
         is ProCopy.ServiceTerm.Until ->
             "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day until ${term.date}, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month"
+        else -> serviceTermText(term)
+    }
+
+    /**
+     * The AI card's term before the server confirms the plan (owner, 2026-11-22, OT-48 call 4 B): "Pro allowance until
+     * Nov 12, 2027", not "Included until", because AI answers carry on after that date at the free plan's allowance; only
+     * the Pro allowance ends.
+     */
+    fun aiPendingTermText(term: ProCopy.ServiceTerm): String = when (term) {
+        is ProCopy.ServiceTerm.Until -> "Pro allowance until ${term.date}"
         else -> serviceTermText(term)
     }
 

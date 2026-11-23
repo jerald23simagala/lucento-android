@@ -41,8 +41,9 @@ soft shadow becomes a soft partly transparent shadow, and a ground-coloured patc
 so a prop never has a hole. It trims the prop to its visible pixels (shadow included) at the source's own
 resolution, and writes `app/src/main/res/drawable-nodpi/perk_art_<stop>.webp` (with alpha, 21–40 KB) and
 `perk_thumb_<stop>.webp` (192 px, centred on the blue). The app paints the band blue with faint doodles and lays the
-pair out by what shows (`pairLayout` in `PerkArt.kt`): the mascot's hand over the prop, the torch's glow inside the
-band. It also writes `PerkPropEdges.kt` (where each prop itself ends on the right; its blue shadow runs further), so
+pair out by what shows (`pairLayout` in `PerkArt.kt`): the mascot's hand over the prop, the pair centred on every card.
+On the widest pairs (cards 7, 9 and 10) the faint outer edge of the torch's glow is cut at the band's edge (owner,
+2026-11-22, OT-48 call 2 B). It also writes `PerkPropEdges.kt` (where each prop itself ends on the right; its blue shadow runs further), so
 the app sets the 10 dp gap beside a standing mascot by what is seen. Needs Pillow, numpy and scipy.
 
 ## Prompts

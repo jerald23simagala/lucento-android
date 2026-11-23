@@ -48,13 +48,19 @@ class PerkArtTest {
     private val aspects = listOf(0.64f, 0.97f, 1.4f, 1.79f)
 
     @Test
-    fun the_pair_and_the_torch_glow_stay_inside_every_band() {
+    fun the_pair_is_centred_and_stays_inside_every_band() {
         for (w in widths) for (h in heights) for (a in aspects) for (touches in listOf(true, false)) {
             val p = pairLayout(w, h, a, touches)
             val where = "band ${w}x$h, prop $a, touches $touches"
             assertTrue("prop starts left of the band: $where", p.propX >= 0f)
             assertTrue("prop runs past the band: $where", p.propX + p.propWidth <= w + 0.01f)
-            assertTrue("glow runs past the band: $where", p.mascotX + p.mascot * (0.965f + 0.163f) <= w + 0.01f)
+            // Centred on what shows, from the prop's left edge to the character's right (owner, OT-48 call 2 B).
+            val characterRight = p.mascotX + p.mascot * 0.965f
+            assertTrue("character runs past the band: $where", characterRight <= w + 0.01f)
+            assertEquals("pair off centre: $where", w / 2f, (p.propX + characterRight) / 2f, 0.01f)
+            // The glow's faint outer edge may be cut at the band's edge, but never more than half of its reach.
+            val glowReach = p.mascot * 0.163f
+            assertTrue("more than half the glow cut: $where", characterRight + glowReach - w <= glowReach / 2f + 0.01f)
             assertTrue("head above the band: $where", p.mascotY + p.mascot * 0.03f >= -0.01f)
             assertTrue("prop above the band: $where", p.propY >= -0.01f)
             assertTrue("shadow below the band: $where", p.mascotY + p.mascot * 0.97f <= h + 0.01f)

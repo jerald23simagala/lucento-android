@@ -351,11 +351,11 @@ microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
   (vc 12, PR #64). Its fixes: the next card is in place under a leaving card at once and a swiped card leaves from
   where it was let go; each card's own scroll position; balanced last lines. Large text
   re-captured (130 % light/dark, 150 %, 200 %) after the emulator's System UI froze on text-size changes (capture
-  with a settle step: studio scratch `capture_lt.sh` logic). Open for the owner (three polish rounds done): doodle
-  spacing refinements (bare patches beside the pair), one art window for the deck with copy trims, centring wide pairs
-  versus keeping the torch glow inside, the AI feature's name and card 7's chip wording; a phone recording of leaving,
-  swiping and going back;
-- (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
+  with a settle step: studio scratch `capture_lt.sh` logic). The owner's calls (OT-48, 2026-11-22: "1 A, 2 B, 3 A,
+  4 B"; on the phone the hop, swipe, doodles and props were fine): doodles stay as they are; wide pairs are centred and
+  the glow's faint outer edge may be cut; "AI answers" and "AI adviser" both stay; card 7's chip says "Pro allowance
+  until" (both built on `feature/pro-cards-owner-calls`). The one art window for the deck was passed on earlier;
+- (b) on a phone: done by the owner in OT-48 (the hop, the doodles in a dim room, the props' sharpness);
 - (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
