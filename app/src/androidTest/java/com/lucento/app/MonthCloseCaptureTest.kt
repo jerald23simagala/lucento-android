@@ -41,9 +41,9 @@ import java.time.YearMonth
 import java.util.UUID
 
 /**
- * Captures the monthly check-in, the plan page, Milestones and Awards, a future month on Budget and Follow Lucento for design review
- * (CI doesn't run it). The card waits until a budget is two weeks old, so it runs in two steps with the device clock set
- * by the person running it (`settings put global auto_time 0; cmd alarm set-time <ms>`):
+ * Captures the monthly check-in, the plan page, a month's recap, Milestones and Awards, a future month on Budget and
+ * Follow Lucento for design review (CI doesn't run it). The card waits until a budget is two weeks old, so it runs in
+ * two steps with the device clock set by the person running it (`settings put global auto_time 0; cmd alarm set-time <ms>`):
  * 1. [seed] on a fresh install, on a day at least two weeks before the one to capture (e.g. 10 November): onboarding,
  *    the demo month, a yearly bill due next month, one category over its budget, the trip goal topped up to its target and a
  *    small loan paid off (so two of the new awards show their earned art).
@@ -254,31 +254,37 @@ class MonthCloseCaptureTest {
             }
         }
         if (homeOnly) return
+        // The check-in's recap opens on its own page (owner, 2026-11-23: Milestones keeps the year on top).
         if (recap != null && compose.onAllNodesWithText("See ${name(recap)}’s recap").fetchSemanticsNodes().isNotEmpty()) {
             click("See ${name(recap)}’s recap")
-        } else {
-            compose.onNodeWithContentDescription("Milestones").performScrollTo().performClick()
+            waitForText("How the month went")
+            shot("$tag-07-month-recap")
+            for (step in 'a'..'h') {
+                if (isShown("Recorded on")) break
+                scrollOn()
+                shot("$tag-07$step-month-recap-scroll")
+            }
+            back()
         }
-        waitForText("How your months are going")
-        shot("$tag-07-progress-recap")
+        compose.onNodeWithContentDescription("Milestones").performScrollTo().performClick()
+        waitForText("Your budget year")
+        shot("$tag-08-milestones")
         // Most of a screen at a time to the page's end: the year's totals on Pro, the plan preview on Free.
         for (step in 'a'..'p') {
-            if (isShown(if (pro) "months with records" else "always free")) break
+            if (isShown(if (pro) "months with records" else "tap a month")) break
             scrollOn()
-            shot("$tag-08$step-progress-scroll")
+            shot("$tag-08$step-milestones-scroll")
         }
-        if (pro) {
-            // A month picked in the year: its recap comes into view above (and is announced).
-            runCatching {
-                compose.onNodeWithText("Your budget year").performScrollTo()
-                compose.onNode(androidx.compose.ui.test.hasContentDescription("October 2026", substring = true) and hasClickAction())
-                    .performScrollTo()
-                    .performClick()
-                compose.waitForIdle()
-                shot("$tag-09-year-tap")
-            }
+        // A month's square opens its recap, on every plan (the recap is free).
+        runCatching {
+            compose.onNode(androidx.compose.ui.test.hasContentDescription("October 2026", substring = true) and hasClickAction())
+                .performScrollTo()
+                .performClick()
+            waitForText("How the month went")
+            shot("$tag-09-square-opens-recap")
+            back()
         }
-        // The awards on their own page, from the button at the top of Milestones (Pro's Membership shelf comes last).
+        // The awards on their own page, from the card at the top of Milestones (Pro's Membership shelf comes last).
         scrollOn(-20f)
         click("Awards")
         waitForText("From your own records")

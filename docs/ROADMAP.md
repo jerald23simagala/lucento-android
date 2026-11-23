@@ -378,9 +378,12 @@ needs `20261122090000_user_settings.sql` on each project).
 ## Built — Milestones: the budget year, Awards on their own page (owner, 2026-11-23, `feature/milestones-budget-year`)
 - Progress is now **Milestones**. Its year is the **budget year**: January to December as 12 flat colour squares in the
   Budget tab's levels (on track, getting close, over, no budget), each with its month and the share of the budget used
-  ("so far" for the running month, an outline for months to come); earlier years with a year switcher. Tapping a month
-  shows its recap above. Pro, previewed on Free with the person's own months in grey.
-- **Awards** has its own page, from a button at the top of Milestones and from an award ceremony's "See all awards".
+  ("so far" for the running month, an outline for months to come), the title and the year switcher on one line, and
+  the year's totals as a bulleted outline with its figures in bold. Pro, previewed on Free with the person's own months
+  in grey. Owner review the same day: the year on top; a month's recap moved to its own page, opened from its square
+  (Free too) and from Home's check-in card.
+- **Awards** has its own page, from the card at the top of Milestones (three small medals on its right) and from an
+  award ceremony's "See all awards".
 - docs/CALCULATIONS.md "Milestones recap"; no Room or Supabase change.
 
 ## M11 — Polish & release readiness

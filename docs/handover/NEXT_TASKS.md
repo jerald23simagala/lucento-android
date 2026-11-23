@@ -62,10 +62,12 @@
 
 ## Milestones — follow-ups (2026-11-23, `feature/milestones-budget-year`)
 
-- **ML-N1 Owner look at the screenshots before merging** (the layout rule): the budget year's squares in light and
-  dark, at 130 % and 200 % text, the Free preview and the Awards page.
-- **ML-N2 Phone check in the next build**: Home › Quick links › Milestones; Awards opens the cabinet and an earned medal
-  replays its ceremony; a square opens that month's recap above; ‹ › steps to last year once there are records from it.
+- ~~ML-N1 Owner look at the screenshots~~ **Done 2026-11-23:** the owner asked for the year on top (a month's recap
+  moved to its own page), small medals on the Awards card, the title and year switcher on one line and a bulleted
+  totals footer, then a release once CI passes.
+- **ML-N2 Phone check in the next build**: Home › Quick links › Milestones; the Awards card opens the cabinet and an
+  earned medal replays its ceremony; a square opens that month's recap page (on Free too); Home's check-in card opens
+  the recap page; ‹ › steps to last year once there are records from it.
 
 ## Composer — on-device reading, next (2026-11-23, after `feature/composer-merchant-categories`)
 

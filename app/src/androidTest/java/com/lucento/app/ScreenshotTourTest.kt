@@ -341,16 +341,22 @@ class ScreenshotTourTest {
         compose.waitForIdle()
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
-        // Milestones (owner, 2026-11-23; "Progress" until then): the Awards button, the month's recap, the budget year as
-        // squares; then the awards on their own page (earned medals in gold, the rest as outlines with how to earn them
-        // and a count where it takes several steps); an earned medal replays its ceremony — Lucento presenting the medal.
+        // Milestones (owner, 2026-11-23; "Progress" until then): the Awards card, then the budget year as squares; this
+        // month's square opens its recap on its own page; then the awards on their own page (earned medals in gold, the
+        // rest as outlines with how to earn them and a count where it takes several steps); an earned medal replays its
+        // ceremony — Lucento presenting the medal.
         compose.onNodeWithContentDescription("Milestones").performScrollTo().performClick()
-        waitForText("How your months are going", substring = true)
+        waitForText("Your budget year")
+        shot("07a-milestones")
+        val thisMonth = java.time.YearMonth.now()
+        compose.onNode(
+            hasContentDescription("${com.lucento.app.feature.home.monthLabel(thisMonth)} ${thisMonth.year}", substring = true) and
+                androidx.compose.ui.test.hasClickAction(),
+        ).performScrollTo().performClick()
         waitForText("Where it went")
-        shot("07a-progress-recap")
-        compose.onNodeWithText("Your budget year").performScrollTo()
-        compose.waitForIdle()
-        shot("07a2-progress-year")
+        shot("07a2-month-recap")
+        backUntilGone("Where it went")
+        waitForText("Your budget year")
         compose.onNodeWithText("Awards").performScrollTo().performClick()
         waitForText("From your own records", substring = true)
         shot("07a3-awards-cabinet")
@@ -361,7 +367,7 @@ class ScreenshotTourTest {
         click("Thanks, Lucento")
         // Awards, then Milestones under it.
         backUntilGone("From your own records")
-        backUntilGone("How your months are going")
+        backUntilGone("Your budget year")
 
         // ---------------------------------------------------------------- the composer: several transactions in one message
         compose.onNodeWithContentDescription("Add transaction").performClick()

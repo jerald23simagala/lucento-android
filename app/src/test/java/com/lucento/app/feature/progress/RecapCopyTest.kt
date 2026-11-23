@@ -10,6 +10,7 @@ import com.lucento.app.domain.RecapBudget
 import com.lucento.app.domain.RecapMonthResult
 import com.lucento.app.domain.YearRecap
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.YearMonth
 import java.util.Locale
@@ -123,20 +124,31 @@ class RecapCopyTest {
             RecapMonthResult(YearMonth.of(2026, 12), usd(0), false, false, null, upcoming = true),
         )
         val year = YearRecap(YearMonth.of(2026, 11), "USD", months, income = usd(50_000), spent = usd(27_000), netWorthChange = usd(23_000))
+        val lines = RecapCopy.yearLines(year, AmountFormat.Shown)
         assertEquals(
             listOf(
                 "Within budget in 1 of 2 budgeted months so far",
                 // The first month with records is September: the year is told from there, never called a whole year.
-                "\$230.00 kept since September.",
-                "\$500.00 came in and \$270.00 went out.",
-                "More came in than went out in 1 of 3 months with records.",
-                "Net worth +\$230.00 in 2026 so far.",
+                "\$230.00 kept since September",
+                "\$500.00 came in and \$270.00 went out",
+                "More came in than went out in 1 of 3 months with records",
+                "Net worth +\$230.00 in 2026 so far",
             ),
-            RecapCopy.yearLines(year, AmountFormat.Shown),
+            lines.map { it.text },
         )
+        // Each bullet has its mark, and its figures are the parts shown in bold.
+        assertEquals(
+            listOf(YearLine.Kind.BUDGET, YearLine.Kind.KEPT, YearLine.Kind.FLOW, YearLine.Kind.MONTHS, YearLine.Kind.NET_WORTH),
+            lines.map { it.kind },
+        )
+        assertEquals(
+            listOf(listOf("1 of 2"), listOf("\$230.00"), listOf("\$500.00", "\$270.00"), listOf("1 of 3"), listOf("+\$230.00")),
+            lines.map { it.figures },
+        )
+        assertTrue(lines.all { line -> line.figures.all { it in line.text } })
         // More out than in says so, in words.
         val spentMore = year.copy(income = usd(10_000))
-        assertEquals("\$170.00 more went out than came in since September.", RecapCopy.yearLines(spentMore, AmountFormat.Shown)[1])
+        assertEquals("\$170.00 more went out than came in since September", RecapCopy.yearLines(spentMore, AmountFormat.Shown)[1].text)
     }
 
     @Test fun `a finished year is told as that year`() = english {
@@ -145,28 +157,29 @@ class RecapCopyTest {
         assertEquals(
             listOf(
                 "\$120.00 kept in 2025",
-                "\$120.00 came in and \$0.00 went out.",
-                "More came in than went out in 12 of 12 months with records.",
+                "\$120.00 came in and \$0.00 went out",
+                "More came in than went out in 12 of 12 months with records",
             ),
-            RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", full, usd(12_000), usd(0), null), AmountFormat.Shown),
+            RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", full, usd(12_000), usd(0), null), AmountFormat.Shown).map { it.text },
         )
         // Records from September on: told from September of that year.
         val late = (1..12).map { m ->
             RecapMonthResult(YearMonth.of(2025, m), usd(if (m >= 9) 1_000 else 0), hasRecords = m >= 9, finished = true, budgetKept = if (m >= 9) true else null)
         }
-        val lines = RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", late, usd(4_000), usd(0), usd(4_000)), AmountFormat.Shown)
+        val lines = RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", late, usd(4_000), usd(0), usd(4_000)), AmountFormat.Shown).map { it.text }
         assertEquals("Within budget in 4 of 4 budgeted months", lines[0])
-        assertEquals("\$40.00 kept since September 2025.", lines[1])
-        assertEquals("Net worth +\$40.00 in 2025.", lines.last())
+        assertEquals("\$40.00 kept since September 2025", lines[1])
+        assertEquals("Net worth +\$40.00 in 2025", lines.last())
     }
 
     @Test fun `a year without records says so`() = english {
         val running = (1..12).map { m ->
             RecapMonthResult(YearMonth.of(2026, m), usd(0), hasRecords = false, finished = m < 11, budgetKept = null, upcoming = m > 11)
         }
-        assertEquals(listOf("Nothing recorded in 2026 yet."), RecapCopy.yearLines(YearRecap(YearMonth.of(2026, 11), "USD", running, usd(0), usd(0), null), AmountFormat.Shown))
+        val empty = RecapCopy.yearLines(YearRecap(YearMonth.of(2026, 11), "USD", running, usd(0), usd(0), null), AmountFormat.Shown)
+        assertEquals(listOf(YearLine(YearLine.Kind.NOTHING, "Nothing recorded in 2026 yet")), empty)
         val past = (1..12).map { RecapMonthResult(YearMonth.of(2025, it), usd(0), false, true, null) }
-        assertEquals(listOf("Nothing recorded in 2025."), RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", past, usd(0), usd(0), null), AmountFormat.Shown))
+        assertEquals(listOf("Nothing recorded in 2025"), RecapCopy.yearLines(YearRecap(YearMonth.of(2025, 12), "USD", past, usd(0), usd(0), null), AmountFormat.Shown).map { it.text })
     }
 
     @Test fun `a month still running is compared with the same days of the month before`() = english {

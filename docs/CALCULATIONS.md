@@ -186,7 +186,7 @@ in `MonthCheckIn`:
   Only the month the card asks about next, or an earlier one, is recorded as planned (`countsAsPlanned`): planning March
   from November keeps March's amounts but leaves the December, January and February check-ins to come.
 - **Recap part**: the 1st to the 7th, when last month has income or expenses recorded; it goes once the recap is opened
-  (from the card or on the Milestones page) or dismissed.
+  (from the card, or from its square on Milestones) or dismissed.
 - **Markers**: `budget_month_planned` and `recap_month_seen` ("yyyy-MM", the latest month done or dismissed) follow the
   account like the budget moment (docs/SYNC.md "Settings": ledger settings, never moving back to an earlier month). They
   aren't in the JSON backup (docs/BACKUP.md), like the one-time notices.
@@ -215,11 +215,12 @@ in `MonthCheckIn`:
   tab's running month from the 1st to the 7th, so the hints never depend on the card.
 - **Closing the card** ("Not this month") hides both parts and offers Undo, which puts the two months back as they were
   (the one time they move back). The message names what stops: "We won’t ask about December again", or "November’s
-  recap hidden" (the recap stays on the Milestones page).
+  recap hidden" (the recap stays a tap away on Milestones).
 
 ### Milestones recap (owner, 2026-11-23)
-The Milestones page ("Progress" until the same day; from Home's Quick links) opens with an Awards button (the award
-cabinet has its own page) and tells a month's story and the calendar year's budget, from the same calculators as the rest of the app (`MonthRecaps`), in the main currency on the translated ledger (FX results left
+The Milestones page ("Progress" until the same day; from Home's Quick links) opens with the Awards card (the award
+cabinet has its own page), then the calendar year's budget on top; a month's story is its own page (`MonthRecapScreen`,
+opened from the month's square on every plan and from Home's check-in card). Both come from the same calculators as the rest of the app (`MonthRecaps`), in the main currency on the translated ledger (FX results left
 out, as on Home and Budget):
 - **Kept** = income − expenses (`CashflowCalculator.netFlow`), signed. Transfers, adjustments and goal contributions
   never count.
@@ -252,7 +253,7 @@ out, as on Home and Budget):
   records start after January it is told from the first month with records ("kept since September"). The budget year
   is Lucento Pro, gated like Insights' 12 months (`ProGates.insightsPeriodAllowed(12)`, docs/MONETIZATION.md §3.4),
   previewed on Free as the person's own months in grey with every result hidden; each month's recap is free.
-- Last month kept within budget is celebrated once, on the Milestones page or the Budget tab, whichever comes first (the
+- Last month kept within budget is celebrated once, on its recap page or the Budget tab, whichever comes first (the
   same `acknowledged_budget_month`).
 
 ### Spendable now (Home, P2-1)

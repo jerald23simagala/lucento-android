@@ -37,10 +37,10 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Monthly check-in**: from a month's last 3 days to the 7th of the next, a card on Home asks to plan the coming month
   (a birthday, an event, a yearly bill): the plan page shows that month's budget, hints from your own records (yearly
   costs due, the same month last year, last month's overspending) and sets one-off amounts for that month only.
-- **Milestones** (from Home's Quick links): each month's recap — what was kept, the budget, where the money went, the
-  biggest change, net worth, goals, debts and days recorded — and the budget year, twelve squares coloured by how each
-  month's budget went (Pro, previewed on Free). Its Awards button opens the award cabinet, including Steady Month, Goal
-  Reached and Loan Cleared.
+- **Milestones** (from Home's Quick links): the budget year, twelve squares coloured by how each month's budget went,
+  with the year's totals (Pro, previewed on Free); a month's square opens its recap — what was kept, the budget, where
+  the money went, the biggest change, net worth, goals, debts and days recorded (free). Its Awards card opens the award
+  cabinet, including Steady Month, Goal Reached and Loan Cleared.
 - **Insights**: the Ask Lucento card and the Reports list, then income and expenses over 3/6/12 months (transfers
   excluded, with the change against the period before; 6 and 12 months are Pro, previewed with the figures hidden on
   Free), where your money went, and net worth over time.
