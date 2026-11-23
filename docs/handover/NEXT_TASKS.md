@@ -108,8 +108,8 @@ Control › Tasks.
   step; older builds refuse newer files). Until then "Not this month" is the way.
 - **MCI-N4 Labels for one-off amounts** ("Mia's birthday"): a new table, never new columns on `budgets` (the same rule as
   custom budget periods below).
-- **MCI-N5 Owner: the Facebook Page's username** `lucentoapp` (Mission Control **OT-60**); then update `LucentoLinks.FOLLOW` and lucento-website
-  `src/data/site.ts` together (both use `profile.php?id=61596187720039` until then, which keeps working).
+- **MCI-N5 Done 2026-11-23:** the Facebook Page is facebook.com/lucentoapp (OT-60, checked in a browser).
+  `LucentoLinks.FOLLOW` shows it as @lucentoapp, and lucento-website `src/data/site.ts` links it too.
 - **MCI-N6 Custom budget periods** (below): the check-in then follows the period's start rather than the 1st.
 
 ## Settings that follow the account — follow-ups (2026-11-22, PR #130 merged as `96e6287` on 2026-11-23)

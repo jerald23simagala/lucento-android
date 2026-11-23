@@ -10,12 +10,12 @@ object LucentoLinks {
 
     /**
      * Lucento's channels, in the website's order (lucento-website `src/data/site.ts`). Each says only what is true of it
-     * today: Instagram and TikTok are @lucentoapp; the Facebook Page has no username yet and is linked by its profile ID,
-     * and YouTube by its channel ID, as on the website (design review 2026-11-23). When the Page gets its username,
-     * change its link and subtitle here and on the website together (NEXT_TASKS MCI-N5).
+     * today: Facebook, Instagram and TikTok are @lucentoapp (the Facebook Page got its username on 2026-11-23, OT-60);
+     * YouTube is linked by its channel ID, as on the website (design review 2026-11-23). Change a link here and on the
+     * website together.
      */
     val FOLLOW: List<Channel> = listOf(
-        Channel("Facebook", "Lucento · Page", "https://www.facebook.com/profile.php?id=61596187720039", com.lucento.app.R.drawable.ic_brand_facebook),
+        Channel("Facebook", "@lucentoapp", "https://www.facebook.com/lucentoapp", com.lucento.app.R.drawable.ic_brand_facebook),
         Channel("Instagram", "@lucentoapp", "https://www.instagram.com/lucentoapp/", com.lucento.app.R.drawable.ic_brand_instagram),
         Channel("TikTok", "@lucentoapp", "https://www.tiktok.com/@lucentoapp", com.lucento.app.R.drawable.ic_brand_tiktok),
         Channel("YouTube", "Lucento · Channel", "https://www.youtube.com/channel/UCg8f6wbVTgYPnXBeMvD0FyA", com.lucento.app.R.drawable.ic_brand_youtube),
