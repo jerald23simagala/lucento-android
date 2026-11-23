@@ -190,6 +190,33 @@ class AccountSettingsPreferencesTest {
     }
 
     @Test
+    fun `a refused Pro theme doesn't say this phone's change was replaced`() {
+        // Pro-gate review 2026-11-23 (F2): the phone keeps its own theme, so "changed on another device" would be untrue.
+        val p = mutablePreferencesOf()
+        p.change(now = 50) { this[theme] = "midnight" }
+        val result = merge(p, doc(AccountSetting.THEME to (JsonPrimitive("aurora") to 100L)), lockedThemes = setOf("aurora"))
+        assertEquals("midnight", p[theme])
+        assertEquals(0, result.replaced)
+        assertEquals(0, result.taken)
+        // The account's newer choice counts as seen: the older change here doesn't go up over it...
+        assertNull(result.upload)
+        assertNull(p[dirty])
+        assertEquals(100L, p[at(AccountSetting.THEME)])
+        // ...and once the plan allows it (a purchase), the next merge applies it.
+        merge(p, doc(AccountSetting.THEME to (JsonPrimitive("aurora") to 100L)))
+        assertEquals("aurora", p[theme])
+    }
+
+    @Test
+    fun `a change that gives way to a newer one from another phone still says so`() {
+        val p = mutablePreferencesOf()
+        p.change(now = 50) { this[theme] = "midnight" }
+        val result = merge(p, doc(AccountSetting.THEME to (JsonPrimitive("grove") to 100L)))
+        assertEquals("grove", p[theme])
+        assertEquals(1, result.replaced)
+    }
+
+    @Test
     fun `a default wallet that isn't on this phone leaves none here`() {
         val p = mutablePreferencesOf(defaultWallet to 7L)
         merge(p, doc(AccountSetting.DEFAULT_WALLET to (JsonPrimitive("wallet-elsewhere") to 100L)))

@@ -42,8 +42,11 @@ class RoomBackupStore(
     private val runner: TransactionRunner,
     private val preferences: UserPreferencesRepository,
     private val goalPhotos: GoalPhotos,
-    /** Lucento Pro: whether this phone's plan may use a theme, so a file can't unlock a Pro theme (ProGates.themeAllowed). */
-    private val themeAllowed: suspend (com.lucento.app.data.preferences.ThemeId) -> Boolean = { true },
+    /**
+     * Lucento Pro: whether this phone's plan may use a theme, so a file can't unlock a Pro theme (ProGates.themeAllowed).
+     * No default, so the store can't be built without the plan (Pro-gate review 2026-11-23, F1).
+     */
+    private val themeAllowed: suspend (com.lucento.app.data.preferences.ThemeId) -> Boolean,
 ) : BackupStore {
 
     override suspend fun read(): BackupSnapshot = runner.run {

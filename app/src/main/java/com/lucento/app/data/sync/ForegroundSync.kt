@@ -50,5 +50,13 @@ internal class ForegroundSync(
     companion object {
         /** Opening the app again within this long after a complete sync doesn't sync again. */
         const val FRESH_MILLIS = 60_000L
+
+        /**
+         * The app's [upToDate]: a sync finished under [FRESH_MILLIS] ago and nothing that can go up is waiting. Settings
+         * waiting on a phone whose plan can't save them (a Partner without a cloud plan of their own) wait for good, so they
+         * don't count, or every return to the app would sync again (Pro-gate review 2026-11-23, F3).
+         */
+        fun isUpToDate(lastSyncedAt: Long?, now: Long, pendingChanges: Int, settingsWaiting: Boolean, settingsCanUpload: Boolean): Boolean =
+            lastSyncedAt != null && now - lastSyncedAt < FRESH_MILLIS && pendingChanges == 0 && !(settingsWaiting && settingsCanUpload)
     }
 }

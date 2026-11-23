@@ -109,6 +109,13 @@ class AccountSettingsSyncTest {
             accountSettings = store, accountSettingsUploadAllowed = { ownCloud }, lockedThemes = { lockedThemes },
         ).sync()
 
+        /** A sync built with the settings store but without its plan checks, which must then deny (Pro-gate review F1). */
+        suspend fun syncWithoutPlanChecks(): SyncResult = SyncRepository(
+            server.remote(account), wallets, categories, transactions, FakeBudgetDao(), FakeGoalDao(), tombstones, prefs,
+            recurring = FakeRecurringDao(), debtTerms = FakeDebtTermsDao(), clock = { now },
+            accountSettings = store,
+        ).sync()
+
         /** Signs out (the wipe's preference part and a cleared binding), then signs in as [next]. */
         fun signOutAndSignIn(next: String) {
             UserPreferencesRepository.resetAccountSetup(settings)
@@ -399,5 +406,21 @@ class AccountSettingsSyncTest {
         val restored = Device(owner).apply { lockedThemes = setOf("aurora") }
         success(restored.sync())
         assertNull(restored.settings[theme])
+    }
+
+    @Test
+    fun `a sync built without the plan checks applies no Pro theme and saves nothing`() = runTest {
+        // Pro-gate review 2026-11-23 (F1): both checks deny unless the app wires them in.
+        val first = Device(owner)
+        first.change { this[theme] = "aurora" }
+        success(first.sync())
+        val restored = Device(owner)
+        success(restored.syncWithoutPlanChecks())
+        assertNull(restored.settings[theme])
+        val saves = server.settingsSaves.size
+        restored.change { this[cents] = false }
+        success(restored.syncWithoutPlanChecks())
+        assertEquals(saves, server.settingsSaves.size)
+        assertEquals(setOf("show_cents"), restored.settings[dirty])
     }
 }

@@ -364,7 +364,11 @@ account. Then:
   again next cycle. No phone overwrites a version it hasn't seen.
 - A change saved while a sync runs stays waiting and goes up next. Every change asks for a sync shortly after, a second
   change of a waiting setting included (`accountSettingChanges` → `uploadRequests`). Opening Lucento with a setting still
-  waiting syncs even if a sync finished moments ago.
+  waiting syncs even if a sync finished moments ago, but only where the person's plan can save it
+  (`ForegroundSync.isUpToDate`): a Partner's settings without their own plan wait for good and don't make every return to
+  the app sync (Pro-gate review 2026-11-23, F3).
+- Lucento Pro: the plan checks (`accountSettingsUploadAllowed`, `lockedThemes`) deny unless the app wires them in. A sync
+  built without them saves no settings and applies no Pro theme (Pro-gate review F1).
 
 **Lucento Shared.** The row is always the signed-in person's own. A Partner's phone keeps to the person's settings (theme,
 name…). It neither sends nor takes the default wallet or the budget moment, which belong to the Owner's records it holds,

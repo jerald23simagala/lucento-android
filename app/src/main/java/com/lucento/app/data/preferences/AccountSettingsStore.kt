@@ -23,6 +23,7 @@ interface AccountSettingsStore {
      * send back. [account]: whose document it is. [settings]: what this phone may send and take. [walletUuid] and
      * [walletId] translate the default wallet between this phone's ids and the stable ones the document uses.
      * [lockedThemes]: theme keys this phone's plan may not pick (Lucento Pro); the account's choice of one isn't applied.
+     * It has no default, so no caller can leave the plan out (Pro-gate review 2026-11-23, F1).
      */
     suspend fun mergeAccountSettings(
         account: String,
@@ -30,7 +31,7 @@ interface AccountSettingsStore {
         settings: Set<AccountSetting>,
         walletUuid: (Long) -> String?,
         walletId: (String) -> Long?,
-        lockedThemes: Set<String> = emptySet(),
+        lockedThemes: Set<String>,
     ): AccountSettingsMerge.Result
 
     /** The account accepted [upload]: what it carried counts as synced, unless it changed here in the meantime. */

@@ -23,6 +23,27 @@ internal fun firstSyncDecision(alreadyBound: Boolean, probe: AccountProbe?, loca
     else -> FirstSync.SYNC
 }
 
+/** What Settings' "Sync now" does. */
+enum class SyncNowStep {
+    /** The plan doesn't include cloud sync here: say so and sync nothing. */
+    PLAN_LOCKED,
+    /** This phone never synced with the signed-in account: the first-sync rule ([firstSyncDecision]) comes first. */
+    FIRST_SYNC_CHECK,
+    SYNC,
+}
+
+/**
+ * The plan comes first. The screen shows the plan's wall instead of calling Sync now, and the rule holds here too, so no
+ * path syncs without the plan: a sync would also download the account's records, which is restore, a Pro feature
+ * (docs/MONETIZATION.md §2 principle 5; Pro-gate review 2026-11-23, PE-4). [planAllows]: ProGates.syncAllowedByPlan,
+ * a Partner's phone on the Owner's plan included.
+ */
+internal fun syncNowStep(planAllows: Boolean, neverSyncedHere: Boolean, signedIn: Boolean): SyncNowStep = when {
+    !planAllows -> SyncNowStep.PLAN_LOCKED
+    neverSyncedHere && signedIn -> SyncNowStep.FIRST_SYNC_CHECK
+    else -> SyncNowStep.SYNC
+}
+
 /**
  * After an account switch wiped the previous ledger, Settings syncs the new account only if this phone is still set up.
  * The wipe sends a phone back to onboarding (F-7), and onboarding then checks the account and restores or sets it up.
