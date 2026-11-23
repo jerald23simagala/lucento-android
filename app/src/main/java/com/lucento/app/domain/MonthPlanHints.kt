@@ -25,8 +25,17 @@ sealed interface PlanHint {
     /** The same month a year ago: spending in a category was above what this month plans for it ([planned] null: nothing). */
     data class LastYear(override val categoryId: Long, val spent: Money, val month: YearMonth, val planned: Money?) : PlanHint
 
-    /** A category went over its budget in [month] by [over]; [finished] false when that month is still running. */
-    data class WentOver(override val categoryId: Long, val over: Money, val month: YearMonth, val finished: Boolean) : PlanHint
+    /**
+     * A category went over its budget in [month] by [over], having spent [spent] there; [finished] false when that month
+     * is still running.
+     */
+    data class WentOver(
+        override val categoryId: Long,
+        val over: Money,
+        val spent: Money,
+        val month: YearMonth,
+        val finished: Boolean,
+    ) : PlanHint
 }
 
 object MonthPlanHints {
@@ -74,7 +83,10 @@ object MonthPlanHints {
             .sortedWith(compareBy<PlanHint.DueInMonth> { it.date }.thenBy { it.name })
             .take(EACH)
 
-    /** Categories whose spending in the same month last year was clearly above what [month] plans for them. */
+    /**
+     * Categories whose spending in the same month last year was clearly above their usual amount in [month] (an amount
+     * set for that month alone doesn't count, so the hint stays, marked as acted on, once the person has set one).
+     */
     fun lastYear(
         month: YearMonth,
         categories: List<Category>,
@@ -88,12 +100,13 @@ object MonthPlanHints {
             .groupBy { it.categoryId }
         if (spentThen.isEmpty()) return emptyList()
         val active = categories.filter { it.kind == CategoryKind.EXPENSE && !it.archived }
-        val planned = BudgetPlanner.activeAllocations(budgets, categories, month)
-            .filter { it.currencyCode == currencyCode }
-            .associate { it.categoryId!! to it.limit }
+        val usual: (Long) -> Money? = { id ->
+            BudgetPlanner.recurringAllocation(budgets.filter { it.categoryId == id && it.currencyCode == currencyCode }, month)
+                ?.limit?.takeIf { it.amountMinor > 0L }
+        }
         return active.mapNotNull { category ->
             val spent = Money.sum(currencyCode, spentThen[category.id].orEmpty().map { it.amount })
-            val plan = planned[category.id]
+            val plan = usual(category.id)
             val notable = when {
                 spent.isZero -> false
                 plan == null -> true
@@ -123,7 +136,11 @@ object MonthPlanHints {
         if (before > YearMonth.from(today)) return emptyList()
         val plan = BudgetPlanner.plan(categories, budgets, transactions, currencyCode, before)
         return plan.allocatedLines
-            .mapNotNull { line -> line.remaining?.takeIf { it.isNegative }?.let { PlanHint.WentOver(line.category.id, -it, before, before < YearMonth.from(today)) } }
+            .mapNotNull { line ->
+                line.remaining?.takeIf { it.isNegative }?.let {
+                    PlanHint.WentOver(line.category.id, over = -it, spent = line.spent, month = before, finished = before < YearMonth.from(today))
+                }
+            }
             .sortedWith(compareByDescending<PlanHint.WentOver> { it.over.amountMinor }.thenBy { it.categoryId })
             .take(EACH)
     }

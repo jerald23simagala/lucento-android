@@ -1,12 +1,17 @@
 package com.lucento.app
 
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -19,11 +24,13 @@ import com.lucento.app.core.money.Money
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.data.repository.RecurringRepository
+import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.domain.CategoryKind
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.MonthCheckIn
 import com.lucento.app.domain.TransactionType
+import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -38,7 +45,8 @@ import java.util.UUID
  * (CI doesn't run it). The card waits until a budget is two weeks old, so it runs in two steps with the device clock set
  * by the person running it (`settings put global auto_time 0; cmd alarm set-time <ms>`):
  * 1. [seed] on a fresh install, on a day at least two weeks before the one to capture (e.g. 10 November): onboarding,
- *    the demo month, a yearly bill due next month and one category over its budget.
+ *    the demo month, a yearly bill due next month, one category over its budget, the trip goal topped up to its target and a
+ *    small loan paid off (so two of the new awards show their earned art).
  * 2. [capture] on a day inside the check-in's window (e.g. 29 November, then 2 December). `-e captureDark true` takes the
  *    dark theme, `-e capturePro true` a Pro plan (the year view unlocked). Shots land in /data/local/tmp/lucento-monthclose.
  */
@@ -85,6 +93,8 @@ class MonthCloseCaptureTest {
                     com.lucento.app.domain.Achievement.FIRST_STEP,
                     com.lucento.app.domain.Achievement.GETTING_CONSISTENT,
                     com.lucento.app.domain.Achievement.GOAL_SETTER,
+                    com.lucento.app.domain.Achievement.GOAL_REACHED,
+                    com.lucento.app.domain.Achievement.LOAN_CLEARED,
                 ),
             )
             val currency = container.preferences.preferences.first().primaryCurrency
@@ -110,6 +120,20 @@ class MonthCloseCaptureTest {
             // A long category name with an amount, for the large-text checks (28 characters).
             val school = (container.categories.create("Children’s school activities", CategoryKind.EXPENSE) as CategoryRepository.SaveResult.Saved).id
             container.budgets.setAllocation(school, currency, money(150))
+            // A goal saved up to its target and a small loan paid off, so Goal Reached and Loan Cleared are earned. Free
+            // allows two goals and two cards or loans, and the demo month has both: the trip goal is topped up, and the
+            // card (nothing uses it) makes room for the loan.
+            val trip = container.goals.observeGoals().first().first { it.name == "Japan trip" }
+            container.goals.contribute(trip.id, money(1_350), today.minusDays(3), "", UUID.randomUUID().toString())
+            val visa = container.wallets.observeWallets().first().first { it.name == "Visa card" }.id
+            check(container.wallets.delete(visa) == WalletRepository.DeleteResult.Deleted)
+            val phone = (container.wallets.create("Phone loan", WalletType.LOAN, money(300)) as WalletRepository.SaveResult.Saved).id
+            container.transactions.saveTransfer(
+                TransactionRepository.TransferInput(
+                    group = null, clientUuid = UUID.randomUUID().toString(), fromWalletId = bank, toWalletId = phone,
+                    amount = money(300), date = today.minusDays(2), note = "",
+                ),
+            )
         }
         waitForText("Monthly budget", 15_000)
     }
@@ -148,22 +172,23 @@ class MonthCloseCaptureTest {
             if (finish) {
                 // Its close button, then Undo: the card comes back.
                 compose.onNodeWithContentDescription("Not this month").performClick()
-                waitForText("Check-in hidden")
+                waitForText("We won’t ask about")
                 shot("$tag-01b-card-hidden-undo")
                 click("Undo")
                 waitForText("Plan ${name(plan)}")
             }
             compose.onNode(hasText("Plan ${name(plan)}") and hasClickAction()).performClick()
             compose.waitForIdle()
-            // The plan page is a lazy list: its top, then a swipe at a time, then its end.
+            // The plan page is a lazy list: its top, then most of a screen at a time to its end.
             waitForText("What’s different about", 10_000)
             shot("$tag-02-plan-top")
-            swipeList()
-            shot("$tag-03-plan-middle")
-            swipeList()
-            shot("$tag-04-plan-categories")
-            lazyScrollTo("Done planning")
-            shot("$tag-04b-plan-done")
+            // Most of a screen at a time until the page's end is in view, so every row is seen at every text size.
+            for (step in 'a'..'p') {
+                if (isShown("Each change is saved")) break
+                scrollOn()
+                shot("$tag-03$step-plan-scroll")
+            }
+            scrollOn(-100f) // back to the top (scrolling stops there)
             // A bill's hint opens its category with the bill's amount already in (design review 2026-11-23).
             lazyScrollTo("Worth a look")
             runCatching {
@@ -181,8 +206,17 @@ class MonthCloseCaptureTest {
                     shot("$tag-05b-plan-amount-over")
                     click("Save amount")
                     compose.waitUntilDoesNotExist(hasText("Apply to"), 5_000)
-                    lazyScrollTo("Budgeted")
+                    // The hint now says what December has, and offers a change instead of a new figure.
+                    lazyScrollTo("Worth a look")
                     shot("$tag-05c-plan-after-save")
+                    // Opened again, it shows the amount saved, never that amount plus the overspend.
+                    compose.onAllNodesWithText("Restaurants:", substring = true)[0].performClick()
+                    waitForText("Apply to")
+                    shot("$tag-05d-hint-reopened")
+                    backUntilGone("Apply to")
+                    // The row it changed, under Budgeted: "Only December · usually …".
+                    lazyScrollTo("usually")
+                    shot("$tag-05e-edited-row")
                 }
             }
             runCatching {
@@ -190,15 +224,26 @@ class MonthCloseCaptureTest {
                 click("Add something for ${name(plan)}")
                 waitForText("Your categories")
                 shot("$tag-06-add-something")
-                backUntilGone("Your categories")
+                // A budgeted category takes the extra: "Personal care becomes … (… planned + …)".
+                compose.onNode(hasText("Personal care") and hasText("planned", substring = true) and hasClickAction())
+                    .performScrollTo()
+                    .performClick()
+                waitForText("Extra for")
+                shot("$tag-06d-extra-sheet")
+                compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("200")
+                compose.waitForIdle()
+                shot("$tag-06e-extra-typed")
+                backUntilGone("Extra for")
             }
             if (finish) {
-                // Done from the top bar: back on Home with the message, and the card's recap (if any) left.
-                lazyScrollTo("What’s different about")
-                click("Done")
+                // Done planning, at the page's end: back on Home with the total, and the card's recap (if any) left.
+                lazyScrollTo("Done planning")
+                compose.onNode(hasText("Done planning ${name(plan)}") and hasClickAction()).performClick()
                 waitForText("is planned")
                 shot("$tag-06b-done-message")
-                Thread.sleep(4_500) // the message goes; the card shows what is left
+                // The message's 4 seconds pass (the test's clock moves only when told to); the card shows what is left.
+                compose.mainClock.advanceTimeBy(5_000)
+                compose.waitForIdle()
                 shot("$tag-06c-home-after-done")
             } else {
                 backUntilShown("Monthly budget")
@@ -212,19 +257,28 @@ class MonthCloseCaptureTest {
         }
         waitForText("How your months are going")
         shot("$tag-07-progress-recap")
-        runCatching { compose.onNodeWithText("Where it went").performScrollTo() }
-        shot("$tag-08-progress-details")
-        runCatching { compose.onNodeWithText("Your year").performScrollTo() }
-        shot("$tag-09-progress-year")
-        runCatching { compose.onNodeWithText("Money Keeper").performScrollTo() }
-        shot("$tag-10-progress-awards")
-        runCatching { compose.onNodeWithText("Loan Cleared").performScrollTo() }
-        shot("$tag-10b-progress-awards-end")
+        // Most of a screen at a time to the page's end (Pro's Membership shelf comes after the awards).
+        for (step in 'a'..'p') {
+            if (isShown(if (pro) "Yours to keep" else "Paid a loan down to zero")) break
+            scrollOn()
+            shot("$tag-08$step-progress-scroll")
+        }
         back()
 
         // Budget, one month ahead: what is planned, nothing spent yet.
         compose.onNodeWithContentDescription("Budget").performClick()
         compose.waitUntilAtLeastOneExists(androidx.compose.ui.test.hasContentDescription("Next month"), 10_000)
+        if (today.dayOfMonth <= MonthCheckIn.LAST_DAY) {
+            // In a month's first days its plan page is on the Budget tab too.
+            lazyScrollTo("Plan ${name(YearMonth.from(today))}")
+            scrollOn(0.3f) // clear of the navigation dock
+            shot("$tag-11a-budget-this-month")
+            runCatching {
+                compose.onAllNodes(hasScrollToNodeAction()).onFirst()
+                    .performScrollToNode(androidx.compose.ui.test.hasContentDescription("Next month"))
+                compose.waitForIdle()
+            }
+        }
         compose.onNodeWithContentDescription("Next month").performClick()
         compose.waitForIdle()
         shot("$tag-11-budget-next-month")
@@ -238,13 +292,22 @@ class MonthCloseCaptureTest {
         back()
     }
 
-    /** One swipe up the screen's scrolling list, for a shot of what comes next. */
-    private fun swipeList() {
+    /**
+     * Scrolls the screen's main page (its tallest scrolling container) by [fraction] of its height, with no fling, so
+     * consecutive shots overlap and nothing is skipped. A large negative fraction goes back to the top.
+     */
+    private fun scrollOn(fraction: Float = 0.7f) {
         runCatching {
-            compose.onAllNodes(hasScrollToNodeAction()).onFirst().performTouchInput { swipeUp() }
+            val page = compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().maxByOrNull { it.size.height } ?: return
+            compose.onNode(SemanticsMatcher("the page") { it.id == page.id })
+                .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, page.size.height * fraction) }
             compose.waitForIdle()
         }
     }
+
+    /** Whether [text] is on screen now (composed and in view). */
+    private fun isShown(text: String): Boolean =
+        runCatching { compose.onAllNodes(hasText(text, substring = true)).onFirst().assertIsDisplayed() }.isSuccess
 
     /** Scrolls the screen's lazy list to the item holding [text] (a lazy list composes only what is in view). */
     private fun lazyScrollTo(text: String) {

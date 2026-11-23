@@ -128,7 +128,19 @@ object BudgetMilestones {
     }
 
     /**
-     * Whether [month] stayed within its budget by [monthToAcknowledge]'s rules (allocations that covered the whole month,
+     * The first month a budget in [currencyCode] was in place from its 1st: the month the first amount was set when that
+     * was on a 1st, otherwise the month after. Null without amounts, or when one has no date (then it is unknown).
+     * Steady Month can count no earlier month ([keptWithin]).
+     */
+    fun firstWholeMonth(budgets: List<Budget>, currencyCode: String): YearMonth? {
+        val rows = budgets.filter { !it.isLegacyOverall && it.currencyCode == currencyCode }
+        if (rows.isEmpty() || rows.any { it.createdOn == null }) return null
+        val began = rows.mapNotNull { it.createdOn }.min()
+        return if (began.dayOfMonth == 1) YearMonth.from(began) else YearMonth.from(began).plusMonths(1)
+    }
+
+    /**
+     * Whether [month] stayed within its budget by [monthToAcknowledge]'s rules (a budget in place from the month's 1st,
      * real spending, Spent at or under the total). Steady Month uses it for any finished month.
      */
     fun keptWithin(
@@ -146,8 +158,14 @@ object BudgetMilestones {
         currencyCode: String,
         month: YearMonth,
     ): BudgetPlan? {
-        val wholeMonth = budgets.filter { b -> b.createdOn != null && !b.createdOn.isAfter(month.atDay(1)) }
-        val plan = BudgetPlanner.plan(categories, wholeMonth, ledger.transactions, currencyCode, month)
+        // The month had a budget from its 1st: an amount in this currency was set on or before that day (a row without a
+        // date can't show it). From then on the month is judged as the Budget tab and the recap judge it, with every
+        // amount it has — one set while planning it in the check-in's first days too (critic r2, P1-3).
+        val began = budgets.any { b ->
+            !b.isLegacyOverall && b.currencyCode == currencyCode && b.createdOn != null && !b.createdOn.isAfter(month.atDay(1))
+        }
+        if (!began) return null
+        val plan = BudgetPlanner.plan(categories, budgets, ledger.transactions, currencyCode, month)
         if (!plan.hasBudget || plan.spent.isZero || plan.spent > plan.total) return null
         return plan
     }

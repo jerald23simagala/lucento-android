@@ -75,10 +75,23 @@ class MonthPlanHintsTest {
         assertTrue(MonthPlanHints.lastYear(dec, categories, budgets, emptyList(), "PHP").isEmpty())
     }
 
+    @Test fun `last year's hint stays once December has its own amount, measured against the usual one`() {
+        val lastDecember = listOf(spend(5_000, 6, "2025-12-20"))
+        // ₱50 set for Gifts in December alone: the hint is still about the usual ₱30, so the plan page can show it as
+        // acted on instead of dropping it (critic r2, P0-2).
+        val own = budgets + Budget(3, 6, php(5_000), createdOn = LocalDate.parse("2026-11-29"), month = dec)
+        val hint = MonthPlanHints.lastYear(dec, categories, own, lastDecember, "PHP").single()
+        assertEquals(php(3_000), hint.planned)
+        // Raising the usual amount itself is what makes it ordinary.
+        val raised = budgets + Budget(4, 6, php(5_000), createdOn = LocalDate.parse("2026-11-29"), effectiveFrom = dec)
+        assertTrue(MonthPlanHints.lastYear(dec, categories, raised, lastDecember, "PHP").isEmpty())
+    }
+
     @Test fun `last month's overspending, so far while it is still running`() {
         val november = listOf(spend(12_500, 4, "2026-11-10"), spend(2_000, 6, "2026-11-11"))
         val lateNovember = MonthPlanHints.wentOver(dec, LocalDate.parse("2026-11-29"), categories, budgets, november, "PHP")
-        assertEquals(listOf(PlanHint.WentOver(4, php(2_500), YearMonth.of(2026, 11), finished = false)), lateNovember)
+        // Food: ₱125 spent against ₱100, so ₱25 over; the hint carries what was spent, for the sheet it opens.
+        assertEquals(listOf(PlanHint.WentOver(4, over = php(2_500), spent = php(12_500), month = YearMonth.of(2026, 11), finished = false)), lateNovember)
         val earlyDecember = MonthPlanHints.wentOver(dec, LocalDate.parse("2026-12-02"), categories, budgets, november, "PHP")
         assertEquals(true, earlyDecember.single().finished)
     }

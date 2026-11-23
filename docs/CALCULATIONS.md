@@ -67,7 +67,7 @@ Docs: docs/MULTICURRENCY.md. Code: `domain/fx/FxLedger.kt` (`FxLedger`, `FxTrans
 | Recurring idempotency key | `recurring-<schedule id>-on-<due epoch day>` (v0.4). Keyed by due date, not index, so editing a schedule's timing (which restarts the index) never makes a new payment look like a duplicate of an old one. v0.3 keys (`recurring-<id>-<index>`) cannot collide | `RecurringSchedule.occurrenceKey` |
 | Goal milestone | halfway / reached, when saved × 100 crosses target × 50 / × 100 because of a contribution (never a withdrawal) | `GoalMilestones` |
 | Archived goal | only a reached goal (saved ≥ target) can be archived; it keeps its contributions but is left out of every goal total (Goals hero, Home's savings card, featured goal) and takes no money in or out until restored. It still counts for the Goal Setter milestone | `GoalRepository.archive` / `restore` |
-| Budget month kept | the previous calendar month: allocations that existed all month (created on/before its 1st) sum to a positive budget in the main currency, and that month's Spent (every expense, budgeted or not, as on the Budget tab; other currencies at their own value from the translated ledger) is > 0 and ≤ that budget. Acknowledged once (persisted). Until 2026-11-16 it read the untranslated transactions, so foreign-wallet spending could not stop it | `BudgetMilestones` |
+| Budget month kept | the previous calendar month: it had a budget from its 1st (an amount in the main currency set on or before that day; a row without a creation date can't show it), its plan (every amount it has, as on the Budget tab, one set while planning it in the check-in's first days included) is positive, and that month's Spent (every expense, budgeted or not, as on the Budget tab; other currencies at their own value from the translated ledger) is > 0 and ≤ that budget. Acknowledged once (persisted). Until 2026-11-16 it read the untranslated transactions, so foreign-wallet spending could not stop it; until 2026-11-23 only allocations created on or before the 1st counted, so an amount set in the check-in's first days was left out of the budget while its spending counted | `BudgetMilestones` |
 
 ## Budget model (v0.5)
 - The overall budget is derived — the sum of category amounts — for one currency and one calendar month. There is no
@@ -155,9 +155,12 @@ Builder (a category with an amount this month, lifecycle rules), First Step (an 
 Consistent (expenses or income on 7 different days, any order — no streak), Financial Explorer (Insights opened; a
 local flag), Goal Setter (a savings goal, archived ones included), Secured (app lock turned on at some point; a local
 flag). The progress awards (owner, 2026-11-23) recognise results rather than setup:
-- **Steady Month**: a finished month, at most 24 back, that stayed within its budget by the budget moment's rules
-  (`BudgetMilestones.keptWithin`: allocations that covered the whole month, real spending, Spent at or under the total,
-  in the main currency on the translated ledger).
+- **Steady Month**: a whole finished month, at most 24 back, that stayed within its budget by the budget moment's rules
+  (`BudgetMilestones.keptWithin`: a budget from the month's 1st, real spending, Spent at or under the total, in the main
+  currency on the translated ledger). So the recap's verdict and the award agree: a month whose budget began later says
+  so under its verdict ("Your budget began on November 10"), and until the first whole month
+  (`BudgetMilestones.firstWholeMonth`: the month after the first amount, or its own month when set on a 1st) has ended,
+  the cabinet names it under the award ("Your first whole month is December.").
 - **Goal Reached**: a goal (archived ones too) whose contributions, added up in date order, reached its target at some
   point (`Achievements.everReached`); taking money back later doesn't undo it.
 - **Loan Cleared**: a loan (`WalletType.LOAN`, not a card: paying a card in full is routine) owing nothing, with at
@@ -179,7 +182,9 @@ in `MonthCheckIn`:
   notification, and it never opens over the composer or a widget.
 - **Plan part**: Budgets on, the phone may change the budget (not a Partner's), and the budget is settled: it has an
   amount this month and its first amount is at least 14 days old (`budgetSettled`; rows without a creation date count
-  as settled). It goes once the month is planned ("Done planning" on the plan page) or dismissed.
+  as settled). It goes once the month is planned (the plan page's first saved change, or "Done planning") or dismissed.
+  Only the month the card asks about next, or an earlier one, is recorded as planned (`countsAsPlanned`): planning March
+  from November keeps March's amounts but leaves the December, January and February check-ins to come.
 - **Recap part**: the 1st to the 7th, when last month has income or expenses recorded; it goes once the recap is opened
   (from the card or on the Progress page) or dismissed.
 - **Markers**: `budget_month_planned` and `recap_month_seen` ("yyyy-MM", the latest month done or dismissed) follow the
@@ -191,14 +196,21 @@ in `MonthCheckIn`:
   or "₱1,200 over budget" (in a month's last days this month's figures are on the budget card below it).
 - **Hints** (`MonthPlanHints`, facts only, at most 4, at most 2 of each kind, in this order): scheduled expenses that don't
   come every month (yearly, every few months; not weekly, monthly, linked or paused ones) with an occurrence in the
-  month; the same month last year where a category's spending was at least 10 % above this month's plan for it, or it
-  had no plan; last month's budgeted categories that went over (so far, in a month's last days). A hint opens its
-  category's amount with a suggestion, said where it comes from (`hintSuggestion`): a bill due adds its amount to the
-  usual one; last year's month proposes what it cost then; last month's overspending proposes what was spent. Nothing
-  is saved until the person saves it.
-- **Reaching the plan page**: from the card, and from the Budget tab on any month ahead ("Plan <month>").
+  month; the same month last year where a category's spending was at least 10 % above its usual amount for this month
+  (an amount set for the month alone doesn't count), or it had none; last month's budgeted categories that went over (so
+  far, in a month's last days). A hint opens its category's amount with a suggestion, said where it comes from
+  (`hintSuggestion`): a bill due adds its amount to the category's usual monthly amount (`PlannedSource.usual`, never an
+  amount already raised for the month); last year's month proposes what it cost then; last month's overspending proposes
+  what was spent in that category. Nothing is saved until the person saves it. Once the month has its own amount for a
+  hint's category, the hint says so ("$235.00 set for December", with "Change") and opens at that amount, with no
+  suggestion: a hint never adds to what the person has already set.
+- **Add something** on a category that already has an amount asks for the extra ("Extra for December") and saves the
+  amount plus the extra for that month only ("Personal care becomes $260.00 for December ($60.00 planned + $200.00)").
+- **Reaching the plan page**: from the card; from the Budget tab on any month ahead ("Plan <month>"); and on the Budget
+  tab's running month from the 1st to the 7th, so the hints never depend on the card.
 - **Closing the card** ("Not this month") hides both parts and offers Undo, which puts the two months back as they were
-  (the one time they move back).
+  (the one time they move back). The message names what stops: "We won’t ask about December again", or "November’s
+  recap hidden" (the recap stays on the Progress page).
 
 ### Progress recap (owner, 2026-11-23)
 The Progress page (from Home's Quick links; it replaced the awards sheet) tells a month's story and the year's, from the
@@ -207,7 +219,9 @@ out, as on Home and Budget):
 - **Kept** = income − expenses (`CashflowCalculator.netFlow`), signed. Transfers, adjustments and goal contributions
   never count.
 - **Budget**: the Budget tab's plan for the month (`BudgetPlanner.plan`): spent of the total, categories within, and the
-  ones that went over, by how much. Null when Budgets is off or the month had no budget.
+  ones that went over, by how much. Null when Budgets is off or the month had no budget. When the first amount in the
+  currency was set after the month's 1st (`RecapBudget.since`; unknown when an amount has no date), the line says when
+  the budget began, since such a month can't be a Steady Month.
 - **Where it went**: the 3 largest expense categories, with their share of the month's expenses.
 - **Biggest change**: the category whose spending moved most since the month before (by size, either way; ties to the
   larger amount, then category id), only when the month before has records. A month still running is compared with the

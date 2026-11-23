@@ -15,10 +15,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.core.net.toUri
 import com.lucento.app.core.LucentoLinks
 import com.lucento.app.core.designsystem.component.Hairline
@@ -29,16 +36,18 @@ import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 
 /**
- * Lucento's social channels (owner, 2026-11-23): Facebook, Instagram, TikTok and YouTube, all @lucentoapp, each opened in
- * its own app or the browser on a tap. The app itself sends nothing and shows no feed: these are links, like the website
- * and the Community group above them in the profile menu.
+ * Lucento's social channels (owner, 2026-11-23): the Facebook Page, Instagram and TikTok (@lucentoapp) and the YouTube
+ * channel, each opened in its own app or the browser on a tap. The app itself sends nothing and shows no feed: these are
+ * links, like the website and the Community group above them in the profile menu. When nothing on the phone can open
+ * one, the sheet says so and gives the address.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FollowSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
-    fun browse(url: String) {
-        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
+    var failed by remember { mutableStateOf<LucentoLinks.Channel?>(null) }
+    fun browse(channel: LucentoLinks.Channel) {
+        failed = if (runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, channel.url.toUri())) }.isSuccess) null else channel
     }
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -60,9 +69,20 @@ fun FollowSheet(onDismiss: () -> Unit) {
                     icon = ImageVector.vectorResource(channel.icon),
                     title = channel.name,
                     summary = channel.subtitle,
-                    onClick = { browse(channel.url) },
+                    onClick = { browse(channel) },
+                    external = true,
+                    onClickLabel = "Open in ${channel.name}",
                 )
                 if (index < LucentoLinks.FOLLOW.lastIndex) Hairline(inset = inset)
+            }
+            failed?.let { channel ->
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    "Couldn’t open ${channel.name} on this phone. Its address is ${displayAddress(channel.url)}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
             }
             Spacer(Modifier.height(Spacing.md))
             Text(
@@ -73,3 +93,7 @@ fun FollowSheet(onDismiss: () -> Unit) {
         }
     }
 }
+
+/** "instagram.com/lucentoapp": a link as a person would type it. */
+internal fun displayAddress(url: String): String =
+    url.removePrefix("https://").removePrefix("http://").removePrefix("www.").trimEnd('/')

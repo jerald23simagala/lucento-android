@@ -421,8 +421,9 @@ private fun HomeDashboard(
                     onOpenMilestones = { actions.onOpenProgress(null, false) },
                     onDismissSpotlight = viewModel::dismissAddSpotlight,
                     onDismissCheckIn = { card ->
-                        // A quiet close with a way back (design review 2026-11-23): the card returns with Undo.
-                        viewModel.dismissCheckIn(card) { undo -> messageHosts?.top?.show("Check-in hidden", "Undo", undo) }
+                        // A quiet close with a way back (design review 2026-11-23): the card returns with Undo. The
+                        // message names what stops (critic r2, P3-8).
+                        viewModel.dismissCheckIn(card) { undo -> messageHosts?.top?.show(checkInHiddenMessage(card), "Undo", undo) }
                     },
                     onSeeRecap = { month ->
                         viewModel.markRecapSeen(month)

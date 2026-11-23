@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.component.AmountFormat
 import com.lucento.app.core.designsystem.component.IconTile
 import com.lucento.app.core.designsystem.component.LucentoCard
-import com.lucento.app.core.designsystem.component.LucentoSecondaryButton
+import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
 import com.lucento.app.core.designsystem.component.LucentoTextButton
 import com.lucento.app.core.designsystem.component.amountFormat
 import com.lucento.app.core.designsystem.theme.Hierarchy
@@ -68,15 +68,21 @@ internal fun MonthCheckInCard(
             Column(Modifier.weight(1f).padding(top = Spacing.xs)) {
                 Text(copy.title, style = Hierarchy.cardTitle, modifier = Modifier.semantics { heading() })
                 Spacer(Modifier.height(Spacing.xxs))
-                Text(copy.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Balanced lines, so no word is left alone on the last one (critic r2).
+                Text(
+                    copy.body,
+                    style = MaterialTheme.typography.bodyMedium.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             // 48dp, pulled into the card's padding so its icon lines up with the title.
             IconButton(onClick = onDismiss, modifier = Modifier.offset(x = Spacing.sm, y = -Spacing.sm)) {
                 Icon(Icons.Outlined.Close, contentDescription = "Not this month", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        // Wraps at large text sizes, so every action keeps its whole label and its 48dp target. Planning is the card's
-        // main action, so it alone has a fill (design review 2026-11-23).
+        // Wraps at large text sizes, so every action keeps its whole label and its 48dp target. The card's main action is
+        // the filled one, plain to see in both themes (design review 2026-11-23; critic r2: a tonal fill sank in dark).
+        // There is one card at a time and only around a month's turn, so it doesn't compete with Home's own actions.
         Spacer(Modifier.height(Spacing.xs))
         // The main action first, under the text it belongs to; a second action follows it, or sits below it on a narrow
         // screen, so a wrap reads as an order rather than a gap.
@@ -85,14 +91,18 @@ internal fun MonthCheckInCard(
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
-            card.plan?.let { month -> LucentoSecondaryButton(text = "Plan ${monthLabel(month)}", onClick = { onPlan(month) }, fillWidth = false) }
+            card.plan?.let { month -> LucentoPrimaryButton(text = "Plan ${monthLabel(month)}", onClick = { onPlan(month) }, fillWidth = false) }
             card.recap?.let { month ->
                 if (card.plan != null) LucentoTextButton(text = copy.recapAction, onClick = { onRecap(month) })
-                else LucentoSecondaryButton(text = copy.recapAction, onClick = { onRecap(month) }, fillWidth = false)
+                else LucentoPrimaryButton(text = copy.recapAction, onClick = { onRecap(month) }, fillWidth = false)
             }
         }
     }
 }
+
+/** What closing the card stops: "We won’t ask about December again", or "November’s recap hidden" (it stays in Progress). */
+internal fun checkInHiddenMessage(card: MonthCheckIn.Card): String = card.plan?.let { "We won’t ask about ${monthLabel(it)} again" }
+    ?: "${monthLabel(card.recap!!)}’s recap hidden"
 
 /** The card's words, from its figures only. Pure (apart from month names), so the cases are pinned in tests. */
 internal data class CheckInCopy(val title: String, val body: String, val recapAction: String) {

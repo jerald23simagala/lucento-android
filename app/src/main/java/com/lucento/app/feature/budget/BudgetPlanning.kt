@@ -14,16 +14,20 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,7 +44,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,6 +71,7 @@ import com.lucento.app.core.designsystem.theme.Hierarchy
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.core.money.Money
+import com.lucento.app.data.repository.BudgetRepository
 import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.domain.Budget
 import com.lucento.app.domain.BudgetPlan
@@ -86,9 +91,17 @@ import java.util.Locale
 /** Where a planned month's amount for one category comes from: its own amount for that month, or the usual one. */
 internal data class PlannedSource(val ownAmount: Boolean, val usual: Money?)
 
-/** [line]'s source in [month], from the stored rows ([BudgetPlanner]'s lifecycle rules). */
-internal fun plannedSource(budgets: List<Budget>, line: CategoryBudgetLine, month: YearMonth): PlannedSource {
-    val currency = line.allocation?.currencyCode ?: return PlannedSource(ownAmount = false, usual = null)
+/**
+ * [line]'s source in [month], from the stored rows ([BudgetPlanner]'s lifecycle rules). [currencyCode] is the plan's, for a
+ * line without an amount; otherwise the amount's own.
+ */
+internal fun plannedSource(
+    budgets: List<Budget>,
+    line: CategoryBudgetLine,
+    month: YearMonth,
+    currencyCode: String? = null,
+): PlannedSource {
+    val currency = line.allocation?.currencyCode ?: currencyCode ?: return PlannedSource(ownAmount = false, usual = null)
     val rows = budgets.filter { it.categoryId == line.category.id && it.currencyCode == currency }
     return PlannedSource(
         ownAmount = rows.any { it.month == month },
@@ -149,7 +162,8 @@ internal fun PlannedRow(line: CategoryBudgetLine, source: PlannedSource, onClick
         CategoryTile(category = line.category, type = TransactionType.EXPENSE, size = RowTile)
         Spacer(Modifier.width(RowGap))
         Column(Modifier.weight(1f)) {
-            Text(line.category.name, style = Hierarchy.cardTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            // The whole name, however long (40 characters at most), at any text size (critic r2).
+            Text(line.category.name, style = Hierarchy.cardTitle)
             Text(
                 plannedRowDetail(line, source, fmt),
                 style = MaterialTheme.typography.bodySmall,
@@ -160,6 +174,11 @@ internal fun PlannedRow(line: CategoryBudgetLine, source: PlannedSource, onClick
         if (!stacked) {
             Spacer(Modifier.width(Spacing.sm))
             amount()
+        }
+        // A planned amount can be changed: the chevron says so, as on the app's other rows that open something (critic r2, P2-6).
+        if (onClick != null) {
+            Spacer(Modifier.width(Spacing.xs))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -179,8 +198,8 @@ internal fun plannedRowDetail(line: CategoryBudgetLine, source: PlannedSource, f
 /**
  * The monthly check-in's plan page (owner, 2026-11-23): one month's budget, ready for what is different about it — a
  * birthday, an event, a yearly bill. Hints from the person's own records come first; every change starts as that month's
- * only ([BudgetChangeContext.planning]); "Done" records the month as planned so Home stops asking. The figures are the
- * Budget tab's own (the same [BudgetPlanner] plan, from the translated ledger).
+ * only ([BudgetChangeContext.planning]). The first saved change, or "Done planning", records the month as planned so Home
+ * stops asking. The figures are the Budget tab's own (the same [BudgetPlanner] plan, from the translated ledger).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,6 +237,8 @@ fun MonthPlanScreen(
     var editing by remember { mutableStateOf<CategoryBudgetLine?>(null) }
     // A hint's amount, carried into the sheet it opens (critic r1, P1-3): never retyped from the line above it.
     var suggestion by remember { mutableStateOf<HintSuggestion?>(null) }
+    // "Add something" on a category that already has an amount: the sheet asks for the extra (critic r2, P2-7).
+    var extra by remember { mutableStateOf(false) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var naming by rememberSaveable { mutableStateOf(false) }
     // A category made from "Add something" opens its amount as soon as it is part of the plan.
@@ -227,11 +248,14 @@ fun MonthPlanScreen(
         val id = created ?: return@LaunchedEffect
         plan.lines.firstOrNull { it.category.id == id }?.let {
             suggestion = null
+            extra = false
             editing = it
             created = null
         }
     }
     val lineOf: (Long?) -> CategoryBudgetLine? = { id -> plan.lines.firstOrNull { it.category.id == id } }
+    // A saved change is planning the month: Home stops asking, even if the person leaves with Back (critic r2, P2-5).
+    val plannedBy: (BudgetRepository.SaveResult) -> Unit = { if (it is BudgetRepository.SaveResult.Saved) viewModel.markPlanned(month) }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -242,24 +266,9 @@ fun MonthPlanScreen(
         ),
     ) {
         item(key = "bar") {
-            LucentoTopBar(
-                title = "Plan ${monthLabel(month)}",
-                onBack = onBack,
-                // Done is always in reach, not only after every category (critic r1, P2-5 hierarchy).
-                actions = {
-                    if (canEdit) {
-                        com.lucento.app.core.designsystem.component.LucentoTextButton(
-                            text = "Done",
-                            onClick = {
-                                if (!finishing) {
-                                    finishing = true
-                                    viewModel.markPlanned(month) { onDone(plan.total.takeIf { plan.hasBudget }) }
-                                }
-                            },
-                        )
-                    }
-                },
-            )
+            // The title has the bar to itself and may take two lines, so "Plan September" is never cut (critic r2, P0-1).
+            // Done planning ends the page, and the first saved change already counts as planning the month.
+            LucentoTopBar(title = "Plan ${monthLabel(month)}", onBack = onBack, titleMaxLines = 2)
         }
         if (state.loading) return@LazyColumn
 
@@ -290,11 +299,17 @@ fun MonthPlanScreen(
                 LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
                     hints.forEachIndexed { index, hint ->
                         val line = lineOf(hint.categoryId)
+                        val source = line?.let { plannedSource(state.budgets, it, month, plan.currencyCode) }
+                        // Acted on: the month has its own amount for this category, so the hint says what is set and the
+                        // sheet opens at that amount, never at a figure worked out again from it (critic r2, P0-2).
+                        val handled = if (line?.limit != null && source?.ownAmount == true) hintHandledText(hint, line, month, fmt) else null
                         HintRow(
                             hint,
                             state.categoriesById,
+                            handled = handled,
                             onClick = if (canEdit && line != null) ({
-                                suggestion = hintSuggestion(hint, line, fmt)
+                                suggestion = if (handled != null) null else hintSuggestion(hint, line, source?.usual, fmt)
+                                extra = false
                                 editing = line
                             }) else null,
                         )
@@ -372,11 +387,23 @@ fun MonthPlanScreen(
             isFuture = month > current,
             initialAmount = suggestion?.amount,
             note = suggestion?.note,
-            onSave = { limit, scope, done -> viewModel.saveAmount(line.category.id, plan.currencyCode, month, limit, scope, done) },
-            onUseUsual = { done -> viewModel.useUsualAmount(line.category.id, plan.currencyCode, month, done) },
+            addTo = if (extra) line.limit else null,
+            onSave = { limit, scope, done ->
+                viewModel.saveAmount(line.category.id, plan.currencyCode, month, limit, scope) { result ->
+                    plannedBy(result)
+                    done(result)
+                }
+            },
+            onUseUsual = { done ->
+                viewModel.useUsualAmount(line.category.id, plan.currencyCode, month) { result ->
+                    plannedBy(result)
+                    done(result)
+                }
+            },
             onDismiss = {
                 editing = null
                 suggestion = null
+                extra = false
             },
         )
     }
@@ -387,6 +414,8 @@ fun MonthPlanScreen(
             onPick = { line ->
                 adding = false
                 suggestion = null
+                // A one-off on a budgeted category is extra on top of its amount, never a new total to work out.
+                extra = line.isAllocated
                 editing = line
             },
             onNew = {
@@ -432,11 +461,17 @@ internal fun planIntro(month: YearMonth, previous: BudgetPlan, today: LocalDate,
         "for ${monthLabel(month)} only."
 }
 
-/** One hint on the plan page, with what it is about; a tap opens that category's amount when it has one. */
+/**
+ * One hint on the plan page, with what it is about; a tap opens that category's amount when it has one. [handled] says
+ * what the month already has for it, once the person has set it.
+ */
 @Composable
-private fun HintRow(hint: PlanHint, categories: Map<Long, Category>, onClick: (() -> Unit)?) {
+private fun HintRow(hint: PlanHint, categories: Map<Long, Category>, handled: String?, onClick: (() -> Unit)?) {
     val fmt = amountFormat()
     val (title, detail) = hintText(hint, { id -> id?.let { categories[it]?.name } }, fmt)
+    // From 130 % text the action goes under the words, as on the other rows (critic r1, P0-1).
+    val stacked = LocalDensity.current.fontScale >= 1.3f
+    val action = if (handled != null) "Change" else "Set amount"
     val icon = when (hint) {
         is PlanHint.DueInMonth -> Icons.Outlined.EventRepeat
         is PlanHint.LastYear -> Icons.Outlined.History
@@ -446,7 +481,10 @@ private fun HintRow(hint: PlanHint, categories: Map<Long, Category>, onClick: ((
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .let { if (onClick != null) it.clickable(role = Role.Button, onClickLabel = "Set its amount", onClick = onClick) else it }
+            .let {
+                if (onClick != null) it.clickable(role = Role.Button, onClickLabel = if (handled != null) "Change its amount" else "Set its amount", onClick = onClick)
+                else it
+            }
             .semantics(mergeDescendants = true) {}
             .padding(horizontal = RowPadding, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -460,14 +498,34 @@ private fun HintRow(hint: PlanHint, categories: Map<Long, Category>, onClick: ((
         Spacer(Modifier.width(RowGap))
         Column(Modifier.weight(1f)) {
             // Balanced lines: "Dec 12" never breaks with the 12 alone (design review 2026-11-23).
-            Text(title, style = MaterialTheme.typography.bodyMedium.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading))
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Heading))
+            if (handled != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(handled, style = MaterialTheme.typography.bodySmall.copy(lineBreak = LineBreak.Heading), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                Text(detail, style = MaterialTheme.typography.bodySmall.copy(lineBreak = LineBreak.Heading), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (stacked && onClick != null) {
+                Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
         }
-        if (onClick != null) {
+        if (!stacked && onClick != null) {
             Spacer(Modifier.width(Spacing.sm))
-            Text("Set amount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
     }
+}
+
+/**
+ * What a hint's month already has for its category, once the person has set the month's own amount: "$235.00 set for
+ * December" (a bill names its category, since the hint names the bill).
+ */
+internal fun hintHandledText(hint: PlanHint, line: CategoryBudgetLine, month: YearMonth, fmt: AmountFormat): String {
+    val set = line.limit?.let { "${fmt.format(it)} set for ${monthLabel(month)}" } ?: "No amount for ${monthLabel(month)}"
+    return if (hint is PlanHint.DueInMonth) "${line.category.name}: $set" else set
 }
 
 /** A hint's two lines, from its facts only. [name] gives a category's name. Pure, so the wording is pinned in tests. */
@@ -495,26 +553,33 @@ internal fun hintText(hint: PlanHint, name: (Long?) -> String?, fmt: AmountForma
 internal data class HintSuggestion(val amount: Money, val note: String)
 
 /**
- * What a hint suggests for [line]'s amount this month (critic r1, P1-3): a bill due adds to the usual amount, last
- * year's same month proposes what it cost then, last month's overspending proposes what was spent. The person sees the
- * figure and its source and can change it before saving.
+ * What a hint suggests for [line]'s amount in a month that has no amount of its own for it yet (critic r1, P1-3; r2, P0-2):
+ * a bill due adds to [usual], the category's usual monthly amount for that month (never to an amount already raised for
+ * it); last year's same month proposes what it cost then; last month's overspending proposes what was spent there. The
+ * person sees the figure and its source and can change it before saving.
  */
-internal fun hintSuggestion(hint: PlanHint, line: CategoryBudgetLine, fmt: AmountFormat): HintSuggestion {
+internal fun hintSuggestion(
+    hint: PlanHint,
+    line: CategoryBudgetLine,
+    usual: Money?,
+    fmt: AmountFormat,
+    locale: Locale = Locale.getDefault(),
+): HintSuggestion {
     val name = line.category.name
     return when (hint) {
         is PlanHint.DueInMonth -> {
-            val usual = line.limit
-            HintSuggestion(
-                amount = if (usual == null) hint.amount else usual + hint.amount,
-                note = if (usual == null) "${hint.name}’s ${fmt.format(hint.amount)}, due ${monthLabel(java.time.YearMonth.from(hint.date))} ${hint.date.dayOfMonth}."
-                else "Your usual ${fmt.format(usual)} plus ${hint.name}’s ${fmt.format(hint.amount)}.",
-            )
+            // A no-break space keeps the month and the day together on one line.
+            val due = hint.date.format(DateTimeFormatter.ofPattern("MMMM d", locale)).replace(' ', '\u00A0')
+            val withUsual = usual?.let { runCatching { it + hint.amount }.getOrNull() }
+            if (usual == null || withUsual == null) {
+                HintSuggestion(hint.amount, "${hint.name}: ${fmt.format(hint.amount)}, due $due.")
+            } else {
+                HintSuggestion(withUsual, "Your usual ${fmt.format(usual)}, plus ${fmt.format(hint.amount)} for ${hint.name}, due $due.")
+            }
         }
-        is PlanHint.LastYear -> HintSuggestion(hint.spent, "What $name cost last ${monthLabel(hint.month)}.")
-        is PlanHint.WentOver -> {
-            val spent = (line.limit ?: Money.zero(hint.over.currencyCode)) + hint.over
-            HintSuggestion(spent, "What $name cost in ${monthLabel(hint.month)}" + if (hint.finished) "." else " so far.")
-        }
+        is PlanHint.LastYear -> HintSuggestion(hint.spent, "Filled in with what $name cost last ${monthLabel(hint.month)}.")
+        is PlanHint.WentOver ->
+            HintSuggestion(hint.spent, "Filled in with what $name cost in ${monthLabel(hint.month)}" + if (hint.finished) "." else " so far.")
     }
 }
 

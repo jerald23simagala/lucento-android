@@ -48,10 +48,12 @@ fun AwardCabinet(
     /** When the Lucento Pro medal was presented (epoch millis); null before. It stands on its own Membership shelf. */
     proMemberSince: Long? = null,
     onReplayPro: () -> Unit = {},
+    /** A line under an award not yet earned, from the person's own records ("Your first whole month is December."). */
+    notes: Map<Achievement, String> = emptyMap(),
 ) {
     Column(modifier) {
         Achievement.entries.chunked(2).forEach { shelf ->
-            Shelf(shelf, earned, facts, onReplay)
+            Shelf(shelf, earned, facts, onReplay, notes)
             Spacer(Modifier.height(Spacing.lg))
         }
         // Membership isn't progress, so it isn't counted with the awards above: a shelf of its own.
@@ -100,7 +102,14 @@ private fun MembershipShelf(since: String, onReplay: () -> Unit) {
                 Spacer(Modifier.height(Spacing.md))
                 Text("Lucento Pro", style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(Spacing.xxs))
-                Text("Member since $since", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                // Centred like the award cells, also when it wraps at a large text size.
+                Text(
+                    "Member since $since",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = Spacing.xs),
+                )
                 Spacer(Modifier.height(Spacing.xxs))
                 Text(
                     "Joined Lucento Pro. Yours to keep.",
@@ -116,7 +125,13 @@ private fun MembershipShelf(since: String, onReplay: () -> Unit) {
 }
 
 @Composable
-private fun Shelf(awards: List<Achievement>, earned: Set<Achievement>, facts: ProgressFacts?, onReplay: (Achievement) -> Unit) {
+private fun Shelf(
+    awards: List<Achievement>,
+    earned: Set<Achievement>,
+    facts: ProgressFacts?,
+    onReplay: (Achievement) -> Unit,
+    notes: Map<Achievement, String>,
+) {
     Box(Modifier.fillMaxWidth()) {
         // The shelf the medals stand on, just under the discs.
         Box(
@@ -129,7 +144,7 @@ private fun Shelf(awards: List<Achievement>, earned: Set<Achievement>, facts: Pr
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             awards.forEach { a ->
-                AwardCell(a, a in earned, facts?.let { Achievements.progress(a, it) }, onReplay, Modifier.weight(1f))
+                AwardCell(a, a in earned, facts?.let { Achievements.progress(a, it) }, onReplay, notes[a], Modifier.weight(1f))
             }
             if (awards.size == 1) Spacer(Modifier.weight(1f))
         }
@@ -142,6 +157,7 @@ private fun AwardCell(
     earned: Boolean,
     progress: com.lucento.app.domain.AwardProgress?,
     onReplay: (Achievement) -> Unit,
+    note: String?,
     modifier: Modifier = Modifier,
 ) {
     val tap = if (earned) {
@@ -193,5 +209,15 @@ private fun AwardCell(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = Spacing.xs),
         )
+        if (!earned && note != null) {
+            Spacer(Modifier.height(Spacing.xxs))
+            Text(
+                note,
+                style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = Spacing.xs),
+            )
+        }
     }
 }

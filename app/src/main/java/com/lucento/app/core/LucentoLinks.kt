@@ -12,7 +12,7 @@ object LucentoLinks {
      * Lucento's channels, in the website's order (lucento-website `src/data/site.ts`). Each says only what is true of it
      * today: Instagram and TikTok are @lucentoapp; the Facebook Page has no username yet and is linked by its profile ID,
      * and YouTube by its channel ID, as on the website (design review 2026-11-23). When the Page gets its username,
-     * change its link and subtitle here and on the website together (NEXT_TASKS MC-N5).
+     * change its link and subtitle here and on the website together (NEXT_TASKS MCI-N5).
      */
     val FOLLOW: List<Channel> = listOf(
         Channel("Facebook", "Lucento · Page", "https://www.facebook.com/profile.php?id=61596187720039", com.lucento.app.R.drawable.ic_brand_facebook),

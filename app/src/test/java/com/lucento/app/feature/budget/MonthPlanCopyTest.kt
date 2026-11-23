@@ -74,9 +74,9 @@ class MonthPlanCopyTest {
         )
         assertEquals(
             "Gifts: \$5.00 over so far in November" to "Worth a different amount this time?",
-            hintText(PlanHint.WentOver(6, usd(500), nov, finished = false), name, fmt, Locale.US),
+            hintText(PlanHint.WentOver(6, usd(500), usd(3_500), nov, finished = false), name, fmt, Locale.US),
         )
-        assertEquals("Gifts: \$5.00 over in November", hintText(PlanHint.WentOver(6, usd(500), nov, finished = true), name, fmt, Locale.US).first)
+        assertEquals("Gifts: \$5.00 over in November", hintText(PlanHint.WentOver(6, usd(500), usd(3_500), nov, finished = true), name, fmt, Locale.US).first)
         assertEquals("Every 3 months", frequencyLabel(Frequency.MONTHLY, 3))
         assertEquals("Every 2 years", frequencyLabel(Frequency.YEARLY, 2))
     }
@@ -101,18 +101,58 @@ class MonthPlanCopyTest {
         val budgeted = CategoryBudgetLine(gifts, usual, usd(0))
         val unbudgeted = CategoryBudgetLine(gifts, null, usd(0))
         val due = PlanHint.DueInMonth(6, "Car insurance", usd(64_000), LocalDate.parse("2026-12-12"), Frequency.YEARLY, 1)
-        // A bill due adds to the usual amount, and says so.
-        assertEquals(HintSuggestion(usd(66_000), "Your usual \$20.00 plus Car insurance’s \$640.00."), hintSuggestion(due, budgeted, fmt))
-        assertEquals(HintSuggestion(usd(64_000), "Car insurance’s \$640.00, due December 12."), hintSuggestion(due, unbudgeted, fmt))
+        // A bill due adds to the usual amount, and says so; the day never breaks from its month.
+        assertEquals(
+            HintSuggestion(usd(66_000), "Your usual \$20.00, plus \$640.00 for Car insurance, due December\u00A012."),
+            hintSuggestion(due, budgeted, usd(2_000), fmt, Locale.US),
+        )
+        assertEquals(
+            HintSuggestion(usd(64_000), "Car insurance: \$640.00, due December\u00A012."),
+            hintSuggestion(due, unbudgeted, null, fmt, Locale.US),
+        )
         // Last year's month proposes what it cost then; last month's overspending, what was spent.
         assertEquals(
-            HintSuggestion(usd(5_000), "What Gifts cost last December."),
-            hintSuggestion(PlanHint.LastYear(6, usd(5_000), YearMonth.of(2025, 12), usd(3_000)), budgeted, fmt),
+            HintSuggestion(usd(5_000), "Filled in with what Gifts cost last December."),
+            hintSuggestion(PlanHint.LastYear(6, usd(5_000), YearMonth.of(2025, 12), usd(3_000)), budgeted, usd(2_000), fmt),
         )
         assertEquals(
-            HintSuggestion(usd(2_500), "What Gifts cost in November so far."),
-            hintSuggestion(PlanHint.WentOver(6, usd(500), nov, finished = false), budgeted, fmt),
+            HintSuggestion(usd(3_500), "Filled in with what Gifts cost in November so far."),
+            hintSuggestion(PlanHint.WentOver(6, usd(500), usd(3_500), nov, finished = false), budgeted, usd(2_000), fmt),
         )
+    }
+
+    @Test fun `once December has its own amount a hint never adds to it again`() = english {
+        // Critic r2, P0-2: Restaurants saved at $235.00 for December only after going $35.00 over in November ($235.00
+        // spent against $200.00), and Car insurance at $640.00 for December with no usual amount.
+        val fmt = AmountFormat.Shown
+        val usual = Budget(2, 6, usd(20_000))
+        val own = Budget(3, 6, usd(23_500), month = dec)
+        val restaurants = CategoryBudgetLine(gifts.copy(name = "Restaurants"), own, usd(0))
+        val source = plannedSource(listOf(usual, own), restaurants, dec, "USD")
+        assertEquals(PlannedSource(ownAmount = true, usual = usd(20_000)), source)
+        val over = PlanHint.WentOver(6, usd(3_500), usd(23_500), nov, finished = true)
+        // What it cost, never the new amount plus the overspend ($270.00).
+        assertEquals(usd(23_500), hintSuggestion(over, restaurants, source.usual, fmt).amount)
+        assertEquals("\$235.00 set for December", hintHandledText(over, restaurants, dec, fmt))
+
+        val insurance = Category(7, "Insurance", CategoryKind.EXPENSE, "shield")
+        val bill = PlanHint.DueInMonth(7, "Car insurance", usd(64_000), LocalDate.parse("2026-12-12"), Frequency.YEARLY, 1)
+        val ownBill = Budget(5, 7, usd(64_000), month = dec)
+        val insured = CategoryBudgetLine(insurance, ownBill, usd(0))
+        val billSource = plannedSource(listOf(ownBill), insured, dec, "USD")
+        // No usual amount: the bill alone, never $1,280.00 "plus your usual $640.00".
+        assertEquals(PlannedSource(ownAmount = true, usual = null), billSource)
+        assertEquals(usd(64_000), hintSuggestion(bill, insured, billSource.usual, fmt).amount)
+        // A bill's hint names its category, since the hint names the bill.
+        assertEquals("Insurance: \$640.00 set for December", hintHandledText(bill, insured, dec, fmt))
+    }
+
+    @Test fun `a line without an amount reads its source in the plan's currency`() {
+        val usual = Budget(2, 6, usd(2_000))
+        val none = Budget(3, 6, usd(0), month = dec)
+        val line = CategoryBudgetLine(gifts, null, usd(0))
+        assertEquals(PlannedSource(ownAmount = true, usual = usd(2_000)), plannedSource(listOf(usual, none), line, dec, "USD"))
+        assertEquals(PlannedSource(ownAmount = false, usual = null), plannedSource(listOf(usual, none), line, dec))
     }
 
     @Test fun `planning starts every change as that month's only`() {

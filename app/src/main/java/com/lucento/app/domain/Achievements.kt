@@ -21,8 +21,8 @@ enum class Achievement(val key: String, val title: String, val description: Stri
     SECURED("secured", "Secured", "Locked Lucento with your phone’s screen lock", "Turn on Lock Lucento in Settings › Privacy & security"),
 
     // Progress awards (owner, 2026-11-23): real results rather than setup steps. Past progress counts, quietly.
-    STEADY_MONTH("steady_month", "Steady Month", "Finished a month within its budget", "Finish a month within its budget"),
-    GOAL_REACHED("goal_reached", "Goal Reached", "Saved up to a goal’s target", "Save up to one of your goals’ targets"),
+    STEADY_MONTH("steady_month", "Steady Month", "Kept a whole month within its budget", "Keep a whole month within its budget"),
+    GOAL_REACHED("goal_reached", "Goal Reached", "Reached one of your goals’ targets", "Reach one of your goals’ targets"),
     LOAN_CLEARED("loan_cleared", "Loan Cleared", "Paid a loan down to zero", "Pay one of your loans down to zero");
 
     companion object {

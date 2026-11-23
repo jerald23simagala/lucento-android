@@ -40,6 +40,16 @@ object MonthCheckIn {
     fun recapMonth(today: LocalDate): YearMonth? =
         if (today.dayOfMonth <= LAST_DAY) YearMonth.from(today).minusMonths(1) else null
 
+    /**
+     * Whether planning [month] on [today] answers the check-in: the next month the card asks about, or an earlier one.
+     * Planning further ahead (March, from November) is kept as amounts but doesn't silence the months in between, whose
+     * own check-ins still come (the planned mark only moves forward).
+     */
+    fun countsAsPlanned(month: YearMonth, today: LocalDate): Boolean {
+        val next = if (today.dayOfMonth <= LAST_DAY) YearMonth.from(today) else YearMonth.from(today).plusMonths(1)
+        return month <= next
+    }
+
     /** Days left in [today]'s month after today: 0 on its last day. */
     fun daysLeft(today: LocalDate): Int = today.lengthOfMonth() - today.dayOfMonth
 

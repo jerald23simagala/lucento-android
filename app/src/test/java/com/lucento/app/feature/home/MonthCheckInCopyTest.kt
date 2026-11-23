@@ -61,6 +61,12 @@ class MonthCheckInCopyTest {
         assertEquals("\$182.00 of \$200.00 spent. See what came in, what went out and where it went.", recapOnly.body)
     }
 
+    @Test fun `closing the card says what stops`() = english {
+        assertEquals("We won’t ask about December again", checkInHiddenMessage(MonthCheckIn.Card(dec, nov)))
+        assertEquals("We won’t ask about December again", checkInHiddenMessage(MonthCheckIn.Card(dec, null)))
+        assertEquals("November’s recap hidden", checkInHiddenMessage(MonthCheckIn.Card(null, nov)))
+    }
+
     @Test fun `hidden amounts stay hidden in the card's sentences`() = english {
         val c = CheckInCopy.of(MonthCheckIn.Card(dec, nov), LocalDate.parse("2026-12-03"), plan(nov, 20_000, 21_200), AmountFormat.Hidden)
         assertEquals(false, c.body.contains("12.00"))

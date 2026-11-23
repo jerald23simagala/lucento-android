@@ -98,6 +98,14 @@ class MonthRecapTest {
         val plan = BudgetPlanner.plan(categories, budgets, inputs().transactions, "PHP", october)
         assertEquals(plan.total, budget.total)
         assertEquals(plan.spent, budget.spent)
+        // Set up in August, so October had its budget from the 1st.
+        assertNull(budget.since)
+    }
+
+    @Test fun `a budget that began after the 1st says when`() {
+        // The budget's first amount on 15 August: August's recap says so, September's doesn't (critic r2, P1-3).
+        assertEquals(LocalDate.parse("2026-08-15"), MonthRecaps.budgetOf(inputs(), "PHP", YearMonth.of(2026, 8))?.since)
+        assertNull(MonthRecaps.budgetOf(inputs(), "PHP", YearMonth.of(2026, 9))?.since)
     }
 
     @Test fun `where it went, and what moved most since the month before`() {

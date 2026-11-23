@@ -31,6 +31,18 @@ class MonthCheckInTest {
         assertEquals(YearMonth.of(2027, 1), MonthCheckIn.planMonth(day("2026-12-31")))
     }
 
+    @Test fun `planning counts for the month the card asks about next, never for one further ahead`() {
+        // From the 8th, the next card is about next month; until the 7th, about this one.
+        assertTrue(MonthCheckIn.countsAsPlanned(dec, day("2026-11-15")))
+        assertTrue(MonthCheckIn.countsAsPlanned(dec, day("2026-11-29")))
+        assertTrue(MonthCheckIn.countsAsPlanned(dec, day("2026-12-03")))
+        assertTrue(MonthCheckIn.countsAsPlanned(nov, day("2026-11-15")))
+        // March planned from November keeps its amounts but leaves December's, January's and February's check-ins.
+        assertFalse(MonthCheckIn.countsAsPlanned(YearMonth.of(2027, 3), day("2026-11-15")))
+        assertFalse(MonthCheckIn.countsAsPlanned(YearMonth.of(2027, 1), day("2026-12-03")))
+        assertTrue(MonthCheckIn.countsAsPlanned(YearMonth.of(2027, 1), day("2026-12-08")))
+    }
+
     @Test fun `the recap is last month's, from the 1st to the 7th only`() {
         assertNull(MonthCheckIn.recapMonth(day("2026-11-30")))
         assertEquals(nov, MonthCheckIn.recapMonth(day("2026-12-01")))

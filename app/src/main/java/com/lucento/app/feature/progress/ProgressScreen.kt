@@ -216,12 +216,19 @@ fun ProgressScreen(
                 modifier = Modifier.bringIntoViewRequester(awardsRequester),
             )
             Spacer(Modifier.height(Spacing.md))
+            // Steady Month counts whole months only: say which month can be the first (critic r2, P1-3).
+            val firstWhole = remember(inputs, state.primaryCurrency) {
+                inputs?.let { com.lucento.app.domain.BudgetMilestones.firstWholeMonth(it.budgets, state.primaryCurrency) }
+            }
             com.lucento.app.feature.awards.AwardCabinet(
                 earned = state.earned,
                 facts = state.facts,
                 onReplay = { replaying = it },
                 proMemberSince = state.proMemberSince,
                 onReplayPro = { replayingPro = true },
+                notes = buildMap {
+                    if (firstWhole != null && firstWhole >= current) put(Achievement.STEADY_MONTH, "Your first whole month is ${monthLabel(firstWhole)}.")
+                },
             )
             Spacer(Modifier.height(Spacing.fabClearance))
         }
@@ -521,6 +528,8 @@ internal object RecapCopy {
             val details = buildList {
                 add("${fmt.format(b.spent)} of ${fmt.format(b.total)} spent")
                 add("${b.within} of ${b.budgeted} ${if (b.budgeted == 1) "category" else "categories"} within budget")
+                // Why this month can't be a Steady Month, said where the verdict is (critic r2, P1-3).
+                b.since?.let { add("Your budget began on ${monthLabel(YearMonth.from(it))} ${it.dayOfMonth}") }
                 if (b.over.isNotEmpty()) {
                     add("Over: " + b.over.take(MonthRecaps.TOP).joinToString(", ") { "${name(it.categoryId) ?: "Uncategorized"} ${fmt.format(it.amount)}" })
                 }

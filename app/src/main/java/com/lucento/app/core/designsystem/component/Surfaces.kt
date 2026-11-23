@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -364,17 +365,24 @@ fun ListSectionHeader(
     subtotal: String? = null,
     action: @Composable (RowScope.() -> Unit)? = null,
 ) {
-    // From 130 % text a caption has no room beside the title: it goes under it, whole (design review 2026-11-23).
-    if (caption != null && action == null && LocalDensity.current.fontScale >= 1.3f) {
+    // From 130 % text the title has its line to itself, and the caption and subtotal share the one under it, whole
+    // ("10 categories · $2,740.00 planned"), so nothing is broken mid-word (design review 2026-11-23; critic r2, P2-4).
+    if ((caption != null || subtotal != null) && action == null && LocalDensity.current.fontScale >= 1.3f) {
         Column(modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.xs, start = Spacing.xxs)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, style = Hierarchy.sectionTitle, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f).semantics { heading() })
-                if (subtotal != null) {
-                    Spacer(Modifier.width(Spacing.sm))
-                    Text(subtotal, style = AmountStyles.small.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                }
             }
-            Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                androidx.compose.ui.text.buildAnnotatedString {
+                    caption?.let { append(it) }
+                    if (subtotal != null) {
+                        if (caption != null) append(" · ")
+                        withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.SemiBold)) { append(subtotal) }
+                    }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         return
     }

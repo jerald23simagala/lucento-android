@@ -663,12 +663,15 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     if (month == null) {
                                         LaunchedEffect(Unit) { back() }
                                     } else {
+                                        val fmt = com.lucento.app.core.designsystem.component.amountFormat()
                                         com.lucento.app.feature.budget.MonthPlanScreen(
                                             month = month,
                                             onBack = back,
-                                            onDone = {
+                                            onDone = { total ->
                                                 back()
-                                                notify("${com.lucento.app.feature.home.monthLabel(month)} is planned")
+                                                // With the total it now adds up to, unless amounts are hidden (critic r2, P3-8).
+                                                val name = com.lucento.app.feature.home.monthLabel(month)
+                                                notify(if (total == null || fmt.hidden) "$name is planned" else "$name is planned: ${fmt.format(total)}")
                                             },
                                         )
                                     }

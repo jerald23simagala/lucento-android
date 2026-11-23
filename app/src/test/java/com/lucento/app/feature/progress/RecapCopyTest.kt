@@ -81,6 +81,14 @@ class RecapCopyTest {
         assertEquals("Within budget so far", RecapCopy.lines(recap(budget = within, finished = false), name, AmountFormat.Shown).first().title)
     }
 
+    @Test fun `a budget set up during the month says when it began`() = english {
+        // Why this month can't count for Steady Month, under its verdict (critic r2, P1-3).
+        val late = RecapBudget(usd(20_000), usd(15_000), budgeted = 2, within = 2, over = emptyList(), since = java.time.LocalDate.parse("2026-10-10"))
+        val line = RecapCopy.lines(recap(budget = late), name, AmountFormat.Shown).first()
+        assertEquals("Within budget", line.title)
+        assertEquals("Your budget began on October\u00A010", line.details.last())
+    }
+
     @Test fun `a month tile is one sentence for screen readers`() = english {
         val kept = RecapMonthResult(oct, usd(35_000), hasRecords = true, finished = true, budgetKept = false)
         assertEquals("October 2026: kept \$350.00, over budget", RecapCopy.tileDescription(kept, AmountFormat.Shown))

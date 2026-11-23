@@ -23,6 +23,12 @@ data class RecapBudget(
     val within: Int,
     /** The categories that went over, by how much, most first. */
     val over: List<CategoryAmount>,
+    /**
+     * The day the first amount in this currency was set, when that was after the month's 1st: the month didn't have a
+     * budget all through, so it can't count for Steady Month (critic r2, P1-3). Null when the budget was there from the 1st,
+     * or when an amount without a date leaves it unknown.
+     */
+    val since: LocalDate? = null,
 ) {
     /** Budget minus every expense: negative when the month went over. */
     val remaining: Money get() = total - spent
@@ -237,12 +243,17 @@ object MonthRecaps {
         val over = allocated.filter { it.remaining?.isNegative == true }
             .map { CategoryAmount(it.category.id, -(it.remaining!!)) }
             .sortedWith(compareByDescending<CategoryAmount> { it.amount.amountMinor }.thenBy { it.categoryId })
+        val rows = inputs.budgets.filter { !it.isLegacyOverall && it.currencyCode == currency }
+        val since = rows.takeIf { r -> r.none { it.createdOn == null } }
+            ?.mapNotNull { it.createdOn }?.minOrNull()
+            ?.takeIf { it.isAfter(month.atDay(1)) }
         return RecapBudget(
             total = plan.total,
             spent = plan.spent,
             budgeted = allocated.size,
             within = allocated.size - over.size,
             over = over,
+            since = since,
         )
     }
 
