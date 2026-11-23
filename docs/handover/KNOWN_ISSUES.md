@@ -116,6 +116,14 @@ Tasks.
 | AI-3 | **Closed 2026-11-19**: the owner saw the whole path with a real Gemini answer on a release build (0.5.14 vc 19, OT-36), including "9 left this month". Debug builds still have no AI proxy | — | OT-36 done |
 | AI-4 | The website's /privacy, homepage privacy table and FAQ describe the new default, so they go live with the release that has it, not before | lucento-website PR #36, merged with 0.5.12 (owner's choice) | — |
 
+## AI allowance per month (2026-11-23, `feature/ai-allowance-monthly`)
+
+| Id | Issue | Evidence | Next step |
+|---|---|---|---|
+| AI-5 | Builds before this change (0.5.16 and older) still say "50 AI questions a day" and call Pro's count "N left today" until they are updated; the server's monthly limit (Free 5, Pro 45) applies to them as soon as `20261123120000_ai_allowance_monthly.sql` runs | Code-only | Release the next build soon after the migration (testers only before launch) |
+| AI-6 | The Pro welcome deck still has its Smarter reading card (now saying each message uses one of your AI questions). With Gemini for Ask only, the owner may prefer to drop the card | Code-only | Owner call |
+| AI-7 | Smarter reading is turned off for everyone without a message (the consent's key moved to `smart_reading_v2`); someone who used it finds messages read on the phone until they turn it on again in Settings | Verified: `SmartReadingConsentTest` (by design, owner: "We turn off Smarter Reading") | Say so in the release notes |
+
 ## Play Console edge-to-edge warnings on 0.5.10 (2026-11-16, `fix/edge-to-edge-deprecated-apis`)
 
 | Id | Issue | Evidence | Next step |

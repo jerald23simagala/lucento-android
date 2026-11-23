@@ -38,7 +38,7 @@ class AccountSettingsPreferencesTest {
     private val aiConfirmed = booleanPreferencesKey("ask_lucento_ai_v2")
     private val defaultWallet = longPreferencesKey("default_wallet_id")
     private val budgetMonth = stringPreferencesKey("acknowledged_budget_month")
-    private val smart = booleanPreferencesKey("smart_reading")
+    private val smart = booleanPreferencesKey("smart_reading_v2")
     private val onlineVoice = booleanPreferencesKey("online_voice")
     private val crash = booleanPreferencesKey("crash_reports")
     private val usage = booleanPreferencesKey("usage_counts")

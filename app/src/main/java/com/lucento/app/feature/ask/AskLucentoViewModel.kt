@@ -94,8 +94,8 @@ data class AskUiState(
     val aiConfirmed: Boolean = false,
     /** What is left of the AI allowance, once the server has said. */
     val remaining: Int? = null,
-    /** The allowance runs per day (Lucento Pro) rather than per month (the free plan). */
-    val aiPerDay: Boolean = false,
+    /** The plan's allowance is Pro's (Pro, Lifetime's included year, the Cloud add-on) rather than the free plan's. */
+    val aiPro: Boolean = false,
     val hasRecords: Boolean = false,
     /** Lucento Pro: statements as PDF are Pro; on screen they are always free (docs/MONETIZATION.md §3.4). */
     val pdfLocked: Boolean = false,
@@ -135,8 +135,8 @@ class AskLucentoViewModel(
         val messages: List<AskMessage> = emptyList(),
         val thinking: Boolean = false,
         val remaining: Int? = null,
-        /** How the server said the allowance runs (true: per day); null until it has answered. */
-        val remainingPerDay: Boolean? = null,
+        /** Which allowance the server said it counted (true: Pro's); null until it has answered. */
+        val remainingPro: Boolean? = null,
         val nextId: Long = 1,
         /** The free plan's monthly allowance just ran out: the Pro dialog, once (owner, 2026-11-18). */
         val allowanceWall: Boolean = false,
@@ -181,8 +181,8 @@ class AskLucentoViewModel(
             aiConfirmed = prefs.askAiConfirmed,
             remaining = chat.remaining,
             // The server's word once it has answered; before that, the plan this phone holds.
-            aiPerDay = chat.remainingPerDay
-                ?: (plan != null && com.lucento.app.domain.entitlement.ProGates.aiAllowancePerDay(plan, System.currentTimeMillis())),
+            aiPro = chat.remainingPro
+                ?: (plan != null && com.lucento.app.domain.entitlement.ProGates.aiProAllowance(plan, System.currentTimeMillis())),
             hasRecords = data != null && (data.transactions.isNotEmpty() || data.wallets.isNotEmpty()),
             pdfLocked = plan != null && !com.lucento.app.domain.entitlement.ProGates.pdfAllowed(plan, System.currentTimeMillis()),
             allowanceWall = chat.allowanceWall,
@@ -343,7 +343,7 @@ class AskLucentoViewModel(
                     AnswerSource.PHONE,
                     offersAi = true,
                 )
-                state.aiConfigured -> AskMessage.Answer(0, plain(AskAiCopy.signInHint(state.aiPerDay)), AnswerSource.PHONE)
+                state.aiConfigured -> AskMessage.Answer(0, plain(AskAiCopy.signInHint(state.aiPro)), AnswerSource.PHONE)
                 else -> AskMessage.Answer(
                     0,
                     plain("On this phone I can prepare your net worth, cash flow, budget, debts and top categories — try one of those below."),
@@ -371,10 +371,10 @@ class AskLucentoViewModel(
                 conversation.update {
                     it.copy(
                         remaining = result.remaining,
-                        remainingPerDay = when (result.plan) {
+                        remainingPro = when (result.plan) {
                             "PRO" -> true
                             "FREE" -> false
-                            else -> it.remainingPerDay
+                            else -> it.remainingPro
                         },
                     )
                 }
@@ -395,13 +395,13 @@ class AskLucentoViewModel(
             }
             else -> {
                 // The free plan's monthly questions are used up: the answer still comes from the phone, and the Pro
-                // dialog says what the plan includes (owner, 2026-11-18). Pro's own daily limit has no dialog.
-                // The server's last word can lag a purchase it hasn't checked yet: a phone that already holds Pro's daily
+                // dialog says what the plan includes (owner, 2026-11-18). Pro's own monthly limit has no dialog.
+                // The server's last word can lag a purchase it hasn't checked yet: a phone that already holds Pro's
                 // allowance never gets the Free dialog.
-                val phonePerDay = entitlements?.value?.let {
-                    com.lucento.app.domain.entitlement.ProGates.aiAllowancePerDay(it, System.currentTimeMillis())
+                val phonePro = entitlements?.value?.let {
+                    com.lucento.app.domain.entitlement.ProGates.aiProAllowance(it, System.currentTimeMillis())
                 } ?: false
-                if (result == AskLucentoClient.Result.LimitReached && !state.aiPerDay && !phonePerDay) {
+                if (result == AskLucentoClient.Result.LimitReached && !state.aiPro && !phonePro) {
                     conversation.update { it.copy(allowanceWall = true) }
                 }
                 val reason = failureReason(result, state.signedIn)
@@ -442,7 +442,7 @@ class AskLucentoViewModel(
          * ended on the server (signed out elsewhere, password changed): say so, rather than "needs your sync account".
          */
         internal fun failureReason(result: AskLucentoClient.Result?, signedIn: Boolean): String = when (result) {
-            AskLucentoClient.Result.LimitReached -> "Your AI adviser allowance is used up for now"
+            AskLucentoClient.Result.LimitReached -> "This month’s AI questions are used up"
             AskLucentoClient.Result.NotSignedIn ->
                 if (signedIn) "Your sign-in has expired — sign in again in Settings › Account & sync" else "AI answers need you to sign in"
             null -> "Gemini took too long to answer"

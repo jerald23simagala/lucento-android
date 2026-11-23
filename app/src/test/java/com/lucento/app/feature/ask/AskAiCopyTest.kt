@@ -11,27 +11,28 @@ import org.junit.Test
 class AskAiCopyTest {
 
     @Test fun `the free plan's allowance is a month's, with no Smarter reading`() {
-        val free = AskAiCopy.allowance(perDay = false)
-        assertTrue(free, free.contains("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} AI questions a month"))
+        val free = AskAiCopy.allowance(pro = false)
+        assertEquals("The free plan includes 5 AI questions a month.", free)
         assertFalse(free, free.contains("day"))
         assertFalse(free, free.contains("Smarter reading"))
     }
 
-    @Test fun `Lucento Pro's allowance is a day's, shared with Smarter reading`() {
-        val pro = AskAiCopy.allowance(perDay = true)
-        assertTrue(pro, pro.contains("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} AI questions a day"))
-        assertTrue(pro, pro.contains("shared with Smarter reading"))
+    @Test fun `Lucento Pro's allowance is a month's too, shared with Smarter reading`() {
+        // Owner, 2026-11-23: 45 a month replaced 50 a day.
+        val pro = AskAiCopy.allowance(pro = true)
+        assertEquals("Your plan includes 45 AI questions a month, shared with Smarter reading.", pro)
+        assertFalse(pro, pro.contains("day"))
     }
 
-    @Test fun `what is left says today only for a daily allowance`() {
-        assertEquals("9 left this month", AskAiCopy.remaining(9, perDay = false))
-        assertEquals("49 left today", AskAiCopy.remaining(49, perDay = true))
+    @Test fun `what is left is always this month's`() {
+        assertEquals("4 left this month", AskAiCopy.remaining(4))
+        assertEquals("44 left this month", AskAiCopy.remaining(44))
     }
 
     @Test fun `signed out, the hint says where to sign in and what the free plan includes`() {
-        assertTrue(AskAiCopy.signInHint(perDay = false).contains("Settings › Account & sync"))
-        assertTrue(AskAiCopy.signInHint(perDay = false).contains("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} AI questions a month"))
-        assertFalse(AskAiCopy.signInHint(perDay = true).contains("free plan"))
+        assertTrue(AskAiCopy.signInHint(pro = false).contains("Settings › Account & sync"))
+        assertTrue(AskAiCopy.signInHint(pro = false).contains("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH} AI questions a month"))
+        assertFalse(AskAiCopy.signInHint(pro = true).contains("free plan"))
     }
 
     @Test fun `the first-question card says what is sent and where`() {

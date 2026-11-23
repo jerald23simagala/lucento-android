@@ -48,10 +48,11 @@ object ProGates {
     fun smartReadingAllowed(state: EntitlementState, now: Long): Boolean = state.has(ProFeature.SMART_READING.requires, now)
 
     /**
-     * How the AI adviser's allowance runs, for what the app says about it (the server counts and decides, docs §3.6): per
-     * day with AI_PRO (Pro, Lifetime's included year, the Cloud add-on), per calendar month on the free plan.
+     * Which AI allowance the app talks about (the server counts and decides, docs §3.6): Pro's
+     * ([PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH] a month) with AI_PRO (Pro, Lifetime's included year, the Cloud add-on),
+     * otherwise the free plan's ([PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH] a month). Both run per calendar month.
      */
-    fun aiAllowancePerDay(state: EntitlementState, now: Long): Boolean = state.has(ProFeature.AI_ADVISER.requires, now)
+    fun aiProAllowance(state: EntitlementState, now: Long): Boolean = state.has(ProFeature.AI_ADVISER.requires, now)
 
     /**
      * Sunrise and Midnight are free; Grove, Mono and Aurora are Pro (docs §3.8). Theme ids are strings here so the domain

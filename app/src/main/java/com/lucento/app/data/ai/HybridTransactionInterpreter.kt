@@ -10,8 +10,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The composer's interpreter: Gemini (through [remote]) when the user turned Smarter reading on, otherwise — and
- * whenever Gemini can't answer (offline, signed out, today's limit used, an error) — [local], on this phone. Each
- * result names who read it, so local rules are never presented as AI. Scans (receipts and statements) are always read
+ * whenever Gemini can't answer (offline, signed out, this month's AI questions used, an error) — [local], on this phone.
+ * Each result names who read it, so local rules are never presented as AI, and a Gemini reply says how many of the AI
+ * questions it shares with Ask Lucento are left (owner, 2026-11-23). Scans (receipts and statements) are always read
  * on this phone.
  */
 class HybridTransactionInterpreter(
@@ -35,11 +36,11 @@ class HybridTransactionInterpreter(
         val fallbackReason = when (result) {
             is RemoteTransactionInterpreter.Result.Read ->
                 if (result.items.isNotEmpty()) {
-                    return Interpretation.Candidates(result.items, GEMINI, CaptureLimits.note(result.leftOut, result.inputCut))
+                    return Interpretation.Candidates(result.items, gemini(result.remaining), CaptureLimits.note(result.leftOut, result.inputCut))
                 } else {
                     "Gemini found nothing"
                 }
-            RemoteTransactionInterpreter.Result.LimitReached -> "the Gemini allowance is used up for now"
+            RemoteTransactionInterpreter.Result.LimitReached -> "this month’s AI questions are used up"
             RemoteTransactionInterpreter.Result.ProRequired -> "Smarter reading is part of Lucento Pro"
             RemoteTransactionInterpreter.Result.NotSignedIn -> "Gemini needs your sync account"
             // A slow answer and an unreachable server need different fixes, so they read differently.
@@ -62,5 +63,13 @@ class HybridTransactionInterpreter(
     companion object {
         val GEMINI = InterpreterEngine(label = "Gemini", onDevice = false)
         private const val REMOTE_TIMEOUT_MS = 20_000L
+
+        /**
+         * Who read a message, with what is left of the AI questions Smarter reading shares with Ask Lucento, as the server
+         * counted them: shown as "Read by Gemini · 12 AI questions left this month". Just "Gemini" from an older proxy.
+         */
+        internal fun gemini(remaining: Int?): InterpreterEngine =
+            if (remaining == null) GEMINI
+            else GEMINI.copy(label = "${GEMINI.label} · $remaining AI ${if (remaining == 1) "question" else "questions"} left this month")
     }
 }

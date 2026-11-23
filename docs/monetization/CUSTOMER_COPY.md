@@ -117,7 +117,7 @@ phone. Lucento does not check your purchase every time you open it, and it never
 adviser's Pro allowance, Smarter reading and Lucento Shared run on servers that cost money every month. Lifetime
 includes them for **12 months** from your purchase. After that you can keep them with **Lucento Cloud**
 (₱59 a month or ₱490 a year), or carry on without them: your data stays on your phone, backup files and CSV keep
-working, and the AI adviser falls back to the free allowance of 10 questions a month. Nothing you own is affected.
+working, and the AI adviser falls back to the free allowance of 5 questions a month. Nothing you own is affected.
 
 **If Lucento's servers are ever unavailable.** Everything you own keeps working, because none of it depends on our
 servers. Only the online services would be affected, for everyone, for as long as the outage lasts.
@@ -155,10 +155,10 @@ an account.**
 - Schedule bills and salary, and confirm them when they happen.
 - Two active savings goals.
 - Insights over the last 3 months, and Ask Lucento's on-phone statements.
-- 10 AI adviser questions a month when you sign in.
+- 5 AI adviser questions a month when you sign in.
 - Backup files, CSV export, app lock, two themes.
 
-*Limits:* 3 money wallets, 2 cards or loans, 2 active goals, 3-month Insights, 10 AI questions a month, no cloud
+*Limits:* 3 money wallets, 2 cards or loans, 2 active goals, 3-month Insights, 5 AI questions a month, no cloud
 sync or Lucento Shared.
 
 *CTA:* **Get Lucento on Google Play**
@@ -181,10 +181,10 @@ adviser who knows your numbers.
 - Statements as PDF.
 - Cloud sync between your phones, and restore from your account on a new one.
 - Lucento Shared: one Partner sees and records in your ledger from their own phone.
-- AI adviser, 50 questions a day, and Smarter reading.
+- AI adviser, 45 questions a month.
 - All five themes.
 
-*Limits:* 20 active goals; 50 AI questions a day. The online services need internet and an active subscription.
+*Limits:* 20 active goals; 45 AI questions a month (shared with Smarter reading). The online services need internet and an active subscription.
 
 *Price:* **₱149 a month**, or **₱1,190 a year** (about ₱99 a month) with a **7-day free trial**.
 
@@ -209,7 +209,7 @@ a subscription and without our servers.
 - All five themes.
 - Every future Pro feature that runs on the phone.
 
-*Included for 12 months:* cloud sync, restore from your account, Lucento Shared, the AI adviser at 50 questions a day,
+*Included for 12 months:* cloud sync, restore from your account, Lucento Shared, the AI adviser at 45 questions a month,
 Smarter reading. Afterwards, optional with Lucento Cloud (₱59 a month or ₱490 a year), or carry on without them.
 
 *Limits:* 20 active goals. Online services are a service, not part of the one-time purchase, and are included for the
@@ -254,7 +254,7 @@ case of D-5 below, which stay for the reasoning.
 | Cards or loans | The Free plan includes 2 cards or loans | You have {n}. Lucento Pro and Pro Lifetime have no limit. Payments and reminders on the ones you have carry on as usual. |
 | Every wallet kind full (Add wallet) | The Free plan includes 3 money wallets and 2 cards or loans | You have {n} money wallets and {m} cards or loans. Lucento Pro and Pro Lifetime have no limit. Everything in the ones you have keeps working. |
 | Savings goals | The Free plan includes 2 active goals | You have {n}. Lucento Pro and Pro Lifetime allow 20. When a goal is reached, archiving it frees a slot. Nothing happens to the goals you have. |
-| AI questions | The Free plan includes 10 AI questions a month | Lucento Pro gives you 50 a day. Until your questions return, Lucento answers what it can on this phone. |
+| AI questions | The Free plan includes 5 AI questions a month | Lucento Pro gives you 45 a month. Until your questions return, Lucento answers what it can on this phone. |
 | Receivable | Money owed to you is part of Lucento Pro | Track what someone owes you and each instalment they pay back. You can always record what they pay as income. |
 | Valued asset | Things you own are part of Lucento Pro | Add a home, a car or jewellery at a value you set, so your net worth is complete. Your wallets and debts already count. |
 | Other currency | Wallets in other currencies are part of Lucento Pro | A wallet in your main currency is always free. |
@@ -271,7 +271,7 @@ For **Pro Lifetime without Lucento Cloud** (its included year over), the online 
 
 | Wall | Title | Body |
 |---|---|---|
-| AI questions | Pro Lifetime includes 10 AI questions a month | Lucento Cloud gives you 50 a day. Until your questions return, Lucento answers what it can on this phone. |
+| AI questions | Pro Lifetime includes 5 AI questions a month | Lucento Cloud gives you 45 a month. Until your questions return, Lucento answers what it can on this phone. |
 | Cloud sync | Cloud sync comes with Lucento Cloud | Everything on this phone stays yours with Pro Lifetime. Lucento Cloud adds cloud sync, Lucento Shared, Smarter reading and more AI questions. |
 | Restore from account | Restoring from your account comes with Lucento Cloud | (as above) |
 | Smarter reading | Smarter reading comes with Lucento Cloud | (as above) |
@@ -365,19 +365,13 @@ add options and says:
 
 **D-5 AI quota exhausted**
 Free:
-> **You've used your 10 free adviser questions this month**
-> They return on {1 December}. Lucento Pro gives you 50 a day. Ask Lucento's on-phone statements are always available.
+> **You've used your 5 free adviser questions this month**
+> They return on {1 December}. Lucento Pro gives you 45 a month. Ask Lucento's on-phone statements are always available.
 > [ See plans ]  [ OK ]
 
-Pro, daily:
-> **That's 50 questions today**
-> Your allowance returns at midnight. Statements and on-phone answers are still here.
-> [ OK ]
-
-Pro, monthly ceiling (rare):
-> **You've reached this month's adviser allowance**
-> To keep the adviser affordable for everyone there is a monthly limit; it resets on {date}. Everything else in Pro is
-> unaffected.
+Pro (owner, 2026-11-23: every plan runs per calendar month; Pro's daily limit and monthly ceiling are gone):
+> **You've used this month's 45 adviser questions**
+> They return on {1 December}. Statements and on-phone answers are still here; everything else in Pro is unaffected.
 > [ OK ]
 
 **D-6 Lifetime purchase option (plan selector card)**
@@ -545,7 +539,7 @@ from the moment you buy it. Google Play cannot credit the unused months automati
 contact us and we will extend your included online services by the same amount.
 
 **15. How many AI questions do I get, and why is there a limit?**
-Free: 10 a month. Pro, and Lifetime in its first year or with Lucento Cloud: 50 a day. Each question is answered by
+Free: 5 a month. Pro, and Lifetime in its first year or with Lucento Cloud: 45 a month, shared with Smarter reading. Each question is answered by
 Google's Gemini and costs us money, so there are limits; they are enforced on our servers and shown in the app. The
 on-phone Ask Lucento statements have no limit.
 

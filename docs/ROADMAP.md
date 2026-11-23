@@ -351,6 +351,17 @@ needs `20261122090000_user_settings.sql` on each project).
 - The Budget tab shows the same two limits and Safe to spend under its hero, with Safe per day. The calculation is
   the tester round's, unchanged (docs/CALCULATIONS.md "Home budget card and the Budget tab").
 
+## Built — AI allowance per month; Gemini is for Ask Lucento (owner, 2026-11-23, `feature/ai-allowance-monthly`)
+- Owner: $2 a month of AI per Pro account was too much against the subscription; "Gemini is generally for Ask use and
+  not for simple add transaction work". Every plan now runs per calendar month: **Free 5, Pro 45** (was 10 a month and
+  50 a day under a 400 monthly ceiling), at most about $0.23 a Pro account on Gemini 3.5 Flash-Lite, production's model
+  since the same day (docs/MONETIZATION.md §4.5).
+- Smarter reading stays a Pro opt-in in Settings, now with the caveat that each message uses one of the same AI
+  questions; the composer no longer mentions it, and everyone who had it on is asked again (docs/CAPTURE.md). A reply
+  Gemini read says how many AI questions are left; Ask says "N left this month" on every plan.
+- Server: `supabase/migrations/20261123120000_ai_allowance_monthly.sql`; website wording in lucento-website
+  `copy/ai-allowance-monthly`.
+
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,

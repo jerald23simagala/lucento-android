@@ -283,7 +283,7 @@ fun TransactionComposerScreen(
             }
             if (state.messages.isEmpty()) {
                 item(key = "intro") {
-                    ComposerIntro(transfersAllowed = state.transfersAllowed, geminiReads = state.geminiReads, onExample = { input = it })
+                    ComposerIntro(transfersAllowed = state.transfersAllowed, onExample = { input = it })
                 }
             }
             if (state.messages.isNotEmpty()) {
@@ -678,8 +678,12 @@ private fun ComposerBanner(mood: MascotMood, transfersAllowed: Boolean) {
     )
 }
 
+/**
+ * The examples to try. Owner, 2026-11-23: the composer says nothing about Smarter reading (Gemini is for Ask Lucento);
+ * when someone has turned it on in Settings, each reply says who read it and how many AI questions are left.
+ */
 @Composable
-private fun ComposerIntro(transfersAllowed: Boolean, geminiReads: Boolean, onExample: (String) -> Unit) {
+private fun ComposerIntro(transfersAllowed: Boolean, onExample: (String) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         Text("TRY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(Spacing.xs))
@@ -691,13 +695,6 @@ private fun ComposerIntro(transfersAllowed: Boolean, geminiReads: Boolean, onExa
         examples.forEach { example ->
             LucentoTextButton(text = "“$example”", onClick = { onExample(example) })
         }
-        Spacer(Modifier.height(Spacing.sm))
-        // Who reads the messages, and so how fast rows appear; with Smarter reading on, where to turn it off.
-        Text(
-            SmartReadingCopy.composerNote(geminiReads),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

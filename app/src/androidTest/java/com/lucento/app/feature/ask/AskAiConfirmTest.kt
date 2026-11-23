@@ -81,7 +81,7 @@ class AskAiConfirmTest {
         askUntilTheCardShows(LocalAnswers.adviceSuggestions.first())
         compose.onNodeWithText(LegalDocuments.GEMINI_DATA_USE).assertExists()
         // Free: AI answers are available, 10 a month (not "a day", and no Smarter reading).
-        compose.onNodeWithText(AskAiCopy.allowance(perDay = false), substring = true).assertExists()
+        compose.onNodeWithText(AskAiCopy.allowance(pro = false), substring = true).assertExists()
         assertEquals("nothing is requested before the person confirms", 0, tokenRequests.get())
         shot("1-first-question-card")
 
@@ -97,11 +97,11 @@ class AskAiConfirmTest {
     }
 
     @Test fun keeping_answers_on_the_phone_sends_nothing_and_turns_ai_answers_off() {
-        // A Lifetime in its included year: the same card, with Pro's daily allowance.
+        // A Lifetime in its included year: the same card, with Pro's allowance.
         usePlan(SimulatedPlan.LIFETIME)
         open()
         askUntilTheCardShows(LocalAnswers.adviceSuggestions.first())
-        compose.onNodeWithText(AskAiCopy.allowance(perDay = true), substring = true).assertExists()
+        compose.onNodeWithText(AskAiCopy.allowance(pro = true), substring = true).assertExists()
         compose.onNodeWithText(AskAiCopy.CONFIRM_KEEP).performScrollTo().performClick()
         waitForText("Nothing was sent")
         // The top bar's Gemini switch is always on screen (the status line scrolls away at large text).

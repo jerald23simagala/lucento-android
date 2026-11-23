@@ -11,10 +11,13 @@ object PlanCatalog {
     const val FREE_DEBT_ACCOUNTS = 2
     const val FREE_ACTIVE_GOALS = 2
     const val PRO_ACTIVE_GOALS = 20
-    const val FREE_AI_QUESTIONS_PER_MONTH = 10
-    const val PRO_AI_QUESTIONS_PER_DAY = 50
-    /** A soft monthly ceiling the server applies to the Pro allowance (abuse guard, shown only when hit). */
-    const val PRO_AI_MONTHLY_CEILING = 400
+    /**
+     * The AI allowance, per calendar month on every plan (owner, 2026-11-23): Gemini is for Ask Lucento, and adding
+     * transactions is read on the phone. Smarter reading (Pro, opt-in in Settings) uses the same allowance. The server
+     * counts (`ai_free_monthly`, `ai_pro_monthly`); at most about $0.23 a month for a Pro account on Gemini 3.5 Flash-Lite.
+     */
+    const val FREE_AI_QUESTIONS_PER_MONTH = 5
+    const val PRO_AI_QUESTIONS_PER_MONTH = 45
     const val PRO_PARTNERS = 1
 
     /** What [capabilities] allow for [feature]. */
@@ -24,7 +27,7 @@ object PlanCatalog {
             ProFeature.MONEY_WALLETS -> if (unlocked) Limit.Unlimited else Limit.Count(FREE_MONEY_WALLETS)
             ProFeature.DEBT_ACCOUNTS -> if (unlocked) Limit.Unlimited else Limit.Count(FREE_DEBT_ACCOUNTS)
             ProFeature.SAVINGS_GOALS -> Limit.Count(if (unlocked) PRO_ACTIVE_GOALS else FREE_ACTIVE_GOALS)
-            ProFeature.AI_ADVISER -> if (unlocked) Limit.PerDay(PRO_AI_QUESTIONS_PER_DAY) else Limit.PerMonth(FREE_AI_QUESTIONS_PER_MONTH)
+            ProFeature.AI_ADVISER -> Limit.PerMonth(if (unlocked) PRO_AI_QUESTIONS_PER_MONTH else FREE_AI_QUESTIONS_PER_MONTH)
             ProFeature.SHARED_SPACE -> if (unlocked) Limit.Count(PRO_PARTNERS) else Limit.None
             ProFeature.RECEIVABLES, ProFeature.VALUED_ASSETS, ProFeature.FOREIGN_CURRENCY_WALLETS,
             ProFeature.INSIGHTS_LONG_PERIODS, ProFeature.PDF_STATEMENTS,

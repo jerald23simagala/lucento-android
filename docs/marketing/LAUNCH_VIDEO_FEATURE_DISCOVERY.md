@@ -193,7 +193,7 @@ snackbar; Insights previews 6 and 12 months with the figures hidden; Pro themes 
 | PDF statements | — | ✓ |
 | Themes | 2 | All 5 |
 | Cloud sync and restore | — | ✓ |
-| AI adviser questions | 10 a month | 50 a day |
+| AI adviser questions | 5 a month | 45 a month |
 | Smarter reading | — | ✓ |
 | Lucento Shared | — | 1 Partner |
 

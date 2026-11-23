@@ -26,7 +26,7 @@ class SharedSpaceLedgerSwitchTest {
     private val guide = stringPreferencesKey("guide_step")
     private val defaultWallet = longPreferencesKey("default_wallet_id")
     private val name = stringPreferencesKey("display_name")
-    private val smart = booleanPreferencesKey("smart_reading")
+    private val smart = booleanPreferencesKey("smart_reading_v2")
 
     private class Marker(var value: Boolean = false) : WipeMarker {
         override fun set() = true.also { value = true }

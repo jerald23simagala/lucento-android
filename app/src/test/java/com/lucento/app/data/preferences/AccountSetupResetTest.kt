@@ -19,7 +19,7 @@ class AccountSetupResetTest {
     private val defaultWallet = longPreferencesKey("default_wallet_id")
     private val name = stringPreferencesKey("display_name")
     private val budgetMonth = stringPreferencesKey("acknowledged_budget_month")
-    private val smart = booleanPreferencesKey("smart_reading")
+    private val smart = booleanPreferencesKey("smart_reading_v2")
     private val askAi = booleanPreferencesKey("ask_lucento_ai_v2")
     private val askAiV1 = booleanPreferencesKey("ask_lucento_ai")
     private val generation = intPreferencesKey("setup_generation")

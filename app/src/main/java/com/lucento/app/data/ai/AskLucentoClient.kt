@@ -22,7 +22,7 @@ class AskLucentoClient(
 ) {
     sealed interface Result {
         /**
-         * [remaining] is what is left of the allowance; [plan] says how it runs: "PRO" per day, "FREE" per month (the
+         * [remaining] is what is left of this calendar month's allowance; [plan] says whose it is: "PRO" or "FREE" (the
          * server's `consume_ai_request`). Either is null from an older proxy.
          */
         data class Answered(

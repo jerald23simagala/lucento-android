@@ -622,7 +622,7 @@ private fun SettingsContent(
             AskLucentoAiSection(
                 on = prefs.askLucentoAi,
                 confirmed = prefs.askAiConfirmed,
-                perDay = current.aiAllowancePerDay,
+                pro = current.aiProAllowance,
                 onChange = onAskLucentoAi,
             )
         }
@@ -921,10 +921,11 @@ private fun Fact(icon: ImageVector, title: String, body: String) {
 
 /**
  * Smarter reading (opt-in, off by default): typed and spoken messages are read by Gemini through Lucento's server.
- * This is the only place it is turned on (owner, 2026-11-15). Turning it on always goes through a dialog that says
- * first that adding transactions gets slower, then what is sent and where; it needs a sync account, which carries the
- * daily allowance, and a plan that includes it ([locked] otherwise: a Pro note instead, owner 2026-11-15). Receipts are
- * always read on this phone, and so is everything when this is off, unreachable or not in the plan.
+ * This is the only place it is turned on (owner, 2026-11-15), and nowhere else mentions it (owner, 2026-11-23: Gemini is
+ * for Ask Lucento). Turning it on always goes through a dialog that says first that each message uses one of the AI
+ * questions Ask Lucento uses and that adding transactions gets slower, then what is sent and where; it needs a sync
+ * account, which carries the AI allowance, and a plan that includes it ([locked] otherwise: a Pro note instead, owner
+ * 2026-11-15). Receipts are always read on this phone, and so is everything when this is off, unreachable or not in the plan.
  */
 @Composable
 private fun SmartReadingSection(on: Boolean, signedIn: Boolean, locked: Boolean, onChange: (Boolean) -> Unit) {
@@ -945,11 +946,11 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, locked: Boolean,
         // Off always works, so a consent given earlier can be taken back while it is paused.
         enabled = signedIn || on,
         description = "Better at messy, multi-item messages. Off, Lucento reads them on this phone straight away.",
-        // The cost stays in view, on or off: it's why the composer has no switch of its own.
+        // The costs stay in view, on or off: the AI questions it uses, and why the composer has no switch of its own.
         note = when {
-            !signedIn -> "Connect a sync account above first — it keeps your daily allowance."
+            !signedIn -> "Connect a sync account above first — it keeps your AI allowance."
             locked -> null
-            else -> com.lucento.app.feature.capture.SmartReadingCopy.SLOWER
+            else -> com.lucento.app.feature.capture.SmartReadingCopy.NOTE
         },
     )
     if (locked && on) {
@@ -1014,7 +1015,7 @@ private fun OnlineVoiceRow(on: Boolean, onChange: (Boolean) -> Unit) {
  * back on shows the dialog. Reports are always calculated on this phone, with or without them.
  */
 @Composable
-private fun AskLucentoAiSection(on: Boolean, confirmed: Boolean, perDay: Boolean, onChange: (Boolean) -> Unit) {
+private fun AskLucentoAiSection(on: Boolean, confirmed: Boolean, pro: Boolean, onChange: (Boolean) -> Unit) {
     var asking by remember { mutableStateOf(false) }
     SectionHeader("Ask Lucento", Modifier.padding(top = Spacing.section))
     SwitchRow(
@@ -1038,7 +1039,7 @@ private fun AskLucentoAiSection(on: Boolean, confirmed: Boolean, perDay: Boolean
                 "Receipts, photos, older transactions and other " +
                 "currencies are never sent. Every amount in an answer is worked out on this phone. Gemini's advice is " +
                 "based on your figures, but AI can be inaccurate, so check it before you act on it. " +
-                "${com.lucento.app.feature.ask.AskAiCopy.allowance(perDay)} You can turn this off at any time.",
+                "${com.lucento.app.feature.ask.AskAiCopy.allowance(pro)} You can turn this off at any time.",
             confirmLabel = "Turn on",
             onConfirm = {
                 asking = false
