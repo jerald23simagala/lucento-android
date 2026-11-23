@@ -50,12 +50,12 @@ class ProGatesTest {
         assertFalse(ProGates.smartReadingAllowed(pro, now + 1_000_000 + Entitlement.OFFLINE_GRACE_MILLIS))
     }
 
-    @Test fun ai_allowance_runs_per_day_with_the_online_ai_service_and_per_month_on_free() {
-        // Free still gets AI answers (10 a month, docs §3.6); only how the allowance runs depends on the plan.
-        assertFalse("Free: per month", ProGates.aiAllowancePerDay(free, now))
-        assertFalse("Lifetime after its included year: back to the free allowance", ProGates.aiAllowancePerDay(lifetimeOnly, now))
-        assertTrue(ProGates.aiAllowancePerDay(pro, now))
-        assertTrue("AI_PRO alone is enough", ProGates.aiAllowancePerDay(state(Capability.AI_PRO), now))
+    @Test fun ai_allowance_is_pros_with_the_online_ai_service_and_the_free_plans_otherwise() {
+        // Free still gets AI answers (5 a month, docs §3.6); Pro gets 45 a month. Both run per calendar month.
+        assertFalse("Free: the free plan's allowance", ProGates.aiProAllowance(free, now))
+        assertFalse("Lifetime after its included year: back to the free allowance", ProGates.aiProAllowance(lifetimeOnly, now))
+        assertTrue(ProGates.aiProAllowance(pro, now))
+        assertTrue("AI_PRO alone is enough", ProGates.aiProAllowance(state(Capability.AI_PRO), now))
     }
 
     @Test fun sunrise_and_midnight_are_free_the_other_three_are_pro() {

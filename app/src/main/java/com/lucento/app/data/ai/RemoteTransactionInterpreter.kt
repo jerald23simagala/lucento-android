@@ -24,9 +24,12 @@ class RemoteTransactionInterpreter(
     private val endpoint: String = BuildConfig.AI_INTERPRET_URL,
 ) {
     sealed interface Result {
-        /** [leftOut]: rows past the 30 read at once; [inputCut]: text past the 2,000 characters sent (CaptureLimits). */
-        data class Read(val items: List<TransactionCandidate>, val remainingToday: Int?, val leftOut: Int = 0, val inputCut: Boolean = false) : Result
-        /** The account's AI allowance is used up for now (a day for Pro, a month on the free plan). */
+        /**
+         * [remaining]: the account's AI questions left this calendar month, shared with Ask Lucento (null from an older
+         * proxy); [leftOut]: rows past the 30 read at once; [inputCut]: text past the 2,000 characters sent (CaptureLimits).
+         */
+        data class Read(val items: List<TransactionCandidate>, val remaining: Int?, val leftOut: Int = 0, val inputCut: Boolean = false) : Result
+        /** The account's AI questions for this calendar month are used up (the allowance Ask Lucento uses too). */
         data object LimitReached : Result
         /** Lucento Pro: Smarter reading is a Pro feature; the free allowance covers Ask Lucento only. */
         data object ProRequired : Result

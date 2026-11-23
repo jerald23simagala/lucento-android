@@ -59,7 +59,7 @@ class ProPagePresentationTest {
         assertEquals(TableCell.NotIncluded, free(ProFeature.RECEIVABLES))
         assertEquals(TableCell.Included, pro(ProFeature.RECEIVABLES))
         assertEquals(TableCell.Value("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}/mo"), free(ProFeature.AI_ADVISER))
-        assertEquals(TableCell.Value("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}/day"), pro(ProFeature.AI_ADVISER))
+        assertEquals(TableCell.Value("${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH}/mo"), pro(ProFeature.AI_ADVISER))
         assertEquals(TableCell.Value("2"), free(ProFeature.EXTRA_THEMES))
         assertEquals(TableCell.Value("All 5"), pro(ProFeature.EXTRA_THEMES))
         assertEquals(TableCell.Value("1 Partner"), pro(ProFeature.SHARED_SPACE))
@@ -86,7 +86,7 @@ class ProPagePresentationTest {
     }
 
     @Test fun pitches_use_the_catalog_numbers_and_never_promise_online_services_forever() {
-        assertTrue(ProCopy.pitch(PlanCardKind.PRO).benefits.contains("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY} AI adviser questions a day"))
+        assertTrue(ProCopy.pitch(PlanCardKind.PRO).benefits.contains("${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH} AI adviser questions a month"))
         val lifetime = ProCopy.pitch(PlanCardKind.LIFETIME).benefits
         assertTrue(lifetime.any { it.contains("Cloud sync") && it.contains("first year") })
         PlanCardKind.entries.forEach { kind ->

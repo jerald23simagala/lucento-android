@@ -14,7 +14,7 @@ class PlanCatalogTest {
         assertEquals(Limit.Count(3), PlanCatalog.limit(ProFeature.MONEY_WALLETS, free))
         assertEquals(Limit.Count(2), PlanCatalog.limit(ProFeature.DEBT_ACCOUNTS, free))
         assertEquals(Limit.Count(2), PlanCatalog.limit(ProFeature.SAVINGS_GOALS, free))
-        assertEquals(Limit.PerMonth(10), PlanCatalog.limit(ProFeature.AI_ADVISER, free))
+        assertEquals(Limit.PerMonth(5), PlanCatalog.limit(ProFeature.AI_ADVISER, free))
         for (f in listOf(
             ProFeature.RECEIVABLES, ProFeature.VALUED_ASSETS, ProFeature.FOREIGN_CURRENCY_WALLETS, ProFeature.INSIGHTS_LONG_PERIODS,
             ProFeature.PDF_STATEMENTS, ProFeature.EXTRA_THEMES, ProFeature.CLOUD_SYNC,
@@ -29,7 +29,7 @@ class PlanCatalogTest {
             val limit = PlanCatalog.limit(f, pro)
             when (f) {
                 ProFeature.SAVINGS_GOALS -> assertEquals(Limit.Count(20), limit)
-                ProFeature.AI_ADVISER -> assertEquals(Limit.PerDay(50), limit)
+                ProFeature.AI_ADVISER -> assertEquals(Limit.PerMonth(45), limit)
                 ProFeature.SHARED_SPACE -> assertEquals(Limit.Count(1), limit)
                 else -> assertEquals("$f on Pro", Limit.Unlimited, limit)
             }
@@ -70,14 +70,15 @@ class PlanCatalogTest {
         assertTrue(Limit.Unlimited.allows(1_000_000))
         assertTrue(!Limit.None.allows(0))
         assertTrue(Limit.PerMonth(10).allows(9))
-        assertTrue(!Limit.PerDay(50).allows(50))
+        assertTrue(!Limit.PerMonth(45).allows(45))
         assertEquals(3, Limit.Count(3).maxOrNull)
         assertEquals(null, Limit.Unlimited.maxOrNull)
         assertEquals(null, Limit.None.maxOrNull)
     }
 
     @Test fun server_mirrored_numbers_are_the_approved_ones() {
-        assertEquals(400, PlanCatalog.PRO_AI_MONTHLY_CEILING)
+        assertEquals(5, PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH)
+        assertEquals(45, PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH)
         assertEquals(1, PlanCatalog.PRO_PARTNERS)
     }
 }

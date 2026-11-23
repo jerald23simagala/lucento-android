@@ -31,7 +31,7 @@ class ProWallTest {
         assertEquals("The Free plan includes 3 money wallets", ProCopy.wallTitle(ProWall(ProFeature.MONEY_WALLETS, 3, Limit.Count(3))))
         assertEquals("The Free plan includes 2 cards or loans", ProCopy.wallTitle(ProWall(ProFeature.DEBT_ACCOUNTS)))
         assertEquals("The Free plan includes 2 active goals", ProCopy.wallTitle(ProWall(ProFeature.SAVINGS_GOALS, 2, Limit.Count(2))))
-        assertEquals("The Free plan includes 10 AI questions a month", ProCopy.wallTitle(ProWall(ProFeature.AI_ADVISER)))
+        assertEquals("The Free plan includes 5 AI questions a month", ProCopy.wallTitle(ProWall(ProFeature.AI_ADVISER)))
         assertEquals("Grove is part of Lucento Pro", ProCopy.wallTitle(ProWall(ProFeature.EXTRA_THEMES, subject = "Grove")))
     }
 
@@ -81,10 +81,10 @@ class ProWallTest {
         val lifetime = DisplayPlan.LIFETIME
         assertEquals("Cloud sync comes with Lucento Cloud", ProCopy.wallTitle(ProWall(ProFeature.CLOUD_SYNC), lifetime))
         assertEquals("Inviting a Partner comes with Lucento Cloud", ProCopy.wallTitle(ProWall(ProFeature.SHARED_SPACE), lifetime))
-        assertEquals("Pro Lifetime includes 10 AI questions a month", ProCopy.wallTitle(ProWall(ProFeature.AI_ADVISER), lifetime))
-        assertTrue(ProCopy.wallBody(ProWall(ProFeature.AI_ADVISER), lifetime).startsWith("Lucento Cloud gives you 50 a day."))
+        assertEquals("Pro Lifetime includes 5 AI questions a month", ProCopy.wallTitle(ProWall(ProFeature.AI_ADVISER), lifetime))
+        assertTrue(ProCopy.wallBody(ProWall(ProFeature.AI_ADVISER), lifetime).startsWith("Lucento Cloud gives you 45 a month."))
         // Free hears about the plan; what runs on the phone never takes the Cloud words.
-        assertEquals("The Free plan includes 10 AI questions a month", ProCopy.wallTitle(ProWall(ProFeature.AI_ADVISER), DisplayPlan.FREE))
+        assertEquals("The Free plan includes 5 AI questions a month", ProCopy.wallTitle(ProWall(ProFeature.AI_ADVISER), DisplayPlan.FREE))
         // Lifetime with its services, or Pro, never meets these walls; the words only change for Lifetime without them.
         assertFalse(ProCopy.cloudWall(ProWall(ProFeature.CLOUD_SYNC), DisplayPlan.LIFETIME_WITH_SERVICES))
         assertEquals("Cloud sync is part of Lucento Pro", ProCopy.wallTitle(ProWall(ProFeature.CLOUD_SYNC)))

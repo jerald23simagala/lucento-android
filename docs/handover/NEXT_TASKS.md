@@ -60,6 +60,21 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## AI allowance per month — follow-ups (2026-11-23, `feature/ai-allowance-monthly`)
+
+- **Done 2026-11-23 (owner: "Switch now"):** Vercel production `GEMINI_MODEL=gemini-3.5-flash-lite`, redeployed
+  (`dpl_4Z9YaRLsUJ9j9q3CcKePrz49Ujd2`, serving www.lucentoapp.com); `/api/ask` and `/api/interpret` answer
+  `401 sign_in_required` without a token, as before.
+- **Owner (OT-61 in Mission Control, owner chose "Now"):** paste `supabase/migrations/20261123120000_ai_allowance_monthly.sql`
+  into production and `lucento-test`. Claude's Supabase connection reads but can't write (`execute_sql` was declined).
+  The website wording is live: lucento-website #43 merged as `e5b7441` and deployed 2026-11-23. Then release the app
+  build that carries this branch (0.5.18; KNOWN_ISSUES AI-5).
+- **Next (owner: "Yes, build it next"):** on-device categories for typed and spoken messages from the merchant dictionaries and the
+  person's own habits (today only scans use `MerchantDirectory` / `MerchantMemory`). Measured on the Gemini test's notes:
+  the on-device reader got 31/45 on Taglish and 35/45 in English with every amount right; 7 of the 14 Taglish misses
+  were categories left to choose. Gemini 3.5 Flash-Lite got 42/45.
+- **Decided:** the Pro welcome deck no longer deals the Smarter reading card (owner, 2026-11-23; KNOWN_ISSUES AI-6).
+
 ## Security and anti-tampering plan (2026-11-23)
 
 The plan (work in order, sizes, console steps) is in the private `lucento-studio` repository

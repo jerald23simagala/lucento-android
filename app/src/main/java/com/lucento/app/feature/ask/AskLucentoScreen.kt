@@ -285,7 +285,7 @@ fun AskLucentoScreen(
                             onFollowUp = { send(it) },
                         )
                         is AskMessage.ConfirmAi -> AiConfirmCard(
-                            perDay = state.aiPerDay,
+                            pro = state.aiPro,
                             enabled = !state.thinking,
                             onSend = {
                                 haptics.tick()
@@ -332,7 +332,7 @@ fun AskLucentoScreen(
 
     if (askingConsent) {
         AiConsentSheet(
-            perDay = state.aiPerDay,
+            pro = state.aiPro,
             onAccept = {
                 askingConsent = false
                 viewModel.setAiAnswers(true, thenAsk = consentFor)
@@ -346,7 +346,7 @@ fun AskLucentoScreen(
     }
     reviewingCard?.let { cardId ->
         AiConsentSheet(
-            perDay = state.aiPerDay,
+            pro = state.aiPro,
             title = "What AI answers send",
             acceptLabel = AskAiCopy.CONFIRM_SEND,
             onAccept = {
@@ -382,7 +382,7 @@ private fun SmallLabel(text: String) {
 
 /**
  * Where answers come from right now: this phone only, or AI answers on (Gemini), with what is left of the allowance once
- * the server has said (per day with Lucento Pro, per month on the free plan).
+ * the server has said (per calendar month, on every plan).
  */
 @Composable
 private fun AiStatus(state: AskUiState, onTurnOn: () -> Unit) {
@@ -390,7 +390,7 @@ private fun AiStatus(state: AskUiState, onTurnOn: () -> Unit) {
         if (state.aiActive) {
             StatusPill("AI answers on · Gemini", StatusTones.brand)
             state.remaining?.let {
-                Text(AskAiCopy.remaining(it, state.aiPerDay), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(AskAiCopy.remaining(it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             StatusPill("Answers on this phone", StatusTones.neutral)
@@ -547,7 +547,7 @@ private fun PreviewLine(line: ReportLine) {
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun AiConsentSheet(
-    perDay: Boolean,
+    pro: Boolean,
     onAccept: () -> Unit,
     onDismiss: () -> Unit,
     title: String = "Turn on AI answers?",
@@ -560,7 +560,7 @@ private fun AiConsentSheet(
             ConsentPoint("Never sent", AI_NEVER_SENT)
             ConsentPoint("Google", com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE)
             ConsentPoint("Checked here", "Every amount in an answer is one of your figures, or a sum this phone worked out from them — shown in bold. Gemini gives you its own recommendations from your figures, but AI can misread a question or miss something only you know, so check advice before you act on it.")
-            ConsentPoint("Limits", "Needs you to be signed in. ${AskAiCopy.allowance(perDay)} Turn AI answers off any time with the Gemini switch above or in Settings.")
+            ConsentPoint("Limits", "Needs you to be signed in. ${AskAiCopy.allowance(pro)} Turn AI answers off any time with the Gemini switch above or in Settings.")
             Spacer(Modifier.height(Spacing.md))
             LucentoPrimaryButton(text = acceptLabel, onClick = onAccept)
             Spacer(Modifier.height(Spacing.sm))
@@ -576,7 +576,7 @@ private fun AiConsentSheet(
  * answers on this phone" turns AI answers off. The buttons are stacked full width so 200 % text never squeezes them.
  */
 @Composable
-internal fun AiConfirmCard(perDay: Boolean, enabled: Boolean, onSend: () -> Unit, onKeep: () -> Unit, onWhatsSent: () -> Unit) {
+internal fun AiConfirmCard(pro: Boolean, enabled: Boolean, onSend: () -> Unit, onKeep: () -> Unit, onWhatsSent: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     LucentoReply(mood = MascotMood.Curious) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -594,7 +594,7 @@ internal fun AiConfirmCard(perDay: Boolean, enabled: Boolean, onSend: () -> Unit
         InfoNote(com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE)
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            "${AskAiCopy.allowance(perDay)} $AI_CAN_BE_WRONG",
+            "${AskAiCopy.allowance(pro)} $AI_CAN_BE_WRONG",
             style = MaterialTheme.typography.bodySmall,
             color = colors.onSurfaceVariant,
         )

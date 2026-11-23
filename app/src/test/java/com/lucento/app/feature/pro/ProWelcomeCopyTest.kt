@@ -62,7 +62,7 @@ class ProWelcomeCopyTest {
         assertEquals("${PlanCatalog.PRO_ACTIVE_GOALS}", goals.after)
         val ai = ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, signedIn = true, aiAnswersOn = false).changes.single()
         assertEquals("${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month", ai.before)
-        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day", ai.after)
+        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month", ai.after)
         assertEquals("Money wallets: 3 on the free plan, No limit now", ProWelcomeCopy.spokenChange(wallets[0]))
     }
 
@@ -90,7 +90,7 @@ class ProWelcomeCopyTest {
         }
         val confirmed = ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, signedIn = true, aiAnswersOn = false, online = OnlineStatus.CONFIRMED)
         assertEquals(1, confirmed.changes.size)
-        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day", confirmed.gain)
+        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month", confirmed.gain)
     }
 
     @Test fun before_the_server_confirms_card_7_says_when_the_pro_allowance_ends() {
@@ -112,7 +112,7 @@ class ProWelcomeCopyTest {
         }
         // The AI adviser carries on after a Lifetime's included year, at the free plan's allowance (as the Pro page says).
         assertEquals(
-            "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day until Nov\u00A012,\u00A02027, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month",
+            "${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month until Nov\u00A012,\u00A02027, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month",
             ProWelcomeCopy.stop(ProTourStop.AI_ANSWERS, all, true, false, term = year).term,
         )
         // What runs on the phone is owned: never a term.
@@ -129,7 +129,7 @@ class ProWelcomeCopyTest {
         assertEquals("12 months", tag(ProTourStop.INSIGHTS_PERIODS, year))
         assertEquals("Until Nov 12, 2027", tag(ProTourStop.SYNC, year))
         // The AI adviser shows its allowance, never a date: it doesn't stop when the year ends.
-        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day", tag(ProTourStop.AI_ANSWERS, year))
+        assertEquals("${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month", tag(ProTourStop.AI_ANSWERS, year))
         assertNull(tag(ProTourStop.AI_ANSWERS, year, OnlineStatus.CONFIRMING))
         assertNull(tag(ProTourStop.SYNC, ProCopy.ServiceTerm.Subscription))
         assertNull(tag(ProTourStop.THEMES, year))
