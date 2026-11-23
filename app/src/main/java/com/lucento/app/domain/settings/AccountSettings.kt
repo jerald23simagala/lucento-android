@@ -38,6 +38,9 @@ enum class AccountSetting(val key: String, val ledger: Boolean = false) {
     FX_RATES_ONLINE("fx_rates_online"),
     DEFAULT_WALLET("default_wallet", ledger = true),
     BUDGET_MONTH_SEEN("budget_month_seen", ledger = true),
+    /** The monthly check-in: the latest month planned or dismissed, and the latest recap seen (owner, 2026-11-23). */
+    BUDGET_MONTH_PLANNED("budget_month_planned", ledger = true),
+    RECAP_MONTH_SEEN("recap_month_seen", ledger = true),
     ;
 
     /**
@@ -57,7 +60,7 @@ enum class AccountSetting(val key: String, val ledger: Boolean = false) {
             SHOW_CENTS, MODULE_OFFERS_HIDDEN, FX_RATES_ONLINE ->
                 (value as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull != null
             DEFAULT_WALLET -> value.text()?.let { it.isNotEmpty() && it.length <= MAX_ID } == true
-            BUDGET_MONTH_SEEN -> value.text()?.let { isMonth(it) } == true
+            BUDGET_MONTH_SEEN, BUDGET_MONTH_PLANNED, RECAP_MONTH_SEEN -> value.text()?.let { isMonth(it) } == true
         }
     }
 

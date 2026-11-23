@@ -304,7 +304,9 @@ v6, docs/BACKUP.md).
 **What follows the account** (`AccountSetting`):
 - the person's own choices: theme mode, colour theme, the modules switched on, display name, Show cents, the Wallets
   view, Home's hidden module offers and exchange rates online;
-- two that belong to the ledger: the default wallet (by its stable id) and the budget moment already seen.
+- four that belong to the ledger: the default wallet (by its stable id), the budget moment already seen, and the monthly
+  check-in's two months (the latest month planned or dismissed, and the latest recap seen; docs/CALCULATIONS.md "Monthly
+  check-in", owner 2026-11-23). A newer phone's setting reaches an older one as an entry it carries through untouched.
 
 **What each phone keeps for itself:**
 - Consents to send something off the phone, and their choices: crash reports, usage counts, online voice, Smarter reading,
@@ -348,7 +350,7 @@ arrived can be matched):
   it (MONETIZATION §3.8; one already chosen here stays, §6.3).
 - A default wallet that isn't on this phone leaves none here, and the next merge tries again. A waiting value that can't
   be written for the account (a default wallet with no stable id yet) stays waiting rather than going up as "none".
-- The budget moment never goes back to an earlier month.
+- The budget moment, and the check-in's two months, never go back to an earlier month.
 
 **Sign-out and the next account.** The wipe keeps the theme and the other choices on the phone (as before), but sets them
 aside as the signed-out account's (`forgetAccountSettingsSync`). It keeps a SHA-256 of that account (never the id) and
@@ -374,7 +376,8 @@ account. Then:
   built without them saves no settings and applies no Pro theme (Pro-gate review F1).
 
 **Lucento Shared.** The row is always the signed-in person's own. A Partner's phone keeps to the person's settings (theme,
-name…). It neither sends nor takes the default wallet or the budget moment, which belong to the Owner's records it holds,
+name…). It neither sends nor takes the default wallet, the budget moment or the check-in's months, which belong to the Owner's
+records it holds,
 and it doesn't keep them waiting. Saving needs the person's own CLOUD (the F-01 gate), so a Partner without their own
 plan keeps their settings on the phone while the space's records sync on the Owner's plan.
 

@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Flag
@@ -51,6 +54,9 @@ fun awardArt(achievement: Achievement): AwardArt = when (achievement) {
     Achievement.FINANCIAL_EXPLORER -> AwardArt(Icons.Filled.Explore, AwardArtwork.RibbonSky, AwardArtwork.StripeNavy)
     Achievement.GOAL_SETTER -> AwardArt(Icons.Filled.Flag, AwardArtwork.RibbonSun, AwardArtwork.StripeNavy)
     Achievement.SECURED -> AwardArt(Icons.Filled.Shield, AwardArtwork.RibbonGreen, AwardArtwork.StripeGold)
+    Achievement.STEADY_MONTH -> AwardArt(Icons.Filled.CalendarMonth, AwardArtwork.RibbonBlue, AwardArtwork.StripeIvory)
+    Achievement.GOAL_REACHED -> AwardArt(Icons.Filled.EmojiEvents, AwardArtwork.RibbonTangerine, AwardArtwork.StripeGold)
+    Achievement.LOAN_CLEARED -> AwardArt(Icons.Filled.TaskAlt, AwardArtwork.RibbonPlum, AwardArtwork.StripeIvory)
 }
 
 /**

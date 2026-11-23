@@ -6,7 +6,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 
-/** One month of the dashboard's balance history: net wallet balance at the end of [month] in one currency. */
+/** One month of the dashboard's balance history: net worth at the end of [month] in one currency. */
 data class MonthBalance(val month: YearMonth, val netWorth: Money)
 
 /**
@@ -60,7 +60,7 @@ object BalanceHistory {
         else NetWorthComposer.compose(walletsAt(wallets, transactions, month.atEndOfMonth(), zone), currency)
 
     /**
-     * Net wallet balance at the end of each of the [count] months up to [endMonth], oldest first. Months before any
+     * Net worth at the end of each of the [count] months up to [endMonth], oldest first. Months before any
      * wallet in [currency] existed are left out rather than shown as zero (there was nothing to measure).
      */
     fun lastMonths(

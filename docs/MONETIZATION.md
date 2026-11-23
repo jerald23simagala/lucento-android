@@ -231,6 +231,9 @@ Pro-sized life.
 | Ask Lucento: on-phone answers, four statements on screen (net worth, cash flow, budget vs actual, debts), top categories | Shipped | ✔ | ✔ | ✔ | Yes | none |
 | Ask Lucento: **statements as PDF** (save / share) | Shipped | — | ✔ | ✔ | Yes | `AskLucentoViewModel` PDF actions → `ProRequired` |
 | Category breakdown on Budget / Home | Shipped | ✔ | ✔ | ✔ | Yes | none |
+| Progress: a month's recap (kept, budget, where it went, the biggest change, net worth, goals, debts, days recorded) and the awards | Shipped (owner, 2026-11-23) | ✔ any month | ✔ | ✔ | Yes | none |
+| Progress: **the year view** (12 months' results, which stayed within budget, the year's totals) | Shipped (owner, 2026-11-23) | Preview: the person's own months, figures hidden | ✔ | ✔ | Yes | `ProGates.insightsPeriodAllowed(12)`, the same gate and wall as Insights' 12 months (`ProFeature.INSIGHTS_LONG_PERIODS`) |
+| Monthly check-in: the Home card, the plan page, planning months ahead | Shipped (owner, 2026-11-23) | ✔ | ✔ | ✔ | Yes | none |
 
 Why this split and not "all Insights free" (v1): the owner wants analytics as a Pro reason, and the period selector is
 a natural, honest depth line — a Free person still sees where this quarter's money went. Why not "all Insights Pro":

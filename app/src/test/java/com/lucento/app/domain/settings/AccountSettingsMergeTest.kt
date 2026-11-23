@@ -145,6 +145,11 @@ class AccountSettingsMergeTest {
         assertFalse(AccountSetting.SHOW_CENTS.accepts(JsonPrimitive("false")))
         assertTrue(AccountSetting.BUDGET_MONTH_SEEN.accepts(JsonPrimitive("2026-11")))
         assertFalse(AccountSetting.BUDGET_MONTH_SEEN.accepts(JsonPrimitive("2026-13")))
+        // The monthly check-in's months take the same form.
+        assertTrue(AccountSetting.BUDGET_MONTH_PLANNED.accepts(JsonPrimitive("2026-12")))
+        assertFalse(AccountSetting.BUDGET_MONTH_PLANNED.accepts(JsonPrimitive("December")))
+        assertTrue(AccountSetting.RECAP_MONTH_SEEN.accepts(JsonPrimitive("2026-11")))
+        assertFalse(AccountSetting.RECAP_MONTH_SEEN.accepts(JsonPrimitive(202611)))
         // Null is every setting's "no value of its own".
         assertTrue(AccountSetting.entries.all { it.accepts(JsonNull) })
     }
@@ -153,7 +158,10 @@ class AccountSettingsMergeTest {
     fun `a Partner's phone keeps to the person's own settings`() {
         assertFalse(AccountSetting.DEFAULT_WALLET in AccountSetting.PERSONAL)
         assertFalse(AccountSetting.BUDGET_MONTH_SEEN in AccountSetting.PERSONAL)
+        // The check-in's months are about the ledger's budget, like the budget moment.
+        assertFalse(AccountSetting.BUDGET_MONTH_PLANNED in AccountSetting.PERSONAL)
+        assertFalse(AccountSetting.RECAP_MONTH_SEEN in AccountSetting.PERSONAL)
         assertTrue(AccountSetting.THEME in AccountSetting.PERSONAL)
-        assertEquals(AccountSetting.entries.size - 2, AccountSetting.PERSONAL.size)
+        assertEquals(AccountSetting.entries.size - 4, AccountSetting.PERSONAL.size)
     }
 }
