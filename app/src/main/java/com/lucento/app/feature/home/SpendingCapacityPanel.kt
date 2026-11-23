@@ -100,8 +100,23 @@ private val SideBySideFrom = 280.dp
 
 private fun stacked(width: Dp, fontScale: Float): Boolean = width < SideBySideFrom || fontScale >= 1.3f
 
-/** The verdict puts its figure and its words side by side only this wide (tablets, unfolded phones). */
+/** The verdict puts its figure and its words side by side, half and half, this wide (tablets, unfolded phones). */
 private val VerdictSideBySideFrom = 360.dp
+
+/**
+ * Phones too (owner, 2026-11-23, after a tester saw the sentence drop under the amount and leave the right side
+ * empty): from this width (a 360dp phone and up) the sentence sits beside the amount ([VerdictCompactSplit] of the width
+ * for the figure) whenever it fits there in [VerdictCompactMaxLines] lines, and the status icon shrinks into the label so
+ * the amount keeps most of its size. Large text, a longer sentence and a verdict with a second line stack as before
+ * (they would make a tall, narrow column).
+ */
+private val VerdictCompactSideBySideFrom = 240.dp
+
+/** The figure's share of the width when the verdict is side by side on a phone; the words take the rest. */
+private const val VerdictCompactSplit = 0.56f
+
+/** Beside the amount on a phone, the sentence may take this many lines: about the figure's own height. */
+private const val VerdictCompactMaxLines = 4
 
 /** What a tap on the verdict does, as TalkBack offers it ("Double-tap to show how…"). */
 internal const val SHOW_HOW_LABEL = "Show how Safe to spend is worked out"
@@ -596,7 +611,11 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
     val nothing = capacity.nothingSafe
     val ink = if (nothing) ext.negative else ext.positive
     val container = if (nothing) ext.negativeContainer else ext.positiveContainer
-    val fontScale = LocalDensity.current.fontScale
+    val density = LocalDensity.current
+    val fontScale = density.fontScale
+    // Measures the sentence at the width it would have beside the amount on a phone (VerdictCompactMaxLines).
+    val measurer = rememberTextMeasurer()
+    val headlineStyle = MaterialTheme.typography.titleSmall.copy(lineBreak = LineBreak.Heading, fontWeight = FontWeight.Bold)
     val perDay = capacity.perDay?.takeIf { showPerDay && !nothing }
     val days = "${capacity.daysLeft} ${if (capacity.daysLeft == 1) "day" else "days"}"
     val detail = capacity.detail
@@ -626,6 +645,23 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
                 }
             }
             // It opens how the figure is worked out (design review: the old line's (i) was the only visible cue).
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ink, modifier = Modifier.size(24.dp))
+        }
+    }
+    // Beside the words on a phone: the status icon moves into the label, so the amount keeps most of its width.
+    val compactFigure: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (nothing) Icons.Outlined.ErrorOutline else Icons.Filled.Check, contentDescription = null, tint = ink, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text("SAFE TO SPEND", style = OverlineStyle, color = ink)
+                }
+                MoneyText(money = capacity.shown, style = AmountStyles.headline, color = ink, fractionScale = 1f, minScale = 0.5f)
+                if (perDay != null) {
+                    Text("${fmt.format(perDay)} a day for $days", style = MaterialTheme.typography.bodySmall, color = ink)
+                }
+            }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ink, modifier = Modifier.size(24.dp))
         }
     }
@@ -663,25 +699,35 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
             }
             .padding(Spacing.md),
     ) {
-        if (stacked(maxWidth, fontScale) || maxWidth < VerdictSideBySideFrom) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                figure()
-                words(Modifier.fillMaxWidth())
-            }
-        } else {
+        // Figure and words side by side, [split] of the width for the figure, with a hairline between them.
+        val divided: @Composable (Float, Dp, @Composable () -> Unit) -> Unit = { split, gap, left ->
             val line = ink.copy(alpha = 0.25f)
             Row(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 72.dp)
                     .drawBehind {
-                        val x = size.width * 0.5f
+                        val x = size.width * split
                         drawLine(line, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
                     },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.weight(1f).padding(end = Spacing.md)) { figure() }
-                words(Modifier.weight(1f).padding(start = Spacing.md))
+                Box(Modifier.weight(split).padding(end = gap)) { left() }
+                words(Modifier.weight(1f - split).padding(start = gap))
+            }
+        }
+        // On a phone: beside the amount only while the sentence fits there in a few lines, at a normal text size.
+        val besideOnPhone = fontScale < 1.3f && detail == null && maxWidth >= VerdictCompactSideBySideFrom && run {
+            val wordsWidth = with(density) { (maxWidth * (1f - VerdictCompactSplit) - Spacing.sm).roundToPx() }
+            measurer.measure(capacity.headline, headlineStyle, constraints = Constraints(maxWidth = wordsWidth.coerceAtLeast(1)))
+                .lineCount <= VerdictCompactMaxLines
+        }
+        when {
+            !stacked(maxWidth, fontScale) && maxWidth >= VerdictSideBySideFrom -> divided(0.5f, Spacing.md) { figure() }
+            besideOnPhone -> divided(VerdictCompactSplit, Spacing.sm) { compactFigure() }
+            else -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                figure()
+                words(Modifier.fillMaxWidth())
             }
         }
     }

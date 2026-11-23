@@ -182,7 +182,10 @@ select to_regclass('public.user_settings') is not null as table_exists,
   (159.90 of 200.00); see BC-5. Count today once between "days elapsed" and the days left.
 - A Compose UI test for the panel: stacking at 280dp and 130 %, the click labels, "—", Hide amounts.
 - Device: a Partner's phone (the wallets column opens the explanation), a TalkBack pass, a window 600dp or wider (the
-  verdict side by side).
+  verdict side by side). Since 2026-11-23 (tester: the sentence dropped under the amount and left the right side empty;
+  owner chose "Sentence beside the amount") phones put it beside the amount too, whenever it fits there in 4 lines at
+  normal text; checked on API 35 at 360, 393 and 411 dp and at 130 % (stacked), screenshots in the main checkout's
+  `artifacts/safe-to-spend-2026-11-23/`. Still to do: TalkBack on the phone layout (the semantics are unchanged).
 - `DailyFigure.SafePerDay` / `NothingLeft` now only feed `BudgetDailyFigureTest`: fold those checks into
   `budgetSafeToSpend` and keep `DailyFigure` for a finished month's average.
 
