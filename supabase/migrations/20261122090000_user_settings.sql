@@ -4,9 +4,9 @@
 -- public.user_settings — one row per account: a JSON document with one entry per setting and the time it was chosen,
 --   {"theme": {"v": "grove", "at": 1763800000000}, "features": {"v": ["budgets", "insights"], "at": …}, …}
 -- holding the theme and its mode, the modules switched on, the display name, Show cents, the Wallets view, hidden module
--- offers, exchange rates online, AI answers on or off, the default wallet and the budget moment. Phones merge it one
--- setting at a time (app: domain/settings/AccountSettings.kt). Consents to send something (crash reports, usage counts,
--- online voice, Smarter reading, the agreement to what AI answers send) and the app lock never come here.
+-- offers, exchange rates online, the default wallet and the budget moment. Phones merge it one setting at a time (app:
+-- domain/settings/AccountSettings.kt). Consents to send something (crash reports, usage counts, online voice, Smarter
+-- reading, Ask Lucento's AI answers and the agreement to what they send) and the app lock never come here.
 --
 -- Concurrency — compare-and-set on revision. A phone reads the row, merges, and writes the result back with
 -- base_revision = the revision it read. lucento_user_settings_write keeps that write only while it is still the stored
