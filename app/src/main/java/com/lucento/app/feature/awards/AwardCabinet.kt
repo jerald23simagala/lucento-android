@@ -211,10 +211,11 @@ private fun AwardCell(
         )
         if (!earned && note != null) {
             Spacer(Modifier.height(Spacing.xxs))
+            // Secondary ink, not link blue: it is a fact, not something to tap (critic r3, P3).
             Text(
                 note,
-                style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = Spacing.xs),
             )

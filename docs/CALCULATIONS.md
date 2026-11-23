@@ -143,7 +143,7 @@ budget periods" (new tables only, never new scope columns on `budgets`).
 - **Where it went** (`spendingBreakdown`): the shown month's EXPENSE rows in the dashboard currency, grouped by
   category, largest first; the top four are listed and the rest summed as "Other". Transfers, adjustments, goal
   contributions and income never count. Shares are of that month's total spending in that currency.
-- **Vs last month** (wallet card, `BalanceHistory`): net wallet balance at the end of the previous month, rebuilt from
+- **Vs last month** (wallet card, `BalanceHistory`): net worth at the end of the previous month, rebuilt from
   opening balances and transactions dated up to then (wallets created later are left out), against the shown month.
   The percentage appears only when the previous month's balance is above zero and no wallet in that currency was added
   in between (`comparableTrendPercent`): a new wallet's opening balance is not growth. The spoken comparison states the
@@ -201,11 +201,16 @@ in `MonthCheckIn`:
   far, in a month's last days). A hint opens its category's amount with a suggestion, said where it comes from
   (`hintSuggestion`): a bill due adds its amount to the category's usual monthly amount (`PlannedSource.usual`, never an
   amount already raised for the month); last year's month proposes what it cost then; last month's overspending proposes
-  what was spent in that category. Nothing is saved until the person saves it. Once the month has its own amount for a
+  what was spent in that category (owner, 2026-11-23: what was spent, labelled, rather than the usual amount). Nothing
+  is saved until the person saves it, and each save says what it did and the month's new total ("Restaurants: $235.00
+  for December only. December’s budget: $2,775.00."). Once the month has its own amount for a
   hint's category, the hint says so ("$235.00 set for December", with "Change") and opens at that amount, with no
   suggestion: a hint never adds to what the person has already set.
 - **Add something** on a category that already has an amount asks for the extra ("Extra for December") and saves the
   amount plus the extra for that month only ("Personal care becomes $260.00 for December ($60.00 planned + $200.00)").
+- **The page's order**: the intro and "each change is saved as you make it" first; the hints; Add something; the
+  budgeted categories with this month's own amounts first, folded after five as on the Budget tab (a usual amount has no
+  subtitle: only what differs gets one); categories without an amount; "Done planning".
 - **Reaching the plan page**: from the card; from the Budget tab on any month ahead ("Plan <month>"); and on the Budget
   tab's running month from the 1st to the 7th, so the hints never depend on the card.
 - **Closing the card** ("Not this month") hides both parts and offers Undo, which puts the two months back as they were

@@ -56,6 +56,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +94,7 @@ import com.lucento.app.domain.YearRecap
 import com.lucento.app.feature.budget.MonthSwitcher
 import com.lucento.app.feature.home.monthLabel
 import java.time.YearMonth
+import kotlinx.coroutines.launch
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -152,6 +154,9 @@ fun ProgressScreen(
     }
 
     val awardsRequester = remember { BringIntoViewRequester() }
+    // A month picked in the year changes the recap above it: the recap comes into view (critic r3, P2).
+    val recapRequester = remember { BringIntoViewRequester() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     LaunchedEffect(showAwards, state.loading) {
         if (showAwards && !state.loading) awardsRequester.bringIntoView()
     }
@@ -172,13 +177,15 @@ fun ProgressScreen(
             if (state.loading || recap == null || year == null) return@Column
 
             Spacer(Modifier.height(Spacing.sm))
-            MonthSwitcher(
-                month = month,
-                canGoForward = month < current,
-                canGoBack = month > state.earliestMonth,
-                onPrevious = { if (month > state.earliestMonth) chosen = month.minusMonths(1).toString() },
-                onNext = { if (month < current) chosen = month.plusMonths(1).toString() },
-            )
+            Box(Modifier.bringIntoViewRequester(recapRequester)) {
+                MonthSwitcher(
+                    month = month,
+                    canGoForward = month < current,
+                    canGoBack = month > state.earliestMonth,
+                    onPrevious = { if (month > state.earliestMonth) chosen = month.minusMonths(1).toString() },
+                    onNext = { if (month < current) chosen = month.plusMonths(1).toString() },
+                )
+            }
             Spacer(Modifier.height(Spacing.sm))
             RecapHero(recap)
             Spacer(Modifier.height(Spacing.md))
@@ -204,7 +211,10 @@ fun ProgressScreen(
             if (state.yearLocked) {
                 YearPreview(year, shownMonths)
             } else {
-                YearGrid(shownMonths, selected = month, onSelect = { chosen = it.toString() })
+                YearGrid(shownMonths, selected = month, onSelect = {
+                    chosen = it.toString()
+                    scope.launch { recapRequester.bringIntoView() }
+                })
                 Spacer(Modifier.height(Spacing.md))
                 YearTotals(year)
             }
@@ -269,9 +279,14 @@ private fun RecapHero(recap: MonthRecap) {
     val ext = LucentoTheme.extendedColors
     HeroCard {
         Spacer(Modifier.height(Spacing.xs))
+        // A polite live region: a month picked in the year (or with the arrows) is announced as it appears.
         CardOverline(
             "${monthLabel(recap.month)} ${recap.month.year}" + if (recap.finished) "" else " · so far",
             color = ext.onHeroMuted,
+            modifier = Modifier.semantics {
+                liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite
+                contentDescription = "Showing ${monthLabel(recap.month)} ${recap.month.year}" + if (recap.finished) "" else ", so far"
+            },
         )
         Spacer(Modifier.height(6.dp))
         if (!recap.hasRecords) {
@@ -478,7 +493,11 @@ private fun YearPreview(year: YearRecap, months: List<RecapMonthResult>) {
     val wall = com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS)
     LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
         if (year.recordedMonths > 0) {
-            Box(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = "Your last 12 months, with the figures hidden." }) {
+            // Says what it shows: the months since the first one with records, not always twelve (critic r3, P3).
+            val since = months.firstOrNull()?.month
+            val described = if (since == null || months.size >= 12) "Your last 12 months, with the figures hidden."
+            else "Your months since ${monthLabel(since)} ${since.year}, with the figures hidden."
+            Box(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = described }) {
                 CompositionLocalProvider(LocalAmountsHidden provides true) {
                     Box(Modifier.alpha(0.45f)) { YearGrid(months, selected = null, onSelect = null) }
                 }

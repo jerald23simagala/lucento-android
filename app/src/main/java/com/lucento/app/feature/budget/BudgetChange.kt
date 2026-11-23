@@ -9,6 +9,46 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 /** Who a budget change applies to (docs/CALCULATIONS.md, "Budget lifecycle"). */
+/**
+ * What a saved amount did, said once the sheet closes (critic r3, P2: TalkBack hears it too): "Restaurants: $235.00 for
+ * December only. December’s budget: $2,775.00." With amounts hidden, it says what changed without them.
+ */
+internal fun savedAmountMessage(
+    name: String,
+    amount: com.lucento.app.core.money.Money?,
+    scope: BudgetScope,
+    month: YearMonth,
+    total: com.lucento.app.core.money.Money?,
+    fmt: com.lucento.app.core.designsystem.component.AmountFormat,
+): String {
+    val m = BudgetChangeContext.monthName(month)
+    val what = when {
+        amount == null && scope == BudgetScope.THIS_MONTH -> "no amount for $m"
+        amount == null -> "no amount from $m on"
+        fmt.hidden && scope == BudgetScope.THIS_MONTH -> "new amount for $m only"
+        fmt.hidden -> "new monthly amount from $m on"
+        scope == BudgetScope.THIS_MONTH -> "${fmt.format(amount)} for $m only"
+        else -> "${fmt.format(amount)} a month from $m on"
+    }
+    return "$name: $what." + budgetAfter(m, total, fmt)
+}
+
+/** "Restaurants: back to the usual $200.00 for December. December’s budget: $2,740.00." */
+internal fun usualAmountMessage(
+    name: String,
+    usual: com.lucento.app.core.money.Money,
+    month: YearMonth,
+    total: com.lucento.app.core.money.Money?,
+    fmt: com.lucento.app.core.designsystem.component.AmountFormat,
+): String {
+    val m = BudgetChangeContext.monthName(month)
+    return (if (fmt.hidden) "$name: back to the usual amount for $m." else "$name: back to the usual ${fmt.format(usual)} for $m.") +
+        budgetAfter(m, total, fmt)
+}
+
+private fun budgetAfter(m: String, total: com.lucento.app.core.money.Money?, fmt: com.lucento.app.core.designsystem.component.AmountFormat): String =
+    if (total == null || fmt.hidden) "" else " $m’s budget: ${fmt.format(total)}."
+
 enum class BudgetScope {
     /** The month being viewed, nothing else — the normal adjustment. */
     THIS_MONTH,
@@ -48,6 +88,12 @@ data class BudgetChangeContext(
     private val name get() = monthName(month)
 
     /** Short month names so both choices fit one line at large text sizes. */
+    /** The choice in full, for TalkBack: "Only December", "December onward" (the buttons say "Only Dec"). */
+    fun scopeDescription(scope: BudgetScope): String = when (scope) {
+        BudgetScope.THIS_MONTH -> "Only ${monthName(month)}"
+        BudgetScope.ONWARD -> "${monthName(month)} onward"
+    }
+
     fun scopeLabel(scope: BudgetScope): String = when (scope) {
         BudgetScope.THIS_MONTH -> "Only ${monthName(month, short = true)}"
         BudgetScope.ONWARD -> "${monthName(month, short = true)} onward"

@@ -137,6 +137,8 @@ fun <T> SegmentedToggle(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     selectedTone: ((T) -> TonePair)? = null,
+    /** What TalkBack reads for an option, when its label is shortened ("Only Dec" → "Only December"). */
+    descriptions: ((T) -> String)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val haptics = rememberHaptics()
@@ -184,7 +186,9 @@ fun <T> SegmentedToggle(
                             haptics.tick()
                             onSelect(value)
                         }
-                    },
+                    }
+                    .then(if (descriptions != null) Modifier.semantics { contentDescription = descriptions(value) } else Modifier)
+                    .padding(horizontal = Spacing.xs),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -195,7 +199,9 @@ fun <T> SegmentedToggle(
                         else -> MaterialTheme.typography.labelLarge
                     },
                     color = content,
-                    maxLines = 1,
+                    // Two lines at large text sizes rather than a label cut at the edge (critic r3, P2).
+                    maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
         }

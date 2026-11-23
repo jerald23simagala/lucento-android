@@ -56,7 +56,6 @@ import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.component.Hairline
 import com.lucento.app.core.designsystem.component.HeroCard
 import com.lucento.app.core.designsystem.component.IconTile
-import com.lucento.app.core.designsystem.component.InfoNote
 import com.lucento.app.core.designsystem.component.ListSectionHeader
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoCard
@@ -164,11 +163,10 @@ internal fun PlannedRow(line: CategoryBudgetLine, source: PlannedSource, onClick
         Column(Modifier.weight(1f)) {
             // The whole name, however long (40 characters at most), at any text size (critic r2).
             Text(line.category.name, style = Hierarchy.cardTitle)
-            Text(
-                plannedRowDetail(line, source, fmt),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Only what differs gets a line ("Only December · usually $200.00"); a usual amount needs none (critic r3).
+            plannedRowDetail(line, source, fmt)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (stacked) amount()
         }
         if (!stacked) {
@@ -183,16 +181,17 @@ internal fun PlannedRow(line: CategoryBudgetLine, source: PlannedSource, onClick
     }
 }
 
-/** "Only December · usually ₱2,000", or "Every month", and what is spent so far when there is something. */
-internal fun plannedRowDetail(line: CategoryBudgetLine, source: PlannedSource, fmt: AmountFormat): String = buildString {
+/**
+ * What sets a planned row apart: "Only December · usually ₱2,000", and what is spent so far when there is something.
+ * Null for a usual monthly amount with nothing spent: the row is just the name and the amount.
+ */
+internal fun plannedRowDetail(line: CategoryBudgetLine, source: PlannedSource, fmt: AmountFormat): String? {
     val month = line.allocation?.month
-    if (source.ownAmount && month != null) {
-        append("Only ${monthLabel(month)}")
-        source.usual?.let { append(" · usually ${fmt.format(it)}") }
-    } else {
-        append("Every month")
+    val parts = buildList {
+        if (source.ownAmount && month != null) add("Only ${monthLabel(month)}" + (source.usual?.let { " · usually ${fmt.format(it)}" } ?: ""))
+        if (!line.spent.isZero) add("${fmt.format(line.spent)} spent so far")
     }
-    if (!line.spent.isZero) append(" · ${fmt.format(line.spent)} spent so far")
+    return parts.joinToString(" · ").ifEmpty { null }
 }
 
 /**
@@ -241,6 +240,7 @@ fun MonthPlanScreen(
     var extra by remember { mutableStateOf(false) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var naming by rememberSaveable { mutableStateOf(false) }
+    var showAllBudgeted by rememberSaveable { mutableStateOf(false) }
     // A category made from "Add something" opens its amount as soon as it is part of the plan.
     var created by rememberSaveable { mutableStateOf<Long?>(null) }
     var finishing by remember { mutableStateOf(false) }
@@ -273,12 +273,22 @@ fun MonthPlanScreen(
         if (state.loading) return@LazyColumn
 
         item(key = "intro") {
-            Text(
-                planIntro(month, previous, state.today, fmt),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.md),
-            )
+            Column(Modifier.padding(top = Spacing.xs, bottom = Spacing.md)) {
+                Text(
+                    planIntro(month, previous, state.today, fmt),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // "Do I need to save?" answered first, not under the last category (critic r3, P2).
+                if (canEdit) {
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        planSavingNote(month),
+                        style = MaterialTheme.typography.bodySmall.copy(lineBreak = LineBreak.Heading),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
         if (currencies.size > 1) {
             item(key = "currencies") {
@@ -331,10 +341,23 @@ fun MonthPlanScreen(
                 ListSectionHeader("Budgeted", caption = categoryCount(plan.allocatedLines.size), subtotal = "${fmt.format(plan.total)} planned")
             }
             item(key = "budgeted") {
+                // What is different about this month first, then the rest in the Budget tab's order, folded after five as
+                // the Budget tab does, so the page's end stays in reach (critic r3, P2).
+                val lines = plan.allocatedLines.sortedBy { if (plannedSource(state.budgets, it, month).ownAmount) 0 else 1 }
+                val folded = !showAllBudgeted && lines.size > BUDGETED_FOLD + 1
+                val shown = if (folded) lines.take(BUDGETED_FOLD) else lines
                 LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
-                    plan.allocatedLines.forEachIndexed { index, line ->
+                    shown.forEachIndexed { index, line ->
                         PlannedRow(line, plannedSource(state.budgets, line, month), onClick = if (canEdit) ({ editing = line }) else null)
-                        if (index < plan.allocatedLines.lastIndex) Hairline(inset = RowTextInset)
+                        if (index < shown.lastIndex) Hairline(inset = RowTextInset)
+                    }
+                    if (lines.size > BUDGETED_FOLD + 1) {
+                        Hairline(inset = RowTextInset)
+                        com.lucento.app.core.designsystem.component.LucentoTextButton(
+                            text = if (folded) "Show ${moreCategories(lines.size - BUDGETED_FOLD)}" else "Show fewer",
+                            onClick = { showAllBudgeted = !showAllBudgeted },
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                        )
                     }
                 }
             }
@@ -367,12 +390,6 @@ fun MonthPlanScreen(
             } else {
                 com.lucento.app.feature.sharedspace.OwnerManagesNote("budgets and categories")
             }
-            InfoNote(
-                "Each change is saved as you make it. A change here is for ${monthLabel(month)} only, unless you choose " +
-                    "“${BudgetChangeContext.monthName(month, short = true)} onward”. Other months keep their amounts, and your " +
-                    "total is always the sum of your categories.",
-                modifier = Modifier.padding(top = Spacing.lg),
-            )
         }
     }
 
@@ -449,6 +466,11 @@ fun MonthPlanScreen(
     }
 }
 
+/** Under the intro: nothing needs saving, and a change is for that month alone unless the person chooses otherwise. */
+internal fun planSavingNote(month: YearMonth): String =
+    "Each change is saved as you make it, for ${monthLabel(month)} only unless you choose " +
+        "“${BudgetChangeContext.monthName(month, short = true)} onward”."
+
 /** The plan page's first words: how the month before went (or is going), then what planning a month is for. */
 internal fun planIntro(month: YearMonth, previous: BudgetPlan, today: LocalDate, fmt: AmountFormat): String {
     val before = previous.month
@@ -498,7 +520,8 @@ private fun HintRow(hint: PlanHint, categories: Map<Long, Category>, handled: St
         Spacer(Modifier.width(RowGap))
         Column(Modifier.weight(1f)) {
             // Balanced lines: "Dec 12" never breaks with the 12 alone (design review 2026-11-23).
-            Text(title, style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Heading))
+            // The hint is the page's news, so its line carries the weight a category name does (critic r3, P3).
+            Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, lineBreak = LineBreak.Heading))
             if (handled != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
@@ -648,6 +671,9 @@ private fun AddForMonthSheet(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        // Opens its amount, like every other row that leads somewhere (critic r3, P3).
+                        Spacer(Modifier.width(Spacing.xs))
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (index < lines.lastIndex) Hairline(inset = RowTextInset)
                 }

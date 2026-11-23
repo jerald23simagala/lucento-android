@@ -92,7 +92,40 @@ class MonthPlanCopyTest {
         assertEquals(PlannedSource(ownAmount = true, usual = usd(2_000)), source)
         assertEquals("Only December · usually \$20.00", plannedRowDetail(line, source, fmt))
         val monthly = CategoryBudgetLine(gifts, usual, usd(1_500))
-        assertEquals("Every month · \$15.00 spent so far", plannedRowDetail(monthly, plannedSource(listOf(usual), monthly, dec), fmt))
+        assertEquals("\$15.00 spent so far", plannedRowDetail(monthly, plannedSource(listOf(usual), monthly, dec), fmt))
+        // A usual amount with nothing spent needs no line of its own (critic r3).
+        val plain = CategoryBudgetLine(gifts, usual, usd(0))
+        assertEquals(null, plannedRowDetail(plain, plannedSource(listOf(usual), plain, dec), fmt))
+    }
+
+    @Test fun `a saved amount says what it did, the month's total with it`() = english {
+        val fmt = AmountFormat.Shown
+        assertEquals(
+            "Restaurants: \$235.00 for December only. December’s budget: \$2,775.00.",
+            savedAmountMessage("Restaurants", usd(23_500), BudgetScope.THIS_MONTH, dec, usd(277_500), fmt),
+        )
+        assertEquals(
+            "Restaurants: \$235.00 a month from December on. December’s budget: \$2,775.00.",
+            savedAmountMessage("Restaurants", usd(23_500), BudgetScope.ONWARD, dec, usd(277_500), fmt),
+        )
+        assertEquals("Gifts: no amount for December.", savedAmountMessage("Gifts", null, BudgetScope.THIS_MONTH, dec, null, fmt))
+        assertEquals(
+            "Restaurants: back to the usual \$200.00 for December. December’s budget: \$2,740.00.",
+            usualAmountMessage("Restaurants", usd(20_000), dec, usd(274_000), fmt),
+        )
+        // With amounts hidden, it says what changed without them.
+        assertEquals(
+            "Restaurants: new amount for December only.",
+            savedAmountMessage("Restaurants", usd(23_500), BudgetScope.THIS_MONTH, dec, usd(277_500), AmountFormat.Hidden),
+        )
+    }
+
+    @Test fun `the plan page says first that nothing needs saving`() = english {
+        assertEquals("Each change is saved as you make it, for December only unless you choose “Dec onward”.", planSavingNote(dec))
+        // The toggle's short labels are read in full.
+        val change = BudgetChangeContext.of(emptyList(), 6, "Gifts", "USD", dec, nov, planning = true)
+        assertEquals("Only December", change.scopeDescription(BudgetScope.THIS_MONTH))
+        assertEquals("December onward", change.scopeDescription(BudgetScope.ONWARD))
     }
 
     @Test fun `a hint's amount comes with it into the sheet it opens`() = english {

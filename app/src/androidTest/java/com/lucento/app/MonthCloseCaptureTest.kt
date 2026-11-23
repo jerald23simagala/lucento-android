@@ -184,7 +184,7 @@ class MonthCloseCaptureTest {
             shot("$tag-02-plan-top")
             // Most of a screen at a time until the page's end is in view, so every row is seen at every text size.
             for (step in 'a'..'p') {
-                if (isShown("Each change is saved")) break
+                if (isShown("Done planning")) break
                 scrollOn()
                 shot("$tag-03$step-plan-scroll")
             }
@@ -206,9 +206,13 @@ class MonthCloseCaptureTest {
                     shot("$tag-05b-plan-amount-over")
                     click("Save amount")
                     compose.waitUntilDoesNotExist(hasText("Apply to"), 5_000)
-                    // The hint now says what December has, and offers a change instead of a new figure.
+                    // The hint now says what December has, and offers a change instead of a new figure; the message says
+                    // what the save did (TalkBack reads it too).
                     lazyScrollTo("Worth a look")
+                    waitForText("for ${name(plan)} only")
                     shot("$tag-05c-plan-after-save")
+                    compose.mainClock.advanceTimeBy(5_000) // the message's time passes
+                    compose.waitForIdle()
                     // Opened again, it shows the amount saved, never that amount plus the overspend.
                     compose.onAllNodesWithText("Restaurants:", substring = true)[0].performClick()
                     waitForText("Apply to")
@@ -262,6 +266,17 @@ class MonthCloseCaptureTest {
             if (isShown(if (pro) "Yours to keep" else "Paid a loan down to zero")) break
             scrollOn()
             shot("$tag-08$step-progress-scroll")
+        }
+        if (pro) {
+            // A month picked in the year: its recap comes into view above (and is announced).
+            runCatching {
+                compose.onNodeWithText("Your year").performScrollTo()
+                compose.onNode(androidx.compose.ui.test.hasContentDescription("October 2026", substring = true) and hasClickAction())
+                    .performScrollTo()
+                    .performClick()
+                compose.waitForIdle()
+                shot("$tag-09-year-tap")
+            }
         }
         back()
 

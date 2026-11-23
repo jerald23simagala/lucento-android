@@ -22,7 +22,7 @@ enum class Achievement(val key: String, val title: String, val description: Stri
 
     // Progress awards (owner, 2026-11-23): real results rather than setup steps. Past progress counts, quietly.
     STEADY_MONTH("steady_month", "Steady Month", "Kept a whole month within its budget", "Keep a whole month within its budget"),
-    GOAL_REACHED("goal_reached", "Goal Reached", "Reached one of your goals’ targets", "Reach one of your goals’ targets"),
+    GOAL_REACHED("goal_reached", "Goal Reached", "Reached a goal’s target", "Reach a goal’s target"),
     LOAN_CLEARED("loan_cleared", "Loan Cleared", "Paid a loan down to zero", "Pay one of your loans down to zero");
 
     companion object {

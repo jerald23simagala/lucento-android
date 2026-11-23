@@ -36,29 +36,33 @@ class MonthCheckInCopyTest {
         val c = copy(MonthCheckIn.Card(dec, null), "2026-11-28", plan(nov, 20_000, 18_200))
         // The title doesn't repeat the "Plan December" button under it.
         assertEquals("Ready for December?", c.title)
-        assertEquals("November ends in 2 days. Set December’s amounts now, so a birthday or another one-off cost has room.", c.body)
-        assertEquals("November ends tomorrow. Set December’s amounts now, so a birthday or another one-off cost has room.", copy(MonthCheckIn.Card(dec, null), "2026-11-29", null).body)
-        assertEquals("November ends today.", copy(MonthCheckIn.Card(dec, null), "2026-11-30", null).body.substringBefore(" Set"))
+        // Short, so it stays within three lines at 360 dp and 130 % text (critic r3, P1).
+        assertEquals("November ends in 2 days. Make room for December’s one-offs, like a birthday.", c.body)
+        assertEquals("November ends tomorrow. Make room for December’s one-offs, like a birthday.", copy(MonthCheckIn.Card(dec, null), "2026-11-29", null).body)
+        assertEquals("November ends today.", copy(MonthCheckIn.Card(dec, null), "2026-11-30", null).body.substringBefore(" Make"))
+        assertEquals("Not this month", c.closeLabel)
     }
 
     @Test fun `in the first days it says how last month ended, the sign in words`() = english {
         val over = copy(MonthCheckIn.Card(dec, nov), "2026-12-03", plan(nov, 20_000, 21_200))
         assertEquals("December has started", over.title)
-        assertEquals("November: \$12.00 over budget. Check December’s amounts for anything different this month.", over.body)
+        assertEquals("November: \$12.00 over budget. Anything different this month?", over.body)
         assertEquals("See November’s recap", over.recapAction)
         val within = copy(MonthCheckIn.Card(dec, nov), "2026-12-03", plan(nov, 20_000, 18_200))
-        assertEquals("November: \$182.00 of \$200.00 spent. Check December’s amounts for anything different this month.", within.body)
+        assertEquals("November: \$182.00 of \$200.00 spent. Anything different this month?", within.body)
         val noBudget = copy(MonthCheckIn.Card(dec, nov), "2026-12-03", null)
-        assertEquals("November is done. Check December’s amounts for anything different this month.", noBudget.body)
+        assertEquals("November is done. Anything different this month?", noBudget.body)
     }
 
     @Test fun `with only one thing left, the card is about that`() = english {
         val planOnly = copy(MonthCheckIn.Card(dec, null), "2026-12-02", null)
         assertEquals("December has started", planOnly.title)
-        assertEquals("Check its amounts for anything different this month, like a birthday or an event.", planOnly.body)
+        assertEquals("Anything different this month, like a birthday or an event?", planOnly.body)
         val recapOnly = copy(MonthCheckIn.Card(null, nov), "2026-12-02", plan(nov, 20_000, 18_200))
         assertEquals("November in review", recapOnly.title)
-        assertEquals("\$182.00 of \$200.00 spent. See what came in, what went out and where it went.", recapOnly.body)
+        assertEquals("\$182.00 of \$200.00 spent. See where November’s money went.", recapOnly.body)
+        // Its close button hides the recap, and says so to TalkBack (critic r3, P3).
+        assertEquals("Hide November’s recap", recapOnly.closeLabel)
     }
 
     @Test fun `closing the card says what stops`() = english {

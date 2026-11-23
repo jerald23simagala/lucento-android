@@ -29,9 +29,10 @@ resolved items are kept at the bottom for traceability.
 | MCI-K8 | Not yet run at a real turn of the month on a phone; checked on an emulator with its clock set | `MonthCloseCaptureTest` | NEXT_TASKS MCI-N1 |
 | MCI-K9 | A plan hint shows as acted on only when the month has its own amount for its category. After an “onward” change from the plan page it is offered again, with a suggestion from the new usual amount; two bills due in one category each suggest only their own amount | `MonthPlanCopyTest` | — |
 | MCI-K10 | Steady Month and the budget moment need dated amounts: a ledger whose every amount predates creation dates (pre-0.5 rows) earns neither until an amount is set again, as before; its recap can't say when its budget began | `BudgetMilestonesTest` | — |
-| MCI-K11 | One figure, two names: Home's card says “Net Wallet Balance” (the owner-approved dashboard label), while Progress, Insights, Reports and Ask say “Net worth” | Critic r2 P3-9 | Owner call |
-| MCI-K12 | The Follow sheet's brand marks are tinted Lucento blue, not the platforms' own colours | Critic r2 P3-11 | Owner call |
-| MCI-K13 | Seen by the critic, outside this change: Home's “+0% vs last month” shows a rising arrow, and Home's “NET WALLET BALANCE” label is cut at 200 % text; the compact segmented toggle (pinned headers) is 40 dp tall | Critic r2 | Next Home pass |
+| MCI-K11 | ~~One figure, two names~~ — resolved 2026-11-23: the owner chose “Net worth” on Home's card too | Owner answer | — |
+| MCI-K12 | ~~The Follow sheet's brand marks tinted Lucento blue~~ — resolved 2026-11-23: one colour, the text ink, on a neutral tile (the owner's choice; the platforms allow plain black or white) | Owner answer | — |
+| MCI-K13 | Seen by the critic, outside this change: Home's “+0% vs last month” shows a rising arrow; the compact segmented toggle (pinned headers) is 40 dp tall. (Fixed here: the card's label, now “Net worth”, is no longer cut at 200 %, and “Dashboard” stays whole at 130 % on a 360 dp phone) | Critics r2, r3 | Next Home pass |
+| MCI-K14 | No fourth design round: after r3 REVISE 3.5 the owner chose “fix all, then PR”, so the round-3 fixes (card at 360 dp, save messages, year tap, plan-page order, toggle labels, P3s) were checked by recaptures and tests, not by the critic | Studio critic/reports/2026-11-23-month-close-r3-response.md | Owner review of the PR |
 
 ## Security and anti-tampering audit (2026-11-23)
 

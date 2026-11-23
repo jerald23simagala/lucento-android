@@ -421,7 +421,7 @@ data class HomeUiState(
     val showAddSpotlight: Boolean = false,
     /** Wallet card: balances at the end of [month] (today's for the current month) in [focusCurrency]. */
     val monthComposition: NetWorthComposition? = null,
-    /** Wallet card: net wallet balance at the end of last month and [month] (oldest first), for "vs last month". */
+    /** Wallet card: net worth at the end of last month and [month] (oldest first), for "vs last month". */
     val balanceHistory: List<com.lucento.app.domain.MonthBalance> = emptyList(),
     /** Change across [balanceHistory] in whole percent, only when meaningful (see BalanceHistory.trendPercent). */
     val balanceTrend: Int? = null,

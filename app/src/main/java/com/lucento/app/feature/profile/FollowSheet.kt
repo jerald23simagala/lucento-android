@@ -69,6 +69,12 @@ fun FollowSheet(onDismiss: () -> Unit) {
                     icon = ImageVector.vectorResource(channel.icon),
                     title = channel.name,
                     summary = channel.subtitle,
+                    // One colour, the text's ink, on a neutral tile: the platforms allow their marks in plain black or
+                    // white, not in another brand's colour (owner, 2026-11-23).
+                    tone = com.lucento.app.core.designsystem.theme.TonePair(
+                        container = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        content = MaterialTheme.colorScheme.onSurface,
+                    ),
                     onClick = { browse(channel) },
                     external = true,
                     onClickLabel = "Open in ${channel.name}",

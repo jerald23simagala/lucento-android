@@ -1,6 +1,7 @@
 package com.lucento.app.feature.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -22,8 +23,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.dp
 import com.lucento.app.core.designsystem.component.AmountFormat
 import com.lucento.app.core.designsystem.component.IconTile
@@ -41,8 +45,11 @@ import java.time.YearMonth
 /**
  * The monthly check-in on Home (owner, 2026-11-23): in the last days of a month it asks to plan the next one, and from the
  * 1st to the 7th it also offers the month that ended as a recap. Nothing is changed by the card itself: planning happens
- * on the plan page, and its close button ("Not this month") only stops the card asking about these months again. The
- * close button sits in the corner, so the actions that do something share one row.
+ * on the plan page, and its close button ("Not this month") only stops the card asking about these months again.
+ *
+ * Built for a 360 dp phone first (critic r3, P1): the words and the actions use the card's full width, the close button
+ * sits in the corner without a row of its own, and below 400 dp or from 130 % text the icon tile gives its room to the
+ * words. The card is there for about ten days a month, so it stays short.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -56,38 +63,44 @@ internal fun MonthCheckInCard(
 ) {
     val fmt = amountFormat()
     val copy = CheckInCopy.of(card, today, budget, fmt)
+    val compact = LocalConfiguration.current.screenWidthDp < 400 || LocalDensity.current.fontScale >= 1.3f
     LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
-        Row(verticalAlignment = Alignment.Top) {
-            IconTile(
-                icon = if (card.plan != null) Icons.Outlined.EditCalendar else Icons.Outlined.EmojiEvents,
-                size = 40.dp,
-                container = MaterialTheme.colorScheme.primaryContainer,
-                content = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f).padding(top = Spacing.xs)) {
-                Text(copy.title, style = Hierarchy.cardTitle, modifier = Modifier.semantics { heading() })
-                Spacer(Modifier.height(Spacing.xxs))
+        Box(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth()) {
+                // The title leaves room for the close button beside it; the words below use the whole width.
+                Row(Modifier.padding(end = 36.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (!compact) {
+                        IconTile(
+                            icon = if (card.plan != null) Icons.Outlined.EditCalendar else Icons.Outlined.EmojiEvents,
+                            size = 40.dp,
+                            container = MaterialTheme.colorScheme.primaryContainer,
+                            content = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Spacer(Modifier.width(Spacing.md))
+                    }
+                    Text(copy.title, style = Hierarchy.cardTitle, modifier = Modifier.semantics { heading() })
+                }
+                Spacer(Modifier.height(Spacing.xs))
                 // Balanced lines, so no word is left alone on the last one (critic r2).
                 Text(
                     copy.body,
-                    style = MaterialTheme.typography.bodyMedium.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                    style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Heading),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            // 48dp, pulled into the card's padding so its icon lines up with the title.
-            IconButton(onClick = onDismiss, modifier = Modifier.offset(x = Spacing.sm, y = -Spacing.sm)) {
-                Icon(Icons.Outlined.Close, contentDescription = "Not this month", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            // 48dp, in the corner over the card's padding, so it takes no row of its own.
+            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).offset(x = Spacing.md, y = -Spacing.md)) {
+                Icon(Icons.Outlined.Close, contentDescription = copy.closeLabel, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         // Wraps at large text sizes, so every action keeps its whole label and its 48dp target. The card's main action is
         // the filled one, plain to see in both themes (design review 2026-11-23; critic r2: a tonal fill sank in dark).
         // There is one card at a time and only around a month's turn, so it doesn't compete with Home's own actions.
-        Spacer(Modifier.height(Spacing.xs))
-        // The main action first, under the text it belongs to; a second action follows it, or sits below it on a narrow
-        // screen, so a wrap reads as an order rather than a gap.
+        Spacer(Modifier.height(Spacing.md))
+        // The main action first; a second action follows it, or sits below it on a narrow screen, so a wrap reads as an
+        // order rather than a gap.
         FlowRow(
-            Modifier.fillMaxWidth().padding(start = 40.dp + Spacing.md),
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
@@ -104,14 +117,19 @@ internal fun MonthCheckInCard(
 internal fun checkInHiddenMessage(card: MonthCheckIn.Card): String = card.plan?.let { "We won’t ask about ${monthLabel(it)} again" }
     ?: "${monthLabel(card.recap!!)}’s recap hidden"
 
-/** The card's words, from its figures only. Pure (apart from month names), so the cases are pinned in tests. */
-internal data class CheckInCopy(val title: String, val body: String, val recapAction: String) {
+/**
+ * The card's words, from its figures only. Pure (apart from month names), so the cases are pinned in tests. Short on
+ * purpose: at 360 dp and 130 % text the body stays within three lines (critic r3, P1). [closeLabel] is what the close
+ * button does, for TalkBack.
+ */
+internal data class CheckInCopy(val title: String, val body: String, val recapAction: String, val closeLabel: String) {
     companion object {
         fun of(card: MonthCheckIn.Card, today: LocalDate, budget: BudgetPlan?, fmt: AmountFormat): CheckInCopy {
             val thisMonth = YearMonth.from(today)
             val recap = card.recap
             val recapAction = recap?.let { "See ${monthLabel(it)}’s recap" } ?: ""
             val plan = card.plan
+            val closeLabel = if (plan != null) "Not this month" else "Hide ${monthLabel(requireNotNull(recap))}’s recap"
             return when {
                 // The last days of a month: plan the next one before it starts.
                 plan != null && plan > thisMonth -> {
@@ -123,29 +141,32 @@ internal data class CheckInCopy(val title: String, val body: String, val recapAc
                     // This month's figures are on the budget card right below: the card only says what to do.
                     CheckInCopy(
                         title = "Ready for ${monthLabel(plan)}?",
-                        body = "$ends Set ${monthLabel(plan)}’s amounts now, so a birthday or another one-off cost has room.",
+                        body = "$ends Make room for ${monthLabel(plan)}’s one-offs, like a birthday.",
                         recapAction = recapAction,
+                        closeLabel = closeLabel,
                     )
                 }
                 // The first days of a month, with last month to look back on.
                 plan != null && recap != null -> CheckInCopy(
                     title = "${monthLabel(plan)} has started",
                     body = (budget?.let { "${monthLabel(recap)}: ${budgetLine(it, fmt)}. " } ?: "${monthLabel(recap)} is done. ") +
-                        "Check ${monthLabel(plan)}’s amounts for anything different this month.",
+                        "Anything different this month?",
                     recapAction = recapAction,
+                    closeLabel = closeLabel,
                 )
                 plan != null -> CheckInCopy(
                     title = "${monthLabel(plan)} has started",
-                    body = "Check its amounts for anything different this month, like a birthday or an event.",
+                    body = "Anything different this month, like a birthday or an event?",
                     recapAction = recapAction,
+                    closeLabel = closeLabel,
                 )
                 else -> {
                     val month = requireNotNull(recap)
                     CheckInCopy(
                         title = "${monthLabel(month)} in review",
-                        body = (budget?.let { "${budgetLine(it, fmt)}. " }.orEmpty()) +
-                            "See what came in, what went out and where it went.",
+                        body = (budget?.let { "${budgetLine(it, fmt)}. " }.orEmpty()) + "See where ${monthLabel(month)}’s money went.",
                         recapAction = recapAction,
+                        closeLabel = closeLabel,
                     )
                 }
             }

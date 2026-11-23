@@ -689,7 +689,7 @@ internal val RowGap = Spacing.sm + Spacing.xxs
 internal val RowTextInset = RowPadding + RowTile + RowGap
 
 /** The Budgeted card shows this many rows, then "Show n more", unless only one more would be hidden. */
-private const val BUDGETED_FOLD = 5
+internal const val BUDGETED_FOLD = 5
 
 internal fun categoryCount(n: Int): String = "$n ${if (n == 1) "category" else "categories"}"
 
@@ -846,7 +846,36 @@ internal fun AllocationSheet(
     onSave: (Money?, BudgetScope, (BudgetRepository.SaveResult) -> Unit) -> Unit,
     onUseUsual: ((BudgetRepository.SaveResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
-) = AmountsShown {
+) {
+    // The message after a save follows the person's choice to hide amounts (read here, outside AmountsShown); the sheet
+    // itself always shows them, since nobody types an amount they can't see.
+    val messageFmt = amountFormat()
+    val messages = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
+    AmountsShown {
+        // The app's own message host: the sheet's goes with the sheet, and the message comes once it has closed.
+        AllocationSheetContent(line, plan, change, isFuture, initialAmount, note, addTo, onSave, onUseUsual, onDismiss, messageFmt) {
+            messages?.app?.show(it)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AllocationSheetContent(
+    line: CategoryBudgetLine,
+    plan: BudgetPlan,
+    change: BudgetChangeContext,
+    isFuture: Boolean,
+    initialAmount: Money?,
+    note: String?,
+    addTo: Money?,
+    onSave: (Money?, BudgetScope, (BudgetRepository.SaveResult) -> Unit) -> Unit,
+    onUseUsual: ((BudgetRepository.SaveResult) -> Unit) -> Unit,
+    onDismiss: () -> Unit,
+    messageFmt: com.lucento.app.core.designsystem.component.AmountFormat,
+    /** Says what a save did once the sheet has closed (a message TalkBack reads too; critic r3, P2). */
+    announce: (String) -> Unit,
+) {
     val fmt = amountFormat()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -859,14 +888,25 @@ internal fun AllocationSheet(
     var budgetScope by rememberSaveable { mutableStateOf(change.defaultScope) }
     /** An "onward" change waiting for confirmation: the amount (null when removing). */
     var confirming by remember { mutableStateOf<OnwardChange?>(null) }
+    /** What the save being made will say once it is done. */
+    var saidAfter by remember { mutableStateOf<String?>(null) }
+    val zero = Money.zero(currency)
+    fun totalAfter(amount: Money?): Money? = runCatching { plan.total - (line.limit ?: zero) + (amount ?: zero) }.getOrNull()
 
-    fun close() {
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    fun close(then: (() -> Unit)? = null) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion {
+            onDismiss()
+            then?.invoke()
+        }
     }
 
     fun handle(result: BudgetRepository.SaveResult) {
         when (result) {
-            is BudgetRepository.SaveResult.Saved -> close()
+            is BudgetRepository.SaveResult.Saved -> {
+                // Said once the sheet has gone, on the screen behind it (critic r3, P2).
+                val said = saidAfter
+                close { said?.let(announce) }
+            }
             BudgetRepository.SaveResult.LimitNotPositive -> error = "The amount must be greater than zero."
             BudgetRepository.SaveResult.InvalidCategory -> error = "This category is archived. Restore it in Manage categories first."
             BudgetRepository.SaveResult.Duplicate, BudgetRepository.SaveResult.NotFound -> close()
@@ -878,6 +918,7 @@ internal fun AllocationSheet(
     val scopeNow = if (addTo != null) BudgetScope.THIS_MONTH else budgetScope
 
     fun submit(amount: Money?) {
+        saidAfter = savedAmountMessage(line.category.name, amount, scopeNow, plan.month, totalAfter(amount), messageFmt)
         if (change.needsConfirmation(scopeNow, removing = amount == null)) confirming = OnwardChange(amount)
         else onSave(amount, scopeNow, ::handle)
     }
@@ -923,11 +964,12 @@ internal fun AllocationSheet(
                 label = if (addTo != null) "Extra for ${monthLabel(plan.month)}" else "Amount",
                 currencyCode = currency,
                 error = error,
+                // With an extra, one line says both what the category and the month become (critic r3, P3).
                 supporting = when {
                     addTo != null && parsed != null && newAmount != null ->
-                        "${line.category.name} becomes ${fmt.format(newAmount)} for ${monthLabel(plan.month)} " +
-                            "(${fmt.format(addTo)} planned + ${fmt.format(parsed)})."
-                    addTo != null -> "Added to the ${fmt.format(addTo)} planned for ${monthLabel(plan.month)}."
+                        "${line.category.name} becomes ${fmt.format(newAmount)} (${fmt.format(addTo)} + ${fmt.format(parsed)})" +
+                            (newTotal?.let { " · ${monthLabel(plan.month)}’s budget ${fmt.format(it)}." } ?: ".")
+                    addTo != null -> "Added to the ${fmt.format(addTo)} planned for ${monthLabel(plan.month)} only."
                     else -> newTotal?.let { "${monthLabel(plan.month)}’s budget becomes ${fmt.format(it)}." }
                 },
             )
@@ -941,13 +983,17 @@ internal fun AllocationSheet(
                     options = change.scopes.map { it to change.scopeLabel(it) },
                     selected = budgetScope,
                     onSelect = { budgetScope = it },
+                    descriptions = change::scopeDescription,
                 )
             }
-            Text(
-                change.scopeExplanation(scopeNow),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // An extra is for this month only, as its field and button say: no second line to line up (critic r3, P3).
+            if (addTo == null) {
+                Text(
+                    change.scopeExplanation(scopeNow),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(Modifier.height(Spacing.sm))
             LucentoPrimaryButton(
                 text = when {
@@ -973,7 +1019,10 @@ internal fun AllocationSheet(
             if (addTo == null && change.hasOwnAmount && usual != null) {
                 LucentoTextButton(
                     text = "Use the usual ${fmt.format(usual)}",
-                    onClick = { onUseUsual(::handle) },
+                    onClick = {
+                        saidAfter = usualAmountMessage(line.category.name, usual, plan.month, totalAfter(usual), messageFmt)
+                        onUseUsual(::handle)
+                    },
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             }

@@ -268,7 +268,7 @@ data class HomeActions(
 
 /**
  * The dashboard, top to bottom: a pinned header ("Dashboard", sync status, payments bell, profile) and month selector;
- * the net wallet balance card; the month's budget with its top two categories; shortcuts; getting started (only until
+ * the net worth card; the month's budget with its top two categories; shortcuts; getting started (only until
  * the basics are in place); upcoming scheduled transactions; recent transactions. Every month-dependent section follows
  * the one selected month. Every figure comes from [HomeUiState].
  *
@@ -835,8 +835,11 @@ private fun SyncStatusChip(status: CloudStatus, details: SyncDetails, onClick: (
                 0f
             }
             Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = angle })
-            // At large text sizes the icon alone keeps the header readable; the status is still announced in full.
-            if (!largeText()) {
+            // At large text sizes, or at 130 % on a narrow phone, the icon alone keeps "Dashboard" whole (critic r3); the
+            // status is still announced in full.
+            val iconOnly = largeText() ||
+                (LocalDensity.current.fontScale >= 1.3f && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 400)
+            if (!iconOnly) {
                 Spacer(Modifier.width(Spacing.xs))
                 Text(label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
             }
@@ -1269,7 +1272,7 @@ private fun quickLinkName(feature: Feature): String = when (feature) {
     else -> feature.title
 }
 
-// ------------------------------------------------------------------ Dashboard: net wallet balance card
+// ------------------------------------------------------------------ Dashboard: net worth card
 
 // The card's face (Figma "Net wallet balance") comes from the theme (LucentoTheme.spec.balanceCard): the same in light
 // and dark mode, like a physical card.
@@ -1286,7 +1289,8 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
     val spec = LucentoTheme.spec
     val face = spec.balanceCard
     val owed = -composition.totalLiabilities
-    val label = if (state.isCurrentMonth) "Net Wallet Balance" else "Net Wallet Balance · end of ${monthLabel(state.month)}"
+    // One name for the figure everywhere: Progress, Insights, Reports and Ask say "Net worth" too (owner, 2026-11-23).
+    val label = if (state.isCurrentMonth) "Net worth" else "Net worth · end of ${monthLabel(state.month)}"
     val history = state.balanceHistory
     val netWorthSpoken = spokenAmount(composition.netWorth, signed = true)
     val assetsSpoken = spokenAmount(composition.totalAssets, signed = true)
@@ -1348,11 +1352,12 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                         // Label and (i) together on the left; the brand stays on the right.
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                             // Caps like every other card's overline; TalkBack reads the spoken summary instead.
+                            // Two lines at large text sizes, so "NET WORTH" is never cut on a narrow phone (critic r3).
                             Text(
                                 label.uppercase(Locale.getDefault()),
                                 style = Hierarchy.cardOverline,
                                 color = face.inkMuted,
-                                maxLines = 1,
+                                maxLines = if (largeText()) 2 else 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics { contentDescription = spoken },
                             )
@@ -1363,7 +1368,7 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                         Spacer(Modifier.width(5.dp))
                         Image(painterResource(com.lucento.app.R.drawable.lucento_wordmark_dark), contentDescription = null, modifier = Modifier.height(15.dp))
                     }
-                    // Right under its label: one reading, "Net Wallet Balance −$2,339.35".
+                    // Right under its label: one reading, "Net worth −$2,339.35".
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MoneyText(
                             money = composition.netWorth,
@@ -1435,7 +1440,7 @@ private fun DrawScope.drawCardSurface() {
     )
 }
 
-/** What net wallet balance means, for the (i) beside it. */
+/** What net worth means, for the (i) beside it. */
 internal const val BALANCE_INFO = "What you have in your wallets minus what you owe on cards and loans. Wallets in other " +
     "currencies count at their value in your main currency, from the rates saved with their movements. A wallet with no " +
     "rate yet isn’t included."
@@ -1454,7 +1459,7 @@ private fun BalanceInfo() {
         state = tip,
     ) {
         IconButton(onClick = { scope.launch { tip.show() } }, modifier = Modifier.size(Sizes.minTouch)) {
-            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net wallet balance means", tint = LucentoTheme.spec.balanceCard.inkMuted, modifier = Modifier.size(14.dp))
+            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net worth means", tint = LucentoTheme.spec.balanceCard.inkMuted, modifier = Modifier.size(14.dp))
         }
     }
 }
