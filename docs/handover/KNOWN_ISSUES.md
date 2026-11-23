@@ -15,6 +15,25 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Monthly check-in, Progress, Follow Lucento (2026-11-23, `feature/month-close`)
+
+| ID | Issue | Evidence | Next |
+|---|---|---|---|
+| MCI-K1 | The check-in shows only while Lucento is open: nothing reminds anyone on the 1st (by design for now; a reminder would be the app's first notification permission) | Code (`MonthCheckIn`) | NEXT_TASKS MCI-N2 |
+| MCI-K2 | No switch turns the card off: a new setting would need backup schema 7 (unknown fields make a file invalid, and older builds refuse newer files), so "Not this month" is the only way to hide it | Code; docs/BACKUP.md | NEXT_TASKS MCI-N3 |
+| MCI-K3 | The check-in's months aren't in the JSON backup: a restore during the card's days can bring the card back (one tap); with sync on they return from the account | `AccountSettingsPreferencesTest` | — |
+| MCI-K4 | Progress reads the main currency only, as Home does; a budget in another currency is on the Budget tab, not in the recap | Code (`MonthRecaps`) | Owner call if multicurrency testers need per-currency recaps |
+| MCI-K5 | A one-off amount has no label of its own: it is a category's amount for that month only | Code | NEXT_TASKS MCI-N4 |
+| MCI-K6 | The year view's lock covers the 12-month overview only: every month's recap is free, as every month's report is free beside Insights' Pro trends | docs/MONETIZATION.md §3.4 | — |
+| MCI-K7 | Steady Month looks back 24 months: a kept month older than that doesn't earn it | `ProgressAwardsTest` | — |
+| MCI-K8 | Not yet run at a real turn of the month on a phone; checked on an emulator with its clock set | `MonthCloseCaptureTest` | NEXT_TASKS MCI-N1 |
+| MCI-K9 | A plan hint shows as acted on only when the month has its own amount for its category. After an “onward” change from the plan page it is offered again, with a suggestion from the new usual amount; two bills due in one category each suggest only their own amount | `MonthPlanCopyTest` | — |
+| MCI-K10 | Steady Month and the budget moment need dated amounts: a ledger whose every amount predates creation dates (pre-0.5 rows) earns neither until an amount is set again, as before; its recap can't say when its budget began | `BudgetMilestonesTest` | — |
+| MCI-K11 | ~~One figure, two names~~ — resolved 2026-11-23: the owner chose “Net worth” on Home's card too | Owner answer | — |
+| MCI-K12 | ~~The Follow sheet's brand marks tinted Lucento blue~~ — resolved 2026-11-23: one colour, the text ink, on a neutral tile (the owner's choice; the platforms allow plain black or white) | Owner answer | — |
+| MCI-K13 | Seen by the critic, outside this change: Home's “+0% vs last month” shows a rising arrow; the compact segmented toggle (pinned headers) is 40 dp tall. (Fixed here: the card's label, now “Net worth”, is no longer cut at 200 %, and “Dashboard” stays whole at 130 % on a 360 dp phone) | Critics r2, r3 | Next Home pass |
+| MCI-K14 | No fourth design round: after r3 REVISE 3.5 the owner chose “fix all, then PR”, so the round-3 fixes (card at 360 dp, save messages, year tap, plan-page order, toggle labels, P3s) were checked by recaptures and tests, not by the critic | Studio critic/reports/2026-11-23-month-close-r3-response.md | Owner review of the PR |
+
 ## Security and anti-tampering audit (2026-11-23)
 
 The findings are kept in the private `lucento-studio` repository (`docs/security/2026-11-23/`), not here: this
@@ -120,7 +139,7 @@ Tasks.
 
 | Id | Issue | Evidence | Next step |
 |---|---|---|---|
-| AI-5 | Builds before this change (0.5.16 and older) still say "50 AI questions a day" and call Pro's count "N left today" until they are updated; the server's monthly limit (Free 5, Pro 45) applies to them as soon as `20261123120000_ai_allowance_monthly.sql` runs | Code-only | Release the next build soon after the migration (testers only before launch) |
+| AI-5 | Builds before this change (0.5.17 and older) still say "50 AI questions a day" and call Pro's count "N left today" until they are updated; the server's monthly limit (Free 5, Pro 45) applies to them as soon as `20261123120000_ai_allowance_monthly.sql` runs | Code-only | Release the next build soon after the migration (testers only before launch) |
 | AI-6 | The Pro welcome deck still has its Smarter reading card (now saying each message uses one of your AI questions). With Gemini for Ask only, the owner may prefer to drop the card | Code-only | Owner call |
 | AI-7 | Smarter reading is turned off for everyone without a message (the consent's key moved to `smart_reading_v2`); someone who used it finds messages read on the phone until they turn it on again in Settings | Verified: `SmartReadingConsentTest` (by design, owner: "We turn off Smarter Reading") | Say so in the release notes |
 

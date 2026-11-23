@@ -16,6 +16,7 @@ import com.lucento.app.domain.CategoryKind
 import com.lucento.app.domain.CategorySelection
 import com.lucento.app.domain.Feature
 import com.lucento.app.domain.FeatureSet
+import com.lucento.app.domain.MonthCheckIn
 import com.lucento.app.domain.RecurringSchedule
 import com.lucento.app.domain.Transaction
 import com.lucento.app.domain.Wallet
@@ -157,6 +158,17 @@ class BudgetViewModel(
 
     fun acknowledgeBudgetMonth(month: YearMonth) {
         viewModelScope.launch { runCatching { preferences.setAcknowledgedBudgetMonth(month) } }
+    }
+
+    /**
+     * [month] is planned (the plan page's Done, or its first saved change), so the monthly check-in doesn't ask about it
+     * again. Only the month the check-in asks about next, or an earlier one, is recorded ([MonthCheckIn.countsAsPlanned]).
+     */
+    fun markPlanned(month: YearMonth, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            if (MonthCheckIn.countsAsPlanned(month, uiState.value.today)) runCatching { preferences.setBudgetMonthPlanned(month) }
+            onDone()
+        }
     }
 
     companion object {

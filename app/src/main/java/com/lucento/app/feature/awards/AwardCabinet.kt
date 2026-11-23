@@ -9,18 +9,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,9 +28,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.lucento.app.core.designsystem.component.LucentoBottomSheet
-import com.lucento.app.core.designsystem.component.SheetHeader
-import com.lucento.app.core.designsystem.component.StatusTones
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.domain.Achievement
 import com.lucento.app.domain.Achievements
@@ -44,48 +36,35 @@ import com.lucento.app.domain.ProgressFacts
 /**
  * The award cabinet: every award as a medal on a shelf, two to a shelf. Earned medals are struck gold and replay their
  * ceremony on tap ([onReplay]); the rest wait as outlines with how to earn them, and a count where the award takes
- * several steps. Worked out from the user's records — nothing to keep up and nothing to lose.
+ * several steps. Worked out from the user's records — nothing to keep up and nothing to lose. It sits at the foot of
+ * the Progress page (owner, 2026-11-23), under the month's recap and the year; the page gives it its heading.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AwardsSheet(
+fun AwardCabinet(
     earned: Set<Achievement>,
     facts: ProgressFacts?,
-    onDismiss: () -> Unit,
     onReplay: (Achievement) -> Unit,
+    modifier: Modifier = Modifier,
     /** When the Lucento Pro medal was presented (epoch millis); null before. It stands on its own Membership shelf. */
     proMemberSince: Long? = null,
     onReplayPro: () -> Unit = {},
+    /** A line under an award not yet earned, from the person's own records ("Your first whole month is December."). */
+    notes: Map<Achievement, String> = emptyMap(),
 ) {
-    LucentoBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier
-                .padding(horizontal = Spacing.gutter)
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding() // the last shelf's words clear the navigation bar
-                .padding(bottom = Spacing.lg),
-        ) {
-            SheetHeader(
-                title = "Awards",
-                subtitle = "${earned.size} of ${Achievement.entries.size} earned · from your own records. No streaks, nothing to lose.",
-                icon = Icons.Filled.EmojiEvents,
-                tone = StatusTones.warning,
-                modifier = Modifier.padding(bottom = Spacing.md),
+    Column(modifier) {
+        Achievement.entries.chunked(2).forEach { shelf ->
+            Shelf(shelf, earned, facts, onReplay, notes)
+            Spacer(Modifier.height(Spacing.lg))
+        }
+        // Membership isn't progress, so it isn't counted with the awards above: a shelf of its own.
+        if (proMemberSince != null) {
+            Text(
+                "Membership",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(bottom = Spacing.sm).semantics { heading() },
             )
-            Achievement.entries.chunked(2).forEach { shelf ->
-                Shelf(shelf, earned, facts, onReplay)
-                Spacer(Modifier.height(Spacing.lg))
-            }
-            // Membership isn't progress, so it isn't counted with the awards above: a shelf of its own.
-            if (proMemberSince != null) {
-                Text(
-                    "Membership",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(bottom = Spacing.sm).semantics { heading() },
-                )
-                MembershipShelf(memberSinceLabel(proMemberSince), onReplayPro)
-                Spacer(Modifier.height(Spacing.lg))
-            }
+            MembershipShelf(memberSinceLabel(proMemberSince), onReplayPro)
+            Spacer(Modifier.height(Spacing.lg))
         }
     }
 }
@@ -123,7 +102,14 @@ private fun MembershipShelf(since: String, onReplay: () -> Unit) {
                 Spacer(Modifier.height(Spacing.md))
                 Text("Lucento Pro", style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(Spacing.xxs))
-                Text("Member since $since", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                // Centred like the award cells, also when it wraps at a large text size.
+                Text(
+                    "Member since $since",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = Spacing.xs),
+                )
                 Spacer(Modifier.height(Spacing.xxs))
                 Text(
                     "Joined Lucento Pro. Yours to keep.",
@@ -139,7 +125,13 @@ private fun MembershipShelf(since: String, onReplay: () -> Unit) {
 }
 
 @Composable
-private fun Shelf(awards: List<Achievement>, earned: Set<Achievement>, facts: ProgressFacts?, onReplay: (Achievement) -> Unit) {
+private fun Shelf(
+    awards: List<Achievement>,
+    earned: Set<Achievement>,
+    facts: ProgressFacts?,
+    onReplay: (Achievement) -> Unit,
+    notes: Map<Achievement, String>,
+) {
     Box(Modifier.fillMaxWidth()) {
         // The shelf the medals stand on, just under the discs.
         Box(
@@ -152,7 +144,7 @@ private fun Shelf(awards: List<Achievement>, earned: Set<Achievement>, facts: Pr
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             awards.forEach { a ->
-                AwardCell(a, a in earned, facts?.let { Achievements.progress(a, it) }, onReplay, Modifier.weight(1f))
+                AwardCell(a, a in earned, facts?.let { Achievements.progress(a, it) }, onReplay, notes[a], Modifier.weight(1f))
             }
             if (awards.size == 1) Spacer(Modifier.weight(1f))
         }
@@ -165,6 +157,7 @@ private fun AwardCell(
     earned: Boolean,
     progress: com.lucento.app.domain.AwardProgress?,
     onReplay: (Achievement) -> Unit,
+    note: String?,
     modifier: Modifier = Modifier,
 ) {
     val tap = if (earned) {
@@ -189,7 +182,7 @@ private fun AwardCell(
         Spacer(Modifier.height(Spacing.md))
         Text(
             award.title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleSmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = Spacing.xs),
         )
@@ -210,10 +203,22 @@ private fun AwardCell(
         Spacer(Modifier.height(Spacing.xxs))
         Text(
             if (earned) award.description else award.howTo,
-            style = MaterialTheme.typography.bodySmall,
+            // Balanced lines, so no word is left alone on the last one at large text sizes (design review 2026-11-23).
+            style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = Spacing.xs),
         )
+        if (!earned && note != null) {
+            Spacer(Modifier.height(Spacing.xxs))
+            // Secondary ink, not link blue: it is a fact, not something to tap (critic r3, P3).
+            Text(
+                note,
+                style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = Spacing.xs),
+            )
+        }
     }
 }

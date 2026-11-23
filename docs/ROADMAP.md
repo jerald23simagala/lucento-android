@@ -351,6 +351,19 @@ needs `20261122090000_user_settings.sql` on each project).
 - The Budget tab shows the same two limits and Safe to spend under its hero, with Safe per day. The calculation is
   the tester round's, unchanged (docs/CALCULATIONS.md "Home budget card and the Budget tab").
 
+## Built — Monthly check-in, Progress, Follow Lucento (owner, 2026-11-23, `feature/month-close`)
+- **Monthly check-in** (a tester: some costs aren't the same every month): a Home card from a month's last 3 days to the
+  7th of the next; the plan page is that month's budget with hints (yearly costs due, the same month last year, last
+  month's overspending), "Add something" for one-off amounts, and changes that start as that month's only. The Budget
+  tab plans up to 12 months ahead. Never a notification (that waits for opt-in reminders).
+- **Progress** replaces the awards sheet (a tester: awards were an outlier, a reward page with no function): a month's
+  recap from the app's own calculators, the 12-month year view (Pro, like Insights' 12 months) and the award cabinet with
+  Steady Month, Goal Reached and Loan Cleared (past progress recorded quietly on update).
+- **Follow Lucento** in the profile menu: Facebook, Instagram, TikTok and YouTube, opened by a tap; the Community group
+  stays for questions and ideas.
+- docs/CALCULATIONS.md "Monthly check-in" and "Progress recap"; no Room or Supabase change (two ledger settings in the
+  account document).
+
 ## Built — AI allowance per month; Gemini is for Ask Lucento (owner, 2026-11-23, `feature/ai-allowance-monthly`)
 - Owner: $2 a month of AI per Pro account was too much against the subscription; "Gemini is generally for Ask use and
   not for simple add transaction work". Every plan now runs per calendar month: **Free 5, Pro 45** (was 10 a month and

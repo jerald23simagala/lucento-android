@@ -404,6 +404,15 @@ data class HomeUiState(
     val milestonesAlsoNew: List<com.lucento.app.domain.Achievement> = emptyList(),
     /** Part D: first time milestones exist on this install — record what's already earned without a fuss. */
     val needsMilestoneBaseline: Boolean = false,
+    /** Awards an update added that this phone hasn't recorded yet: what they already earn is recorded quietly. */
+    val awardsNewHere: Set<com.lucento.app.domain.Achievement> = emptySet(),
+    /**
+     * The monthly check-in card (docs/CALCULATIONS.md "Monthly check-in"): what it offers today, before the Shared Space
+     * rule (a phone that can't change the budget isn't asked to plan). Null outside its days, or when nothing is left.
+     */
+    val checkIn: com.lucento.app.domain.MonthCheckIn.Card? = null,
+    /** The card's one line about the budget: the finished month it recaps. Main currency; null without a budget then. */
+    val checkInBudget: BudgetPlan? = null,
     /** When the Lucento Pro medal was presented (epoch millis), for the cabinet's Membership shelf; null before. */
     val proMemberSince: Long? = null,
     /** Expenses and income recorded so far (internal movements excluded). */
@@ -412,7 +421,7 @@ data class HomeUiState(
     val showAddSpotlight: Boolean = false,
     /** Wallet card: balances at the end of [month] (today's for the current month) in [focusCurrency]. */
     val monthComposition: NetWorthComposition? = null,
-    /** Wallet card: net wallet balance at the end of last month and [month] (oldest first), for "vs last month". */
+    /** Wallet card: net worth at the end of last month and [month] (oldest first), for "vs last month". */
     val balanceHistory: List<com.lucento.app.domain.MonthBalance> = emptyList(),
     /** Change across [balanceHistory] in whole percent, only when meaningful (see BalanceHistory.trendPercent). */
     val balanceTrend: Int? = null,
@@ -485,6 +494,11 @@ object HomeStateBuilder {
         cloudStatus: CloudStatus = CloudStatus.LOCAL,
         visitedInsights: Boolean = false,
         secured: Boolean = false,
+        /** The monthly check-in: whether it may show at all (onboarding and the guided setup are done). */
+        checkInAllowed: Boolean = false,
+        /** The latest month planned or dismissed, and the latest recap seen ([UserPreferences.budgetMonthPlanned]). */
+        checkInPlanned: YearMonth? = null,
+        checkInRecapSeen: YearMonth? = null,
     ): HomeUiState {
         // Multicurrency (docs/CALCULATIONS.md "Exchange rates"): every figure below is in the main currency — wallets in
         // other currencies at their carrying value, their movements at their own value. Lists of what was recorded
@@ -513,7 +527,21 @@ object HomeStateBuilder {
             .takeWhile { !it.isBefore(earliest) }
             .take(MAX_SELECTABLE_MONTHS)
             .toList()
-        val awardFacts = com.lucento.app.domain.Achievements.facts(all, wallets, categories, budgets, goals + archivedGoals, today, visitedInsights, secured)
+        val awardFacts = com.lucento.app.domain.Achievements.facts(
+            all, wallets, categories, budgets, goals + archivedGoals, today, visitedInsights, secured,
+            contributions = contributions,
+            ledger = ledger,
+            primaryCurrency = primaryCurrency,
+        )
+        val checkIn = if (!checkInAllowed) null else com.lucento.app.domain.MonthCheckIn.card(
+            today = today,
+            plannedThrough = checkInPlanned,
+            recapSeenThrough = checkInRecapSeen,
+            canPlan = budgetsOn && com.lucento.app.domain.MonthCheckIn.budgetSettled(budgets, categories, today),
+        ) { com.lucento.app.domain.MonthCheckIn.hasRecords(all, it) }
+        val checkInBudget = checkIn?.recap?.takeIf { budgetsOn }?.let { month ->
+            BudgetPlanner.plan(categories, budgets, recorded, focus, month).takeIf { it.hasBudget }
+        }
 
         return HomeUiState(
             loading = false,
@@ -568,6 +596,8 @@ object HomeStateBuilder {
                 limit = SCHEDULED_LIMIT,
             ),
             recentInMonth = recentInMonth,
+            checkIn = checkIn,
+            checkInBudget = checkInBudget,
             cardDues = if (shown != current) emptyList() else com.lucento.app.domain.CreditCardMath.dues(wallets, all, today, shown.atEndOfMonth()),
             cardDuesSoon = com.lucento.app.domain.CreditCardMath.dues(wallets, all, today, today.plusDays(RecurringMath.DUE_SOON_DAYS)),
             recentTransfers = (recentActivity(all, limit = RECENT_LIMIT) + recentInMonth).mapNotNull { it.transferGroup }.toSet().let { groups ->

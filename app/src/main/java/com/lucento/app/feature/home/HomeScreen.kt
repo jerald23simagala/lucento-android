@@ -257,11 +257,18 @@ data class HomeActions(
     val onSetSpendable: (Long, Boolean) -> Unit = { _, _ -> },
     /** Opens a wallet's editor on the dashboard (a card's counted credit, from the spending money sheet). */
     val onEditWallet: (com.lucento.app.domain.Wallet) -> Unit = {},
+    /**
+     * The Progress page (owner, 2026-11-23): a month's recap (null: the page's own default month), and with true, scrolled
+     * to the awards.
+     */
+    val onOpenProgress: (YearMonth?, Boolean) -> Unit = { _, _ -> },
+    /** The monthly check-in: plan this month's budget (or next month's, in the last days of this one). */
+    val onPlanMonth: (YearMonth) -> Unit = {},
 )
 
 /**
  * The dashboard, top to bottom: a pinned header ("Dashboard", sync status, payments bell, profile) and month selector;
- * the net wallet balance card; the month's budget with its top two categories; shortcuts; getting started (only until
+ * the net worth card; the month's budget with its top two categories; shortcuts; getting started (only until
  * the basics are in place); upcoming scheduled transactions; recent transactions. Every month-dependent section follows
  * the one selected month. Every figure comes from [HomeUiState].
  *
@@ -303,12 +310,10 @@ private fun HomeDashboard(
     // Add wallet: the editor on Cash, the type sheet when money wallets are full, or the Pro dialog (owner, 2026-11-18).
     val addWallet = com.lucento.app.feature.wallets.rememberAddWallet(planWallets, state.primaryCurrency) { editingWallet = it }
     var showSync by remember { mutableStateOf(false) }
-    var showAwards by remember { mutableStateOf(false) }
+    val messageHosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
     // The award being presented. Saved, so a ceremony isn't lost to rotation after its award was acknowledged.
     var ceremony by rememberSaveable { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
     var ceremonyAlso by rememberSaveable { mutableStateOf<List<com.lucento.app.domain.Achievement>>(emptyList()) }
-    var replaying by remember { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
-    var replayingPro by remember { mutableStateOf(false) }
 
     // Part D: milestones. The first time they exist, what's already earned is recorded quietly; after that each new
     // one is acknowledged once — this runs only when the stored records change, i.e. after a committed write.
@@ -316,15 +321,19 @@ private fun HomeDashboard(
         if (state.loading) return@LaunchedEffect
         if (state.needsMilestoneBaseline) viewModel.baselineMilestones(state.earned)
     }
+    // Awards an update added: what they already earn is recorded quietly, so the update brings no ceremony for the past.
+    LaunchedEffect(state.loading, state.needsMilestoneBaseline, state.awardsNewHere, state.earned) {
+        if (state.loading || state.needsMilestoneBaseline || state.awardsNewHere.isEmpty()) return@LaunchedEffect
+        viewModel.recordNewAwardsQuietly(state.earned intersect state.awardsNewHere)
+    }
     // Anyone who has recorded something doesn't need the + spotlight (also clears it for people who record from elsewhere).
     LaunchedEffect(state.loading, state.recordedCount > 0) {
         if (!state.loading && state.recordedCount > 0) viewModel.dismissAddSpotlight()
     }
-    // One ceremony for whatever was earned together; anything earned while one is open (or while the cabinet is, where
-    // the person is already looking at their awards) is presented after it closes.
-    LaunchedEffect(state.milestoneToShow, ceremony == null, showAwards) {
+    // One ceremony for whatever was earned together; anything earned while one is open is presented after it closes.
+    LaunchedEffect(state.milestoneToShow, ceremony == null) {
         val award = state.milestoneToShow ?: return@LaunchedEffect
-        if (ceremony != null || showAwards) return@LaunchedEffect
+        if (ceremony != null) return@LaunchedEffect
         ceremony = award
         ceremonyAlso = ArrayList(state.milestonesAlsoNew)
         viewModel.acknowledgeMilestones(listOf(award) + state.milestonesAlsoNew)
@@ -409,8 +418,17 @@ private fun HomeDashboard(
                     onTurnOn = viewModel::turnOn,
                     onHideOffers = viewModel::hideModuleOffers,
                     onAddWallet = addWallet,
-                    onOpenMilestones = { showAwards = true },
+                    onOpenMilestones = { actions.onOpenProgress(null, false) },
                     onDismissSpotlight = viewModel::dismissAddSpotlight,
+                    onDismissCheckIn = { card ->
+                        // A quiet close with a way back (design review 2026-11-23): the card returns with Undo. The
+                        // message names what stops (critic r2, P3-8).
+                        viewModel.dismissCheckIn(card) { undo -> messageHosts?.top?.show(checkInHiddenMessage(card), "Undo", undo) }
+                    },
+                    onSeeRecap = { month ->
+                        viewModel.markRecapSeen(month)
+                        actions.onOpenProgress(month, false)
+                    },
                 )
             }
         }
@@ -443,26 +461,6 @@ private fun HomeDashboard(
             mainCurrency = state.primaryCurrency.takeIf { planWallets != null },
         )
     }
-    if (showAwards) {
-        com.lucento.app.feature.awards.AwardsSheet(
-            earned = state.earned,
-            facts = state.awardFacts,
-            onDismiss = { showAwards = false },
-            onReplay = { replaying = it },
-            proMemberSince = state.proMemberSince,
-            onReplayPro = { replayingPro = true },
-        )
-    }
-    replaying?.let { award ->
-        com.lucento.app.feature.awards.AwardCeremony(award, earnedCount = state.earned.size, onDismiss = { replaying = null })
-    }
-    if (replayingPro) {
-        com.lucento.app.feature.awards.ProMedalCeremony(
-            onDismiss = { replayingPro = false },
-            replay = true,
-            memberSince = state.proMemberSince?.let { com.lucento.app.feature.awards.memberSinceLabel(it) },
-        )
-    }
     ceremony?.let { award ->
         com.lucento.app.feature.awards.AwardCeremony(
             achievement = award,
@@ -471,7 +469,7 @@ private fun HomeDashboard(
             onDismiss = { ceremony = null },
             onSeeAll = {
                 ceremony = null
-                showAwards = true
+                actions.onOpenProgress(null, true)
             },
         )
     }
@@ -837,8 +835,11 @@ private fun SyncStatusChip(status: CloudStatus, details: SyncDetails, onClick: (
                 0f
             }
             Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = angle })
-            // At large text sizes the icon alone keeps the header readable; the status is still announced in full.
-            if (!largeText()) {
+            // At large text sizes, or at 130 % on a narrow phone, the icon alone keeps "Dashboard" whole (critic r3); the
+            // status is still announced in full.
+            val iconOnly = largeText() ||
+                (LocalDensity.current.fontScale >= 1.3f && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 400)
+            if (!iconOnly) {
                 Spacer(Modifier.width(Spacing.xs))
                 Text(label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
             }
@@ -1041,6 +1042,8 @@ private fun Overview(
     onAddWallet: () -> Unit = {},
     onOpenMilestones: () -> Unit = {},
     onDismissSpotlight: () -> Unit = {},
+    onDismissCheckIn: (com.lucento.app.domain.MonthCheckIn.Card) -> Unit = {},
+    onSeeRecap: (YearMonth) -> Unit = {},
 ) {
     val f = state.features
     val canEdit = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
@@ -1060,6 +1063,24 @@ private fun Overview(
         }
         if (state.showAddSpotlight) {
             AddSpotlightCard(onRecord = { actions.onAddTransaction(null) }, onDismiss = onDismissSpotlight)
+        }
+        // The monthly check-in, on the month it's about. A Partner's phone isn't asked to plan: the Owner sets the budget.
+        val checkIn = state.checkIn?.takeIf { state.isCurrentMonth }?.let { card ->
+            when {
+                canEdit -> card
+                card.recap != null -> com.lucento.app.domain.MonthCheckIn.Card(plan = null, recap = card.recap)
+                else -> null
+            }
+        }
+        if (checkIn != null) {
+            MonthCheckInCard(
+                card = checkIn,
+                today = state.today,
+                budget = state.checkInBudget,
+                onPlan = actions.onPlanMonth,
+                onRecap = onSeeRecap,
+                onDismiss = { onDismissCheckIn(checkIn) },
+            )
         }
 
         state.monthComposition?.let { WalletBalanceCard(state, it, actions.onOpenWallets) }
@@ -1251,7 +1272,7 @@ private fun quickLinkName(feature: Feature): String = when (feature) {
     else -> feature.title
 }
 
-// ------------------------------------------------------------------ Dashboard: net wallet balance card
+// ------------------------------------------------------------------ Dashboard: net worth card
 
 // The card's face (Figma "Net wallet balance") comes from the theme (LucentoTheme.spec.balanceCard): the same in light
 // and dark mode, like a physical card.
@@ -1268,7 +1289,8 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
     val spec = LucentoTheme.spec
     val face = spec.balanceCard
     val owed = -composition.totalLiabilities
-    val label = if (state.isCurrentMonth) "Net Wallet Balance" else "Net Wallet Balance · end of ${monthLabel(state.month)}"
+    // One name for the figure everywhere: Progress, Insights, Reports and Ask say "Net worth" too (owner, 2026-11-23).
+    val label = if (state.isCurrentMonth) "Net worth" else "Net worth · end of ${monthLabel(state.month)}"
     val history = state.balanceHistory
     val netWorthSpoken = spokenAmount(composition.netWorth, signed = true)
     val assetsSpoken = spokenAmount(composition.totalAssets, signed = true)
@@ -1330,11 +1352,12 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                         // Label and (i) together on the left; the brand stays on the right.
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                             // Caps like every other card's overline; TalkBack reads the spoken summary instead.
+                            // Two lines at large text sizes, so "NET WORTH" is never cut on a narrow phone (critic r3).
                             Text(
                                 label.uppercase(Locale.getDefault()),
                                 style = Hierarchy.cardOverline,
                                 color = face.inkMuted,
-                                maxLines = 1,
+                                maxLines = if (largeText()) 2 else 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics { contentDescription = spoken },
                             )
@@ -1345,7 +1368,7 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                         Spacer(Modifier.width(5.dp))
                         Image(painterResource(com.lucento.app.R.drawable.lucento_wordmark_dark), contentDescription = null, modifier = Modifier.height(15.dp))
                     }
-                    // Right under its label: one reading, "Net Wallet Balance −$2,339.35".
+                    // Right under its label: one reading, "Net worth −$2,339.35".
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MoneyText(
                             money = composition.netWorth,
@@ -1417,7 +1440,7 @@ private fun DrawScope.drawCardSurface() {
     )
 }
 
-/** What net wallet balance means, for the (i) beside it. */
+/** What net worth means, for the (i) beside it. */
 internal const val BALANCE_INFO = "What you have in your wallets minus what you owe on cards and loans. Wallets in other " +
     "currencies count at their value in your main currency, from the rates saved with their movements. A wallet with no " +
     "rate yet isn’t included."
@@ -1436,7 +1459,7 @@ private fun BalanceInfo() {
         state = tip,
     ) {
         IconButton(onClick = { scope.launch { tip.show() } }, modifier = Modifier.size(Sizes.minTouch)) {
-            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net wallet balance means", tint = LucentoTheme.spec.balanceCard.inkMuted, modifier = Modifier.size(14.dp))
+            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net worth means", tint = LucentoTheme.spec.balanceCard.inkMuted, modifier = Modifier.size(14.dp))
         }
     }
 }
@@ -1823,7 +1846,8 @@ private fun ShortcutRow(
     val items = listOfNotNull(
         module(Feature.SAVINGS_GOALS, tones.goals, actions.onOpenGoals),
         module(Feature.INSIGHTS, tones.insights, actions.onOpenInsights),
-        Shortcut("Awards", "Awards", Icons.Outlined.EmojiEvents, tones.awards, onOpenMilestones),
+        // The awards live on Progress now, with each month's recap and the year (owner, 2026-11-23).
+        Shortcut("Progress", "Progress", Icons.Outlined.EmojiEvents, tones.awards, onOpenMilestones),
         module(Feature.DEBTS_LOANS, tones.debts, actions.onOpenDebts),
         module(Feature.RECURRING, tones.scheduled) { actions.onOpenRecurring(null) },
     )

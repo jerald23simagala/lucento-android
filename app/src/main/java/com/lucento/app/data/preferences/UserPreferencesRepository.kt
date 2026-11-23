@@ -81,6 +81,13 @@ data class UserPreferences(
     val features: FeatureSet = FeatureSet.ALL,
     /** Last month whose kept budget was acknowledged ("2026-09"), so the moment is shown only once. */
     val acknowledgedBudgetMonth: java.time.YearMonth? = null,
+    /**
+     * The monthly check-in (owner, 2026-11-23): the latest month planned, or whose check-in was dismissed. Home never asks
+     * about a month up to it again. Follows the account ([AccountSetting.BUDGET_MONTH_PLANNED]); never goes back.
+     */
+    val budgetMonthPlanned: java.time.YearMonth? = null,
+    /** The latest finished month whose recap was seen, or dismissed, from the check-in ([AccountSetting.RECAP_MONTH_SEEN]). */
+    val recapMonthSeen: java.time.YearMonth? = null,
     /** Optional name shown on the profile button and menu; never required. Follows the account ([AccountSetting.DISPLAY_NAME]). */
     val displayName: String? = null,
     /**
@@ -161,6 +168,11 @@ data class UserPreferences(
     val spendTypes: Set<com.lucento.app.domain.SpendType> = emptySet(),
     /** Milestones already acknowledged (Part D); null until first baselined, so older installs aren't congratulated in bulk. */
     val achievementsSeen: Set<com.lucento.app.domain.Achievement>? = null,
+    /**
+     * The award keys this phone knew when it last recorded its awards; null before it kept the record. Awards an update
+     * adds are recorded quietly for the past ([com.lucento.app.domain.Achievements.newToThisPhone]). Local only.
+     */
+    val achievementsKnown: Set<String>? = null,
     /** The user has opened Insights at least once (the Financial Explorer milestone). Local only. */
     val insightsVisited: Boolean = false,
     /** App lock has been turned on at some point (the Secured award). Local only; never cleared by turning lock off. */
@@ -214,6 +226,9 @@ data class BackupCustomisations(
     val moduleOffersHidden: Boolean?,
     val fxRatesOnline: Boolean?,
 )
+
+/** The monthly check-in's two months as stored ("yyyy-MM", or none), kept by "Not this month" for its Undo. */
+data class CheckInMarks(val planned: String?, val recapSeen: String?)
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = UserPreferencesRepository.DATA_STORE_NAME)
 
@@ -281,6 +296,8 @@ class UserPreferencesRepository internal constructor(
         val primaryCurrency = stringPreferencesKey("primary_currency")
         val enabledFeatures = stringSetPreferencesKey("enabled_features")
         val acknowledgedBudgetMonth = stringPreferencesKey("acknowledged_budget_month")
+        val budgetMonthPlanned = stringPreferencesKey("budget_month_planned")
+        val recapMonthSeen = stringPreferencesKey("recap_month_seen")
         val displayName = stringPreferencesKey("display_name")
         val categorySetupDone = booleanPreferencesKey("category_setup_done")
         val defaultWalletId = longPreferencesKey("default_wallet_id")
@@ -323,6 +340,7 @@ class UserPreferencesRepository internal constructor(
         val moduleOffersHidden = booleanPreferencesKey("module_offers_hidden")
         val spendTypes = stringSetPreferencesKey("spend_types")
         val achievementsSeen = stringSetPreferencesKey("achievements_seen")
+        val achievementsKnown = stringSetPreferencesKey("achievements_known")
         val insightsVisited = booleanPreferencesKey("insights_visited")
         val appLockUsed = booleanPreferencesKey("app_lock_used")
         val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
@@ -376,6 +394,8 @@ class UserPreferencesRepository internal constructor(
                     ?: FeatureSet.ALL,
                 acknowledgedBudgetMonth = p[Keys.acknowledgedBudgetMonth]
                     ?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
+                budgetMonthPlanned = p[Keys.budgetMonthPlanned]?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
+                recapMonthSeen = p[Keys.recapMonthSeen]?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
                 displayName = p[Keys.displayName]?.trim()?.takeIf { it.isNotEmpty() },
                 categorySetupDone = p[Keys.categorySetupDone] ?: false,
                 defaultWalletId = p[Keys.defaultWalletId],
@@ -396,6 +416,7 @@ class UserPreferencesRepository internal constructor(
                 moduleOffersHidden = p[Keys.moduleOffersHidden] ?: false,
                 spendTypes = com.lucento.app.domain.SpendType.fromKeys(p[Keys.spendTypes].orEmpty()),
                 achievementsSeen = p[Keys.achievementsSeen]?.mapNotNull(com.lucento.app.domain.Achievement::fromKey)?.toSet(),
+                achievementsKnown = p[Keys.achievementsKnown],
                 insightsVisited = p[Keys.insightsVisited] ?: false,
                 // Installs that turned lock on before this flag existed count too.
                 appLockUsed = p[Keys.appLockUsed] ?: (p[Keys.appLock] ?: false),
@@ -703,6 +724,38 @@ class UserPreferencesRepository internal constructor(
         trackedEdit { it[Keys.acknowledgedBudgetMonth] = month.toString() }
     }
 
+    /** The monthly check-in planned [month] (or it was dismissed). Never moves back to an earlier month. */
+    suspend fun setBudgetMonthPlanned(month: java.time.YearMonth) {
+        trackedEdit { laterMonth(it, Keys.budgetMonthPlanned, month) }
+    }
+
+    /** [month]'s recap was seen from the check-in, or dismissed. Never moves back to an earlier month. */
+    suspend fun setRecapMonthSeen(month: java.time.YearMonth) {
+        trackedEdit { laterMonth(it, Keys.recapMonthSeen, month) }
+    }
+
+    /**
+     * "Not this month" on the check-in card: both of what it offered, in one change. Returns the months that were there,
+     * for Undo ([restoreMonthCheckIn]).
+     */
+    suspend fun dismissMonthCheckIn(plan: java.time.YearMonth?, recap: java.time.YearMonth?): CheckInMarks {
+        var before = CheckInMarks(null, null)
+        trackedEdit { p ->
+            before = CheckInMarks(p[Keys.budgetMonthPlanned], p[Keys.recapMonthSeen])
+            plan?.let { laterMonth(p, Keys.budgetMonthPlanned, it) }
+            recap?.let { laterMonth(p, Keys.recapMonthSeen, it) }
+        }
+        return before
+    }
+
+    /** Undo of [dismissMonthCheckIn]: the months exactly as they were (the one place they may move back). */
+    suspend fun restoreMonthCheckIn(marks: CheckInMarks) {
+        trackedEdit { p ->
+            if (marks.planned == null) p.remove(Keys.budgetMonthPlanned) else p[Keys.budgetMonthPlanned] = marks.planned
+            if (marks.recapSeen == null) p.remove(Keys.recapMonthSeen) else p[Keys.recapMonthSeen] = marks.recapSeen
+        }
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         trackedEdit { it[Keys.themeMode] = mode.name }
     }
@@ -715,6 +768,17 @@ class UserPreferencesRepository internal constructor(
     suspend fun acknowledgeAchievements(achievements: Set<com.lucento.app.domain.Achievement>) {
         trackedEdit {
             it[Keys.achievementsSeen] = it[Keys.achievementsSeen].orEmpty() + achievements.map { a -> a.key }
+        }
+    }
+
+    /**
+     * Records quietly what is already [earned] among the awards this phone didn't know (the first run, or an update that
+     * added awards), and that it now knows every award of this build. Nothing is presented for them.
+     */
+    suspend fun recordAwardsQuietly(earned: Set<com.lucento.app.domain.Achievement>) {
+        trackedEdit {
+            it[Keys.achievementsSeen] = it[Keys.achievementsSeen].orEmpty() + earned.map { a -> a.key }
+            it[Keys.achievementsKnown] = it[Keys.achievementsKnown].orEmpty() + com.lucento.app.domain.Achievement.entries.map { a -> a.key }
         }
     }
 
@@ -798,6 +862,7 @@ class UserPreferencesRepository internal constructor(
             p.remove(Keys.guideStep)
             p.remove(Keys.spendTypes)
             p.remove(Keys.achievementsSeen)
+            p.remove(Keys.achievementsKnown)
             p.remove(Keys.insightsVisited)
             p.remove(Keys.appLockUsed)
             // Lucento Pro's welcome and medal belong to the person, like the name: the next account starts without them.
@@ -810,6 +875,8 @@ class UserPreferencesRepository internal constructor(
             p.remove(Keys.profilePhotoVersion)
             p.remove(Keys.profilePhotoChoice)
             p.remove(Keys.acknowledgedBudgetMonth)
+            p.remove(Keys.budgetMonthPlanned)
+            p.remove(Keys.recapMonthSeen)
             p[Keys.smartReading] = false
             forgetAskAi(p)
             forgetAccountSettingsSync(p)
@@ -853,7 +920,10 @@ class UserPreferencesRepository internal constructor(
             p.remove(Keys.guideStep)
             p.remove(Keys.defaultWalletId)
             p.remove(Keys.acknowledgedBudgetMonth)
+            p.remove(Keys.budgetMonthPlanned)
+            p.remove(Keys.recapMonthSeen)
             p.remove(Keys.achievementsSeen)
+            p.remove(Keys.achievementsKnown)
             forgetSettingsSync(p, AccountSetting.entries.filter { it.ledger })
         }
         const val MAX_DISPLAY_NAME = 40
@@ -876,6 +946,8 @@ class UserPreferencesRepository internal constructor(
                 AccountSetting.FX_RATES_ONLINE -> p[Keys.fxRatesOnline]?.let(::JsonPrimitive)
                 AccountSetting.DEFAULT_WALLET -> p[Keys.defaultWalletId]?.let(defaultWallet)
                 AccountSetting.BUDGET_MONTH_SEEN -> p[Keys.acknowledgedBudgetMonth]?.let(::JsonPrimitive)
+                AccountSetting.BUDGET_MONTH_PLANNED -> p[Keys.budgetMonthPlanned]?.let(::JsonPrimitive)
+                AccountSetting.RECAP_MONTH_SEEN -> p[Keys.recapMonthSeen]?.let(::JsonPrimitive)
             }
 
         /** What this phone would put in the account's document for [setting]; a damaged stored value is never sent. */
@@ -958,6 +1030,17 @@ class UserPreferencesRepository internal constructor(
                     val seen = p[Keys.acknowledgedBudgetMonth]
                     if (seen != null && (text == null || text < seen)) return false
                     put(Keys.acknowledgedBudgetMonth, text)
+                }
+                // The check-in's months, like the budget moment: an earlier month never asks again about a later one.
+                AccountSetting.BUDGET_MONTH_PLANNED -> {
+                    val planned = p[Keys.budgetMonthPlanned]
+                    if (planned != null && (text == null || text < planned)) return false
+                    put(Keys.budgetMonthPlanned, text)
+                }
+                AccountSetting.RECAP_MONTH_SEEN -> {
+                    val seen = p[Keys.recapMonthSeen]
+                    if (seen != null && (text == null || text < seen)) return false
+                    put(Keys.recapMonthSeen, text)
                 }
             }
             return true
@@ -1168,6 +1251,13 @@ class UserPreferencesRepository internal constructor(
                 ?.let { putEffective(Keys.walletsViewMode, it.key, WalletsViewMode.CARDS.key) }
             settings.moduleOffersHidden?.let { putEffective(Keys.moduleOffersHidden, it, false) }
             settings.fxRatesOnline?.let { putEffective(Keys.fxRatesOnline, it, true) }
+        }
+
+        /** Writes [month] to [key] unless a later month is already there ("yyyy-MM" sorts as text). */
+        internal fun laterMonth(p: MutablePreferences, key: Preferences.Key<String>, month: java.time.YearMonth) {
+            val text = month.toString()
+            val stored = p[key]
+            if (stored == null || stored < text) p[key] = text
         }
 
         /** The display name as [UserPreferencesRepository.setDisplayName] stores it. */

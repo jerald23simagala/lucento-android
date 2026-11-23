@@ -80,6 +80,22 @@ The plan (work in order, sizes, console steps) is in the private `lucento-studio
 (`docs/security/2026-11-23/IMPLEMENTATION_PLAN.md`), because this repository is public. Owner steps are in Mission
 Control › Tasks.
 
+## Monthly check-in, Progress, Follow Lucento — follow-ups (2026-11-23, `feature/month-close`)
+
+- **MCI-N1 Phone test at a real turn of the month** (owner, on 0.5.17: Mission Control **OT-59**, 28 Nov – 7 Dec) (from the 28th to the 7th), with a budget at least two weeks old:
+  the card appears; Plan December → the plan page → Done hides it and says "December is planned"; See November opens
+  Progress on November; Not this month hides it, and on a second phone after a sync; a Partner's phone gets only the
+  recap; the Budget tab steps into next month and back.
+- **MCI-N2 Opt-in reminder** for the check-in, together with bill reminders: the app's first `POST_NOTIFICATIONS`
+  (CI's release permission allow-list), a Settings switch, the Privacy Policy (local only), docs/QUALITY.md.
+- **MCI-N3 A switch to turn the card off**, when backup schema 7 comes (a new field needs the next `BackupMigrations`
+  step; older builds refuse newer files). Until then "Not this month" is the way.
+- **MCI-N4 Labels for one-off amounts** ("Mia's birthday"): a new table, never new columns on `budgets` (the same rule as
+  custom budget periods below).
+- **MCI-N5 Owner: the Facebook Page's username** `lucentoapp` (Mission Control **OT-60**); then update `LucentoLinks.FOLLOW` and lucento-website
+  `src/data/site.ts` together (both use `profile.php?id=61596187720039` until then, which keeps working).
+- **MCI-N6 Custom budget periods** (below): the check-in then follows the period's start rather than the 1st.
+
 ## Settings that follow the account — follow-ups (2026-11-22, PR #130 merged as `96e6287` on 2026-11-23)
 
 Tester feedback: sync restored the records but not the settings and customisations, "so restoring means setting up

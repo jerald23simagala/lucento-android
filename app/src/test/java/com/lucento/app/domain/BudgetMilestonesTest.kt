@@ -57,6 +57,34 @@ class BudgetMilestonesTest {
         assertNull(ack(budgets.map { it.copy(createdOn = null) }, listOf(spend(1, "2026-09-10"))))
     }
 
+    @Test fun anAmountSetWhilePlanningTheMonthCounts() {
+        // The budget began in August; Food raised from ₱60 to ₱80 for September only, on the 3rd (the check-in runs to the
+        // 7th). ₱110 against ₱120 is within, as the Budget tab and the recap say (critic r2, P1-3).
+        val planned = budgets + Budget(3, 4, Money(8_000, "PHP"), createdOn = LocalDate.parse("2026-09-03"), month = YearMonth.of(2026, 9))
+        val txs = listOf(spend(7_000, "2026-09-10"), spend(4_000, "2026-09-11", category = 5))
+        assertEquals(YearMonth.of(2026, 9), ack(planned, txs)?.month)
+        assertNull(ack(budgets, txs))
+    }
+
+    @Test fun aBudgetThatBeganAfterTheFirstNeverCountsForThatMonth() {
+        val late = budgets.map { it.copy(createdOn = LocalDate.parse("2026-09-10")) }
+        assertNull(ack(late, listOf(spend(1, "2026-09-12"))))
+        // A legacy "everything" row from August doesn't start the budget either.
+        val legacy = Budget(9, null, Money(10_000, "PHP"), createdOn = created)
+        assertNull(ack(late + legacy, listOf(spend(1, "2026-09-12"))))
+    }
+
+    @Test fun theFirstWholeMonthFollowsTheFirstAmount() {
+        // Set on 15 August: September is the first month with a budget from its 1st.
+        assertEquals(YearMonth.of(2026, 9), BudgetMilestones.firstWholeMonth(budgets, "PHP"))
+        // Set on a 1st, that month counts.
+        assertEquals(YearMonth.of(2026, 8), BudgetMilestones.firstWholeMonth(budgets.map { it.copy(createdOn = LocalDate.parse("2026-08-01")) }, "PHP"))
+        // Another currency, no amounts, or an amount without a date: nothing to say.
+        assertNull(BudgetMilestones.firstWholeMonth(budgets, "USD"))
+        assertNull(BudgetMilestones.firstWholeMonth(emptyList(), "PHP"))
+        assertNull(BudgetMilestones.firstWholeMonth(budgets + Budget(3, 4, Money(1_000, "PHP")), "PHP"))
+    }
+
     @Test fun foreignWalletSpendingCountsTowardTheMonthAtItsOwnValue() {
         // Audit D2 (2026-11-16): ₱90 in pesos + ¥100 worth ₱38 = ₱128 against ₱100. Over, so never celebrated
         // (leaving the yen out read ₱90 and celebrated it).

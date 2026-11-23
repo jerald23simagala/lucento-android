@@ -22,7 +22,9 @@ The stable id is the row's `client_uuid` (field name `id` in the file). Room's n
 foreign keys in the file are the parent's stable id.
 
 Not in the file: auth tokens, sessions, the Supabase key, the sync cursor, the synced account id, crash-report and
-usage preferences, the one-time local-data notice, `dirty` / `synced_at` / `base_revision`, and goal photo files.
+usage preferences, the one-time local-data notice, the monthly check-in's two months (they follow the account in sync,
+docs/SYNC.md, but like the notices they are only about which card to show this month), which awards this phone already
+knows (`achievements_known`), `dirty` / `synced_at` / `base_revision`, and goal photo files.
 Each phone also keeps for itself online voice, Ask Lucento's AI answers (on or off, and the agreement to what they
 send), app lock, hiding Lucento in recent apps and hidden amounts. A custom goal photo stays on the phone that took it. Unknown fields, including anything
 named like a token, make the file invalid.

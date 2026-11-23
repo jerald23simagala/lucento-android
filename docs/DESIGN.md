@@ -294,7 +294,8 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
 (calendar icon, "November 2026", ▾; this month back to the first month with data). Top to bottom:
 1. **First-run cards** (new users only): "Record your first transaction" spotlight (also rings the dock's + until the
    first entry; the pulse stops under reduced motion) and **Getting started** (x of 3 done). Both disappear once used.
-2. **Net Wallet Balance card**: an ID-1-proportioned blue card (theme-independent, like a physical card) with a
+2. **Net worth card** (labelled "Net Wallet Balance" until 2026-11-23, when the owner chose one name with Progress,
+   Insights, Reports and Ask): an ID-1-proportioned blue card (theme-independent, like a physical card) with a
    guilloché texture, the Lucento mark, a decorative gold chip and a contactless glyph; the signed balance (info
    tooltip explains assets − owed), "vs last month" mini-bars with a % only when comparable (docs/CALCULATIONS.md),
    then **Assets** (everything held; "Wallets" until the tester round of 2026-11-18) and **Debt & Loans** (signed, −) figures. Empty: mascot on the left with a short prompt.
