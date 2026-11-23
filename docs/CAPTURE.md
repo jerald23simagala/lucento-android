@@ -37,7 +37,11 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
   "paid my card" → transfer). Otherwise the matched category's kind, then the previous clause, then the type hint
   (e.g. opened from a wallet's "Income"), then expense. Transfers stay transfers (two linked legs, never spending).
 - **Category**: the user's own category names first, then keywords per icon key, specific before general ("coffee" →
-  "Cafes and coffee" if present, else "Restaurants"/"Dining"). No match → the row asks for one ("Choose a category"):
+  "Cafes and coffee" if present, else "Restaurants"/"Dining"). Then, as for scans (owner, 2026-11-23: Gemini is for Ask
+  Lucento, so the phone should know what scans know), the business the row names: the person's usual category for it,
+  learned from their own recent entries (`MerchantMemory`: chosen at least twice and for most of them), else the
+  merchant dictionary's ("Jollibee 285" → dining, "Meralco" → utilities; `MerchantRecognizer`, `CategoryIntents`; never
+  for income). No match → the row asks for one ("Choose a category"):
   every income and expense needs a category before the batch can be saved (owner, 2026-11-04); transfers have none.
   Categories are never created silently.
 - **Date**: today, yesterday, N days ago, weekdays, "October 12", "12 Oct 2026". One date in a message applies to all

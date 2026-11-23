@@ -60,6 +60,14 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Composer — on-device reading, next (2026-11-23, after `feature/composer-merchant-categories`)
+
+- What's left between the phone and Gemini on the test notes is grammar, not categories:
+  - Tagalog date words ("kahapon" = yesterday, "ngayon", "noong Lunes");
+  - "paid 7000 to my credit card from payroll" / "binayaran ko … sa credit card" read as a card payment (a transfer);
+  - a closing "paid with BPI card" / "bayad gamit …" applying to every row of the message, not only the last.
+- Each is a deterministic rule with JVM tests, in `QuickEntryParser` / `BatchEntryParser`.
+
 ## Security and anti-tampering plan (2026-11-23)
 
 The plan (work in order, sizes, console steps) is in the private `lucento-studio` repository
