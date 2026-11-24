@@ -14,6 +14,8 @@
 
 > **Launch film (2026-11-14, refreshed with 0.5.14 screens on 2026-11-19):** watch `Downloads/lucento-launch-film/lucento-launch-film.mp4` (and the vertical version, the 30 s and 15 s cuts; the 0.5.8 versions are in `previous-0.5.8/` beside them); decide on narration (script in `docs/marketing/launch-film/VOICEOVER.md`) and a real two-account Shared capture; the product issues it surfaced are fixed in #116 (merged 2026-11-19; check them on the phone in the next build), listed in `KNOWN_ISSUES.md`.
 
+> **Launch marketing (2026-11-14; parked until the Play launch, owner 2026-11-21):** the plan is `docs/marketing/launch/PLAYBOOK.md` (₱0, faceless shorts, a weekly ready pack, the KlaroPH bridge), with the truth rules every post passes (`TRUTH_RULES.md`, checked against 0.5.19 on 2026-11-24) and the click-by-click parts in `OWNER_STEPS.md`. Its owner steps now live in Mission Control › Tasks.
+
 | # | To-do | Status | Why it matters |
 |---|---|---|---|
 | OT-1 | Apply `supabase/migrations/20261103180000_credit_card_billing.sql` to **`lucento-test`** (SQL editor, one `begin … commit` block; verify query in `PRODUCTION_MIGRATION.md`, top section) | **Done** (owner, 2026-11-03) | A v11 build sends `credit_limit_minor`, `statement_day`, `due_day` on every wallet row; until the project has them, wallet sync from a v11 build stalls (rows stay pending, nothing is lost) |

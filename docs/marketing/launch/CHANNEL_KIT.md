@@ -1,0 +1,160 @@
+# Lucento channel kit
+
+Everything to paste while setting up and running Lucento's channels. All of it passes `TRUTH_RULES.md`. Facebook
+Page and Group texts live in `docs/community/facebook/README.md`.
+
+## 1. Names, handles and pictures
+
+| Channel | Display name | Handle | Picture |
+|---|---|---|---|
+| TikTok | Lucento · Budget App | `@lucentoapp` | `docs/community/facebook/profile-720x720.png` |
+| Instagram | Lucento · Budget App | `@lucentoapp` | same file |
+| YouTube | Lucento | `@lucentoapp` | same file |
+| Facebook Page | Lucento | (Page username) `lucentoapp` | same file, plus `page-cover-1640x624.png` |
+
+- One handle everywhere makes Lucento easy to find. If `lucentoapp` is taken somewhere, try `lucento.app`, then
+  `lucentoapp.ph`, and use the same fallback on every channel that's still open.
+- "Budget App" in the display name helps search on TikTok and Instagram, where the name field is searchable.
+- Every account is created with **lucentoapp@gmail.com** (so the brand owns it) and has 2-step verification on.
+- A YouTube banner is optional at the start. It comes with the first production batch.
+
+**Live channels (set up by the owner 2026-11-14, all on `@lucentoapp`):**
+
+| Channel | Link | Notes |
+|---|---|---|
+| TikTok | https://www.tiktok.com/@lucentoapp | Personal account (owner, 2026-11-15): switching to Business asks for business verification (company certificate, license number) because finance is a restricted industry, so it stays personal. No paid promotion is needed (₱0). The bio link becomes clickable at 1,000 followers; until then the bio carries lucentoapp.com as text |
+| Instagram | https://www.instagram.com/lucentoapp/ | Professional, linked to the Lucento Page |
+| YouTube | https://www.youtube.com/channel/UCg8f6wbVTgYPnXBeMvD0FyA | |
+| Facebook Page | https://www.facebook.com/lucentoapp | Username `lucentoapp` set 2026-11-23 (profile ID `61596187720039`) |
+| Facebook Group | https://www.facebook.com/groups/1574188714744063 | Lucento Community |
+
+**In the app (0.5.17 and later):** the profile menu links these channels: **Lucento Community** (the Group, through
+the share link https://www.facebook.com/share/g/1E4BdQJjgW/), **Follow Lucento** (Facebook, Instagram, TikTok and
+YouTube, each on the addresses above), **Lucento website** and **Share Lucento**. The app's links live in
+`app/src/main/java/com/lucento/app/core/LucentoLinks.kt` and the website's in lucento-website `src/data/site.ts`:
+change a channel in both together.
+
+## 2. Bios
+
+**TikTok** (80 characters max; 77 used; a personal account under 1,000 followers can't have a clickable link, so the address is plain text):
+> Type your gastos like a text. Android budget app, coming soon. lucentoapp.com
+
+After P-day (80 characters max; 79 used):
+> Type your gastos like a text. Android budget app on Google Play. lucentoapp.com
+
+**Instagram** (150 characters max; 137 used, line breaks included):
+> Everything about your money, in one clear view.
+> Type what you spent like a text. Budgets, bills, goals.
+> Android · Offline · No bank login
+
+**YouTube** channel description:
+> Lucento is a personal finance app for Android: wallets, budgets, bills, debts, goals and insights in one clear view.
+> Type a purchase the way you'd text a friend ("lunch 250, jeep 13, load 100") and Lucento turns it into
+> transactions you check before saving. It works offline and never asks for your bank login.
+>
+> Short tips and features every week.
+> Website: https://www.lucentoapp.com · Email: lucentoapp@gmail.com
+
+**Link in bio** (every channel):
+- Before P-day: the website link for that channel (section 3).
+- After P-day: the Play link for that channel.
+- If TikTok doesn't offer a website field on the account yet, the bio text "lucentoapp.com" is enough.
+
+## 3. Links (UTM tags)
+
+UTM tags tell us which channel each visit or install came from. Never post an untagged link.
+
+**Before P-day**, to the website:
+```
+https://www.lucentoapp.com/?utm_source=<source>&utm_medium=<medium>&utm_campaign=warmup
+```
+
+**After P-day**, to Google Play (Play Console reads the tags from `referrer`):
+```
+https://play.google.com/store/apps/details?id=com.lucento.app&referrer=utm_source%3D<source>%26utm_medium%3D<medium>%26utm_campaign%3Dlaunch
+```
+
+| Where | source | medium |
+|---|---|---|
+| TikTok bio | `tiktok` | `bio` |
+| Instagram bio | `instagram` | `bio` |
+| YouTube bio, descriptions | `youtube` | `bio` / `video` |
+| Facebook Page posts | `facebook` | `social` |
+| Lucento Community group | `fb_group` | `community` |
+| Reddit, other communities | `reddit`, `community_<name>` | `community` |
+| A creator's post | `creator_<handle>` | `creator` |
+| Press | `press_<outlet>` | `press` |
+| KlaroPH Page | `klaroph` | `klaro_page` |
+| Klaro in-app banner | `klaroph` | `klaro_banner` |
+| klaroph.com tools and guides card | `klaroph` | `klaro_tools` |
+| Klaro email | `klaroph` | `klaro_email` |
+| Product Hunt, AlternativeTo | `producthunt`, `alternativeto` | `directory` |
+| Lucento Shared invite (in the app) | `shared_invite` | `referral` |
+| Share Lucento, "Tell a friend about Lucento" (profile menu) | `app_share` | `referral` |
+
+The last two are reserved: they need an app change. Today Share Lucento sends the plain website link (the plain Play
+link once `LucentoLinks.PLAY_LISTING_PUBLIC` is turned on in a build), and the Shared invite's message has no link
+(NEXT_TASKS LS-7).
+
+Example, the TikTok bio before P-day:
+`https://www.lucentoapp.com/?utm_source=tiktok&utm_medium=bio&utm_campaign=warmup`
+
+## 4. Calls to action
+
+| Phase | On screen (last 2–3 s) | Caption line |
+|---|---|---|
+| Warm-up | "Coming soon to Google Play" | "Coming soon to Google Play. Follow so you don't miss launch day." |
+| Launch week and after | "Get it on Google Play" | "Free to download on Google Play. Link in bio." |
+| KlaroPH channels | "From the maker of KlaroPH" | "KlaroPH on the web, Lucento on your phone." |
+
+## 5. Hashtags (3–5 per post; mix one broad and two or three specific)
+
+| Set | Tags |
+|---|---|
+| PH everyday | `#ipon` `#budgeting` `#gastos` `#sweldo` `#ipontips` `#personalfinanceph` `#moneytipsph` |
+| Global | `#budgeting` `#budgetapp` `#moneytips` `#personalfinance` `#expensetracker` `#savingmoney` |
+| By topic | OFW: `#ofw` `#ofwlife` · Couples: `#couplesfinance` · Android: `#androidapps` · Payday: `#payday` `#kinsenas` |
+| YouTube Shorts | `#shorts` plus two from the sets above |
+
+The analyst replaces tags that don't pull views after four weeks. No brand hashtags for banks, e-wallets or shops
+(T21).
+
+## 6. Caption shape
+
+```
+<Hook, the same words as on screen>
+<One line on what it does for you>
+<Taglish line, PH posts>
+<Call to action for the phase>
+<3–5 hashtags>
+```
+
+Example (week 1, Monday):
+> One message. Three transactions. Done.
+> Type your day the way you'd text a friend, check the rows, save once.
+> I-type mo lang: "jeep 13, load 100, sweldo 25000."
+> Coming soon to Google Play. Follow so you don't miss launch day.
+> #budgeting #gastos #ipon #personalfinanceph
+
+## 7. Saved replies (comments and messages)
+
+Paste them as they are, or as a starting point. Before P-day, use the "coming soon" wording.
+
+| They ask | Reply |
+|---|---|
+| Where can I get it? (before P-day) | "Coming soon to Google Play! Follow us and we'll post the moment it's live. 🙌" |
+| Where can I get it? (after P-day) | "It's on Google Play: tap the link in our bio. 🙌" |
+| Is it free? | "Yes, it's free to download, and the free plan has no time limit. Lucento Pro adds extras like more wallets, multicurrency and Shared." |
+| iPhone? | "Right now Lucento is on Android only." |
+| Does it connect to my bank or e-wallet? | "No. Lucento never asks for your bank login or connects to your bank or e-wallet. You type, say or scan what you spent, and it's read on your phone." |
+| Can it read receipts or bank statements? | "Yes: Lucento Scan reads receipts, bills and bank, card or e-wallet statements from a photo, a screenshot or a PDF, right on your phone. You check every row before it's saved, and statement lines you've already saved are held back. No bank login needed." |
+| Does it remind me about bills? | "Not with notifications. Home shows what's due this week, Scheduled lists every bill and payday coming, and at the end of each month Home asks you to plan the next one. You mark each bill paid yourself: nothing is posted or paid by itself." |
+| Is my data safe? | "Your entries are stored on your phone, and the core features work offline. Cloud sync (Pro) is optional, and nothing goes to Gemini until you say yes. Full details: lucentoapp.com/privacy" |
+| Is it AI? | "Typing, voice and scanning are read by Lucento on your phone, no AI needed. AI is optional, with Google's Gemini: Ask Lucento's AI answers (signed in; nothing is sent until you say yes; 5 questions a month free, 45 with Pro) and Smarter reading (Pro, off until you turn it on in Settings). Details: lucentoapp.com/privacy" |
+| Tagalog? | "The app is in English, and it understands everyday Filipino money words like sweldo, palengke, load and jeep." |
+| How much is Pro? | "Pro prices are shown in Google Play for your country, and the free plan works without it." |
+| Is this like KlaroPH? | "Same maker! KlaroPH is on the web, and Lucento is the Android app: offline, on your phone, and you type your gastos like a text." |
+| Feature request | "Love this, thank you! It's on our list. Join the Lucento Community group to see what's coming." |
+| Something's broken | "Sorry about that! Please email lucentoapp@gmail.com with your phone model and what happened, and we'll look into it." |
+| Rude or spam | Don't reply. Hide or delete it. |
+| Ads? Price promises? Anything not in this table | Don't guess: leave it for the owner (T14, T15) |
