@@ -14,6 +14,8 @@ import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performTouchInput
@@ -183,6 +185,14 @@ class ScreenshotTourTest {
     private val demoDark: Boolean
         get() = InstrumentationRegistry.getArguments().getString("demoDark") == "true"
 
+    /**
+     * Opt-in (`-e demoHistory true`): eight more months of budgets and spending before the demo month, from January
+     * ([DemoMonth.seedHistory]), so Milestones' budget year shows each level for the website and the Play listing, and the
+     * tour also takes a finished month's recap. Off by default (CI keeps the demo month alone).
+     */
+    private val demoHistory: Boolean
+        get() = InstrumentationRegistry.getArguments().getString("demoHistory") == "true"
+
     private fun applyDemoDark() {
         if (!demoDark) return
         runBlocking { container.preferences.setThemeMode(com.lucento.app.data.preferences.ThemeMode.DARK) }
@@ -261,7 +271,18 @@ class ScreenshotTourTest {
         demoCurrency?.let { code ->
             compose.onAllNodes(hasSetTextAction())[0].performTextInput(code)
             waitForText("$code ·")
-            compose.onNodeWithText("$code ·", substring = true).performClick()
+            // The result row can arrive while the list is still settling, and a tap then doesn't select it: tap until the
+            // main-currency card says so (it happened on an API 35 emulator, 2026-11-13).
+            var chosen = false
+            repeat(5) {
+                if (chosen) return@repeat
+                compose.onAllNodesWithText("$code ·", substring = true).onFirst().performClick()
+                compose.waitForIdle()
+                chosen = runCatching {
+                    compose.waitUntil(2_000) { compose.onAllNodesWithText("$code · your main currency", substring = true).fetchSemanticsNodes().isNotEmpty() }
+                }.isSuccess
+            }
+            check(chosen) { "Onboarding didn't take $code as the main currency" }
             closeKeyboard()
         }
         shot("03b-onboarding-currency")
@@ -304,7 +325,11 @@ class ScreenshotTourTest {
         // shared with WebsiteShowcaseTest, so the website's screens and the tour show the same figures.
         // A new award is presented in a modal ceremony, and the seeded month earns several at once: mark them all as seen
         // first so no ceremony covers a capture or blocks a tap (the tour captures the cabinet and a ceremony on purpose).
-        runBlocking { container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet()) }
+        // With the marketing history, only what the data really earns is recorded (DemoMonth.settleHistoryMoments).
+        runBlocking {
+            if (demoHistory) DemoMonth.settleHistoryMoments(container, today)
+            else container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet())
+        }
         // The monthly check-in card shows only in a month's last days and first week: settled here, so every run's
         // dashboard is the same whatever the date (the card and the plan page are captured separately, on a set clock).
         runBlocking {
@@ -314,6 +339,7 @@ class ScreenshotTourTest {
             )
         }
         runBlocking { DemoMonth.seed(container, currency, demoScale, today) }
+        if (demoHistory) runBlocking { DemoMonth.seedHistory(container, currency, demoScale, today) }
         applyDemoDark()
 
         // ---------------------------------------------------------------- dashboard: within budget (happy sun)
@@ -357,6 +383,18 @@ class ScreenshotTourTest {
         shot("07a2-month-recap")
         backUntilGone("Where it went")
         waitForText("Your budget year")
+        if (demoHistory) {
+            // A finished month from the history: its square opens the recap with the month's budget result.
+            val lastMonth = thisMonth.minusMonths(1)
+            compose.onNode(
+                hasContentDescription("${com.lucento.app.feature.home.monthLabel(lastMonth)} ${lastMonth.year}", substring = true) and
+                    androidx.compose.ui.test.hasClickAction(),
+            ).performScrollTo().performClick()
+            waitForText("Where it went")
+            shot("07a2b-month-recap-finished")
+            backUntilGone("Where it went")
+            waitForText("Your budget year")
+        }
         compose.onNodeWithText("Awards").performScrollTo().performClick()
         waitForText("From your own records", substring = true)
         shot("07a3-awards-cabinet")

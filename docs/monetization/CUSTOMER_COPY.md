@@ -56,8 +56,11 @@ billed differently; the table shows them as one column with a note where they di
 | **Where your money went and net worth over time** — expenses by category and month-end net worth, for the period you pick (3 months free) | ✔ | ✔ | ✔ |
 | **Ask Lucento** — answers from your own figures, on this phone, no internet: net worth, cash flow, budget against actual, debts, top categories | ✔ | ✔ | ✔ |
 | **Save or share a statement as a PDF** | — | ✔ | ✔ |
-| **AI adviser** — ask Gemini about your numbers and get plans and recommendations (needs sign-in, consent and internet; Lucento sends figures, never your name) | **10 questions a month** | **50 questions a day** | 50 a day for the **first 12 months**, then 10 a month — or 50 a day with Lucento Cloud |
-| **Smarter reading** — Gemini reads a messy message into transactions when the on-phone reader isn't sure | — | ✔ | First 12 months, then with Lucento Cloud |
+| **AI adviser** — ask Gemini about your numbers and get plans and recommendations (needs sign-in, consent and internet; Lucento sends figures, never your name) | **5 questions a month** | **45 questions a month** | 45 a month for the **first 12 months**, then 5 a month — or 45 a month with Lucento Cloud |
+| **Smarter reading** — Gemini reads a messy message into transactions when the on-phone reader isn't sure (off until you turn it on in Settings; slower; each message uses one of the month's AI questions) | — | ✔ | First 12 months, then with Lucento Cloud |
+| **Monthly check-in** — as a month ends, a card on Home offers to plan the next one (a yearly bill, a birthday) and, from the 1st, last month's recap; never a notification | ✔ | ✔ | ✔ |
+| **Milestones** — each month's recap (what you kept, where it went, how the budget ended) and the awards you earn from your own records | ✔ | ✔ | ✔ |
+| **Milestones: your budget year** — the calendar year as twelve squares, each coloured by how its budget went | Your own months as a preview | ✔ | ✔ |
 
 ### A.5 Keeping your data
 
@@ -226,8 +229,8 @@ fully offline. Read exactly what Lifetime includes in **The Lifetime promise**.
 
 *Short description:* The online services for people who own Lucento.
 
-*Included:* cloud sync between your phones, restore from your account, Lucento Shared, the AI adviser at 50 questions a
-day, Smarter reading.
+*Included:* cloud sync between your phones, restore from your account, Lucento Shared, the AI adviser at 45 questions a
+month, Smarter reading.
 
 *Price:* **₱59 a month** or **₱490 a year.**
 

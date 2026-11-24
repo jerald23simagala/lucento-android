@@ -92,10 +92,13 @@ class WebsiteShowcaseTest {
         waitForText("Rename, reorder or add more")
         click("Confirm", substring = true)
         waitForText("Currency and look")
-        compose.onAllNodes(hasSetTextAction())[0].performTextInput(showcaseCurrency)
-        waitForText("$showcaseCurrency ·")
-        compose.onNodeWithText("$showcaseCurrency ·", substring = true).performClick()
-        closeKeyboard()
+        // Already the phone's currency (US dollars on the emulator): the card says so, and a search would list it twice.
+        if (!exists("$showcaseCurrency · your main currency")) {
+            compose.onAllNodes(hasSetTextAction())[0].performTextInput(showcaseCurrency)
+            waitForText("$showcaseCurrency ·")
+            compose.onNodeWithText("$showcaseCurrency ·", substring = true).performClick()
+            closeKeyboard()
+        }
         click("Continue")
         waitForText("Lucento is personalized")
         click("Continue to set up")
@@ -114,9 +117,15 @@ class WebsiteShowcaseTest {
         check(currency == showcaseCurrency) { "Onboarding should have chosen $showcaseCurrency, got $currency" }
         // A new award is presented in a modal ceremony, and the seeded month earns several at once: mark them all as seen
         // first so no ceremony covers a capture or blocks a tap (the tour captures the cabinet and a ceremony on purpose).
-        runBlocking { container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet()) }
+        val demoHistory = arguments.getString("demoHistory") == "true"
+        runBlocking {
+            if (demoHistory) DemoMonth.settleHistoryMoments(container, LocalDate.now())
+            else container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet())
+        }
         val scale = if (showcaseCurrency == "PHP") 10L else 1L // the tour's demoScale
         runBlocking { DemoMonth.seed(container, currency, scale = scale, today = LocalDate.now()) }
+        // `-e demoHistory true`, as in the tour: the same months before the demo month, so both runs show the same figures.
+        if (demoHistory) runBlocking { DemoMonth.seedHistory(container, currency, scale = scale, today = LocalDate.now()) }
         waitForText("Monthly budget")
         waitForToastsGone()
 
@@ -135,6 +144,13 @@ class WebsiteShowcaseTest {
         Thread.sleep(600)
         shot("home-hidden")
         runBlocking { container.preferences.setHideAmounts(false) }
+        compose.waitForIdle()
+        // Home in Sunrise light, for the website's share image (beside the light Wallets gallery below).
+        runBlocking { container.preferences.setThemeMode(ThemeMode.LIGHT) }
+        compose.waitForIdle()
+        Thread.sleep(600)
+        shot("home-light")
+        runBlocking { container.preferences.setThemeMode(ThemeMode.DARK) }
         compose.waitForIdle()
 
         // ---------------------------------------------------------------- the Wallets gallery in every theme
