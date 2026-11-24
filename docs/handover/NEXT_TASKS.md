@@ -60,6 +60,23 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Assets aligned with 0.5.19 — follow-ups (2026-11-24, `marketing/assets-0.5.19`)
+
+- **AS-1 Launch film on 0.5.19 (next; owner: after this review).** It still shows 0.5.14 screens ("Net Wallet Balance",
+  no Milestones). Re-capture with `capture_marketing.sh` runs `tour-php` and `showcase-php` (the same demo year), then
+  lucento-studio `video/tools/capture/live_capture.py` in the showcase state, `prepare_screens.py`, `remap_boxes.py
+  <old> <new>`, fix the moved crop boxes and render all five versions with the emulator shut down
+  (docs/marketing/launch-film/ASSET_INVENTORY.md). Update ASSET_INVENTORY's source line and the "Net worth" wording.
+- **AS-2 Owner uploads the Play graphics and texts** (Mission Control task): both listings' eight screenshots and feature
+  graphic from `docs/play/graphics/{global,ph}/` (Milestones replaced Insights) and §4's texts.
+- **AS-3 Owner pastes the Facebook Page's new About text** from `docs/community/facebook/README.md` (PR #75).
+- **AS-4 Claude pages:** "Lucento Price Check" still shows AI answers as Free 10 a month · Pro 50 a day (its data lives in
+  the page's own store; the repo source `docs/monetization/COMPETITOR_PRICING_2026-11.md` is fixed); the "Lucento"
+  design-system page dates from 2026-10-23, before the five themes.
+- **AS-5 Website #45** merges on the owner's word after the Vercel preview; then the share image is live.
+- Parked by the owner until the Play launch (2026-11-21): the shorts, the Launch Board and Mission Control's posts. They
+  reuse these captures when marketing restarts.
+
 ## Milestones — follow-ups (2026-11-23, `feature/milestones-budget-year`)
 
 - ~~ML-N1 Owner look at the screenshots~~ **Done 2026-11-23:** the owner asked for the year on top (a month's recap

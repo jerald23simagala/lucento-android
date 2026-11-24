@@ -14,7 +14,7 @@ expected impact on installs.
 | 7 | **AI advice with consent (Pro)** | "Advice that can't make up numbers." | Every figure in an AI answer is calculated on the phone; clear consent | 30 s | Must mention Gemini, consent and limits; sync with the Privacy Policy |
 | 8 | **Loans and credit cards** | "See the end of your loan." | Amortization suggestion with "Use", instalment bar, card statement cycles, one-tap card payment | 30 s | — |
 | 9 | **Privacy in your pocket** | "Check your money on the bus." | Hide amounts (₱••••, fingerprint to reveal), App lock, Hide in recent apps blocks screenshots, no bank login, works offline | 20 s | Scope privacy lines ("your entries"); never "nothing leaves your phone" |
-| 10 | **Awards with no streaks** | "Encouragement, not guilt." | Seven awards earned from real records, presented by the mascot | 15 s | Light, mascot-forward, good for TikTok |
+| 10 | **Awards with no streaks** | "Encouragement, not guilt." | Ten awards earned from real records, presented by the mascot | 15 s | Light, mascot-forward, good for TikTok |
 | 11 | **Speaks Filipino money** | "Sweldo, palengke, jeepney — it gets it." | PH vocabulary built into the reader | 15 s | PH channels only |
 | 12 | **Backup, restore and switching phones** | "Your data, portable." | Free JSON backup with preview; Pro sync and restore | 20 s | Backups are not encrypted; don't imply they are |
 | 13 | **Getting started in two minutes** | "From install to your first budget." | Onboarding with presets, guided setup with real data | 45 s | Good for the Play listing's second video slot |

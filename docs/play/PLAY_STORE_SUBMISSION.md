@@ -114,21 +114,26 @@ saves them to `/data/local/tmp/lucento-shots/delete-0*.png`), plus the public pa
 | Contact email | lucentoapp@gmail.com |
 | Website | `https://www.lucentoapp.com` |
 | Privacy policy | `https://www.lucentoapp.com/privacy` |
-| Graphics | `docs/play/graphics/global/` (main listing, US dollars) and `docs/play/graphics/ph/` (Philippines custom listing, pesos), same eight designs in each: one clear view, type it like a text, safe to spend, one net worth, multicurrency (Pro), insights, goals, Lucento Shared (Pro); feature graphic 1024 × 500; icon 512 × 512 (the Rising Crest `play-store-512.png` from lucento-website `brand/logo`, unchanged). Built 2026-11-08 from the website's phone template and treatments (window/focus/angle/lift) on dark captures: PH from the website's peso run, global from `ScreenshotTourTest -e demoCurrency USD -e demoDark true` and `WebsiteShowcaseTest -e showcaseCurrency USD` (`artifacts/play-global-*-usd-dark/`) |
+| Graphics | `docs/play/graphics/global/` (main listing, US dollars) and `docs/play/graphics/ph/` (Philippines custom listing, pesos), same eight designs in each: one clear view, type it like a text, safe to spend, one net worth, multicurrency (Pro), Milestones (its coloured year is Pro; it replaced Insights on 2026-11-24, owner's choice), goals, Lucento Shared (Pro); feature graphic 1024 × 500; icon 512 × 512 (the Rising Crest `play-store-512.png` from lucento-website `brand/logo`, unchanged). Rebuilt 2026-11-24 from app 0.5.19 by lucento-studio `lab/play-graphics/render.mjs` (the website's phone template and treatments, window/focus/angle/lift) on dark captures from `tools/screenshots/capture_marketing.sh` (docs/QUALITY.md › Marketing screenshots): global from `tour-usd` + `showcase-usd`, Philippines from `tour-php` + `showcase-php`. The first set (2026-11-08, app 0.5.0) had no saved source |
 
 Copy rules: never promise "no ads" (ads may come to Free); never call local parsing AI; mark Pro features; no prices,
 "best" or "#1" in graphics; name no third-party brands (GCash, Maya, Meralco) in metadata, since Play can reject
 unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the institution count from README.
 
-### Main listing, English (global default), 2804 characters
+### Main listing, English (global default), 3313 characters
 
 > Lucento is a budget planner and expense tracker that shows everything about your money in one clear view: wallets, budgets, bills, goals, debts and net worth. No bank login and no spreadsheets. You record it, and Lucento keeps it straight, even offline.
 >
 > TYPE IT LIKE A TEXT
-> Log spending the way you'd text a friend: "coffee 4.50, groceries 85, salary 3000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan a receipt, which is read on your phone.
+> Log spending the way you'd text a friend: "coffee 4.50, groceries 85, salary 3000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan receipts, bills and bank, card or e-wallet statements, which are read on your phone. Two home-screen widgets add a transaction in a tap or keep what's safe to spend in view.
 >
 > KNOW WHAT'S SAFE TO SPEND
 > Give each category a monthly budget. Lucento compares what you've spent with how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
+>
+> PLAN EACH MONTH, SEE YOUR YEAR
+> • As a month ends, Lucento offers to plan the next one, so a yearly bill, a birthday or a trip gets its own amount.
+> • Every month gets a recap: what you kept, where the money went and how the budget ended.
+> • Milestones shows your budget year month by month (Pro), and the awards you earn from your own records.
 >
 > EVERY ACCOUNT, ONE NET WORTH
 > Cash, bank accounts, e-wallets, savings, credit cards and loans, all in one money manager. Wallets can show the logo and colours of 409 banks and providers in 48 countries, so each account looks like the card you know. Lucento adds what you have and what you owe into one net worth.
@@ -151,7 +156,7 @@ unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the 
 > Lucento Pro adds:
 > • unlimited wallets and up to 20 goals
 > • wallets in other currencies
-> • 6- and 12-month Insights and PDF statements
+> • 6- and 12-month Insights, the budget year on Milestones, and PDF statements
 > • more themes
 > • cloud sync between phones
 > • Lucento Shared, so a partner can record from their own phone
@@ -161,17 +166,22 @@ unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the 
 >
 > Lucento records the money you tell it about. It doesn't connect to your bank, move money or give financial advice.
 
-### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 2902 characters
+### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 3414 characters
 
 Short description: Type your gastos like a text. Budget, ipon and utang in pesos, offline. (71)
 
 > Lucento is a budget app and expense tracker made for how Filipinos handle money: cash, bank accounts, e-wallets, credit cards and loans, all in one clear view. Track your gastos, ipon and utang in pesos, with no bank login. You record it, and Lucento keeps it straight, even offline.
 >
 > TYPE IT LIKE A TEXT
-> Log spending the way you'd text a friend: "jeep 13, load 100, electric bill 2450, sweldo 25000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan a receipt, which is read on your phone.
+> Log spending the way you'd text a friend: "jeep 13, load 100, electric bill 2450, sweldo 25000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan receipts, bills and bank, card or e-wallet statements, which are read on your phone. Two home-screen widgets add a transaction in a tap or keep what's safe to spend in view.
 >
 > KNOW WHAT'S SAFE TO SPEND THIS MONTH
 > Give each category a monthly budget. Lucento compares what you've spent with how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
+>
+> PLAN EACH MONTH, SEE YOUR YEAR
+> • As a month ends, Lucento offers to plan the next one, so a yearly bill, a birthday or Christmas gets its own amount.
+> • Every month gets a recap: what you kept, where the money went and how the budget ended.
+> • Milestones shows your budget year month by month (Pro), and the awards you earn from your own records.
 >
 > EVERY ACCOUNT, ONE NET WORTH
 > Cash, bank accounts, e-wallets, savings, credit cards and loans, all in one money manager. Wallets can show the logo and colours of your bank or e-wallet, from 409 providers in 48 countries, including Philippine banks and e-wallets. Lucento adds what you have and what you owe into one net worth.
@@ -194,7 +204,7 @@ Short description: Type your gastos like a text. Budget, ipon and utang in pesos
 > Lucento Pro adds:
 > • unlimited wallets and up to 20 goals
 > • wallets in other currencies
-> • 6- and 12-month Insights and PDF statements
+> • 6- and 12-month Insights, the budget year on Milestones, and PDF statements
 > • more themes
 > • cloud sync between phones
 > • Lucento Shared, so your partner can record from their own phone
@@ -221,3 +231,6 @@ Short description: Type your gastos like a text. Budget, ipon and utang in pesos
 3. Release notes in plain words; no promises about features that aren't in the build.
 4. If anything changed what leaves the phone: update `LegalDocuments.kt`, bump `VERSION`, regenerate the website legal
    data, redeploy the site, then update the Data safety form.
+5. If a screen in the listing changed, or a release adds something the listing should show: capture and redraw the
+   graphics (docs/QUALITY.md › Marketing screenshots), update §4's text, and upload both listings again; Play keeps
+   the old graphics until they are replaced.

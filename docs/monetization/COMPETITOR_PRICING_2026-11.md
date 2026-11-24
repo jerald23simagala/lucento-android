@@ -12,8 +12,8 @@ in [REGIONAL_PRICING.md](REGIONAL_PRICING.md).
   sharing. Plans with bank connections cost 1.3–6.7 × as much ($39.99–$199.99 a year).
 - **Lucento is the cheapest confirmed way to get AI over your own figures.** Emma's Claude connector starts at
   $41.99 a year, Monarch's assistant comes with $99.99 a year, and Rocket Money's agent with its $15-a-month tier.
-  Wallet's connector is the one exception we couldn't price, because its tier isn't stated. Lucento Pro includes 50
-  adviser questions a day, and Free includes 10 a month.
+  Wallet's connector is the one exception we couldn't price, because its tier isn't stated. Lucento Pro includes 45
+  adviser questions a month, and Free includes 5 a month (since 0.5.18, 2026-11-23; it was 50 a day and 10 a month).
 - **In the Philippines** the subscription sits in the middle of the pack. ₱149 a month is ₱30 below Spendee Plus and
   ₱4 above Money Lover's Budget Plus. ₱1,190 a year is exactly Spendee Plus's yearly price.
 - **Lifetime was the exception, and was lowered on 2026-11-21.** At the old $79.99 / ₱3,490 it was 2.7–4 × the
@@ -49,7 +49,7 @@ and **Not stated** means no page read mentions it.
 | **Wallets in several currencies** | **Pro** | Yes | Premium (Free has 1 wallet) | Yes (tier not stated) | Free | Free (rates typed in by hand) | Plus (Free has 1 wallet) | Yes (rates typed in by hand) | Free |
 | **Net worth** | **Free (things you own: Pro)** | Yes | Premium (total of wallets) | Yes (tier not stated) | Free | Free (up to 15 assets) | Partial (one total balance) | Not stated | Pro |
 | **Reports over time** | **Free 3 months · Pro 12 months** | Yes (past periods in Pro) | Free per wallet · Premium all wallets | Yes (some charts paid) | Free | Free | Free | Yes | Free (planning graphs in Pro) |
-| **AI answers about your own money** | **Free 10 a month · Pro 50 a day** | Not stated | Not stated | Premium through an outside AI (MCP; beta) | Not stated | Not stated | Not stated | Not stated | Not stated |
+| **AI answers about your own money** | **Free 5 a month · Pro 45 a month** | Not stated | Not stated | Premium through an outside AI (MCP; beta) | Not stated | Not stated | Not stated | Not stated | Not stated |
 | **Share with a partner** | **Pro (1 partner)** | Not stated | Yes (tier not stated) | Premium | Premium (by sharing one cloud account) | No | Plus or Premium | Yes (by sharing one cloud account) | No |
 | **Cloud sync** | **Pro** | Yes (your Google Drive) | Free | Yes (tier not stated) | Premium (your own cloud account) | No (backup only) | Free | Yes (your Google Drive or Dropbox) | Free |
 | **Works offline without an account** | **Free** | Yes | Not stated (asks you to sign in) | No (sign-up needed) | Free | Free | Not stated (sign-up shown) | Yes | Not stated (sign-up shown) |

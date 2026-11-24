@@ -10,7 +10,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 > [docs/QUALITY.md](docs/QUALITY.md) for exactly what was and wasn't verified. Also: [docs/ROADMAP.md](docs/ROADMAP.md),
 > [docs/DESIGN.md](docs/DESIGN.md), [docs/CALCULATIONS.md](docs/CALCULATIONS.md), [CHANGELOG.md](CHANGELOG.md).
 
-## What works today (0.5.14)
+## What works today (0.5.19)
 - **Navigation**: a persistent dock — **Home · Transactions · (+) · Budget · Wallets** — whose central **+** opens the
   **transaction composer**; Insights, Savings goals, Milestones, Scheduled transactions and Debts & loans open from
   Home's Quick links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
@@ -19,10 +19,10 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   **I already have an account** (when sync is available) reminds you to sync the old phone first, signs in, downloads
   the account — records and settings — and goes straight to Home: no story, no guided setup; an empty account continues
   with the normal setup.
-- **Home**: a working header (sync status, month selector, profile); the **Budget pace** card — % of budget used,
-  budget used vs month elapsed, a verdict in words and Lucento, the mascot, whose look follows it; **net worth** as
-  assets − liabilities with shortcuts to goals, scheduled transactions, debts and categories; the savings goal closest
-  to done; **scheduled transactions** (tap to review and mark paid).
+- **Home**: a working header (sync status, month selector, profile); the **Monthly budget** card — % of budget used on
+  a gauge, budget used vs month elapsed with a verdict in words, then Budget remaining, Spendable wallets and Safe to
+  spend; **net worth** as assets − liabilities with Quick links to goals, Insights, Milestones, debts and scheduled
+  transactions; the savings goal closest to done; **scheduled transactions** (tap to review and mark paid).
 - **Wallets** include **investments** (stocks, funds, MP2, time deposits and more, each with a kind and an icon):
   money moves in and out with transfers, and **Update value** records growth or loss as a balance adjustment, never as
   income or spending. **Property & valuables** (home, car, jewellery) are valued by hand and never used for

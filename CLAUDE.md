@@ -87,7 +87,7 @@ a better user-facing structure while preserving sound engineering boundaries.
     only the text. Lucento holds `RECORD_AUDIO` (asked on first use) only for the composer's own listening sheet; it
     keeps no recording, and without the permission the speech service's own window is used.
   - **On by default, confirmed once:** Ask Lucento's AI answers (owner decision 2026-11-17; docs/ASK.md), on every plan
-    for a signed-in account (Free 10 questions a month, Pro 50 a day). Nothing is sent until the person confirms what
+    for a signed-in account (Free 5 questions a month, Pro 45 a month). Nothing is sent until the person confirms what
     is sent: the first question shows a card ("Ask Gemini" / "Keep answers on this phone"), or they accept Ask's sheet or
     Settings' dialog. Then the question goes with a summary of their finances, including the last 60 days of
     transactions. Sign-out and account resets return it to unconfirmed; turning it off withdraws the agreement.

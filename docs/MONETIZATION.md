@@ -33,7 +33,7 @@ outright.
 |---|---|---|---|---|
 | **A. Local Pro features** (run on the phone, cost Lucento nothing per use) | unlimited money wallets, unlimited debt accounts, receivables, manually valued assets, 20 active goals, 12-month Insights and net-worth composition, wallets in other currencies, statements as PDF, all themes, every future local Pro feature | limits | ✔ while subscribed | **✔ forever, offline** |
 | **B. Cloud services** (Supabase) | cloud sync, cloud restore on a new phone | — | ✔ | 12 months included, then Lucento Cloud add-on |
-| **C. AI services** (Gemini via the Vercel proxy) | AI adviser allowance, Smarter reading | 10 questions / month | 50 / day | 12 months at Pro allowance, then Free allowance or Lucento Cloud add-on |
+| **C. AI services** (Gemini via the Vercel proxy) | AI adviser allowance, Smarter reading | 5 questions / month | 45 / month | 12 months at Pro allowance, then Free allowance or Lucento Cloud add-on |
 | **D. Lucento Shared** (needs B) | invite one Partner | — | ✔ | while B is active |
 
 **What changed from v1 and why** (each is a decision in §7):

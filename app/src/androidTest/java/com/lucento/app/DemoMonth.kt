@@ -134,4 +134,102 @@ object DemoMonth {
             ),
         )
     }
+
+    /**
+     * Opt-in history for the marketing captures (`-e demoHistory true`; never in CI, whose tour expects the demo month
+     * alone): eight more months of salary and spending before [seed]'s two, from January of the demo year, with the same
+     * nine budgets from the first of them, so Milestones' budget year is full and Insights' "vs prior" compares like with
+     * like. Run after [seed]. Oldest first the months use 108 %, 95 %, 86 %, 78 %, 101 %, 77 %, 74 % and 79 % of the 2,590
+     * budget (×[scale]); [seed]'s two months use 84 % and 82 %. Each month's cash spending is withdrawn from the bank first,
+     * so Cash keeps [seed]'s balance. Every amount goes through the repositories, like the rest of the demo month.
+     */
+    suspend fun seedHistory(container: AppContainer, currency: String, scale: Long, today: LocalDate) {
+        fun money(major: Long) = Money(major * 100 * scale, currency)
+        val categories = container.categories.observeCategories().first()
+        fun cat(name: String) = categories.first { it.name == name && !it.archived }.id
+        val salary = categories.first { it.kind == CategoryKind.INCOME && it.name == "Salary" }.id
+        val wallets = container.wallets.observeWallets().first()
+        val bank = wallets.first { it.name == "Everyday bank" }.id
+        val cash = wallets.first { it.name == "Cash" }.id
+        suspend fun add(type: TransactionType, amount: Long, wallet: Long, category: Long, date: LocalDate, note: String) {
+            if (amount == 0L) return
+            val r = container.transactions.save(
+                TransactionRepository.Input(null, UUID.randomUUID().toString(), type, money(amount), wallet, category, date, note),
+            )
+            check(r is TransactionRepository.SaveResult.Saved) { "history seed failed: $r" }
+        }
+        // Rent 1,500, internet 60 and transit 80 every month, plus what changes: groceries, restaurants, power, clothing.
+        data class HistoryMonth(val monthsBack: Long, val groceries: Long, val restaurants: Long, val power: Long, val clothing: Long)
+        val months = listOf(
+            HistoryMonth(10, 520, 340, 152, 145), // 2,797: over
+            HistoryMonth(9, 455, 205, 118, 42), //   2,460: getting close
+            HistoryMonth(8, 400, 120, 67, 0), //     2,227: getting close
+            HistoryMonth(7, 250, 50, 80, 0), //      2,020: on track
+            HistoryMonth(6, 430, 260, 136, 150), //  2,616: over
+            HistoryMonth(5, 240, 40, 74, 0), //      1,994: on track
+            HistoryMonth(4, 190, 30, 57, 0), //      1,917: on track
+            HistoryMonth(3, 270, 60, 76, 0), //      2,046: on track
+        )
+        for (m in months) {
+            val month = java.time.YearMonth.from(today).minusMonths(m.monthsBack)
+            // The month's cash, taken out of the bank on the 1st: a transfer, so budgets and net worth don't change.
+            val withdrawal = container.transactions.saveTransfer(
+                TransactionRepository.TransferInput(
+                    group = null, clientUuid = UUID.randomUUID().toString(), fromWalletId = bank, toWalletId = cash,
+                    amount = money(80 + m.restaurants), date = month.atDay(1), note = "Cash",
+                ),
+            )
+            check(withdrawal is TransactionRepository.TransferResult.Saved) { "history withdrawal failed: $withdrawal" }
+            add(TransactionType.INCOME, 4_200, bank, salary, month.atDay(10), "Salary")
+            add(TransactionType.EXPENSE, 1_500, bank, cat("Rent"), month.atDay(2), "Rent")
+            add(TransactionType.EXPENSE, 60, bank, cat("Internet"), month.atDay(3), "Fibre")
+            add(TransactionType.EXPENSE, 80, cash, cat("Public transportation"), month.atDay(5), "Transit card")
+            add(TransactionType.EXPENSE, m.power, bank, cat("Electricity"), month.atDay(6), "Power bill")
+            add(TransactionType.EXPENSE, m.groceries, bank, cat("Groceries"), month.atDay(12), "Groceries")
+            add(TransactionType.EXPENSE, m.restaurants, cash, cat("Restaurants"), month.atDay(18), "Dinners")
+            add(TransactionType.EXPENSE, m.clothing, bank, cat("Clothing and shoes"), month.atDay(22), "Clothes")
+        }
+        // The demo month's nine amounts, from the first history month onward.
+        val first = java.time.YearMonth.from(today).minusMonths(months.first().monthsBack)
+        listOf(
+            "Rent" to 1_500L, "Groceries" to 450L, "Restaurants" to 200L, "Electricity" to 120L, "Internet" to 60L,
+            "Public transportation" to 80L, "Streaming services" to 20L, "Clothing and shoes" to 100L, "Personal care" to 60L,
+        ).forEach { (name, amount) -> container.budgets.setRecurring(cat(name), currency, first, money(amount)) }
+        backdateBudgets(container, first.atDay(1))
+    }
+
+    /**
+     * For runs with [seedHistory], in place of marking every award as seen: records quietly only the awards that history
+     * really earns, so the rest stay outlines as a person's would (Financial Explorer counts, since ten months of use means
+     * Insights was opened), and marks last month's budget result as already celebrated. Nothing then covers a capture with
+     * a ceremony, and nothing shows an award the data didn't earn. Call before seeding.
+     */
+    suspend fun settleHistoryMoments(container: AppContainer, today: LocalDate) {
+        container.preferences.setInsightsVisited()
+        container.preferences.recordAwardsQuietly(
+            setOf(
+                com.lucento.app.domain.Achievement.MONEY_KEEPER,
+                com.lucento.app.domain.Achievement.BUDGET_BUILDER,
+                com.lucento.app.domain.Achievement.FIRST_STEP,
+                com.lucento.app.domain.Achievement.GETTING_CONSISTENT,
+                com.lucento.app.domain.Achievement.FINANCIAL_EXPLORER,
+                com.lucento.app.domain.Achievement.GOAL_SETTER,
+                com.lucento.app.domain.Achievement.STEADY_MONTH,
+            ),
+        )
+        container.preferences.setAcknowledgedBudgetMonth(java.time.YearMonth.from(today).minusMonths(1))
+    }
+
+    /**
+     * The budget rows' creation day, so the history reads as budgets kept since [day]: a month's recap names the day a
+     * budget began when that falls inside the month, and every row here was really written today. The app container keeps
+     * its database private, so this capture-only helper reaches it by reflection rather than widening the app's API.
+     */
+    private suspend fun backdateBudgets(container: AppContainer, day: LocalDate) {
+        val field = AppContainer::class.java.getDeclaredField("database\$delegate").apply { isAccessible = true }
+        val database = (field.get(container) as Lazy<*>).value as com.lucento.app.data.local.LucentoDatabase
+        val millis = day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val dao = database.budgetDao()
+        dao.getAll().forEach { dao.update(it.copy(createdAt = millis)) }
+    }
 }
