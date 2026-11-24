@@ -70,9 +70,9 @@
 - **AS-2 Owner uploads the Play graphics and texts** (Mission Control task): both listings' eight screenshots and feature
   graphic from `docs/play/graphics/{global,ph}/` (Milestones replaced Insights) and §4's texts.
 - **AS-3 Owner pastes the Facebook Page's new About text** from `docs/community/facebook/README.md` (PR #75).
-- **AS-4 Claude pages:** "Lucento Price Check" still shows AI answers as Free 10 a month · Pro 50 a day (its data lives in
-  the page's own store; the repo source `docs/monetization/COMPETITOR_PRICING_2026-11.md` is fixed); the "Lucento"
-  design-system page dates from 2026-10-23, before the five themes.
+- **AS-4 Claude pages:** the "Lucento" design-system page dates from 2026-10-23, before the five themes; bring its tokens
+  and themes up to `core/designsystem/theme/`. ~~"Lucento Price Check" showed AI answers as Free 10 a month · Pro 50 a
+  day~~ fixed 2026-11-24 (its features.csv re-uploaded; the repo source was fixed in this branch).
 - **AS-5 Website #45** merges on the owner's word after the Vercel preview; then the share image is live.
 - Parked by the owner until the Play launch (2026-11-21): the shorts, the Launch Board and Mission Control's posts. They
   reuse these captures when marketing restarts.
