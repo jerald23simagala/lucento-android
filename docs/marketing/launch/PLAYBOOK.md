@@ -17,8 +17,9 @@ files (templates, renders, weekly packs) live in `lucento-studio/marketing/` and
    with something useful, never by spamming.
 3. **Search.** People search Google Play for "budget app" and "expense tracker". Ratings, review replies, the listing
    video and steady installs move Lucento up. Later, website guides can catch Google searches.
-4. **Word of mouth.** Shared invites and a "Tell a friend" share carry a tagged Play link, so every happy user is a
-   channel.
+4. **Word of mouth.** The profile menu's **Share Lucento** ("Tell a friend about Lucento") sends the website link,
+   and the Play link once the listing is public, so every happy user is a channel. Neither it nor the Shared invite
+   carries a UTM tag yet, and the invite has no link until NEXT_TASKS LS-7 (`CHANNEL_KIT.md` §3).
 
 Free reach comes in spikes: most videos get a few hundred views and a few get thousands. We don't promise numbers. We
 measure, keep what works and drop what doesn't.
@@ -51,9 +52,9 @@ Targets over a month. The warm-up weeks lean on Feature in 15 s because nobody k
 
 | Pillar | Share | What it is | Hooks to start from |
 |---|---|---|---|
-| **P1 Type it like a text** | 30% | Composer, voice, receipt and statement scans: the "less work" story | "I log my whole day in one text." · "jeep 13, load 100, sweldo 25000. Tapos na." · "A month of entries from one screenshot." · "Say it. It's saved." |
+| **P1 Type it like a text** | 30% | Composer, voice and Lucento Scan (receipts, bills and statements from a photo, a screenshot or a PDF): the "less work" story | "I log my whole day in one text." · "jeep 13, load 100, sweldo 25000. Tapos na." · "A month of entries from one screenshot." · "Say it, check it, save it." |
 | **P2 Pinoy money moments** | 25% | Payday, ipon, bills, utang, palengke, 13th month, using the app as proof | "POV: sweldo day and you actually know where it's going." · "Bago bumili, tanungin mo muna." · "13th month pay: saan mapupunta this year?" · "Ipon goal: Japan. At your pace: March." |
-| **P3 Feature in 15 s** | 25% | One feature, one benefit, one screen | The 13 topics in `docs/marketing/launch-film/FUTURE_VIDEOS.md` |
+| **P3 Feature in 15 s** | 25% | One feature, one benefit, one screen | The 15 topics in `docs/marketing/launch-film/FUTURE_VIDEOS.md` (as on main since the 0.5.14 refresh) |
 | **P4 Calm money basics** | 15% | General education with the app as the example, never advice (T18) | "What 'safe to spend' actually means." · "Your budget is just your categories added up." · "Why bills come first." |
 | **P5 New in Lucento** | 5% | What changed this release, faceless changelog | "New this week: …" (only what's in a released build) |
 
@@ -93,6 +94,10 @@ on Saturday 14 November. The 14 days are done on 28 November and the plan on 30 
 **Monday 30 November** and **P-day is expected between 1 and 8 December**. Play Console's Dashboard is the authority on
 the day count; if it shows a different number, move these dates with it. December is a good month to land in: the 13th
 month pay and Christmas spending give the launch posts their hook.
+
+**On hold (owner, 2026-11-21):** marketing posts are parked until Lucento is on Google Play. The warm-up plan below
+and the section 11 calendar are kept as written; their dates are from 2026-11-14. The app is now 0.5.19 (version
+code 24, 2026-11-23), and `TRUTH_RULES.md` was checked against it on 2026-11-24.
 
 **No pre-registration (owner, 2026-11-15):** Google Play pre-registration unlocks for this account only after the
 testing requirement, so the owner chose to launch as soon as production access is granted instead of holding the

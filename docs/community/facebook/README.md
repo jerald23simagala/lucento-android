@@ -2,7 +2,8 @@
 
 A Facebook **Page** called "Lucento" (the brand's home) runs a Facebook **Group** called "Lucento Community", where
 people suggest ideas, ask questions and report problems. This folder holds every graphic and every piece of text
-needed to set both up and run the first month. Made 2026-11-09.
+needed to set both up and run the first month. Made 2026-11-09; texts checked against Lucento 0.5.19 (version code 24)
+on 2026-11-24.
 
 ## Graphics
 
@@ -43,6 +44,7 @@ Facebook renames buttons now and then. If a label below doesn't match, look for 
 4. Profile picture: upload `profile-720x720.png`. Cover photo: upload `page-cover-1640x624.png`, and don't drag it to reposition.
 5. Under **Contact**, add the website `https://www.lucentoapp.com` and the email `lucentoapp@gmail.com`.
 6. Later, in **Settings › Page setup › Username**, try `lucentoapp` (Facebook only accepts it if nobody else has it).
+   Done 2026-11-23: the Page is https://www.facebook.com/lucentoapp.
 
 **2. Create the Group as the Page** (so admin posts show as "Lucento", not your personal name)
 1. Switch to the Page: click your profile photo (top right), then **Lucento**.
@@ -81,10 +83,10 @@ the extension can't use. When it asks, choose the file yourself from
 
 ### Page "About" / long description
 > Lucento is a personal finance app for Android: wallets, budgets, bills, debts, goals and insights in one clear view.
-> Type a purchase the way you'd text a friend and Lucento turns it into a transaction. Your records live on your
-> phone and core features work offline; cloud sync is optional.
+> Type a purchase the way you'd text a friend and Lucento turns it into a transaction. Your records are stored on
+> your phone and every core feature works offline; online extras such as cloud sync (Lucento Pro) are optional.
 > Join the Lucento Community group to suggest ideas, ask questions and report problems.
-> Website: https://www.lucentoapp.com · Email: lucentoapp@gmail.com
+> Website: https://www.lucentoapp.com · Privacy: https://www.lucentoapp.com/privacy · Email: lucentoapp@gmail.com
 
 ### Group description
 > The official community for Lucento, the personal finance app for Android.
@@ -191,7 +193,12 @@ Saved replies keep answers consistent. They live in Messenger or Meta Business S
 - **Moderate rule 2 hard.** Hide any post or comment that shows account numbers, card numbers, codes or a backup file,
   then use the saved reply above.
 - **Brand truth:** don't promise "no ads" or "free forever", don't name banks or e-wallets as partners, and don't
-  post real people's amounts.
+  post real people's amounts. Never call typing, voice or scanning "AI" (they're read on the phone; only Ask
+  Lucento's AI answers and Smarter reading use Gemini), mark Pro features "Pro", and never call the monthly check-in a
+  notification or reminder: it's a card on Home. Before answering a feature question, check
+  `docs/marketing/launch/TRUTH_RULES.md`.
+- **The app links here.** Its profile menu opens the Group (**Lucento Community**) and the Page (**Follow Lucento**)
+  from `core/LucentoLinks.kt`. If either address changes, the app and the website need the new one too.
 
 ## Making new graphics
 

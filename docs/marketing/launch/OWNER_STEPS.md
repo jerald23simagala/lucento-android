@@ -21,7 +21,8 @@ on every account you create below.
 
 ### A2. Facebook Page and Group (skip if already done)
 Follow `docs/community/facebook/README.md`, which has every text and picture. When done, send Claude the Page's
-link and the Group's link.
+link and the Group's link. (Done: both are live, and the Page's username `lucentoapp` was set on 23 November, so the
+Page is https://www.facebook.com/lucentoapp.)
 
 ### A3. Instagram (15 min, on your phone)
 1. Install **Instagram** and tap **Create new account**. Sign up with **lucentoapp@gmail.com**.

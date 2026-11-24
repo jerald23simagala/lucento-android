@@ -25,8 +25,14 @@ Page and Group texts live in `docs/community/facebook/README.md`.
 | TikTok | https://www.tiktok.com/@lucentoapp | Personal account (owner, 2026-11-15): switching to Business asks for business verification (company certificate, license number) because finance is a restricted industry, so it stays personal. No paid promotion is needed (₱0). The bio link becomes clickable at 1,000 followers; until then the bio carries lucentoapp.com as text |
 | Instagram | https://www.instagram.com/lucentoapp/ | Professional, linked to the Lucento Page |
 | YouTube | https://www.youtube.com/channel/UCg8f6wbVTgYPnXBeMvD0FyA | |
-| Facebook Page | Page profile ID `61596187720039` (https://www.facebook.com/profile.php?id=61596187720039 until a username is set) | |
+| Facebook Page | https://www.facebook.com/lucentoapp | Username `lucentoapp` set 2026-11-23 (profile ID `61596187720039`) |
 | Facebook Group | https://www.facebook.com/groups/1574188714744063 | Lucento Community |
+
+**In the app (0.5.17 and later):** the profile menu links these channels: **Lucento Community** (the Group, through
+the share link https://www.facebook.com/share/g/1E4BdQJjgW/), **Follow Lucento** (Facebook, Instagram, TikTok and
+YouTube, each on the addresses above), **Lucento website** and **Share Lucento**. The app's links live in
+`app/src/main/java/com/lucento/app/core/LucentoLinks.kt` and the website's in lucento-website `src/data/site.ts`:
+change a channel in both together.
 
 ## 2. Bios
 
@@ -84,7 +90,11 @@ https://play.google.com/store/apps/details?id=com.lucento.app&referrer=utm_sourc
 | Klaro email | `klaroph` | `klaro_email` |
 | Product Hunt, AlternativeTo | `producthunt`, `alternativeto` | `directory` |
 | Lucento Shared invite (in the app) | `shared_invite` | `referral` |
-| "Tell a friend" (in the app) | `app_share` | `referral` |
+| Share Lucento, "Tell a friend about Lucento" (profile menu) | `app_share` | `referral` |
+
+The last two are reserved: they need an app change. Today Share Lucento sends the plain website link (the plain Play
+link once `LucentoLinks.PLAY_LISTING_PUBLIC` is turned on in a build), and the Shared invite's message has no link
+(NEXT_TASKS LS-7).
 
 Example, the TikTok bio before P-day:
 `https://www.lucentoapp.com/?utm_source=tiktok&utm_medium=bio&utm_campaign=warmup`
@@ -137,8 +147,10 @@ Paste them as they are, or as a starting point. Before P-day, use the "coming so
 | Is it free? | "Yes, it's free to download, and the free plan has no time limit. Lucento Pro adds extras like more wallets, multicurrency and Shared." |
 | iPhone? | "Right now Lucento is on Android only." |
 | Does it connect to my bank or e-wallet? | "No. Lucento never asks for your bank login or connects to your bank or e-wallet. You type, say or scan what you spent, and it's read on your phone." |
-| Is my data safe? | "Your entries stay on your phone, and the core features work offline. Cloud sync is optional (Pro). Full details: lucentoapp.com/privacy" |
-| Is it AI? | "Typing, voice and scanning are read by Lucento on your phone, no AI needed. AI is optional: Smarter reading (Pro) and Ask Lucento's AI answers use Google's Gemini, only if you turn them on." |
+| Can it read receipts or bank statements? | "Yes: Lucento Scan reads receipts, bills and bank, card or e-wallet statements from a photo, a screenshot or a PDF, right on your phone. You check every row before it's saved, and statement lines you've already saved are held back. No bank login needed." |
+| Does it remind me about bills? | "Not with notifications. Home shows what's due this week, Scheduled lists every bill and payday coming, and at the end of each month Home asks you to plan the next one. You mark each bill paid yourself: nothing is posted or paid by itself." |
+| Is my data safe? | "Your entries are stored on your phone, and the core features work offline. Cloud sync (Pro) is optional, and nothing goes to Gemini until you say yes. Full details: lucentoapp.com/privacy" |
+| Is it AI? | "Typing, voice and scanning are read by Lucento on your phone, no AI needed. AI is optional, with Google's Gemini: Ask Lucento's AI answers (signed in; nothing is sent until you say yes; 5 questions a month free, 45 with Pro) and Smarter reading (Pro, off until you turn it on in Settings). Details: lucentoapp.com/privacy" |
 | Tagalog? | "The app is in English, and it understands everyday Filipino money words like sweldo, palengke, load and jeep." |
 | How much is Pro? | "Pro prices are shown in Google Play for your country, and the free plan works without it." |
 | Is this like KlaroPH? | "Same maker! KlaroPH is on the web, and Lucento is the Android app: offline, on your phone, and you type your gastos like a text." |
